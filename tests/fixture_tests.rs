@@ -25,7 +25,8 @@ fn discover_fixtures(base_dir: &Path) -> Vec<(String, String)> {
 
                     // Check if this looks like a valid fixture (has input and expected files)
                     let has_input = fixture_path.join("input.ts").exists()
-                        || fixture_path.join("input.svelte").exists();
+                        || fixture_path.join("input.svelte").exists()
+                        || fixture_path.join("input.css").exists();
                     let has_expected = fixture_path.join("expected.json").exists();
 
                     if has_input && has_expected {
@@ -43,10 +44,13 @@ fn discover_fixtures(base_dir: &Path) -> Vec<(String, String)> {
 fn test_fixture(category: &str, name: &str) -> Result<(), String> {
     let fixture_dir = PathBuf::from("tests/fixtures").join(category).join(name);
 
-    // Read input file (.ts or .svelte)
+    // Read input file (.ts, .svelte, or .css)
     let input = if fixture_dir.join("input.ts").exists() {
         fs::read_to_string(fixture_dir.join("input.ts"))
             .map_err(|e| format!("Failed to read input.ts: {}", e))?
+    } else if fixture_dir.join("input.css").exists() {
+        fs::read_to_string(fixture_dir.join("input.css"))
+            .map_err(|e| format!("Failed to read input.css: {}", e))?
     } else {
         fs::read_to_string(fixture_dir.join("input.svelte"))
             .map_err(|e| format!("Failed to read input.svelte: {}", e))?

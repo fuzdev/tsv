@@ -2,9 +2,11 @@
 
 mod typescript;
 mod svelte;
+mod css;
 
 pub use typescript::parse_typescript;
 pub use svelte::parse_svelte;
+pub use css::parse_css;
 
 // Shared peek token data (not storing Token<'a> to avoid lifetime issues)
 // Used by both TypeScript and Svelte parsers for single-token lookahead

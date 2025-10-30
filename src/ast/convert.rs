@@ -290,7 +290,7 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
     //   - Result: start = css.span.start, end = script.span.end
     //   - This produces inverted positions since CSS comes after script
     //
-    // See: tests/fixtures/3-svelte-parser/bug-script-style-without-markup/SVELTE_BUG.md
+    // See: tests/fixtures/3_svelte_parser/bug_script_style_without_markup/SVELTE_BUG.md
     let (start, end) = {
         // Find first and last non-Text nodes (elements/expression tags)
         let first_element = root.fragment.nodes.iter().find(|node| {
@@ -512,8 +512,13 @@ fn convert_style(
     // Extract the raw CSS content
     let styles = source[style.content_span.start as usize..style.content_span.end as usize].to_string();
 
-    // For minimal CSS support, we don't parse the CSS AST yet
-    // We just output the raw styles and empty children array
+    // Convert CSS nodes to JSON
+    let children = style
+        .css_nodes
+        .iter()
+        .map(|node| convert_css_node(node, source))
+        .collect();
+
     public::StyleSheet {
         node_type: "StyleSheet".to_string(),
         start: style.span.start,
@@ -523,7 +528,7 @@ fn convert_style(
             .iter()
             .map(|attr| convert_attribute(attr, &full_loc, interner))
             .collect(),
-        children: vec![], // TODO: Parse CSS AST in future sprint
+        children,
         content: public::StyleContent {
             start: style.content_span.start,
             end: style.content_span.end,
@@ -531,4 +536,108 @@ fn convert_style(
             comment: None,
         },
     }
+}
+
+fn convert_css_node(node: &internal::CssNode, source: &str) -> serde_json::Value {
+    match node {
+        internal::CssNode::Rule(rule) => convert_css_rule(rule, source),
+    }
+}
+
+fn convert_css_rule(rule: &internal::CssRule, _source: &str) -> serde_json::Value {
+    // For minimal implementation, create a simplified Rule structure
+    // TODO: Properly parse selectors into SelectorList, ComplexSelector, RelativeSelector, TypeSelector hierarchy
+
+    let declarations: Vec<serde_json::Value> = rule
+        .declarations
+        .iter()
+        .map(|decl| {
+            serde_json::json!({
+                "type": "Declaration",
+                "start": decl.span.start,
+                "end": decl.span.end,
+                "property": decl.property,
+                "value": decl.value,
+            })
+        })
+        .collect();
+
+    // Create a minimal selector structure
+    // TODO: Parse selector properly to match Svelte's structure
+    let prelude = serde_json::json!({
+        "type": "SelectorList",
+        "start": rule.selector_span.start,
+        "end": rule.selector_span.end,
+        "children": [
+            {
+                "type": "ComplexSelector",
+                "start": rule.selector_span.start,
+                "end": rule.selector_span.end,
+                "children": [
+                    {
+                        "type": "RelativeSelector",
+                        "combinator": serde_json::Value::Null,
+                        "selectors": [
+                            {
+                                "type": "TypeSelector",
+                                "name": rule.selector.trim(),
+                                "start": rule.selector_span.start,
+                                "end": rule.selector_span.end,
+                            }
+                        ],
+                        "start": rule.selector_span.start,
+                        "end": rule.selector_span.end,
+                    }
+                ]
+            }
+        ]
+    });
+
+    serde_json::json!({
+        "type": "Rule",
+        "prelude": prelude,
+        "block": {
+            "type": "Block",
+            "start": rule.block_span.start,
+            "end": rule.block_span.end,
+            "children": declarations,
+        },
+        "start": rule.span.start,
+        "end": rule.span.end,
+    })
+}
+
+/// Convert a list of CSS nodes to a StyleSheet JSON structure
+pub fn convert_css_nodes(nodes: &[internal::CssNode], source: &str) -> serde_json::Value {
+    let children: Vec<serde_json::Value> = nodes
+        .iter()
+        .map(|node| convert_css_node(node, source))
+        .collect();
+
+    // Calculate content span from all nodes
+    let (content_start, content_end) = if let Some(first) = nodes.first() {
+        let start = match first {
+            internal::CssNode::Rule(rule) => rule.span.start,
+        };
+        let end = match nodes.last().unwrap() {
+            internal::CssNode::Rule(rule) => rule.span.end,
+        };
+        (start, end)
+    } else {
+        (0, 0)
+    };
+
+    serde_json::json!({
+        "type": "StyleSheet",
+        "start": content_start,
+        "end": content_end,
+        "attributes": [],
+        "children": children,
+        "content": {
+            "start": content_start,
+            "end": content_end,
+            "styles": source[content_start as usize..content_end as usize].to_string(),
+            "comment": serde_json::Value::Null,
+        }
+    })
 }

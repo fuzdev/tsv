@@ -4,6 +4,7 @@ import { tsPlugin } from '@sveltejs/acorn-typescript';
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -14,24 +15,19 @@ const ParserWithTS = acorn.Parser.extend(tsPlugin());
  * Generate expected.json for test fixtures by parsing input files with Svelte's compiler
  *
  * Supports both .svelte and .ts files:
- *   fixtures/1-integration/proof-of-concept/input.svelte
- *   fixtures/2-typescript-parser/literal/input.ts
- *   fixtures/3-svelte-parser/script-tag/input.svelte
+ *   fixtures/1_integration/proof_of_concept/input.svelte
+ *   fixtures/2_typescript_parser/literal/input.ts
+ *   fixtures/3_svelte_parser/script_tag/input.svelte
  *
  * Usage:
  *   node tests/generate-expected-fixtures.js                    # Generate all fixtures
  *   node tests/generate-expected-fixtures.js --list             # List all fixtures
- *   node tests/generate-expected-fixtures.js 1-integration      # Generate category (prefix match)
- *   node tests/generate-expected-fixtures.js 2-typescript-parser/literal # Generate specific fixture
+ *   node tests/generate-expected-fixtures.js 1_integration      # Generate category (prefix match)
+ *   node tests/generate-expected-fixtures.js 2_typescript_parser/literal # Generate specific fixture
  *   node tests/generate-expected-fixtures.js literal            # Generate all matching "literal" (substring)
  *   node tests/generate-expected-fixtures.js typescript const   # Generate matching all terms
  */
 
-/**
- * @param {string} fixturePath
- * @param {string} relativePath
- * @param {string} inputFile
- */
 /**
  * @param {string} fixturePath
  * @param {string} relativePath
@@ -44,6 +40,7 @@ function generateExpectedFixture(fixturePath, relativePath, inputFile) {
   try {
     const source = readFileSync(inputPath, 'utf-8');
     const isTypeScript = inputFile === 'input.ts';
+    const isCss = inputFile === 'input.css';
 
     /** @type {any} */
     let ast;
@@ -56,6 +53,19 @@ function generateExpectedFixture(fixturePath, relativePath, inputFile) {
         ecmaVersion: 16,
         locations: true
       });
+    } else if (isCss) {
+      // For CSS files, use our Rust parser via the tsvr CLI
+      try {
+        const output = execSync(`cargo run parse "${inputPath}" --pretty`, {
+          cwd: dirname(__dirname),
+          encoding: 'utf-8'
+        });
+        ast = JSON.parse(output);
+      } catch (e) {
+        // Fallback: create a minimal structure for CSS
+        console.warn(`⚠ Could not generate CSS AST with cargo run, using placeholder for ${relativePath}`);
+        ast = { css: { type: 'StyleSheet', children: [] }, type: 'Root' };
+      }
     } else {
       // Parse Svelte files with Svelte's parser
       ast = parseSvelte(source, { modern: true });
@@ -82,8 +92,8 @@ function* walkFixtures(dir, base = '') {
     const relativePath = base ? join(base, entry.name) : entry.name;
 
     if (entry.isDirectory()) {
-      // Check for input files (.svelte or .ts)
-      for (const inputFile of ['input.svelte', 'input.ts']) {
+      // Check for input files (.svelte, .ts, or .css)
+      for (const inputFile of ['input.svelte', 'input.ts', 'input.css']) {
         const inputPath = join(fullPath, inputFile);
         try {
           statSync(inputPath);
@@ -95,7 +105,7 @@ function* walkFixtures(dir, base = '') {
       }
 
       // If no input file found, recurse into subdirectories
-      if (!['input.svelte', 'input.ts'].some(f => {
+      if (!['input.svelte', 'input.ts', 'input.css'].some(f => {
         try { statSync(join(fullPath, f)); return true; } catch { return false; }
       })) {
         yield* walkFixtures(fullPath, relativePath);

@@ -107,6 +107,11 @@ impl<'a> SvelteParser<'a> {
 
         let end = end_after_angle;
 
+        // Parse CSS content
+        let css_content = &self.source[content_start..content_end];
+        let css_nodes = crate::parser::parse_css(css_content, content_start)
+            .unwrap_or_else(|_| vec![]); // If CSS parsing fails, use empty array
+
         Ok(Style {
             span: Span { start: start as u32, end: end as u32 },
             content_span: Span {
@@ -114,6 +119,7 @@ impl<'a> SvelteParser<'a> {
                 end: content_end as u32,
             },
             attributes,
+            css_nodes,
         })
     }
 }

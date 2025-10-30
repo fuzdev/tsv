@@ -58,7 +58,9 @@ pub enum LiteralValue {
 #[derive(Debug, Clone)]
 pub struct Literal {
     pub value: LiteralValue,
-    // TODO: Intern raw string to save memory for repeated literals (e.g., "42" appearing multiple times)
+    // TODO: Consider interning raw string if profiling shows literal memory is significant.
+    // Current assessment: Internal AST is ephemeral (~ms), benefit unclear without real-world workloads.
+    // Revisit when: parsing large files (>10K lines) or batch processing shows memory pressure.
     pub raw: String,
     pub span: Span,
 }
@@ -265,10 +267,43 @@ pub enum ScriptContext {
 /// Svelte Style block - <style> tag contents
 ///
 /// Stores the span of the entire <style> tag and the content span.
-/// The actual CSS parsing is minimal - we just extract the raw text.
+/// Style tag with parsed CSS content
 #[derive(Debug, Clone)]
 pub struct Style {
     pub span: Span,         // Full <style>...</style> span
     pub content_span: Span, // Just the CSS text inside the tags
     pub attributes: Vec<Attribute>,
+    pub css_nodes: Vec<CssNode>,  // Parsed CSS AST
+}
+
+// CSS AST nodes
+
+#[derive(Debug, Clone)]
+pub enum CssNode {
+    Rule(CssRule),
+    // TODO: Add more node types as needed (AtRule, Comment, etc.)
+}
+
+impl CssNode {
+    pub fn span(&self) -> Span {
+        match self {
+            CssNode::Rule(rule) => rule.span,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CssRule {
+    pub selector: String,  // TODO: Parse selector structure (SelectorList, ComplexSelector, etc.)
+    pub selector_span: Span,  // Span of just the selector
+    pub block_span: Span,     // Span of the block including braces
+    pub declarations: Vec<CssDeclaration>,
+    pub span: Span,           // Full rule span
+}
+
+#[derive(Debug, Clone)]
+pub struct CssDeclaration {
+    pub property: String,
+    pub value: String,
+    pub span: Span,
 }
