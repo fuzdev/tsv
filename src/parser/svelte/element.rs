@@ -7,8 +7,20 @@ use crate::span::Span;
 
 use super::parser_impl::SvelteParser;
 
+// Void elements never have closing tags
+// Reference: node_modules/svelte/src/utils.js:16-41
+const VOID_ELEMENTS: &[&str] = &[
+    "area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link",
+    "meta", "param", "source", "track", "wbr",
+];
+
+/// Check if an element is void (self-closing by spec, never has children)
+fn is_void(name: &str) -> bool {
+    VOID_ELEMENTS.contains(&name) || name.eq_ignore_ascii_case("!doctype")
+}
+
 impl<'a> SvelteParser<'a> {
-    /// Parse an element: <tag></tag>
+    /// Parse an element: <tag></tag> or <tag/> or <void>
     pub(crate) fn parse_element(&mut self) -> Result<Element, ParseError> {
         let start = self.current_start;
 
@@ -19,6 +31,7 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected tag name, found {}", self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
 
@@ -26,79 +39,112 @@ impl<'a> SvelteParser<'a> {
         let tag_symbol = self.intern(&tag_name);
         self.advance()?;
 
-        // For Sprint 5: no attributes support yet
+        // TODO: Parse attributes (future sprint)
+
+        // Check for self-closing tag: <div/>
+        let self_closing = self.check(TokenKind::Slash);
+        if self_closing {
+            self.advance()?; // consume /
+        }
+
+        // Save position before consuming > (needed for void/self-closing elements)
+        let opening_tag_end = self.current_end;
         self.expect(TokenKind::RightAngle)?;
+
+        // Void and self-closing elements have no children or closing tag
+        if is_void(&tag_name) || self_closing {
+            return Ok(Element {
+                name: tag_symbol,
+                attributes: Vec::new(),
+                fragment: Fragment { nodes: Vec::new() },
+                span: Span {
+                    start: start as u32,
+                    end: opening_tag_end as u32, // Use saved position, not current
+                },
+            });
+        }
 
         // Parse children
         let mut child_nodes = Vec::new();
+        let mut last_end = opening_tag_end;
 
         // Parse children until we hit closing tag
         loop {
+            // Capture text/whitespace gaps between tokens
+            self.capture_text_if_gap(last_end, &mut child_nodes)?;
+
             if self.check(TokenKind::LeftBrace) {
-                // Parse expression tag
+                // Expression tag: {expr}
                 let expression_tag = self.parse_expression_tag()?;
+                last_end = expression_tag.span.end as usize;
                 child_nodes.push(FragmentNode::ExpressionTag(expression_tag));
             } else if self.check(TokenKind::LeftAngle) {
-                // Could be closing tag or child element
-                // For now, assume it's closing tag and break
-                // (nested elements not supported in Sprint 6)
-                break;
+                // Check if it's a closing tag or child element
+                // Peek ahead: </tag> has slash, <child> doesn't
+                if self.is_next_token(TokenKind::Slash)? {
+                    // It's a closing tag - exit loop
+                    break;
+                } else {
+                    // It's a child element - recursively parse
+                    let child = self.parse_element()?;
+                    last_end = child.span.end as usize;
+                    child_nodes.push(FragmentNode::Element(child));
+                }
+            } else if self.check(TokenKind::Eof) {
+                return Err(ParseError::InvalidSyntax {
+                    message: format!("Unclosed element: <{}>", tag_name),
+                    position: start,
+                    context: None,
+                });
             } else {
                 // Unexpected token
                 return Err(ParseError::InvalidSyntax {
-                    message: format!("Expected element, expression tag, or closing tag, found {}", self.current_kind),
+                    message: format!(
+                        "Expected element, expression tag, or closing tag, found {}",
+                        self.current_kind
+                    ),
                     position: self.current_start,
+                    context: None,
                 });
             }
         }
 
-        // Now parse the closing tag
-        if !self.check(TokenKind::LeftAngle) {
+        // Parse closing tag: </tag>
+        self.expect(TokenKind::LeftAngle)?;
+        self.expect(TokenKind::Slash)?;
+
+        if !self.check(TokenKind::Identifier) {
             return Err(ParseError::InvalidSyntax {
-                message: "Expected closing tag".to_string(),
+                message: format!("Expected tag name, found {}", self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
 
-        self.advance()?; // consume <
-        if self.check(TokenKind::Slash) {
-                // It's a closing tag: </tag>
-                self.advance()?;
-
-                if !self.check(TokenKind::Identifier) {
-                    return Err(ParseError::InvalidSyntax {
-                        message: format!("Expected tag name, found {}", self.current_kind),
-                        position: self.current_start,
-                    });
-                }
-
-                let closing_tag_name = self.current_value();
-                if closing_tag_name != tag_name {
-                    return Err(ParseError::InvalidSyntax {
-                        message: format!("Mismatched tags: expected closing tag for '{}' but found '{}'", tag_name, closing_tag_name),
-                        position: self.current_start,
-                    });
-                }
-                self.advance()?;
-
-                // Save end position before advancing past '>'
-                let (_, end_after_angle) = self.current_pos();
-                self.expect(TokenKind::RightAngle)?;
-
-                let end = end_after_angle;
-
-                return Ok(Element {
-                    name: tag_symbol,
-                    attributes: Vec::new(),
-                    fragment: Fragment { nodes: child_nodes },
-                    span: Span { start: start as u32, end: end as u32 },
-                });
+        let closing_tag_name = self.current_value();
+        if closing_tag_name != tag_name {
+            return Err(ParseError::InvalidSyntax {
+                message: format!(
+                    "Mismatched tags: expected closing tag for '{}' but found '{}'",
+                    tag_name, closing_tag_name
+                ),
+                position: self.current_start,
+                context: None,
+            });
         }
+        self.advance()?;
 
-        // Not a closing tag
-        Err(ParseError::InvalidSyntax {
-            message: "Expected closing tag with '/'".to_string(),
-            position: self.current_start,
+        let end = self.current_end;
+        self.expect(TokenKind::RightAngle)?;
+
+        Ok(Element {
+            name: tag_symbol,
+            attributes: Vec::new(),
+            fragment: Fragment { nodes: child_nodes },
+            span: Span {
+                start: start as u32,
+                end: end as u32,
+            },
         })
     }
 }

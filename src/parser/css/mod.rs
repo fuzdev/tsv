@@ -14,7 +14,7 @@ pub(crate) struct CssParser<'a> {
     current_start: usize,
     current_end: usize,
     peek_cache: Option<PeekData<TokenKind>>,
-    base_offset: usize,  // Offset in full source (when parsing embedded CSS)
+    base_offset: usize, // Offset in full source (when parsing embedded CSS)
 }
 
 impl<'a> CssParser<'a> {
@@ -58,6 +58,7 @@ impl<'a> CssParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected {:?}, found {:?}", kind, self.current_kind),
                 position: self.base_offset + self.current_start,
+                context: None,
             });
         }
         self.advance()
@@ -112,6 +113,7 @@ impl<'a> CssParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: "Empty CSS selector".to_string(),
                 position: start,
+                context: None,
             });
         }
 
@@ -138,6 +140,7 @@ impl<'a> CssParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: "Expected '}'".to_string(),
                 position: self.base_offset + self.current_start,
+                context: None,
             });
         }
         let block_end = self.base_offset + self.current_end;
@@ -146,10 +149,19 @@ impl<'a> CssParser<'a> {
 
         Ok(CssRule {
             selector,
-            selector_span: Span { start: start as u32, end: selector_end as u32 },
-            block_span: Span { start: block_start as u32, end: block_end as u32 },
+            selector_span: Span {
+                start: start as u32,
+                end: selector_end as u32,
+            },
+            block_span: Span {
+                start: block_start as u32,
+                end: block_end as u32,
+            },
             declarations,
-            span: Span { start: start as u32, end: end as u32 },
+            span: Span {
+                start: start as u32,
+                end: end as u32,
+            },
         })
     }
 
@@ -162,6 +174,7 @@ impl<'a> CssParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: "Expected property name".to_string(),
                 position: start,
+                context: None,
             });
         }
         let property = self.current_value().to_string();
@@ -193,6 +206,7 @@ impl<'a> CssParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: "Empty CSS value".to_string(),
                 position: start,
+                context: None,
             });
         }
 
@@ -207,7 +221,10 @@ impl<'a> CssParser<'a> {
         Ok(CssDeclaration {
             property,
             value,
-            span: Span { start: start as u32, end: end as u32 },
+            span: Span {
+                start: start as u32,
+                end: end as u32,
+            },
         })
     }
 }

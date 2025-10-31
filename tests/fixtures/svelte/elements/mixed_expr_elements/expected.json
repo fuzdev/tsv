@@ -1,0 +1,100 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 46,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "RegularElement",
+        "start": 0,
+        "end": 46,
+        "name": "div",
+        "attributes": [],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "RegularElement",
+              "start": 5,
+              "end": 19,
+              "name": "span",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": [
+                  {
+                    "type": "Text",
+                    "start": 11,
+                    "end": 12,
+                    "raw": "a",
+                    "data": "a"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Text",
+              "start": 19,
+              "end": 20,
+              "raw": " ",
+              "data": " "
+            },
+            {
+              "type": "ExpressionTag",
+              "start": 20,
+              "end": 25,
+              "expression": {
+                "type": "Literal",
+                "start": 21,
+                "end": 24,
+                "loc": {
+                  "start": {
+                    "line": 1,
+                    "column": 21
+                  },
+                  "end": {
+                    "line": 1,
+                    "column": 24
+                  }
+                },
+                "value": "x",
+                "raw": "'x'"
+              }
+            },
+            {
+              "type": "Text",
+              "start": 25,
+              "end": 26,
+              "raw": " ",
+              "data": " "
+            },
+            {
+              "type": "RegularElement",
+              "start": 26,
+              "end": 40,
+              "name": "span",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": [
+                  {
+                    "type": "Text",
+                    "start": 32,
+                    "end": 33,
+                    "raw": "b",
+                    "data": "b"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

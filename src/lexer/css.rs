@@ -4,12 +4,12 @@ use crate::error::ParseError;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TokenKind {
-    Identifier,      // div, color, red, etc.
-    LeftBrace,       // {
-    RightBrace,      // }
-    Colon,           // :
-    Semicolon,       // ;
-    Whitespace,      // spaces, tabs, newlines
+    Identifier, // div, color, red, etc.
+    LeftBrace,  // {
+    RightBrace, // }
+    Colon,      // :
+    Semicolon,  // ;
+    Whitespace, // spaces, tabs, newlines
     Eof,
 }
 
@@ -34,11 +34,9 @@ impl<'a> Lexer<'a> {
         self.source[self.pos..].chars().next()
     }
 
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "Reserved for future CSS lexer lookahead")]
     fn peek_char(&self, offset: usize) -> Option<char> {
-        self.source[self.pos..]
-            .chars()
-            .nth(offset)
+        self.source[self.pos..].chars().nth(offset)
     }
 
     fn advance(&mut self) -> Option<char> {
@@ -97,7 +95,7 @@ impl<'a> Lexer<'a> {
                     kind: TokenKind::Eof,
                     start: self.pos,
                     end: self.pos,
-                })
+                });
             }
         };
 
@@ -143,6 +141,7 @@ impl<'a> Lexer<'a> {
             _ => Err(ParseError::InvalidSyntax {
                 message: format!("Unexpected character in CSS: '{}'", ch),
                 position: self.pos,
+                context: None,
             }),
         }
     }

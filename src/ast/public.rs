@@ -28,7 +28,7 @@ pub struct Position {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(untagged)]
 pub enum Statement {
     ExpressionStatement(ExpressionStatement),
     VariableDeclaration(VariableDeclaration),
@@ -36,6 +36,8 @@ pub enum Statement {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExpressionStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -43,7 +45,7 @@ pub struct ExpressionStatement {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(untagged)]
 pub enum Expression {
     Literal(Literal),
     Identifier(Identifier),
@@ -52,6 +54,8 @@ pub enum Expression {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Literal {
+    #[serde(rename = "type")]
+    pub node_type: String,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -74,6 +78,8 @@ pub struct Identifier {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VariableDeclaration {
+    #[serde(rename = "type")]
+    pub node_type: String,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -124,7 +130,7 @@ pub struct TSTypeAnnotation {
 /// Uses serde's `tag = "type"` to serialize enum variants with a `type` field.
 /// Each variant serializes to a flat object with its own fields plus `"type": "VariantName"`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(untagged)]
 pub enum TSType {
     /// The `number` type keyword
     TSNumberKeyword(TSNumberKeyword),
@@ -144,6 +150,8 @@ pub enum TSType {
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TSNumberKeyword {
+    #[serde(rename = "type")]
+    pub node_type: String,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -181,7 +189,7 @@ pub struct Root {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub module: Option<Script>,
     pub css: Option<StyleSheet>,
-    pub js: Vec<serde_json::Value>,      // empty array for now
+    pub js: Vec<serde_json::Value>,         // empty array for now
     pub options: Option<serde_json::Value>, // null for now
     pub comments: Vec<serde_json::Value>,   // empty array for now
 }
@@ -196,7 +204,7 @@ pub struct Fragment {
 
 /// Svelte template node types
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(untagged)]
 pub enum FragmentNode {
     RegularElement(Element),
     ExpressionTag(ExpressionTag),
@@ -224,7 +232,7 @@ pub struct Attribute {
     pub end: u32,
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub value: Option<Vec<AttributeValue>>,
+    pub value: Option<serde_json::Value>,
 }
 
 /// Svelte Attribute value part
@@ -252,6 +260,8 @@ pub struct Text {
 /// Svelte ExpressionTag - {expression} in template
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExpressionTag {
+    #[serde(rename = "type")]
+    pub node_type: String,
     pub start: u32,
     pub end: u32,
     pub expression: Expression,
@@ -264,7 +274,7 @@ pub struct Script {
     pub node_type: String,
     pub start: u32,
     pub end: u32,
-    pub context: String,  // "default" or "module"
+    pub context: String, // "default" or "module"
     pub content: Program,
     pub attributes: Vec<Attribute>,
 }
@@ -280,7 +290,7 @@ pub struct StyleSheet {
     pub start: u32,
     pub end: u32,
     pub attributes: Vec<Attribute>,
-    pub children: Vec<serde_json::Value>,  // CSS AST nodes (placeholder for now)
+    pub children: Vec<serde_json::Value>, // CSS AST nodes (placeholder for now)
     pub content: StyleContent,
 }
 

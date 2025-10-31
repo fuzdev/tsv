@@ -17,6 +17,7 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected '{{', found {}", self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
 
@@ -52,6 +53,7 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: "Unterminated expression tag".to_string(),
                 position: start,
+                context: None,
             });
         }
 
@@ -88,7 +90,7 @@ impl<'a> SvelteParser<'a> {
 
         // Now we can move the lexer and set base_offset
         self.lexer = new_lexer;
-        self.base_offset = expr_end;  // Lexer's source starts at expr_end in full source
+        self.base_offset = expr_end; // Lexer's source starts at expr_end in full source
         self.current_kind = token_kind;
         self.current_start = expr_end + token_start;
         self.current_end = expr_end + token_end;
@@ -99,17 +101,23 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected '}}', found {}", self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
+
+        // Save the end position (right after the '}') before advancing
+        // The lexer skips whitespace on advance, so we must capture end first
+        let end = self.current_end;
 
         // Consume the closing brace
         self.advance()?;
 
-        let end = self.current_start;
-
         Ok(ExpressionTag {
             expression,
-            span: Span { start: start as u32, end: end as u32 },
+            span: Span {
+                start: start as u32,
+                end: end as u32,
+            },
         })
     }
 }

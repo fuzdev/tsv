@@ -1,0 +1,85 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 64,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "RegularElement",
+        "start": 0,
+        "end": 64,
+        "name": "div",
+        "attributes": [],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 5,
+              "end": 11,
+              "raw": "\n\ttext",
+              "data": "\n\ttext"
+            },
+            {
+              "type": "RegularElement",
+              "start": 11,
+              "end": 30,
+              "name": "span",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": [
+                  {
+                    "type": "Text",
+                    "start": 17,
+                    "end": 23,
+                    "raw": "inline",
+                    "data": "inline"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Text",
+              "start": 30,
+              "end": 41,
+              "raw": "more text\n\t",
+              "data": "more text\n\t"
+            },
+            {
+              "type": "RegularElement",
+              "start": 41,
+              "end": 57,
+              "name": "div",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": [
+                  {
+                    "type": "Text",
+                    "start": 46,
+                    "end": 51,
+                    "raw": "block",
+                    "data": "block"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Text",
+              "start": 57,
+              "end": 58,
+              "raw": "\n",
+              "data": "\n"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

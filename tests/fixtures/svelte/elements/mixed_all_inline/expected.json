@@ -1,0 +1,88 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 49,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "RegularElement",
+        "start": 0,
+        "end": 49,
+        "name": "div",
+        "attributes": [],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 5,
+              "end": 10,
+              "raw": "text ",
+              "data": "text "
+            },
+            {
+              "type": "RegularElement",
+              "start": 10,
+              "end": 29,
+              "name": "span",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": [
+                  {
+                    "type": "Text",
+                    "start": 16,
+                    "end": 22,
+                    "raw": "inline",
+                    "data": "inline"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Text",
+              "start": 29,
+              "end": 30,
+              "raw": " ",
+              "data": " "
+            },
+            {
+              "type": "ExpressionTag",
+              "start": 30,
+              "end": 38,
+              "expression": {
+                "type": "Literal",
+                "start": 31,
+                "end": 37,
+                "loc": {
+                  "start": {
+                    "line": 1,
+                    "column": 31
+                  },
+                  "end": {
+                    "line": 1,
+                    "column": 37
+                  }
+                },
+                "value": "expr",
+                "raw": "'expr'"
+              }
+            },
+            {
+              "type": "Text",
+              "start": 38,
+              "end": 43,
+              "raw": " more",
+              "data": " more"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

@@ -19,6 +19,7 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected 'style', found {}", self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
         self.advance()?;
@@ -31,6 +32,7 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected '>', found {}", self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
 
@@ -57,6 +59,7 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: "Unterminated style tag".to_string(),
                 position: start,
+                context: None,
             });
         }
 
@@ -81,6 +84,7 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected '</style>', found {}", self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
         self.advance()?; // consume <
@@ -89,6 +93,7 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected '/', found {}", self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
         self.advance()?; // consume /
@@ -97,23 +102,25 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected 'style', found {}", self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
         self.advance()?; // consume style
 
         // Save end position before consuming >
-        let (_, end_after_angle) = self.current_pos();
+        let end = self.current_end;
         self.expect(TokenKind::RightAngle)?; // consume >
-
-        let end = end_after_angle;
 
         // Parse CSS content
         let css_content = &self.source[content_start..content_end];
-        let css_nodes = crate::parser::parse_css(css_content, content_start)
-            .unwrap_or_else(|_| vec![]); // If CSS parsing fails, use empty array
+        let css_nodes =
+            crate::parser::parse_css(css_content, content_start).unwrap_or_else(|_| vec![]); // If CSS parsing fails, use empty array
 
         Ok(Style {
-            span: Span { start: start as u32, end: end as u32 },
+            span: Span {
+                start: start as u32,
+                end: end as u32,
+            },
             content_span: Span {
                 start: content_start as u32,
                 end: content_end as u32,

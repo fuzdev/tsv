@@ -19,8 +19,12 @@ impl<'a> SvelteParser<'a> {
                 attributes.push(self.parse_attribute()?);
             } else {
                 return Err(ParseError::InvalidSyntax {
-                    message: format!("Expected attribute name or '>', found {}", self.current_kind),
+                    message: format!(
+                        "Expected attribute name or '>', found {}",
+                        self.current_kind
+                    ),
                     position: self.current_start,
+                    context: None,
                 });
             }
         }
@@ -37,6 +41,7 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected attribute name, found {}", self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
 
@@ -55,7 +60,10 @@ impl<'a> SvelteParser<'a> {
             Ok(Attribute {
                 name,
                 value: Some(value),
-                span: Span { start: start as u32, end: end as u32 },
+                span: Span {
+                    start: start as u32,
+                    end: end as u32,
+                },
             })
         } else {
             // Boolean attribute (no value)
@@ -63,7 +71,10 @@ impl<'a> SvelteParser<'a> {
             Ok(Attribute {
                 name,
                 value: None,
-                span: Span { start: start as u32, end: end as u32 },
+                span: Span {
+                    start: start as u32,
+                    end: end as u32,
+                },
             })
         }
     }
@@ -75,6 +86,7 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected string value, found {}", self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
 

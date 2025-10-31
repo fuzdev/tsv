@@ -1,0 +1,111 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 62,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "RegularElement",
+        "start": 0,
+        "end": 62,
+        "name": "div",
+        "attributes": [],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 5,
+              "end": 7,
+              "raw": "\n\t",
+              "data": "\n\t"
+            },
+            {
+              "type": "RegularElement",
+              "start": 7,
+              "end": 21,
+              "name": "span",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": [
+                  {
+                    "type": "Text",
+                    "start": 13,
+                    "end": 14,
+                    "raw": "a",
+                    "data": "a"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Text",
+              "start": 21,
+              "end": 24,
+              "raw": "\n\n\t",
+              "data": "\n\n\t"
+            },
+            {
+              "type": "RegularElement",
+              "start": 24,
+              "end": 38,
+              "name": "span",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": [
+                  {
+                    "type": "Text",
+                    "start": 30,
+                    "end": 31,
+                    "raw": "b",
+                    "data": "b"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Text",
+              "start": 38,
+              "end": 41,
+              "raw": "\n\n\t",
+              "data": "\n\n\t"
+            },
+            {
+              "type": "RegularElement",
+              "start": 41,
+              "end": 55,
+              "name": "span",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": [
+                  {
+                    "type": "Text",
+                    "start": 47,
+                    "end": 48,
+                    "raw": "c",
+                    "data": "c"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Text",
+              "start": 55,
+              "end": 56,
+              "raw": "\n",
+              "data": "\n"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

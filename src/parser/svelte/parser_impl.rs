@@ -1,5 +1,6 @@
 // SvelteParser struct and helper methods
 
+use crate::ast::internal::FragmentNode;
 use crate::error::ParseError;
 use crate::lexer::svelte::{Lexer, TokenKind};
 use std::cell::RefCell;
@@ -9,14 +10,14 @@ use string_interner::{DefaultStringInterner, DefaultSymbol};
 use super::PeekData;
 
 pub(crate) struct SvelteParser<'a> {
-    pub(crate) source: &'a str,  // Full original source
+    pub(crate) source: &'a str, // Full original source
     pub(crate) lexer: Lexer<'a>,
     pub(crate) current_kind: TokenKind,
-    pub(crate) current_start: usize,  // Global position in full source
-    pub(crate) current_end: usize,    // Global position in full source
+    pub(crate) current_start: usize, // Global position in full source
+    pub(crate) current_end: usize,   // Global position in full source
     pub(crate) peek_cache: Option<PeekData<TokenKind>>,
     pub(crate) interner: Rc<RefCell<DefaultStringInterner>>,
-    pub(crate) base_offset: usize,  // Offset of lexer's source in full source
+    pub(crate) base_offset: usize, // Offset of lexer's source in full source
 }
 
 impl<'a> SvelteParser<'a> {
@@ -76,6 +77,7 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected {}, found {}", kind, self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
         self.advance()
@@ -100,12 +102,48 @@ impl<'a> SvelteParser<'a> {
         }
 
         if let Some(peek) = &self.peek_cache
-            && peek.kind == TokenKind::Identifier {
+            && peek.kind == TokenKind::Identifier
+        {
             // Compare directly without allocating
             let value = &self.source[peek.start..peek.end];
             return Ok(value == tag_name);
         }
 
         Ok(false)
+    }
+
+    /// Peek at the next token to check if it matches the given kind
+    /// Does not consume current token or advance parser
+    /// Returns true if next token matches kind, false otherwise
+    pub(crate) fn is_next_token(&mut self, kind: TokenKind) -> Result<bool, ParseError> {
+        // Populate peek cache if not already cached
+        if self.peek_cache.is_none() {
+            let token = self.lexer.next_token()?;
+            self.peek_cache = Some(PeekData {
+                kind: token.kind,
+                start: self.base_offset + token.start,
+                end: self.base_offset + token.end,
+            });
+        }
+
+        Ok(self
+            .peek_cache
+            .as_ref()
+            .map(|p| p.kind == kind)
+            .unwrap_or(false))
+    }
+
+    /// Parse a text node if there's a gap between the last position and current position.
+    /// The Svelte lexer skips whitespace, so gaps represent text/whitespace content.
+    pub(crate) fn capture_text_if_gap(
+        &mut self,
+        last_end: usize,
+        nodes: &mut Vec<FragmentNode>,
+    ) -> Result<(), ParseError> {
+        if self.current_start > last_end {
+            let text = self.parse_text(last_end, self.current_start)?;
+            nodes.push(FragmentNode::Text(text));
+        }
+        Ok(())
     }
 }

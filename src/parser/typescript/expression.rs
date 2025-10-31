@@ -23,6 +23,7 @@ impl<'a> Parser<'a> {
                 let number = raw.parse().map_err(|_| ParseError::InvalidSyntax {
                     message: format!("Invalid number: {}", raw),
                     position: start,
+                    context: None,
                 })?;
                 self.advance()?;
                 Ok(Expression::Literal(Literal {
@@ -64,6 +65,7 @@ impl<'a> Parser<'a> {
             _ => Err(ParseError::InvalidExpression {
                 found: self.current_kind(),
                 position: self.current_pos().0,
+                context: None,
             }),
         }
     }

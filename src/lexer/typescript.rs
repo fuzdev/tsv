@@ -56,7 +56,7 @@ pub struct Token<'a> {
     pub kind: TokenKind,
     pub start: usize,
     pub end: usize,
-    #[allow(dead_code)] // Used for debugging and testing
+    #[expect(dead_code, reason = "Used for debugging and testing")]
     pub value: &'a str,
 }
 
@@ -224,11 +224,13 @@ impl<'a> Lexer<'a> {
                 Err(ParseError::InvalidSyntax {
                     message: "Unterminated string literal".to_string(),
                     position: start,
+                    context: None,
                 })
             }
             Some(ch) => Err(ParseError::InvalidSyntax {
                 message: format!("Unexpected character: '{}'", ch),
                 position: start,
+                context: None,
             }),
         }
     }

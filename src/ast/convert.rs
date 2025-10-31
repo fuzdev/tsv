@@ -25,13 +25,6 @@ fn create_source_location(span: Span, tracker: &LocationTracker) -> public::Sour
 
 // Helper to create SourceLocation with position offset
 // Used for embedded content where AST has global positions but LocationTracker is from substring
-// TODO(performance): This creates repetitive if/else checks throughout conversion (9 occurrences).
-// Consider alternatives:
-// 1. Always use this function, make it handle offset=0 efficiently
-// 2. Use a trait or wrapper type for offset-aware conversion
-// 3. Create separate LocationTracker that has built-in offset handling
-// Current approach: Simple and correct, minimal overhead (branch prediction handles it well)
-// Refactor when profiling shows this as a bottleneck
 fn create_source_location_with_offset(
     span: Span,
     tracker: &LocationTracker,
@@ -43,6 +36,19 @@ fn create_source_location_with_offset(
         end: span.end - offset as u32,
     };
     create_source_location(adjusted_span, tracker)
+}
+
+/// Create source location, automatically handling offset if needed
+///
+/// Unified helper that eliminates repetitive if/else checks throughout conversion.
+/// When offset is 0, uses fast path directly. When offset is non-zero, adjusts span accordingly.
+#[inline]
+fn create_location(span: Span, tracker: &LocationTracker, offset: usize) -> public::SourceLocation {
+    if offset == 0 {
+        create_source_location(span, tracker)
+    } else {
+        create_source_location_with_offset(span, tracker, offset)
+    }
 }
 
 pub fn convert_program(program: &internal::Program, loc: &LocationTracker) -> public::Program {
@@ -61,11 +67,7 @@ fn convert_program_with_offset(
         node_type: "Program".to_string(),
         start: program.span.start,
         end: program.span.end,
-        loc: if offset == 0 {
-            create_source_location(program.span, loc)
-        } else {
-            create_source_location_with_offset(program.span, loc, offset)
-        },
+        loc: create_location(program.span, loc, offset),
         body: program
             .body
             .iter()
@@ -84,35 +86,25 @@ fn convert_statement(
     match stmt {
         internal::Statement::ExpressionStatement(expr_stmt) => {
             public::Statement::ExpressionStatement(public::ExpressionStatement {
+                node_type: "ExpressionStatement".to_string(),
                 start: expr_stmt.span.start,
                 end: expr_stmt.span.end,
-                loc: if offset == 0 {
-                    create_source_location(expr_stmt.span, loc)
-                } else {
-                    create_source_location_with_offset(expr_stmt.span, loc, offset)
-                },
+                loc: create_location(expr_stmt.span, loc, offset),
                 expression: convert_expression(&expr_stmt.expression, loc, interner, offset),
             })
         }
         internal::Statement::VariableDeclaration(var_decl) => {
             public::Statement::VariableDeclaration(public::VariableDeclaration {
+                node_type: "VariableDeclaration".to_string(),
                 start: var_decl.span.start,
                 end: var_decl.span.end,
-                loc: if offset == 0 {
-                    create_source_location(var_decl.span, loc)
-                } else {
-                    create_source_location_with_offset(var_decl.span, loc, offset)
-                },
+                loc: create_location(var_decl.span, loc, offset),
                 declarations: var_decl
                     .declarations
                     .iter()
                     .map(|d| convert_variable_declarator(d, loc, interner, offset))
                     .collect(),
-                kind: match var_decl.kind {
-                    internal::VariableDeclarationKind::Const => "const".to_string(),
-                    internal::VariableDeclarationKind::Let => "let".to_string(),
-                    internal::VariableDeclarationKind::Var => "var".to_string(),
-                },
+                kind: var_decl.kind.as_str().to_string(),
             })
         }
     }
@@ -128,20 +120,12 @@ fn convert_variable_declarator(
         node_type: "VariableDeclarator".to_string(),
         start: declarator.span.start,
         end: declarator.span.end,
-        loc: if offset == 0 {
-            create_source_location(declarator.span, loc)
-        } else {
-            create_source_location_with_offset(declarator.span, loc, offset)
-        },
+        loc: create_location(declarator.span, loc, offset),
         id: public::Identifier {
             node_type: "Identifier".to_string(),
             start: declarator.id.span.start,
             end: declarator.id.span.end,
-            loc: if offset == 0 {
-                create_source_location(declarator.id.span, loc)
-            } else {
-                create_source_location_with_offset(declarator.id.span, loc, offset)
-            },
+            loc: create_location(declarator.id.span, loc, offset),
             name: interner.resolve(declarator.id.name).unwrap().to_string(),
             type_annotation: declarator
                 .id
@@ -166,19 +150,15 @@ fn convert_expression(
         internal::Expression::Literal(lit) => {
             let value = match &lit.value {
                 internal::LiteralValue::Number(n) => serde_json::Value::Number(
-                    serde_json::Number::from_f64(*n)
-                        .unwrap_or_else(|| serde_json::Number::from(0))
+                    serde_json::Number::from_f64(*n).unwrap_or_else(|| serde_json::Number::from(0)),
                 ),
                 internal::LiteralValue::String(s) => serde_json::Value::String(s.clone()),
             };
             public::Expression::Literal(public::Literal {
+                node_type: "Literal".to_string(),
                 start: lit.span.start,
                 end: lit.span.end,
-                loc: if offset == 0 {
-                    create_source_location(lit.span, loc)
-                } else {
-                    create_source_location_with_offset(lit.span, loc, offset)
-                },
+                loc: create_location(lit.span, loc, offset),
                 value,
                 raw: lit.raw.clone(),
             })
@@ -188,11 +168,7 @@ fn convert_expression(
                 node_type: "Identifier".to_string(),
                 start: id.span.start,
                 end: id.span.end,
-                loc: if offset == 0 {
-                    create_source_location(id.span, loc)
-                } else {
-                    create_source_location_with_offset(id.span, loc, offset)
-                },
+                loc: create_location(id.span, loc, offset),
                 name: interner.resolve(id.name).unwrap().to_string(),
                 type_annotation: id
                     .type_annotation
@@ -212,26 +188,23 @@ fn convert_type_annotation(
         node_type: "TSTypeAnnotation".to_string(),
         start: type_annotation.span.start,
         end: type_annotation.span.end,
-        loc: if offset == 0 {
-            create_source_location(type_annotation.span, loc)
-        } else {
-            create_source_location_with_offset(type_annotation.span, loc, offset)
-        },
+        loc: create_location(type_annotation.span, loc, offset),
         type_annotation: Box::new(convert_type(&type_annotation.type_annotation, loc, offset)),
     }
 }
 
-fn convert_type(ts_type: &internal::TSType, loc: &LocationTracker, offset: usize) -> public::TSType {
+fn convert_type(
+    ts_type: &internal::TSType,
+    loc: &LocationTracker,
+    offset: usize,
+) -> public::TSType {
     match ts_type {
         internal::TSType::TSNumberKeyword(node) => {
             public::TSType::TSNumberKeyword(public::TSNumberKeyword {
+                node_type: "TSNumberKeyword".to_string(),
                 start: node.span.start,
                 end: node.span.end,
-                loc: if offset == 0 {
-                    create_source_location(node.span, loc)
-                } else {
-                    create_source_location_with_offset(node.span, loc, offset)
-                },
+                loc: create_location(node.span, loc, offset),
             })
         }
     }
@@ -291,18 +264,23 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
     //   - This produces inverted positions since CSS comes after script
     //
     // See: tests/fixtures/3_svelte_parser/bug_script_style_without_markup/SVELTE_BUG.md
+    //
+    // NOTE: The parser now calculates start/end correctly in the internal AST (root.span),
+    // so we use those values directly. The parser handles all the edge cases including:
+    // - Script/style tags in any order
+    // - Proper root.start positioning (first non-instance-script item)
+    // - Maximum end across all top-level nodes
     let (start, end) = {
-        // Find first and last non-Text nodes (elements/expression tags)
-        let first_element = root.fragment.nodes.iter().find(|node| {
-            !matches!(node, internal::FragmentNode::Text(_))
-        });
-        let last_element = root.fragment.nodes.iter().rev().find(|node| {
-            !matches!(node, internal::FragmentNode::Text(_))
-        });
+        // Check if we have actual template markup (non-Text fragment nodes)
+        let has_template_markup = root
+            .fragment
+            .nodes
+            .iter()
+            .any(|node| !matches!(node, internal::FragmentNode::Text(_)));
 
-        if let (Some(first), Some(last)) = (first_element, last_element) {
-            // Fragment has template markup - span the non-Text nodes
-            (Some(first.span().start), Some(last.span().end))
+        if has_template_markup {
+            // Use the parser's calculated span
+            (Some(root.span.start), Some(root.span.end))
         } else {
             // No template markup - check for the script+CSS bug case
 
@@ -329,13 +307,18 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
         start,
         end,
         fragment: convert_fragment(&root.fragment, &loc, &interner),
-        instance: root.instance.as_ref().map(|script| {
-            convert_script(script, source, &interner)
-        }),
-        module: None, // Sprint 5 doesn't use module scripts
-        css: root.css.as_ref().map(|style| {
-            convert_style(style, source, &interner)
-        }),
+        instance: root
+            .instance
+            .as_ref()
+            .map(|script| convert_script(script, source, &interner)),
+        module: root
+            .module
+            .as_ref()
+            .map(|script| convert_script(script, source, &interner)),
+        css: root
+            .css
+            .as_ref()
+            .map(|style| convert_style(style, source, &interner)),
         js: vec![],
         options: None,
         comments: vec![],
@@ -369,9 +352,7 @@ fn convert_fragment_node(
         internal::FragmentNode::ExpressionTag(tag) => {
             public::FragmentNode::ExpressionTag(convert_expression_tag(tag, loc, interner))
         }
-        internal::FragmentNode::Text(text) => {
-            public::FragmentNode::Text(convert_text(text))
-        }
+        internal::FragmentNode::Text(text) => public::FragmentNode::Text(convert_text(text)),
     }
 }
 
@@ -400,6 +381,7 @@ fn convert_expression_tag(
     interner: &DefaultStringInterner,
 ) -> public::ExpressionTag {
     public::ExpressionTag {
+        node_type: "ExpressionTag".to_string(),
         start: tag.span.start,
         end: tag.span.end,
         expression: convert_expression(&tag.expression, loc, interner, 0),
@@ -414,13 +396,19 @@ fn convert_attribute(
     // Extract attribute name from interner
     let name = interner.resolve(attr.name).unwrap().to_string();
 
-    // Convert attribute value if present
-    let value = attr.value.as_ref().map(|values| {
-        values
-            .iter()
-            .map(|v| convert_attribute_value(v, loc, interner))
-            .collect()
-    });
+    // Convert attribute value
+    // - Boolean attributes (no value): serialize as `true`
+    // - Regular attributes (with value): serialize as array
+    let value = match &attr.value {
+        None => Some(serde_json::Value::Bool(true)), // Boolean attribute
+        Some(values) => {
+            let converted: Vec<_> = values
+                .iter()
+                .map(|v| convert_attribute_value(v, loc, interner))
+                .collect();
+            Some(serde_json::to_value(converted).unwrap())
+        }
+    };
 
     public::Attribute {
         node_type: "Attribute".to_string(),
@@ -437,9 +425,7 @@ fn convert_attribute_value(
     _interner: &DefaultStringInterner,
 ) -> public::AttributeValue {
     match value {
-        internal::AttributeValue::Text(text) => {
-            public::AttributeValue::Text(convert_text(text))
-        }
+        internal::AttributeValue::Text(text) => public::AttributeValue::Text(convert_text(text)),
     }
 }
 
@@ -466,37 +452,23 @@ fn convert_script(
         internal::ScriptContext::Module => "module",
     };
 
-    // TODO(performance): We create two LocationTrackers here (one for script, one for attributes).
-    // LocationTracker.new() scans entire source to build line index (O(n) where n=source length).
-    // For large files with script tags, this doubles the line-scanning work.
-    // Alternatives:
-    // 1. Share LocationTracker and adjust positions manually (complex, error-prone)
-    // 2. Use lazy line index building (only scan when get_line_column called)
-    // 3. Pass pre-built LocationTracker from convert_root (thread through all conversions)
-    // Current: Simple and correct, cost is acceptable for typical Svelte file sizes
-    // Optimize if profiling shows this as bottleneck
+    // Use full source LocationTracker for absolute line/column numbers everywhere
+    let loc = LocationTracker::new(source);
 
-    // Create LocationTracker from script content substring for correct line/column
-    // The Program span gives us the global positions of the script content
-    let script_content = &source[script.content.span.start as usize..script.content.span.end as usize];
-    let script_loc = LocationTracker::new(script_content);
-
-    // Create LocationTracker for attributes (they use global positions in full source)
-    let full_loc = LocationTracker::new(source);
-
-    // Convert Program with offset so line/column are relative to script content
-    let content_offset = script.content.span.start as usize;
+    // Convert Program with Svelte's quirk: loc.start is hardcoded to {line: 1, column: 0}
+    let mut program = convert_program(&script.content, &loc);
+    program.loc.start = public::Position { line: 1, column: 0 };
 
     public::Script {
         node_type: "Script".to_string(),
         start: script.span.start,
         end: script.span.end,
         context: context.to_string(),
-        content: convert_program_with_offset(&script.content, &script_loc, content_offset),
+        content: program,
         attributes: script
             .attributes
             .iter()
-            .map(|attr| convert_attribute(attr, &full_loc, interner))
+            .map(|attr| convert_attribute(attr, &loc, interner))
             .collect(),
     }
 }
@@ -510,7 +482,8 @@ fn convert_style(
     let full_loc = LocationTracker::new(source);
 
     // Extract the raw CSS content
-    let styles = source[style.content_span.start as usize..style.content_span.end as usize].to_string();
+    let styles =
+        source[style.content_span.start as usize..style.content_span.end as usize].to_string();
 
     // Convert CSS nodes to JSON
     let children = style

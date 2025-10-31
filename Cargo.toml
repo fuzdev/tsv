@@ -11,3 +11,4 @@ string-interner = "0.19"
 
 [dev-dependencies]
 serde_json = "1"
+criterion = "0.5"

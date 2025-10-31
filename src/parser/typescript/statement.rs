@@ -20,6 +20,7 @@ impl<'a> Parser<'a> {
                     Err(ParseError::InvalidSyntax {
                         message: format!("Unexpected keyword '{}'", kw),
                         position: self.current_pos().0,
+                        context: None,
                     })
                 }
             },
@@ -70,6 +71,7 @@ impl<'a> Parser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: "Expected identifier in variable declaration".to_string(),
                 position: self.current_pos().0,
+                context: None,
             });
         }
 
@@ -104,7 +106,10 @@ impl<'a> Parser<'a> {
             None
         };
 
-        let end = init.as_ref().map(|e| e.span().end as usize).unwrap_or(id_span_end);
+        let end = init
+            .as_ref()
+            .map(|e| e.span().end as usize)
+            .unwrap_or(id_span_end);
 
         Ok(VariableDeclarator {
             id,
@@ -138,6 +143,7 @@ impl<'a> Parser<'a> {
             _ => Err(ParseError::InvalidSyntax {
                 message: format!("Expected type, found {}", self.current_kind()),
                 position: self.current_pos().0,
+                context: None,
             }),
         }
     }

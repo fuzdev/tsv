@@ -22,12 +22,16 @@ pub(crate) struct Parser<'a> {
     current_end: usize,
     peek_cache: Option<PeekData<TokenKind>>,
     interner: Rc<RefCell<DefaultStringInterner>>,
-    base_offset: usize,  // Offset in full source (for embedded expressions)
+    base_offset: usize, // Offset in full source (for embedded expressions)
 }
 
 impl<'a> Parser<'a> {
     fn new(source: &'a str) -> Result<Self, ParseError> {
-        Self::with_interner(source, 0, Rc::new(RefCell::new(DefaultStringInterner::new())))
+        Self::with_interner(
+            source,
+            0,
+            Rc::new(RefCell::new(DefaultStringInterner::new())),
+        )
     }
 
     /// Create a parser with shared interner and base offset.
@@ -98,20 +102,23 @@ impl<'a> Parser<'a> {
 
     // Peek helpers for lookahead (needed for type annotations, operators, etc.)
     // Lazily computes peek token on first access
-    #[allow(dead_code)]
     pub(super) fn peek_kind(&mut self) -> TokenKind {
         if self.peek_cache.is_none()
-            && let Ok(token) = self.lexer.next_token() {
-                self.peek_cache = Some(PeekData {
-                    kind: token.kind,
-                    start: token.start,
-                    end: token.end,
-                });
-            }
-        self.peek_cache.as_ref().map(|p| p.kind).unwrap_or(TokenKind::Eof)
+            && let Ok(token) = self.lexer.next_token()
+        {
+            self.peek_cache = Some(PeekData {
+                kind: token.kind,
+                start: token.start,
+                end: token.end,
+            });
+        }
+        self.peek_cache
+            .as_ref()
+            .map(|p| p.kind)
+            .unwrap_or(TokenKind::Eof)
     }
 
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "Convenience wrapper for peek_kind() == kind")]
     pub(super) fn peek_check(&mut self, kind: TokenKind) -> bool {
         self.peek_kind() == kind
     }
@@ -124,6 +131,7 @@ impl<'a> Parser<'a> {
                 expected: kind,
                 found: self.current_kind,
                 position: self.current_start,
+                context: None,
             })
         }
     }

@@ -1,0 +1,87 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 55,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "RegularElement",
+        "start": 0,
+        "end": 55,
+        "name": "div",
+        "attributes": [],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 5,
+              "end": 15,
+              "raw": "\n\tLine one",
+              "data": "\n\tLine one"
+            },
+            {
+              "type": "RegularElement",
+              "start": 15,
+              "end": 21,
+              "name": "br",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": []
+              }
+            },
+            {
+              "type": "Text",
+              "start": 21,
+              "end": 33,
+              "raw": "\n\tLine two\n\t",
+              "data": "\n\tLine two\n\t"
+            },
+            {
+              "type": "RegularElement",
+              "start": 33,
+              "end": 39,
+              "name": "hr",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": []
+              }
+            },
+            {
+              "type": "Text",
+              "start": 39,
+              "end": 41,
+              "raw": "\n\t",
+              "data": "\n\t"
+            },
+            {
+              "type": "RegularElement",
+              "start": 41,
+              "end": 48,
+              "name": "img",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": []
+              }
+            },
+            {
+              "type": "Text",
+              "start": 48,
+              "end": 49,
+              "raw": "\n",
+              "data": "\n"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

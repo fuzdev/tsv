@@ -4,14 +4,14 @@ use std::str::Chars;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TokenKind {
-    LeftAngle,   // <
-    RightAngle,  // >
-    Slash,       // /
-    LeftBrace,   // {
-    RightBrace,  // }
-    Equals,      // =
-    String,      // "..." attribute values
-    Identifier,  // Tag names, attribute names
+    LeftAngle,  // <
+    RightAngle, // >
+    Slash,      // /
+    LeftBrace,  // {
+    RightBrace, // }
+    Equals,     // =
+    String,     // "..." attribute values
+    Identifier, // Tag names, attribute names
     Eof,
 }
 
@@ -37,7 +37,7 @@ pub struct Token<'a> {
     pub kind: TokenKind,
     pub start: usize,
     pub end: usize,
-    #[allow(dead_code)] // Used for debugging and testing
+    #[expect(dead_code, reason = "Used for debugging and testing")]
     pub value: &'a str,
 }
 
@@ -46,6 +46,7 @@ pub struct Lexer<'a> {
     chars: Chars<'a>,
     position: usize,
     current: Option<char>,
+    inside_tag: bool, // Track if we're inside <...>
 }
 
 impl<'a> Lexer<'a> {
@@ -57,6 +58,7 @@ impl<'a> Lexer<'a> {
             chars,
             position: 0,
             current,
+            inside_tag: false,
         }
     }
 
@@ -77,8 +79,25 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Skip everything until we hit a special character (<, {, })
+    /// Used in template mode to treat text content as gaps
+    fn skip_to_special_char(&mut self) {
+        while let Some(ch) = self.current {
+            match ch {
+                '<' | '{' | '}' => break,
+                _ => self.advance(),
+            }
+        }
+    }
+
     pub fn next_token(&mut self) -> Result<Token<'_>, ParseError> {
-        self.skip_whitespace();
+        // Template mode (outside tags): skip text content, only tokenize special chars
+        // Tag mode (inside <...>): tokenize everything including identifiers
+        if self.inside_tag {
+            self.skip_whitespace();
+        } else {
+            self.skip_to_special_char();
+        }
 
         let start = self.position;
 
@@ -90,6 +109,7 @@ impl<'a> Lexer<'a> {
                 value: "",
             }),
             Some('<') => {
+                self.inside_tag = true; // Enter tag mode
                 self.advance();
                 Ok(Token {
                     kind: TokenKind::LeftAngle,
@@ -99,6 +119,7 @@ impl<'a> Lexer<'a> {
                 })
             }
             Some('>') => {
+                self.inside_tag = false; // Exit tag mode, back to template mode
                 self.advance();
                 Ok(Token {
                     kind: TokenKind::RightAngle,
@@ -165,6 +186,7 @@ impl<'a> Lexer<'a> {
                 Err(ParseError::InvalidSyntax {
                     message: "Unterminated string literal in template".to_string(),
                     position: start,
+                    context: None,
                 })
             }
             Some(ch) if ch.is_alphabetic() || ch == '_' || ch == '$' => {
@@ -187,6 +209,7 @@ impl<'a> Lexer<'a> {
             Some(ch) => Err(ParseError::InvalidSyntax {
                 message: format!("Unexpected character in template: '{}'", ch),
                 position: start,
+                context: None,
             }),
         }
     }

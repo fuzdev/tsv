@@ -79,6 +79,17 @@ pub enum VariableDeclarationKind {
     Var,
 }
 
+impl VariableDeclarationKind {
+    /// Returns the string representation of the variable declaration kind
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Const => "const",
+            Self::Let => "let",
+            Self::Var => "var",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct VariableDeclaration {
     pub kind: VariableDeclarationKind,
@@ -228,6 +239,11 @@ pub enum AttributeValue {
 /// For now, raw and data are identical since HTML entity decoding isn't implemented.
 /// This wastes ~50% memory for text nodes. See TODO_PERF.md "P1: Text Node Dual Storage"
 /// for optimization strategies (store only raw, compute data on-demand).
+///
+/// TODO(performance): Formatter repeatedly calls is_whitespace_only() on text nodes in
+/// hot loops (multiline children, inline run detection). Could cache this as a bool field
+/// computed during parsing: `pub is_whitespace_only: bool`. Trade-off: 1 byte per Text
+/// node vs repeated string scans. Profile before optimizing.
 #[derive(Debug, Clone)]
 pub struct Text {
     pub raw: String,  // Raw text content (for attributes: "ts" has raw="ts")
@@ -260,8 +276,8 @@ pub struct Script {
 /// Script context type
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ScriptContext {
-    Default,  // <script>
-    Module,   // <script context="module">
+    Default, // <script>
+    Module,  // <script context="module">
 }
 
 /// Svelte Style block - <style> tag contents
@@ -273,7 +289,7 @@ pub struct Style {
     pub span: Span,         // Full <style>...</style> span
     pub content_span: Span, // Just the CSS text inside the tags
     pub attributes: Vec<Attribute>,
-    pub css_nodes: Vec<CssNode>,  // Parsed CSS AST
+    pub css_nodes: Vec<CssNode>, // Parsed CSS AST
 }
 
 // CSS AST nodes
@@ -294,11 +310,11 @@ impl CssNode {
 
 #[derive(Debug, Clone)]
 pub struct CssRule {
-    pub selector: String,  // TODO: Parse selector structure (SelectorList, ComplexSelector, etc.)
-    pub selector_span: Span,  // Span of just the selector
-    pub block_span: Span,     // Span of the block including braces
+    pub selector: String, // TODO: Parse selector structure (SelectorList, ComplexSelector, etc.)
+    pub selector_span: Span, // Span of just the selector
+    pub block_span: Span, // Span of the block including braces
     pub declarations: Vec<CssDeclaration>,
-    pub span: Span,           // Full rule span
+    pub span: Span, // Full rule span
 }
 
 #[derive(Debug, Clone)]

@@ -4,6 +4,9 @@ use crate::ast::internal::*;
 use crate::error::ParseError;
 use crate::lexer::svelte::TokenKind;
 use crate::span::Span;
+use std::cell::RefCell;
+use std::rc::Rc;
+use string_interner::DefaultStringInterner;
 
 use super::parser_impl::SvelteParser;
 
@@ -20,6 +23,7 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected 'script', found {}", self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
         self.advance()?;
@@ -32,6 +36,7 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected '>', found {}", self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
 
@@ -40,8 +45,8 @@ impl<'a> SvelteParser<'a> {
         let content_start = self.current_end;
 
         // TODO(future): This is a simple pattern matching approach that doesn't handle:
-        // - Nested <script> in string literals or comments: `const x = "</script>";`
-        // - Template strings with </script>: `const x = \`</script>\`;`
+        // - Nested <script> in string literals or comments: `const a = "</script>";`
+        // - Template strings with </script>: `const a = \`</script>\`;`
         // For proper implementation, could use TypeScript lexer to tokenize and track
         // string/comment contexts. For POC, simple pattern matching is acceptable.
         let closing_pattern = b"</script>";
@@ -65,6 +70,7 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: "Unterminated script tag".to_string(),
                 position: start,
+                context: None,
             });
         }
 
@@ -101,6 +107,7 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected '</script>', found {}", self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
         self.advance()?; // consume <
@@ -109,6 +116,7 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected '/', found {}", self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
         self.advance()?; // consume /
@@ -117,25 +125,57 @@ impl<'a> SvelteParser<'a> {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected 'script', found {}", self.current_kind),
                 position: self.current_start,
+                context: None,
             });
         }
         self.advance()?; // consume script
 
         // Save end position before consuming >
-        let (_, end_after_angle) = self.current_pos();
+        let end = self.current_end;
         self.expect(TokenKind::RightAngle)?; // consume >
 
-        let end = end_after_angle;
-
-        // TODO(future): Detect script context from attributes
-        // For now, always use Default. Module scripts (`<script context="module">`) deferred.
-        let context = ScriptContext::Default;
+        // Detect script context from attributes
+        // Module scripts can be specified as:
+        //   - <script module> (boolean attribute)
+        //   - <script context="module"> (string attribute)
+        let context = Self::detect_script_context(&attributes, self.source, &self.interner);
 
         Ok(Script {
             content: program,
             attributes,
             context,
-            span: Span { start: start as u32, end: end as u32 },
+            span: Span {
+                start: start as u32,
+                end: end as u32,
+            },
         })
+    }
+
+    /// Detect whether a script is a module script based on its attributes
+    fn detect_script_context(
+        attributes: &[Attribute],
+        _source: &str,
+        interner: &Rc<RefCell<DefaultStringInterner>>,
+    ) -> ScriptContext {
+        for attr in attributes {
+            // Resolve attribute name to string
+            let name = interner.borrow().resolve(attr.name).unwrap().to_string();
+
+            // Check for boolean module attribute: <script module>
+            if name == "module" && attr.value.is_none() {
+                return ScriptContext::Module;
+            }
+
+            // Check for context="module": <script context="module">
+            if name == "context"
+                && let Some(values) = &attr.value
+                && let Some(AttributeValue::Text(text)) = values.first()
+                && text.data == "module"
+            {
+                return ScriptContext::Module;
+            }
+        }
+
+        ScriptContext::Default
     }
 }

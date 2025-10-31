@@ -1,0 +1,77 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 52,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "RegularElement",
+        "start": 0,
+        "end": 52,
+        "name": "div",
+        "attributes": [],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 5,
+              "end": 11,
+              "raw": "\n\ttext",
+              "data": "\n\ttext"
+            },
+            {
+              "type": "RegularElement",
+              "start": 11,
+              "end": 17,
+              "name": "br",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": []
+              }
+            },
+            {
+              "type": "Text",
+              "start": 17,
+              "end": 28,
+              "raw": "more text\n\t",
+              "data": "more text\n\t"
+            },
+            {
+              "type": "RegularElement",
+              "start": 28,
+              "end": 45,
+              "name": "div",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": [
+                  {
+                    "type": "Text",
+                    "start": 33,
+                    "end": 39,
+                    "raw": "nested",
+                    "data": "nested"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Text",
+              "start": 45,
+              "end": 46,
+              "raw": "\n",
+              "data": "\n"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

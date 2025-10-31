@@ -1,0 +1,108 @@
+{
+  "attributes": [],
+  "children": [
+    {
+      "block": {
+        "children": [
+          {
+            "end": 17,
+            "property": "color",
+            "start": 7,
+            "type": "Declaration",
+            "value": "red"
+          }
+        ],
+        "end": 20,
+        "start": 4,
+        "type": "Block"
+      },
+      "end": 20,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 3,
+                "selectors": [
+                  {
+                    "end": 3,
+                    "name": "div",
+                    "start": 0,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 0,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 3,
+            "start": 0,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 3,
+        "start": 0,
+        "type": "SelectorList"
+      },
+      "start": 0,
+      "type": "Rule"
+    },
+    {
+      "block": {
+        "children": [
+          {
+            "end": 46,
+            "property": "font-weight",
+            "start": 29,
+            "type": "Declaration",
+            "value": "bold"
+          }
+        ],
+        "end": 49,
+        "start": 26,
+        "type": "Block"
+      },
+      "end": 49,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 25,
+                "selectors": [
+                  {
+                    "end": 25,
+                    "name": "span",
+                    "start": 21,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 21,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 25,
+            "start": 21,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 25,
+        "start": 21,
+        "type": "SelectorList"
+      },
+      "start": 21,
+      "type": "Rule"
+    }
+  ],
+  "content": {
+    "comment": null,
+    "end": 49,
+    "start": 0,
+    "styles": "div {\n\tcolor: red;\n}\nspan {\n\tfont-weight: bold;\n}"
+  },
+  "end": 49,
+  "start": 0,
+  "type": "StyleSheet"
+}

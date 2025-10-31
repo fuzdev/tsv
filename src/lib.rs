@@ -1,18 +1,26 @@
 mod ast;
+mod error;
+mod formatter;
+pub mod language; // Public for benchmarks and external tools
 mod lexer;
 mod location;
 mod parser;
-mod error;
 mod span;
 
-use location::LocationTracker;
-use parser::{parse_typescript, parse_svelte, parse_css};
+use parser::{parse_css, parse_svelte, parse_typescript};
 
 // Re-export AST types
 pub use ast::internal;
 pub use ast::public;
 pub use error::ParseError;
+pub use location::LocationTracker;
 pub use span::Span;
+
+// Re-export formatter
+pub use formatter::{format_css, format_svelte, format_typescript};
+
+// Re-export AST converter for tests
+pub use ast::{convert_program, convert_root};
 
 /// Parse TypeScript/JavaScript source and return internal AST
 pub fn parse_typescript_ast(source: &str) -> Result<internal::Program, ParseError> {
@@ -63,12 +71,12 @@ pub fn parse_to_json_with_options(source: &str, pretty: bool) -> Result<String, 
     // Simple heuristic: if it starts with '<', it's Svelte; otherwise check for CSS-like content
     let trimmed = source.trim_start();
     let is_svelte = trimmed.starts_with('<');
-    let is_css = !is_svelte && (trimmed.ends_with('}') || trimmed.contains('{') && trimmed.contains(':'));
+    let is_css =
+        !is_svelte && (trimmed.ends_with('}') || trimmed.contains('{') && trimmed.contains(':'));
 
     let json = if is_svelte {
         // Parse as Svelte
-        let internal_ast = parse_svelte(source)
-            .map_err(|e| e.to_string())?;
+        let internal_ast = parse_svelte(source).map_err(|e| e.to_string())?;
 
         // Convert to public AST
         let public_ast = ast::convert_root(&internal_ast, source);
@@ -81,8 +89,7 @@ pub fn parse_to_json_with_options(source: &str, pretty: bool) -> Result<String, 
         }
     } else if is_css {
         // Parse as CSS
-        let internal_css = parse_css(source, 0)
-            .map_err(|e| e.to_string())?;
+        let internal_css = parse_css(source, 0).map_err(|e| e.to_string())?;
 
         // Convert to public CSS AST (build a CSS Root-like structure)
         let css_json = ast::convert_css_nodes(&internal_css, source);
@@ -96,8 +103,7 @@ pub fn parse_to_json_with_options(source: &str, pretty: bool) -> Result<String, 
     } else {
         // Parse as TypeScript
         let location_tracker = LocationTracker::new(source);
-        let internal_ast = parse_typescript(source)
-            .map_err(|e| e.to_string())?;
+        let internal_ast = parse_typescript(source).map_err(|e| e.to_string())?;
 
         // Convert to public AST
         let public_ast = ast::convert_program(&internal_ast, &location_tracker);
