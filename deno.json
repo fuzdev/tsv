@@ -1,0 +1,23 @@
+{
+	"// npm dependencies": "Version pinning managed in crates/tsv_debug/src/deno.rs (PRETTIER_VERSION, SVELTE_VERSION, etc.)",
+	"tasks": {
+		"test": "cargo test && cargo clippy && deno fmt --check && cargo run -p tsv_debug --quiet fixtures_check_formatted",
+		"format": "cargo fmt && deno fmt",
+		"fixtures_update_expected": "cargo run -p tsv_debug --quiet fixtures_update_expected",
+		"fixtures_update_formatted": "cargo run -p tsv_debug --quiet fixtures_update_formatted",
+		"fixtures_check_formatted": "cargo run -p tsv_debug --quiet fixtures_check_formatted",
+		"fixtures_list": "cargo run -p tsv_debug --quiet fixtures_update_expected --list",
+		"debug_compare": "cargo run -p tsv_debug --quiet compare"
+	},
+	"fmt": {
+		"useTabs": true,
+		"lineWidth": 100,
+		"singleQuote": true,
+		"proseWrap": "preserve"
+	},
+	"exclude": [
+		"node_modules",
+		"target",
+		"tests/fixtures"
+	]
+}

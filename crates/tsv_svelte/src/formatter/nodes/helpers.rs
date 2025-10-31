@@ -31,17 +31,21 @@ impl Formatter {
         }
     }
 
-    /// Get the content span for a node, skipping leading whitespace for text nodes
+    /// Get the content span for a node, skipping layout whitespace for text nodes
     ///
     /// Used for inline run grouping to determine if nodes are on the same source line.
-    /// For text nodes, we skip leading whitespace (which is often indentation) to get
-    /// the actual content position.
+    /// For text nodes, we skip both leading and trailing whitespace (which is often
+    /// indentation and layout separation) to get the actual content position.
     pub fn get_content_span(&self, node: &FragmentNode) -> tsv_lang::Span {
         match node {
             FragmentNode::Text(text) => {
-                // Skip leading whitespace to get the actual content position
+                // Skip leading and trailing whitespace to get the actual content position
                 let leading_ws_len = text.raw.len() - text.raw.trim_start().len();
-                tsv_lang::Span::new(text.span.start + leading_ws_len as u32, text.span.end)
+                let trailing_ws_len = text.raw.len() - text.raw.trim_end().len();
+                tsv_lang::Span::new(
+                    text.span.start + leading_ws_len as u32,
+                    text.span.end - trailing_ws_len as u32,
+                )
             }
             _ => node.span(),
         }

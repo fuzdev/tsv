@@ -1,0 +1,15 @@
+{
+	"plugins": ["prettier-plugin-svelte"],
+	"useTabs": true,
+	"printWidth": 100,
+	"singleQuote": true,
+	"bracketSpacing": false,
+	"overrides": [
+		{
+			"files": "deno.json",
+			"options": {
+				"useTabs": false
+			}
+		}
+	]
+}

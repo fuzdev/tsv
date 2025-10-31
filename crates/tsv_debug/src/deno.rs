@@ -3,9 +3,12 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 
 /// NPM package versions used by tsv_debug
+/// These are the single source of truth for version pinning
 pub const PRETTIER_VERSION: &str = "^3.6.2";
 pub const PRETTIER_SVELTE_VERSION: &str = "^3.4.0";
 pub const SVELTE_VERSION: &str = "^5.43.0";
+pub const ACORN_VERSION: &str = "^8.14.0";
+pub const ACORN_TYPESCRIPT_VERSION: &str = "^1.0.1";
 
 /// Run a Deno script via stdin with the given permissions and arguments
 ///
@@ -166,29 +169,31 @@ pub fn parse_svelte(source: &str) -> Result<String, String> {
 /// # Returns
 /// JSON AST on success
 pub fn acorn_parse_script() -> String {
-    r#"
-import * as acorn from 'npm:acorn@^8.14.0';
-import { tsPlugin } from 'npm:@sveltejs/acorn-typescript@^1.0.1';
+    format!(
+        r#"
+import * as acorn from 'npm:acorn@{}';
+import {{ tsPlugin }} from 'npm:@sveltejs/acorn-typescript@{}';
 
 const source = Deno.args[0];
 
 // Create parser with TypeScript support, matching Svelte's configuration
 const ParserWithTS = acorn.Parser.extend(tsPlugin());
 
-try {
-    const ast = ParserWithTS.parse(source, {
+try {{
+    const ast = ParserWithTS.parse(source, {{
         sourceType: 'module',
         ecmaVersion: 16,
         locations: true,
-    });
+    }});
     const json = JSON.stringify(ast, null, 2);
     Deno.stdout.writeSync(new TextEncoder().encode(json));
-} catch (err) {
+}} catch (err) {{
     Deno.stderr.writeSync(new TextEncoder().encode(err.message + '\n'));
     Deno.exit(1);
-}
-"#
-    .to_string()
+}}
+"#,
+        ACORN_VERSION, ACORN_TYPESCRIPT_VERSION
+    )
 }
 
 /// Parse TypeScript source code using acorn with TypeScript plugin
