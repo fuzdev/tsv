@@ -1,0 +1,152 @@
+// Svelte internal AST types
+//
+// Internal representation optimized for manipulation and formatting.
+// Uses string interning for efficient storage and comparison of identifiers.
+
+use std::cell::RefCell;
+use std::rc::Rc;
+use string_interner::{DefaultStringInterner, DefaultSymbol};
+use tsv_css::ast::internal::CssNode;
+use tsv_lang::Span;
+use tsv_ts::ast::internal::{Expression, Program};
+
+/// Svelte Root - top-level AST node
+///
+/// Represents a complete Svelte component with template, scripts, and styles.
+/// Contains optional instance script, module script, and style sections.
+#[derive(Debug, Clone)]
+pub struct Root {
+    pub fragment: Fragment,
+    pub instance: Option<Box<Script>>,
+    pub module: Option<Box<Script>>,
+    pub css: Option<Box<Style>>,
+    pub span: Span,
+    pub interner: Rc<RefCell<DefaultStringInterner>>,
+}
+
+/// Svelte Fragment - container for template nodes
+///
+/// A fragment contains a sequence of template nodes (elements, text, expressions).
+/// Used both at the root level and as children of elements.
+#[derive(Debug, Clone)]
+pub struct Fragment {
+    pub nodes: Vec<FragmentNode>,
+}
+
+/// Svelte template node types
+///
+/// Represents the different kinds of nodes that can appear in a Svelte template.
+#[derive(Debug, Clone)]
+pub enum FragmentNode {
+    Element(Element),
+    ExpressionTag(ExpressionTag),
+    Text(Text),
+}
+
+impl FragmentNode {
+    pub fn span(&self) -> Span {
+        match self {
+            FragmentNode::Element(elem) => elem.span,
+            FragmentNode::ExpressionTag(tag) => tag.span,
+            FragmentNode::Text(text) => text.span,
+        }
+    }
+}
+
+/// Svelte Element - HTML/component tag
+///
+/// Represents an HTML element or Svelte component in the template.
+/// Elements have a name, attributes, and child nodes in a fragment.
+#[derive(Debug, Clone)]
+pub struct Element {
+    pub name: DefaultSymbol,
+    pub attributes: Vec<Attribute>,
+    pub fragment: Fragment,
+    pub span: Span,
+}
+
+/// Svelte Attribute - element attribute
+///
+/// Represents an attribute on an element, e.g., `class="foo"` or `disabled`.
+/// The value is optional (for boolean attributes) and can contain text or expressions.
+#[derive(Debug, Clone)]
+pub struct Attribute {
+    pub name: DefaultSymbol,
+    pub value: Option<Vec<AttributeValue>>,
+    pub span: Span,
+}
+
+/// Svelte Attribute value part
+///
+/// Attribute values can contain static text or dynamic expressions.
+#[derive(Debug, Clone)]
+pub enum AttributeValue {
+    Text(Text),
+    // TODO(Future sprint): ExpressionTag(ExpressionTag)
+    // For dynamic attribute values like: <div class={expr} title={"text"}>
+    // Note: Sprint 6 implemented template-level expression tags (<div>{expr}</div>)
+    // but not attribute-level expression tags yet.
+}
+
+/// Svelte Text node - raw text content
+///
+/// Represents static text in the template or attribute values.
+/// For Sprint 7, we store the content directly to simplify conversion.
+/// In attribute values, this represents the unquoted string content.
+///
+/// TODO(performance): Text nodes store duplicate data (raw + data fields).
+/// For now, raw and data are identical since HTML entity decoding isn't implemented.
+/// This wastes ~50% memory for text nodes. See TODO_PERF.md "P1: Text Node Dual Storage"
+/// for optimization strategies (store only raw, compute data on-demand).
+///
+/// TODO(performance): Formatter repeatedly calls is_whitespace_only() on text nodes in
+/// hot loops (multiline children, inline run detection). Could cache this as a bool field
+/// computed during parsing: `pub is_whitespace_only: bool`. Trade-off: 1 byte per Text
+/// node vs repeated string scans. Profile before optimizing.
+#[derive(Debug, Clone)]
+pub struct Text {
+    pub raw: String,  // Raw text content (for attributes: "ts" has raw="ts")
+    pub data: String, // Processed text (for Sprint 7, same as raw; future: decode entities)
+    pub span: Span,
+}
+
+/// Svelte ExpressionTag - {expression} in template
+///
+/// Represents a TypeScript/JS expression embedded in the template.
+/// The expression is evaluated and its result is rendered.
+#[derive(Debug, Clone)]
+pub struct ExpressionTag {
+    pub expression: Expression,
+    pub span: Span,
+}
+
+/// Svelte Script block - <script> tag contents
+///
+/// Contains a TypeScript/JS program and metadata about the script tag.
+/// The `context` field distinguishes between instance and module scripts.
+#[derive(Debug, Clone)]
+pub struct Script {
+    pub content: Program,
+    pub attributes: Vec<Attribute>,
+    pub context: ScriptContext,
+    pub span: Span,
+}
+
+/// Script context type
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ScriptContext {
+    Default, // <script>
+    Module,  // <script context="module">
+}
+
+/// Svelte Style block - <style> tag contents
+///
+/// Stores the span of the entire <style> tag and the content span.
+/// Style tag with parsed CSS content
+#[derive(Debug, Clone)]
+pub struct Style {
+    pub span: Span,         // Full <style>...</style> span
+    pub content_span: Span, // Just the CSS text inside the tags
+    pub attributes: Vec<Attribute>,
+    pub css_nodes: Vec<CssNode>, // Parsed CSS AST
+}

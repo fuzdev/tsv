@@ -1,14 +1,45 @@
-[package]
-name = "tsv"
+[workspace]
+resolver = "2"
+members = [
+    "crates/tsv_lang",
+    "crates/tsv_html",
+    "crates/tsv_ts",
+    "crates/tsv_css",
+    "crates/tsv_svelte",
+    "crates/tsv_cli",
+]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
-description = "TypeScript and Svelte tools in Rust"
+authors = ["tsv contributors"]
+license = "MIT OR Apache-2.0"
 
-[dependencies]
+[workspace.dependencies]
+# Foundation
+tsv_lang = { path = "crates/tsv_lang" }
+tsv_html = { path = "crates/tsv_html" }
+
+# Language implementations
+tsv_ts = { path = "crates/tsv_ts" }
+tsv_css = { path = "crates/tsv_css" }
+tsv_svelte = { path = "crates/tsv_svelte" }
+
+# External dependencies
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 string-interner = "0.19"
 
-[dev-dependencies]
-serde_json = "1"
-criterion = "0.5"
+# Root package for integration tests
+[package]
+name = "tsv"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tsv_lang.workspace = true
+tsv_ts.workspace = true
+tsv_css.workspace = true
+tsv_svelte.workspace = true
+serde.workspace = true
+serde_json.workspace = true

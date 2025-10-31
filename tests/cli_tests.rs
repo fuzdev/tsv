@@ -5,7 +5,15 @@ use std::process::Command;
 #[test]
 fn test_parse_command_with_content() {
     let output = Command::new("cargo")
-        .args(&["run", "-q", "parse", "--content", "const x = 42;"])
+        .args(&[
+            "run",
+            "-p",
+            "tsv_cli",
+            "-q",
+            "parse",
+            "--content",
+            "const x = 42;",
+        ])
         .output()
         .expect("Failed to execute command");
 
@@ -23,6 +31,8 @@ fn test_parse_command_with_pretty() {
     let output = Command::new("cargo")
         .args(&[
             "run",
+            "-p",
+            "tsv_cli",
             "-q",
             "parse",
             "--content",
@@ -43,6 +53,8 @@ fn test_format_command_typescript() {
     let output = Command::new("cargo")
         .args(&[
             "run",
+            "-p",
+            "tsv_cli",
             "-q",
             "format",
             "--content",
@@ -67,6 +79,8 @@ fn test_format_command_svelte() {
     let output = Command::new("cargo")
         .args(&[
             "run",
+            "-p",
+            "tsv_cli",
             "-q",
             "format",
             "--content",
@@ -90,6 +104,8 @@ fn test_format_command_css() {
     let output = Command::new("cargo")
         .args(&[
             "run",
+            "-p",
+            "tsv_cli",
             "-q",
             "format",
             "--content",
@@ -109,7 +125,7 @@ fn test_format_command_css() {
 #[test]
 fn test_unknown_command() {
     let output = Command::new("cargo")
-        .args(&["run", "-q", "unknown-command"])
+        .args(&["run", "-p", "tsv_cli", "-q", "unknown-command"])
         .output()
         .expect("Failed to execute command");
 
@@ -124,7 +140,15 @@ fn test_unknown_command() {
 #[test]
 fn test_parse_invalid_syntax() {
     let output = Command::new("cargo")
-        .args(&["run", "-q", "parse", "--content", "const x = "])
+        .args(&[
+            "run",
+            "-p",
+            "tsv_cli",
+            "-q",
+            "parse",
+            "--content",
+            "const x = ",
+        ])
         .output()
         .expect("Failed to execute command");
 
@@ -139,7 +163,15 @@ fn test_parse_invalid_syntax() {
 #[test]
 fn test_format_missing_parser() {
     let output = Command::new("cargo")
-        .args(&["run", "-q", "format", "--content", "<div>test</div>"])
+        .args(&[
+            "run",
+            "-p",
+            "tsv_cli",
+            "-q",
+            "format",
+            "--content",
+            "<div>test</div>",
+        ])
         .output()
         .expect("Failed to execute command");
 
@@ -157,7 +189,7 @@ fn test_format_missing_parser() {
 #[test]
 fn test_no_command() {
     let output = Command::new("cargo")
-        .args(&["run", "-q"])
+        .args(&["run", "-p", "tsv_cli", "-q"])
         .output()
         .expect("Failed to execute command");
 

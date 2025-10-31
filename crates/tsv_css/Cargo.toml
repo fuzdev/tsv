@@ -1,0 +1,10 @@
+[package]
+name = "tsv_css"
+version.workspace = true
+edition.workspace = true
+description = "CSS parsing and formatting library"
+
+[dependencies]
+tsv_lang.workspace = true
+serde.workspace = true
+serde_json.workspace = true

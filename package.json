@@ -2,7 +2,7 @@
   "name": "tsv",
   "version": "0.0.1",
   "description": "a high-performance Rust parser that's a drop-in replacement for Svelte's modern parser (acorn + acorn-typescript)",
-  "homepage": "https://github.com/ryanatkn/tsv#readme",
+  "homepage": "https://www.tsv.dev/",
   "bugs": {
     "url": "https://github.com/ryanatkn/tsv/issues"
   },

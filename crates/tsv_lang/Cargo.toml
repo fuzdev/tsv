@@ -1,0 +1,8 @@
+[package]
+name = "tsv_lang"
+version.workspace = true
+edition.workspace = true
+description = "Language-agnostic foundation primitives for TSV"
+
+[dependencies]
+# No external dependencies - pure foundation crate

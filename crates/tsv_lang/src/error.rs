@@ -1,0 +1,212 @@
+// Error types for parsing
+
+use std::fmt;
+
+/// Rich error context with source snippet and position
+#[derive(Debug, Clone, PartialEq)]
+pub struct ErrorContext {
+    /// The source line containing the error
+    pub source_line: String,
+    /// Column position within the line (0-indexed)
+    pub column: usize,
+    /// Line number in the source (1-indexed)
+    pub line_number: usize,
+}
+
+impl ErrorContext {
+    /// Extract error context from source code at a given byte position
+    ///
+    /// Returns None if position is out of bounds or source is empty
+    pub fn from_source(source: &str, position: usize) -> Option<Self> {
+        if source.is_empty() || position > source.len() {
+            return None;
+        }
+
+        let position = position.min(source.len());
+
+        // Find line boundaries
+        let mut line_start = position;
+        while line_start > 0 && !source[..line_start].ends_with('\n') {
+            line_start -= 1;
+        }
+        if line_start > 0 && source.as_bytes()[line_start] == b'\n' {
+            line_start += 1;
+        }
+
+        let mut line_end = position;
+        while line_end < source.len() && source.as_bytes()[line_end] != b'\n' {
+            line_end += 1;
+        }
+
+        // Extract the line
+        let source_line = source[line_start..line_end].to_string();
+
+        // Calculate column (bytes from line start to error position)
+        let column = position.saturating_sub(line_start);
+
+        // Calculate line number (1-indexed)
+        let line_number = source[..line_start].matches('\n').count() + 1;
+
+        Some(ErrorContext {
+            source_line,
+            column,
+            line_number,
+        })
+    }
+
+    /// Format error context with caret pointer
+    fn format_with_caret(&self, message: &str) -> String {
+        let indent = " ".repeat(format!("{}:", self.line_number).len() + self.column + 1);
+        format!(
+            "{}\n{}:{} {}\n{}^ here",
+            message,
+            self.line_number,
+            self.column + 1, // Display as 1-indexed for users
+            self.source_line,
+            indent,
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ParseError {
+    UnexpectedToken {
+        expected: String,
+        found: String,
+        position: usize,
+        context: Option<ErrorContext>,
+    },
+    UnexpectedEof {
+        position: usize,
+        context: Option<ErrorContext>,
+    },
+    InvalidSyntax {
+        message: String,
+        position: usize,
+        context: Option<ErrorContext>,
+    },
+    InvalidExpression {
+        found: String,
+        position: usize,
+        context: Option<ErrorContext>,
+    },
+    FileTooLarge {
+        size: usize,
+        max: usize,
+    },
+}
+
+/// Result type alias for parsing operations
+pub type Result<T> = std::result::Result<T, ParseError>;
+
+impl ParseError {
+    /// Add source context to an error
+    ///
+    /// Call this to enrich errors with source snippets for better debugging.
+    /// Example:
+    /// ```ignore
+    /// let err = ParseError::UnexpectedToken { ... };
+    /// let rich_err = err.with_context(source);
+    /// ```
+    pub fn with_context(self, source: &str) -> Self {
+        match self {
+            ParseError::UnexpectedToken {
+                expected,
+                found,
+                position,
+                context: _,
+            } => ParseError::UnexpectedToken {
+                expected,
+                found,
+                position,
+                context: ErrorContext::from_source(source, position),
+            },
+            ParseError::UnexpectedEof {
+                position,
+                context: _,
+            } => ParseError::UnexpectedEof {
+                position,
+                context: ErrorContext::from_source(source, position),
+            },
+            ParseError::InvalidSyntax {
+                message,
+                position,
+                context: _,
+            } => ParseError::InvalidSyntax {
+                message,
+                position,
+                context: ErrorContext::from_source(source, position),
+            },
+            ParseError::InvalidExpression {
+                found,
+                position,
+                context: _,
+            } => ParseError::InvalidExpression {
+                found,
+                position,
+                context: ErrorContext::from_source(source, position),
+            },
+            other => other, // FileTooLarge doesn't need context
+        }
+    }
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ParseError::UnexpectedToken {
+                expected,
+                found,
+                position,
+                context,
+            } => {
+                let base_msg = format!("Expected {}, found {}", expected, found);
+                if let Some(ctx) = context {
+                    write!(f, "{}", ctx.format_with_caret(&base_msg))
+                } else {
+                    write!(f, "{} at position {}", base_msg, position)
+                }
+            }
+            ParseError::UnexpectedEof { position, context } => {
+                let base_msg = "Unexpected end of file";
+                if let Some(ctx) = context {
+                    write!(f, "{}", ctx.format_with_caret(base_msg))
+                } else {
+                    write!(f, "{} at position {}", base_msg, position)
+                }
+            }
+            ParseError::InvalidSyntax {
+                message,
+                position,
+                context,
+            } => {
+                if let Some(ctx) = context {
+                    write!(f, "{}", ctx.format_with_caret(message))
+                } else {
+                    write!(f, "{} at position {}", message, position)
+                }
+            }
+            ParseError::InvalidExpression {
+                found,
+                position,
+                context,
+            } => {
+                let base_msg = format!("Expected expression, found {}", found);
+                if let Some(ctx) = context {
+                    write!(f, "{}", ctx.format_with_caret(&base_msg))
+                } else {
+                    write!(f, "{} at position {}", base_msg, position)
+                }
+            }
+            ParseError::FileTooLarge { size, max } => {
+                write!(
+                    f,
+                    "File too large: {} bytes (maximum: {} bytes / 4GB)",
+                    size, max
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for ParseError {}

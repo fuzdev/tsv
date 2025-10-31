@@ -1,0 +1,316 @@
+// Svelte AST conversion
+//
+// Converts internal AST to public JSON-compatible representation.
+// Matches Svelte's official parser output format.
+
+use crate::ast::{internal, public};
+use string_interner::DefaultStringInterner;
+use tsv_lang::LocationTracker;
+
+/// Convert Svelte Root AST to public format
+pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
+    let loc = LocationTracker::new(source);
+    let interner = root.interner.borrow();
+
+    // Svelte Root start/end behavior (discovered through empirical testing)
+    //
+    // The Root node's start/end positions follow conditional rules based on fragment content:
+    //
+    // Rule 1: NULL when fragment has no non-Text nodes
+    //   - Script-only files: `<script>...</script>` → start=null, end=null
+    //   - CSS-only files: `<style>...</style>` → start=null, end=null
+    //   - Empty files or whitespace-only → start=null, end=null
+    //
+    // Rule 2: SET when fragment has at least one non-Text node
+    //   - Template-only: `<div></div>` → start=0, end=11
+    //   - Script+template: `<script>...</script>\n<div></div>` → start=div_start, end=div_end
+    //   - Any combination with actual markup (elements, expression tags, etc.)
+    //
+    // Rule 3: What the positions span
+    //   - start: Position of the FIRST non-Text fragment node (Element, ExpressionTag, etc.)
+    //   - end: Position AFTER the LAST fragment node (including trailing Text nodes)
+    //
+    // Critical insight: Text nodes (whitespace) are asymmetric:
+    //   - Leading text does NOT affect start (ignored when finding first non-Text node)
+    //   - Trailing text DOES affect end (included in final position)
+    //
+    // Examples:
+    //   `<div></div>` → start=0, end=11
+    //   `\n\n<div></div>` → start=2 (skips leading text), end=13
+    //   `<script>...</script>\n\n<div>{a}</div>` → start=53 (div), end=67 (after closing tag)
+    //
+    // Note: The Root span does NOT include script/CSS blocks - those are stored separately
+    // in ast.instance, ast.module, and ast.css fields.
+    //
+    // ⚠️ SVELTE BUG REPLICATION (for exact compatibility):
+    //
+    // When there's script+CSS with NO template markup, Svelte has a bug where start > end:
+    //   `<script>...</script>\n<style>...</style>` → start=34 (CSS start), end=33 (script end)
+    //
+    // This is clearly incorrect (start should never be greater than end), and the correct
+    // behavior would be start=null, end=null (no template content).
+    //
+    // However, we replicate this bug EXACTLY for compatibility with Svelte's behavior.
+    // This quirk is isolated to this conversion layer - our internal AST remains clean.
+    //
+    // Bug pattern:
+    //   - Fragment has NO non-Text nodes (no template markup)
+    //   - File has BOTH script (instance OR module) AND CSS
+    //   - Result: start = css.span.start, end = script.span.end
+    //   - This produces inverted positions since CSS comes after script
+    //
+    // See: tests/fixtures/3_svelte_parser/bug_script_style_without_markup/SVELTE_BUG.md
+    //
+    // NOTE: The parser now calculates start/end correctly in the internal AST (root.span),
+    // so we use those values directly. The parser handles all the edge cases including:
+    // - Script/style tags in any order
+    // - Proper root.start positioning (first non-instance-script item)
+    // - Maximum end across all top-level nodes
+    let (start, end) = {
+        // Check if we have actual template markup (non-Text fragment nodes)
+        let has_template_markup = root
+            .fragment
+            .nodes
+            .iter()
+            .any(|node| !matches!(node, internal::FragmentNode::Text(_)));
+
+        if has_template_markup {
+            // Use the parser's calculated span
+            (Some(root.span.start), Some(root.span.end))
+        } else {
+            // No template markup - check for the script+CSS bug case
+
+            // ⚠️ BUG REPLICATION: Detect script+CSS with no template
+            // Svelte produces inverted positions (start > end) in this case
+            if let (Some(css), Some(script)) = (&root.css, &root.instance) {
+                // BUG: start=css.start, end=script.end (inverted!)
+                (Some(css.span.start), Some(script.span.end))
+            } else if let (Some(css), Some(script)) = (&root.css, &root.module) {
+                // BUG: start=css.start, end=module.end (inverted!)
+                (Some(css.span.start), Some(script.span.end))
+            } else if root.instance.is_some() || root.module.is_some() || root.css.is_some() {
+                // Script-only, CSS-only, or only text nodes: null/null (correct behavior)
+                (None, None)
+            } else {
+                // Empty file
+                (Some(0), Some(0))
+            }
+        }
+    };
+
+    public::Root {
+        node_type: "Root".to_string(),
+        start,
+        end,
+        fragment: convert_fragment(&root.fragment, &loc, &interner),
+        instance: root
+            .instance
+            .as_ref()
+            .map(|script| convert_script(script, source, &interner)),
+        module: root
+            .module
+            .as_ref()
+            .map(|script| convert_script(script, source, &interner)),
+        css: root
+            .css
+            .as_ref()
+            .map(|style| convert_style(style, source, &interner)),
+        js: vec![],
+        options: None,
+        comments: vec![],
+    }
+}
+
+fn convert_fragment(
+    fragment: &internal::Fragment,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+) -> public::Fragment {
+    public::Fragment {
+        node_type: "Fragment".to_string(),
+        nodes: fragment
+            .nodes
+            .iter()
+            .map(|node| convert_fragment_node(node, loc, interner))
+            .collect(),
+    }
+}
+
+fn convert_fragment_node(
+    node: &internal::FragmentNode,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+) -> public::FragmentNode {
+    match node {
+        internal::FragmentNode::Element(elem) => {
+            public::FragmentNode::RegularElement(convert_element(elem, loc, interner))
+        }
+        internal::FragmentNode::ExpressionTag(tag) => {
+            public::FragmentNode::ExpressionTag(convert_expression_tag(tag, loc, interner))
+        }
+        internal::FragmentNode::Text(text) => public::FragmentNode::Text(convert_text(text)),
+    }
+}
+
+fn convert_element(
+    elem: &internal::Element,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+) -> public::Element {
+    public::Element {
+        node_type: "RegularElement".to_string(),
+        start: elem.span.start,
+        end: elem.span.end,
+        name: interner.resolve(elem.name).unwrap().to_string(),
+        attributes: elem
+            .attributes
+            .iter()
+            .map(|attr| convert_attribute(attr, loc, interner))
+            .collect(),
+        fragment: convert_fragment(&elem.fragment, loc, interner),
+    }
+}
+
+fn convert_expression_tag(
+    tag: &internal::ExpressionTag,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+) -> public::ExpressionTag {
+    // Delegate to tsv_ts for expression conversion
+    let ts_expr = tsv_ts::ast::convert::convert_expression(&tag.expression, loc, interner, 0);
+
+    public::ExpressionTag {
+        node_type: "ExpressionTag".to_string(),
+        start: tag.span.start,
+        end: tag.span.end,
+        expression: ts_expr,
+    }
+}
+
+fn convert_attribute(
+    attr: &internal::Attribute,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+) -> public::Attribute {
+    // Extract attribute name from interner
+    let name = interner.resolve(attr.name).unwrap().to_string();
+
+    // Convert attribute value
+    // - Boolean attributes (no value): serialize as `true`
+    // - Regular attributes (with value): serialize as array
+    let value = match &attr.value {
+        None => Some(serde_json::Value::Bool(true)), // Boolean attribute
+        Some(values) => {
+            let converted: Vec<_> = values
+                .iter()
+                .map(|v| convert_attribute_value(v, loc, interner))
+                .collect();
+            Some(serde_json::to_value(converted).unwrap())
+        }
+    };
+
+    public::Attribute {
+        node_type: "Attribute".to_string(),
+        start: attr.span.start,
+        end: attr.span.end,
+        name,
+        value,
+    }
+}
+
+fn convert_attribute_value(
+    value: &internal::AttributeValue,
+    _loc: &LocationTracker,
+    _interner: &DefaultStringInterner,
+) -> public::AttributeValue {
+    match value {
+        internal::AttributeValue::Text(text) => public::AttributeValue::Text(convert_text(text)),
+    }
+}
+
+fn convert_text(text: &internal::Text) -> public::Text {
+    // For Sprint 7, raw and data are the same (no HTML entity decoding yet)
+    // Future sprints: data might decode entities (&lt; -> <, &quot; -> ", etc.)
+    public::Text {
+        node_type: "Text".to_string(),
+        start: text.span.start,
+        end: text.span.end,
+        raw: text.raw.clone(),
+        data: text.data.clone(),
+    }
+}
+
+fn convert_script(
+    script: &internal::Script,
+    source: &str,
+    interner: &DefaultStringInterner,
+) -> public::Script {
+    // Convert script context enum to string
+    let context = match script.context {
+        internal::ScriptContext::Default => "default",
+        internal::ScriptContext::Module => "module",
+    };
+
+    // Use full source LocationTracker for absolute line/column numbers everywhere
+    let loc = LocationTracker::new(source);
+
+    // Delegate to tsv_ts for program conversion
+    let mut program = tsv_ts::ast::convert::convert_program(&script.content, &loc);
+
+    // Svelte's quirk: loc.start is hardcoded to {line: 1, column: 0}
+    program.loc.start = tsv_ts::ast::public::Position { line: 1, column: 0 };
+
+    public::Script {
+        node_type: "Script".to_string(),
+        start: script.span.start,
+        end: script.span.end,
+        context: context.to_string(),
+        content: program,
+        attributes: script
+            .attributes
+            .iter()
+            .map(|attr| convert_attribute(attr, &loc, interner))
+            .collect(),
+    }
+}
+
+fn convert_style(
+    style: &internal::Style,
+    source: &str,
+    interner: &DefaultStringInterner,
+) -> tsv_css::StyleSheet {
+    // Create LocationTracker for the full source (for attributes)
+    let full_loc = LocationTracker::new(source);
+
+    // Extract the raw CSS content
+    let styles =
+        source[style.content_span.start as usize..style.content_span.end as usize].to_string();
+
+    // Delegate to tsv_css for CSS node conversion
+    let children: Vec<serde_json::Value> = style
+        .css_nodes
+        .iter()
+        .map(|node| tsv_css::ast::convert::convert_css_node(node, source))
+        .collect();
+
+    tsv_css::StyleSheet {
+        node_type: "StyleSheet".to_string(),
+        start: style.span.start,
+        end: style.span.end,
+        attributes: style
+            .attributes
+            .iter()
+            .map(|attr| {
+                let public_attr = convert_attribute(attr, &full_loc, interner);
+                serde_json::to_value(public_attr).expect("Failed to serialize attribute")
+            })
+            .collect(),
+        children,
+        content: tsv_css::StyleContent {
+            start: style.content_span.start,
+            end: style.content_span.end,
+            styles,
+            comment: None,
+        },
+    }
+}

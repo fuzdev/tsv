@@ -1,0 +1,14 @@
+[package]
+name = "tsv_svelte"
+version.workspace = true
+edition.workspace = true
+description = "Svelte parsing and formatting library"
+
+[dependencies]
+tsv_lang.workspace = true
+tsv_html.workspace = true
+tsv_ts.workspace = true
+tsv_css.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+string-interner.workspace = true

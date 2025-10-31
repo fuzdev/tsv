@@ -37,17 +37,17 @@ fn test_format_round_trip(fixture_path: &Path) -> Result<(), String> {
     if file_type == "svelte" {
         // Svelte round-trip
         let ast1 =
-            tsv::parse_svelte_ast(&input).map_err(|e| format!("Failed to parse input: {}", e))?;
+            tsv_svelte::parse(&input).map_err(|e| format!("Failed to parse input: {}", e))?;
 
-        let formatted = tsv::format_svelte(&ast1, &input);
+        let formatted = tsv_svelte::format(&ast1, &input);
 
-        let ast2 = tsv::parse_svelte_ast(&formatted)
+        let ast2 = tsv_svelte::parse(&formatted)
             .map_err(|e| format!("Failed to parse formatted output: {}", e))?;
 
         // Compare ASTs (ignoring spans)
-        let json1 = serde_json::to_value(&tsv::convert_root(&ast1, &input))
+        let json1 = serde_json::to_value(&tsv_svelte::convert_ast(&ast1, &input))
             .map_err(|e| format!("Failed to serialize AST1: {}", e))?;
-        let json2 = serde_json::to_value(&tsv::convert_root(&ast2, &formatted))
+        let json2 = serde_json::to_value(&tsv_svelte::convert_ast(&ast2, &formatted))
             .map_err(|e| format!("Failed to serialize AST2: {}", e))?;
 
         let json1_no_loc = remove_locations(json1);
@@ -61,25 +61,18 @@ fn test_format_round_trip(fixture_path: &Path) -> Result<(), String> {
         }
     } else if file_type == "typescript" {
         // TypeScript round-trip
-        let ast1 = tsv::parse_typescript_ast(&input)
-            .map_err(|e| format!("Failed to parse input: {}", e))?;
+        let ast1 = tsv_ts::parse(&input).map_err(|e| format!("Failed to parse input: {}", e))?;
 
-        let formatted = tsv::format_typescript(&ast1);
+        let formatted = tsv_ts::format(&ast1);
 
-        let ast2 = tsv::parse_typescript_ast(&formatted)
+        let ast2 = tsv_ts::parse(&formatted)
             .map_err(|e| format!("Failed to parse formatted output: {}", e))?;
 
         // Compare ASTs (ignoring spans)
-        let json1 = serde_json::to_value(&tsv::convert_program(
-            &ast1,
-            &tsv::LocationTracker::new(&input),
-        ))
-        .map_err(|e| format!("Failed to serialize AST1: {}", e))?;
-        let json2 = serde_json::to_value(&tsv::convert_program(
-            &ast2,
-            &tsv::LocationTracker::new(&formatted),
-        ))
-        .map_err(|e| format!("Failed to serialize AST2: {}", e))?;
+        let json1 = serde_json::to_value(&tsv_ts::convert_ast(&ast1, &input))
+            .map_err(|e| format!("Failed to serialize AST1: {}", e))?;
+        let json2 = serde_json::to_value(&tsv_ts::convert_ast(&ast2, &formatted))
+            .map_err(|e| format!("Failed to serialize AST2: {}", e))?;
 
         let json1_no_loc = remove_locations(json1);
         let json2_no_loc = remove_locations(json2);
@@ -93,16 +86,16 @@ fn test_format_round_trip(fixture_path: &Path) -> Result<(), String> {
     } else {
         // CSS round-trip
         let ast1 =
-            tsv::parse_css_ast(&input).map_err(|e| format!("Failed to parse input: {}", e))?;
+            tsv_css::parse(&input, 0).map_err(|e| format!("Failed to parse input: {}", e))?;
 
-        let formatted = tsv::format_css(&ast1);
+        let formatted = tsv_css::format(&ast1);
 
-        let ast2 = tsv::parse_css_ast(&formatted)
+        let ast2 = tsv_css::parse(&formatted, 0)
             .map_err(|e| format!("Failed to parse formatted output: {}", e))?;
 
         // For CSS, we'll compare formatted strings directly since CSS AST is simple
         // If we parse and format again, it should be identical
-        let formatted2 = tsv::format_css(&ast2);
+        let formatted2 = tsv_css::format(&ast2);
 
         if formatted != formatted2 {
             return Err(format!(
@@ -135,15 +128,14 @@ fn test_format_matches_prettier(fixture_path: &Path) -> Result<(), String> {
 
     // Parse and format based on file type
     let formatted = if file_type == "svelte" {
-        let ast = tsv::parse_svelte_ast(&input).map_err(|e| format!("Failed to parse: {}", e))?;
-        tsv::format_svelte(&ast, &input)
+        let ast = tsv_svelte::parse(&input).map_err(|e| format!("Failed to parse: {}", e))?;
+        tsv_svelte::format(&ast, &input)
     } else if file_type == "typescript" {
-        let ast =
-            tsv::parse_typescript_ast(&input).map_err(|e| format!("Failed to parse: {}", e))?;
-        tsv::format_typescript(&ast)
+        let ast = tsv_ts::parse(&input).map_err(|e| format!("Failed to parse: {}", e))?;
+        tsv_ts::format(&ast)
     } else {
-        let ast = tsv::parse_css_ast(&input).map_err(|e| format!("Failed to parse: {}", e))?;
-        tsv::format_css(&ast)
+        let ast = tsv_css::parse(&input, 0).map_err(|e| format!("Failed to parse: {}", e))?;
+        tsv_css::format(&ast)
     };
 
     // Check against formatted.* if it exists, otherwise input.*
@@ -197,37 +189,36 @@ fn test_format_idempotent(fixture_path: &Path) -> Result<(), String> {
     let (format1, format2) = if file_type == "svelte" {
         // Format once
         let ast1 =
-            tsv::parse_svelte_ast(&input).map_err(|e| format!("Failed to parse input: {}", e))?;
-        let format1 = tsv::format_svelte(&ast1, &input);
+            tsv_svelte::parse(&input).map_err(|e| format!("Failed to parse input: {}", e))?;
+        let format1 = tsv_svelte::format(&ast1, &input);
 
         // Format again
-        let ast2 = tsv::parse_svelte_ast(&format1)
+        let ast2 = tsv_svelte::parse(&format1)
             .map_err(|e| format!("Failed to parse formatted output: {}", e))?;
-        let format2 = tsv::format_svelte(&ast2, &format1);
+        let format2 = tsv_svelte::format(&ast2, &format1);
 
         (format1, format2)
     } else if file_type == "typescript" {
         // Format once
-        let ast1 = tsv::parse_typescript_ast(&input)
-            .map_err(|e| format!("Failed to parse input: {}", e))?;
-        let format1 = tsv::format_typescript(&ast1);
+        let ast1 = tsv_ts::parse(&input).map_err(|e| format!("Failed to parse input: {}", e))?;
+        let format1 = tsv_ts::format(&ast1);
 
         // Format again
-        let ast2 = tsv::parse_typescript_ast(&format1)
+        let ast2 = tsv_ts::parse(&format1)
             .map_err(|e| format!("Failed to parse formatted output: {}", e))?;
-        let format2 = tsv::format_typescript(&ast2);
+        let format2 = tsv_ts::format(&ast2);
 
         (format1, format2)
     } else {
         // CSS - Format once
         let ast1 =
-            tsv::parse_css_ast(&input).map_err(|e| format!("Failed to parse input: {}", e))?;
-        let format1 = tsv::format_css(&ast1);
+            tsv_css::parse(&input, 0).map_err(|e| format!("Failed to parse input: {}", e))?;
+        let format1 = tsv_css::format(&ast1);
 
         // Format again
-        let ast2 = tsv::parse_css_ast(&format1)
+        let ast2 = tsv_css::parse(&format1, 0)
             .map_err(|e| format!("Failed to parse formatted output: {}", e))?;
-        let format2 = tsv::format_css(&ast2);
+        let format2 = tsv_css::format(&ast2);
 
         (format1, format2)
     };
@@ -260,17 +251,17 @@ fn test_format_normalization(
 
     // Parse and format the unformatted input
     let formatted = if is_svelte {
-        let ast = tsv::parse_svelte_ast(&unformatted_input)
+        let ast = tsv_svelte::parse(&unformatted_input)
             .map_err(|e| format!("Failed to parse {}: {}", unformatted_filename, e))?;
-        tsv::format_svelte(&ast, &unformatted_input)
+        tsv_svelte::format(&ast, &unformatted_input)
     } else if is_css {
-        let ast = tsv::parse_css_ast(&unformatted_input)
+        let ast = tsv_css::parse(&unformatted_input, 0)
             .map_err(|e| format!("Failed to parse {}: {}", unformatted_filename, e))?;
-        tsv::format_css(&ast)
+        tsv_css::format(&ast)
     } else {
-        let ast = tsv::parse_typescript_ast(&unformatted_input)
+        let ast = tsv_ts::parse(&unformatted_input)
             .map_err(|e| format!("Failed to parse {}: {}", unformatted_filename, e))?;
-        tsv::format_typescript(&ast)
+        tsv_ts::format(&ast)
     };
 
     // Determine expected output based on file type
