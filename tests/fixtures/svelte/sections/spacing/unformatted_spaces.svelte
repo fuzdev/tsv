@@ -1,23 +1,23 @@
-<script module>
-	const m = '';
-</script>
+          <script module>    
+	const m = '';       
+ </script>   
 
-<script lang="ts">
+<script lang="ts">      
 	const a: number = 5;
-</script>
+ </script>
 
 <div>{a}</div>
 
-<div>{a}</div>
+    <div>{a}</div>
 
 <div>{a}</div>
 
-<div>{a}</div>
+       <div>{a}</div>
 
 
-<style>
-	div {
+  <style>  
+	  div {
 		color: red;
 	}
-</style>
+       </style>
 

@@ -253,7 +253,7 @@ pub struct Text {
 
 /// Svelte ExpressionTag - {expression} in template
 ///
-/// Represents a JavaScript/TypeScript expression embedded in the template.
+/// Represents a TypeScript/JS expression embedded in the template.
 /// The expression is evaluated and its result is rendered.
 #[derive(Debug, Clone)]
 pub struct ExpressionTag {
@@ -263,7 +263,7 @@ pub struct ExpressionTag {
 
 /// Svelte Script block - <script> tag contents
 ///
-/// Contains a TypeScript/JavaScript program and metadata about the script tag.
+/// Contains a TypeScript/JS program and metadata about the script tag.
 /// The `context` field distinguishes between instance and module scripts.
 #[derive(Debug, Clone)]
 pub struct Script {

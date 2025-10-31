@@ -10,4 +10,3 @@
 
 pub mod content;
 pub mod element;
-pub mod whitespace;

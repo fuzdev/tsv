@@ -10,7 +10,7 @@ use test_helpers::{
 /// Uses formatted.* as baseline if it exists (for fixtures with structural changes),
 /// otherwise uses input.* (for fixtures where formatter only changes formatting)
 fn test_format_round_trip(fixture_path: &Path) -> Result<(), String> {
-    let fixture_dir = PathBuf::from("tests/fixtures").join(fixture_path);
+    let fixture_dir = fixture_path;
 
     // Check for Svelte, TypeScript, or CSS file
     let (input_file, formatted_file, file_type) = if fixture_dir.join("input.svelte").exists() {
@@ -37,17 +37,17 @@ fn test_format_round_trip(fixture_path: &Path) -> Result<(), String> {
     if file_type == "svelte" {
         // Svelte round-trip
         let ast1 =
-            tsvr::parse_svelte_ast(&input).map_err(|e| format!("Failed to parse input: {}", e))?;
+            tsv::parse_svelte_ast(&input).map_err(|e| format!("Failed to parse input: {}", e))?;
 
-        let formatted = tsvr::format_svelte(&ast1, &input);
+        let formatted = tsv::format_svelte(&ast1, &input);
 
-        let ast2 = tsvr::parse_svelte_ast(&formatted)
+        let ast2 = tsv::parse_svelte_ast(&formatted)
             .map_err(|e| format!("Failed to parse formatted output: {}", e))?;
 
         // Compare ASTs (ignoring spans)
-        let json1 = serde_json::to_value(&tsvr::convert_root(&ast1, &input))
+        let json1 = serde_json::to_value(&tsv::convert_root(&ast1, &input))
             .map_err(|e| format!("Failed to serialize AST1: {}", e))?;
-        let json2 = serde_json::to_value(&tsvr::convert_root(&ast2, &formatted))
+        let json2 = serde_json::to_value(&tsv::convert_root(&ast2, &formatted))
             .map_err(|e| format!("Failed to serialize AST2: {}", e))?;
 
         let json1_no_loc = remove_locations(json1);
@@ -61,23 +61,23 @@ fn test_format_round_trip(fixture_path: &Path) -> Result<(), String> {
         }
     } else if file_type == "typescript" {
         // TypeScript round-trip
-        let ast1 = tsvr::parse_typescript_ast(&input)
+        let ast1 = tsv::parse_typescript_ast(&input)
             .map_err(|e| format!("Failed to parse input: {}", e))?;
 
-        let formatted = tsvr::format_typescript(&ast1);
+        let formatted = tsv::format_typescript(&ast1);
 
-        let ast2 = tsvr::parse_typescript_ast(&formatted)
+        let ast2 = tsv::parse_typescript_ast(&formatted)
             .map_err(|e| format!("Failed to parse formatted output: {}", e))?;
 
         // Compare ASTs (ignoring spans)
-        let json1 = serde_json::to_value(&tsvr::convert_program(
+        let json1 = serde_json::to_value(&tsv::convert_program(
             &ast1,
-            &tsvr::LocationTracker::new(&input),
+            &tsv::LocationTracker::new(&input),
         ))
         .map_err(|e| format!("Failed to serialize AST1: {}", e))?;
-        let json2 = serde_json::to_value(&tsvr::convert_program(
+        let json2 = serde_json::to_value(&tsv::convert_program(
             &ast2,
-            &tsvr::LocationTracker::new(&formatted),
+            &tsv::LocationTracker::new(&formatted),
         ))
         .map_err(|e| format!("Failed to serialize AST2: {}", e))?;
 
@@ -93,16 +93,16 @@ fn test_format_round_trip(fixture_path: &Path) -> Result<(), String> {
     } else {
         // CSS round-trip
         let ast1 =
-            tsvr::parse_css_ast(&input).map_err(|e| format!("Failed to parse input: {}", e))?;
+            tsv::parse_css_ast(&input).map_err(|e| format!("Failed to parse input: {}", e))?;
 
-        let formatted = tsvr::format_css(&ast1);
+        let formatted = tsv::format_css(&ast1);
 
-        let ast2 = tsvr::parse_css_ast(&formatted)
+        let ast2 = tsv::parse_css_ast(&formatted)
             .map_err(|e| format!("Failed to parse formatted output: {}", e))?;
 
         // For CSS, we'll compare formatted strings directly since CSS AST is simple
         // If we parse and format again, it should be identical
-        let formatted2 = tsvr::format_css(&ast2);
+        let formatted2 = tsv::format_css(&ast2);
 
         if formatted != formatted2 {
             return Err(format!(
@@ -117,7 +117,7 @@ fn test_format_round_trip(fixture_path: &Path) -> Result<(), String> {
 
 /// Test prettier baseline: format → compare against formatted.* or input.*
 fn test_format_matches_prettier(fixture_path: &Path) -> Result<(), String> {
-    let fixture_dir = PathBuf::from("tests/fixtures").join(fixture_path);
+    let fixture_dir = fixture_path;
 
     // Check for Svelte, TypeScript, or CSS file
     let (input_file, formatted_file, file_type) = if fixture_dir.join("input.svelte").exists() {
@@ -135,15 +135,15 @@ fn test_format_matches_prettier(fixture_path: &Path) -> Result<(), String> {
 
     // Parse and format based on file type
     let formatted = if file_type == "svelte" {
-        let ast = tsvr::parse_svelte_ast(&input).map_err(|e| format!("Failed to parse: {}", e))?;
-        tsvr::format_svelte(&ast, &input)
+        let ast = tsv::parse_svelte_ast(&input).map_err(|e| format!("Failed to parse: {}", e))?;
+        tsv::format_svelte(&ast, &input)
     } else if file_type == "typescript" {
         let ast =
-            tsvr::parse_typescript_ast(&input).map_err(|e| format!("Failed to parse: {}", e))?;
-        tsvr::format_typescript(&ast)
+            tsv::parse_typescript_ast(&input).map_err(|e| format!("Failed to parse: {}", e))?;
+        tsv::format_typescript(&ast)
     } else {
-        let ast = tsvr::parse_css_ast(&input).map_err(|e| format!("Failed to parse: {}", e))?;
-        tsvr::format_css(&ast)
+        let ast = tsv::parse_css_ast(&input).map_err(|e| format!("Failed to parse: {}", e))?;
+        tsv::format_css(&ast)
     };
 
     // Check against formatted.* if it exists, otherwise input.*
@@ -170,7 +170,7 @@ fn test_format_matches_prettier(fixture_path: &Path) -> Result<(), String> {
 /// Uses formatted.* as baseline if it exists (for fixtures with structural changes),
 /// otherwise uses input.* (for fixtures where formatter only changes formatting)
 fn test_format_idempotent(fixture_path: &Path) -> Result<(), String> {
-    let fixture_dir = PathBuf::from("tests/fixtures").join(fixture_path);
+    let fixture_dir = fixture_path;
 
     // Check for Svelte, TypeScript, or CSS file
     let (input_file, formatted_file, file_type) = if fixture_dir.join("input.svelte").exists() {
@@ -197,37 +197,37 @@ fn test_format_idempotent(fixture_path: &Path) -> Result<(), String> {
     let (format1, format2) = if file_type == "svelte" {
         // Format once
         let ast1 =
-            tsvr::parse_svelte_ast(&input).map_err(|e| format!("Failed to parse input: {}", e))?;
-        let format1 = tsvr::format_svelte(&ast1, &input);
+            tsv::parse_svelte_ast(&input).map_err(|e| format!("Failed to parse input: {}", e))?;
+        let format1 = tsv::format_svelte(&ast1, &input);
 
         // Format again
-        let ast2 = tsvr::parse_svelte_ast(&format1)
+        let ast2 = tsv::parse_svelte_ast(&format1)
             .map_err(|e| format!("Failed to parse formatted output: {}", e))?;
-        let format2 = tsvr::format_svelte(&ast2, &format1);
+        let format2 = tsv::format_svelte(&ast2, &format1);
 
         (format1, format2)
     } else if file_type == "typescript" {
         // Format once
-        let ast1 = tsvr::parse_typescript_ast(&input)
+        let ast1 = tsv::parse_typescript_ast(&input)
             .map_err(|e| format!("Failed to parse input: {}", e))?;
-        let format1 = tsvr::format_typescript(&ast1);
+        let format1 = tsv::format_typescript(&ast1);
 
         // Format again
-        let ast2 = tsvr::parse_typescript_ast(&format1)
+        let ast2 = tsv::parse_typescript_ast(&format1)
             .map_err(|e| format!("Failed to parse formatted output: {}", e))?;
-        let format2 = tsvr::format_typescript(&ast2);
+        let format2 = tsv::format_typescript(&ast2);
 
         (format1, format2)
     } else {
         // CSS - Format once
         let ast1 =
-            tsvr::parse_css_ast(&input).map_err(|e| format!("Failed to parse input: {}", e))?;
-        let format1 = tsvr::format_css(&ast1);
+            tsv::parse_css_ast(&input).map_err(|e| format!("Failed to parse input: {}", e))?;
+        let format1 = tsv::format_css(&ast1);
 
         // Format again
-        let ast2 = tsvr::parse_css_ast(&format1)
+        let ast2 = tsv::parse_css_ast(&format1)
             .map_err(|e| format!("Failed to parse formatted output: {}", e))?;
-        let format2 = tsvr::format_css(&ast2);
+        let format2 = tsv::format_css(&ast2);
 
         (format1, format2)
     };
@@ -247,7 +247,7 @@ fn test_format_normalization(
     fixture_path: &Path,
     unformatted_filename: &str,
 ) -> Result<(), String> {
-    let fixture_dir = PathBuf::from("tests/fixtures").join(fixture_path);
+    let fixture_dir = fixture_path;
 
     // Read the unformatted variant
     let unformatted_path = fixture_dir.join(unformatted_filename);
@@ -260,17 +260,17 @@ fn test_format_normalization(
 
     // Parse and format the unformatted input
     let formatted = if is_svelte {
-        let ast = tsvr::parse_svelte_ast(&unformatted_input)
+        let ast = tsv::parse_svelte_ast(&unformatted_input)
             .map_err(|e| format!("Failed to parse {}: {}", unformatted_filename, e))?;
-        tsvr::format_svelte(&ast, &unformatted_input)
+        tsv::format_svelte(&ast, &unformatted_input)
     } else if is_css {
-        let ast = tsvr::parse_css_ast(&unformatted_input)
+        let ast = tsv::parse_css_ast(&unformatted_input)
             .map_err(|e| format!("Failed to parse {}: {}", unformatted_filename, e))?;
-        tsvr::format_css(&ast)
+        tsv::format_css(&ast)
     } else {
-        let ast = tsvr::parse_typescript_ast(&unformatted_input)
+        let ast = tsv::parse_typescript_ast(&unformatted_input)
             .map_err(|e| format!("Failed to parse {}: {}", unformatted_filename, e))?;
-        tsvr::format_typescript(&ast)
+        tsv::format_typescript(&ast)
     };
 
     // Determine expected output based on file type
@@ -316,8 +316,7 @@ fn test_formatter_all_fixtures() {
 
     for fixture in &fixtures {
         // Fixture structure validation (checks conventions are followed)
-        let fixture_dir = fixtures_dir.join(fixture);
-        if let Err(e) = validate_fixture_structure(&fixture_dir) {
+        if let Err(e) = validate_fixture_structure(fixture) {
             failures.push(format!(
                 "[Fixture structure] Failed to validate {}: {}",
                 fixture.display(),
@@ -342,7 +341,7 @@ fn test_formatter_all_fixtures() {
         }
 
         // Normalization tests (auto-discover unformatted_*.ts variants)
-        let unformatted_variants = discover_unformatted_variants(&fixture_dir);
+        let unformatted_variants = discover_unformatted_variants(fixture);
         for variant in unformatted_variants {
             if let Err(e) = test_format_normalization(fixture, &variant) {
                 failures.push(format!("[Normalization] {}", e));

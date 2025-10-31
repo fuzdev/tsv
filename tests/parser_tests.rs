@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use test_helpers::discover_fixtures;
 
 fn test_fixture(fixture_path: &Path) -> Result<(), String> {
-    let fixture_dir = PathBuf::from("tests/fixtures").join(fixture_path);
+    let fixture_dir = fixture_path;
 
     // Parser tests require expected.json
     if !fixture_dir.join("expected.json").exists() {
@@ -30,7 +30,7 @@ fn test_fixture(fixture_path: &Path) -> Result<(), String> {
     let expected = fs::read_to_string(fixture_dir.join("expected.json"))
         .map_err(|e| format!("Failed to read expected.json: {}", e))?;
 
-    let actual = tsvr::parse_to_json(&input).map_err(|e| format!("Failed to parse: {}", e))?;
+    let actual = tsv::parse_to_json(&input).map_err(|e| format!("Failed to parse: {}", e))?;
 
     let actual_json: serde_json::Value =
         serde_json::from_str(&actual).map_err(|e| format!("Failed to parse actual JSON: {}", e))?;

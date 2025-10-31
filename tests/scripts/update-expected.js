@@ -52,7 +52,7 @@ function generateExpectedFixture(fixturePath, relativePath, inputFile) {
 				locations: true,
 			});
 		} else if (isCss) {
-			// For CSS files, use our Rust parser via the tsvr CLI
+			// For CSS files, use our Rust parser via the tsv CLI
 			try {
 				const output = execSync(`cargo run --quiet parse "${inputPath}" --pretty`, {
 					encoding: 'utf-8',
@@ -104,9 +104,15 @@ function generateExpectedFixture(fixturePath, relativePath, inputFile) {
 /**
  * @param {string} dir
  * @param {string} base
+ * @param {string} rootDir
  * @returns {Generator<{path: string, relative: string, inputFile: string}>}
  */
-function* walkFixtures(dir, base = '') {
+function* walkFixtures(dir, base = '', rootDir = null) {
+	// Track the root directory for ./ prefix
+	if (rootDir === null) {
+		rootDir = dir;
+	}
+
 	const entries = readdirSync(dir, {withFileTypes: true});
 
 	for (const entry of entries) {
@@ -119,7 +125,9 @@ function* walkFixtures(dir, base = '') {
 				const inputPath = join(fullPath, inputFile);
 				try {
 					statSync(inputPath);
-					yield {path: fullPath, relative: relativePath, inputFile};
+					// Return path with ./ prefix
+					const displayPath = './' + join(rootDir, relativePath);
+					yield {path: fullPath, relative: displayPath, inputFile};
 					break; // Found an input file, don't check others
 				} catch {
 					// File doesn't exist, try next
@@ -137,7 +145,7 @@ function* walkFixtures(dir, base = '') {
 					}
 				})
 			) {
-				yield* walkFixtures(fullPath, relativePath);
+				yield* walkFixtures(fullPath, relativePath, rootDir);
 			}
 		}
 	}

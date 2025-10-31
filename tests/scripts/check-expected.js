@@ -91,9 +91,15 @@ async function checkFixture(fixturePath, relativePath, inputFile) {
 /**
  * @param {string} dir
  * @param {string} base
+ * @param {string} rootDir
  * @returns {AsyncGenerator<{path: string, relative: string, inputFile: string}>}
  */
-async function* walkFixtures(dir, base = '') {
+async function* walkFixtures(dir, base = '', rootDir = null) {
+	// Track the root directory for ./ prefix
+	if (rootDir === null) {
+		rootDir = dir;
+	}
+
 	const entries = await readdir(dir, {withFileTypes: true});
 
 	for (const entry of entries) {
@@ -106,7 +112,9 @@ async function* walkFixtures(dir, base = '') {
 				const inputPath = join(fullPath, inputFile);
 				try {
 					await stat(inputPath);
-					yield {path: fullPath, relative: relativePath, inputFile};
+					// Return path with ./ prefix
+					const displayPath = './' + join(rootDir, relativePath);
+					yield {path: fullPath, relative: displayPath, inputFile};
 					break; // Found an input file, don't check others
 				} catch {
 					// File doesn't exist, try next
@@ -127,7 +135,7 @@ async function* walkFixtures(dir, base = '') {
 			})();
 
 			if (!hasInput) {
-				yield* walkFixtures(fullPath, relativePath);
+				yield* walkFixtures(fullPath, relativePath, rootDir);
 			}
 		}
 	}

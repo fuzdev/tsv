@@ -464,7 +464,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tsvr"
+name = "tsv"
 version = "0.1.0"
 dependencies = [
  "criterion",

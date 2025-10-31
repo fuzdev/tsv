@@ -48,9 +48,10 @@ fn discover_fixtures_recursive(base_dir: &Path, current_dir: &Path, fixtures: &m
         || current_dir.join("input.css").exists();
 
     if has_input {
-        // Get relative path from base_dir
-        let rel_path = current_dir.strip_prefix(base_dir).unwrap_or(current_dir);
-        fixtures.push(rel_path.to_path_buf());
+        // Return full path with ./ prefix (e.g., ./tests/fixtures/typescript/literal)
+        let mut path_with_prefix = PathBuf::from(".");
+        path_with_prefix.push(current_dir);
+        fixtures.push(path_with_prefix);
     }
 }
 

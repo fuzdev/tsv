@@ -29,13 +29,4 @@ impl Formatter {
         let tag_name = self.resolve_symbol(element.name);
         html::is_block_element(&tag_name)
     }
-
-    /// Check if element is void (self-closing by spec)
-    ///
-    /// Adapter that resolves the element's tag name and calls the pure
-    /// language-level classification function.
-    pub(crate) fn is_void_element(&self, element: &internal::Element) -> bool {
-        let tag_name = self.resolve_symbol(element.name);
-        html::is_void_element(&tag_name)
-    }
 }

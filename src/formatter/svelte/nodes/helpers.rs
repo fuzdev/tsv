@@ -9,7 +9,7 @@ use crate::formatter::Formatter;
 impl Formatter {
     /// Format an ExpressionTag
     ///
-    /// Expression tags are Svelte-specific syntax for embedding JavaScript/TypeScript
+    /// Expression tags are Svelte-specific syntax for embedding TypeScript/JS
     /// expressions in the template: `{expression}`
     pub fn format_expression_tag(&mut self, tag: &crate::ast::internal::ExpressionTag) {
         self.write("{");

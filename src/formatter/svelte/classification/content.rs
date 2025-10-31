@@ -11,6 +11,7 @@
 use super::super::text::TextAnalysis;
 use crate::ast::internal::{self, FragmentNode};
 use crate::formatter::Formatter;
+use crate::language::html;
 
 impl Formatter {
     /// Check if a fragment node is inline content
@@ -21,7 +22,12 @@ impl Formatter {
     /// - Text nodes (any text content)
     pub(crate) fn is_inline_node(&self, node: &FragmentNode) -> bool {
         match node {
-            FragmentNode::Element(el) => self.is_inline_element(el) || self.is_void_element(el),
+            FragmentNode::Element(el) => {
+                // Optimize: resolve symbol once for both checks
+                self.with_resolved_symbol(el.name, |tag| {
+                    html::is_inline_element(tag) || html::is_void_element(tag)
+                })
+            }
             FragmentNode::ExpressionTag(_) => true,
             FragmentNode::Text(_) => true,
         }

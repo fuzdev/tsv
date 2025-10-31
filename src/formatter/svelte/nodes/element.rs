@@ -5,6 +5,7 @@
 
 use crate::ast::internal::{self, FragmentNode};
 use crate::formatter::Formatter;
+use crate::language::html;
 
 impl Formatter {
     /// Format a Svelte element with context-aware formatting
@@ -12,17 +13,20 @@ impl Formatter {
     /// Block elements with multiple block children: multiline with indentation
     /// All other cases: compact (single line)
     pub fn format_element(&mut self, element: &internal::Element) {
-        let tag_name = self.resolve_symbol(element.name);
-
-        // Determine element characteristics
-        let is_block = self.is_block_element(element);
-        let preserves_ws = self.preserves_whitespace(element);
-        let is_void = self.is_void_element(element);
+        // Determine element characteristics (single symbol resolution for efficiency)
+        let (is_block, preserves_ws, is_void) = self.with_resolved_symbol(element.name, |tag| {
+            (
+                html::is_block_element(tag),
+                html::preserves_whitespace(tag),
+                html::is_void_element(tag),
+            )
+        });
 
         // Decide if children should be multiline
         let multiline = self.should_format_multiline(element, is_block, preserves_ws);
 
         // Opening tag
+        let tag_name = self.resolve_symbol(element.name);
         self.write("<");
         self.write(&tag_name);
         // TODO: Format attributes (future sprint)

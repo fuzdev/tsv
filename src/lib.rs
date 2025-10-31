@@ -22,7 +22,7 @@ pub use formatter::{format_css, format_svelte, format_typescript};
 // Re-export AST converter for tests
 pub use ast::{convert_program, convert_root};
 
-/// Parse TypeScript/JavaScript source and return internal AST
+/// Parse TypeScript/JS source and return internal AST
 pub fn parse_typescript_ast(source: &str) -> Result<internal::Program, ParseError> {
     // Check file size limit (u32::MAX for span positions)
     if source.len() > u32::MAX as usize {

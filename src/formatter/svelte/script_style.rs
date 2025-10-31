@@ -1,7 +1,7 @@
 // Script and Style section formatting for Svelte components
 //
 // Handles the top-level <script> and <style> sections in .svelte files.
-// These sections contain TypeScript/JavaScript and CSS respectively,
+// These sections contain TypeScript/JS and CSS respectively,
 // which are formatted using their dedicated formatters.
 
 use crate::ast::internal;
