@@ -1,7 +1,7 @@
 {
   "name": "tsv",
   "version": "0.0.1",
-  "description": "a high-performance Rust parser that's a drop-in replacement for Svelte's modern parser (acorn + acorn-typescript)",
+  "description": "a collection of efficient and effective tools for TypeScript, CSS, HTML, and Svelte",
   "homepage": "https://www.tsv.dev/",
   "bugs": {
     "url": "https://github.com/ryanatkn/tsv/issues"
@@ -18,15 +18,14 @@
   },
   "type": "module",
   "scripts": {
-    "test": "cargo test && cargo clippy && npm run typecheck && prettier . --check && npm run fixtures:check-formatted",
+    "test": "cargo test && cargo clippy && npm run typecheck && prettier . --check && npm run fixtures_check_formatted",
     "typecheck": "tsc",
     "format": "cargo fmt && prettier . --write",
-    "fixtures:update-expected": "node tests/scripts/update-expected.js",
-    "fixtures:update-formatted": "node tests/scripts/update-formatted.js",
-    "fixtures:check-formatted": "node tests/scripts/check-expected.js",
-    "fixtures:list": "node tests/scripts/update-expected.js --list",
-    "debug:compare": "node tests/debug/compare.js",
-    "debug:ast": "node tests/debug/parse-ast.js"
+    "fixtures_update_expected": "cargo run -p tsv_debug --quiet fixtures_update_expected",
+    "fixtures_update_formatted": "cargo run -p tsv_debug --quiet fixtures_update_formatted",
+    "fixtures_check_formatted": "cargo run -p tsv_debug --quiet fixtures_check_formatted",
+    "fixtures_list": "cargo run -p tsv_debug --quiet fixtures_update_expected --list",
+    "debug_compare": "cargo run -p tsv_debug --quiet compare"
   },
   "devDependencies": {
     "@types/node": "^24.9.2",
@@ -51,5 +50,6 @@
         }
       }
     ]
-  }
+  },
+  "motto": "TypeScript and Svelte tools in Rust"
 }
