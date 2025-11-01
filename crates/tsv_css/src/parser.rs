@@ -1,4 +1,31 @@
 // CSS parser - parse CSS content from <style> tags
+//
+// PERFORMANCE CONSIDERATIONS:
+//
+// TODO: Future optimization opportunities (Phase 4+ from CSS_SPEC.md):
+//
+// 1. Pre-compile regex patterns (like Svelte does)
+//    - Currently we match character-by-character in lexer
+//    - Could use regex for faster identifier/number matching
+//    - Trade-off: regex overhead vs simpler code
+//
+// 2. String slicing over allocation
+//    - Currently allocating String for selectors, properties, values
+//    - Could use string slices (&str) with lifetime management
+//    - Trade-off: memory vs complexity
+//
+// 3. Single-pass parsing (inline tokenization like Svelte)
+//    - Currently two-pass: lex then parse
+//    - Could collapse into single pass
+//    - Trade-off: performance vs debuggability (see lexer.rs TODO)
+//
+// 4. Arena allocation for AST nodes
+//    - Currently using Vec and individual allocations
+//    - Could use typed-arena or bumpalo for better cache locality
+//    - Trade-off: speed vs memory control
+//
+// Recommendation: Implement features first, optimize when proven necessary.
+// Profile real-world CSS files (10k+ lines) before optimizing.
 
 use crate::ast::internal::*;
 use crate::lexer::{Lexer, TokenKind};
@@ -53,11 +80,11 @@ impl<'a> CssParser<'a> {
         Ok(())
     }
 
-    fn check(&self, kind: TokenKind) -> bool {
-        self.current_kind == kind
+    fn check(&self, kind: &TokenKind) -> bool {
+        &self.current_kind == kind
     }
 
-    fn expect(&mut self, kind: TokenKind) -> Result<(), ParseError> {
+    fn expect(&mut self, kind: &TokenKind) -> Result<(), ParseError> {
         if !self.check(kind) {
             return Err(ParseError::InvalidSyntax {
                 message: format!("Expected {:?}, found {:?}", kind, self.current_kind),
@@ -69,7 +96,7 @@ impl<'a> CssParser<'a> {
     }
 
     fn skip_whitespace(&mut self) -> Result<(), ParseError> {
-        while self.check(TokenKind::Whitespace) {
+        while self.check(&TokenKind::Whitespace) {
             self.advance()?;
         }
         Ok(())
@@ -85,7 +112,26 @@ impl<'a> CssParser<'a> {
 
         self.skip_whitespace()?;
 
-        while !self.check(TokenKind::Eof) {
+        while !self.check(&TokenKind::Eof) {
+            // Handle comments at top level
+            if let TokenKind::Comment(content) = &self.current_kind {
+                let comment_start = self.base_offset + self.current_start;
+                let comment_end = self.base_offset + self.current_end;
+                let content = content.clone();
+
+                self.advance()?;
+                self.skip_whitespace()?;
+
+                nodes.push(CssNode::Comment(CssComment {
+                    content,
+                    span: Span {
+                        start: comment_start as u32,
+                        end: comment_end as u32,
+                    },
+                }));
+                continue;
+            }
+
             // For now, only parse rules (selector { declarations })
             let node = self.parse_rule()?;
             nodes.push(CssNode::Rule(node));
@@ -99,19 +145,20 @@ impl<'a> CssParser<'a> {
     /// Parse a CSS rule: `selector { property: value; }`
     fn parse_rule(&mut self) -> Result<CssRule, ParseError> {
         let start = self.base_offset + self.current_start;
+        let selector_start_in_source = self.current_start;
 
-        // Parse selector (just grab identifiers until we hit {)
-        let mut selector_parts = Vec::new();
-        let mut selector_end = start;
-        while !self.check(TokenKind::LeftBrace) && !self.check(TokenKind::Eof) {
-            if self.check(TokenKind::Identifier) {
-                selector_parts.push(self.current_value().to_string());
-                selector_end = self.base_offset + self.current_end; // Track last identifier's end
-            }
+        // Advance past selector tokens until we hit {
+        // Phase 2: TODO - parse selectors into structured AST (see CSS_SPEC.md)
+        // For now, just preserve the raw selector text
+        while !self.check(&TokenKind::LeftBrace) && !self.check(&TokenKind::Eof) {
             self.advance()?;
         }
 
-        let selector = selector_parts.join(" ");
+        // Extract raw selector text from source (trimmed)
+        let selector_end_in_source = self.current_start;
+        let selector = self.source[selector_start_in_source..selector_end_in_source]
+            .trim()
+            .to_string();
 
         if selector.is_empty() {
             return Err(ParseError::InvalidSyntax {
@@ -121,15 +168,17 @@ impl<'a> CssParser<'a> {
             });
         }
 
+        let selector_end = start + selector.len();
+
         // Expect { and capture its start
         let block_start = self.base_offset + self.current_start;
-        self.expect(TokenKind::LeftBrace)?;
+        self.expect(&TokenKind::LeftBrace)?;
         self.skip_whitespace()?;
 
         // Parse declarations
         let mut declarations = Vec::new();
-        while !self.check(TokenKind::RightBrace) && !self.check(TokenKind::Eof) {
-            if self.check(TokenKind::Identifier) {
+        while !self.check(&TokenKind::RightBrace) && !self.check(&TokenKind::Eof) {
+            if self.check(&TokenKind::Identifier) {
                 let decl = self.parse_declaration()?;
                 declarations.push(decl);
             } else {
@@ -140,7 +189,7 @@ impl<'a> CssParser<'a> {
         }
 
         // Expect } and capture its end position
-        if !self.check(TokenKind::RightBrace) {
+        if !self.check(&TokenKind::RightBrace) {
             return Err(ParseError::InvalidSyntax {
                 message: "Expected '}'".to_string(),
                 position: self.base_offset + self.current_start,
@@ -174,7 +223,7 @@ impl<'a> CssParser<'a> {
         let start = self.base_offset + self.current_start;
 
         // Parse property
-        if !self.check(TokenKind::Identifier) {
+        if !self.check(&TokenKind::Identifier) {
             return Err(ParseError::InvalidSyntax {
                 message: "Expected property name".to_string(),
                 position: start,
@@ -187,20 +236,40 @@ impl<'a> CssParser<'a> {
         self.skip_whitespace()?;
 
         // Expect :
-        self.expect(TokenKind::Colon)?;
+        self.expect(&TokenKind::Colon)?;
         self.skip_whitespace()?;
 
         // Parse value (collect tokens until ; or })
         let mut value_parts = Vec::new();
         let mut value_end = start;
-        while !self.check(TokenKind::Semicolon)
-            && !self.check(TokenKind::RightBrace)
-            && !self.check(TokenKind::Eof)
+        while !self.check(&TokenKind::Semicolon)
+            && !self.check(&TokenKind::RightBrace)
+            && !self.check(&TokenKind::Eof)
         {
-            if self.check(TokenKind::Identifier) {
-                value_parts.push(self.current_value().to_string());
-                value_end = self.base_offset + self.current_end;
-            }
+            // Convert token to string representation for value
+            let value_str = match &self.current_kind {
+                TokenKind::Identifier => self.current_value().to_string(),
+                TokenKind::String { content, quote } => format!("{}{}{}", quote, content, quote),
+                TokenKind::Number(n) => n.to_string(),
+                TokenKind::Percentage(n) => format!("{}%", n),
+                TokenKind::Dimension(n, unit) => format!("{}{}", n, unit),
+                TokenKind::Whitespace => {
+                    self.advance()?;
+                    continue;
+                }
+                TokenKind::Comment(_) => {
+                    // Skip comments in values
+                    self.advance()?;
+                    continue;
+                }
+                _ => {
+                    // Other tokens - include them as-is from source
+                    self.current_value().to_string()
+                }
+            };
+
+            value_parts.push(value_str);
+            value_end = self.base_offset + self.current_end;
             self.advance()?;
         }
 
@@ -218,7 +287,7 @@ impl<'a> CssParser<'a> {
         let end = value_end;
 
         // Optionally consume semicolon (but don't include it in the declaration span)
-        if self.check(TokenKind::Semicolon) {
+        if self.check(&TokenKind::Semicolon) {
             self.advance()?;
         }
 

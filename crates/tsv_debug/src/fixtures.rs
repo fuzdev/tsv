@@ -26,11 +26,15 @@ impl Fixture {
 
     /// Get the full path to formatted file
     pub fn formatted_path(&self) -> PathBuf {
-        let extension = Path::new(&self.input_file)
+        self.path.join(format!("formatted.{}", self.extension()))
+    }
+
+    /// Get the file extension (e.g., "svelte", "ts", "css")
+    pub fn extension(&self) -> &str {
+        Path::new(&self.input_file)
             .extension()
             .and_then(|e| e.to_str())
-            .unwrap_or("");
-        self.path.join(format!("formatted.{}", extension))
+            .unwrap_or("")
     }
 
     /// Determine the file type from the input filename
@@ -52,7 +56,9 @@ impl Fixture {
             return true;
         }
         let lower_path = self.relative_path.to_lowercase();
-        filters.iter().all(|filter| lower_path.contains(&filter.to_lowercase()))
+        filters
+            .iter()
+            .all(|filter| lower_path.contains(&filter.to_lowercase()))
     }
 }
 
@@ -110,9 +116,12 @@ fn walk_fixtures_recursive(
             for input_file in &input_files {
                 let input_path = path.join(input_file);
                 if input_path.exists() {
+                    // Create relative path with ./{root}/ prefix
+                    let relative_with_prefix = format!("./{}/{}", root.display(), new_relative);
+
                     fixtures.push(Fixture {
                         path: path.clone(),
-                        relative_path: new_relative.clone(),
+                        relative_path: relative_with_prefix,
                         input_file: input_file.to_string(),
                     });
                     found_input = true;
@@ -130,23 +139,131 @@ fn walk_fixtures_recursive(
     Ok(())
 }
 
+/// Discover unformatted_* variant files in a fixture directory
+pub fn discover_unformatted_variants(fixture_dir: &Path) -> Vec<String> {
+    let mut variants = Vec::new();
+
+    if let Ok(entries) = fs::read_dir(fixture_dir) {
+        for entry in entries.flatten() {
+            if let Some(filename) = entry.file_name().to_str() {
+                if filename.starts_with("unformatted_")
+                    && (filename.ends_with(".ts")
+                        || filename.ends_with(".svelte")
+                        || filename.ends_with(".css"))
+                {
+                    variants.push(filename.to_string());
+                }
+            }
+        }
+    }
+
+    variants.sort();
+    variants
+}
+
+/// Validate fixture structure and conventions
+///
+/// Checks:
+/// 1. `input.*` exists for every fixture
+/// 2. `unformatted_*` variants are NOT identical to `input.*`
+/// 3. `formatted.*` files exist only when different from `input.*`
+/// 4. `expected.json` exists (required for parser tests)
+/// 5. `unformatted_*` variants do NOT coexist with `formatted.*` (redundant)
+pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
+    let fixture_dir = &fixture.path;
+
+    // Check expected.json exists (required for parser tests)
+    let expected_path = fixture.expected_path();
+    if !expected_path.exists() {
+        return Err(format!(
+            "Missing expected.json (required for parser tests, run: deno task fixtures_update_expected)"
+        ));
+    }
+
+    let input_content = read_file(&fixture.input_path())?;
+
+    // Check unformatted_* variants are not identical to input
+    let unformatted_variants = discover_unformatted_variants(fixture_dir);
+    for variant_name in &unformatted_variants {
+        let variant_path = fixture_dir.join(variant_name);
+        let variant_content = read_file(&variant_path)?;
+
+        if variant_content == input_content {
+            return Err(format!(
+                "unformatted_* variant '{}' is identical to input.{} (should be different for testing normalization)",
+                variant_name,
+                fixture.extension()
+            ));
+        }
+    }
+
+    // Check formatted.* files only exist when different from input
+    let formatted_path = fixture.formatted_path();
+    if formatted_path.exists() {
+        let formatted_content = read_file(&formatted_path)?;
+
+        if formatted_content == input_content {
+            return Err(format!(
+                "formatted.{} is identical to input.{} (should be deleted if no changes needed)",
+                fixture.extension(),
+                fixture.extension()
+            ));
+        }
+
+        // Check that unformatted_* variants don't coexist with formatted.*
+        if !unformatted_variants.is_empty() {
+            return Err(format!(
+                "unformatted_* variants ({}) should not coexist with formatted.{} (input.{} is already unformatted - probably rename input.{} → unformatted_something.{} and formatted.{} → input.{})",
+                unformatted_variants.join(", "),
+                fixture.extension(),
+                fixture.extension(),
+                fixture.extension(),
+                fixture.extension(),
+                fixture.extension(),
+                fixture.extension()
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// Recursively remove location/span fields from JSON for AST comparison
+#[allow(dead_code)]
+pub fn remove_locations(mut value: serde_json::Value) -> serde_json::Value {
+    match &mut value {
+        serde_json::Value::Object(map) => {
+            map.remove("start");
+            map.remove("end");
+            map.remove("loc");
+            for v in map.values_mut() {
+                *v = remove_locations(v.clone());
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for v in arr.iter_mut() {
+                *v = remove_locations(v.clone());
+            }
+        }
+        _ => {}
+    }
+    value
+}
+
 /// Read file contents
 pub fn read_file(path: &Path) -> Result<String, String> {
-    fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read file {:?}: {}", path, e))
+    fs::read_to_string(path).map_err(|e| format!("Failed to read file {:?}: {}", path, e))
 }
 
 /// Write file contents
 pub fn write_file(path: &Path, content: &str) -> Result<(), String> {
-    fs::write(path, content)
-        .map_err(|e| format!("Failed to write file {:?}: {}", path, e))
+    fs::write(path, content).map_err(|e| format!("Failed to write file {:?}: {}", path, e))
 }
 
 /// Delete file if it exists
 pub fn delete_file_if_exists(path: &Path) -> Result<(), String> {
     if path.exists() {
-        fs::remove_file(path)
-            .map_err(|e| format!("Failed to delete file {:?}: {}", path, e))?;
+        fs::remove_file(path).map_err(|e| format!("Failed to delete file {:?}: {}", path, e))?;
     }
     Ok(())
 }

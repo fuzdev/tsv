@@ -6,7 +6,18 @@ use super::internal;
 pub fn convert_css_node(node: &internal::CssNode, source: &str) -> serde_json::Value {
     match node {
         internal::CssNode::Rule(rule) => convert_css_rule(rule, source),
+        internal::CssNode::Comment(comment) => convert_css_comment(comment),
     }
+}
+
+/// Convert a CSS comment to JSON representation
+fn convert_css_comment(comment: &internal::CssComment) -> serde_json::Value {
+    serde_json::json!({
+        "type": "Comment",
+        "start": comment.span.start,
+        "end": comment.span.end,
+        "data": comment.content,
+    })
 }
 
 /// Convert a CSS rule to JSON representation
@@ -84,9 +95,11 @@ pub fn convert_css_nodes(nodes: &[internal::CssNode], source: &str) -> serde_jso
     let (content_start, content_end) = if let Some(first) = nodes.first() {
         let start = match first {
             internal::CssNode::Rule(rule) => rule.span.start,
+            internal::CssNode::Comment(comment) => comment.span.start,
         };
         let end = match nodes.last().unwrap() {
             internal::CssNode::Rule(rule) => rule.span.end,
+            internal::CssNode::Comment(comment) => comment.span.end,
         };
         (start, end)
     } else {

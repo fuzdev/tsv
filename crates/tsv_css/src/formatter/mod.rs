@@ -16,6 +16,7 @@
 mod rules;
 
 use crate::ast::internal::CssNode;
+use tsv_lang::OutputBuffer;
 
 /// Format configuration
 #[derive(Debug, Clone)]
@@ -39,11 +40,13 @@ impl Default for FormatConfig {
 /// Formatter state for building output
 pub struct Formatter {
     /// Output buffer
-    buffer: String,
+    buffer: OutputBuffer,
     /// Current indentation level
     pub(crate) indent_level: usize,
     /// Format configuration
     config: FormatConfig,
+    /// Original source (for blank line detection)
+    source: Option<String>,
 }
 
 impl Formatter {
@@ -55,36 +58,68 @@ impl Formatter {
     /// Create a new formatter with the given config
     pub fn with_config(config: FormatConfig) -> Self {
         Self {
-            buffer: String::new(),
+            buffer: OutputBuffer::new(),
             indent_level: 0,
             config,
+            source: None,
+        }
+    }
+
+    /// Create a new formatter with source (for blank line preservation)
+    pub fn with_source(source: &str) -> Self {
+        Self {
+            buffer: OutputBuffer::new(),
+            indent_level: 0,
+            config: FormatConfig::default(),
+            source: Some(source.to_string()),
         }
     }
 
     /// Write a string to the buffer
     pub(crate) fn write(&mut self, s: &str) {
-        self.buffer.push_str(s);
+        self.buffer.write(s);
     }
 
     /// Write indentation based on current indent level
     ///
     /// Used for formatting nested structures like CSS rules.
     pub(crate) fn write_indent(&mut self) {
-        for _ in 0..self.indent_level {
-            self.write(self.config.indent);
-        }
+        tsv_lang::write_indent(&mut self.buffer, self.indent_level, self.config.indent);
     }
 
     /// Get the formatted output
     pub fn into_string(self) -> String {
-        self.buffer
+        self.buffer.into_string()
     }
 
     /// Format a list of CSS nodes (rules)
     pub fn format_css_nodes(&mut self, nodes: &[CssNode]) {
         for (i, node) in nodes.iter().enumerate() {
             if i > 0 {
-                self.write("\n"); // Blank line between rules
+                let prev_node = &nodes[i - 1];
+                let has_blank_line_in_source = self.has_blank_line_between(prev_node, node);
+
+                let prev_is_rule = matches!(prev_node, CssNode::Rule(_));
+                let prev_is_comment = matches!(prev_node, CssNode::Comment(_));
+                let curr_is_rule = matches!(node, CssNode::Rule(_));
+                let curr_is_comment = matches!(node, CssNode::Comment(_));
+
+                // Check if previous node was a comment at the start (no rule before it)
+                let prev_comment_at_start = prev_is_comment && i == 1;
+
+                // Prettier preserves blank lines from source
+                if has_blank_line_in_source {
+                    self.write("\n\n");
+                } else if prev_is_rule && curr_is_comment {
+                    // Rule → Comment: always add blank line
+                    self.write("\n\n");
+                } else if prev_is_comment && curr_is_rule && !prev_comment_at_start {
+                    // Comment → Rule: add blank line only if comment wasn't at start
+                    self.write("\n\n");
+                } else {
+                    // All other cases: single newline
+                    self.write("\n");
+                }
             }
             self.format_css_node(node);
         }
@@ -92,12 +127,40 @@ impl Formatter {
         self.write("\n");
     }
 
+    /// Check if there's a blank line in the source between two nodes
+    fn has_blank_line_between(&self, prev: &CssNode, curr: &CssNode) -> bool {
+        if let Some(source) = &self.source {
+            let prev_end = prev.span().end as usize;
+            let curr_start = curr.span().start as usize;
+
+            if prev_end < curr_start && curr_start <= source.len() {
+                let between = &source[prev_end..curr_start];
+                // Blank line = 2+ newlines in the whitespace between nodes
+                between.matches('\n').count() >= 2
+            } else {
+                false
+            }
+        } else {
+            // No source available - default to single newline
+            false
+        }
+    }
+
     /// Format a single CSS node
     fn format_css_node(&mut self, node: &CssNode) {
         match node {
             CssNode::Rule(rule) => self.format_css_rule(rule),
-            // TODO: Add more node types as needed (AtRule, Comment, etc.)
+            CssNode::Comment(comment) => self.format_css_comment(comment),
+            // TODO: Add more node types as needed (AtRule, etc.)
         }
+    }
+
+    /// Format a CSS comment
+    fn format_css_comment(&mut self, comment: &crate::ast::internal::CssComment) {
+        // Write comment with delimiters - content is preserved exactly as written
+        self.write("/*");
+        self.write(&comment.content);
+        self.write("*/");
     }
 }
 
@@ -110,6 +173,13 @@ impl Default for Formatter {
 /// Format CSS nodes to a string
 pub fn format_css(nodes: &[CssNode]) -> String {
     let mut formatter = Formatter::new();
+    formatter.format_css_nodes(nodes);
+    formatter.into_string()
+}
+
+/// Format CSS nodes to a string with source (for blank line preservation)
+pub fn format_css_with_source(nodes: &[CssNode], source: &str) -> String {
+    let mut formatter = Formatter::with_source(source);
     formatter.format_css_nodes(nodes);
     formatter.into_string()
 }

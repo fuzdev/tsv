@@ -79,7 +79,15 @@ impl Executable for CompareExecutable {
 
 fn run_our_formatter(content: &str, parser: &str) -> Result<String, String> {
     let output = ProcessCommand::new("cargo")
-        .args(["run", "-p", "tsv_cli", "--quiet", "--", "format", "--content"])
+        .args([
+            "run",
+            "-p",
+            "tsv_cli",
+            "--quiet",
+            "--",
+            "format",
+            "--content",
+        ])
         .arg(content)
         .args(["--parser", parser])
         .output()

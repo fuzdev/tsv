@@ -1,0 +1,108 @@
+{
+  "attributes": [],
+  "children": [
+    {
+      "block": {
+        "children": [
+          {
+            "end": 26,
+            "property": "opacity",
+            "start": 14,
+            "type": "Declaration",
+            "value": "0.5"
+          }
+        ],
+        "end": 29,
+        "start": 11,
+        "type": "Block"
+      },
+      "end": 29,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 10,
+                "selectors": [
+                  {
+                    "end": 10,
+                    "name": "[disabled]",
+                    "start": 0,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 0,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 10,
+            "start": 0,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 10,
+        "start": 0,
+        "type": "SelectorList"
+      },
+      "start": 0,
+      "type": "Rule"
+    },
+    {
+      "block": {
+        "children": [
+          {
+            "end": 68,
+            "property": "text-decoration",
+            "start": 42,
+            "type": "Declaration",
+            "value": "underline"
+          }
+        ],
+        "end": 71,
+        "start": 39,
+        "type": "Block"
+      },
+      "end": 71,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 38,
+                "selectors": [
+                  {
+                    "end": 38,
+                    "name": "a[href]",
+                    "start": 31,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 31,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 38,
+            "start": 31,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 38,
+        "start": 31,
+        "type": "SelectorList"
+      },
+      "start": 31,
+      "type": "Rule"
+    }
+  ],
+  "content": {
+    "comment": null,
+    "end": 71,
+    "start": 0,
+    "styles": "[disabled] {\n\topacity: 0.5;\n}\n\na[href] {\n\ttext-decoration: underline;\n}"
+  },
+  "end": 71,
+  "start": 0,
+  "type": "StyleSheet"
+}

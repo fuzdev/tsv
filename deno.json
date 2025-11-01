@@ -1,6 +1,11 @@
 {
-	"// npm dependencies": "Version pinning managed in crates/tsv_debug/src/deno.rs (PRETTIER_VERSION, SVELTE_VERSION, etc.)",
+	"comment:npm_dependencies": "version pinning managed in crates/tsv_debug/src/deno.rs (PRETTIER_VERSION, SVELTE_VERSION, etc.)",
 	"tasks": {
+		"build": "cargo build --workspace",
+		"build_release": "cargo build --workspace --release",
+		"quick": "cargo check --workspace",
+		"clean": "cargo clean",
+		"dev": "cargo watch -x 'check --workspace' -x 'test --workspace' || echo '⚠️  cargo-watch not installed. Run: cargo install cargo-watch'",
 		"test": "cargo test && cargo clippy && deno fmt --check && cargo run -p tsv_debug --quiet fixtures_check_formatted",
 		"format": "cargo fmt && deno fmt",
 		"fixtures_update_expected": "cargo run -p tsv_debug --quiet fixtures_update_expected",
@@ -15,9 +20,5 @@
 		"singleQuote": true,
 		"proseWrap": "preserve"
 	},
-	"exclude": [
-		"node_modules",
-		"target",
-		"tests/fixtures"
-	]
+	"exclude": ["node_modules", "target", "tests/fixtures"]
 }

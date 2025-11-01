@@ -1,0 +1,61 @@
+{
+  "attributes": [],
+  "children": [
+    {
+      "block": {
+        "children": [
+          {
+            "end": 29,
+            "property": "content",
+            "start": 7,
+            "type": "Declaration",
+            "value": "'Hello World'"
+          }
+        ],
+        "end": 32,
+        "start": 4,
+        "type": "Block"
+      },
+      "end": 32,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 3,
+                "selectors": [
+                  {
+                    "end": 3,
+                    "name": "div",
+                    "start": 0,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 0,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 3,
+            "start": 0,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 3,
+        "start": 0,
+        "type": "SelectorList"
+      },
+      "start": 0,
+      "type": "Rule"
+    }
+  ],
+  "content": {
+    "comment": null,
+    "end": 32,
+    "start": 0,
+    "styles": "div {\n\tcontent: 'Hello World';\n}"
+  },
+  "end": 32,
+  "start": 0,
+  "type": "StyleSheet"
+}

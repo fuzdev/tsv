@@ -1,0 +1,108 @@
+{
+  "attributes": [],
+  "children": [
+    {
+      "block": {
+        "children": [
+          {
+            "end": 27,
+            "property": "height",
+            "start": 14,
+            "type": "Declaration",
+            "value": "100px"
+          }
+        ],
+        "end": 30,
+        "start": 11,
+        "type": "Block"
+      },
+      "end": 30,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 10,
+                "selectors": [
+                  {
+                    "end": 10,
+                    "name": "div#header",
+                    "start": 0,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 0,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 10,
+            "start": 0,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 10,
+        "start": 0,
+        "type": "SelectorList"
+      },
+      "start": 0,
+      "type": "Rule"
+    },
+    {
+      "block": {
+        "children": [
+          {
+            "end": 60,
+            "property": "font-size",
+            "start": 45,
+            "type": "Declaration",
+            "value": "24px"
+          }
+        ],
+        "end": 63,
+        "start": 42,
+        "type": "Block"
+      },
+      "end": 63,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 41,
+                "selectors": [
+                  {
+                    "end": 41,
+                    "name": "span#logo",
+                    "start": 32,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 32,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 41,
+            "start": 32,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 41,
+        "start": 32,
+        "type": "SelectorList"
+      },
+      "start": 32,
+      "type": "Rule"
+    }
+  ],
+  "content": {
+    "comment": null,
+    "end": 63,
+    "start": 0,
+    "styles": "div#header {\n\theight: 100px;\n}\n\nspan#logo {\n\tfont-size: 24px;\n}"
+  },
+  "end": 63,
+  "start": 0,
+  "type": "StyleSheet"
+}

@@ -62,9 +62,14 @@ impl Formatter {
         if !style.css_nodes.is_empty() {
             self.write("\n");
 
+            // Extract CSS source for blank line preservation
+            let start = style.content_span.start as usize;
+            let end = style.content_span.end as usize;
+            let css_source = &self.source()[start..end];
+
             // Format CSS nodes with indentation
             // Use the CSS formatter from tsv_css crate
-            let formatted_css = tsv_css::format(&style.css_nodes);
+            let formatted_css = tsv_css::format(&style.css_nodes, css_source);
 
             // Indent each line - trim trailing newline first to avoid extra blank lines
             let css_trimmed = formatted_css.trim_end_matches('\n');

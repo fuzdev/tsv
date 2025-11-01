@@ -124,6 +124,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tsv_css",
+ "tsv_debug",
  "tsv_lang",
  "tsv_svelte",
  "tsv_ts",

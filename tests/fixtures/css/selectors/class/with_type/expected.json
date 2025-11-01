@@ -1,0 +1,108 @@
+{
+  "attributes": [],
+  "children": [
+    {
+      "block": {
+        "children": [
+          {
+            "end": 28,
+            "property": "width",
+            "start": 17,
+            "type": "Declaration",
+            "value": "100%"
+          }
+        ],
+        "end": 31,
+        "start": 14,
+        "type": "Block"
+      },
+      "end": 31,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 13,
+                "selectors": [
+                  {
+                    "end": 13,
+                    "name": "div.container",
+                    "start": 0,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 0,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 13,
+            "start": 0,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 13,
+        "start": 0,
+        "type": "SelectorList"
+      },
+      "start": 0,
+      "type": "Rule"
+    },
+    {
+      "block": {
+        "children": [
+          {
+            "end": 64,
+            "property": "color",
+            "start": 51,
+            "type": "Declaration",
+            "value": "yellow"
+          }
+        ],
+        "end": 67,
+        "start": 48,
+        "type": "Block"
+      },
+      "end": 67,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 47,
+                "selectors": [
+                  {
+                    "end": 47,
+                    "name": "span.highlight",
+                    "start": 33,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 33,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 47,
+            "start": 33,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 47,
+        "start": 33,
+        "type": "SelectorList"
+      },
+      "start": 33,
+      "type": "Rule"
+    }
+  ],
+  "content": {
+    "comment": null,
+    "end": 67,
+    "start": 0,
+    "styles": "div.container {\n\twidth: 100%;\n}\n\nspan.highlight {\n\tcolor: yellow;\n}"
+  },
+  "end": 67,
+  "start": 0,
+  "type": "StyleSheet"
+}

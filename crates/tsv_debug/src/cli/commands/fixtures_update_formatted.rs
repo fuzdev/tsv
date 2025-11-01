@@ -22,7 +22,8 @@ impl Command for FixturesUpdateFormattedCommand {
 
     fn usage(&self) -> Vec<String> {
         vec![
-            "fixtures_update_formatted                   Regenerate all formatted.* files".to_string(),
+            "fixtures_update_formatted                   Regenerate all formatted.* files"
+                .to_string(),
             "fixtures_update_formatted <filter>...       Regenerate matching fixtures".to_string(),
         ]
     }
@@ -81,7 +82,10 @@ impl Executable for FixturesUpdateFormattedExecutable {
                     updated += 1;
                 }
                 FormattedResult::Removed => {
-                    println!("✓ Removed {}/formatted.* (identical to input)", fixture.relative_path);
+                    println!(
+                        "✓ Removed {}/formatted.* (identical to input)",
+                        fixture.relative_path
+                    );
                     removed += 1;
                 }
                 FormattedResult::Unchanged => {
@@ -101,7 +105,12 @@ impl Executable for FixturesUpdateFormattedExecutable {
 
         println!(
             "\nSummary: {} created, {} updated, {} removed, {} unchanged, {} failed (total: {})",
-            created, updated, removed, unchanged, failed, fixtures.len()
+            created,
+            updated,
+            removed,
+            unchanged,
+            failed,
+            fixtures.len()
         );
 
         if created > 0 || updated > 0 || removed > 0 {
@@ -135,7 +144,9 @@ fn update_formatted_file(fixture: &fixtures::Fixture) -> FormattedResult {
         fixtures::FileType::Svelte => "temp.svelte",
         fixtures::FileType::TypeScript => "temp.ts",
         fixtures::FileType::Css => "temp.css",
-        fixtures::FileType::Unknown => return FormattedResult::Failed("Unknown file type".to_string()),
+        fixtures::FileType::Unknown => {
+            return FormattedResult::Failed("Unknown file type".to_string());
+        }
     };
 
     // Run prettier

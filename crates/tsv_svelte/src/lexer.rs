@@ -37,7 +37,6 @@ pub struct Token<'a> {
     pub kind: TokenKind,
     pub start: usize,
     pub end: usize,
-    #[expect(dead_code, reason = "Used for debugging and testing")]
     pub value: &'a str,
 }
 

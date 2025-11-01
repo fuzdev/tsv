@@ -20,11 +20,7 @@ pub const ACORN_TYPESCRIPT_VERSION: &str = "^1.0.1";
 /// # Returns
 /// * `Ok(stdout)` on success
 /// * `Err(stderr)` on failure
-pub fn run_script(
-    script: &str,
-    permissions: &[&str],
-    args: &[&str],
-) -> Result<String, String> {
+pub fn run_script(script: &str, permissions: &[&str], args: &[&str]) -> Result<String, String> {
     let mut cmd = Command::new("deno");
     cmd.arg("run");
 
@@ -45,7 +41,9 @@ pub fn run_script(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn deno: {}", e))?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to spawn deno: {}", e))?;
 
     // Write script to stdin
     if let Some(mut stdin) = child.stdin.take() {

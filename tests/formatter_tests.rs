@@ -1,16 +1,15 @@
-mod test_helpers;
-
 use std::fs;
-use std::path::{Path, PathBuf};
-use test_helpers::{
-    discover_fixtures, discover_unformatted_variants, remove_locations, validate_fixture_structure,
+use std::path::Path;
+use tsv_debug::fixtures::{
+    Fixture, discover_unformatted_variants, remove_locations, validate_fixture_structure,
+    walk_fixtures,
 };
 
 /// Test round-trip: parse → format → parse → compare ASTs (ignoring spans)
 /// Uses formatted.* as baseline if it exists (for fixtures with structural changes),
 /// otherwise uses input.* (for fixtures where formatter only changes formatting)
-fn test_format_round_trip(fixture_path: &Path) -> Result<(), String> {
-    let fixture_dir = fixture_path;
+fn test_format_round_trip(fixture: &Fixture) -> Result<(), String> {
+    let fixture_dir = &fixture.path;
 
     // Check for Svelte, TypeScript, or CSS file
     let (input_file, formatted_file, file_type) = if fixture_dir.join("input.svelte").exists() {
@@ -56,7 +55,7 @@ fn test_format_round_trip(fixture_path: &Path) -> Result<(), String> {
         if json1_no_loc != json2_no_loc {
             return Err(format!(
                 "Round-trip failed: AST changed after format for {}",
-                fixture_path.display()
+                fixture.relative_path
             ));
         }
     } else if file_type == "typescript" {
@@ -80,7 +79,7 @@ fn test_format_round_trip(fixture_path: &Path) -> Result<(), String> {
         if json1_no_loc != json2_no_loc {
             return Err(format!(
                 "Round-trip failed: AST changed after format for {}",
-                fixture_path.display()
+                fixture.relative_path
             ));
         }
     } else {
@@ -88,19 +87,19 @@ fn test_format_round_trip(fixture_path: &Path) -> Result<(), String> {
         let ast1 =
             tsv_css::parse(&input, 0).map_err(|e| format!("Failed to parse input: {}", e))?;
 
-        let formatted = tsv_css::format(&ast1);
+        let formatted = tsv_css::format(&ast1, &input);
 
         let ast2 = tsv_css::parse(&formatted, 0)
             .map_err(|e| format!("Failed to parse formatted output: {}", e))?;
 
         // For CSS, we'll compare formatted strings directly since CSS AST is simple
         // If we parse and format again, it should be identical
-        let formatted2 = tsv_css::format(&ast2);
+        let formatted2 = tsv_css::format(&ast2, &formatted);
 
         if formatted != formatted2 {
             return Err(format!(
                 "Round-trip failed: formatted output changed after re-parsing for {}",
-                fixture_path.display()
+                fixture.relative_path
             ));
         }
     }
@@ -109,8 +108,8 @@ fn test_format_round_trip(fixture_path: &Path) -> Result<(), String> {
 }
 
 /// Test prettier baseline: format → compare against formatted.* or input.*
-fn test_format_matches_prettier(fixture_path: &Path) -> Result<(), String> {
-    let fixture_dir = fixture_path;
+fn test_format_matches_prettier(fixture: &Fixture) -> Result<(), String> {
+    let fixture_dir = &fixture.path;
 
     // Check for Svelte, TypeScript, or CSS file
     let (input_file, formatted_file, file_type) = if fixture_dir.join("input.svelte").exists() {
@@ -135,7 +134,7 @@ fn test_format_matches_prettier(fixture_path: &Path) -> Result<(), String> {
         tsv_ts::format(&ast)
     } else {
         let ast = tsv_css::parse(&input, 0).map_err(|e| format!("Failed to parse: {}", e))?;
-        tsv_css::format(&ast)
+        tsv_css::format(&ast, &input)
     };
 
     // Check against formatted.* if it exists, otherwise input.*
@@ -149,9 +148,7 @@ fn test_format_matches_prettier(fixture_path: &Path) -> Result<(), String> {
     if formatted != expected {
         return Err(format!(
             "Formatter output doesn't match prettier baseline for {}\n\nExpected:\n{}\n\nActual:\n{}",
-            fixture_path.display(),
-            expected,
-            formatted
+            fixture.relative_path, expected, formatted
         ));
     }
 
@@ -161,8 +158,8 @@ fn test_format_matches_prettier(fixture_path: &Path) -> Result<(), String> {
 /// Test idempotency: format → parse → format → should be identical
 /// Uses formatted.* as baseline if it exists (for fixtures with structural changes),
 /// otherwise uses input.* (for fixtures where formatter only changes formatting)
-fn test_format_idempotent(fixture_path: &Path) -> Result<(), String> {
-    let fixture_dir = fixture_path;
+fn test_format_idempotent(fixture: &Fixture) -> Result<(), String> {
+    let fixture_dir = &fixture.path;
 
     // Check for Svelte, TypeScript, or CSS file
     let (input_file, formatted_file, file_type) = if fixture_dir.join("input.svelte").exists() {
@@ -213,12 +210,12 @@ fn test_format_idempotent(fixture_path: &Path) -> Result<(), String> {
         // CSS - Format once
         let ast1 =
             tsv_css::parse(&input, 0).map_err(|e| format!("Failed to parse input: {}", e))?;
-        let format1 = tsv_css::format(&ast1);
+        let format1 = tsv_css::format(&ast1, &input);
 
         // Format again
         let ast2 = tsv_css::parse(&format1, 0)
             .map_err(|e| format!("Failed to parse formatted output: {}", e))?;
-        let format2 = tsv_css::format(&ast2);
+        let format2 = tsv_css::format(&ast2, &format1);
 
         (format1, format2)
     };
@@ -226,7 +223,7 @@ fn test_format_idempotent(fixture_path: &Path) -> Result<(), String> {
     if format1 != format2 {
         return Err(format!(
             "Formatter not idempotent for {}",
-            fixture_path.display()
+            fixture.relative_path
         ));
     }
 
@@ -234,11 +231,8 @@ fn test_format_idempotent(fixture_path: &Path) -> Result<(), String> {
 }
 
 /// Test normalization: unformatted variants → format → should match expected
-fn test_format_normalization(
-    fixture_path: &Path,
-    unformatted_filename: &str,
-) -> Result<(), String> {
-    let fixture_dir = fixture_path;
+fn test_format_normalization(fixture: &Fixture, unformatted_filename: &str) -> Result<(), String> {
+    let fixture_dir = &fixture.path;
 
     // Read the unformatted variant
     let unformatted_path = fixture_dir.join(unformatted_filename);
@@ -255,9 +249,19 @@ fn test_format_normalization(
             .map_err(|e| format!("Failed to parse {}: {}", unformatted_filename, e))?;
         tsv_svelte::format(&ast, &unformatted_input)
     } else if is_css {
+        // For CSS, we need to pass the baseline source (not unformatted source) to the formatter
+        // so that blank line preservation references the canonical layout
+        let baseline_source = if fixture_dir.join("formatted.css").exists() {
+            fs::read_to_string(fixture_dir.join("formatted.css"))
+                .map_err(|e| format!("Failed to read formatted.css: {}", e))?
+        } else {
+            fs::read_to_string(fixture_dir.join("input.css"))
+                .map_err(|e| format!("Failed to read input.css: {}", e))?
+        };
+
         let ast = tsv_css::parse(&unformatted_input, 0)
             .map_err(|e| format!("Failed to parse {}: {}", unformatted_filename, e))?;
-        tsv_css::format(&ast)
+        tsv_css::format(&ast, &baseline_source)
     } else {
         let ast = tsv_ts::parse(&unformatted_input)
             .map_err(|e| format!("Failed to parse {}: {}", unformatted_filename, e))?;
@@ -285,62 +289,108 @@ fn test_format_normalization(
     if formatted != expected {
         return Err(format!(
             "Failed to normalize {} in {}\n\nExpected:\n{}\n\nActual:\n{}",
-            unformatted_filename,
-            fixture_path.display(),
-            expected,
-            formatted
+            unformatted_filename, fixture.relative_path, expected, formatted
         ));
     }
 
     Ok(())
 }
 
+/// Result of testing a single fixture
+struct FixtureTestResult {
+    relative_path: String,
+    failures: Vec<String>,
+}
+
+impl FixtureTestResult {
+    fn new(fixture: &Fixture) -> Self {
+        Self {
+            relative_path: fixture.relative_path.clone(),
+            failures: Vec::new(),
+        }
+    }
+
+    fn add_failure(&mut self, error: String) {
+        self.failures.push(error);
+    }
+
+    fn passed(&self) -> bool {
+        self.failures.is_empty()
+    }
+
+    fn relative_path(&self) -> &str {
+        &self.relative_path
+    }
+}
+
 // Test all fixtures with formatter
 #[test]
 fn test_formatter_all_fixtures() {
-    let fixtures_dir = PathBuf::from("tests/fixtures");
-    let fixtures = discover_fixtures(&fixtures_dir);
+    let fixtures_dir = Path::new("tests/fixtures");
+    let fixtures = walk_fixtures(fixtures_dir).expect("Failed to discover fixtures");
 
     println!("\nDiscovered {} fixtures\n", fixtures.len());
 
-    let mut failures = Vec::new();
+    let mut results: Vec<FixtureTestResult> = Vec::new();
 
     for fixture in &fixtures {
+        let mut result = FixtureTestResult::new(fixture);
+
         // Fixture structure validation (checks conventions are followed)
         if let Err(e) = validate_fixture_structure(fixture) {
-            failures.push(format!(
-                "[Fixture structure] Failed to validate {}: {}",
-                fixture.display(),
-                e
-            ));
+            result.add_failure(format!("[Fixture structure] {}", e));
+            results.push(result);
             continue; // Skip further tests if structure is invalid
         }
 
         // Round-trip test
         if let Err(e) = test_format_round_trip(fixture) {
-            failures.push(format!("[Round-trip] {}", e));
+            result.add_failure(format!("[Round-trip] {}", e));
         }
 
         // Prettier baseline test
         if let Err(e) = test_format_matches_prettier(fixture) {
-            failures.push(format!("[Prettier] {}", e));
+            result.add_failure(format!("[Prettier] {}", e));
         }
 
         // Idempotency test
         if let Err(e) = test_format_idempotent(fixture) {
-            failures.push(format!("[Idempotent] {}", e));
+            result.add_failure(format!("[Idempotent] {}", e));
         }
 
         // Normalization tests (auto-discover unformatted_*.ts variants)
-        let unformatted_variants = discover_unformatted_variants(fixture);
+        let unformatted_variants = discover_unformatted_variants(&fixture.path);
         for variant in unformatted_variants {
             if let Err(e) = test_format_normalization(fixture, &variant) {
-                failures.push(format!("[Normalization] {}", e));
+                result.add_failure(format!("[Normalization] {}", e));
             }
         }
+
+        results.push(result);
     }
 
-    if !failures.is_empty() {
-        panic!("Formatter tests failed:\n{}", failures.join("\n"));
+    // Compute statistics
+    let total = results.len();
+    let passed = results.iter().filter(|r| r.passed()).count();
+    let failed = total - passed;
+
+    // Print summary
+    if failed > 0 {
+        println!("\n{} / {} fixtures failed:\n", failed, total);
+
+        for result in results.iter().filter(|r| !r.passed()) {
+            println!("  ✗ {}", result.relative_path());
+            for failure in &result.failures {
+                println!("      {}", failure);
+            }
+            println!();
+        }
+
+        panic!(
+            "test_formatter_all_fixtures - {} / {} failed",
+            failed, total
+        );
+    } else {
+        println!("\n✓ All {} fixtures passed", total);
     }
 }

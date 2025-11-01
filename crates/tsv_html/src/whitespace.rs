@@ -10,8 +10,8 @@
 /// Elements like `<pre>` and `<textarea>` render whitespace literally,
 /// without collapsing multiple spaces or trimming leading/trailing whitespace.
 ///
-/// Examples: `<pre>`, `<textarea>`, `<plaintext>`, `<xmp>`
+/// Examples: `<pre>`, `<textarea>`
 #[inline]
 pub fn preserves_whitespace(tag_name: &str) -> bool {
-    matches!(tag_name, "pre" | "textarea" | "plaintext" | "xmp")
+    matches!(tag_name, "pre" | "textarea")
 }

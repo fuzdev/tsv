@@ -1,0 +1,108 @@
+{
+  "attributes": [],
+  "children": [
+    {
+      "block": {
+        "children": [
+          {
+            "end": 26,
+            "property": "color",
+            "start": 12,
+            "type": "Declaration",
+            "value": "inherit"
+          }
+        ],
+        "end": 29,
+        "start": 9,
+        "type": "Block"
+      },
+      "end": 29,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 8,
+                "selectors": [
+                  {
+                    "end": 8,
+                    "name": "div span",
+                    "start": 0,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 0,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 8,
+            "start": 0,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 8,
+        "start": 0,
+        "type": "SelectorList"
+      },
+      "start": 0,
+      "type": "Rule"
+    },
+    {
+      "block": {
+        "children": [
+          {
+            "end": 63,
+            "property": "line-height",
+            "start": 47,
+            "type": "Declaration",
+            "value": "1.5"
+          }
+        ],
+        "end": 66,
+        "start": 44,
+        "type": "Block"
+      },
+      "end": 66,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 43,
+                "selectors": [
+                  {
+                    "end": 43,
+                    "name": ".container p",
+                    "start": 31,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 31,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 43,
+            "start": 31,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 43,
+        "start": 31,
+        "type": "SelectorList"
+      },
+      "start": 31,
+      "type": "Rule"
+    }
+  ],
+  "content": {
+    "comment": null,
+    "end": 66,
+    "start": 0,
+    "styles": "div span {\n\tcolor: inherit;\n}\n\n.container p {\n\tline-height: 1.5;\n}"
+  },
+  "end": 66,
+  "start": 0,
+  "type": "StyleSheet"
+}

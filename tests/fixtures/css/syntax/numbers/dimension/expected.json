@@ -1,0 +1,68 @@
+{
+  "attributes": [],
+  "children": [
+    {
+      "block": {
+        "children": [
+          {
+            "end": 22,
+            "property": "font-size",
+            "start": 7,
+            "type": "Declaration",
+            "value": "16px"
+          },
+          {
+            "end": 38,
+            "property": "margin",
+            "start": 25,
+            "type": "Declaration",
+            "value": "1.5em"
+          }
+        ],
+        "end": 41,
+        "start": 4,
+        "type": "Block"
+      },
+      "end": 41,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 3,
+                "selectors": [
+                  {
+                    "end": 3,
+                    "name": "div",
+                    "start": 0,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 0,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 3,
+            "start": 0,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 3,
+        "start": 0,
+        "type": "SelectorList"
+      },
+      "start": 0,
+      "type": "Rule"
+    }
+  ],
+  "content": {
+    "comment": null,
+    "end": 41,
+    "start": 0,
+    "styles": "div {\n\tfont-size: 16px;\n\tmargin: 1.5em;\n}"
+  },
+  "end": 41,
+  "start": 0,
+  "type": "StyleSheet"
+}

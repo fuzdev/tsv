@@ -3,6 +3,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
+use tsv_lang::OutputBuffer;
 
 /// Format configuration
 #[derive(Debug, Clone)]
@@ -27,7 +28,7 @@ impl Default for FormatConfig {
 /// Formatter state for building output
 pub struct Formatter {
     /// Output buffer
-    buffer: String,
+    buffer: OutputBuffer,
     /// Current indentation level
     #[allow(dead_code)]
     pub(crate) indent_level: usize,
@@ -47,7 +48,7 @@ impl Formatter {
     /// Create a new formatter with the given interner and config
     pub fn with_config(interner: Rc<RefCell<DefaultStringInterner>>, config: FormatConfig) -> Self {
         Self {
-            buffer: String::new(),
+            buffer: OutputBuffer::new(),
             indent_level: 0,
             config,
             interner,
@@ -56,7 +57,7 @@ impl Formatter {
 
     /// Write a string to the buffer
     pub(crate) fn write(&mut self, s: &str) {
-        self.buffer.push_str(s);
+        self.buffer.write(s);
     }
 
     /// Resolve a symbol from the interner to a string
@@ -94,13 +95,11 @@ impl Formatter {
     /// Write indentation based on current indent level
     #[allow(dead_code)]
     pub(crate) fn write_indent(&mut self) {
-        for _ in 0..self.indent_level {
-            self.write(self.config.indent);
-        }
+        tsv_lang::write_indent(&mut self.buffer, self.indent_level, self.config.indent);
     }
 
     /// Get the formatted output
     pub fn into_string(self) -> String {
-        self.buffer
+        self.buffer.into_string()
     }
 }

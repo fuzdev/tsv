@@ -1,8 +1,6 @@
-mod test_helpers;
-
 use std::fs;
-use std::path::{Path, PathBuf};
-use test_helpers::discover_fixtures;
+use std::path::Path;
+use tsv_debug::fixtures::{Fixture, walk_fixtures};
 
 /// Parse input using the new multi-crate API
 fn parse_to_json(input: &str, file_type: &str) -> Result<String, String> {
@@ -33,39 +31,29 @@ fn parse_to_json(input: &str, file_type: &str) -> Result<String, String> {
     Ok(json)
 }
 
-fn test_fixture(fixture_path: &Path) -> Result<(), String> {
-    let fixture_dir = fixture_path;
-
+fn test_fixture(fixture: &Fixture) -> Result<(), String> {
     // Parser tests require expected.json
-    if !fixture_dir.join("expected.json").exists() {
+    if !fixture.expected_path().exists() {
         panic!(
             "Found input file in {} but missing expected.json",
-            fixture_dir.display()
+            fixture.relative_path
         );
     }
 
-    // Read input file (.ts, .svelte, or .css)
-    let (input, file_type) = if fixture_dir.join("input.ts").exists() {
-        (
-            fs::read_to_string(fixture_dir.join("input.ts"))
-                .map_err(|e| format!("Failed to read input.ts: {}", e))?,
-            "typescript",
-        )
-    } else if fixture_dir.join("input.css").exists() {
-        (
-            fs::read_to_string(fixture_dir.join("input.css"))
-                .map_err(|e| format!("Failed to read input.css: {}", e))?,
-            "css",
-        )
+    // Read input file
+    let input = fs::read_to_string(fixture.input_path())
+        .map_err(|e| format!("Failed to read {}: {}", fixture.input_file, e))?;
+
+    // Determine file type
+    let file_type = if fixture.input_file.ends_with(".ts") {
+        "typescript"
+    } else if fixture.input_file.ends_with(".css") {
+        "css"
     } else {
-        (
-            fs::read_to_string(fixture_dir.join("input.svelte"))
-                .map_err(|e| format!("Failed to read input.svelte: {}", e))?,
-            "svelte",
-        )
+        "svelte"
     };
 
-    let expected = fs::read_to_string(fixture_dir.join("expected.json"))
+    let expected = fs::read_to_string(fixture.expected_path())
         .map_err(|e| format!("Failed to read expected.json: {}", e))?;
 
     let actual = parse_to_json(&input, file_type)?;
@@ -84,7 +72,7 @@ fn test_fixture(fixture_path: &Path) -> Result<(), String> {
         return Err(format!(
             "AST mismatch for {}",
             // "AST mismatch for {}\n\nExpected:\n{}\n\nActual:\n{}\n",
-            fixture_path.display(), //expected_pretty, actual_pretty
+            fixture.relative_path, //expected_pretty, actual_pretty
         ));
     }
 
@@ -93,8 +81,8 @@ fn test_fixture(fixture_path: &Path) -> Result<(), String> {
 
 #[test]
 fn test_all_fixtures() {
-    let fixtures_path = PathBuf::from("tests/fixtures");
-    let fixtures = discover_fixtures(&fixtures_path);
+    let fixtures_path = Path::new("tests/fixtures");
+    let fixtures = walk_fixtures(fixtures_path).expect("Failed to discover fixtures");
 
     println!("\nDiscovered {} fixtures\n", fixtures.len());
 
@@ -104,12 +92,12 @@ fn test_all_fixtures() {
     for fixture in &fixtures {
         match test_fixture(fixture) {
             Ok(()) => {
-                println!("✓ {}", fixture.display());
+                println!("✓ {}", fixture.relative_path);
                 passes += 1;
             }
             Err(e) => {
-                println!("✗ {}: {}", fixture.display(), e);
-                failures.push(format!("{}: {}", fixture.display(), e));
+                println!("✗ {}: {}", fixture.relative_path, e);
+                failures.push(format!("{}: {}", fixture.relative_path, e));
             }
         }
     }

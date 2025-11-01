@@ -1,0 +1,61 @@
+{
+  "attributes": [],
+  "children": [
+    {
+      "block": {
+        "children": [
+          {
+            "end": 17,
+            "property": "width",
+            "start": 7,
+            "type": "Declaration",
+            "value": "50%"
+          }
+        ],
+        "end": 20,
+        "start": 4,
+        "type": "Block"
+      },
+      "end": 20,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 3,
+                "selectors": [
+                  {
+                    "end": 3,
+                    "name": "div",
+                    "start": 0,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 0,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 3,
+            "start": 0,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 3,
+        "start": 0,
+        "type": "SelectorList"
+      },
+      "start": 0,
+      "type": "Rule"
+    }
+  ],
+  "content": {
+    "comment": null,
+    "end": 20,
+    "start": 0,
+    "styles": "div {\n\twidth: 50%;\n}"
+  },
+  "end": 20,
+  "start": 0,
+  "type": "StyleSheet"
+}

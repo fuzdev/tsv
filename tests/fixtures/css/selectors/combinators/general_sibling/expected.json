@@ -1,0 +1,108 @@
+{
+  "attributes": [],
+  "children": [
+    {
+      "block": {
+        "children": [
+          {
+            "end": 21,
+            "property": "color",
+            "start": 10,
+            "type": "Declaration",
+            "value": "gray"
+          }
+        ],
+        "end": 24,
+        "start": 7,
+        "type": "Block"
+      },
+      "end": 24,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 6,
+                "selectors": [
+                  {
+                    "end": 6,
+                    "name": "h1 ~ p",
+                    "start": 0,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 0,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 6,
+            "start": 0,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 6,
+        "start": 0,
+        "type": "SelectorList"
+      },
+      "start": 0,
+      "type": "Rule"
+    },
+    {
+      "block": {
+        "children": [
+          {
+            "end": 57,
+            "property": "opacity",
+            "start": 45,
+            "type": "Declaration",
+            "value": "0.5"
+          }
+        ],
+        "end": 60,
+        "start": 42,
+        "type": "Block"
+      },
+      "end": 60,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 41,
+                "selectors": [
+                  {
+                    "end": 41,
+                    "name": ".active ~ .item",
+                    "start": 26,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 26,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 41,
+            "start": 26,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 41,
+        "start": 26,
+        "type": "SelectorList"
+      },
+      "start": 26,
+      "type": "Rule"
+    }
+  ],
+  "content": {
+    "comment": null,
+    "end": 60,
+    "start": 0,
+    "styles": "h1 ~ p {\n\tcolor: gray;\n}\n\n.active ~ .item {\n\topacity: 0.5;\n}"
+  },
+  "end": 60,
+  "start": 0,
+  "type": "StyleSheet"
+}

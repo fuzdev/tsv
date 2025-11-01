@@ -44,10 +44,17 @@ impl Executable for FixturesCheckFormattedExecutable {
         let mut outdated = Vec::new();
         let mut missing = Vec::new();
         let mut incorrect = Vec::new();
+        let mut structure_errors = Vec::new();
         let mut checked = 0;
 
         for fixture in &all_fixtures {
             checked += 1;
+
+            // Validate fixture structure
+            if let Err(e) = fixtures::validate_fixture_structure(fixture) {
+                structure_errors.push(format!("{}: {}", fixture.relative_path, e));
+                continue; // Skip further checks if structure is invalid
+            }
 
             // Read input file
             let input = match fixtures::read_file(&fixture.input_path()) {
@@ -82,31 +89,38 @@ impl Executable for FixturesCheckFormattedExecutable {
                 // Input is already formatted, formatted.* should NOT exist
                 if formatted_path.exists() {
                     incorrect.push(format!(
-                        "{}/formatted.* should not exist (input is already formatted)",
-                        fixture.relative_path
+                        "{}/formatted.{} should not exist (input is already formatted)",
+                        fixture.relative_path,
+                        fixture.extension()
                     ));
                 }
             } else {
                 // Input differs from prettier output, formatted.* SHOULD exist
                 if !formatted_path.exists() {
                     missing.push(format!(
-                        "{}/formatted.* is missing",
-                        fixture.relative_path
+                        "{}/formatted.{} missing or input.{} unexpectedly doesn't match prettier",
+                        fixture.relative_path,
+                        fixture.extension(),
+                        fixture.extension()
                     ));
                 } else {
                     // Check if content matches
                     let existing = match fixtures::read_file(&formatted_path) {
                         Ok(s) => s,
                         Err(e) => {
-                            eprintln!("✗ Failed to read formatted file for {}: {}", fixture.relative_path, e);
+                            eprintln!(
+                                "✗ Failed to read formatted file for {}: {}",
+                                fixture.relative_path, e
+                            );
                             continue;
                         }
                     };
 
                     if existing != formatted {
                         outdated.push(format!(
-                            "{}/formatted.* is outdated",
-                            fixture.relative_path
+                            "{}/formatted.{} is outdated",
+                            fixture.relative_path,
+                            fixture.extension()
                         ));
                     }
                 }
@@ -114,9 +128,23 @@ impl Executable for FixturesCheckFormattedExecutable {
         }
 
         // Report results
-        if outdated.is_empty() && missing.is_empty() && incorrect.is_empty() {
-            println!("✓ All {} formatted.* files are up to date", checked);
+        if outdated.is_empty()
+            && missing.is_empty()
+            && incorrect.is_empty()
+            && structure_errors.is_empty()
+        {
+            println!("✓ All {} fixtures match Prettier formatting", checked);
             std::process::exit(0);
+        }
+
+        if !structure_errors.is_empty() {
+            eprintln!(
+                "\n❌ Fixture structure errors ({}):",
+                structure_errors.len()
+            );
+            for item in &structure_errors {
+                eprintln!("  {}", item);
+            }
         }
 
         if !outdated.is_empty() {
@@ -127,20 +155,23 @@ impl Executable for FixturesCheckFormattedExecutable {
         }
 
         if !missing.is_empty() {
-            eprintln!("\n❌ Missing formatted.* files ({}):", missing.len());
+            eprintln!(
+                "\n❌ Prettier mismatch - missing formatted.* or input.* differs ({}):",
+                missing.len()
+            );
             for item in &missing {
                 eprintln!("  {}", item);
             }
         }
 
         if !incorrect.is_empty() {
-            eprintln!("\n❌ Incorrect formatted.* files ({}):", incorrect.len());
+            eprintln!("\n❌ Unnecessary formatted.* files ({}):", incorrect.len());
             for item in &incorrect {
                 eprintln!("  {}", item);
             }
         }
 
-        eprintln!("\nRun: npm run fixtures_update_formatted");
+        eprintln!("\nRun: deno task fixtures_update_formatted");
         std::process::exit(1);
     }
 }

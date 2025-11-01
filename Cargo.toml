@@ -44,3 +44,6 @@ tsv_css.workspace = true
 tsv_svelte.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+tsv_debug = { path = "crates/tsv_debug" }

@@ -1,0 +1,155 @@
+{
+  "attributes": [],
+  "children": [
+    {
+      "block": {
+        "children": [
+          {
+            "end": 45,
+            "property": "background",
+            "start": 24,
+            "type": "Declaration",
+            "value": "lightgray"
+          }
+        ],
+        "end": 48,
+        "start": 21,
+        "type": "Block"
+      },
+      "end": 48,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 20,
+                "selectors": [
+                  {
+                    "end": 20,
+                    "name": "li:nth-child(2n + 1)",
+                    "start": 0,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 0,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 20,
+            "start": 0,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 20,
+        "start": 0,
+        "type": "SelectorList"
+      },
+      "start": 0,
+      "type": "Rule"
+    },
+    {
+      "block": {
+        "children": [
+          {
+            "end": 88,
+            "property": "background",
+            "start": 71,
+            "type": "Declaration",
+            "value": "white"
+          }
+        ],
+        "end": 91,
+        "start": 68,
+        "type": "Block"
+      },
+      "end": 91,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 67,
+                "selectors": [
+                  {
+                    "end": 67,
+                    "name": "tr:nth-child(odd)",
+                    "start": 50,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 50,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 67,
+            "start": 50,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 67,
+        "start": 50,
+        "type": "SelectorList"
+      },
+      "start": 50,
+      "type": "Rule"
+    },
+    {
+      "block": {
+        "children": [
+          {
+            "end": 129,
+            "property": "margin-top",
+            "start": 113,
+            "type": "Declaration",
+            "value": "20px"
+          }
+        ],
+        "end": 132,
+        "start": 110,
+        "type": "Block"
+      },
+      "end": 132,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 109,
+                "selectors": [
+                  {
+                    "end": 109,
+                    "name": "div:nth-child(3)",
+                    "start": 93,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 93,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 109,
+            "start": 93,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 109,
+        "start": 93,
+        "type": "SelectorList"
+      },
+      "start": 93,
+      "type": "Rule"
+    }
+  ],
+  "content": {
+    "comment": null,
+    "end": 132,
+    "start": 0,
+    "styles": "li:nth-child(2n + 1) {\n\tbackground: lightgray;\n}\n\ntr:nth-child(odd) {\n\tbackground: white;\n}\n\ndiv:nth-child(3) {\n\tmargin-top: 20px;\n}"
+  },
+  "end": 132,
+  "start": 0,
+  "type": "StyleSheet"
+}

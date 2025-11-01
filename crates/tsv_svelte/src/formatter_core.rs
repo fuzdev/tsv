@@ -3,6 +3,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
+use tsv_lang::OutputBuffer;
 
 /// Format configuration
 #[derive(Debug, Clone)]
@@ -11,7 +12,6 @@ pub struct FormatConfig {
     #[allow(dead_code)]
     pub indent: &'static str,
     /// Maximum line width (default: 100)
-    #[expect(dead_code, reason = "TODO: Use for line wrapping decisions")]
     pub print_width: usize,
 }
 
@@ -27,7 +27,7 @@ impl Default for FormatConfig {
 /// Formatter state for building output
 pub struct Formatter {
     /// Output buffer
-    buffer: String,
+    buffer: OutputBuffer,
     /// Current indentation level
     #[allow(dead_code)]
     pub(crate) indent_level: usize,
@@ -53,7 +53,7 @@ impl Formatter {
         config: FormatConfig,
     ) -> Self {
         Self {
-            buffer: String::new(),
+            buffer: OutputBuffer::new(),
             indent_level: 0,
             config,
             source: source.to_string(),
@@ -63,7 +63,7 @@ impl Formatter {
 
     /// Write a string to the buffer
     pub(crate) fn write(&mut self, s: &str) {
-        self.buffer.push_str(s);
+        self.buffer.write(s);
     }
 
     /// Get the source code
@@ -106,14 +106,12 @@ impl Formatter {
     /// Write indentation based on current indent level
     #[allow(dead_code)]
     pub(crate) fn write_indent(&mut self) {
-        for _ in 0..self.indent_level {
-            self.write(self.config.indent);
-        }
+        tsv_lang::write_indent(&mut self.buffer, self.indent_level, self.config.indent);
     }
 
     /// Get the formatted output
     pub fn into_string(self) -> String {
-        self.buffer
+        self.buffer.into_string()
     }
 
     /// Check if two spans are on the same line in the source

@@ -68,7 +68,7 @@ impl Executable for FormatExecutable {
             },
             ParserType::Css => match tsv_css::parse(source, 0) {
                 Ok(ast) => {
-                    let formatted = tsv_css::format(&ast);
+                    let formatted = tsv_css::format(&ast, source);
                     println!("{}", formatted);
                 }
                 Err(e) => {

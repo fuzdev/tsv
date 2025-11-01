@@ -39,6 +39,7 @@ pub fn parse(source: &str, base_offset: usize) -> Result<Vec<CssNode>> {
 ///
 /// # Arguments
 /// * `nodes` - CSS AST nodes to format
+/// * `source` - Original CSS source code (for blank line preservation)
 ///
 /// # Returns
 /// * Formatted CSS string
@@ -49,11 +50,11 @@ pub fn parse(source: &str, base_offset: usize) -> Result<Vec<CssNode>> {
 ///
 /// let css = "div{color:red;}";
 /// let nodes = parse(css, 0).expect("Failed to parse CSS");
-/// let formatted = format(&nodes);
+/// let formatted = format(&nodes, css);
 /// assert_eq!(formatted, "div {\n\tcolor: red;\n}\n");
 /// ```
-pub fn format(nodes: &[CssNode]) -> String {
-    format_css(nodes)
+pub fn format(nodes: &[CssNode], source: &str) -> String {
+    formatter::format_css_with_source(nodes, source)
 }
 
 /// Convert CSS AST nodes to JSON representation

@@ -1,0 +1,67 @@
+{
+  "attributes": [],
+  "children": [
+    {
+      "data": " This is a\n   multi-line comment\n   spanning multiple lines ",
+      "end": 64,
+      "start": 0,
+      "type": "Comment"
+    },
+    {
+      "block": {
+        "children": [
+          {
+            "end": 82,
+            "property": "color",
+            "start": 72,
+            "type": "Declaration",
+            "value": "red"
+          }
+        ],
+        "end": 85,
+        "start": 69,
+        "type": "Block"
+      },
+      "end": 85,
+      "prelude": {
+        "children": [
+          {
+            "children": [
+              {
+                "combinator": null,
+                "end": 68,
+                "selectors": [
+                  {
+                    "end": 68,
+                    "name": "div",
+                    "start": 65,
+                    "type": "TypeSelector"
+                  }
+                ],
+                "start": 65,
+                "type": "RelativeSelector"
+              }
+            ],
+            "end": 68,
+            "start": 65,
+            "type": "ComplexSelector"
+          }
+        ],
+        "end": 68,
+        "start": 65,
+        "type": "SelectorList"
+      },
+      "start": 65,
+      "type": "Rule"
+    }
+  ],
+  "content": {
+    "comment": null,
+    "end": 85,
+    "start": 0,
+    "styles": "/* This is a\n   multi-line comment\n   spanning multiple lines */\ndiv {\n\tcolor: red;\n}"
+  },
+  "end": 85,
+  "start": 0,
+  "type": "StyleSheet"
+}
