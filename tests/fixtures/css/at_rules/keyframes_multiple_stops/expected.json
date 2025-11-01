@@ -1,0 +1,228 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 149,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Atrule",
+        "start": 9,
+        "end": 140,
+        "name": "keyframes",
+        "prelude": "bounce",
+        "block": {
+          "type": "Block",
+          "start": 27,
+          "end": 140,
+          "children": [
+            {
+              "type": "Rule",
+              "prelude": {
+                "type": "SelectorList",
+                "start": 31,
+                "end": 33,
+                "children": [
+                  {
+                    "type": "ComplexSelector",
+                    "start": 31,
+                    "end": 33,
+                    "children": [
+                      {
+                        "type": "RelativeSelector",
+                        "combinator": null,
+                        "selectors": [
+                          {
+                            "type": "Percentage",
+                            "value": "0%",
+                            "start": 31,
+                            "end": 33
+                          }
+                        ],
+                        "start": 31,
+                        "end": 33
+                      }
+                    ]
+                  }
+                ]
+              },
+              "block": {
+                "type": "Block",
+                "start": 34,
+                "end": 53,
+                "children": [
+                  {
+                    "type": "Declaration",
+                    "start": 39,
+                    "end": 48,
+                    "property": "bottom",
+                    "value": "0"
+                  }
+                ]
+              },
+              "start": 31,
+              "end": 53
+            },
+            {
+              "type": "Rule",
+              "prelude": {
+                "type": "SelectorList",
+                "start": 56,
+                "end": 59,
+                "children": [
+                  {
+                    "type": "ComplexSelector",
+                    "start": 56,
+                    "end": 59,
+                    "children": [
+                      {
+                        "type": "RelativeSelector",
+                        "combinator": null,
+                        "selectors": [
+                          {
+                            "type": "Percentage",
+                            "value": "50%",
+                            "start": 56,
+                            "end": 59
+                          }
+                        ],
+                        "start": 56,
+                        "end": 59
+                      }
+                    ]
+                  }
+                ]
+              },
+              "block": {
+                "type": "Block",
+                "start": 60,
+                "end": 82,
+                "children": [
+                  {
+                    "type": "Declaration",
+                    "start": 65,
+                    "end": 77,
+                    "property": "bottom",
+                    "value": "10px"
+                  }
+                ]
+              },
+              "start": 56,
+              "end": 82
+            },
+            {
+              "type": "Rule",
+              "prelude": {
+                "type": "SelectorList",
+                "start": 85,
+                "end": 88,
+                "children": [
+                  {
+                    "type": "ComplexSelector",
+                    "start": 85,
+                    "end": 88,
+                    "children": [
+                      {
+                        "type": "RelativeSelector",
+                        "combinator": null,
+                        "selectors": [
+                          {
+                            "type": "Percentage",
+                            "value": "75%",
+                            "start": 85,
+                            "end": 88
+                          }
+                        ],
+                        "start": 85,
+                        "end": 88
+                      }
+                    ]
+                  }
+                ]
+              },
+              "block": {
+                "type": "Block",
+                "start": 89,
+                "end": 110,
+                "children": [
+                  {
+                    "type": "Declaration",
+                    "start": 94,
+                    "end": 105,
+                    "property": "bottom",
+                    "value": "5px"
+                  }
+                ]
+              },
+              "start": 85,
+              "end": 110
+            },
+            {
+              "type": "Rule",
+              "prelude": {
+                "type": "SelectorList",
+                "start": 113,
+                "end": 117,
+                "children": [
+                  {
+                    "type": "ComplexSelector",
+                    "start": 113,
+                    "end": 117,
+                    "children": [
+                      {
+                        "type": "RelativeSelector",
+                        "combinator": null,
+                        "selectors": [
+                          {
+                            "type": "Percentage",
+                            "value": "100%",
+                            "start": 113,
+                            "end": 117
+                          }
+                        ],
+                        "start": 113,
+                        "end": 117
+                      }
+                    ]
+                  }
+                ]
+              },
+              "block": {
+                "type": "Block",
+                "start": 118,
+                "end": 137,
+                "children": [
+                  {
+                    "type": "Declaration",
+                    "start": 123,
+                    "end": 132,
+                    "property": "bottom",
+                    "value": "0"
+                  }
+                ]
+              },
+              "start": 113,
+              "end": 137
+            }
+          ]
+        }
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 141,
+      "styles": "\n\t@keyframes bounce {\n\t\t0% {\n\t\t\tbottom: 0;\n\t\t}\n\t\t50% {\n\t\t\tbottom: 10px;\n\t\t}\n\t\t75% {\n\t\t\tbottom: 5px;\n\t\t}\n\t\t100% {\n\t\t\tbottom: 0;\n\t\t}\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

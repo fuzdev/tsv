@@ -6,7 +6,7 @@
 		"quick": "cargo check --workspace",
 		"clean": "cargo clean",
 		"dev": "cargo watch -x 'check --workspace' -x 'test --workspace' || echo '⚠️  cargo-watch not installed. Run: cargo install cargo-watch'",
-		"test": "cargo test && cargo clippy && deno fmt --check && cargo run -p tsv_debug --quiet fixtures_check_formatted",
+		"check": "cargo test && cargo clippy && deno fmt --check && cargo run -p tsv_debug --quiet fixtures_check_formatted",
 		"format": "cargo fmt && deno fmt",
 		"fixtures_update_expected": "cargo run -p tsv_debug --quiet fixtures_update_expected",
 		"fixtures_update_formatted": "cargo run -p tsv_debug --quiet fixtures_update_formatted",

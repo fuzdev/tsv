@@ -65,12 +65,16 @@ impl Formatter {
     ///
     /// Trims layout whitespace from first and last nodes in the run to avoid
     /// inserting unwanted spaces from indentation.
+    ///
+    /// If `block_follows_same_line` is true, preserves trailing space in the last text node
+    /// (semantic spacing before the following block element).
     pub fn format_inline_run(
         &mut self,
         nodes: &[FragmentNode],
         start: usize,
         end: usize,
         preserves_ws: bool,
+        block_follows_same_line: bool,
     ) {
         // Find first and last non-whitespace nodes in the run
         let (first_content_idx, last_content_idx) = self.find_content_boundaries(nodes, start, end);
@@ -83,10 +87,21 @@ impl Formatter {
                     continue; // Skip whitespace-only in the run
                 }
 
-                // Trim leading whitespace from first node, trailing from last node
                 let is_first = Some(j) == first_content_idx;
                 let is_last = Some(j) == last_content_idx;
-                let trimmed_text = self.trim_text_for_run_position(&text.raw, is_first, is_last);
+
+                // Handle trimming with context-aware rules for semantic spacing
+                let trimmed_text = if is_last && block_follows_same_line {
+                    // Last node before block on same line: preserve trailing space, trim leading
+                    if is_first {
+                        text.raw.trim_start().to_string()
+                    } else {
+                        text.raw.to_string()
+                    }
+                } else {
+                    // Normal trimming
+                    self.trim_text_for_run_position(&text.raw, is_first, is_last)
+                };
 
                 // Normalize the trimmed text
                 let normalized = self.normalize_whitespace(&trimmed_text, false);

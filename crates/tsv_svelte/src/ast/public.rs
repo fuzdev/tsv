@@ -3,6 +3,7 @@
 // JSON-compatible representation matching Svelte's official parser output.
 // Used for serialization and external tool compatibility.
 
+use crate::ast::internal::ElementKind;
 use serde::{Deserialize, Serialize};
 use tsv_css::ast::public::StyleSheet;
 use tsv_ts::ast::public::{Expression, Program};
@@ -52,8 +53,15 @@ pub struct Element {
     pub start: u32,
     pub end: u32,
     pub name: String,
+    #[serde(skip_serializing_if = "is_html_element")]
+    pub kind: ElementKind,
     pub attributes: Vec<Attribute>,
     pub fragment: Fragment,
+}
+
+/// Helper function to skip serializing ElementKind::Html (the default)
+fn is_html_element(kind: &ElementKind) -> bool {
+    *kind == ElementKind::Html
 }
 
 /// Svelte Attribute - element attribute
@@ -73,10 +81,7 @@ pub struct Attribute {
 #[serde(untagged)]
 pub enum AttributeValue {
     Text(Text),
-    // TODO(Future sprint): ExpressionTag
-    // For dynamic attribute values like: <div class={expr}>
-    // Sprint 6 implemented template-level expression tags only.
-    // Note: Using untagged here because Text already has its own "type" field
+    ExpressionTag(ExpressionTag),
 }
 
 /// Svelte Text node

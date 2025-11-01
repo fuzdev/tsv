@@ -1,0 +1,48 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 33,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "RegularElement",
+        "start": 0,
+        "end": 33,
+        "name": "input",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 7,
+            "end": 22,
+            "name": "type",
+            "value": [
+              {
+                "start": 13,
+                "end": 21,
+                "type": "Text",
+                "raw": "checkbox",
+                "data": "checkbox"
+              }
+            ]
+          },
+          {
+            "type": "Attribute",
+            "start": 23,
+            "end": 30,
+            "name": "checked",
+            "value": true
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": []
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

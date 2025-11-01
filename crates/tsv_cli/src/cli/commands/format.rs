@@ -15,12 +15,12 @@ impl Command for FormatCommand {
         let (input, parser_type) = if let Some(content) = args.option("content") {
             // Format from --content string argument (requires --parser)
             let parser_str = args.required_option("parser")?;
-            let parser_type = ParserType::from_str(&parser_str)?;
+            let parser_type = parser_str.parse()?;
             (Input::from_content(content), parser_type)
         } else if args.flag("stdin") {
             // Read from stdin (requires --parser)
             let parser_str = args.required_option("parser")?;
-            let parser_type = ParserType::from_str(&parser_str)?;
+            let parser_type = parser_str.parse()?;
             let input = Input::from_stdin()?;
             (input, parser_type)
         } else if let Some(path) = args.positional() {

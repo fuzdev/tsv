@@ -29,7 +29,12 @@ impl Formatter {
         let tag_name = self.resolve_symbol(element.name);
         self.write("<");
         self.write(&tag_name);
-        // TODO: Format attributes (future sprint)
+
+        // Format attributes
+        for attr in &element.attributes {
+            self.write(" ");
+            self.format_attribute(attr);
+        }
 
         // Void elements are self-closing
         if is_void {

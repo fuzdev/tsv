@@ -32,7 +32,10 @@ impl Formatter {
         let content_trimmed = formatted_content.trim_end_matches('\n');
         self.indent_level += 1;
         for line in content_trimmed.lines() {
-            self.write_indent();
+            // Don't indent blank lines (prettier outputs truly blank lines)
+            if !line.is_empty() {
+                self.write_indent();
+            }
             self.write(line);
             self.write("\n");
         }
@@ -62,20 +65,32 @@ impl Formatter {
         if !style.css_nodes.is_empty() {
             self.write("\n");
 
-            // Extract CSS source for blank line preservation
-            let start = style.content_span.start as usize;
-            let end = style.content_span.end as usize;
-            let css_source = &self.source()[start..end];
-
-            // Format CSS nodes with indentation
-            // Use the CSS formatter from tsv_css crate
-            let formatted_css = tsv_css::format(&style.css_nodes, css_source);
+            // Pass the entire source to CSS formatter (CSS node spans are absolute)
+            // The CSS formatter will use the spans to detect blank lines correctly
+            let formatted_css = tsv_css::format(&style.css_nodes, self.source());
 
             // Indent each line - trim trailing newline first to avoid extra blank lines
             let css_trimmed = formatted_css.trim_end_matches('\n');
             self.indent_level += 1;
+            let mut in_multiline_comment = false;
             for line in css_trimmed.lines() {
-                self.write_indent();
+                let trimmed = line.trim_start();
+
+                // Check if this is a comment continuation BEFORE updating state
+                // (prettier preserves exact spacing in comment continuations)
+                let is_comment_continuation = in_multiline_comment && !trimmed.starts_with("/*");
+
+                // Track if we're inside a multi-line comment
+                if trimmed.starts_with("/*") && !trimmed.contains("*/") {
+                    in_multiline_comment = true;
+                } else if in_multiline_comment && trimmed.contains("*/") {
+                    in_multiline_comment = false;
+                }
+
+                // Don't indent blank lines or multi-line comment continuation lines
+                if !line.is_empty() && !is_comment_continuation {
+                    self.write_indent();
+                }
                 self.write(line);
                 self.write("\n");
             }

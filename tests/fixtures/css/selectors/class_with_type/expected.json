@@ -1,0 +1,132 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 90,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 9,
+          "end": 22,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 9,
+              "end": 22,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "TypeSelector",
+                      "name": "div",
+                      "start": 9,
+                      "end": 12
+                    },
+                    {
+                      "type": "ClassSelector",
+                      "name": "container",
+                      "start": 12,
+                      "end": 22
+                    }
+                  ],
+                  "start": 9,
+                  "end": 22
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 23,
+          "end": 42,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 27,
+              "end": 38,
+              "property": "width",
+              "value": "100%"
+            }
+          ]
+        },
+        "start": 9,
+        "end": 42
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 45,
+          "end": 59,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 45,
+              "end": 59,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "TypeSelector",
+                      "name": "span",
+                      "start": 45,
+                      "end": 49
+                    },
+                    {
+                      "type": "ClassSelector",
+                      "name": "highlight",
+                      "start": 49,
+                      "end": 59
+                    }
+                  ],
+                  "start": 45,
+                  "end": 59
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 60,
+          "end": 81,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 64,
+              "end": 77,
+              "property": "color",
+              "value": "yellow"
+            }
+          ]
+        },
+        "start": 45,
+        "end": 81
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 82,
+      "styles": "\n\tdiv.container {\n\t\twidth: 100%;\n\t}\n\n\tspan.highlight {\n\t\tcolor: yellow;\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

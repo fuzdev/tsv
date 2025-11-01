@@ -1,0 +1,132 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 86,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 9,
+          "end": 19,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 9,
+              "end": 19,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "TypeSelector",
+                      "name": "div",
+                      "start": 9,
+                      "end": 12
+                    },
+                    {
+                      "type": "IdSelector",
+                      "name": "header",
+                      "start": 12,
+                      "end": 19
+                    }
+                  ],
+                  "start": 9,
+                  "end": 19
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 20,
+          "end": 41,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 24,
+              "end": 37,
+              "property": "height",
+              "value": "100px"
+            }
+          ]
+        },
+        "start": 9,
+        "end": 41
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 44,
+          "end": 53,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 44,
+              "end": 53,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "TypeSelector",
+                      "name": "span",
+                      "start": 44,
+                      "end": 48
+                    },
+                    {
+                      "type": "IdSelector",
+                      "name": "logo",
+                      "start": 48,
+                      "end": 53
+                    }
+                  ],
+                  "start": 44,
+                  "end": 53
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 54,
+          "end": 77,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 58,
+              "end": 73,
+              "property": "font-size",
+              "value": "24px"
+            }
+          ]
+        },
+        "start": 44,
+        "end": 77
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 78,
+      "styles": "\n\tdiv#header {\n\t\theight: 100px;\n\t}\n\n\tspan#logo {\n\t\tfont-size: 24px;\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

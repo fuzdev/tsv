@@ -20,15 +20,14 @@ pub trait Executable {
 }
 
 /// Registry of available commands
+#[derive(Default)]
 pub struct CommandRegistry {
     commands: Vec<Box<dyn Command>>,
 }
 
 impl CommandRegistry {
     pub fn new() -> Self {
-        Self {
-            commands: Vec::new(),
-        }
+        Self::default()
     }
 
     /// Register a command

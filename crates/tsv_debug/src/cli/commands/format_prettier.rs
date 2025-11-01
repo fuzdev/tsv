@@ -15,7 +15,7 @@ impl Command for FormatPrettierCommand {
         let (input, parser_type) = if let Some(content) = args.option("content") {
             let parser = args
                 .option("parser")
-                .map(|p| ParserType::from_str(&p))
+                .map(|p| p.parse())
                 .transpose()?
                 .unwrap_or(ParserType::Svelte);
             (Input::from_content(content), parser)

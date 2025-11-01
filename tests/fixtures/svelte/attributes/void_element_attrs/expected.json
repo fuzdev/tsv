@@ -1,0 +1,41 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 21,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "RegularElement",
+        "start": 0,
+        "end": 21,
+        "name": "br",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 4,
+            "end": 18,
+            "name": "class",
+            "value": [
+              {
+                "start": 11,
+                "end": 17,
+                "type": "Text",
+                "raw": "spacer",
+                "data": "spacer"
+              }
+            ]
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": []
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

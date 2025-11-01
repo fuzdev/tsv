@@ -64,15 +64,13 @@ fn test_fixture(fixture: &Fixture) -> Result<(), String> {
         .map_err(|e| format!("Failed to parse expected JSON: {}", e))?;
 
     if actual_json != expected_json {
-        // TODO need less verbose diffing
         // Format both for better diff viewing
-        // let actual_pretty = serde_json::to_string_pretty(&actual_json).unwrap();
-        // let expected_pretty = serde_json::to_string_pretty(&expected_json).unwrap();
+        let actual_pretty = serde_json::to_string_pretty(&actual_json).unwrap();
+        let expected_pretty = serde_json::to_string_pretty(&expected_json).unwrap();
 
         return Err(format!(
-            "AST mismatch for {}",
-            // "AST mismatch for {}\n\nExpected:\n{}\n\nActual:\n{}\n",
-            fixture.relative_path, //expected_pretty, actual_pretty
+            "AST mismatch for {}\n\nExpected:\n{}\n\nActual:\n{}\n",
+            fixture.relative_path, expected_pretty, actual_pretty
         ));
     }
 

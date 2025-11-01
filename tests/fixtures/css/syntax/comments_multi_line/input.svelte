@@ -1,0 +1,8 @@
+<style>
+	/* This is a
+   multi-line comment
+   spanning multiple lines */
+	div {
+		color: red;
+	}
+</style>

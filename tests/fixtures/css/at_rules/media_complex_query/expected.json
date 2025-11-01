@@ -1,0 +1,87 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 113,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Atrule",
+        "start": 9,
+        "end": 104,
+        "name": "media",
+        "prelude": "screen and (min-width: 768px) and (max-width: 1024px)",
+        "block": {
+          "type": "Block",
+          "start": 70,
+          "end": 104,
+          "children": [
+            {
+              "type": "Rule",
+              "prelude": {
+                "type": "SelectorList",
+                "start": 74,
+                "end": 77,
+                "children": [
+                  {
+                    "type": "ComplexSelector",
+                    "start": 74,
+                    "end": 77,
+                    "children": [
+                      {
+                        "type": "RelativeSelector",
+                        "combinator": null,
+                        "selectors": [
+                          {
+                            "type": "TypeSelector",
+                            "name": "div",
+                            "start": 74,
+                            "end": 77
+                          }
+                        ],
+                        "start": 74,
+                        "end": 77
+                      }
+                    ]
+                  }
+                ]
+              },
+              "block": {
+                "type": "Block",
+                "start": 78,
+                "end": 101,
+                "children": [
+                  {
+                    "type": "Declaration",
+                    "start": 83,
+                    "end": 96,
+                    "property": "display",
+                    "value": "flex"
+                  }
+                ]
+              },
+              "start": 74,
+              "end": 101
+            }
+          ]
+        }
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 105,
+      "styles": "\n\t@media screen and (min-width: 768px) and (max-width: 1024px) {\n\t\tdiv {\n\t\t\tdisplay: flex;\n\t\t}\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

@@ -1,0 +1,158 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 89,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 9,
+          "end": 17,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 9,
+              "end": 17,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "TypeSelector",
+                      "name": "div",
+                      "start": 9,
+                      "end": 12
+                    }
+                  ],
+                  "start": 9,
+                  "end": 12
+                },
+                {
+                  "type": "RelativeSelector",
+                  "combinator": {
+                    "type": "Combinator",
+                    "name": " ",
+                    "start": 12,
+                    "end": 13
+                  },
+                  "selectors": [
+                    {
+                      "type": "TypeSelector",
+                      "name": "span",
+                      "start": 13,
+                      "end": 17
+                    }
+                  ],
+                  "start": 12,
+                  "end": 17
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 18,
+          "end": 40,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 22,
+              "end": 36,
+              "property": "color",
+              "value": "inherit"
+            }
+          ]
+        },
+        "start": 9,
+        "end": 40
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 43,
+          "end": 55,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 43,
+              "end": 55,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "container",
+                      "start": 43,
+                      "end": 53
+                    }
+                  ],
+                  "start": 43,
+                  "end": 53
+                },
+                {
+                  "type": "RelativeSelector",
+                  "combinator": {
+                    "type": "Combinator",
+                    "name": " ",
+                    "start": 53,
+                    "end": 54
+                  },
+                  "selectors": [
+                    {
+                      "type": "TypeSelector",
+                      "name": "p",
+                      "start": 54,
+                      "end": 55
+                    }
+                  ],
+                  "start": 53,
+                  "end": 55
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 56,
+          "end": 80,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 60,
+              "end": 76,
+              "property": "line-height",
+              "value": "1.5"
+            }
+          ]
+        },
+        "start": 43,
+        "end": 80
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 81,
+      "styles": "\n\tdiv span {\n\t\tcolor: inherit;\n\t}\n\n\t.container p {\n\t\tline-height: 1.5;\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

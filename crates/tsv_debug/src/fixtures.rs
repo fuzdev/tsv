@@ -145,14 +145,13 @@ pub fn discover_unformatted_variants(fixture_dir: &Path) -> Vec<String> {
 
     if let Ok(entries) = fs::read_dir(fixture_dir) {
         for entry in entries.flatten() {
-            if let Some(filename) = entry.file_name().to_str() {
-                if filename.starts_with("unformatted_")
-                    && (filename.ends_with(".ts")
-                        || filename.ends_with(".svelte")
-                        || filename.ends_with(".css"))
-                {
-                    variants.push(filename.to_string());
-                }
+            if let Some(filename) = entry.file_name().to_str()
+                && filename.starts_with("unformatted_")
+                && (filename.ends_with(".ts")
+                    || filename.ends_with(".svelte")
+                    || filename.ends_with(".css"))
+            {
+                variants.push(filename.to_string());
             }
         }
     }
@@ -175,9 +174,10 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
     // Check expected.json exists (required for parser tests)
     let expected_path = fixture.expected_path();
     if !expected_path.exists() {
-        return Err(format!(
+        return Err(
             "Missing expected.json (required for parser tests, run: deno task fixtures_update_expected)"
-        ));
+                .to_string(),
+        );
     }
 
     let input_content = read_file(&fixture.input_path())?;
@@ -213,7 +213,7 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         // Check that unformatted_* variants don't coexist with formatted.*
         if !unformatted_variants.is_empty() {
             return Err(format!(
-                "unformatted_* variants ({}) should not coexist with formatted.{} (input.{} is already unformatted - probably rename input.{} → unformatted_something.{} and formatted.{} → input.{})",
+                "unformatted_* variants ({}) should not coexist with formatted.{} (input.{} is already unformatted - probably rename formatted.{} → input.{} and delete or rename input.{} → unformatted_something.{})",
                 unformatted_variants.join(", "),
                 fixture.extension(),
                 fixture.extension(),

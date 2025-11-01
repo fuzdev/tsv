@@ -45,7 +45,7 @@ pub struct Lexer<'a> {
     chars: Chars<'a>,
     position: usize,
     current: Option<char>,
-    inside_tag: bool, // Track if we're inside <...>
+    pub inside_tag: bool, // Track if we're inside <...>
 }
 
 impl<'a> Lexer<'a> {

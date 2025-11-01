@@ -1,0 +1,87 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 76,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Atrule",
+        "start": 9,
+        "end": 67,
+        "name": "media",
+        "prelude": "(min-width: 768px)",
+        "block": {
+          "type": "Block",
+          "start": 35,
+          "end": 67,
+          "children": [
+            {
+              "type": "Rule",
+              "prelude": {
+                "type": "SelectorList",
+                "start": 39,
+                "end": 42,
+                "children": [
+                  {
+                    "type": "ComplexSelector",
+                    "start": 39,
+                    "end": 42,
+                    "children": [
+                      {
+                        "type": "RelativeSelector",
+                        "combinator": null,
+                        "selectors": [
+                          {
+                            "type": "TypeSelector",
+                            "name": "div",
+                            "start": 39,
+                            "end": 42
+                          }
+                        ],
+                        "start": 39,
+                        "end": 42
+                      }
+                    ]
+                  }
+                ]
+              },
+              "block": {
+                "type": "Block",
+                "start": 43,
+                "end": 64,
+                "children": [
+                  {
+                    "type": "Declaration",
+                    "start": 48,
+                    "end": 59,
+                    "property": "color",
+                    "value": "blue"
+                  }
+                ]
+              },
+              "start": 39,
+              "end": 64
+            }
+          ]
+        }
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 68,
+      "styles": "\n\t@media (min-width: 768px) {\n\t\tdiv {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

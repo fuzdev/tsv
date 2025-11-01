@@ -23,28 +23,73 @@ impl<'a> SvelteParser<'a> {
         // Calculate expression start (after the '{')
         let expr_start = self.current_end;
 
-        // Find matching closing brace by scanning raw source
-        // TODO(future): This is a naive implementation with several limitations:
-        // 1. Doesn't handle nested braces: `{foo({ bar: 1 })}` will fail
-        // 2. Doesn't skip braces in strings: `{"hello}world"}` will fail
-        // 3. Doesn't skip braces in comments: `{/* } */}` will fail
-        // For proper implementation, need to track:
-        // - Brace depth counter
-        // - String context (inside string literal or not)
-        // - Comment context (inside comment or not)
-        // Alternative: Let TypeScript lexer do the work by tokenizing until EOF
-        // and tracking brace balance, but that requires full TS tokenization.
-        // For POC scope, this is acceptable as test case has no nesting.
+        // Find matching closing brace with proper handling of nested braces, strings, and comments
         let source_bytes = self.source.as_bytes();
         let mut expr_end = expr_start;
         let mut found_close = false;
+        let mut brace_depth = 1; // Already saw opening {
+        let mut in_string = false;
+        let mut string_char = '\0';
+        let mut in_comment = false;
+        let mut escape_next = false;
 
-        // Scan raw source for closing brace
+        // Scan raw source for matching closing brace
         for (i, &byte) in source_bytes.iter().enumerate().skip(expr_start) {
-            if byte == b'}' {
-                expr_end = i;
-                found_close = true;
-                break;
+            let ch = byte as char;
+
+            // Handle escape sequences in strings
+            if in_string && escape_next {
+                escape_next = false;
+                continue;
+            }
+
+            if in_string && ch == '\\' {
+                escape_next = true;
+                continue;
+            }
+
+            // Handle strings (skip braces when inside)
+            if !in_comment {
+                if in_string {
+                    if ch == string_char {
+                        in_string = false;
+                    }
+                } else if ch == '"' || ch == '\'' || ch == '`' {
+                    in_string = true;
+                    string_char = ch;
+                }
+            }
+
+            // Handle comments (skip braces when inside)
+            if !in_string {
+                if in_comment {
+                    // Block comment: /* ... */
+                    if ch == '*' && i + 1 < source_bytes.len() && source_bytes[i + 1] as char == '/'
+                    {
+                        in_comment = false;
+                    }
+                } else if ch == '/' && i + 1 < source_bytes.len() {
+                    let next_char = source_bytes[i + 1] as char;
+                    if next_char == '*' {
+                        in_comment = true;
+                    }
+                    // Note: Line comments (//) are not relevant in expressions inside {}
+                    // since newlines break the expression anyway
+                }
+            }
+
+            // Count braces (only outside strings and comments)
+            if !in_string && !in_comment {
+                if ch == '{' {
+                    brace_depth += 1;
+                } else if ch == '}' {
+                    brace_depth -= 1;
+                    if brace_depth == 0 {
+                        expr_end = i;
+                        found_close = true;
+                        break;
+                    }
+                }
             }
         }
 
@@ -74,7 +119,20 @@ impl<'a> SvelteParser<'a> {
         // - Performance: ~170ns overhead is negligible
         // Keep this pattern for now, but document for future review.
         let remaining_source = &self.source[expr_end..];
+
+        // Save the lexer state before creating new lexer
+        // This preserves the context (tag vs template) after expression parsing
+        // Example: class={expr}> - we're still in tag mode after the }
+        // Example: {expr}</div> - we're in template mode after the }
+        // TODO(future optimization/redesign):
+        // Could track ParsingContext explicitly in SvelteParser (Template vs TagAttributes enum)
+        // and set lexer.inside_tag from parser context instead of saving/restoring.
+        // Pros: More explicit parsing context available for error messages/validation.
+        // Cons: ~3ns slower (branch instead of direct copy), parser state to maintain.
+        // Current approach (save/restore) is simpler and slightly faster - YAGNI principle.
+        let saved_inside_tag = self.lexer.inside_tag;
         let mut new_lexer = crate::lexer::Lexer::new(remaining_source);
+        new_lexer.inside_tag = saved_inside_tag;
 
         // Get the first token (should be }) and extract its data
         let (token_kind, token_start, token_end) = {

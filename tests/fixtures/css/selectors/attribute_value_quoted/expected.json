@@ -1,0 +1,351 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 358,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 9,
+          "end": 30,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 9,
+              "end": 30,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "AttributeSelector",
+                      "start": 9,
+                      "end": 30,
+                      "name": "data-type",
+                      "matcher": "=",
+                      "value": "primary",
+                      "flags": null
+                    }
+                  ],
+                  "start": 9,
+                  "end": 30
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 31,
+          "end": 71,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 35,
+              "end": 51,
+              "property": "background",
+              "value": "blue"
+            },
+            {
+              "type": "Declaration",
+              "start": 55,
+              "end": 67,
+              "property": "color",
+              "value": "white"
+            }
+          ]
+        },
+        "start": 9,
+        "end": 71
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 74,
+          "end": 88,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 74,
+              "end": 88,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "AttributeSelector",
+                      "start": 74,
+                      "end": 88,
+                      "name": "lang",
+                      "matcher": "=",
+                      "value": "en-US",
+                      "flags": null
+                    }
+                  ],
+                  "start": 74,
+                  "end": 88
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 89,
+          "end": 138,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 93,
+              "end": 134,
+              "property": "font-family",
+              "value": "'American Typewriter', serif"
+            }
+          ]
+        },
+        "start": 74,
+        "end": 138
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 141,
+          "end": 159,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 141,
+              "end": 159,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "TypeSelector",
+                      "name": "input",
+                      "start": 141,
+                      "end": 146
+                    },
+                    {
+                      "type": "AttributeSelector",
+                      "start": 146,
+                      "end": 159,
+                      "name": "type",
+                      "matcher": "=",
+                      "value": "text",
+                      "flags": null
+                    }
+                  ],
+                  "start": 141,
+                  "end": 159
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 160,
+          "end": 190,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 164,
+              "end": 186,
+              "property": "border",
+              "value": "1px solid gray"
+            }
+          ]
+        },
+        "start": 141,
+        "end": 190
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 193,
+          "end": 215,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 193,
+              "end": 215,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "TypeSelector",
+                      "name": "input",
+                      "start": 193,
+                      "end": 198
+                    },
+                    {
+                      "type": "AttributeSelector",
+                      "start": 198,
+                      "end": 215,
+                      "name": "type",
+                      "matcher": "=",
+                      "value": "password",
+                      "flags": null
+                    }
+                  ],
+                  "start": 193,
+                  "end": 215
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 216,
+          "end": 246,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 220,
+              "end": 242,
+              "property": "font-family",
+              "value": "monospace"
+            }
+          ]
+        },
+        "start": 193,
+        "end": 246
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 249,
+          "end": 267,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 249,
+              "end": 267,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "TypeSelector",
+                      "name": "a",
+                      "start": 249,
+                      "end": 250
+                    },
+                    {
+                      "type": "AttributeSelector",
+                      "start": 250,
+                      "end": 267,
+                      "name": "target",
+                      "matcher": "=",
+                      "value": "_blank",
+                      "flags": null
+                    }
+                  ],
+                  "start": 249,
+                  "end": 267
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 268,
+          "end": 302,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 272,
+              "end": 298,
+              "property": "text-decoration",
+              "value": "underline"
+            }
+          ]
+        },
+        "start": 249,
+        "end": 302
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 305,
+          "end": 325,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 305,
+              "end": 325,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "AttributeSelector",
+                      "start": 305,
+                      "end": 325,
+                      "name": "aria-label",
+                      "matcher": "=",
+                      "value": "Close",
+                      "flags": null
+                    }
+                  ],
+                  "start": 305,
+                  "end": 325
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 326,
+          "end": 349,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 330,
+              "end": 345,
+              "property": "cursor",
+              "value": "pointer"
+            }
+          ]
+        },
+        "start": 305,
+        "end": 349
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 350,
+      "styles": "\n\t[data-type='primary'] {\n\t\tbackground: blue;\n\t\tcolor: white;\n\t}\n\n\t[lang='en-US'] {\n\t\tfont-family: 'American Typewriter', serif;\n\t}\n\n\tinput[type='text'] {\n\t\tborder: 1px solid gray;\n\t}\n\n\tinput[type='password'] {\n\t\tfont-family: monospace;\n\t}\n\n\ta[target='_blank'] {\n\t\ttext-decoration: underline;\n\t}\n\n\t[aria-label='Close'] {\n\t\tcursor: pointer;\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

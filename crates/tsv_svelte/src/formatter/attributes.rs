@@ -27,23 +27,37 @@ impl Formatter {
 
         // Format value if present
         if let Some(value_parts) = &attr.value {
-            self.write("=\"");
+            // Check if value is a single expression (no quotes needed)
+            let is_pure_expression = value_parts.len() == 1
+                && matches!(value_parts[0], internal::AttributeValue::ExpressionTag(_));
+
+            if is_pure_expression {
+                self.write("=");
+            } else {
+                self.write("=\"");
+            }
+
             for part in value_parts {
                 self.format_attribute_value(part);
             }
-            self.write("\"");
+
+            if !is_pure_expression {
+                self.write("\"");
+            }
         }
     }
 
     /// Format an attribute value part
     ///
-    /// Attribute values can contain static text or (in future) dynamic expressions.
-    /// Currently only text values are supported.
+    /// Attribute values can contain static text or dynamic expressions.
     fn format_attribute_value(&mut self, value: &internal::AttributeValue) {
         match value {
             internal::AttributeValue::Text(text) => {
                 self.write(&text.raw);
-            } // TODO: Handle expression attribute values in future sprint
+            }
+            internal::AttributeValue::ExpressionTag(expr_tag) => {
+                self.format_expression_tag(expr_tag);
+            }
         }
     }
 }

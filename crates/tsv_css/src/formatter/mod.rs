@@ -5,15 +5,20 @@
 // This module is organized by concern to support future expansion:
 //
 // - **mod.rs** (this file): Orchestration - coordinates formatting of CSS nodes, core Formatter
-// - **rules.rs**: Rule and declaration formatting (selectors, properties, values)
+// - **selectors.rs**: Selector formatting (reusable across rules and at-rules)
+// - **rules.rs**: Rule and declaration formatting (uses selectors module)
+// - **atrules.rs**: At-rule formatting (@media, @keyframes, etc., uses selectors and rules)
 //
 // ## Design Principles
 //
 // 1. **Match Prettier**: Format output matches prettier for compatibility
 // 2. **Preserve Semantics**: Never change CSS rendering semantics
 // 3. **Modularity**: Each module has single responsibility for future maintainability
+// 4. **Reusability**: Shared formatting logic (selectors) used by multiple modules
 
+mod atrules;
 mod rules;
+mod selectors;
 
 use crate::ast::internal::CssNode;
 use tsv_lang::OutputBuffer;
@@ -101,8 +106,10 @@ impl Formatter {
 
                 let prev_is_rule = matches!(prev_node, CssNode::Rule(_));
                 let prev_is_comment = matches!(prev_node, CssNode::Comment(_));
+                let prev_is_atrule = matches!(prev_node, CssNode::Atrule(_));
                 let curr_is_rule = matches!(node, CssNode::Rule(_));
                 let curr_is_comment = matches!(node, CssNode::Comment(_));
+                let curr_is_atrule = matches!(node, CssNode::Atrule(_));
 
                 // Check if previous node was a comment at the start (no rule before it)
                 let prev_comment_at_start = prev_is_comment && i == 1;
@@ -110,12 +117,18 @@ impl Formatter {
                 // Prettier preserves blank lines from source
                 if has_blank_line_in_source {
                     self.write("\n\n");
-                } else if prev_is_rule && curr_is_comment {
-                    // Rule → Comment: always add blank line
+                } else if (prev_is_rule || prev_is_atrule) && curr_is_comment {
+                    // Rule/AtRule → Comment: always add blank line
                     self.write("\n\n");
-                } else if prev_is_comment && curr_is_rule && !prev_comment_at_start {
-                    // Comment → Rule: add blank line only if comment wasn't at start
+                } else if prev_is_comment
+                    && (curr_is_rule || curr_is_atrule)
+                    && !prev_comment_at_start
+                {
+                    // Comment → Rule/AtRule: add blank line only if comment wasn't at start
                     self.write("\n\n");
+                } else if (prev_is_rule || prev_is_atrule) && (curr_is_rule || curr_is_atrule) {
+                    // Rule/AtRule → Rule/AtRule: single newline
+                    self.write("\n");
                 } else {
                     // All other cases: single newline
                     self.write("\n");
@@ -133,9 +146,38 @@ impl Formatter {
             let prev_end = prev.span().end as usize;
             let curr_start = curr.span().start as usize;
 
-            if prev_end < curr_start && curr_start <= source.len() {
-                let between = &source[prev_end..curr_start];
-                // Blank line = 2+ newlines in the whitespace between nodes
+            // For adjacent spans, check for trailing whitespace in prev span
+            // AND leading whitespace in curr span
+            let (search_start, search_end) = if prev_end == curr_start {
+                // Look back for trailing whitespace in prev span
+                let mut start = prev_end;
+                for ch in source[..prev_end].chars().rev().take(20) {
+                    if ch.is_whitespace() {
+                        start = start.saturating_sub(ch.len_utf8());
+                    } else {
+                        break;
+                    }
+                }
+
+                // Look ahead for leading whitespace in curr span
+                let mut end = curr_start;
+                for ch in source[curr_start..].chars().take(20) {
+                    if ch.is_whitespace() {
+                        end += ch.len_utf8();
+                    } else {
+                        break;
+                    }
+                }
+
+                (start, end)
+            } else {
+                // Non-adjacent spans - check the gap between them
+                (prev_end, curr_start)
+            };
+
+            if search_start < search_end && search_end <= source.len() {
+                let between = &source[search_start..search_end];
+                // Blank line = 2+ newlines in the whitespace
                 between.matches('\n').count() >= 2
             } else {
                 false
@@ -151,7 +193,7 @@ impl Formatter {
         match node {
             CssNode::Rule(rule) => self.format_css_rule(rule),
             CssNode::Comment(comment) => self.format_css_comment(comment),
-            // TODO: Add more node types as needed (AtRule, etc.)
+            CssNode::Atrule(atrule) => self.format_css_atrule(atrule),
         }
     }
 

@@ -1,11 +1,26 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@std/fs@1.0.8": "1.0.8",
+    "jsr:@std/path@1.0.8": "1.0.8",
+    "jsr:@std/path@^1.0.8": "1.0.8",
     "npm:@sveltejs/acorn-typescript@^1.0.1": "1.0.6_acorn@8.15.0",
     "npm:acorn@^8.14.0": "8.15.0",
+    "npm:prettier-plugin-svelte@^3.3.2": "3.4.0_prettier@3.6.2_svelte@5.43.2__acorn@8.15.0",
     "npm:prettier-plugin-svelte@^3.4.0": "3.4.0_prettier@3.6.2_svelte@5.43.2__acorn@8.15.0",
     "npm:prettier@^3.6.2": "3.6.2",
     "npm:svelte@^5.43.0": "5.43.2_acorn@8.15.0"
+  },
+  "jsr": {
+    "@std/fs@1.0.8": {
+      "integrity": "161c721b6f9400b8100a851b6f4061431c538b204bb76c501d02c508995cffe0",
+      "dependencies": [
+        "jsr:@std/path@^1.0.8"
+      ]
+    },
+    "@std/path@1.0.8": {
+      "integrity": "548fa456bb6a04d3c1a1e7477986b6cffbce95102d0bb447c67c4ee70e0364be"
+    }
   },
   "npm": {
     "@jridgewell/gen-mapping@0.3.13": {

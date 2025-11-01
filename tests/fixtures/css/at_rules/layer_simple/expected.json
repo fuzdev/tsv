@@ -1,0 +1,87 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 66,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Atrule",
+        "start": 9,
+        "end": 57,
+        "name": "layer",
+        "prelude": "components",
+        "block": {
+          "type": "Block",
+          "start": 27,
+          "end": 57,
+          "children": [
+            {
+              "type": "Rule",
+              "prelude": {
+                "type": "SelectorList",
+                "start": 31,
+                "end": 34,
+                "children": [
+                  {
+                    "type": "ComplexSelector",
+                    "start": 31,
+                    "end": 34,
+                    "children": [
+                      {
+                        "type": "RelativeSelector",
+                        "combinator": null,
+                        "selectors": [
+                          {
+                            "type": "TypeSelector",
+                            "name": "div",
+                            "start": 31,
+                            "end": 34
+                          }
+                        ],
+                        "start": 31,
+                        "end": 34
+                      }
+                    ]
+                  }
+                ]
+              },
+              "block": {
+                "type": "Block",
+                "start": 35,
+                "end": 54,
+                "children": [
+                  {
+                    "type": "Declaration",
+                    "start": 40,
+                    "end": 49,
+                    "property": "margin",
+                    "value": "0"
+                  }
+                ]
+              },
+              "start": 31,
+              "end": 54
+            }
+          ]
+        }
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 58,
+      "styles": "\n\t@layer components {\n\t\tdiv {\n\t\t\tmargin: 0;\n\t\t}\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

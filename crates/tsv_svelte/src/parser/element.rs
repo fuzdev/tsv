@@ -18,6 +18,11 @@ fn is_void(name: &str) -> bool {
     VOID_ELEMENTS.contains(&name) || name.eq_ignore_ascii_case("!doctype")
 }
 
+/// Check if a tag name is a component (first character uppercase)
+fn is_component(name: &str) -> bool {
+    name.chars().next().is_some_and(|c| c.is_uppercase())
+}
+
 impl<'a> SvelteParser<'a> {
     /// Parse an element: <tag></tag> or <tag/> or <void>
     pub(crate) fn parse_element(&mut self) -> Result<Element, ParseError> {
@@ -36,9 +41,15 @@ impl<'a> SvelteParser<'a> {
 
         let tag_name = self.current_value().to_string();
         let tag_symbol = self.intern(&tag_name);
+        let kind = if is_component(&tag_name) {
+            ElementKind::Component
+        } else {
+            ElementKind::Html
+        };
         self.advance()?;
 
-        // TODO: Parse attributes (future sprint)
+        // Parse attributes
+        let attributes = self.parse_attributes()?;
 
         // Check for self-closing tag: <div/>
         let self_closing = self.check(TokenKind::Slash);
@@ -54,7 +65,8 @@ impl<'a> SvelteParser<'a> {
         if is_void(&tag_name) || self_closing {
             return Ok(Element {
                 name: tag_symbol,
-                attributes: Vec::new(),
+                kind,
+                attributes,
                 fragment: Fragment { nodes: Vec::new() },
                 span: Span {
                     start: start as u32,
@@ -138,7 +150,8 @@ impl<'a> SvelteParser<'a> {
 
         Ok(Element {
             name: tag_symbol,
-            attributes: Vec::new(),
+            kind,
+            attributes,
             fragment: Fragment { nodes: child_nodes },
             span: Span {
                 start: start as u32,

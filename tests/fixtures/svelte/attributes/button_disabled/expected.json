@@ -1,0 +1,41 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 34,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "RegularElement",
+        "start": 0,
+        "end": 34,
+        "name": "button",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 8,
+            "end": 16,
+            "name": "disabled",
+            "value": true
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 17,
+              "end": 25,
+              "raw": "Click me",
+              "data": "Click me"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

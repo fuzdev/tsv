@@ -1,0 +1,13 @@
+<style>
+	li:nth-child(2n + 1) {
+		background: lightgray;
+	}
+
+	tr:nth-child(odd) {
+		background: white;
+	}
+
+	div:nth-child(3) {
+		margin-top: 20px;
+	}
+</style>

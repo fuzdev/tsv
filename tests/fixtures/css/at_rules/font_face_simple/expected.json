@@ -1,0 +1,54 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 100,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Atrule",
+        "start": 9,
+        "end": 91,
+        "name": "font-face",
+        "prelude": "",
+        "block": {
+          "type": "Block",
+          "start": 20,
+          "end": 91,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 24,
+              "end": 45,
+              "property": "font-family",
+              "value": "'MyFont'"
+            },
+            {
+              "type": "Declaration",
+              "start": 49,
+              "end": 87,
+              "property": "src",
+              "value": "url('font.woff2') format('woff2')"
+            }
+          ]
+        }
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 92,
+      "styles": "\n\t@font-face {\n\t\tfont-family: 'MyFont';\n\t\tsrc: url('font.woff2') format('woff2');\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

@@ -1,108 +1,120 @@
 {
-  "attributes": [],
-  "children": [
-    {
-      "block": {
-        "children": [
-          {
-            "end": 17,
-            "property": "color",
-            "start": 7,
-            "type": "Declaration",
-            "value": "red"
-          }
-        ],
-        "end": 20,
-        "start": 4,
-        "type": "Block"
-      },
-      "end": 20,
-      "prelude": {
-        "children": [
-          {
-            "children": [
-              {
-                "combinator": null,
-                "end": 3,
-                "selectors": [
-                  {
-                    "end": 3,
-                    "name": "div",
-                    "start": 0,
-                    "type": "TypeSelector"
-                  }
-                ],
-                "start": 0,
-                "type": "RelativeSelector"
-              }
-            ],
-            "end": 3,
-            "start": 0,
-            "type": "ComplexSelector"
-          }
-        ],
-        "end": 3,
-        "start": 0,
-        "type": "SelectorList"
-      },
-      "start": 0,
-      "type": "Rule"
-    },
-    {
-      "block": {
-        "children": [
-          {
-            "end": 46,
-            "property": "font-weight",
-            "start": 29,
-            "type": "Declaration",
-            "value": "bold"
-          }
-        ],
-        "end": 49,
-        "start": 26,
-        "type": "Block"
-      },
-      "end": 49,
-      "prelude": {
-        "children": [
-          {
-            "children": [
-              {
-                "combinator": null,
-                "end": 25,
-                "selectors": [
-                  {
-                    "end": 25,
-                    "name": "span",
-                    "start": 21,
-                    "type": "TypeSelector"
-                  }
-                ],
-                "start": 21,
-                "type": "RelativeSelector"
-              }
-            ],
-            "end": 25,
-            "start": 21,
-            "type": "ComplexSelector"
-          }
-        ],
-        "end": 25,
-        "start": 21,
-        "type": "SelectorList"
-      },
-      "start": 21,
-      "type": "Rule"
-    }
-  ],
-  "content": {
-    "comment": null,
-    "end": 49,
+  "css": {
+    "type": "StyleSheet",
     "start": 0,
-    "styles": "div {\n\tcolor: red;\n}\nspan {\n\tfont-weight: bold;\n}"
+    "end": 72,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 9,
+          "end": 12,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 9,
+              "end": 12,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "TypeSelector",
+                      "name": "div",
+                      "start": 9,
+                      "end": 12
+                    }
+                  ],
+                  "start": 9,
+                  "end": 12
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 13,
+          "end": 31,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 17,
+              "end": 27,
+              "property": "color",
+              "value": "red"
+            }
+          ]
+        },
+        "start": 9,
+        "end": 31
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 33,
+          "end": 37,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 33,
+              "end": 37,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "TypeSelector",
+                      "name": "span",
+                      "start": 33,
+                      "end": 37
+                    }
+                  ],
+                  "start": 33,
+                  "end": 37
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 38,
+          "end": 63,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 42,
+              "end": 59,
+              "property": "font-weight",
+              "value": "bold"
+            }
+          ]
+        },
+        "start": 33,
+        "end": 63
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 64,
+      "styles": "\n\tdiv {\n\t\tcolor: red;\n\t}\n\tspan {\n\t\tfont-weight: bold;\n\t}\n",
+      "comment": null
+    }
   },
-  "end": 49,
-  "start": 0,
-  "type": "StyleSheet"
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
 }

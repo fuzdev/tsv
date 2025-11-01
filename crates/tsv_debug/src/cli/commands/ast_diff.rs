@@ -24,7 +24,7 @@ impl Command for AstDiffCommand {
             // Single content mode: parse → format → parse
             let parser = args
                 .option("parser")
-                .map(|p| ParserType::from_str(&p))
+                .map(|p| p.parse())
                 .transpose()?
                 .unwrap_or(ParserType::Svelte);
             (Input::from_content(content), None, parser)
@@ -32,7 +32,11 @@ impl Command for AstDiffCommand {
             let parser = ParserType::from_extension(&path1);
             if let Some(path2) = file2 {
                 // Two file mode: compare both
-                (Input::from_file(&path1)?, Some(Input::from_file(&path2)?), parser)
+                (
+                    Input::from_file(&path1)?,
+                    Some(Input::from_file(&path2)?),
+                    parser,
+                )
             } else {
                 // Single file mode: parse → format → parse
                 (Input::from_file(&path1)?, None, parser)
@@ -92,7 +96,11 @@ impl Executable for AstDiffExecutable {
 }
 
 /// Compare two inputs directly
-fn compare_two_inputs(input1: &Input, input2: &Input, parser_type: ParserType) -> Result<bool, String> {
+fn compare_two_inputs(
+    input1: &Input,
+    input2: &Input,
+    parser_type: ParserType,
+) -> Result<bool, String> {
     let content1 = input1.content();
     let content2 = input2.content();
 

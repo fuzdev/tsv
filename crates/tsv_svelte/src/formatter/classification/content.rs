@@ -17,15 +17,24 @@ impl Formatter {
     /// Check if a fragment node is inline content
     ///
     /// Returns true for:
-    /// - Inline/void elements (span, br, etc.)
+    /// - Inline elements (span, a, strong, etc.)
+    /// - Inline void elements (br, img, input, etc.)
     /// - Expression tags
     /// - Text nodes (any text content)
+    ///
+    /// Returns false for:
+    /// - Block elements (div, p, section, etc.)
+    /// - Block void elements (hr)
     pub(crate) fn is_inline_node(&self, node: &FragmentNode) -> bool {
         match node {
             FragmentNode::Element(el) => {
-                // Optimize: resolve symbol once for both checks
+                // Optimize: resolve symbol once for all checks
                 self.with_resolved_symbol(el.name, |tag| {
-                    html::is_inline_element(tag) || html::is_void_element(tag)
+                    // Element is inline if:
+                    // 1. It's classified as inline (phrasing content), OR
+                    // 2. It's void AND not block (inline void like <br>, but not <hr>)
+                    html::is_inline_element(tag)
+                        || (html::is_void_element(tag) && !html::is_block_element(tag))
                 })
             }
             FragmentNode::ExpressionTag(_) => true,

@@ -1,0 +1,77 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 81,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "RegularElement",
+        "start": 0,
+        "end": 81,
+        "name": "input",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 7,
+            "end": 19,
+            "name": "type",
+            "value": [
+              {
+                "start": 13,
+                "end": 18,
+                "type": "Text",
+                "raw": "email",
+                "data": "email"
+              }
+            ]
+          },
+          {
+            "type": "Attribute",
+            "start": 20,
+            "end": 50,
+            "name": "placeholder",
+            "value": [
+              {
+                "start": 33,
+                "end": 49,
+                "type": "Text",
+                "raw": "user@example.com",
+                "data": "user@example.com"
+              }
+            ]
+          },
+          {
+            "type": "Attribute",
+            "start": 51,
+            "end": 59,
+            "name": "required",
+            "value": true
+          },
+          {
+            "type": "Attribute",
+            "start": 60,
+            "end": 68,
+            "name": "disabled",
+            "value": true
+          },
+          {
+            "type": "Attribute",
+            "start": 69,
+            "end": 78,
+            "name": "autofocus",
+            "value": true
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": []
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

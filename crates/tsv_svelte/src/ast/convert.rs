@@ -162,6 +162,7 @@ fn convert_element(
         start: elem.span.start,
         end: elem.span.end,
         name: interner.resolve(elem.name).unwrap().to_string(),
+        kind: elem.kind,
         attributes: elem
             .attributes
             .iter()
@@ -195,17 +196,40 @@ fn convert_attribute(
     // Extract attribute name from interner
     let name = interner.resolve(attr.name).unwrap().to_string();
 
-    // Convert attribute value
+    // Convert attribute value following Svelte's JSON format:
     // - Boolean attributes (no value): serialize as `true`
-    // - Regular attributes (with value): serialize as array
+    // - Text attributes (contain Text nodes): serialize as array
+    // - Pure expression (single ExpressionTag): serialize as object
+    // - Multiple expressions: serialize as array
     let value = match &attr.value {
         None => Some(serde_json::Value::Bool(true)), // Boolean attribute
         Some(values) => {
-            let converted: Vec<_> = values
+            // Check if any value is Text (string content)
+            let has_text = values
                 .iter()
-                .map(|v| convert_attribute_value(v, loc, interner))
-                .collect();
-            Some(serde_json::to_value(converted).unwrap())
+                .any(|v| matches!(v, internal::AttributeValue::Text(_)));
+
+            if has_text {
+                // Has text content: always serialize as array (even if single Text value)
+                let converted: Vec<_> = values
+                    .iter()
+                    .map(|v| convert_attribute_value(v, loc, interner))
+                    .collect();
+                Some(serde_json::to_value(converted).unwrap())
+            } else if values.len() == 1 {
+                // Single expression only: serialize as object
+                Some(
+                    serde_json::to_value(convert_attribute_value(&values[0], loc, interner))
+                        .unwrap(),
+                )
+            } else {
+                // Multiple expressions: serialize as array
+                let converted: Vec<_> = values
+                    .iter()
+                    .map(|v| convert_attribute_value(v, loc, interner))
+                    .collect();
+                Some(serde_json::to_value(converted).unwrap())
+            }
         }
     };
 
@@ -220,11 +244,14 @@ fn convert_attribute(
 
 fn convert_attribute_value(
     value: &internal::AttributeValue,
-    _loc: &LocationTracker,
-    _interner: &DefaultStringInterner,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
 ) -> public::AttributeValue {
     match value {
         internal::AttributeValue::Text(text) => public::AttributeValue::Text(convert_text(text)),
+        internal::AttributeValue::ExpressionTag(tag) => {
+            public::AttributeValue::ExpressionTag(convert_expression_tag(tag, loc, interner))
+        }
     }
 }
 
@@ -287,9 +314,11 @@ fn convert_style(
         source[style.content_span.start as usize..style.content_span.end as usize].to_string();
 
     // Delegate to tsv_css for CSS node conversion
+    // Filter out comments (Svelte's CSS parser doesn't include them in the AST)
     let children: Vec<serde_json::Value> = style
         .css_nodes
         .iter()
+        .filter(|node| !matches!(node, tsv_css::ast::internal::CssNode::Comment(_)))
         .map(|node| tsv_css::ast::convert::convert_css_node(node, source))
         .collect();
 

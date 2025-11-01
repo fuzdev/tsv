@@ -53,6 +53,17 @@ impl FragmentNode {
     }
 }
 
+/// Svelte Element kind - distinguishes HTML elements from components
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ElementKind {
+    /// HTML element: `<div>`, `<span>`, `<input>`, etc. (lowercase first character)
+    #[serde(rename = "Html")]
+    Html,
+    /// Svelte component: `<MyComponent>`, `<Button>`, etc. (uppercase first character)
+    #[serde(rename = "Component")]
+    Component,
+}
+
 /// Svelte Element - HTML/component tag
 ///
 /// Represents an HTML element or Svelte component in the template.
@@ -60,6 +71,7 @@ impl FragmentNode {
 #[derive(Debug, Clone)]
 pub struct Element {
     pub name: DefaultSymbol,
+    pub kind: ElementKind,
     pub attributes: Vec<Attribute>,
     pub fragment: Fragment,
     pub span: Span,
@@ -82,10 +94,7 @@ pub struct Attribute {
 #[derive(Debug, Clone)]
 pub enum AttributeValue {
     Text(Text),
-    // TODO(Future sprint): ExpressionTag(ExpressionTag)
-    // For dynamic attribute values like: <div class={expr} title={"text"}>
-    // Note: Sprint 6 implemented template-level expression tags (<div>{expr}</div>)
-    // but not attribute-level expression tags yet.
+    ExpressionTag(ExpressionTag),
 }
 
 /// Svelte Text node - raw text content
@@ -96,8 +105,7 @@ pub enum AttributeValue {
 ///
 /// TODO(performance): Text nodes store duplicate data (raw + data fields).
 /// For now, raw and data are identical since HTML entity decoding isn't implemented.
-/// This wastes ~50% memory for text nodes. See TODO_PERF.md "P1: Text Node Dual Storage"
-/// for optimization strategies (store only raw, compute data on-demand).
+/// This wastes ~50% memory for text nodes. Possible optimization strategies? (store only raw, compute data on-demand).
 ///
 /// TODO(performance): Formatter repeatedly calls is_whitespace_only() on text nodes in
 /// hot loops (multiline children, inline run detection). Could cache this as a bool field

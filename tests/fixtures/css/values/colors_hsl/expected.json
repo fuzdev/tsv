@@ -1,0 +1,141 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 250,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 67,
+          "end": 78,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 67,
+              "end": 78,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "rgb-colors",
+                      "start": 67,
+                      "end": 78
+                    }
+                  ],
+                  "start": 67,
+                  "end": 78
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 79,
+          "end": 164,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 83,
+              "end": 102,
+              "property": "color",
+              "value": "rgb(255 0 0)"
+            },
+            {
+              "type": "Declaration",
+              "start": 106,
+              "end": 130,
+              "property": "background",
+              "value": "rgb(0 255 0)"
+            },
+            {
+              "type": "Declaration",
+              "start": 134,
+              "end": 160,
+              "property": "border-color",
+              "value": "rgb(0 0 255)"
+            }
+          ]
+        },
+        "start": 67,
+        "end": 164
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 167,
+          "end": 177,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 167,
+              "end": 177,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "rgb-grays",
+                      "start": 167,
+                      "end": 177
+                    }
+                  ],
+                  "start": 167,
+                  "end": 177
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 178,
+          "end": 241,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 182,
+              "end": 205,
+              "property": "color",
+              "value": "rgb(128 128 128)"
+            },
+            {
+              "type": "Declaration",
+              "start": 209,
+              "end": 237,
+              "property": "background",
+              "value": "rgb(200 200 200)"
+            }
+          ]
+        },
+        "start": 167,
+        "end": 241
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 242,
+      "styles": "\n\t/* Test rgb() color function - space separated syntax */\n\t.rgb-colors {\n\t\tcolor: rgb(255 0 0);\n\t\tbackground: rgb(0 255 0);\n\t\tborder-color: rgb(0 0 255);\n\t}\n\n\t.rgb-grays {\n\t\tcolor: rgb(128 128 128);\n\t\tbackground: rgb(200 200 200);\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

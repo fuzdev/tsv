@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::{self, Read as _};
+use std::str::FromStr;
 
 /// Input source for parsing or formatting
 #[derive(Debug)]
@@ -56,8 +57,12 @@ impl ParserType {
             ParserType::TypeScript
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Result<Self, String> {
+impl FromStr for ParserType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, String> {
         match s {
             "svelte" => Ok(ParserType::Svelte),
             "typescript" | "ts" => Ok(ParserType::TypeScript),

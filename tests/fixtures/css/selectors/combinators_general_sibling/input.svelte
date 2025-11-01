@@ -1,0 +1,9 @@
+<style>
+	h1 ~ p {
+		color: gray;
+	}
+
+	.active ~ .item {
+		opacity: 0.5;
+	}
+</style>

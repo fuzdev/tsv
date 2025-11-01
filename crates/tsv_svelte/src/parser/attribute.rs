@@ -46,63 +46,94 @@ impl<'a> SvelteParser<'a> {
 
         let name_str = self.current_value().to_string();
         let name = self.intern(&name_str);
+        let name_end = self.current_end; // Save end position of name token
         self.advance()?;
 
         // Check for = (attribute with value)
         if self.check(TokenKind::Equals) {
             self.advance()?; // consume =
 
-            // Parse attribute value
+            // Parse attribute value (string or expression)
             let value = self.parse_attribute_value()?;
-            let end = self.current_start; // After consuming the value
+
+            // Find the end position from the last value part
+            let value_end = if let Some(last_part) = value.last() {
+                match last_part {
+                    AttributeValue::Text(text) => {
+                        // For string values, the Text span covers content only (without quotes)
+                        // The attribute span must include the closing quote, so add 1 to content_end
+                        // Example: type="text" → Text span is "text" (positions 13-17), token is "text" (positions 12-18)
+                        text.span.end as usize + 1
+                    }
+                    AttributeValue::ExpressionTag(tag) => {
+                        // Expression span already includes the closing } so use as-is
+                        tag.span.end as usize
+                    }
+                }
+            } else {
+                return Err(ParseError::InvalidSyntax {
+                    message: "Attribute value is empty".to_string(),
+                    position: self.current_start,
+                    context: None,
+                });
+            };
 
             Ok(Attribute {
                 name,
                 value: Some(value),
                 span: Span {
                     start: start as u32,
-                    end: end as u32,
+                    end: value_end as u32,
                 },
             })
         } else {
-            // Boolean attribute (no value)
-            let end = self.current_start;
+            // Boolean attribute (no value) - ends where the name ends
             Ok(Attribute {
                 name,
                 value: None,
                 span: Span {
                     start: start as u32,
-                    end: end as u32,
+                    end: name_end as u32,
                 },
             })
         }
     }
 
-    /// Parse attribute value (e.g., `"ts"`)
-    /// Returns a Vec<AttributeValue> to support mixed text/expressions in future
+    /// Parse attribute value (e.g., `"ts"` or `{expr}`)
+    /// Returns a Vec<AttributeValue> to support mixed text/expressions
     pub(crate) fn parse_attribute_value(&mut self) -> Result<Vec<AttributeValue>, ParseError> {
+        let mut parts = Vec::new();
+
+        // Check for expression attribute {expr}
+        if self.check(TokenKind::LeftBrace) {
+            let expr_tag = self.parse_expression_tag()?;
+            parts.push(AttributeValue::ExpressionTag(expr_tag));
+            return Ok(parts);
+        }
+
+        // Otherwise expect string value
         if !self.check(TokenKind::String) {
             return Err(ParseError::InvalidSyntax {
-                message: format!("Expected string value, found {}", self.current_kind),
+                message: format!(
+                    "Expected string or expression value, found {}",
+                    self.current_kind
+                ),
                 position: self.current_start,
                 context: None,
             });
         }
 
         // Extract string content (without quotes)
-        let (start, end) = self.current_pos();
+        let (token_start, token_end) = self.current_pos();
 
         // Remove quotes: "ts" -> ts
-        let content_start = start + 1;
-        let content_end = end - 1;
+        let content_start = token_start + 1;
+        let content_end = token_end - 1;
 
         // Extract the actual text content from source
         let text_content = self.source[content_start..content_end].to_string();
 
-        self.advance()?;
-
         // TODO(performance): Text node allocates twice (raw + data fields are identical).
-        // See TODO_PERF.md "P1: Text Node Dual Storage" and ast/internal.rs:225 for details.
         let text = Text {
             raw: text_content.clone(),
             data: text_content,
@@ -112,6 +143,9 @@ impl<'a> SvelteParser<'a> {
             },
         };
 
-        Ok(vec![AttributeValue::Text(text)])
+        self.advance()?;
+
+        parts.push(AttributeValue::Text(text));
+        Ok(parts)
     }
 }

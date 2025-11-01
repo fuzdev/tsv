@@ -1,0 +1,134 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 92,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Atrule",
+        "start": 9,
+        "end": 83,
+        "name": "keyframes",
+        "prelude": "fade",
+        "block": {
+          "type": "Block",
+          "start": 25,
+          "end": 83,
+          "children": [
+            {
+              "type": "Rule",
+              "prelude": {
+                "type": "SelectorList",
+                "start": 29,
+                "end": 33,
+                "children": [
+                  {
+                    "type": "ComplexSelector",
+                    "start": 29,
+                    "end": 33,
+                    "children": [
+                      {
+                        "type": "RelativeSelector",
+                        "combinator": null,
+                        "selectors": [
+                          {
+                            "type": "TypeSelector",
+                            "name": "from",
+                            "start": 29,
+                            "end": 33
+                          }
+                        ],
+                        "start": 29,
+                        "end": 33
+                      }
+                    ]
+                  }
+                ]
+              },
+              "block": {
+                "type": "Block",
+                "start": 34,
+                "end": 54,
+                "children": [
+                  {
+                    "type": "Declaration",
+                    "start": 39,
+                    "end": 49,
+                    "property": "opacity",
+                    "value": "0"
+                  }
+                ]
+              },
+              "start": 29,
+              "end": 54
+            },
+            {
+              "type": "Rule",
+              "prelude": {
+                "type": "SelectorList",
+                "start": 57,
+                "end": 59,
+                "children": [
+                  {
+                    "type": "ComplexSelector",
+                    "start": 57,
+                    "end": 59,
+                    "children": [
+                      {
+                        "type": "RelativeSelector",
+                        "combinator": null,
+                        "selectors": [
+                          {
+                            "type": "TypeSelector",
+                            "name": "to",
+                            "start": 57,
+                            "end": 59
+                          }
+                        ],
+                        "start": 57,
+                        "end": 59
+                      }
+                    ]
+                  }
+                ]
+              },
+              "block": {
+                "type": "Block",
+                "start": 60,
+                "end": 80,
+                "children": [
+                  {
+                    "type": "Declaration",
+                    "start": 65,
+                    "end": 75,
+                    "property": "opacity",
+                    "value": "1"
+                  }
+                ]
+              },
+              "start": 57,
+              "end": 80
+            }
+          ]
+        }
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 84,
+      "styles": "\n\t@keyframes fade {\n\t\tfrom {\n\t\t\topacity: 0;\n\t\t}\n\t\tto {\n\t\t\topacity: 1;\n\t\t}\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

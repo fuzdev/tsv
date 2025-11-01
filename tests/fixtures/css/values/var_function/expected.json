@@ -1,0 +1,264 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 391,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 9,
+          "end": 14,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 9,
+              "end": 14,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "PseudoClassSelector",
+                      "name": "root",
+                      "args": null,
+                      "start": 9,
+                      "end": 14
+                    }
+                  ],
+                  "start": 9,
+                  "end": 14
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 15,
+          "end": 117,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 19,
+              "end": 43,
+              "property": "--primary-color",
+              "value": "#007bff"
+            },
+            {
+              "type": "Declaration",
+              "start": 47,
+              "end": 73,
+              "property": "--secondary-color",
+              "value": "#6c757d"
+            },
+            {
+              "type": "Declaration",
+              "start": 77,
+              "end": 92,
+              "property": "--spacing",
+              "value": "16px"
+            },
+            {
+              "type": "Declaration",
+              "start": 96,
+              "end": 113,
+              "property": "--font-size",
+              "value": "14px"
+            }
+          ]
+        },
+        "start": 9,
+        "end": 117
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 120,
+          "end": 127,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 120,
+              "end": 127,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "button",
+                      "start": 120,
+                      "end": 127
+                    }
+                  ],
+                  "start": 120,
+                  "end": 127
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 128,
+          "end": 232,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 132,
+              "end": 170,
+              "property": "background-color",
+              "value": "var(--primary-color)"
+            },
+            {
+              "type": "Declaration",
+              "start": 174,
+              "end": 197,
+              "property": "padding",
+              "value": "var(--spacing)"
+            },
+            {
+              "type": "Declaration",
+              "start": 201,
+              "end": 228,
+              "property": "font-size",
+              "value": "var(--font-size)"
+            }
+          ]
+        },
+        "start": 120,
+        "end": 232
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 235,
+          "end": 240,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 235,
+              "end": 240,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "card",
+                      "start": 235,
+                      "end": 240
+                    }
+                  ],
+                  "start": 235,
+                  "end": 240
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 241,
+          "end": 308,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 245,
+              "end": 276,
+              "property": "color",
+              "value": "var(--text-color, black)"
+            },
+            {
+              "type": "Declaration",
+              "start": 280,
+              "end": 304,
+              "property": "margin",
+              "value": "var(--margin, 0)"
+            }
+          ]
+        },
+        "start": 235,
+        "end": 308
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 311,
+          "end": 318,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 311,
+              "end": 318,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "nested",
+                      "start": 311,
+                      "end": 318
+                    }
+                  ],
+                  "start": 311,
+                  "end": 318
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 319,
+          "end": 382,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 323,
+              "end": 348,
+              "property": "width",
+              "value": "var(--size, 100px)"
+            },
+            {
+              "type": "Declaration",
+              "start": 352,
+              "end": 378,
+              "property": "height",
+              "value": "var(--size, 100px)"
+            }
+          ]
+        },
+        "start": 311,
+        "end": 382
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 383,
+      "styles": "\n\t:root {\n\t\t--primary-color: #007bff;\n\t\t--secondary-color: #6c757d;\n\t\t--spacing: 16px;\n\t\t--font-size: 14px;\n\t}\n\n\t.button {\n\t\tbackground-color: var(--primary-color);\n\t\tpadding: var(--spacing);\n\t\tfont-size: var(--font-size);\n\t}\n\n\t.card {\n\t\tcolor: var(--text-color, black);\n\t\tmargin: var(--margin, 0);\n\t}\n\n\t.nested {\n\t\twidth: var(--size, 100px);\n\t\theight: var(--size, 100px);\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

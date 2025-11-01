@@ -1,0 +1,148 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 275,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 63,
+          "end": 74,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 63,
+              "end": 74,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "old-syntax",
+                      "start": 63,
+                      "end": 74
+                    }
+                  ],
+                  "start": 63,
+                  "end": 74
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 75,
+          "end": 166,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 79,
+              "end": 100,
+              "property": "color",
+              "value": "rgb(255, 0, 0)"
+            },
+            {
+              "type": "Declaration",
+              "start": 104,
+              "end": 130,
+              "property": "background",
+              "value": "rgb(0, 255, 0)"
+            },
+            {
+              "type": "Declaration",
+              "start": 134,
+              "end": 162,
+              "property": "border-color",
+              "value": "rgb(0, 0, 255)"
+            }
+          ]
+        },
+        "start": 63,
+        "end": 166
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 169,
+          "end": 180,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 169,
+              "end": 180,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "new-syntax",
+                      "start": 169,
+                      "end": 180
+                    }
+                  ],
+                  "start": 169,
+                  "end": 180
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 181,
+          "end": 266,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 185,
+              "end": 204,
+              "property": "color",
+              "value": "rgb(255 0 0)"
+            },
+            {
+              "type": "Declaration",
+              "start": 208,
+              "end": 232,
+              "property": "background",
+              "value": "rgb(0 255 0)"
+            },
+            {
+              "type": "Declaration",
+              "start": 236,
+              "end": 262,
+              "property": "border-color",
+              "value": "rgb(0 0 255)"
+            }
+          ]
+        },
+        "start": 169,
+        "end": 266
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 267,
+      "styles": "\n\t/* Test rgb() color function - old and new syntax */\n\t.old-syntax {\n\t\tcolor: rgb(255, 0, 0);\n\t\tbackground: rgb(0, 255, 0);\n\t\tborder-color: rgb(0, 0, 255);\n\t}\n\n\t.new-syntax {\n\t\tcolor: rgb(255 0 0);\n\t\tbackground: rgb(0 255 0);\n\t\tborder-color: rgb(0 0 255);\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

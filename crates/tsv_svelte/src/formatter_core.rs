@@ -117,10 +117,24 @@ impl Formatter {
     /// Check if two spans are on the same line in the source
     ///
     /// Used for inline run grouping to preserve authorial layout intent.
+    /// Only checks the whitespace **between** the two spans, not the span content itself.
+    /// This allows tags that span multiple lines (e.g., `<br \n>`) to still be grouped together.
     pub(crate) fn are_on_same_line(&self, span1: tsv_lang::Span, span2: tsv_lang::Span) -> bool {
-        // Count newlines between the two spans
-        let start = span1.start.min(span2.start) as usize;
-        let end = span1.end.max(span2.end) as usize;
+        // Determine which span comes first
+        let (first, second) = if span1.start <= span2.start {
+            (span1, span2)
+        } else {
+            (span2, span1)
+        };
+
+        // If spans overlap or touch, they're on the same line
+        if first.end >= second.start {
+            return true;
+        }
+
+        // Check the whitespace between the spans
+        let start = first.end as usize;
+        let end = second.start as usize;
 
         if start >= self.source.len() || end > self.source.len() {
             return false;
