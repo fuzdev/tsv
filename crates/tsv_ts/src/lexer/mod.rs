@@ -1,0 +1,12 @@
+// TypeScript/JavaScript lexer
+//
+// Tokenizes TypeScript source code into a stream of tokens.
+// Supports TypeScript-specific syntax like type annotations.
+
+mod core;
+pub mod escapes;
+mod token;
+
+// Re-export public API
+pub use core::Lexer;
+pub use token::{KeywordKind, TokenKind};

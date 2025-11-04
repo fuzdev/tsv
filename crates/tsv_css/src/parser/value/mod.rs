@@ -35,10 +35,10 @@ pub fn parse_value_string(value_str: &str) -> CssValue {
     }
 
     // Check for comma-separated values first (these are unambiguous)
-    if contains_comma(trimmed) {
-        if let Some(list) = parse_comma_separated_values(trimmed) {
-            return list;
-        }
+    if contains_comma(trimmed)
+        && let Some(list) = parse_comma_separated_values(trimmed)
+    {
+        return list;
     }
 
     // Try single value
@@ -47,10 +47,10 @@ pub fn parse_value_string(value_str: &str) -> CssValue {
     }
 
     // Try space-separated list as fallback
-    if contains_space_separator(trimmed) {
-        if let Some(list) = parse_space_separated_values(trimmed) {
-            return list;
-        }
+    if contains_space_separator(trimmed)
+        && let Some(list) = parse_space_separated_values(trimmed)
+    {
+        return list;
     }
 
     // Fallback to identifier

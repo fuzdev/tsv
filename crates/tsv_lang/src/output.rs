@@ -1,11 +1,11 @@
-// Shared output utilities for formatters
+// Shared output utilities for printers
 //
-// Provides zero-cost abstractions for building formatted output across all language formatters.
+// Provides zero-cost abstractions for building formatted output across all language printers.
 // These types are designed to be inlined by the compiler for zero runtime overhead.
 
 /// Output buffer for building formatted strings
 ///
-/// A thin wrapper around String that provides a consistent API for all formatters.
+/// A thin wrapper around String that provides a consistent API for all printers.
 /// The compiler will inline these methods, making this zero-cost.
 pub struct OutputBuffer {
     buffer: String,

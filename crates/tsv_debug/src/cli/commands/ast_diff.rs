@@ -17,6 +17,7 @@ impl Command for AstDiffCommand {
         // 1. Single input: parse → format → parse → compare
         // 2. Two inputs: parse both → compare
         let content1 = args.option("content");
+        let use_stdin = args.flag("stdin");
         let file1 = args.positional();
         let file2 = args.positional();
 
@@ -24,10 +25,16 @@ impl Command for AstDiffCommand {
             // Single content mode: parse → format → parse
             let parser = args
                 .option("parser")
-                .map(|p| p.parse())
-                .transpose()?
-                .unwrap_or(ParserType::Svelte);
+                .ok_or("Error: --parser required when using --content")?
+                .parse()?;
             (Input::from_content(content), None, parser)
+        } else if use_stdin {
+            // Single stdin mode: parse → format → parse
+            let parser = args
+                .option("parser")
+                .ok_or("Error: --parser required when using --stdin")?
+                .parse()?;
+            (Input::from_stdin()?, None, parser)
         } else if let Some(path1) = file1 {
             let parser = ParserType::from_extension(&path1);
             if let Some(path2) = file2 {
@@ -42,7 +49,7 @@ impl Command for AstDiffCommand {
                 (Input::from_file(&path1)?, None, parser)
             }
         } else {
-            return Err("No input provided. Use file path(s) or --content".to_string());
+            return Err("No input provided. Use file path(s), --content, or --stdin".to_string());
         };
 
         Ok(Box::new(AstDiffExecutable {
@@ -54,10 +61,12 @@ impl Command for AstDiffCommand {
 
     fn usage(&self) -> Vec<String> {
         vec![
-            "ast_diff <file>                       Parse → format → parse → compare ASTs"
+            "ast_diff <file>                                 Parse → format → parse → compare ASTs"
                 .to_string(),
-            "ast_diff <file1> <file2>              Parse both files and compare ASTs".to_string(),
-            "ast_diff --content <str> --parser <p> Parse → format → parse → compare ASTs"
+            "ast_diff <file1> <file2>                        Parse both files and compare ASTs".to_string(),
+            "ast_diff --content <str> --parser <type>        Parse → format → parse (requires --parser)"
+                .to_string(),
+            "ast_diff --stdin --parser <type>                Parse → format → parse from stdin (requires --parser)"
                 .to_string(),
         ]
     }
@@ -157,7 +166,7 @@ fn parse_to_json(content: &str, parser_type: ParserType) -> Result<String, Strin
     }
 }
 
-/// Format content using our Rust formatter
+/// Format content using our Rust printer
 fn format_content(content: &str, parser_type: ParserType) -> Result<String, String> {
     let parser_name = match parser_type {
         ParserType::Svelte => "svelte",

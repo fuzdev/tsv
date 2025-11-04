@@ -45,5 +45,6 @@ pub(crate) fn read_comment(source: &str, pos: &mut usize) -> Result<Token, Parse
         kind: TokenKind::Comment(content),
         start,
         end: *pos,
+        decoded: None,
     })
 }

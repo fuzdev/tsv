@@ -19,10 +19,10 @@
 //! ```
 
 pub mod ast;
-mod formatter;
-mod formatter_core;
+pub mod escapes;
 mod lexer;
 pub(crate) mod parser;
+mod printer;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -62,14 +62,15 @@ pub fn parse(source: &str) -> Result<ast::internal::Program> {
 /// # Example
 ///
 /// ```rust,ignore
-/// let ast = tsv_ts::parse("const x=42;")?;
-/// let formatted = tsv_ts::format(&ast);
+/// let source = "const x=42;";
+/// let ast = tsv_ts::parse(source)?;
+/// let formatted = tsv_ts::format(&ast, source);
 /// assert_eq!(formatted, "const x = 42;\n");
 /// ```
-pub fn format(program: &ast::internal::Program) -> String {
-    let mut formatter = formatter_core::Formatter::new(program.interner.clone());
-    formatter.format_program(program);
-    formatter.into_string()
+pub fn format(program: &ast::internal::Program, source: &str) -> String {
+    let mut printer = printer::Printer::new(program.interner.clone(), source);
+    printer.print_program(program);
+    printer.into_string()
 }
 
 /// Convert internal AST to public JSON-compatible AST
@@ -93,7 +94,7 @@ pub fn format(program: &ast::internal::Program) -> String {
 /// ```
 pub fn convert_ast(program: &ast::internal::Program, source: &str) -> ast::public::Program {
     let tracker = tsv_lang::LocationTracker::new(source);
-    ast::convert::convert_program(program, &tracker)
+    ast::convert::convert_program(program, source, &tracker)
 }
 
 /// Parse TypeScript with a shared string interner and base offset

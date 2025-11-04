@@ -24,15 +24,19 @@ pub(crate) fn parse_pseudo_selector(
         });
     }
 
-    let name = parser.current_value().to_string();
+    // Internal AST: use decoded value (spec-compliant)
+    let name = parser
+        .current_identifier()
+        .unwrap_or_else(|| parser.current_value())
+        .to_string();
     let mut end = (parser.base_offset() + parser.current_end) as u32; // Capture end of name token
     parser.advance()?;
 
     // Check for arguments: :nth-child(2n+1), :is(), :not(), etc.
-    let raw_args = if parser.check(&TokenKind::LeftParen) {
-        let (args, args_end) = parse_pseudo_args(parser)?;
+    let args = if parser.check(&TokenKind::LeftParen) {
+        let (args_opt, args_end) = parse_pseudo_args(parser, &name)?;
         end = args_end; // Use end of closing paren
-        Some(args)
+        args_opt
     } else {
         None
     };
@@ -40,7 +44,7 @@ pub(crate) fn parse_pseudo_selector(
     if is_pseudo_element {
         Ok(SimpleSelector::PseudoElement {
             name,
-            raw_args,
+            args,
             span: Span {
                 start: start as u32,
                 end,
@@ -49,7 +53,7 @@ pub(crate) fn parse_pseudo_selector(
     } else {
         Ok(SimpleSelector::PseudoClass {
             name,
-            raw_args,
+            args,
             span: Span {
                 start: start as u32,
                 end,
@@ -59,8 +63,15 @@ pub(crate) fn parse_pseudo_selector(
 }
 
 /// Parse pseudo-class arguments: nth-child(2n+1), is(div, span)
-/// Returns (raw_argument_text, end_position_of_closing_paren)
-fn parse_pseudo_args(parser: &mut CssParser) -> Result<(String, u32), ParseError> {
+/// Returns (Option<PseudoClassArgs>, end_position_of_closing_paren)
+///
+/// Creates semantic args for recognized pseudo-classes:
+/// - :nth-child(), :nth-of-type(), :nth-last-child(), :nth-last-of-type() → PseudoClassArgs::Nth
+/// - Others: returns None (deferred for future implementation)
+fn parse_pseudo_args(
+    parser: &mut CssParser,
+    pseudo_name: &str,
+) -> Result<(Option<PseudoClassArgs>, u32), ParseError> {
     parser.expect(&TokenKind::LeftParen)?;
 
     let args_start = parser.current_start;
@@ -79,10 +90,28 @@ fn parse_pseudo_args(parser: &mut CssParser) -> Result<(String, u32), ParseError
     }
 
     let args_end = parser.current_start;
-    let raw_args = parser.source()[args_start..args_end].to_string();
+    let raw_text = parser.source()[args_start..args_end].to_string();
 
     // Capture end of closing paren before advancing
     let end = parser.expect_and_capture(&TokenKind::RightParen)?;
 
-    Ok((raw_args, end))
+    // Create semantic args based on pseudo-class type
+    let args = match pseudo_name {
+        "nth-child" | "nth-of-type" | "nth-last-child" | "nth-last-of-type" => {
+            Some(PseudoClassArgs::Nth {
+                value: raw_text.trim().to_string(),
+                span: Span {
+                    start: (parser.base_offset() + args_start) as u32,
+                    end: (parser.base_offset() + args_end) as u32,
+                },
+            })
+        }
+        _ => {
+            // For other pseudo-classes (:is, :not, :where, :has, etc.), return None for now
+            // Future: parse these into structured args
+            None
+        }
+    };
+
+    Ok((args, end))
 }

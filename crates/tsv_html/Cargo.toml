@@ -5,4 +5,10 @@ edition.workspace = true
 description = "HTML-specific classification and whitespace rules for TSV"
 
 [dependencies]
+phf = { version = "0.11", features = ["macros"] }
 # May add tsv_lang later if needed
+
+[build-dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+phf_codegen = "0.11"

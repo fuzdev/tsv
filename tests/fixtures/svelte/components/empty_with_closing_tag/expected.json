@@ -1,0 +1,25 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 13,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "Component",
+        "start": 0,
+        "end": 13,
+        "name": "Comp",
+        "attributes": [],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": []
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

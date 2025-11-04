@@ -9,7 +9,7 @@ pub struct Fixture {
     pub path: PathBuf,
     /// Relative path from fixtures root (e.g., "svelte/elements/block_text")
     pub relative_path: String,
-    /// Input filename (e.g., "input.svelte", "input.ts", "input.css")
+    /// Input filename (e.g., "input.svelte", "input.svelte.ts")
     pub input_file: String,
 }
 
@@ -29,17 +29,23 @@ impl Fixture {
         self.path.join(format!("formatted.{}", self.extension()))
     }
 
-    /// Get the file extension (e.g., "svelte", "ts", "css")
+    /// Get the file extension (e.g., "svelte", "svelte.ts", "ts", "css")
     pub fn extension(&self) -> &str {
-        Path::new(&self.input_file)
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("")
+        if self.input_file.ends_with(".svelte.ts") {
+            "svelte.ts"
+        } else {
+            Path::new(&self.input_file)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+        }
     }
 
     /// Determine the file type from the input filename
     pub fn file_type(&self) -> FileType {
-        if self.input_file.ends_with(".svelte") {
+        if self.input_file.ends_with(".svelte.ts") {
+            FileType::SvelteTypeScript
+        } else if self.input_file.ends_with(".svelte") {
             FileType::Svelte
         } else if self.input_file.ends_with(".ts") {
             FileType::TypeScript
@@ -66,6 +72,7 @@ impl Fixture {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileType {
     Svelte,
+    SvelteTypeScript,
     TypeScript,
     Css,
     Unknown,
@@ -110,7 +117,7 @@ fn walk_fixtures_recursive(
             };
 
             // Check for input files in this directory
-            let input_files = ["input.svelte", "input.ts", "input.css"];
+            let input_files = ["input.svelte", "input.svelte.ts"];
             let mut found_input = false;
 
             for input_file in &input_files {
@@ -147,7 +154,8 @@ pub fn discover_unformatted_variants(fixture_dir: &Path) -> Vec<String> {
         for entry in entries.flatten() {
             if let Some(filename) = entry.file_name().to_str()
                 && filename.starts_with("unformatted_")
-                && (filename.ends_with(".ts")
+                && (filename.ends_with(".svelte.ts")
+                    || filename.ends_with(".ts")
                     || filename.ends_with(".svelte")
                     || filename.ends_with(".css"))
             {
@@ -160,16 +168,73 @@ pub fn discover_unformatted_variants(fixture_dir: &Path) -> Vec<String> {
     variants
 }
 
+// formatted.* allowlist: fixtures where input.* is intentionally malformed
+//
+// ⚠️  WARNING TO AI AGENTS: DO NOT UPDATE THIS ALLOWLIST ⚠️
+//
+// formatted.* files decouple parser tests (use malformed input) from formatter tests (need correct output).
+//
+// WHEN TO USE formatted.*: (RARE)
+//   • input.* is intentionally malformed/weird (to test parser robustness)
+//   • formatted.* shows the correct formatted output (to test formatter fixes it)
+//   • Example: Section reordering - input has wrong order, formatted has correct order
+//
+// WHEN NOT TO USE formatted.*: (COMMON)
+//   • input.* is already correctly formatted (the baseline)
+//   • Use unformatted_*.* variants to test normalization instead
+//   • Example: Hug mode - input uses hug mode, unformatted_compact tests normalization
+//
+// Current legitimate cases:
+//   • Svelte section reordering: formatter reorders <script>, <style>, and markup sections
+//     into canonical order (module script → instance script → markup → style).
+//
+// If you're an AI agent and think you need to add to this list:
+//   1. STOP - Can input.* be the formatted version instead?
+//   2. If yes: rename formatted.* → input.*, old input.* → unformatted_something.*
+//   3. If no: explain to human why input.* must be malformed, get approval
+//
+const FORMATTED_FILE_ALLOWLIST: &[&str] = &[
+    // Section reordering fixtures (formatter reorders script/style/markup sections)
+    "svelte/sections/ordering/ordering_1_instance_module_style",
+    "svelte/sections/ordering/ordering_2_instance_style_module",
+    "svelte/sections/ordering/ordering_3_module_instance_style",
+    "svelte/sections/ordering/ordering_4_module_style_instance",
+    "svelte/sections/ordering/ordering_5_style_instance_module",
+    "svelte/sections/ordering/ordering_6_style_module_instance",
+];
+
 /// Validate fixture structure and conventions
 ///
 /// Checks:
 /// 1. `input.*` exists for every fixture
-/// 2. `unformatted_*` variants are NOT identical to `input.*`
-/// 3. `formatted.*` files exist only when different from `input.*`
-/// 4. `expected.json` exists (required for parser tests)
-/// 5. `unformatted_*` variants do NOT coexist with `formatted.*` (redundant)
+/// 2. Only `.svelte` and `.svelte.ts` input files are allowed (no standalone `.ts` or `.css`)
+/// 3. `unformatted_*` variants are NOT identical to `input.*`
+/// 4. `formatted.*` files exist only when different from `input.*`
+/// 5. `expected.json` exists (required for parser tests)
+/// 6. `unformatted_*` variants do NOT coexist with `formatted.*` (redundant)
 pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
     let fixture_dir = &fixture.path;
+
+    // Block standalone .ts and .css files - only .svelte and .svelte.ts are allowed
+    if fixture.input_file.ends_with(".ts") && !fixture.input_file.ends_with(".svelte.ts") {
+        return Err(
+            "Standalone .ts files are not allowed. Use .svelte with <script> tags or .svelte.ts for Svelte TypeScript modules."
+                .to_string(),
+        );
+    }
+    if fixture.input_file.ends_with(".css") {
+        return Err(
+            "Standalone .css files are not allowed. Use .svelte with <style> tags.".to_string(),
+        );
+    }
+
+    // Check for unknown file extensions
+    if fixture.file_type() == FileType::Unknown {
+        return Err(format!(
+            "Unknown input file type: '{}'. Allowed: input.svelte, input.svelte.ts",
+            fixture.input_file
+        ));
+    }
 
     // Check expected.json exists (required for parser tests)
     let expected_path = fixture.expected_path();
@@ -200,6 +265,40 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
     // Check formatted.* files only exist when different from input
     let formatted_path = fixture.formatted_path();
     if formatted_path.exists() {
+        // Check if this fixture is in the allowlist
+        // Strip './tests/fixtures/' prefix from relative_path for comparison
+        let normalized_path = fixture
+            .relative_path
+            .strip_prefix("./tests/fixtures/")
+            .unwrap_or(&fixture.relative_path);
+
+        let is_allowed = FORMATTED_FILE_ALLOWLIST
+            .iter()
+            .any(|allowed| normalized_path == *allowed);
+
+        if !is_allowed {
+            return Err(format!(
+                "formatted.{} exists but fixture '{}' is not in FORMATTED_FILE_ALLOWLIST.\n\
+                \n\
+                formatted.* should only exist when input.* is intentionally malformed to test parser robustness.\n\
+                Most alternative formatting patterns should use unformatted_*.{} instead.\n\
+                \n\
+                Consider swapping the files:\n\
+                  mv input.{} unformatted_some_case.{}\n\
+                  mv formatted.{} input.{}\n\
+                  deno task fixtures_update_expected\n\
+                \n\
+                To add to allowlist: ./crates/tsv_debug/src/fixtures.rs",
+                fixture.extension(),
+                fixture.relative_path,
+                fixture.extension(),
+                fixture.extension(),
+                fixture.extension(),
+                fixture.extension(),
+                fixture.extension()
+            ));
+        }
+
         let formatted_content = read_file(&formatted_path)?;
 
         if formatted_content == input_content {

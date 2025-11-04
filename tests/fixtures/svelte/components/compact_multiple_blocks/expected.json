@@ -1,0 +1,97 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 62,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "Component",
+        "start": 0,
+        "end": 62,
+        "name": "Comp",
+        "attributes": [],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "RegularElement",
+              "start": 8,
+              "end": 22,
+              "name": "p",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": [
+                  {
+                    "type": "Text",
+                    "start": 11,
+                    "end": 18,
+                    "raw": "block_a",
+                    "data": "block_a"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Text",
+              "start": 22,
+              "end": 24,
+              "raw": "\n\t",
+              "data": "\n\t"
+            },
+            {
+              "type": "RegularElement",
+              "start": 24,
+              "end": 38,
+              "name": "p",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": [
+                  {
+                    "type": "Text",
+                    "start": 27,
+                    "end": 34,
+                    "raw": "block_b",
+                    "data": "block_b"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Text",
+              "start": 38,
+              "end": 40,
+              "raw": "\n\t",
+              "data": "\n\t"
+            },
+            {
+              "type": "RegularElement",
+              "start": 40,
+              "end": 54,
+              "name": "p",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": [
+                  {
+                    "type": "Text",
+                    "start": 43,
+                    "end": 50,
+                    "raw": "block_c",
+                    "data": "block_c"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

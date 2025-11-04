@@ -66,7 +66,16 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
             context: None,
         });
     }
-    let property = parser.current_value().to_string();
+    // Internal AST: use decoded value (spec-compliant)
+    // Svelte quirk (raw value) will be applied in conversion layer
+    let property = parser
+        .current_identifier()
+        .ok_or_else(|| ParseError::InvalidSyntax {
+            message: "Expected identifier".to_string(),
+            position: start,
+            context: None,
+        })?
+        .to_string();
     parser.advance()?;
 
     parser.skip_whitespace()?;
@@ -74,6 +83,9 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
     // Expect :
     parser.expect(&TokenKind::Colon)?;
     parser.skip_whitespace()?;
+
+    // Track value end for span calculation
+    // (value_start was removed - no longer needed since we extract from source on-demand)
 
     // Parse value (collect tokens until ; or })
     let mut value_parts = Vec::new();
@@ -84,7 +96,11 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
     {
         // Convert token to string representation for value
         let value_str = match &parser.current_kind {
-            TokenKind::Identifier => parser.current_value().to_string(),
+            // Internal AST: use decoded value (spec-compliant)
+            TokenKind::Identifier => parser
+                .current_identifier()
+                .unwrap_or_else(|| parser.current_value())
+                .to_string(),
             TokenKind::String { content, quote } => format!("{}{}{}", quote, content, quote),
             TokenKind::Number(n) => n.clone(),
             TokenKind::Percentage(n) => format!("{}%", n),
@@ -148,6 +164,8 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
         parser.advance()?;
     }
 
+    // Span covers the entire declaration (property + value, not including semicolon)
+    // The source value will be extracted on-demand during conversion using this span
     Ok(CssDeclaration {
         property,
         value,

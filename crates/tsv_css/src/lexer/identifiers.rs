@@ -3,28 +3,42 @@ use tsv_lang::ParseError;
 
 /// Read a CSS identifier
 /// CSS identifiers can contain unicode escapes and the characters a-z, A-Z, 0-9, -, _
+/// Per CSS Syntax Level 3 spec, escape sequences are decoded to their actual characters
 pub(crate) fn read_identifier(source: &str, pos: &mut usize) -> Result<Token, ParseError> {
     let start = *pos;
+    let mut decoded = String::new();
 
-    // CSS identifiers can contain unicode escapes
+    // CSS identifiers can contain escape sequences that must be decoded
     loop {
         let current_char = source[*pos..].chars().next();
         match current_char {
             Some(ch) if ch.is_alphanumeric() || ch == '-' || ch == '_' => {
+                decoded.push(ch);
                 *pos += ch.len_utf8();
             }
             Some('\\') => {
-                // Unicode escape in identifier
+                // Check if this is a valid escape sequence
                 let peek_char = source[*pos + 1..].chars().next();
-                if let Some(next_ch) = peek_char
-                    && next_ch.is_ascii_hexdigit()
-                {
-                    // Decode and continue - we're building the source representation
-                    let _ = decode_unicode_escape(source, pos)?;
-                    continue;
+                if peek_char.is_none() {
+                    // Backslash at end of input - end identifier
+                    break;
                 }
-                // Not a unicode escape, end identifier
-                break;
+
+                let next_ch = peek_char.unwrap();
+                if next_ch.is_ascii_hexdigit() {
+                    // Unicode escape: \XXXXXX (1-6 hex digits)
+                    let ch = decode_unicode_escape(source, pos)?;
+                    decoded.push(ch);
+                } else if next_ch == '\n' || next_ch == '\r' || next_ch == '\x0C' {
+                    // Newline after backslash - invalid escape, end identifier
+                    break;
+                } else {
+                    // Single character escape: backslash followed by any character
+                    // The character itself is the escaped value
+                    *pos += 1; // skip backslash
+                    decoded.push(next_ch);
+                    *pos += next_ch.len_utf8();
+                }
             }
             _ => {
                 break;
@@ -36,6 +50,7 @@ pub(crate) fn read_identifier(source: &str, pos: &mut usize) -> Result<Token, Pa
         kind: TokenKind::Identifier,
         start,
         end: *pos,
+        decoded: Some(decoded),
     })
 }
 

@@ -133,10 +133,12 @@ impl<'a> SvelteParser<'a> {
         // Extract the actual text content from source
         let text_content = self.source[content_start..content_end].to_string();
 
-        // TODO(performance): Text node allocates twice (raw + data fields are identical).
+        // Decode HTML entities in attribute values (is_attribute_value=true)
+        let decoded = tsv_html::decode_character_references(&text_content, true);
+
         let text = Text {
-            raw: text_content.clone(),
-            data: text_content,
+            raw: text_content,
+            data: decoded,
             span: Span {
                 start: content_start as u32,
                 end: content_end as u32,

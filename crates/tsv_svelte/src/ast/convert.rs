@@ -99,10 +99,17 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
     };
 
     public::Root {
-        node_type: "Root".to_string(),
+        css: root
+            .css
+            .as_ref()
+            .map(|style| convert_style(style, source, &interner)),
+        js: vec![],
         start,
         end,
-        fragment: convert_fragment(&root.fragment, &loc, &interner),
+        node_type: "Root".to_string(),
+        fragment: convert_fragment(&root.fragment, source, &loc, &interner),
+        options: None,
+        comments: vec![],
         instance: root
             .instance
             .as_ref()
@@ -111,18 +118,12 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
             .module
             .as_ref()
             .map(|script| convert_script(script, source, &interner)),
-        css: root
-            .css
-            .as_ref()
-            .map(|style| convert_style(style, source, &interner)),
-        js: vec![],
-        options: None,
-        comments: vec![],
     }
 }
 
 fn convert_fragment(
     fragment: &internal::Fragment,
+    source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::Fragment {
@@ -131,22 +132,28 @@ fn convert_fragment(
         nodes: fragment
             .nodes
             .iter()
-            .map(|node| convert_fragment_node(node, loc, interner))
+            .map(|node| convert_fragment_node(node, source, loc, interner))
             .collect(),
     }
 }
 
 fn convert_fragment_node(
     node: &internal::FragmentNode,
+    source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::FragmentNode {
     match node {
         internal::FragmentNode::Element(elem) => {
-            public::FragmentNode::RegularElement(convert_element(elem, loc, interner))
+            let converted = convert_element(elem, source, loc, interner);
+            // Return appropriate variant based on element kind
+            match elem.kind {
+                internal::ElementKind::Component => public::FragmentNode::Component(converted),
+                internal::ElementKind::Html => public::FragmentNode::RegularElement(converted),
+            }
         }
         internal::FragmentNode::ExpressionTag(tag) => {
-            public::FragmentNode::ExpressionTag(convert_expression_tag(tag, loc, interner))
+            public::FragmentNode::ExpressionTag(convert_expression_tag(tag, source, loc, interner))
         }
         internal::FragmentNode::Text(text) => public::FragmentNode::Text(convert_text(text)),
     }
@@ -154,11 +161,18 @@ fn convert_fragment_node(
 
 fn convert_element(
     elem: &internal::Element,
+    source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::Element {
+    // Set node_type based on element kind
+    let node_type = match elem.kind {
+        internal::ElementKind::Component => "Component",
+        internal::ElementKind::Html => "RegularElement",
+    };
+
     public::Element {
-        node_type: "RegularElement".to_string(),
+        node_type: node_type.to_string(),
         start: elem.span.start,
         end: elem.span.end,
         name: interner.resolve(elem.name).unwrap().to_string(),
@@ -166,19 +180,21 @@ fn convert_element(
         attributes: elem
             .attributes
             .iter()
-            .map(|attr| convert_attribute(attr, loc, interner))
+            .map(|attr| convert_attribute(attr, source, loc, interner))
             .collect(),
-        fragment: convert_fragment(&elem.fragment, loc, interner),
+        fragment: convert_fragment(&elem.fragment, source, loc, interner),
     }
 }
 
 fn convert_expression_tag(
     tag: &internal::ExpressionTag,
+    source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::ExpressionTag {
     // Delegate to tsv_ts for expression conversion
-    let ts_expr = tsv_ts::ast::convert::convert_expression(&tag.expression, loc, interner, 0);
+    let ts_expr =
+        tsv_ts::ast::convert::convert_expression(&tag.expression, source, loc, interner, 0);
 
     public::ExpressionTag {
         node_type: "ExpressionTag".to_string(),
@@ -190,6 +206,7 @@ fn convert_expression_tag(
 
 fn convert_attribute(
     attr: &internal::Attribute,
+    source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::Attribute {
@@ -213,20 +230,22 @@ fn convert_attribute(
                 // Has text content: always serialize as array (even if single Text value)
                 let converted: Vec<_> = values
                     .iter()
-                    .map(|v| convert_attribute_value(v, loc, interner))
+                    .map(|v| convert_attribute_value(v, source, loc, interner))
                     .collect();
                 Some(serde_json::to_value(converted).unwrap())
             } else if values.len() == 1 {
                 // Single expression only: serialize as object
                 Some(
-                    serde_json::to_value(convert_attribute_value(&values[0], loc, interner))
-                        .unwrap(),
+                    serde_json::to_value(convert_attribute_value(
+                        &values[0], source, loc, interner,
+                    ))
+                    .unwrap(),
                 )
             } else {
                 // Multiple expressions: serialize as array
                 let converted: Vec<_> = values
                     .iter()
-                    .map(|v| convert_attribute_value(v, loc, interner))
+                    .map(|v| convert_attribute_value(v, source, loc, interner))
                     .collect();
                 Some(serde_json::to_value(converted).unwrap())
             }
@@ -244,20 +263,21 @@ fn convert_attribute(
 
 fn convert_attribute_value(
     value: &internal::AttributeValue,
+    source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::AttributeValue {
     match value {
         internal::AttributeValue::Text(text) => public::AttributeValue::Text(convert_text(text)),
-        internal::AttributeValue::ExpressionTag(tag) => {
-            public::AttributeValue::ExpressionTag(convert_expression_tag(tag, loc, interner))
-        }
+        internal::AttributeValue::ExpressionTag(tag) => public::AttributeValue::ExpressionTag(
+            convert_expression_tag(tag, source, loc, interner),
+        ),
     }
 }
 
 fn convert_text(text: &internal::Text) -> public::Text {
-    // For Sprint 7, raw and data are the same (no HTML entity decoding yet)
-    // Future sprints: data might decode entities (&lt; -> <, &quot; -> ", etc.)
+    // raw contains original source with entities (&lt;, &#65;, etc.)
+    // data contains decoded text (<, A, etc.)
     public::Text {
         node_type: "Text".to_string(),
         start: text.span.start,
@@ -282,7 +302,7 @@ fn convert_script(
     let loc = LocationTracker::new(source);
 
     // Delegate to tsv_ts for program conversion
-    let mut program = tsv_ts::ast::convert::convert_program(&script.content, &loc);
+    let mut program = tsv_ts::ast::convert::convert_program(&script.content, source, &loc);
 
     // Svelte's quirk: loc.start is hardcoded to {line: 1, column: 0}
     program.loc.start = tsv_ts::ast::public::Position { line: 1, column: 0 };
@@ -296,7 +316,7 @@ fn convert_script(
         attributes: script
             .attributes
             .iter()
-            .map(|attr| convert_attribute(attr, &loc, interner))
+            .map(|attr| convert_attribute(attr, source, &loc, interner))
             .collect(),
     }
 }
@@ -330,7 +350,7 @@ fn convert_style(
             .attributes
             .iter()
             .map(|attr| {
-                let public_attr = convert_attribute(attr, &full_loc, interner);
+                let public_attr = convert_attribute(attr, source, &full_loc, interner);
                 serde_json::to_value(public_attr).expect("Failed to serialize attribute")
             })
             .collect(),

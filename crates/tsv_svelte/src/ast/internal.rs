@@ -100,21 +100,25 @@ pub enum AttributeValue {
 /// Svelte Text node - raw text content
 ///
 /// Represents static text in the template or attribute values.
-/// For Sprint 7, we store the content directly to simplify conversion.
 /// In attribute values, this represents the unquoted string content.
 ///
-/// TODO(performance): Text nodes store duplicate data (raw + data fields).
-/// For now, raw and data are identical since HTML entity decoding isn't implemented.
-/// This wastes ~50% memory for text nodes. Possible optimization strategies? (store only raw, compute data on-demand).
+/// The `raw` field contains the original text with HTML entities (`&lt;`, `&#65;`),
+/// while `data` contains the decoded text (`<`, `A`). Both fields are necessary:
+/// - `raw` preserves the original source for accurate formatting/roundtrips
+/// - `data` provides the decoded text for rendering and semantic analysis
 ///
-/// TODO(performance): Formatter repeatedly calls is_whitespace_only() on text nodes in
+/// TODO(performance): Text nodes store duplicate data (raw + data fields).
+/// When raw has no entities, both fields are identical (~50% memory waste).
+/// Possible optimization: store only raw, compute data on-demand when entities present.
+///
+/// TODO(performance): Printer repeatedly calls is_whitespace_only() on text nodes in
 /// hot loops (multiline children, inline run detection). Could cache this as a bool field
 /// computed during parsing: `pub is_whitespace_only: bool`. Trade-off: 1 byte per Text
 /// node vs repeated string scans. Profile before optimizing.
 #[derive(Debug, Clone)]
 pub struct Text {
-    pub raw: String,  // Raw text content (for attributes: "ts" has raw="ts")
-    pub data: String, // Processed text (for Sprint 7, same as raw; future: decode entities)
+    pub raw: String,  // Raw text with HTML entities: "&lt;", "&#65;"
+    pub data: String, // Decoded text: "<", "A"
     pub span: Span,
 }
 

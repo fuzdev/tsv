@@ -1,0 +1,61 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 26,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "Component",
+        "start": 0,
+        "end": 26,
+        "name": "A",
+        "attributes": [],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Component",
+              "start": 3,
+              "end": 22,
+              "name": "B",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": [
+                  {
+                    "type": "Component",
+                    "start": 6,
+                    "end": 18,
+                    "name": "C",
+                    "attributes": [],
+                    "fragment": {
+                      "type": "Fragment",
+                      "nodes": [
+                        {
+                          "type": "Component",
+                          "start": 9,
+                          "end": 14,
+                          "name": "D",
+                          "attributes": [],
+                          "fragment": {
+                            "type": "Fragment",
+                            "nodes": []
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

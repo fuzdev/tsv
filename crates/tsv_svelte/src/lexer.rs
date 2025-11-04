@@ -165,9 +165,9 @@ impl<'a> Lexer<'a> {
             }
             Some(quote @ '\'' | quote @ '"') => {
                 // String literal for attribute values
-                // TODO(Sprint 8+): Handle escape sequences in attribute values
+                // TODO: Handle escape sequences in attribute values
                 // Currently missing: \n, \t, \\, \', \", HTML entities (&lt;, &quot;, etc.)
-                // For Sprint 7, simple quoted strings are sufficient for test case.
+                // Simple quoted strings work for current test cases.
                 self.advance(); // consume opening quote
                 while let Some(ch) = self.current {
                     if ch == quote {

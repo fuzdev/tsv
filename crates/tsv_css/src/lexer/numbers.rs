@@ -55,6 +55,7 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
             kind: TokenKind::Percentage(num_str),
             start,
             end: *pos,
+            decoded: None,
         });
     }
 
@@ -80,6 +81,7 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
                 kind: TokenKind::Dimension(num_str, unit),
                 start,
                 end: *pos,
+                decoded: None,
             });
         }
 
@@ -92,5 +94,6 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
         kind: TokenKind::Number(num_str),
         start,
         end: *pos,
+        decoded: None,
     })
 }

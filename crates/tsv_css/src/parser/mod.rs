@@ -2,7 +2,7 @@
 //
 // PERFORMANCE CONSIDERATIONS:
 //
-// TODO: Future optimization opportunities (Phase 4+ from CSS_SPEC.md):
+// TODO: Future optimization opportunities:
 //
 // 1. Pre-compile regex patterns (like Svelte does)
 //    - Currently we match character-by-character in lexer
@@ -51,6 +51,7 @@ pub(crate) struct CssParser<'a> {
     pub(crate) current_kind: TokenKind,
     pub(crate) current_start: usize,
     pub(crate) current_end: usize,
+    current_decoded: Option<String>, // Decoded value for current token (e.g., identifier escapes)
     peek_cache: Option<PeekData<TokenKind>>,
     base_offset: usize, // Offset in full source (when parsing embedded CSS)
 }
@@ -58,9 +59,9 @@ pub(crate) struct CssParser<'a> {
 impl<'a> CssParser<'a> {
     pub(crate) fn new(source: &'a str, base_offset: usize) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
-        let (kind, start, end) = {
+        let (kind, start, end, decoded) = {
             let token = lexer.next_token()?;
-            (token.kind, token.start, token.end)
+            (token.kind, token.start, token.end, token.decoded)
         };
         Ok(Self {
             source,
@@ -68,6 +69,7 @@ impl<'a> CssParser<'a> {
             current_kind: kind,
             current_start: start,
             current_end: end,
+            current_decoded: decoded,
             peek_cache: None,
             base_offset,
         })
@@ -78,11 +80,13 @@ impl<'a> CssParser<'a> {
             self.current_kind = peek.kind;
             self.current_start = peek.start;
             self.current_end = peek.end;
+            self.current_decoded = None; // Peek cache doesn't store decoded (not needed yet)
         } else {
             let token = self.lexer.next_token()?;
             self.current_kind = token.kind;
             self.current_start = token.start;
             self.current_end = token.end;
+            self.current_decoded = token.decoded;
         }
         Ok(())
     }
@@ -124,8 +128,15 @@ impl<'a> CssParser<'a> {
         Ok(())
     }
 
+    /// Get the current token's value from source (for most tokens)
     pub(crate) fn current_value(&self) -> &str {
         &self.source[self.current_start..self.current_end]
+    }
+
+    /// Get the decoded identifier value (for Identifier tokens only)
+    /// Returns None if not an identifier or no decoded value available
+    pub(crate) fn current_identifier(&self) -> Option<&str> {
+        self.current_decoded.as_deref()
     }
 
     pub(crate) fn current_start(&self) -> usize {

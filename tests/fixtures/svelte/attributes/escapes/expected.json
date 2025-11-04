@@ -1,0 +1,337 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 322,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "RegularElement",
+        "start": 0,
+        "end": 51,
+        "name": "div",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 5,
+            "end": 30,
+            "name": "data-text",
+            "value": {
+              "type": "ExpressionTag",
+              "start": 15,
+              "end": 30,
+              "expression": {
+                "type": "Literal",
+                "start": 16,
+                "end": 29,
+                "loc": {
+                  "start": {
+                    "line": 1,
+                    "column": 16
+                  },
+                  "end": {
+                    "line": 1,
+                    "column": 29
+                  }
+                },
+                "value": "line\nbreak",
+                "raw": "'line\\nbreak'"
+              }
+            }
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 31,
+              "end": 45,
+              "raw": "Newline escape",
+              "data": "Newline escape"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Text",
+        "start": 51,
+        "end": 53,
+        "raw": "\n\n",
+        "data": "\n\n"
+      },
+      {
+        "type": "RegularElement",
+        "start": 53,
+        "end": 94,
+        "name": "div",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 58,
+            "end": 77,
+            "name": "title",
+            "value": {
+              "type": "ExpressionTag",
+              "start": 64,
+              "end": 77,
+              "expression": {
+                "type": "Literal",
+                "start": 65,
+                "end": 76,
+                "loc": {
+                  "start": {
+                    "line": 3,
+                    "column": 12
+                  },
+                  "end": {
+                    "line": 3,
+                    "column": 23
+                  }
+                },
+                "value": "tab\there",
+                "raw": "'tab\\there'"
+              }
+            }
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 78,
+              "end": 88,
+              "raw": "Tab escape",
+              "data": "Tab escape"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Text",
+        "start": 94,
+        "end": 96,
+        "raw": "\n\n",
+        "data": "\n\n"
+      },
+      {
+        "type": "RegularElement",
+        "start": 96,
+        "end": 151,
+        "name": "div",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 101,
+            "end": 131,
+            "name": "data-json",
+            "value": {
+              "type": "ExpressionTag",
+              "start": 111,
+              "end": 131,
+              "expression": {
+                "type": "Literal",
+                "start": 112,
+                "end": 130,
+                "loc": {
+                  "start": {
+                    "line": 5,
+                    "column": 16
+                  },
+                  "end": {
+                    "line": 5,
+                    "column": 34
+                  }
+                },
+                "value": "{\"key\": \"value\"}",
+                "raw": "'{\"key\": \"value\"}'"
+              }
+            }
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 132,
+              "end": 145,
+              "raw": "Quote escapes",
+              "data": "Quote escapes"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Text",
+        "start": 151,
+        "end": 153,
+        "raw": "\n\n",
+        "data": "\n\n"
+      },
+      {
+        "type": "RegularElement",
+        "start": 153,
+        "end": 215,
+        "name": "div",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 158,
+            "end": 193,
+            "name": "data-unicode",
+            "value": {
+              "type": "ExpressionTag",
+              "start": 171,
+              "end": 193,
+              "expression": {
+                "type": "Literal",
+                "start": 172,
+                "end": 192,
+                "loc": {
+                  "start": {
+                    "line": 7,
+                    "column": 19
+                  },
+                  "end": {
+                    "line": 7,
+                    "column": 39
+                  }
+                },
+                "value": "ABC",
+                "raw": "'\\u0041\\u0042\\u0043'"
+              }
+            }
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 194,
+              "end": 209,
+              "raw": "Unicode escapes",
+              "data": "Unicode escapes"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Text",
+        "start": 215,
+        "end": 217,
+        "raw": "\n\n",
+        "data": "\n\n"
+      },
+      {
+        "type": "RegularElement",
+        "start": 217,
+        "end": 265,
+        "name": "div",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 222,
+            "end": 247,
+            "name": "data-hex",
+            "value": {
+              "type": "ExpressionTag",
+              "start": 231,
+              "end": 247,
+              "expression": {
+                "type": "Literal",
+                "start": 232,
+                "end": 246,
+                "loc": {
+                  "start": {
+                    "line": 9,
+                    "column": 15
+                  },
+                  "end": {
+                    "line": 9,
+                    "column": 29
+                  }
+                },
+                "value": "ABC",
+                "raw": "'\\x41\\x42\\x43'"
+              }
+            }
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 248,
+              "end": 259,
+              "raw": "Hex escapes",
+              "data": "Hex escapes"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Text",
+        "start": 265,
+        "end": 267,
+        "raw": "\n\n",
+        "data": "\n\n"
+      },
+      {
+        "type": "RegularElement",
+        "start": 267,
+        "end": 322,
+        "name": "div",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 272,
+            "end": 302,
+            "name": "data-mixed",
+            "value": {
+              "type": "ExpressionTag",
+              "start": 283,
+              "end": 302,
+              "expression": {
+                "type": "Literal",
+                "start": 284,
+                "end": 301,
+                "loc": {
+                  "start": {
+                    "line": 11,
+                    "column": 17
+                  },
+                  "end": {
+                    "line": 11,
+                    "column": 34
+                  }
+                },
+                "value": "Hello\nWorld\t!",
+                "raw": "'Hello\\nWorld\\t!'"
+              }
+            }
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 303,
+              "end": 316,
+              "raw": "Mixed escapes",
+              "data": "Mixed escapes"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

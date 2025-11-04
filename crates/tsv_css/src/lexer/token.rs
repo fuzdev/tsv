@@ -31,11 +31,11 @@ pub enum TokenKind {
         content: String, // Raw content with escapes preserved: hel\"lo
         quote: char,     // ' or "
     },
-    Number(String),         // 123, 1.5, .5, 007 - preserve source representation
-    Percentage(String),     // 50% - preserve source representation
+    Number(String),            // 123, 1.5, .5, 007 - preserve source representation
+    Percentage(String),        // 50% - preserve source representation
     Dimension(String, String), // 16px, 1.5em - preserve source representation (value, unit)
 
-    // Comments - preserved for formatters
+    // Comments - preserved for printers
     Comment(String), // /* ... */ - content without delimiters
 
     // Whitespace
@@ -49,4 +49,8 @@ pub struct Token {
     pub kind: TokenKind,
     pub start: usize,
     pub end: usize,
+    /// Decoded value for tokens that require escape sequence processing
+    /// - For Identifier: decoded CSS identifier (escapes resolved)
+    /// - For other tokens: None
+    pub decoded: Option<String>,
 }

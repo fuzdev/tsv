@@ -19,7 +19,15 @@ pub(crate) fn parse_attribute_selector(
         });
     }
 
-    let name = parser.current_value().to_string();
+    // Internal AST: use decoded value (spec-compliant)
+    let name = parser
+        .current_identifier()
+        .ok_or_else(|| ParseError::InvalidSyntax {
+            message: "Expected identifier".to_string(),
+            position: parser.base_offset() + parser.current_start,
+            context: None,
+        })?
+        .to_string();
     parser.advance()?;
     parser.skip_whitespace()?;
 
@@ -32,7 +40,13 @@ pub(crate) fn parse_attribute_selector(
 
         // Parse value (identifier or string)
         let value = match &parser.current_kind {
-            TokenKind::Identifier => Some(parser.current_value().to_string()),
+            // Internal AST: use decoded value (spec-compliant)
+            TokenKind::Identifier => Some(
+                parser
+                    .current_identifier()
+                    .unwrap_or_else(|| parser.current_value())
+                    .to_string(),
+            ),
             TokenKind::String { content, .. } => Some(content.clone()),
             _ => {
                 return Err(ParseError::InvalidSyntax {

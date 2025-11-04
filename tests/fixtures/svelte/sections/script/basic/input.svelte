@@ -1,3 +1,3 @@
 <script lang="ts">
-	5;
+	55;
 </script>

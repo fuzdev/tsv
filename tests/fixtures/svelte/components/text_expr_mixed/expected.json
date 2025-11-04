@@ -1,0 +1,61 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 33,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "Component",
+        "start": 0,
+        "end": 33,
+        "name": "Comp",
+        "attributes": [],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 6,
+              "end": 13,
+              "raw": "Count: ",
+              "data": "Count: "
+            },
+            {
+              "type": "ExpressionTag",
+              "start": 13,
+              "end": 20,
+              "expression": {
+                "type": "Identifier",
+                "start": 14,
+                "end": 19,
+                "loc": {
+                  "start": {
+                    "line": 1,
+                    "column": 14
+                  },
+                  "end": {
+                    "line": 1,
+                    "column": 19
+                  }
+                },
+                "name": "count"
+              }
+            },
+            {
+              "type": "Text",
+              "start": 20,
+              "end": 26,
+              "raw": " items",
+              "data": " items"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

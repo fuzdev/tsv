@@ -50,13 +50,18 @@ fn create_location(span: Span, tracker: &LocationTracker, offset: usize) -> publ
     }
 }
 
-pub fn convert_program(program: &internal::Program, loc: &LocationTracker) -> public::Program {
-    convert_program_with_offset(program, loc, 0)
+pub fn convert_program(
+    program: &internal::Program,
+    source: &str,
+    loc: &LocationTracker,
+) -> public::Program {
+    convert_program_with_offset(program, source, loc, 0)
 }
 
 // Convert Program with position offset for embedded content
 pub fn convert_program_with_offset(
     program: &internal::Program,
+    source: &str,
     loc: &LocationTracker,
     offset: usize,
 ) -> public::Program {
@@ -70,7 +75,7 @@ pub fn convert_program_with_offset(
         body: program
             .body
             .iter()
-            .map(|s| convert_statement(s, loc, &interner, offset))
+            .map(|s| convert_statement(s, source, loc, &interner, offset))
             .collect(),
         source_type: "module".to_string(),
     }
@@ -78,6 +83,7 @@ pub fn convert_program_with_offset(
 
 fn convert_statement(
     stmt: &internal::Statement,
+    source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
@@ -89,7 +95,13 @@ fn convert_statement(
                 start: expr_stmt.span.start,
                 end: expr_stmt.span.end,
                 loc: create_location(expr_stmt.span, loc, offset),
-                expression: convert_expression(&expr_stmt.expression, loc, interner, offset),
+                expression: convert_expression(
+                    &expr_stmt.expression,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                ),
             })
         }
         internal::Statement::VariableDeclaration(var_decl) => {
@@ -101,7 +113,7 @@ fn convert_statement(
                 declarations: var_decl
                     .declarations
                     .iter()
-                    .map(|d| convert_variable_declarator(d, loc, interner, offset))
+                    .map(|d| convert_variable_declarator(d, source, loc, interner, offset))
                     .collect(),
                 kind: var_decl.kind.as_str().to_string(),
             })
@@ -111,6 +123,7 @@ fn convert_statement(
 
 fn convert_variable_declarator(
     declarator: &internal::VariableDeclarator,
+    source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
@@ -135,12 +148,13 @@ fn convert_variable_declarator(
         init: declarator
             .init
             .as_ref()
-            .map(|expr| convert_expression(expr, loc, interner, offset)),
+            .map(|expr| convert_expression(expr, source, loc, interner, offset)),
     }
 }
 
 pub fn convert_expression(
     expr: &internal::Expression,
+    source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
@@ -151,15 +165,19 @@ pub fn convert_expression(
                 internal::LiteralValue::Number(n) => serde_json::Value::Number(
                     serde_json::Number::from_f64(*n).unwrap_or_else(|| serde_json::Number::from(0)),
                 ),
-                internal::LiteralValue::String(s) => serde_json::Value::String(s.clone()),
+                internal::LiteralValue::String { content, .. } => {
+                    serde_json::Value::String(content.clone())
+                }
             };
+            // Extract raw from source using span
+            let raw = &source[lit.span.start as usize..lit.span.end as usize];
             public::Expression::Literal(public::Literal {
                 node_type: "Literal".to_string(),
                 start: lit.span.start,
                 end: lit.span.end,
                 loc: create_location(lit.span, loc, offset),
                 value,
-                raw: lit.raw.clone(),
+                raw: raw.to_string(),
             })
         }
         internal::Expression::Identifier(id) => {

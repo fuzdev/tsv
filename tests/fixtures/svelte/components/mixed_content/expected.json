@@ -1,0 +1,121 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 80,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "Component",
+        "start": 0,
+        "end": 80,
+        "name": "Outer",
+        "attributes": [],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 7,
+              "end": 9,
+              "raw": "\n\t",
+              "data": "\n\t"
+            },
+            {
+              "type": "RegularElement",
+              "start": 9,
+              "end": 27,
+              "name": "p",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": [
+                  {
+                    "type": "Text",
+                    "start": 12,
+                    "end": 23,
+                    "raw": "Hello world",
+                    "data": "Hello world"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Text",
+              "start": 27,
+              "end": 29,
+              "raw": "\n\t",
+              "data": "\n\t"
+            },
+            {
+              "type": "Component",
+              "start": 29,
+              "end": 62,
+              "name": "Inner",
+              "attributes": [
+                {
+                  "type": "Attribute",
+                  "start": 36,
+                  "end": 43,
+                  "name": "primary",
+                  "value": true
+                }
+              ],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": [
+                  {
+                    "type": "Text",
+                    "start": 44,
+                    "end": 54,
+                    "raw": "inner text",
+                    "data": "inner text"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Text",
+              "start": 62,
+              "end": 64,
+              "raw": "\n\t",
+              "data": "\n\t"
+            },
+            {
+              "type": "ExpressionTag",
+              "start": 64,
+              "end": 71,
+              "expression": {
+                "type": "Identifier",
+                "start": 65,
+                "end": 70,
+                "loc": {
+                  "start": {
+                    "line": 4,
+                    "column": 2
+                  },
+                  "end": {
+                    "line": 4,
+                    "column": 7
+                  }
+                },
+                "name": "count"
+              }
+            },
+            {
+              "type": "Text",
+              "start": 71,
+              "end": 72,
+              "raw": "\n",
+              "data": "\n"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

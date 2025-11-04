@@ -19,7 +19,11 @@ pub(crate) fn parse_atrule(parser: &mut CssParser) -> Result<CssAtrule, ParseErr
         });
     }
 
-    let name = parser.current_value().to_string();
+    // Internal AST: use decoded value (spec-compliant)
+    let name = parser
+        .current_identifier()
+        .unwrap_or_else(|| parser.current_value())
+        .to_string();
     parser.advance()?;
 
     parser.skip_whitespace()?;
@@ -38,7 +42,11 @@ pub(crate) fn parse_atrule(parser: &mut CssParser) -> Result<CssAtrule, ParseErr
         }
 
         let part = match &parser.current_kind {
-            TokenKind::Identifier => parser.current_value().to_string(),
+            // Internal AST: use decoded value (spec-compliant)
+            TokenKind::Identifier => parser
+                .current_identifier()
+                .unwrap_or_else(|| parser.current_value())
+                .to_string(),
             TokenKind::String { content, quote } => format!("{}{}{}", quote, content, quote),
             TokenKind::Number(n) => n.to_string(),
             TokenKind::Percentage(n) => format!("{}%", n),
@@ -58,9 +66,10 @@ pub(crate) fn parse_atrule(parser: &mut CssParser) -> Result<CssAtrule, ParseErr
     let prelude = prelude_parts.join("").trim().to_string();
 
     // Parse block (if present)
-    let block = if parser.check(&TokenKind::LeftBrace) {
+    let (block, end) = if parser.check(&TokenKind::LeftBrace) {
         let block = parse_atrule_block(parser, &name)?;
-        Some(block)
+        let end = block.span.end;
+        (Some(block), end)
     } else if parser.check(&TokenKind::Semicolon) {
         // Statement at-rule (no block)
         let end = parser.base_offset() + parser.current_end;
@@ -81,8 +90,6 @@ pub(crate) fn parse_atrule(parser: &mut CssParser) -> Result<CssAtrule, ParseErr
             context: None,
         });
     };
-
-    let end = (parser.base_offset() + parser.current_end) as u32;
 
     Ok(CssAtrule {
         name,

@@ -1,0 +1,167 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 130,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 9,
+          "end": 15,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 9,
+              "end": 15,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "test1",
+                      "start": 9,
+                      "end": 15
+                    }
+                  ],
+                  "start": 9,
+                  "end": 15
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 16,
+          "end": 45,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 20,
+              "end": 41,
+              "property": "content",
+              "value": "'\\\\000001F4A9'"
+            }
+          ]
+        },
+        "start": 9,
+        "end": 45
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 48,
+          "end": 54,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 48,
+              "end": 54,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "test2",
+                      "start": 48,
+                      "end": 54
+                    }
+                  ],
+                  "start": 48,
+                  "end": 54
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 55,
+          "end": 82,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 59,
+              "end": 78,
+              "property": "content",
+              "value": "'\\\\00000419'"
+            }
+          ]
+        },
+        "start": 48,
+        "end": 82
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 85,
+          "end": 91,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 85,
+              "end": 91,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "test3",
+                      "start": 85,
+                      "end": 91
+                    }
+                  ],
+                  "start": 85,
+                  "end": 91
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 92,
+          "end": 121,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 96,
+              "end": 117,
+              "property": "content",
+              "value": "'\\\\0000000ABC'"
+            }
+          ]
+        },
+        "start": 85,
+        "end": 121
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 122,
+      "styles": "\n\t.test1 {\n\t\tcontent: '\\00001F4A9';\n\t}\n\n\t.test2 {\n\t\tcontent: '\\0000419';\n\t}\n\n\t.test3 {\n\t\tcontent: '\\000000ABC';\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

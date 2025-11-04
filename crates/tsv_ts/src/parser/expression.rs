@@ -27,23 +27,32 @@ impl<'a> Parser<'a> {
                 self.advance()?;
                 Ok(Expression::Literal(Literal {
                     value: LiteralValue::Number(number),
-                    raw,
                     span: Span::new(start as u32, end as u32),
                 }))
             }
             TokenKind::String => {
                 let (start, end) = self.current_pos();
                 let raw = self.current_value().to_string();
-                // Extract string content (remove quotes)
-                let content = if raw.len() >= 2 {
-                    raw[1..raw.len() - 1].to_string()
+
+                // Extract quote character (first char of raw string)
+                let quote = raw.chars().next().unwrap_or('"');
+
+                // Use decoded value from lexer (escapes already processed)
+                // If no decoded value, extract content without quotes (no escapes present)
+                let content = if let Some(decoded) = self.current_decoded() {
+                    decoded.to_string()
                 } else {
-                    String::new()
+                    // No escapes - extract content between quotes
+                    if raw.len() >= 2 {
+                        raw[1..raw.len() - 1].to_string()
+                    } else {
+                        String::new()
+                    }
                 };
+
                 self.advance()?;
                 Ok(Expression::Literal(Literal {
-                    value: LiteralValue::String(content),
-                    raw,
+                    value: LiteralValue::String { content, quote },
                     span: Span::new(start as u32, end as u32),
                 }))
             }

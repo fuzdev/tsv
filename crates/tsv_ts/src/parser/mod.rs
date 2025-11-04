@@ -16,6 +16,7 @@ struct PeekData<T> {
     kind: T,
     start: usize,
     end: usize,
+    decoded: Option<String>,
 }
 
 pub struct Parser<'a> {
@@ -24,6 +25,7 @@ pub struct Parser<'a> {
     current_kind: TokenKind,
     current_start: usize,
     current_end: usize,
+    current_decoded: Option<String>, // Decoded string value (for strings with escapes)
     peek_cache: Option<PeekData<TokenKind>>,
     interner: Rc<RefCell<DefaultStringInterner>>,
     base_offset: usize, // Offset in full source (for embedded expressions)
@@ -49,9 +51,9 @@ impl<'a> Parser<'a> {
     ) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
         // Extract token data immediately to avoid keeping token alive
-        let (kind, start, end) = {
+        let (kind, start, end, decoded) = {
             let token = lexer.next_token()?;
-            (token.kind, token.start, token.end)
+            (token.kind, token.start, token.end, token.decoded)
         };
         Ok(Self {
             source,
@@ -59,6 +61,7 @@ impl<'a> Parser<'a> {
             current_kind: kind,
             current_start: start,
             current_end: end,
+            current_decoded: decoded,
             peek_cache: None,
             interner,
             base_offset,
@@ -70,11 +73,13 @@ impl<'a> Parser<'a> {
             self.current_kind = peek.kind;
             self.current_start = peek.start;
             self.current_end = peek.end;
+            self.current_decoded = peek.decoded;
         } else {
             let token = self.lexer.next_token()?;
             self.current_kind = token.kind;
             self.current_start = token.start;
             self.current_end = token.end;
+            self.current_decoded = token.decoded;
         }
         Ok(())
     }
@@ -100,6 +105,20 @@ impl<'a> Parser<'a> {
         &self.source[self.current_start..self.current_end]
     }
 
+    /// Get the decoded string value for the current token (for strings with escapes)
+    ///
+    /// Currently unused (printer preserves escapes as-is instead of decoding).
+    /// This will be needed in the future for:
+    /// - Expression evaluation (computing const values)
+    /// - Type analysis (analyzing string literal types)
+    /// - Linting (analyzing string content for patterns)
+    ///
+    /// Keep this method for future tooling that needs runtime string values.
+    #[allow(dead_code)]
+    pub(super) fn current_decoded(&self) -> Option<&str> {
+        self.current_decoded.as_deref()
+    }
+
     pub(super) fn check(&self, kind: TokenKind) -> bool {
         self.current_kind == kind
     }
@@ -114,6 +133,7 @@ impl<'a> Parser<'a> {
                 kind: token.kind,
                 start: token.start,
                 end: token.end,
+                decoded: token.decoded,
             });
         }
         self.peek_cache

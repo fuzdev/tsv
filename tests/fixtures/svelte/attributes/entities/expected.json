@@ -1,0 +1,365 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 541,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "RegularElement",
+        "start": 0,
+        "end": 62,
+        "name": "div",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 5,
+            "end": 35,
+            "name": "title",
+            "value": [
+              {
+                "start": 12,
+                "end": 34,
+                "type": "Text",
+                "raw": "&lt;tag&gt; &amp; more",
+                "data": "<tag> & more"
+              }
+            ]
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 36,
+              "end": 56,
+              "raw": "Basic named entities",
+              "data": "Basic named entities"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Text",
+        "start": 62,
+        "end": 64,
+        "raw": "\n\n",
+        "data": "\n\n"
+      },
+      {
+        "type": "RegularElement",
+        "start": 64,
+        "end": 121,
+        "name": "div",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 69,
+            "end": 100,
+            "name": "title",
+            "value": [
+              {
+                "start": 76,
+                "end": 99,
+                "type": "Text",
+                "raw": "&quot;quoted&quot; text",
+                "data": "\"quoted\" text"
+              }
+            ]
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 101,
+              "end": 115,
+              "raw": "Quote entities",
+              "data": "Quote entities"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Text",
+        "start": 121,
+        "end": 123,
+        "raw": "\n\n",
+        "data": "\n\n"
+      },
+      {
+        "type": "RegularElement",
+        "start": 123,
+        "end": 176,
+        "name": "div",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 128,
+            "end": 152,
+            "name": "title",
+            "value": [
+              {
+                "start": 135,
+                "end": 151,
+                "type": "Text",
+                "raw": "It&#39;s working",
+                "data": "It's working"
+              }
+            ]
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 153,
+              "end": 170,
+              "raw": "Apostrophe entity",
+              "data": "Apostrophe entity"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Text",
+        "start": 176,
+        "end": 178,
+        "raw": "\n\n",
+        "data": "\n\n"
+      },
+      {
+        "type": "RegularElement",
+        "start": 178,
+        "end": 261,
+        "name": "div",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 183,
+            "end": 240,
+            "name": "data-text",
+            "value": [
+              {
+                "start": 194,
+                "end": 239,
+                "type": "Text",
+                "raw": "Copyright &copy; 2024 &ndash; Example &trade;",
+                "data": "Copyright © 2024 – Example ™"
+              }
+            ]
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 241,
+              "end": 255,
+              "raw": "Mixed entities",
+              "data": "Mixed entities"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Text",
+        "start": 261,
+        "end": 263,
+        "raw": "\n\n",
+        "data": "\n\n"
+      },
+      {
+        "type": "RegularElement",
+        "start": 263,
+        "end": 328,
+        "name": "div",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 268,
+            "end": 305,
+            "name": "alt",
+            "value": [
+              {
+                "start": 273,
+                "end": 304,
+                "type": "Text",
+                "raw": "Arrow &#8594; and &#x2192; same",
+                "data": "Arrow → and → same"
+              }
+            ]
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 306,
+              "end": 322,
+              "raw": "Numeric entities",
+              "data": "Numeric entities"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Text",
+        "start": 328,
+        "end": 330,
+        "raw": "\n\n",
+        "data": "\n\n"
+      },
+      {
+        "type": "RegularElement",
+        "start": 330,
+        "end": 398,
+        "name": "img",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 335,
+            "end": 349,
+            "name": "src",
+            "value": [
+              {
+                "start": 340,
+                "end": 348,
+                "type": "Text",
+                "raw": "test.jpg",
+                "data": "test.jpg"
+              }
+            ]
+          },
+          {
+            "type": "Attribute",
+            "start": 350,
+            "end": 371,
+            "name": "alt",
+            "value": [
+              {
+                "start": 355,
+                "end": 370,
+                "type": "Text",
+                "raw": "Image &lt;1&gt;",
+                "data": "Image <1>"
+              }
+            ]
+          },
+          {
+            "type": "Attribute",
+            "start": 372,
+            "end": 395,
+            "name": "title",
+            "value": [
+              {
+                "start": 379,
+                "end": 394,
+                "type": "Text",
+                "raw": "Test &amp; Demo",
+                "data": "Test & Demo"
+              }
+            ]
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": []
+        }
+      },
+      {
+        "type": "Text",
+        "start": 398,
+        "end": 400,
+        "raw": "\n\n",
+        "data": "\n\n"
+      },
+      {
+        "type": "RegularElement",
+        "start": 400,
+        "end": 483,
+        "name": "div",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 405,
+            "end": 459,
+            "name": "data-value",
+            "value": [
+              {
+                "start": 417,
+                "end": 458,
+                "type": "Text",
+                "raw": "&lt;div&gt;&quot;nested&quot;&lt;/div&gt;",
+                "data": "<div>\"nested\"</div>"
+              }
+            ]
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 460,
+              "end": 477,
+              "raw": "Complex sequences",
+              "data": "Complex sequences"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Text",
+        "start": 483,
+        "end": 485,
+        "raw": "\n\n",
+        "data": "\n\n"
+      },
+      {
+        "type": "RegularElement",
+        "start": 485,
+        "end": 541,
+        "name": "span",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 491,
+            "end": 515,
+            "name": "data-price",
+            "value": [
+              {
+                "start": 503,
+                "end": 514,
+                "type": "Text",
+                "raw": "&euro;99.99",
+                "data": "€99.99"
+              }
+            ]
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 516,
+              "end": 534,
+              "raw": "Special characters",
+              "data": "Special characters"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

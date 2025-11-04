@@ -59,6 +59,8 @@ impl Executable for FixturesUpdateExpectedExecutable {
             }
         };
 
+        let total_count = all_fixtures.len();
+
         // Apply filters
         let fixtures: Vec<_> = all_fixtures
             .into_iter()
@@ -79,7 +81,11 @@ impl Executable for FixturesUpdateExpectedExecutable {
             for fixture in &fixtures {
                 println!("  {} ({})", fixture.relative_path, fixture.input_file);
             }
-            println!("\nTotal: {}", fixtures.len());
+            if self.filters.is_empty() {
+                println!("\nTotal: {}", fixtures.len());
+            } else {
+                println!("\nMatched: {} of {} fixtures", fixtures.len(), total_count);
+            }
             return;
         }
 
@@ -109,14 +115,26 @@ impl Executable for FixturesUpdateExpectedExecutable {
             }
         }
 
-        println!(
-            "\nSummary: {} created, {} updated, {} unchanged, {} failed (total: {})",
-            created,
-            updated,
-            unchanged,
-            failed,
-            fixtures.len()
-        );
+        if self.filters.is_empty() {
+            println!(
+                "\nSummary: {} created, {} updated, {} unchanged, {} failed ({} fixtures)",
+                created,
+                updated,
+                unchanged,
+                failed,
+                fixtures.len()
+            );
+        } else {
+            println!(
+                "\nSummary: {} created, {} updated, {} unchanged, {} failed (matched {} of {} fixtures)",
+                created,
+                updated,
+                unchanged,
+                failed,
+                fixtures.len(),
+                total_count
+            );
+        }
 
         if created > 0 || updated > 0 {
             println!("⚠️  Updated source of truth files (expected.json)");
@@ -148,10 +166,12 @@ fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult {
             Ok(json) => json,
             Err(e) => return FixtureResult::Failed(format!("Svelte parse error: {}", e)),
         },
-        fixtures::FileType::TypeScript => match deno::parse_typescript(&source) {
-            Ok(json) => json,
-            Err(e) => return FixtureResult::Failed(format!("TypeScript parse error: {}", e)),
-        },
+        fixtures::FileType::SvelteTypeScript | fixtures::FileType::TypeScript => {
+            match deno::parse_typescript(&source) {
+                Ok(json) => json,
+                Err(e) => return FixtureResult::Failed(format!("TypeScript parse error: {}", e)),
+            }
+        }
         fixtures::FileType::Css => {
             // Use our Rust parser for CSS
             match parse_css_via_rust(&fixture.input_path()) {

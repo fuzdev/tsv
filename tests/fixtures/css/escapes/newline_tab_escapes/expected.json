@@ -1,0 +1,167 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 124,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 9,
+          "end": 15,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 9,
+              "end": 15,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "test1",
+                      "start": 9,
+                      "end": 15
+                    }
+                  ],
+                  "start": 9,
+                  "end": 15
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 16,
+          "end": 39,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 20,
+              "end": 35,
+              "property": "content",
+              "value": "'\\\\nn\\\\tt'"
+            }
+          ]
+        },
+        "start": 9,
+        "end": 39
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 42,
+          "end": 48,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 42,
+              "end": 48,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "test2",
+                      "start": 42,
+                      "end": 48
+                    }
+                  ],
+                  "start": 42,
+                  "end": 48
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 49,
+          "end": 76,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 53,
+              "end": 72,
+              "property": "content",
+              "value": "'\\\\rr\\\\bb\\\\ff\\\\vv'"
+            }
+          ]
+        },
+        "start": 42,
+        "end": 76
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 79,
+          "end": 85,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 79,
+              "end": 85,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "test3",
+                      "start": 79,
+                      "end": 85
+                    }
+                  ],
+                  "start": 79,
+                  "end": 85
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 86,
+          "end": 115,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 90,
+              "end": 111,
+              "property": "content",
+              "value": "'test\\\\nnline'"
+            }
+          ]
+        },
+        "start": 79,
+        "end": 115
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 116,
+      "styles": "\n\t.test1 {\n\t\tcontent: '\\n\\t';\n\t}\n\n\t.test2 {\n\t\tcontent: '\\r\\b\\f\\v';\n\t}\n\n\t.test3 {\n\t\tcontent: 'test\\nline';\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

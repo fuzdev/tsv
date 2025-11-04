@@ -3,10 +3,9 @@
 //! This crate provides Svelte component parsing and code formatting.
 
 pub mod ast;
-pub mod formatter;
-pub mod formatter_core;
 pub mod lexer;
 pub mod parser;
+pub mod printer;
 
 pub use tsv_lang::{ParseError, Result};
 
@@ -17,7 +16,7 @@ pub fn parse(source: &str) -> Result<ast::Root> {
 
 /// Format a Svelte AST back to source code
 pub fn format(root: &ast::Root, source: &str) -> String {
-    formatter::format_svelte(root, source)
+    printer::format_svelte(root, source)
 }
 
 /// Convert internal AST to public JSON-compatible AST

@@ -52,16 +52,15 @@ impl Expression {
 #[derive(Debug, Clone)]
 pub enum LiteralValue {
     Number(f64),
-    String(String),
+    String {
+        content: String, // string content without quotes (decoded)
+        quote: char,     // original quote character (' or ")
+    },
 }
 
 #[derive(Debug, Clone)]
 pub struct Literal {
     pub value: LiteralValue,
-    // TODO: Consider interning raw string if profiling shows literal memory is significant.
-    // Current assessment: Internal AST is ephemeral (~ms), benefit unclear without real-world workloads.
-    // Revisit when: parsing large files (>10K lines) or batch processing shows memory pressure.
-    pub raw: String,
     pub span: Span,
 }
 

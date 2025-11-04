@@ -1,43 +1,34 @@
 use crate::ast::internal::CssValue;
+use crate::escapes;
 
-/// Parse CSS string with proper quote handling
+/// Parse CSS string with proper quote handling and escape decoding
+///
+/// Extracts content between quotes and decodes CSS escape sequences.
+/// The internal AST stores fully decoded strings for semantic correctness.
+///
+/// # Examples
+/// - `"test"` → content: `test`, quote: `"`
+/// - `"test\\n"` → content: `test\n` (decoded newline), quote: `"`
+/// - `"\\41"` → content: `A` (decoded unicode U+0041), quote: `"`
+///
+/// # Architecture
+/// - Lexer: Preserves raw escape sequences exactly as written
+/// - Parser: Decodes standard CSS escapes into clean internal AST
+/// - Conversion: Re-applies Svelte quirks when generating public JSON AST
+///
+/// This matches TypeScript's architecture and keeps the internal AST clean.
 pub fn parse_string_literal(s: &str) -> Option<CssValue> {
-    if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
+    if let Some(quote) = s.chars().next()
+        && ((quote == '"' && s.ends_with('"')) || (quote == '\'' && s.ends_with('\'')))
+    {
+        // Extract content without quotes
         let raw_content = &s[1..s.len() - 1];
-        let content = decode_string_escapes(raw_content);
-        return Some(CssValue::String(content));
+
+        // Decode CSS escape sequences for semantic representation
+        // Internal AST stores decoded values; conversion layer re-applies Svelte quirks
+        let content = escapes::decode_escape_sequences(raw_content);
+
+        return Some(CssValue::String { content, quote });
     }
     None
-}
-
-/// Decode CSS string escapes: \", \', and preserve other escape sequences
-///
-/// Only decodes quote escapes (\", \') to allow proper quote style selection.
-/// Preserves other escapes like \\, \n, etc. as literal characters in CSS output.
-fn decode_string_escapes(s: &str) -> String {
-    let mut result = String::new();
-    let mut chars = s.chars().peekable();
-
-    while let Some(ch) = chars.next() {
-        if ch == '\\' {
-            if let Some(&next_ch) = chars.peek() {
-                match next_ch {
-                    '"' | '\'' => {
-                        result.push(next_ch);
-                        chars.next();
-                    }
-                    _ => {
-                        // Keep other escape sequences: \\, \n, \r, \t, \XXXXXX, etc.
-                        result.push(ch);
-                    }
-                }
-            } else {
-                result.push(ch);
-            }
-        } else {
-            result.push(ch);
-        }
-    }
-
-    result
 }

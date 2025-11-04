@@ -2,7 +2,7 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 40,
+    "end": 47,
     "attributes": [],
     "children": [
       {
@@ -38,25 +38,25 @@
         "block": {
           "type": "Block",
           "start": 13,
-          "end": 31,
+          "end": 38,
           "children": [
             {
               "type": "Declaration",
               "start": 17,
-              "end": 27,
+              "end": 34,
               "property": "color",
-              "value": "red"
+              "value": "chartreuse"
             }
           ]
         },
         "start": 9,
-        "end": 31
+        "end": 38
       }
     ],
     "content": {
       "start": 7,
-      "end": 32,
-      "styles": "\n\tdiv {\n\t\tcolor: red;\n\t}\n",
+      "end": 39,
+      "styles": "\n\tdiv {\n\t\tcolor: chartreuse;\n\t}\n",
       "comment": null
     }
   },

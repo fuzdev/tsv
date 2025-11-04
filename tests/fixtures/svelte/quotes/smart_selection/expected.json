@@ -1,0 +1,235 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 108,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "RegularElement",
+        "start": 0,
+        "end": 108,
+        "name": "div",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 5,
+            "end": 17,
+            "name": "data-a",
+            "value": {
+              "type": "ExpressionTag",
+              "start": 12,
+              "end": 17,
+              "expression": {
+                "type": "Literal",
+                "start": 13,
+                "end": 16,
+                "loc": {
+                  "start": {
+                    "line": 1,
+                    "column": 13
+                  },
+                  "end": {
+                    "line": 1,
+                    "column": 16
+                  }
+                },
+                "value": "'",
+                "raw": "\"'\""
+              }
+            }
+          },
+          {
+            "type": "Attribute",
+            "start": 18,
+            "end": 30,
+            "name": "data-b",
+            "value": {
+              "type": "ExpressionTag",
+              "start": 25,
+              "end": 30,
+              "expression": {
+                "type": "Literal",
+                "start": 26,
+                "end": 29,
+                "loc": {
+                  "start": {
+                    "line": 1,
+                    "column": 26
+                  },
+                  "end": {
+                    "line": 1,
+                    "column": 29
+                  }
+                },
+                "value": "\"",
+                "raw": "'\"'"
+              }
+            }
+          },
+          {
+            "type": "Attribute",
+            "start": 31,
+            "end": 45,
+            "name": "data-c",
+            "value": {
+              "type": "ExpressionTag",
+              "start": 38,
+              "end": 45,
+              "expression": {
+                "type": "Literal",
+                "start": 39,
+                "end": 44,
+                "loc": {
+                  "start": {
+                    "line": 1,
+                    "column": 39
+                  },
+                  "end": {
+                    "line": 1,
+                    "column": 44
+                  }
+                },
+                "value": "'\"",
+                "raw": "'\\'\"'"
+              }
+            }
+          },
+          {
+            "type": "Attribute",
+            "start": 46,
+            "end": 61,
+            "name": "data-d",
+            "value": [
+              {
+                "start": 54,
+                "end": 60,
+                "type": "Text",
+                "raw": "&apos;",
+                "data": "'"
+              }
+            ]
+          },
+          {
+            "type": "Attribute",
+            "start": 62,
+            "end": 77,
+            "name": "data-e",
+            "value": [
+              {
+                "start": 70,
+                "end": 76,
+                "type": "Text",
+                "raw": "&quot;",
+                "data": "\""
+              }
+            ]
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 78,
+              "end": 80,
+              "raw": "\n\t",
+              "data": "\n\t"
+            },
+            {
+              "type": "ExpressionTag",
+              "start": 80,
+              "end": 85,
+              "expression": {
+                "type": "Literal",
+                "start": 81,
+                "end": 84,
+                "loc": {
+                  "start": {
+                    "line": 2,
+                    "column": 2
+                  },
+                  "end": {
+                    "line": 2,
+                    "column": 5
+                  }
+                },
+                "value": "'",
+                "raw": "\"'\""
+              }
+            },
+            {
+              "type": "Text",
+              "start": 85,
+              "end": 87,
+              "raw": "\n\t",
+              "data": "\n\t"
+            },
+            {
+              "type": "ExpressionTag",
+              "start": 87,
+              "end": 92,
+              "expression": {
+                "type": "Literal",
+                "start": 88,
+                "end": 91,
+                "loc": {
+                  "start": {
+                    "line": 3,
+                    "column": 2
+                  },
+                  "end": {
+                    "line": 3,
+                    "column": 5
+                  }
+                },
+                "value": "\"",
+                "raw": "'\"'"
+              }
+            },
+            {
+              "type": "Text",
+              "start": 92,
+              "end": 94,
+              "raw": "\n\t",
+              "data": "\n\t"
+            },
+            {
+              "type": "ExpressionTag",
+              "start": 94,
+              "end": 101,
+              "expression": {
+                "type": "Literal",
+                "start": 95,
+                "end": 100,
+                "loc": {
+                  "start": {
+                    "line": 4,
+                    "column": 2
+                  },
+                  "end": {
+                    "line": 4,
+                    "column": 7
+                  }
+                },
+                "value": "'\"",
+                "raw": "'\\'\"'"
+              }
+            },
+            {
+              "type": "Text",
+              "start": 101,
+              "end": 102,
+              "raw": "\n",
+              "data": "\n"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

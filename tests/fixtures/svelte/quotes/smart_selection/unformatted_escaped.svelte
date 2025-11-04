@@ -1,0 +1,11 @@
+<div
+	data-a={'\''}
+	data-b={"\""}
+	data-c={"'\""}
+	data-d='&apos;'
+	data-e='&quot;'
+>
+	{'\''}
+	{"\""}
+	{"'\""}
+</div>

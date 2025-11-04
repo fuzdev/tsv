@@ -1,0 +1,73 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 69,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 9,
+          "end": 13,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 9,
+              "end": 13,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "foo",
+                      "start": 9,
+                      "end": 13
+                    }
+                  ],
+                  "start": 9,
+                  "end": 13
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 14,
+          "end": 32,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 18,
+              "end": 28,
+              "property": "color",
+              "value": "red"
+            }
+          ]
+        },
+        "start": 9,
+        "end": 32
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 61,
+      "styles": "\n\t.foo {\n\t\tcolor: red;\n\t}\n\t/* Final comment at end */\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

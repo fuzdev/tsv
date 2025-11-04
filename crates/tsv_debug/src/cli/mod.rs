@@ -1,12 +1,10 @@
 pub mod commands;
 
 use commands::{
-    ast_diff::AstDiffCommand, compare::CompareCommand,
-    fixtures_check_formatted::FixturesCheckFormattedCommand,
+    ast_diff::AstDiffCommand, canonical_parse::CanonicalParseCommand, compare::CompareCommand,
     fixtures_update_expected::FixturesUpdateExpectedCommand,
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
-    format_prettier::FormatPrettierCommand, parse_svelte::ParseSvelteCommand,
-    parse_typescript::ParseTypeScriptCommand,
+    fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
 };
 use tsv_cli::cli::commands::CommandRegistry;
 
@@ -19,14 +17,13 @@ pub fn build_registry() -> CommandRegistry {
     registry.register(Box::new(AstDiffCommand));
 
     // Register parser commands
-    registry.register(Box::new(ParseSvelteCommand));
-    registry.register(Box::new(ParseTypeScriptCommand));
+    registry.register(Box::new(CanonicalParseCommand));
     registry.register(Box::new(FormatPrettierCommand));
 
     // Register fixture management commands
     registry.register(Box::new(FixturesUpdateExpectedCommand));
     registry.register(Box::new(FixturesUpdateFormattedCommand));
-    registry.register(Box::new(FixturesCheckFormattedCommand));
+    registry.register(Box::new(FixturesValidateCommand));
 
     registry
 }

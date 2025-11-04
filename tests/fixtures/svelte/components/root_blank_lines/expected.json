@@ -1,0 +1,43 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 19,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "Component",
+        "start": 0,
+        "end": 8,
+        "name": "Comp",
+        "attributes": [],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": []
+        }
+      },
+      {
+        "type": "Text",
+        "start": 8,
+        "end": 10,
+        "raw": "\n\n",
+        "data": "\n\n"
+      },
+      {
+        "type": "Component",
+        "start": 10,
+        "end": 19,
+        "name": "CompB",
+        "attributes": [],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": []
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

@@ -1,0 +1,6 @@
+<Comp>
+
+	{
+	  count
+	}</Comp
+>

@@ -1,0 +1,1 @@
+<Comp>text content</Comp>

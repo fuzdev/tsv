@@ -1,0 +1,40 @@
+{
+  "css": null,
+  "js": [],
+  "start": 0,
+  "end": 25,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "Component",
+        "start": 0,
+        "end": 25,
+        "name": "Comp",
+        "attributes": [
+          {
+            "type": "Attribute",
+            "start": 6,
+            "end": 13,
+            "name": "primary",
+            "value": true
+          },
+          {
+            "type": "Attribute",
+            "start": 14,
+            "end": 22,
+            "name": "disabled",
+            "value": true
+          }
+        ],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": []
+        }
+      }
+    ]
+  },
+  "options": null,
+  "comments": []
+}

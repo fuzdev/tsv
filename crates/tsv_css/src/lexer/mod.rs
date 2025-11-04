@@ -66,6 +66,7 @@ impl<'a> Lexer<'a> {
             kind: TokenKind::Whitespace,
             start,
             end: self.pos,
+            decoded: None,
         }
     }
 
@@ -75,6 +76,7 @@ impl<'a> Lexer<'a> {
                 kind: TokenKind::Eof,
                 start: self.pos,
                 end: self.pos,
+                decoded: None,
             });
         }
 
@@ -85,6 +87,7 @@ impl<'a> Lexer<'a> {
                     kind: TokenKind::Eof,
                     start: self.pos,
                     end: self.pos,
+                    decoded: None,
                 });
             }
         };
@@ -98,6 +101,7 @@ impl<'a> Lexer<'a> {
                     kind: $kind,
                     start,
                     end: self.pos,
+                    decoded: None,
                 })
             }};
         }

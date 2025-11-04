@@ -1,5 +1,5 @@
 <style>
 	div {
-		color: red;
+		color: chartreuse;
 	}
 </style>

@@ -72,6 +72,7 @@ pub struct ComplexSelector {
 #[derive(Debug, Clone)]
 pub struct RelativeSelector {
     pub combinator: Option<Combinator>,
+    pub combinator_span: Option<Span>, // Position of the combinator symbol
     pub selectors: Vec<SimpleSelector>,
     pub span: Span,
 }
@@ -116,12 +117,12 @@ pub enum SimpleSelector {
     },
     PseudoClass {
         name: String,
-        raw_args: Option<String>, // TODO: Parse into Vec<SelectorList> for :is(), :not(), etc.
+        args: Option<PseudoClassArgs>,
         span: Span,
     },
     PseudoElement {
         name: String,
-        raw_args: Option<String>, // TODO: Parse into Vec<SimpleSelector> for ::slotted(), etc.
+        args: Option<PseudoClassArgs>,
         span: Span,
     },
     Nesting {
@@ -131,6 +132,21 @@ pub enum SimpleSelector {
         value: f64,
         span: Span, // Phase 3b: @keyframes percentage selectors (0%, 50%, 100%)
     },
+}
+
+/// Pseudo-class/pseudo-element argument types (semantic representation)
+///
+/// Stores semantic data (what the args mean), not output structure.
+/// Conversion layer generates Svelte's wrapper format.
+#[derive(Debug, Clone)]
+pub enum PseudoClassArgs {
+    /// Nth expression for :nth-child(), :nth-of-type(), :nth-last-child(), :nth-last-of-type()
+    ///
+    /// Values: "2n + 1", "odd", "even", "3", "-n+6", etc.
+    /// Span covers the argument content (inside the parentheses)
+    Nth { value: String, span: Span },
+    // Future extensions:
+    // SelectorList(Vec<ComplexSelector>, Span),  // For :is(), :not(), :where(), :has()
 }
 
 /// Attribute selector matcher type
@@ -145,10 +161,14 @@ pub enum AttributeMatcher {
 }
 
 /// CSS Declaration - property: value pair
+///
+/// Maintains semantic representation:
+/// - `value`: Rich semantic AST for manipulation, formatting, linting
+/// - Source text extracted via span when needed (e.g., for JSON output)
 #[derive(Debug, Clone)]
 pub struct CssDeclaration {
     pub property: String,
-    pub value: CssValue,
+    pub value: CssValue, // Semantic representation (normalized)
     pub span: Span,
 }
 
@@ -172,12 +192,16 @@ pub enum CssValue {
     Identifier(String),
 
     /// String literal: "Arial", 'font.woff'
-    String(String),
+    /// Content includes decoded escape sequences (internal representation)
+    String {
+        content: String, // string content without quotes (decoded)
+        quote: char,     // original quote character (' or ")
+    },
 
     /// Number with optional unit: 10, 10px, 1.5em, 50%, etc.
     Dimension {
         value: f64,
-        unit: String, // empty string for unitless numbers, "px", "%", etc.
+        unit: String,   // empty string for unitless numbers, "px", "%", etc.
         source: String, // original source representation (preserves leading zeros)
     },
 

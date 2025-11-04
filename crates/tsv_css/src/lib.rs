@@ -4,14 +4,15 @@
 // Part of the tsv (TypeScript and Svelte tools in Rust) project.
 
 pub mod ast;
-pub mod formatter;
+pub mod escapes;
 pub mod lexer;
 pub mod parser;
+pub mod printer;
 
 // Re-export commonly used types and functions
 pub use ast::{CssDeclaration, CssNode, CssRule, StyleContent, StyleSheet};
-pub use formatter::{FormatConfig, Formatter, format_css};
 pub use parser::parse_css;
+pub use printer::{PrintConfig, Printer, format_css};
 pub use tsv_lang::{ParseError, Result, Span};
 
 /// Parse CSS source into internal AST
@@ -54,7 +55,7 @@ pub fn parse(source: &str, base_offset: usize) -> Result<Vec<CssNode>> {
 /// assert_eq!(formatted, "div {\n\tcolor: red;\n}\n");
 /// ```
 pub fn format(nodes: &[CssNode], source: &str) -> String {
-    formatter::format_css_with_source(nodes, source)
+    printer::format_css(nodes, source)
 }
 
 /// Convert CSS AST nodes to JSON representation

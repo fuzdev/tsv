@@ -2,7 +2,7 @@
 name = "tsv_debug"
 version.workspace = true
 edition.workspace = true
-description = "Development utilities for TSV (AST debugging, formatter comparison)"
+description = "Development utilities for TSV (AST debugging, printer comparison)"
 
 [[bin]]
 name = "tsv_debug"

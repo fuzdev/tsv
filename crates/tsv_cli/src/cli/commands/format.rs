@@ -78,7 +78,7 @@ impl Executable for FormatExecutable {
             },
             ParserType::TypeScript => match tsv_ts::parse(source) {
                 Ok(ast) => {
-                    let formatted = tsv_ts::format(&ast);
+                    let formatted = tsv_ts::format(&ast, source);
                     println!("{}", formatted);
                 }
                 Err(e) => {

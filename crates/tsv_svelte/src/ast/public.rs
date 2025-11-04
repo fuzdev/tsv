@@ -13,19 +13,19 @@ use tsv_ts::ast::public::{Expression, Program};
 /// Serializes to match Svelte's parser output exactly.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Root {
-    #[serde(rename = "type")]
-    pub node_type: String,
+    pub css: Option<StyleSheet>,
+    pub js: Vec<serde_json::Value>, // empty array for now
     pub start: Option<u32>,
     pub end: Option<u32>,
+    #[serde(rename = "type")]
+    pub node_type: String,
     pub fragment: Fragment,
+    pub options: Option<serde_json::Value>, // null for now
+    pub comments: Vec<serde_json::Value>,   // empty array for now
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instance: Option<Script>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub module: Option<Script>,
-    pub css: Option<StyleSheet>,
-    pub js: Vec<serde_json::Value>,         // empty array for now
-    pub options: Option<serde_json::Value>, // null for now
-    pub comments: Vec<serde_json::Value>,   // empty array for now
 }
 
 /// Svelte Fragment - container for template nodes
@@ -40,6 +40,7 @@ pub struct Fragment {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum FragmentNode {
+    Component(Element),
     RegularElement(Element),
     ExpressionTag(ExpressionTag),
     Text(Text),
@@ -53,15 +54,10 @@ pub struct Element {
     pub start: u32,
     pub end: u32,
     pub name: String,
-    #[serde(skip_serializing_if = "is_html_element")]
+    #[serde(skip_serializing)]
     pub kind: ElementKind,
     pub attributes: Vec<Attribute>,
     pub fragment: Fragment,
-}
-
-/// Helper function to skip serializing ElementKind::Html (the default)
-fn is_html_element(kind: &ElementKind) -> bool {
-    *kind == ElementKind::Html
 }
 
 /// Svelte Attribute - element attribute

@@ -50,6 +50,8 @@ impl Executable for FixturesUpdateFormattedExecutable {
             }
         };
 
+        let total_count = all_fixtures.len();
+
         // Apply filters
         let fixtures: Vec<_> = all_fixtures
             .into_iter()
@@ -93,7 +95,10 @@ impl Executable for FixturesUpdateFormattedExecutable {
                     unchanged += 1;
                 }
                 FormattedResult::NotNeeded => {
-                    // Input is already formatted, no formatted.* file needed
+                    println!(
+                        "- {}/formatted.* not needed (input already formatted)",
+                        fixture.relative_path
+                    );
                     unchanged += 1;
                 }
                 FormattedResult::Failed(err) => {
@@ -103,15 +108,28 @@ impl Executable for FixturesUpdateFormattedExecutable {
             }
         }
 
-        println!(
-            "\nSummary: {} created, {} updated, {} removed, {} unchanged, {} failed (total: {})",
-            created,
-            updated,
-            removed,
-            unchanged,
-            failed,
-            fixtures.len()
-        );
+        if self.filters.is_empty() {
+            println!(
+                "\nSummary: {} created, {} updated, {} removed, {} unchanged, {} failed ({} fixtures)",
+                created,
+                updated,
+                removed,
+                unchanged,
+                failed,
+                fixtures.len()
+            );
+        } else {
+            println!(
+                "\nSummary: {} created, {} updated, {} removed, {} unchanged, {} failed (matched {} of {} fixtures)",
+                created,
+                updated,
+                removed,
+                unchanged,
+                failed,
+                fixtures.len(),
+                total_count
+            );
+        }
 
         if created > 0 || updated > 0 || removed > 0 {
             println!("⚠️  Updated source of truth files (formatted.*)");
@@ -142,6 +160,7 @@ fn update_formatted_file(fixture: &fixtures::Fixture) -> FormattedResult {
     // Determine filepath for prettier
     let filepath = match fixture.file_type() {
         fixtures::FileType::Svelte => "temp.svelte",
+        fixtures::FileType::SvelteTypeScript => "temp.svelte.ts",
         fixtures::FileType::TypeScript => "temp.ts",
         fixtures::FileType::Css => "temp.css",
         fixtures::FileType::Unknown => {

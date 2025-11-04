@@ -1,0 +1,167 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 148,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 9,
+          "end": 11,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 9,
+              "end": 11,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "a",
+                      "start": 9,
+                      "end": 11
+                    }
+                  ],
+                  "start": 9,
+                  "end": 11
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 12,
+          "end": 50,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 16,
+              "end": 46,
+              "property": "content",
+              "value": "\"has 'single' quotes\""
+            }
+          ]
+        },
+        "start": 9,
+        "end": 50
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 53,
+          "end": 55,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 53,
+              "end": 55,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "b",
+                      "start": 53,
+                      "end": 55
+                    }
+                  ],
+                  "start": 53,
+                  "end": 55
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 56,
+          "end": 94,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 60,
+              "end": 90,
+              "property": "content",
+              "value": "'has \"double\" quotes'"
+            }
+          ]
+        },
+        "start": 53,
+        "end": 94
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 97,
+          "end": 99,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 97,
+              "end": 99,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "c",
+                      "start": 97,
+                      "end": 99
+                    }
+                  ],
+                  "start": 97,
+                  "end": 99
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 100,
+          "end": 139,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 104,
+              "end": 135,
+              "property": "content",
+              "value": "'has \\\\''both\\\\'' \"types\"'"
+            }
+          ]
+        },
+        "start": 97,
+        "end": 139
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 140,
+      "styles": "\n\t.a {\n\t\tcontent: \"has 'single' quotes\";\n\t}\n\n\t.b {\n\t\tcontent: 'has \"double\" quotes';\n\t}\n\n\t.c {\n\t\tcontent: 'has \\'both\\' \"types\"';\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

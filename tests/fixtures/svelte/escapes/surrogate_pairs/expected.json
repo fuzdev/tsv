@@ -1,0 +1,476 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 226,
+    "end": 347,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 235,
+          "end": 241,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 235,
+              "end": 241,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "emoji",
+                      "start": 235,
+                      "end": 241
+                    }
+                  ],
+                  "start": 235,
+                  "end": 241
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 242,
+          "end": 267,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 246,
+              "end": 263,
+              "property": "content",
+              "value": "'\\\\11F4A9'"
+            }
+          ]
+        },
+        "start": 235,
+        "end": 267
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 270,
+          "end": 276,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 270,
+              "end": 276,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "heart",
+                      "start": 270,
+                      "end": 276
+                    }
+                  ],
+                  "start": 270,
+                  "end": 276
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 277,
+          "end": 302,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 281,
+              "end": 298,
+              "property": "content",
+              "value": "'\\\\11F496'"
+            }
+          ]
+        },
+        "start": 270,
+        "end": 302
+      },
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 305,
+          "end": 312,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 305,
+              "end": 312,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "rocket",
+                      "start": 305,
+                      "end": 312
+                    }
+                  ],
+                  "start": 305,
+                  "end": 312
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 313,
+          "end": 338,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 317,
+              "end": 334,
+              "property": "content",
+              "value": "'\\\\11F680'"
+            }
+          ]
+        },
+        "start": 305,
+        "end": 338
+      }
+    ],
+    "content": {
+      "start": 233,
+      "end": 339,
+      "styles": "\n\t.emoji {\n\t\tcontent: '\\1F4A9';\n\t}\n\n\t.heart {\n\t\tcontent: '\\1F496';\n\t}\n\n\t.rocket {\n\t\tcontent: '\\1F680';\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": 114,
+  "end": 224,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": [
+      {
+        "type": "Text",
+        "start": 112,
+        "end": 114,
+        "raw": "\n\n",
+        "data": "\n\n"
+      },
+      {
+        "type": "RegularElement",
+        "start": 114,
+        "end": 148,
+        "name": "p",
+        "attributes": [],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 117,
+              "end": 144,
+              "raw": "Emoji via entity: &#128169;",
+              "data": "Emoji via entity: 💩"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Text",
+        "start": 148,
+        "end": 149,
+        "raw": "\n",
+        "data": "\n"
+      },
+      {
+        "type": "RegularElement",
+        "start": 149,
+        "end": 187,
+        "name": "p",
+        "attributes": [],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 152,
+              "end": 183,
+              "raw": "Heart via hex entity: &#x1F496;",
+              "data": "Heart via hex entity: 💖"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Text",
+        "start": 187,
+        "end": 188,
+        "raw": "\n",
+        "data": "\n"
+      },
+      {
+        "type": "RegularElement",
+        "start": 188,
+        "end": 224,
+        "name": "p",
+        "attributes": [],
+        "fragment": {
+          "type": "Fragment",
+          "nodes": [
+            {
+              "type": "Text",
+              "start": 191,
+              "end": 220,
+              "raw": "Rocket via decimal: &#128640;",
+              "data": "Rocket via decimal: 🚀"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Text",
+        "start": 224,
+        "end": 226,
+        "raw": "\n\n",
+        "data": "\n\n"
+      }
+    ]
+  },
+  "options": null,
+  "comments": [],
+  "instance": {
+    "type": "Script",
+    "start": 0,
+    "end": 112,
+    "context": "default",
+    "content": {
+      "type": "Program",
+      "start": 8,
+      "end": 103,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 5,
+          "column": 0
+        }
+      },
+      "body": [
+        {
+          "type": "VariableDeclaration",
+          "start": 10,
+          "end": 39,
+          "loc": {
+            "start": {
+              "line": 2,
+              "column": 1
+            },
+            "end": {
+              "line": 2,
+              "column": 30
+            }
+          },
+          "declarations": [
+            {
+              "type": "VariableDeclarator",
+              "start": 16,
+              "end": 38,
+              "loc": {
+                "start": {
+                  "line": 2,
+                  "column": 7
+                },
+                "end": {
+                  "line": 2,
+                  "column": 29
+                }
+              },
+              "id": {
+                "type": "Identifier",
+                "start": 16,
+                "end": 21,
+                "loc": {
+                  "start": {
+                    "line": 2,
+                    "column": 7
+                  },
+                  "end": {
+                    "line": 2,
+                    "column": 12
+                  }
+                },
+                "name": "emoji"
+              },
+              "init": {
+                "type": "Literal",
+                "start": 24,
+                "end": 38,
+                "loc": {
+                  "start": {
+                    "line": 2,
+                    "column": 15
+                  },
+                  "end": {
+                    "line": 2,
+                    "column": 29
+                  }
+                },
+                "value": "💩",
+                "raw": "'\\uD83D\\uDCA9'"
+              }
+            }
+          ],
+          "kind": "const"
+        },
+        {
+          "type": "VariableDeclaration",
+          "start": 41,
+          "end": 70,
+          "loc": {
+            "start": {
+              "line": 3,
+              "column": 1
+            },
+            "end": {
+              "line": 3,
+              "column": 30
+            }
+          },
+          "declarations": [
+            {
+              "type": "VariableDeclarator",
+              "start": 47,
+              "end": 69,
+              "loc": {
+                "start": {
+                  "line": 3,
+                  "column": 7
+                },
+                "end": {
+                  "line": 3,
+                  "column": 29
+                }
+              },
+              "id": {
+                "type": "Identifier",
+                "start": 47,
+                "end": 52,
+                "loc": {
+                  "start": {
+                    "line": 3,
+                    "column": 7
+                  },
+                  "end": {
+                    "line": 3,
+                    "column": 12
+                  }
+                },
+                "name": "heart"
+              },
+              "init": {
+                "type": "Literal",
+                "start": 55,
+                "end": 69,
+                "loc": {
+                  "start": {
+                    "line": 3,
+                    "column": 15
+                  },
+                  "end": {
+                    "line": 3,
+                    "column": 29
+                  }
+                },
+                "value": "💖",
+                "raw": "'\\uD83D\\uDC96'"
+              }
+            }
+          ],
+          "kind": "const"
+        },
+        {
+          "type": "VariableDeclaration",
+          "start": 72,
+          "end": 102,
+          "loc": {
+            "start": {
+              "line": 4,
+              "column": 1
+            },
+            "end": {
+              "line": 4,
+              "column": 31
+            }
+          },
+          "declarations": [
+            {
+              "type": "VariableDeclarator",
+              "start": 78,
+              "end": 101,
+              "loc": {
+                "start": {
+                  "line": 4,
+                  "column": 7
+                },
+                "end": {
+                  "line": 4,
+                  "column": 30
+                }
+              },
+              "id": {
+                "type": "Identifier",
+                "start": 78,
+                "end": 84,
+                "loc": {
+                  "start": {
+                    "line": 4,
+                    "column": 7
+                  },
+                  "end": {
+                    "line": 4,
+                    "column": 13
+                  }
+                },
+                "name": "rocket"
+              },
+              "init": {
+                "type": "Literal",
+                "start": 87,
+                "end": 101,
+                "loc": {
+                  "start": {
+                    "line": 4,
+                    "column": 16
+                  },
+                  "end": {
+                    "line": 4,
+                    "column": 30
+                  }
+                },
+                "value": "🚀",
+                "raw": "'\\uD83D\\uDE80'"
+              }
+            }
+          ],
+          "kind": "const"
+        }
+      ],
+      "sourceType": "module"
+    },
+    "attributes": []
+  }
+}

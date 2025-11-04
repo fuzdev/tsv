@@ -4,7 +4,7 @@ use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
 use tsv_cli::cli::input::{Input, ParserType};
 
-/// Compare command - compares our formatter output with prettier
+/// Compare command - compares our printer output with prettier
 pub struct CompareCommand;
 
 impl Command for CompareCommand {
@@ -15,17 +15,24 @@ impl Command for CompareCommand {
     fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
         // Parse input and detect parser type
         let (input, parser_type) = if let Some(content) = args.option("content") {
+            // --content requires --parser
             let parser = args
                 .option("parser")
-                .map(|p| p.parse())
-                .transpose()?
-                .unwrap_or(ParserType::Svelte);
+                .ok_or("Error: --parser required when using --content")?
+                .parse()?;
             (Input::from_content(content), parser)
+        } else if args.flag("stdin") {
+            // --stdin requires --parser
+            let parser = args
+                .option("parser")
+                .ok_or("Error: --parser required when using --stdin")?
+                .parse()?;
+            (Input::from_stdin()?, parser)
         } else if let Some(path) = args.positional() {
             let parser = ParserType::from_extension(&path);
             (Input::from_file(&path)?, parser)
         } else {
-            return Err("No input provided. Use a file path or --content".to_string());
+            return Err("No input provided. Use a file path, --content, or --stdin".to_string());
         };
 
         Ok(Box::new(CompareExecutable { input, parser_type }))
@@ -33,9 +40,11 @@ impl Command for CompareCommand {
 
     fn usage(&self) -> Vec<String> {
         vec![
-            "compare <file>                    Compare formatter output with prettier for file"
+            "compare <file>                                  Compare formatter output with prettier for file"
                 .to_string(),
-            "compare --content <string>        Compare formatter output with prettier for content"
+            "compare --content <string> --parser <type>      Compare formatter output (requires --parser svelte|typescript|css)"
+                .to_string(),
+            "compare --stdin --parser <type>                 Compare formatter output from stdin (requires --parser)"
                 .to_string(),
         ]
     }

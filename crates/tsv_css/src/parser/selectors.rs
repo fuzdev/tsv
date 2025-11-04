@@ -38,7 +38,7 @@ pub(crate) fn parse_complex_selector(
     let mut children = Vec::new();
 
     // First relative selector has no combinator
-    children.push(parse_relative_selector(parser, None)?);
+    children.push(parse_relative_selector(parser, None, None)?);
 
     // Parse additional relative selectors with combinators
     while !parser.check(&TokenKind::LeftBrace)
@@ -46,12 +46,17 @@ pub(crate) fn parse_complex_selector(
         && !parser.check(&TokenKind::Eof)
     {
         // Check for combinator
-        let combinator = parse_combinator(parser)?;
-        if combinator.is_none() {
+        let combinator_info = parse_combinator(parser)?;
+        if combinator_info.is_none() {
             break; // No more combinators, we're done
         }
 
-        children.push(parse_relative_selector(parser, combinator)?);
+        let (combinator, combinator_span) = combinator_info.unwrap();
+        children.push(parse_relative_selector(
+            parser,
+            Some(combinator),
+            Some(combinator_span),
+        )?);
     }
 
     // End position should be the end of the last child, not the next token
@@ -67,8 +72,15 @@ pub(crate) fn parse_complex_selector(
 }
 
 /// Parse a combinator: `>`, `+`, `~`, `||`, or whitespace (descendant)
-pub(crate) fn parse_combinator(parser: &mut CssParser) -> Result<Option<Combinator>, ParseError> {
+/// Returns (combinator type, combinator span)
+pub(crate) fn parse_combinator(
+    parser: &mut CssParser,
+) -> Result<Option<(Combinator, Span)>, ParseError> {
+    // Capture position before skipping whitespace for descendant combinator
+    let whitespace_start = parser.base_offset() + parser.current_start();
     parser.skip_whitespace()?;
+
+    let combinator_start = parser.base_offset() + parser.current_start();
 
     let combinator = match &parser.current_kind {
         TokenKind::GreaterThan => Some(Combinator::Child),
@@ -79,6 +91,7 @@ pub(crate) fn parse_combinator(parser: &mut CssParser) -> Result<Option<Combinat
             // Check if we had whitespace before (descendant combinator)
             // For now, peek ahead to see if there's another selector coming
             if is_selector_start(parser) {
+                // Descendant combinator - use a single space span at current position
                 Some(Combinator::Descendant)
             } else {
                 None
@@ -86,12 +99,31 @@ pub(crate) fn parse_combinator(parser: &mut CssParser) -> Result<Option<Combinat
         }
     };
 
-    if combinator.is_some() && combinator != Some(Combinator::Descendant) {
-        parser.advance()?; // consume combinator token
-        parser.skip_whitespace()?;
-    }
+    let result = if let Some(comb) = combinator {
+        let (start, end) = if comb == Combinator::Descendant {
+            // Descendant is whitespace - span from end of previous to start of next
+            (whitespace_start, combinator_start)
+        } else {
+            (combinator_start, parser.base_offset() + parser.current_end)
+        };
 
-    Ok(combinator)
+        if comb != Combinator::Descendant {
+            parser.advance()?; // consume combinator token
+            parser.skip_whitespace()?;
+        }
+
+        Some((
+            comb,
+            Span {
+                start: start as u32,
+                end: end as u32,
+            },
+        ))
+    } else {
+        None
+    };
+
+    Ok(result)
 }
 
 /// Check if current token could start a selector
@@ -112,8 +144,12 @@ fn is_selector_start(parser: &CssParser) -> bool {
 fn parse_relative_selector(
     parser: &mut CssParser,
     combinator: Option<Combinator>,
+    combinator_span: Option<Span>,
 ) -> Result<RelativeSelector, ParseError> {
-    let start = parser.base_offset() + parser.current_start();
+    // Start position is either the combinator start (if present) or the current selector start
+    let start = combinator_span
+        .map(|s| s.start as usize)
+        .unwrap_or_else(|| parser.base_offset() + parser.current_start());
     let mut selectors = Vec::new();
 
     // Parse one or more simple selectors
@@ -139,6 +175,7 @@ fn parse_relative_selector(
 
     Ok(RelativeSelector {
         combinator,
+        combinator_span,
         selectors,
         span: Span {
             start: start as u32,
@@ -162,7 +199,14 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
     match &parser.current_kind {
         TokenKind::Identifier => {
             // Type selector: div, span, etc.
-            let name = parser.current_value().to_string();
+            let name = parser
+                .current_identifier()
+                .ok_or_else(|| ParseError::InvalidSyntax {
+                    message: "Expected identifier".to_string(),
+                    position: parser.base_offset() + parser.current_start(),
+                    context: None,
+                })?
+                .to_string();
             let end = parser.base_offset() + parser.current_end;
             parser.advance()?;
             Ok(SimpleSelector::Type {
@@ -184,7 +228,14 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
                     context: None,
                 });
             }
-            let name = parser.current_value().to_string();
+            let name = parser
+                .current_identifier()
+                .ok_or_else(|| ParseError::InvalidSyntax {
+                    message: "Expected identifier".to_string(),
+                    position: parser.base_offset() + parser.current_start(),
+                    context: None,
+                })?
+                .to_string();
             let end = parser.base_offset() + parser.current_end;
             parser.advance()?;
             Ok(SimpleSelector::Class {
@@ -205,7 +256,14 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
                     context: None,
                 });
             }
-            let name = parser.current_value().to_string();
+            let name = parser
+                .current_identifier()
+                .ok_or_else(|| ParseError::InvalidSyntax {
+                    message: "Expected identifier".to_string(),
+                    position: parser.base_offset() + parser.current_start(),
+                    context: None,
+                })?
+                .to_string();
             let end = parser.base_offset() + parser.current_end;
             parser.advance()?;
             Ok(SimpleSelector::Id {
@@ -249,11 +307,13 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
         }
         TokenKind::Percentage(value_str) => {
             // Percentage selector: 0%, 50%, 100% (used in @keyframes)
-            let value = value_str.parse::<f64>().map_err(|_| ParseError::InvalidSyntax {
-                message: format!("Invalid percentage value: {}", value_str),
-                position: start,
-                context: None,
-            })?;
+            let value = value_str
+                .parse::<f64>()
+                .map_err(|_| ParseError::InvalidSyntax {
+                    message: format!("Invalid percentage value: {}", value_str),
+                    position: start,
+                    context: None,
+                })?;
             let end = parser.base_offset() + parser.current_end;
             parser.advance()?;
             Ok(SimpleSelector::Percentage {

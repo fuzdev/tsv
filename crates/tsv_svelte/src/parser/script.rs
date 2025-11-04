@@ -80,7 +80,7 @@ impl<'a> SvelteParser<'a> {
         let program = tsv_ts::parse_with_interner(content, content_start, self.interner.clone())?;
 
         // Recreate lexer starting from the closing tag position
-        // (same pattern as expression tags - see Sprint 6 for rationale)
+        // (same pattern as expression tags)
         let remaining_source = &self.source[content_end..];
         let mut new_lexer = crate::lexer::Lexer::new(remaining_source);
 
