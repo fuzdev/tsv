@@ -112,7 +112,8 @@ impl<'a> SvelteParser<'a> {
 
         // Parse CSS content
         let css_content = &self.source[content_start..content_end];
-        let css_nodes = tsv_css::parse_css(css_content, content_start).unwrap_or_else(|_| vec![]); // If CSS parsing fails, use empty array
+        let css_stylesheet = tsv_css::parse_css(css_content, content_start)
+            .unwrap_or_else(|_| tsv_css::CssStyleSheet::new()); // If CSS parsing fails, use empty stylesheet
 
         Ok(Style {
             span: Span {
@@ -124,7 +125,7 @@ impl<'a> SvelteParser<'a> {
                 end: content_end as u32,
             },
             attributes,
-            css_nodes,
+            css_stylesheet,
         })
     }
 }

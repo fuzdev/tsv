@@ -19,16 +19,16 @@
             {
               "type": "Declaration",
               "start": 24,
-              "end": 45,
+              "end": 44,
               "property": "font-family",
-              "value": "'MyFont'"
+              "value": "'Font1'"
             },
             {
               "type": "Declaration",
-              "start": 49,
+              "start": 48,
               "end": 87,
               "property": "src",
-              "value": "url('font.woff2') format('woff2')"
+              "value": "url('font1.woff2') format('woff2')"
             }
           ]
         }
@@ -37,7 +37,7 @@
     "content": {
       "start": 7,
       "end": 92,
-      "styles": "\n\t@font-face {\n\t\tfont-family: 'MyFont';\n\t\tsrc: url('font.woff2') format('woff2');\n\t}\n",
+      "styles": "\n\t@font-face {\n\t\tfont-family: 'Font1';\n\t\tsrc: url('font1.woff2') format('woff2');\n\t}\n",
       "comment": null
     }
   },

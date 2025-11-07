@@ -1,9 +1,9 @@
 <style>
-	div.container {
+	div.class1 {
 		width: 100%;
 	}
 
-	span.highlight {
+	span.class2 {
 		color: yellow;
 	}
 </style>

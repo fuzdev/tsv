@@ -1,26 +1,26 @@
 <style>
-	[data-type='primary'] {
+	[data-attr1='value1'] {
 		background: blue;
 		color: white;
 	}
 
-	[lang='en-US'] {
-		font-family: 'American Typewriter', serif;
+	[data-attr2='value2'] {
+		font-family: serif;
 	}
 
-	input[type='text'] {
+	input[data-attr3='value3'] {
 		border: 1px solid gray;
 	}
 
-	input[type='password'] {
+	input[data-attr4='value4'] {
 		font-family: monospace;
 	}
 
-	a[target='_blank'] {
+	a[data-attr5='value5'] {
 		text-decoration: underline;
 	}
 
-	[aria-label='Close'] {
+	[data-attr6='value6'] {
 		cursor: pointer;
 	}
 </style>

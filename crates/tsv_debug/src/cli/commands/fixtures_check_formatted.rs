@@ -2,7 +2,7 @@ use crate::{deno, fixtures};
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
 
-/// fixtures-check-formatted command - verify formatted.* files are up to date (CI)
+/// fixtures-check-formatted command - verify formatted.svelte files are up to date (CI)
 pub struct FixturesCheckFormattedCommand;
 
 impl Command for FixturesCheckFormattedCommand {
@@ -16,7 +16,7 @@ impl Command for FixturesCheckFormattedCommand {
 
     fn usage(&self) -> Vec<String> {
         vec![
-            "fixtures_validate                    Verify formatted.* files are up to date (CI)"
+            "fixtures_validate                    Verify formatted.svelte files are up to date (CI)"
                 .to_string(),
         ]
     }
@@ -67,14 +67,8 @@ impl Executable for FixturesCheckFormattedExecutable {
                 }
             };
 
-            // Determine filepath for prettier
-            let filepath = match fixture.file_type() {
-                fixtures::FileType::Svelte => "temp.svelte",
-                fixtures::FileType::SvelteTypeScript => "temp.svelte.ts",
-                fixtures::FileType::TypeScript => "temp.ts",
-                fixtures::FileType::Css => "temp.css",
-                fixtures::FileType::Unknown => continue,
-            };
+            // Determine filepath for prettier (always temp.svelte)
+            let filepath = "temp.svelte";
 
             // Run prettier on input
             let formatted = match deno::run_prettier(&input, filepath) {
@@ -87,24 +81,22 @@ impl Executable for FixturesCheckFormattedExecutable {
 
             let formatted_path = fixture.formatted_path();
 
-            // Check if formatted.* should exist
+            // Check if formatted.svelte should exist
             if formatted == input {
-                // Input is already formatted, formatted.* should NOT exist
+                // Input is already formatted, formatted.svelte should NOT exist
                 if formatted_path.exists() {
                     incorrect.push(format!(
-                        "{}/formatted.{} should not exist (input is already formatted)",
-                        fixture.relative_path,
-                        fixture.extension()
+                        "{}/formatted.svelte should not exist (input is already formatted)",
+                        fixture.relative_path
                     ));
                 }
             } else {
-                // Input differs from prettier output, formatted.* SHOULD exist
+                // Input differs from prettier output, formatted.svelte SHOULD exist
                 if !formatted_path.exists() {
                     // Store detailed info for better error message
                     invalid_inputs.push((
                         fixture.relative_path.clone(),
                         fixture.input_path(),
-                        fixture.extension().to_string(),
                         input.clone(),
                         formatted.clone(),
                     ));
@@ -123,15 +115,14 @@ impl Executable for FixturesCheckFormattedExecutable {
 
                     if existing != formatted {
                         outdated.push(format!(
-                            "{}/formatted.{} is outdated",
-                            fixture.relative_path,
-                            fixture.extension()
+                            "{}/formatted.svelte is outdated",
+                            fixture.relative_path
                         ));
                     }
                 }
             }
 
-            // Determine baseline for unformatted_* comparison
+            // Determine baseline for unformatted_*.svelte comparison
             let baseline = if formatted_path.exists() {
                 match fixtures::read_file(&formatted_path) {
                     Ok(s) => s,
@@ -141,7 +132,7 @@ impl Executable for FixturesCheckFormattedExecutable {
                 input.clone()
             };
 
-            // Check unformatted_* variants
+            // Check unformatted_*.svelte variants
             let unformatted_variants = fixtures::discover_unformatted_variants(&fixture.path);
             for variant_name in unformatted_variants {
                 unformatted_checked += 1;
@@ -174,11 +165,8 @@ impl Executable for FixturesCheckFormattedExecutable {
                 // Compare to baseline
                 if variant_formatted != baseline {
                     unformatted_mismatch.push(format!(
-                        "{}/{} does not normalize to baseline (formatted.{} or input.{})",
-                        fixture.relative_path,
-                        variant_name,
-                        fixture.extension(),
-                        fixture.extension()
+                        "{}/{} does not normalize to baseline (formatted.svelte or input.svelte)",
+                        fixture.relative_path, variant_name
                     ));
                 }
             }
@@ -192,7 +180,7 @@ impl Executable for FixturesCheckFormattedExecutable {
             && unformatted_mismatch.is_empty()
         {
             println!(
-                "✓ All {} fixtures match Prettier formatting ({} unformatted_* variants checked)",
+                "✓ All {} fixtures match Prettier formatting ({} unformatted_*.svelte variants checked)",
                 checked, unformatted_checked
             );
             std::process::exit(0);
@@ -209,7 +197,7 @@ impl Executable for FixturesCheckFormattedExecutable {
         }
 
         if !outdated.is_empty() {
-            eprintln!("\n❌ Outdated formatted.* files ({}):", outdated.len());
+            eprintln!("\n❌ Outdated formatted.svelte files ({}):", outdated.len());
             for item in &outdated {
                 eprintln!("  {}", item);
             }
@@ -217,73 +205,49 @@ impl Executable for FixturesCheckFormattedExecutable {
 
         if !invalid_inputs.is_empty() {
             eprintln!(
-                "\n❌ Invalid input.* files - don't match prettier output ({}):",
+                "\n❌ input.svelte differs from prettier ({}):",
                 invalid_inputs.len()
             );
-            eprintln!("These fixtures have input.* files that differ from prettier.");
-            eprintln!(
-                "Fix by formatting the input, or create formatted.* if intentional (rare).\n"
-            );
-
-            for (relative_path, input_path, extension, input_content, prettier_output) in
-                &invalid_inputs
-            {
-                eprintln!("──────────────────────────────────────────────");
-                eprintln!("❌ {}", relative_path);
-
-                // Show first few lines of difference
-                let input_lines: Vec<&str> = input_content.lines().collect();
-                let prettier_lines: Vec<&str> = prettier_output.lines().collect();
-                let show_lines = 3.min(input_lines.len()).min(prettier_lines.len());
-
-                if show_lines > 0 {
-                    eprintln!("\n  Input (first {} lines):", show_lines);
-                    for line in input_lines.iter().take(show_lines) {
-                        eprintln!("    {}", line);
-                    }
-
-                    eprintln!("\n  Prettier (expected first {} lines):", show_lines);
-                    for line in prettier_lines.iter().take(show_lines) {
-                        eprintln!("    {}", line);
-                    }
-                }
-
-                eprintln!("\n  Fix (RECOMMENDED):");
-                eprintln!(
-                    "    cargo run -p tsv_debug format_prettier {} > /tmp/formatted.{}",
-                    input_path.display(),
-                    extension
-                );
-                eprintln!(
-                    "    mv /tmp/formatted.{} {}",
-                    extension,
-                    input_path.display()
-                );
-                eprintln!(
-                    "    deno task fixtures_update_expected -- {}",
-                    relative_path.split('/').next().unwrap_or(relative_path)
-                );
-
-                eprintln!(
-                    "\n  Or create formatted.{} if malformed input is intentional (RARE):",
-                    extension
-                );
-                eprintln!(
-                    "    cargo run -p tsv_debug format_prettier {} > tests/fixtures/{}/formatted.{}",
-                    input_path.display(),
-                    relative_path,
-                    extension
-                );
-                eprintln!("    # See docs/fixtures.md");
-                eprintln!(
-                    "    # Requires allowlist for section reordering, parser robustness tests, etc."
-                );
-                eprintln!();
+            eprintln!();
+            eprintln!("Running: cargo run -p tsv_debug fixtures_validate");
+            eprintln!("input.svelte must match prettier output (it's the baseline for tests).");
+            eprintln!();
+            eprintln!("Affected fixtures:");
+            for (relative_path, _, _, _) in &invalid_inputs {
+                eprintln!("  ✗ {}/input.svelte", relative_path);
             }
+
+            eprintln!("\nPossible causes:");
+            eprintln!("  1. Input file has formatting issues (extra spaces, incorrect indentation)");
+            eprintln!("  2. Input was manually edited without running prettier");
+            eprintln!("  3. Prettier config changed and fixtures need updating");
+
+            eprintln!("\nHow to fix:");
+            eprintln!("  # Step 1: Check what prettier does to your input");
+            eprintln!("  cargo run -p tsv_debug compare FIXTURE/input.svelte");
+            eprintln!();
+            eprintln!("  # Step 2: Fix by either:");
+            eprintln!("  a) Preserve original as unformatted variant:");
+            eprintln!("     mv FIXTURE/input.svelte FIXTURE/unformatted_DESCRIPTIVE_NAME.svelte");
+            eprintln!("     cargo run -p tsv_debug format_prettier FIXTURE/unformatted_DESCRIPTIVE_NAME.svelte > FIXTURE/input.svelte");
+            eprintln!("     deno task fixtures_update_expected CATEGORY");
+            eprintln!();
+            eprintln!("  b) Format input in place:");
+            eprintln!("     cargo run -p tsv_debug format_prettier FIXTURE/input.svelte > /tmp/formatted.svelte");
+            eprintln!("     mv /tmp/formatted.svelte FIXTURE/input.svelte");
+            eprintln!("     deno task fixtures_update_expected CATEGORY");
+            eprintln!();
+            eprintln!("  c) Create formatted.svelte if input MUST be malformed (RARE - requires allowlist):");
+            eprintln!("     cargo run -p tsv_debug format_prettier FIXTURE/input.svelte > FIXTURE/formatted.svelte");
+            eprintln!();
+            eprintln!("See docs/fixtures.md for detailed troubleshooting procedures.");
         }
 
         if !incorrect.is_empty() {
-            eprintln!("\n❌ Unnecessary formatted.* files ({}):", incorrect.len());
+            eprintln!(
+                "\n❌ Unnecessary formatted.svelte files ({}):",
+                incorrect.len()
+            );
             for item in &incorrect {
                 eprintln!("  {}", item);
             }
@@ -291,15 +255,39 @@ impl Executable for FixturesCheckFormattedExecutable {
 
         if !unformatted_mismatch.is_empty() {
             eprintln!(
-                "\n❌ unformatted_* variants don't normalize to baseline ({}):",
+                "\n❌ unformatted_*.svelte variants don't normalize to baseline ({}):",
                 unformatted_mismatch.len()
             );
+            eprintln!();
+            eprintln!("Running: cargo run -p tsv_debug fixtures_validate");
+            eprintln!("When formatted with prettier, variants should match the baseline.");
+            eprintln!("(baseline = formatted.svelte if exists, otherwise input.svelte)");
+            eprintln!();
+            eprintln!("Affected fixtures:");
             for item in &unformatted_mismatch {
-                eprintln!("  {}", item);
+                eprintln!("  ✗ {}", item);
             }
+
+            eprintln!("\nPossible causes:");
+            eprintln!("  1. Content differs (e.g., text/comments don't match baseline)");
+            eprintln!("  2. Variant tests something prettier doesn't normalize (invalid test)");
+            eprintln!("  3. Baseline was updated but variant wasn't");
+
+            eprintln!("\nHow to fix:");
+            eprintln!("  # Step 1: Compare to find differences");
+            eprintln!("  cat FIXTURE/input.svelte");
+            eprintln!("  cat FIXTURE/unformatted_*.svelte");
+            eprintln!();
+            eprintln!("  # Step 2: Check what prettier does");
+            eprintln!("  cargo run -p tsv_debug compare FIXTURE/unformatted_*.svelte");
+            eprintln!();
+            eprintln!("  # Step 3: Fix by either:");
             eprintln!(
-                "\nNote: unformatted_* variants should format to the same output as formatted.* (or input.* if no formatted.* exists)"
+                "  a) Update variant content to match baseline (keep same text/comments, only formatting differs)"
             );
+            eprintln!("  b) Delete variant if it's no longer a valid normalization test");
+            eprintln!();
+            eprintln!("See docs/fixtures.md for unformatted_* validation procedures.");
         }
 
         eprintln!("\nRun: deno task fixtures_update_formatted");

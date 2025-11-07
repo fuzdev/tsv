@@ -1,3 +1,3 @@
 <div>block1</div>
-<span>inline1</span>
+<span>inline</span>
 <div>block2</div>

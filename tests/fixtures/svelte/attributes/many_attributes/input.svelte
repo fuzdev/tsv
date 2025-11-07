@@ -1,1 +1,1 @@
-<input type="email" placeholder="user@example.com" required disabled autofocus />
+<input data-attr1="value" data-attr2 data-attr3 data-attr4 />

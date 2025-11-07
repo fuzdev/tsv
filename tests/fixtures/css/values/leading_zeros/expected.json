@@ -1,0 +1,87 @@
+{
+  "css": {
+    "type": "StyleSheet",
+    "start": 0,
+    "end": 167,
+    "attributes": [],
+    "children": [
+      {
+        "type": "Rule",
+        "prelude": {
+          "type": "SelectorList",
+          "start": 9,
+          "end": 14,
+          "children": [
+            {
+              "type": "ComplexSelector",
+              "start": 9,
+              "end": 14,
+              "children": [
+                {
+                  "type": "RelativeSelector",
+                  "combinator": null,
+                  "selectors": [
+                    {
+                      "type": "ClassSelector",
+                      "name": "test",
+                      "start": 9,
+                      "end": 14
+                    }
+                  ],
+                  "start": 9,
+                  "end": 14
+                }
+              ]
+            }
+          ]
+        },
+        "block": {
+          "type": "Block",
+          "start": 15,
+          "end": 158,
+          "children": [
+            {
+              "type": "Declaration",
+              "start": 19,
+              "end": 72,
+              "property": "background",
+              "value": "linear-gradient(90deg, red 01%, blue 02%)"
+            },
+            {
+              "type": "Declaration",
+              "start": 76,
+              "end": 108,
+              "property": "transform",
+              "value": "translate(01px, 02px)"
+            },
+            {
+              "type": "Declaration",
+              "start": 112,
+              "end": 154,
+              "property": "box-shadow",
+              "value": "0 01px 02px rgba(0, 0, 0, 0.1)"
+            }
+          ]
+        },
+        "start": 9,
+        "end": 158
+      }
+    ],
+    "content": {
+      "start": 7,
+      "end": 159,
+      "styles": "\n\t.test {\n\t\tbackground: linear-gradient(90deg, red 01%, blue 02%);\n\t\ttransform: translate(01px, 02px);\n\t\tbox-shadow: 0 01px 02px rgba(0, 0, 0, 0.1);\n\t}\n",
+      "comment": null
+    }
+  },
+  "js": [],
+  "start": null,
+  "end": null,
+  "type": "Root",
+  "fragment": {
+    "type": "Fragment",
+    "nodes": []
+  },
+  "options": null,
+  "comments": []
+}

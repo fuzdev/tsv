@@ -2,7 +2,7 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 356,
+    "end": 335,
     "attributes": [],
     "children": [
       {
@@ -10,12 +10,12 @@
         "prelude": {
           "type": "SelectorList",
           "start": 66,
-          "end": 90,
+          "end": 85,
           "children": [
             {
               "type": "ComplexSelector",
               "start": 66,
-              "end": 90,
+              "end": 85,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -29,25 +29,25 @@
                     },
                     {
                       "type": "ClassSelector",
-                      "name": "link",
+                      "name": "class1",
                       "start": 67,
-                      "end": 72
+                      "end": 74
                     },
                     {
                       "type": "ClassSelector",
-                      "name": "external",
-                      "start": 72,
+                      "name": "class2",
+                      "start": 74,
                       "end": 81
                     },
                     {
                       "type": "IdSelector",
-                      "name": "nav-link",
+                      "name": "id1",
                       "start": 81,
-                      "end": 90
+                      "end": 85
                     }
                   ],
                   "start": 66,
-                  "end": 90
+                  "end": 85
                 }
               ]
             }
@@ -55,39 +55,39 @@
         },
         "block": {
           "type": "Block",
-          "start": 91,
-          "end": 140,
+          "start": 86,
+          "end": 135,
           "children": [
             {
               "type": "Declaration",
-              "start": 95,
-              "end": 106,
+              "start": 90,
+              "end": 101,
               "property": "color",
               "value": "blue"
             },
             {
               "type": "Declaration",
-              "start": 110,
-              "end": 136,
+              "start": 105,
+              "end": 131,
               "property": "text-decoration",
               "value": "underline"
             }
           ]
         },
         "start": 66,
-        "end": 140
+        "end": 135
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 143,
-          "end": 169,
+          "start": 138,
+          "end": 161,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 143,
-              "end": 169,
+              "start": 138,
+              "end": 161,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -96,30 +96,30 @@
                     {
                       "type": "TypeSelector",
                       "name": "input",
+                      "start": 138,
+                      "end": 143
+                    },
+                    {
+                      "type": "ClassSelector",
+                      "name": "class3",
                       "start": 143,
-                      "end": 148
+                      "end": 150
                     },
                     {
                       "type": "ClassSelector",
-                      "name": "field",
-                      "start": 148,
-                      "end": 154
-                    },
-                    {
-                      "type": "ClassSelector",
-                      "name": "required",
-                      "start": 154,
-                      "end": 163
+                      "name": "class4",
+                      "start": 150,
+                      "end": 157
                     },
                     {
                       "type": "IdSelector",
-                      "name": "email",
-                      "start": 163,
-                      "end": 169
+                      "name": "id2",
+                      "start": 157,
+                      "end": 161
                     }
                   ],
-                  "start": 143,
-                  "end": 169
+                  "start": 138,
+                  "end": 161
                 }
               ]
             }
@@ -127,32 +127,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 170,
-          "end": 199,
+          "start": 162,
+          "end": 191,
           "children": [
             {
               "type": "Declaration",
-              "start": 174,
-              "end": 195,
+              "start": 166,
+              "end": 187,
               "property": "border",
               "value": "1px solid red"
             }
           ]
         },
-        "start": 143,
-        "end": 199
+        "start": 138,
+        "end": 191
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 202,
-          "end": 239,
+          "start": 194,
+          "end": 219,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 202,
-              "end": 239,
+              "start": 194,
+              "end": 219,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -160,31 +160,31 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "btn",
-                      "start": 202,
-                      "end": 206
+                      "name": "class5",
+                      "start": 194,
+                      "end": 201
                     },
                     {
                       "type": "ClassSelector",
-                      "name": "btn-primary",
-                      "start": 206,
-                      "end": 218
+                      "name": "class6",
+                      "start": 201,
+                      "end": 208
                     },
                     {
                       "type": "ClassSelector",
-                      "name": "btn-large",
-                      "start": 218,
-                      "end": 228
+                      "name": "class7",
+                      "start": 208,
+                      "end": 215
                     },
                     {
                       "type": "IdSelector",
-                      "name": "action-btn",
-                      "start": 228,
-                      "end": 239
+                      "name": "id3",
+                      "start": 215,
+                      "end": 219
                     }
                   ],
-                  "start": 202,
-                  "end": 239
+                  "start": 194,
+                  "end": 219
                 }
               ]
             }
@@ -192,32 +192,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 240,
-          "end": 266,
+          "start": 220,
+          "end": 246,
           "children": [
             {
               "type": "Declaration",
-              "start": 244,
-              "end": 262,
+              "start": 224,
+              "end": 242,
               "property": "padding",
               "value": "10px 20px"
             }
           ]
         },
-        "start": 202,
-        "end": 266
+        "start": 194,
+        "end": 246
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 269,
-          "end": 299,
+          "start": 249,
+          "end": 278,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 269,
-              "end": 299,
+              "start": 249,
+              "end": 278,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -226,36 +226,36 @@
                     {
                       "type": "TypeSelector",
                       "name": "div",
-                      "start": 269,
-                      "end": 272
+                      "start": 249,
+                      "end": 252
                     },
                     {
                       "type": "ClassSelector",
-                      "name": "container",
-                      "start": 272,
-                      "end": 282
+                      "name": "class8",
+                      "start": 252,
+                      "end": 259
                     },
                     {
                       "type": "ClassSelector",
-                      "name": "flex",
-                      "start": 282,
-                      "end": 287
+                      "name": "class9",
+                      "start": 259,
+                      "end": 266
                     },
                     {
                       "type": "ClassSelector",
-                      "name": "col",
-                      "start": 287,
-                      "end": 291
+                      "name": "class10",
+                      "start": 266,
+                      "end": 274
                     },
                     {
                       "type": "IdSelector",
-                      "name": "wrapper",
-                      "start": 291,
-                      "end": 299
+                      "name": "id4",
+                      "start": 274,
+                      "end": 278
                     }
                   ],
-                  "start": 269,
-                  "end": 299
+                  "start": 249,
+                  "end": 278
                 }
               ]
             }
@@ -263,33 +263,33 @@
         },
         "block": {
           "type": "Block",
-          "start": 300,
-          "end": 347,
+          "start": 279,
+          "end": 326,
           "children": [
             {
               "type": "Declaration",
-              "start": 304,
-              "end": 317,
+              "start": 283,
+              "end": 296,
               "property": "display",
               "value": "flex"
             },
             {
               "type": "Declaration",
-              "start": 321,
-              "end": 343,
+              "start": 300,
+              "end": 322,
               "property": "flex-direction",
               "value": "column"
             }
           ]
         },
-        "start": 269,
-        "end": 347
+        "start": 249,
+        "end": 326
       }
     ],
     "content": {
       "start": 7,
-      "end": 348,
-      "styles": "\n\t/* Test multiple compound selectors chained together */\n\ta.link.external#nav-link {\n\t\tcolor: blue;\n\t\ttext-decoration: underline;\n\t}\n\n\tinput.field.required#email {\n\t\tborder: 1px solid red;\n\t}\n\n\t.btn.btn-primary.btn-large#action-btn {\n\t\tpadding: 10px 20px;\n\t}\n\n\tdiv.container.flex.col#wrapper {\n\t\tdisplay: flex;\n\t\tflex-direction: column;\n\t}\n",
+      "end": 327,
+      "styles": "\n\t/* Test multiple compound selectors chained together */\n\ta.class1.class2#id1 {\n\t\tcolor: blue;\n\t\ttext-decoration: underline;\n\t}\n\n\tinput.class3.class4#id2 {\n\t\tborder: 1px solid red;\n\t}\n\n\t.class5.class6.class7#id3 {\n\t\tpadding: 10px 20px;\n\t}\n\n\tdiv.class8.class9.class10#id4 {\n\t\tdisplay: flex;\n\t\tflex-direction: column;\n\t}\n",
       "comment": null
     }
   },

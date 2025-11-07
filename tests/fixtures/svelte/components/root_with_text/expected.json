@@ -2,7 +2,7 @@
   "css": null,
   "js": [],
   "start": 0,
-  "end": 23,
+  "end": 24,
   "type": "Root",
   "fragment": {
     "type": "Fragment",
@@ -10,8 +10,8 @@
       {
         "type": "Component",
         "start": 0,
-        "end": 8,
-        "name": "Comp",
+        "end": 9,
+        "name": "Comp1",
         "attributes": [],
         "fragment": {
           "type": "Fragment",
@@ -20,16 +20,16 @@
       },
       {
         "type": "Text",
-        "start": 8,
-        "end": 14,
+        "start": 9,
+        "end": 15,
         "raw": "\ntext\n",
         "data": "\ntext\n"
       },
       {
         "type": "Component",
-        "start": 14,
-        "end": 23,
-        "name": "CompB",
+        "start": 15,
+        "end": 24,
+        "name": "Comp2",
         "attributes": [],
         "fragment": {
           "type": "Fragment",

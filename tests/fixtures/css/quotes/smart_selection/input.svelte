@@ -1,13 +1,13 @@
 <style>
-	.a {
+	.class1 {
 		content: "has 'single' quotes";
 	}
 
-	.b {
+	.class2 {
 		content: 'has "double" quotes';
 	}
 
-	.c {
+	.class3 {
 		content: 'has \'both\' "types"';
 	}
 </style>

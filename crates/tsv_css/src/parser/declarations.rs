@@ -10,17 +10,56 @@ pub(crate) fn parse_rule(parser: &mut CssParser) -> Result<CssRule, ParseError> 
     // Parse selector list
     let selector = super::selectors::parse_selector_list(parser)?;
 
+    // Capture any comment after selector (before {)
+    let mut declarations = Vec::new();
+    parser.skip_whitespace()?;
+    if let TokenKind::Comment(content) = &parser.current_kind {
+        let comment_start = parser.base_offset() + parser.current_start;
+        let comment_end = parser.base_offset() + parser.current_end;
+        let content = content.clone();
+
+        parser.advance()?;
+        parser.skip_whitespace()?;
+
+        // Store comment as first child (will be formatted before opening brace)
+        declarations.push(CssBlockChild::Comment(CssComment {
+            content,
+            span: Span {
+                start: comment_start as u32,
+                end: comment_end as u32,
+            },
+        }));
+    }
+
     // Expect { and capture its start
     let block_start = parser.base_offset() + parser.current_start;
     parser.expect(&TokenKind::LeftBrace)?;
     parser.skip_whitespace()?;
 
-    // Parse declarations
-    let mut declarations = Vec::new();
+    // Parse declarations and comments
     while !parser.check(&TokenKind::RightBrace) && !parser.check(&TokenKind::Eof) {
+        // Capture comments in declaration blocks
+        if let TokenKind::Comment(content) = &parser.current_kind {
+            let comment_start = parser.base_offset() + parser.current_start;
+            let comment_end = parser.base_offset() + parser.current_end;
+            let content = content.clone();
+
+            parser.advance()?;
+            parser.skip_whitespace()?;
+
+            declarations.push(CssBlockChild::Comment(CssComment {
+                content,
+                span: Span {
+                    start: comment_start as u32,
+                    end: comment_end as u32,
+                },
+            }));
+            continue;
+        }
+
         if parser.check(&TokenKind::Identifier) {
             let decl = parse_declaration(parser)?;
-            declarations.push(decl);
+            declarations.push(CssBlockChild::Declaration(decl));
         } else {
             // Skip unexpected tokens
             parser.advance()?;
@@ -78,18 +117,20 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
         .to_string();
     parser.advance()?;
 
-    parser.skip_whitespace()?;
+    parser.skip_whitespace_and_comments()?;
 
     // Expect :
     parser.expect(&TokenKind::Colon)?;
+    // Only skip whitespace, NOT comments - comments in values need to be preserved
     parser.skip_whitespace()?;
 
-    // Track value end for span calculation
-    // (value_start was removed - no longer needed since we extract from source on-demand)
+    // Track value start and end for span calculation
+    let value_start = parser.base_offset() + parser.current_start;
 
     // Parse value (collect tokens until ; or })
     let mut value_parts = Vec::new();
-    let mut value_end = start;
+    let mut value_comments = Vec::new(); // Collect comments found in the value
+    let mut value_end = value_start;
     while !parser.check(&TokenKind::Semicolon)
         && !parser.check(&TokenKind::RightBrace)
         && !parser.check(&TokenKind::Eof)
@@ -109,8 +150,19 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
                 parser.advance()?;
                 continue;
             }
-            TokenKind::Comment(_) => {
-                // Skip comments in values
+            TokenKind::Comment(content) => {
+                // Capture comment for value comments side table
+                let comment_start = parser.base_offset() + parser.current_start;
+                let comment_end = parser.base_offset() + parser.current_end;
+                value_comments.push(crate::ast::internal::CssComment {
+                    content: content.clone(),
+                    span: Span {
+                        start: comment_start as u32,
+                        end: comment_end as u32,
+                    },
+                });
+                // Update value_end to include the comment in the declaration span
+                value_end = parser.base_offset() + parser.current_end;
                 parser.advance()?;
                 continue;
             }
@@ -153,8 +205,23 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
         });
     }
 
-    // Parse the value string into structured CssValue AST
-    let value = super::value::parse_value_string(&value_str);
+    // Create span for the value (from first token to last token, excluding comments)
+    let value_span = Span {
+        start: value_start as u32,
+        end: value_end as u32,
+    };
+
+    // Parse the value directly from source for accurate span tracking
+    // Use parse_value_from_source instead of parse_value_string to avoid
+    // span drift from whitespace differences between source and reconstructed tokens
+    //
+    // Convert absolute span to source-relative span (subtract base_offset)
+    let base = parser.base_offset() as u32;
+    let source_relative_span = Span {
+        start: value_span.start - base,
+        end: value_span.end - base,
+    };
+    let value = super::value::parse_value_from_source(parser.source(), source_relative_span, base);
 
     // Declaration ends after the value, NOT including the semicolon
     let end = value_end;
@@ -164,14 +231,23 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
         parser.advance()?;
     }
 
+    let decl_span = Span {
+        start: start as u32,
+        end: end as u32,
+    };
+
+    // Store value comments in side table if any were found
+    if !value_comments.is_empty() {
+        parser
+            .value_comments
+            .insert(decl_span.start, value_comments);
+    }
+
     // Span covers the entire declaration (property + value, not including semicolon)
     // The source value will be extracted on-demand during conversion using this span
     Ok(CssDeclaration {
         property,
         value,
-        span: Span {
-            start: start as u32,
-            end: end as u32,
-        },
+        span: decl_span,
     })
 }

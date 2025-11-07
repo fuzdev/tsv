@@ -2,7 +2,7 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 162,
+    "end": 159,
     "attributes": [],
     "children": [
       {
@@ -10,12 +10,12 @@
         "prelude": {
           "type": "SelectorList",
           "start": 38,
-          "end": 46,
+          "end": 45,
           "children": [
             {
               "type": "ComplexSelector",
               "start": 38,
-              "end": 46,
+              "end": 45,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -23,13 +23,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "primary",
+                      "name": "class1",
                       "start": 38,
-                      "end": 46
+                      "end": 45
                     }
                   ],
                   "start": 38,
-                  "end": 46
+                  "end": 45
                 }
               ]
             }
@@ -37,32 +37,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 47,
-          "end": 74,
+          "start": 46,
+          "end": 73,
           "children": [
             {
               "type": "Declaration",
-              "start": 51,
-              "end": 70,
+              "start": 50,
+              "end": 69,
               "property": "background",
               "value": "#ff0000"
             }
           ]
         },
         "start": 38,
-        "end": 74
+        "end": 73
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 77,
-          "end": 87,
+          "start": 76,
+          "end": 83,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 77,
-              "end": 87,
+              "start": 76,
+              "end": 83,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -70,13 +70,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "secondary",
-                      "start": 77,
-                      "end": 87
+                      "name": "class2",
+                      "start": 76,
+                      "end": 83
                     }
                   ],
-                  "start": 77,
-                  "end": 87
+                  "start": 76,
+                  "end": 83
                 }
               ]
             }
@@ -84,32 +84,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 88,
-          "end": 110,
+          "start": 84,
+          "end": 106,
           "children": [
             {
               "type": "Declaration",
-              "start": 92,
-              "end": 106,
+              "start": 88,
+              "end": 102,
               "property": "color",
               "value": "#ff1234"
             }
           ]
         },
-        "start": 77,
-        "end": 110
+        "start": 76,
+        "end": 106
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 113,
-          "end": 119,
+          "start": 109,
+          "end": 116,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 113,
-              "end": 119,
+              "start": 109,
+              "end": 116,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -117,13 +117,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "white",
-                      "start": 113,
-                      "end": 119
+                      "name": "class3",
+                      "start": 109,
+                      "end": 116
                     }
                   ],
-                  "start": 113,
-                  "end": 119
+                  "start": 109,
+                  "end": 116
                 }
               ]
             }
@@ -131,26 +131,26 @@
         },
         "block": {
           "type": "Block",
-          "start": 120,
-          "end": 153,
+          "start": 117,
+          "end": 150,
           "children": [
             {
               "type": "Declaration",
-              "start": 124,
-              "end": 149,
+              "start": 121,
+              "end": 146,
               "property": "background-color",
               "value": "#ffffff"
             }
           ]
         },
-        "start": 113,
-        "end": 153
+        "start": 109,
+        "end": 150
       }
     ],
     "content": {
       "start": 7,
-      "end": 154,
-      "styles": "\n\t/* Test hex color values */\n\t.primary {\n\t\tbackground: #ff0000;\n\t}\n\n\t.secondary {\n\t\tcolor: #ff1234;\n\t}\n\n\t.white {\n\t\tbackground-color: #ffffff;\n\t}\n",
+      "end": 151,
+      "styles": "\n\t/* Test hex color values */\n\t.class1 {\n\t\tbackground: #ff0000;\n\t}\n\n\t.class2 {\n\t\tcolor: #ff1234;\n\t}\n\n\t.class3 {\n\t\tbackground-color: #ffffff;\n\t}\n",
       "comment": null
     }
   },

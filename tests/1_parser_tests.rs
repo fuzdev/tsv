@@ -32,12 +32,31 @@ fn parse_to_json(input: &str, file_type: &str) -> Result<String, String> {
 }
 
 fn test_fixture(fixture: &Fixture) -> Result<(), String> {
-    // Parser tests require expected.json
-    if !fixture.expected_path().exists() {
+    // Determine which expected file to use
+    let use_ours_pattern = fixture.has_expected_ours();
+
+    // Parser tests require expected.json OR (expected_ours.json + expected_svelte.json)
+    if !use_ours_pattern && !fixture.expected_path().exists() {
         panic!(
             "Found input file in {} but missing expected.json",
             fixture.relative_path
         );
+    }
+
+    if use_ours_pattern {
+        // New pattern: both files must exist
+        if !fixture.expected_ours_path().exists() {
+            panic!(
+                "Found expected_svelte.json in {} but missing expected_ours.json (both required)",
+                fixture.relative_path
+            );
+        }
+        if !fixture.expected_svelte_path().exists() {
+            panic!(
+                "Found expected_ours.json in {} but missing expected_svelte.json (both required)",
+                fixture.relative_path
+            );
+        }
     }
 
     // Read input file
@@ -58,8 +77,15 @@ fn test_fixture(fixture: &Fixture) -> Result<(), String> {
         "svelte"
     };
 
-    let expected = fs::read_to_string(fixture.expected_path())
-        .map_err(|e| format!("Failed to read expected.json: {}", e))?;
+    // Choose the expected file based on pattern
+    let expected_path = if use_ours_pattern {
+        fixture.expected_ours_path()
+    } else {
+        fixture.expected_path()
+    };
+
+    let expected = fs::read_to_string(&expected_path)
+        .map_err(|e| format!("Failed to read {}: {}", expected_path.display(), e))?;
 
     let actual = parse_to_json(&input, file_type)?;
 
@@ -73,9 +99,15 @@ fn test_fixture(fixture: &Fixture) -> Result<(), String> {
         let actual_pretty = serde_json::to_string_pretty(&actual_json).unwrap();
         let expected_pretty = serde_json::to_string_pretty(&expected_json).unwrap();
 
+        let pattern_note = if use_ours_pattern {
+            " (using expected_ours.json)"
+        } else {
+            ""
+        };
+
         return Err(format!(
-            "AST mismatch for {}\n\nExpected:\n{}\n\nActual:\n{}\n",
-            fixture.relative_path, expected_pretty, actual_pretty
+            "AST mismatch for {}{}\n\nExpected:\n{}\n\nActual:\n{}\n",
+            fixture.relative_path, pattern_note, expected_pretty, actual_pretty
         ));
     }
 
@@ -105,29 +137,27 @@ fn test_parser_ast_correctness() {
         }
     }
 
-    println!("\n════════════════════════════════════════\n");
+    println!("\n════════════════════\n");
 
     if !failures.is_empty() {
-        println!("{} / {} fixtures failed:\n", failures.len(), fixtures.len());
-
+        println!("Failures ({}):\n", failures.len());
         for failure in &failures {
             println!("  ✗ {}", failure);
         }
+        println!();
+    }
 
-        println!(
-            "\nResults Summary: {} passed, {} failed out of {} total\n",
-            passes,
-            failures.len(),
-            fixtures.len()
-        );
+    println!(
+        "Results Summary: {} passed, {} failed out of {} total",
+        passes,
+        failures.len(),
+        fixtures.len()
+    );
 
-        panic!("\nParser test failed");
-    } else {
-        println!(
-            "Results Summary: {} passed, {} failed out of {} total",
-            passes,
-            failures.len(),
-            fixtures.len()
+    if !failures.is_empty() {
+        panic!(
+            "\nParser test failed: {} failures",
+            failures.len()
         );
     }
 }

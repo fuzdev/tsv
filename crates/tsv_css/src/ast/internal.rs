@@ -9,7 +9,52 @@
 //
 // See CSS_SPEC.md for full expansion roadmap.
 
+use std::collections::HashMap;
 use tsv_lang::Span;
+
+/// CSS Stylesheet - top-level container for CSS nodes and metadata
+///
+/// Contains the parsed CSS nodes and a side table for value comments.
+/// The side table keeps value comments (comments inside property values)
+/// separate from the main AST to avoid polluting CssDeclaration.
+#[derive(Debug, Clone)]
+pub struct CssStyleSheet {
+    /// CSS nodes (rules, comments, at-rules)
+    pub nodes: Vec<CssNode>,
+
+    /// Side table: declaration span -> value comments
+    /// Key: declaration span.start (u32)
+    /// Value: comments found inside the property value
+    ///
+    /// Example: `font-size: /* comment */ 12px;`
+    /// - Key: span.start of the declaration
+    /// - Value: vec![CssComment { content: " comment ", ... }]
+    pub value_comments: HashMap<u32, Vec<CssComment>>,
+}
+
+impl CssStyleSheet {
+    /// Create a new empty stylesheet
+    pub fn new() -> Self {
+        Self {
+            nodes: Vec::new(),
+            value_comments: HashMap::new(),
+        }
+    }
+
+    /// Create a stylesheet with nodes (no value comments)
+    pub fn with_nodes(nodes: Vec<CssNode>) -> Self {
+        Self {
+            nodes,
+            value_comments: HashMap::new(),
+        }
+    }
+}
+
+impl Default for CssStyleSheet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// CSS AST node types
 #[derive(Debug, Clone)]
@@ -33,9 +78,9 @@ impl CssNode {
 #[derive(Debug, Clone)]
 pub struct CssRule {
     pub selector: SelectorList,
-    pub block_span: Span, // Span of the block including braces
-    pub declarations: Vec<CssDeclaration>,
-    pub span: Span, // Full rule span
+    pub block_span: Span,                 // Span of the block including braces
+    pub declarations: Vec<CssBlockChild>, // Declarations and comments
+    pub span: Span,                       // Full rule span
 }
 
 // ============================================================================
@@ -186,40 +231,78 @@ pub struct CssDeclaration {
 //   - Pretty-printing with correct precedence
 
 /// CSS value - right-hand side of a declaration
-#[derive(Debug, Clone, serde::Serialize)]
+///
+/// Internal representation optimized for traversal and manipulation.
+/// Converted to public JSON AST via the convert layer (see ast/convert.rs).
+/// Never serialized directly - serde not needed!
+#[derive(Debug, Clone)]
 pub enum CssValue {
     /// Identifier: auto, bold, inherit, currentColor, etc.
-    Identifier(String),
+    Identifier {
+        name: String,
+        span: Span,
+    },
 
     /// String literal: "Arial", 'font.woff'
     /// Content includes decoded escape sequences (internal representation)
     String {
         content: String, // string content without quotes (decoded)
         quote: char,     // original quote character (' or ")
+        span: Span,
     },
 
     /// Number with optional unit: 10, 10px, 1.5em, 50%, etc.
     Dimension {
         value: f64,
-        unit: String,   // empty string for unitless numbers, "px", "%", etc.
-        source: String, // original source representation (preserves leading zeros)
+        unit: String, // empty string for unitless numbers, "px", "%", etc.
+        span: Span,
     },
 
     /// Color - various formats (rgb, hsl, hex, named)
-    Color(Color),
+    Color {
+        color: Color,
+        span: Span,
+    },
 
     /// Function call: calc(), var(), rgb(), url(), etc.
-    Function { name: String, args: Vec<CssValue> },
+    Function {
+        name: String,
+        args: Vec<CssValue>,
+        span: Span,
+    },
 
     /// Space-separated list of values
-    List { values: Vec<CssValue> },
+    List {
+        values: Vec<CssValue>,
+        span: Span,
+    },
 
     /// Comma-separated list of values
-    CommaSeparated { values: Vec<CssValue> },
+    CommaSeparated {
+        values: Vec<CssValue>,
+        span: Span,
+    },
+}
+
+impl CssValue {
+    /// Get the span of this value
+    pub fn span(&self) -> Span {
+        match self {
+            CssValue::Identifier { span, .. } => *span,
+            CssValue::String { span, .. } => *span,
+            CssValue::Dimension { span, .. } => *span,
+            CssValue::Color { span, .. } => *span,
+            CssValue::Function { span, .. } => *span,
+            CssValue::List { span, .. } => *span,
+            CssValue::CommaSeparated { span, .. } => *span,
+        }
+    }
 }
 
 /// CSS color value
-#[derive(Debug, Clone, serde::Serialize)]
+///
+/// Internal representation - converted to JSON via convert layer.
+#[derive(Debug, Clone)]
 pub enum Color {
     /// Named color: red, blue, currentColor, etc.
     Named(String),

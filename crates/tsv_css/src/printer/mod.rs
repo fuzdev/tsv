@@ -19,8 +19,10 @@
 mod atrules;
 mod rules;
 mod selectors;
+pub mod source_fidelity;
 
-use crate::ast::internal::CssNode;
+use crate::ast::internal::{CssComment, CssNode, CssStyleSheet};
+use std::collections::HashMap;
 use tsv_lang::OutputBuffer;
 
 /// Print configuration
@@ -52,21 +54,28 @@ pub struct Printer<'a> {
     config: PrintConfig,
     /// Original source (for blank line detection and raw value extraction)
     pub(crate) source: &'a str,
+    /// Value comments side table (declaration span.start -> comments in value)
+    pub(crate) value_comments: &'a HashMap<u32, Vec<CssComment>>,
 }
 
 impl<'a> Printer<'a> {
-    /// Create a new printer with source
-    pub fn new(source: &'a str) -> Self {
-        Self::with_config(source, PrintConfig::default())
+    /// Create a new printer with source and value comments
+    pub fn new(source: &'a str, value_comments: &'a HashMap<u32, Vec<CssComment>>) -> Self {
+        Self::with_config(source, value_comments, PrintConfig::default())
     }
 
     /// Create a new printer with the given config
-    pub fn with_config(source: &'a str, config: PrintConfig) -> Self {
+    pub fn with_config(
+        source: &'a str,
+        value_comments: &'a HashMap<u32, Vec<CssComment>>,
+        config: PrintConfig,
+    ) -> Self {
         Self {
             buffer: OutputBuffer::new(),
             indent_level: 0,
             config,
             source,
+            value_comments,
         }
     }
 
@@ -82,6 +91,11 @@ impl<'a> Printer<'a> {
         tsv_lang::write_indent(&mut self.buffer, self.indent_level, self.config.indent);
     }
 
+    /// Remove trailing newline from buffer (for inline comment handling)
+    pub(crate) fn buffer_remove_trailing_newline(&mut self) {
+        self.buffer.pop_if_ends_with('\n');
+    }
+
     /// Get the formatted output
     pub fn into_string(self) -> String {
         self.buffer.into_string()
@@ -89,9 +103,24 @@ impl<'a> Printer<'a> {
 
     /// Print a list of CSS nodes (rules)
     pub fn print_css_nodes(&mut self, nodes: &[CssNode]) {
-        for (i, node) in nodes.iter().enumerate() {
+        let mut i = 0;
+        while i < nodes.len() {
+            let node = &nodes[i];
+
             if i > 0 {
                 let prev_node = &nodes[i - 1];
+
+                // Special case: consecutive comments on same line
+                if let (CssNode::Comment(_), CssNode::Comment(curr_comment)) = (prev_node, node)
+                    && self.is_same_line(prev_node.span().end, curr_comment.span.start) {
+                        // Print comment inline with space separator
+                        self.write(" /*");
+                        self.write(&curr_comment.content);
+                        self.write("*/");
+                        i += 1;
+                        continue;
+                    }
+
                 let has_blank_line_in_source = self.has_blank_line_between(prev_node, node);
 
                 // Prettier preserves blank lines from source, otherwise uses single newline
@@ -102,7 +131,21 @@ impl<'a> Printer<'a> {
                     self.write("\n");
                 }
             }
+
             self.print_css_node(node);
+
+            // Check if next node is an inline comment after a rule/at-rule closing brace
+            if matches!(node, CssNode::Rule(_) | CssNode::Atrule(_))
+                && let Some(CssNode::Comment(next_comment)) = nodes.get(i + 1)
+                    && self.is_same_line(node.span().end, next_comment.span.start) {
+                        // Print comment inline after the closing brace
+                        self.write(" /*");
+                        self.write(&next_comment.content);
+                        self.write("*/");
+                        i += 1; // Skip the comment in next iteration
+                    }
+
+            i += 1;
         }
         // Add trailing newline (matches prettier)
         self.write("\n");
@@ -152,6 +195,26 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Check if two positions are on the same line in the source
+    ///
+    /// Returns true if there's no newline between prev_end and curr_start
+    pub(crate) fn is_same_line(&self, prev_end: u32, curr_start: u32) -> bool {
+        let prev_end = prev_end as usize;
+        let curr_start = curr_start as usize;
+
+        // Adjacent tokens (no whitespace) are on the same line
+        if prev_end == curr_start {
+            return true;
+        }
+
+        if prev_end > curr_start || curr_start > self.source.len() {
+            return false;
+        }
+
+        let between = &self.source[prev_end..curr_start];
+        !between.contains('\n')
+    }
+
     /// Print a single CSS node
     fn print_css_node(&mut self, node: &CssNode) {
         match node {
@@ -170,17 +233,10 @@ impl<'a> Printer<'a> {
     }
 }
 
-/// Format CSS nodes to a string
+/// Format CSS stylesheet to a string
 /// Requires source for blank line preservation and raw value extraction
-pub fn format_css(nodes: &[CssNode], source: &str) -> String {
-    let mut printer = Printer::new(source);
-    printer.print_css_nodes(nodes);
+pub fn format_css(stylesheet: &CssStyleSheet, source: &str) -> String {
+    let mut printer = Printer::new(source, &stylesheet.value_comments);
+    printer.print_css_nodes(&stylesheet.nodes);
     printer.into_string()
-}
-
-/// Format CSS nodes to a string with source (deprecated - use format_css)
-/// This function is kept for backward compatibility
-#[deprecated(note = "Use format_css instead - source is now always required")]
-pub fn format_css_with_source(nodes: &[CssNode], source: &str) -> String {
-    format_css(nodes, source)
 }

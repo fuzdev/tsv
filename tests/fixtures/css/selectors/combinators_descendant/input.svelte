@@ -3,7 +3,7 @@
 		color: inherit;
 	}
 
-	.container p {
+	.class1 p {
 		line-height: 1.5;
 	}
 </style>

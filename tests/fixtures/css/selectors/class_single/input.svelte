@@ -1,5 +1,5 @@
 <style>
-	.my-class {
+	.class1 {
 		color: blue;
 	}
 </style>

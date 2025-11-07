@@ -1,4 +1,4 @@
 <span
-	><div>block_a</div>
-	<div>block_b</div></span
+	><div>block1</div>
+	<div>block2</div></span
 >

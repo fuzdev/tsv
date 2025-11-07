@@ -1,2 +1,2 @@
-<Comp />
-<CompB />
+<Comp1 />
+<Comp2 />

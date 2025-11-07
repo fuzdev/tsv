@@ -2,7 +2,7 @@
   "css": null,
   "js": [],
   "start": 0,
-  "end": 33,
+  "end": 39,
   "type": "Root",
   "fragment": {
     "type": "Fragment",
@@ -10,29 +10,29 @@
       {
         "type": "RegularElement",
         "start": 0,
-        "end": 33,
+        "end": 39,
         "name": "input",
         "attributes": [
           {
             "type": "Attribute",
             "start": 7,
-            "end": 22,
-            "name": "type",
+            "end": 25,
+            "name": "data-attr1",
             "value": [
               {
-                "start": 13,
-                "end": 21,
+                "start": 19,
+                "end": 24,
                 "type": "Text",
-                "raw": "checkbox",
-                "data": "checkbox"
+                "raw": "value",
+                "data": "value"
               }
             ]
           },
           {
             "type": "Attribute",
-            "start": 23,
-            "end": 30,
-            "name": "checked",
+            "start": 26,
+            "end": 36,
+            "name": "data-attr2",
             "value": true
           }
         ],

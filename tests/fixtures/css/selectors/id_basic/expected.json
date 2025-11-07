@@ -2,7 +2,7 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 44,
+    "end": 43,
     "attributes": [],
     "children": [
       {
@@ -10,12 +10,12 @@
         "prelude": {
           "type": "SelectorList",
           "start": 9,
-          "end": 14,
+          "end": 13,
           "children": [
             {
               "type": "ComplexSelector",
               "start": 9,
-              "end": 14,
+              "end": 13,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -23,13 +23,13 @@
                   "selectors": [
                     {
                       "type": "IdSelector",
-                      "name": "main",
+                      "name": "id1",
                       "start": 9,
-                      "end": 14
+                      "end": 13
                     }
                   ],
                   "start": 9,
-                  "end": 14
+                  "end": 13
                 }
               ]
             }
@@ -37,26 +37,26 @@
         },
         "block": {
           "type": "Block",
-          "start": 15,
-          "end": 35,
+          "start": 14,
+          "end": 34,
           "children": [
             {
               "type": "Declaration",
-              "start": 19,
-              "end": 31,
+              "start": 18,
+              "end": 30,
               "property": "width",
               "value": "960px"
             }
           ]
         },
         "start": 9,
-        "end": 35
+        "end": 34
       }
     ],
     "content": {
       "start": 7,
-      "end": 36,
-      "styles": "\n\t#main {\n\t\twidth: 960px;\n\t}\n",
+      "end": 35,
+      "styles": "\n\t#id1 {\n\t\twidth: 960px;\n\t}\n",
       "comment": null
     }
   },

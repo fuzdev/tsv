@@ -83,7 +83,7 @@
                     },
                     {
                       "type": "ClassSelector",
-                      "name": "active",
+                      "name": "class1",
                       "start": 77,
                       "end": 84
                     }
@@ -182,7 +182,7 @@
     "content": {
       "start": 7,
       "end": 137,
-      "styles": "\n\t/* Test universal selector */\n\t* {\n\t\tmargin: 0;\n\t\tpadding: 0;\n\t}\n\n\t*.active {\n\t\tcolor: red;\n\t}\n\n\tdiv > * {\n\t\tdisplay: block;\n\t}\n",
+      "styles": "\n\t/* Test universal selector */\n\t* {\n\t\tmargin: 0;\n\t\tpadding: 0;\n\t}\n\n\t*.class1 {\n\t\tcolor: red;\n\t}\n\n\tdiv > * {\n\t\tdisplay: block;\n\t}\n",
       "comment": null
     }
   },

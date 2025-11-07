@@ -1,6 +1,6 @@
 <style>
 	@font-face {
-		font-family: 'MyFont';
-		src: url('font.woff2') format('woff2');
+		font-family: 'Font1';
+		src: url('font1.woff2') format('woff2');
 	}
 </style>

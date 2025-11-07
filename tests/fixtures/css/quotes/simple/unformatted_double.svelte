@@ -1,6 +1,6 @@
 <style>
-	div {
-		content: "a";
+	.class1 {
+		content: "value";
 	}
 
 	.empty {

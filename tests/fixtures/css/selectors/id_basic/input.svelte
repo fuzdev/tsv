@@ -1,5 +1,5 @@
 <style>
-	#main {
+	#id1 {
 		width: 960px;
 	}
 </style>

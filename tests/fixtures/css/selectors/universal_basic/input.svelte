@@ -5,7 +5,7 @@
 		padding: 0;
 	}
 
-	*.active {
+	*.class1 {
 		color: red;
 	}
 

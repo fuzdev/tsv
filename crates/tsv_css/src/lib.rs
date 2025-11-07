@@ -10,7 +10,7 @@ pub mod parser;
 pub mod printer;
 
 // Re-export commonly used types and functions
-pub use ast::{CssDeclaration, CssNode, CssRule, StyleContent, StyleSheet};
+pub use ast::{CssDeclaration, CssNode, CssRule, CssStyleSheet, StyleContent, StyleSheet};
 pub use parser::parse_css;
 pub use printer::{PrintConfig, Printer, format_css};
 pub use tsv_lang::{ParseError, Result, Span};
@@ -22,7 +22,7 @@ pub use tsv_lang::{ParseError, Result, Span};
 /// * `base_offset` - Offset in larger file (for embedded CSS in Svelte)
 ///
 /// # Returns
-/// * `Ok(Vec<CssNode>)` - Parsed AST nodes
+/// * `Ok(CssStyleSheet)` - Parsed AST with nodes and value comments
 /// * `Err(ParseError)` - Parse error with position and context
 ///
 /// # Example
@@ -30,16 +30,16 @@ pub use tsv_lang::{ParseError, Result, Span};
 /// use tsv_css::parse;
 ///
 /// let css = "div { color: red; }";
-/// let nodes = parse(css, 0).expect("Failed to parse CSS");
+/// let stylesheet = parse(css, 0).expect("Failed to parse CSS");
 /// ```
-pub fn parse(source: &str, base_offset: usize) -> Result<Vec<CssNode>> {
+pub fn parse(source: &str, base_offset: usize) -> Result<CssStyleSheet> {
     parse_css(source, base_offset)
 }
 
-/// Format CSS nodes to a formatted string
+/// Format CSS stylesheet to a formatted string
 ///
 /// # Arguments
-/// * `nodes` - CSS AST nodes to format
+/// * `stylesheet` - CSS stylesheet (nodes + value comments)
 /// * `source` - Original CSS source code (for blank line preservation)
 ///
 /// # Returns
@@ -50,18 +50,18 @@ pub fn parse(source: &str, base_offset: usize) -> Result<Vec<CssNode>> {
 /// use tsv_css::{parse, format};
 ///
 /// let css = "div{color:red;}";
-/// let nodes = parse(css, 0).expect("Failed to parse CSS");
-/// let formatted = format(&nodes, css);
+/// let stylesheet = parse(css, 0).expect("Failed to parse CSS");
+/// let formatted = format(&stylesheet, css);
 /// assert_eq!(formatted, "div {\n\tcolor: red;\n}\n");
 /// ```
-pub fn format(nodes: &[CssNode], source: &str) -> String {
-    printer::format_css(nodes, source)
+pub fn format(stylesheet: &CssStyleSheet, source: &str) -> String {
+    printer::format_css(stylesheet, source)
 }
 
-/// Convert CSS AST nodes to JSON representation
+/// Convert CSS AST to JSON representation
 ///
 /// # Arguments
-/// * `nodes` - CSS AST nodes to convert
+/// * `stylesheet` - CSS stylesheet (nodes + value comments)
 /// * `source` - Original CSS source code
 ///
 /// # Returns
@@ -72,9 +72,9 @@ pub fn format(nodes: &[CssNode], source: &str) -> String {
 /// use tsv_css::{parse, convert_ast};
 ///
 /// let css = "div { color: red; }";
-/// let nodes = parse(css, 0).expect("Failed to parse CSS");
-/// let json = convert_ast(&nodes, css);
+/// let stylesheet = parse(css, 0).expect("Failed to parse CSS");
+/// let json = convert_ast(&stylesheet, css);
 /// ```
-pub fn convert_ast(nodes: &[CssNode], source: &str) -> serde_json::Value {
-    ast::convert::convert_css_nodes(nodes, source)
+pub fn convert_ast(stylesheet: &CssStyleSheet, source: &str) -> serde_json::Value {
+    ast::convert::convert_css_nodes(&stylesheet.nodes, source)
 }

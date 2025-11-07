@@ -35,6 +35,14 @@ impl OutputBuffer {
         self.buffer.push_str(s);
     }
 
+    /// Remove the last character if it matches the given character
+    #[inline]
+    pub fn pop_if_ends_with(&mut self, ch: char) {
+        if self.buffer.ends_with(ch) {
+            self.buffer.pop();
+        }
+    }
+
     /// Get the current length of the buffer
     #[inline]
     #[allow(dead_code)]

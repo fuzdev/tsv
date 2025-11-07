@@ -4,68 +4,92 @@
 // Handles identifiers, strings, numbers/dimensions, colors, functions, and lists.
 
 pub mod colors;
+pub(crate) mod cursor;
 pub mod dimensions;
 pub mod functions;
 pub mod lists;
+pub(crate) mod parser;
 pub mod spacing;
 pub mod strings;
 
 use crate::ast::internal::CssValue;
+use tsv_lang::Span;
 
 // Re-export public functions
 pub use colors::{parse_color, parse_color_function};
 pub use dimensions::parse_dimension;
 pub use functions::parse_function_arguments;
-pub use lists::{
-    contains_comma, contains_space_separator, parse_comma_separated_values,
-    parse_space_separated_values,
-};
 pub use spacing::should_add_space_between;
 pub use strings::parse_string_literal;
 
-/// Parse a CSS value string into a structured CssValue
+// Note: contains_space_separator and contains_comma are used internally by ValueParser
+// but not exported publicly
+
+/// Parse a CSS value into a structured CssValue
 ///
-/// Takes the raw string representation and parses it into the appropriate
-/// CssValue variant (identifier, string, number, color, function, or list).
-pub fn parse_value_string(value_str: &str) -> CssValue {
+/// Extracts the value directly from source using the provided span, then parses
+/// it using ValueParser for accurate span tracking with same-source recursion.
+///
+/// This ensures that nested value spans are accurate even with multiline formatting,
+/// since we're working with the actual source text rather than reconstructed tokens.
+///
+/// # Arguments
+/// * `source` - The CSS source text (may be a substring of the full document)
+/// * `source_relative_span` - The span of the value relative to `source` (positions within source)
+/// * `base_offset` - Offset to add to spans for absolute positions in full document
+pub fn parse_value_from_source(
+    source: &str,
+    source_relative_span: Span,
+    base_offset: u32,
+) -> CssValue {
+    // Extract value directly from source using source-relative positions
+    let value_str =
+        &source[source_relative_span.start as usize..source_relative_span.end as usize];
     let trimmed = value_str.trim();
 
     if trimmed.is_empty() {
-        return CssValue::Identifier(String::new());
+        return CssValue::Identifier {
+            name: String::new(),
+            span: Span {
+                start: base_offset + source_relative_span.start,
+                end: base_offset + source_relative_span.end,
+            },
+        };
     }
 
-    // Check for comma-separated values first (these are unambiguous)
-    if contains_comma(trimmed)
-        && let Some(list) = parse_comma_separated_values(trimmed)
-    {
-        return list;
-    }
+    // Calculate adjusted span for trimmed value (relative to source)
+    let trim_start_offset = value_str.len() - value_str.trim_start().len();
+    let trim_end_offset = value_str.len() - value_str.trim_end().len();
+    let source_relative_adjusted = Span {
+        start: source_relative_span.start + trim_start_offset as u32,
+        end: source_relative_span.end - trim_end_offset as u32,
+    };
 
-    // Try single value
-    if let Some(single) = parse_single_value(trimmed) {
-        return single;
-    }
+    // Calculate absolute span for ValueParser (includes base_offset)
+    let absolute_span = Span {
+        start: base_offset + source_relative_adjusted.start,
+        end: base_offset + source_relative_adjusted.end,
+    };
 
-    // Try space-separated list as fallback
-    if contains_space_separator(trimmed)
-        && let Some(list) = parse_space_separated_values(trimmed)
-    {
-        return list;
-    }
-
-    // Fallback to identifier
-    CssValue::Identifier(trimmed.to_string())
+    // Use ValueParser for accurate span tracking through same-source recursion
+    let parser = parser::ValueParser::new(trimmed, absolute_span);
+    parser.parse()
 }
 
+// Old parsing functions removed - replaced by ValueParser with same-source recursion
+// - parse_value_string() → use parse_value_from_source() instead
+// - parse_value_or_list() → handled internally by ValueParser
+// See: parser::ValueParser for the new implementation
+
 /// Parse a single CSS value (no lists)
-pub(crate) fn parse_single_value(s: &str) -> Option<CssValue> {
+pub(crate) fn parse_single_value(s: &str, span: Span) -> Option<CssValue> {
     let s = s.trim();
     if s.is_empty() {
         return None;
     }
 
     // String literal
-    if let Some(val) = parse_string_literal(s) {
+    if let Some(val) = parse_string_literal(s, span) {
         return Some(val);
     }
 
@@ -75,27 +99,39 @@ pub(crate) fn parse_single_value(s: &str) -> Option<CssValue> {
     {
         // Try color function first
         if let Some(color) = parse_color_function(&name.to_lowercase(), &args) {
-            return Some(CssValue::Color(color));
+            return Some(CssValue::Color { color, span });
         }
         // Fall back to generic function
+        // Calculate accurate span for arguments (inside parens)
+        // The args string starts at: paren_pos + 1 (after opening paren)
+        // The args string ends at: paren_pos + 1 + args.len()
+        let args_start = paren_pos + 1;
+        let args_span = Span {
+            start: span.start + args_start as u32,
+            end: span.start + args_start as u32 + args.len() as u32,
+        };
         return Some(CssValue::Function {
             name,
-            args: parse_function_arguments(&args),
+            args: parse_function_arguments(&args, args_span),
+            span,
         });
     }
 
     // Hex or named color
     if let Some(color) = parse_color(s) {
-        return Some(CssValue::Color(color));
+        return Some(CssValue::Color { color, span });
     }
 
     // Dimension (number with optional unit)
-    if let Some(dim) = parse_dimension(s) {
+    if let Some(dim) = parse_dimension(s, span) {
         return Some(dim);
     }
 
     // Default to identifier
-    Some(CssValue::Identifier(s.to_string()))
+    Some(CssValue::Identifier {
+        name: s.to_string(),
+        span,
+    })
 }
 
 /// Extract function name and arguments, validating balanced parentheses

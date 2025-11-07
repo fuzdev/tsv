@@ -1,1 +1,1 @@
-<div>text <span>inline</span> {'expr'} more</div>
+<div>text1 <span>inline1</span> {expr} text2</div>

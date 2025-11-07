@@ -6,21 +6,68 @@
 //
 // Selector formatting is handled by the selectors module.
 
-use super::Printer;
-use crate::ast::internal::{self, Color, CssValue};
-use tsv_lang::printing::{StringFormatOptions, format_string_literal};
+use super::{source_fidelity, Printer};
+use crate::ast::internal::{self, CssValue};
 
 impl<'a> Printer<'a> {
     /// Format a CSS rule (selector + declarations block)
     pub(super) fn print_css_rule(&mut self, rule: &internal::CssRule) {
         // Format selector (uses selectors module)
         self.print_selector_list(&rule.selector);
+
+        // Check if first child is a comment between selector and opening brace
+        let mut start_index = 0;
+        if let Some(internal::CssBlockChild::Comment(comment)) = rule.declarations.first() {
+            // Check if comment is before the opening brace (between selector and {)
+            // block_span.start is the position of the opening brace
+            if comment.span.start < rule.block_span.start {
+                // Comment is between selector and brace - print inline
+                // Always add space before comment for readability (normalize)
+                // This is an intentional divergence from prettier (which preserves no-space)
+                self.write(" /*");
+                self.write(&comment.content);
+                self.write("*/");
+                start_index = 1; // Skip this comment when processing declarations
+            }
+        }
+
         self.write(" {\n");
 
-        // Format declarations with indentation
+        // Format declarations and comments with indentation
         self.indent_level += 1;
-        for decl in &rule.declarations {
-            self.print_css_declaration(decl);
+        let mut i = start_index;
+        while i < rule.declarations.len() {
+            let child = &rule.declarations[i];
+            match child {
+                internal::CssBlockChild::Declaration(decl) => {
+                    self.print_css_declaration(decl);
+
+                    // Check if next child is an inline comment
+                    if let Some(internal::CssBlockChild::Comment(next_comment)) =
+                        rule.declarations.get(i + 1)
+                        && self.is_same_line(decl.span.end, next_comment.span.start) {
+                            // Print comment inline (backspace to remove the newline)
+                            // Note: We need to remove the trailing \n from declaration
+                            self.buffer_remove_trailing_newline();
+                            self.write(" /*");
+                            self.write(&next_comment.content);
+                            self.write("*/\n");
+                            i += 1; // Skip the comment in the next iteration
+                        }
+                }
+                internal::CssBlockChild::Comment(comment) => {
+                    // Standalone comment (not inline after a declaration)
+                    self.write_indent();
+                    self.write("/*");
+                    self.write(&comment.content);
+                    self.write("*/\n");
+                }
+                internal::CssBlockChild::Rule(_) | internal::CssBlockChild::Atrule(_) => {
+                    // Nested rules not expected in regular CSS rules
+                    // (only in at-rules like @media)
+                }
+            }
+            i += 1;
         }
         self.indent_level -= 1;
 
@@ -28,53 +75,13 @@ impl<'a> Printer<'a> {
         self.write("}");
     }
 
-    /// Extract raw property name from source to preserve escape sequences
-    ///
-    /// SVELTE QUIRK: Property names preserve raw escapes without decoding
-    /// Example: `\00e9motion` stays as `\00e9motion`, not `émotion`
-    fn extract_property_name<'b>(&self, decl_source: &'b str) -> &'b str {
-        if let Some(colon_pos) = decl_source.find(':') {
-            decl_source[..colon_pos].trim() // Trim whitespace for normalization
-        } else {
-            // Fallback: no colon found (malformed declaration)
-            // Return entire source as property name
-            decl_source.trim()
-        }
-    }
 
     /// Check if a property should use multiline formatting
     fn should_use_multiline(&self, decl: &internal::CssDeclaration) -> bool {
         matches!(decl.property.as_str(), "box-shadow" | "text-shadow")
-            && matches!(&decl.value, CssValue::CommaSeparated { values } if values.len() > 1)
+            && matches!(&decl.value, CssValue::CommaSeparated { values, .. } if values.len() > 1)
     }
 
-    /// Format a string value by extracting raw content from source
-    ///
-    /// This preserves escape sequences by working with the original source text
-    /// rather than the decoded AST content.
-    fn print_declaration_string_value(&mut self, decl_source: &str, quote: char) {
-        if let Some(colon_pos) = decl_source.find(':') {
-            let value_part = decl_source[colon_pos + 1..].trim();
-            // String should be quoted
-            if value_part.len() >= 2 {
-                let raw_content = &value_part[1..value_part.len() - 1];
-
-                // Format using shared utility (handles quote selection and escaping)
-                let formatted =
-                    format_string_literal(raw_content, quote, StringFormatOptions::default());
-
-                self.write(": ");
-                self.write(&formatted);
-                self.write(";\n");
-                return;
-            }
-        }
-
-        // Fallback: use AST value (loses escape sequence fidelity)
-        self.write(": ");
-        self.write(&format!("'{}'", quote)); // Simplified fallback
-        self.write(";\n");
-    }
 
     /// Format a CSS declaration (property: value;)
     pub(super) fn print_css_declaration(&mut self, decl: &internal::CssDeclaration) {
@@ -83,8 +90,10 @@ impl<'a> Printer<'a> {
         // Extract property name from source to preserve escape sequences
         // See: docs/SVELTE_COMPATIBILITY.md (CSS Quirks section)
         let decl_source = &self.source[decl.span.start as usize..decl.span.end as usize];
-        let property_raw = self.extract_property_name(decl_source);
-        self.write(property_raw);
+        let property_normalized = source_fidelity::extract_property_name(decl_source);
+
+        // Write property name (normalized with spaces around comments)
+        self.write(&property_normalized);
 
         // Check if property needs multiline formatting
         if self.should_use_multiline(decl) {
@@ -93,24 +102,59 @@ impl<'a> Printer<'a> {
             self.print_css_value_multiline(&decl.value);
             self.indent_level -= 1;
             self.write(";\n");
+        } else if self.value_comments.contains_key(&decl.span.start) {
+            // Value has comments - extract from source to preserve them
+            if let Some(normalized) = source_fidelity::extract_value_with_comments(decl_source) {
+                self.write(": ");
+                self.write(&normalized);
+                self.write(";\n");
+            } else {
+                // Fallback: shouldn't happen
+                self.write(": ");
+                self.write(decl_source);
+                self.write(";\n");
+            }
         } else if let CssValue::String { quote, .. } = &decl.value {
             // String values: extract from source to preserve escapes
-            self.print_declaration_string_value(decl_source, *quote);
+            if let Some(formatted) = source_fidelity::extract_string_value(decl_source, *quote) {
+                self.write(": ");
+                self.write(&formatted);
+                self.write(";\n");
+            } else {
+                // Fallback: use semantic formatting
+                self.write(": ");
+                let formatted = source_fidelity::format_string_value("", *quote);
+                self.write(&formatted);
+                self.write(";\n");
+            }
         } else {
             // All other values: use standard formatting
-            self.write(": ");
+            // Property with comment: `color /* comment */` → ` : ` → `color /* comment */ : `
+            // Property without comment: `color` → `: ` → `color: `
+            if property_normalized.contains("/*") {
+                self.write(" : ");
+            } else {
+                self.write(": ");
+            }
             self.print_css_value(&decl.value);
             self.write(";\n");
         }
     }
 
+
     /// Format a CSS value on multiple lines (for shadow properties)
+    ///
+    /// Used for properties like box-shadow and text-shadow that should format
+    /// comma-separated values on multiple lines for readability.
+    ///
+    /// Uses hybrid formatting: preserves source fidelity for leaf values (dimensions, strings)
+    /// while normalizing spacing for composite structures (functions, lists).
     fn print_css_value_multiline(&mut self, value: &CssValue) {
         match value {
-            CssValue::CommaSeparated { values } => {
+            CssValue::CommaSeparated { values, .. } => {
                 for (i, val) in values.iter().enumerate() {
                     self.write_indent();
-                    self.print_css_value(val);
+                    self.print_nested_value(val);  // Use nested_value for normalization
                     if i < values.len() - 1 {
                         self.write(",\n");
                     }
@@ -118,7 +162,149 @@ impl<'a> Printer<'a> {
             }
             _ => {
                 // Fallback to regular formatting
-                self.print_css_value(value);
+                self.print_nested_value(value);  // Use nested_value for normalization
+            }
+        }
+    }
+
+    /// Format a nested value (function arg, list item)
+    ///
+    /// Tries source extraction first (spans are accurate from ValueParser).
+    /// Normalizes formatting whitespace while preserving source fidelity.
+    ///
+    /// This enables preserving source fidelity for nested values (leading zeros, etc.)
+    /// even with multiline input.
+    ///
+    /// Functions and lists are NOT extracted from source - they're formatted semantically
+    /// to ensure correct spacing normalization.
+    fn print_nested_value(&mut self, value: &CssValue) {
+        // Functions, composite values, and colors should be formatted semantically
+        // to normalize their internal spacing (e.g., `rgba(0,0,0,0.1)` → `rgba(0, 0, 0, 0.1)`)
+        match value {
+            CssValue::Function { .. } | CssValue::List { .. } | CssValue::CommaSeparated { .. } | CssValue::Color { .. } => {
+                self.print_css_value_semantic(value);
+                return;
+            }
+            _ => {}
+        }
+
+        let span = value.span();
+
+        // Try source extraction (spans are now accurate from ValueParser!)
+        if span.end as usize <= self.source.len() {
+            let raw = &self.source[span.start as usize..span.end as usize];
+
+            if !raw.is_empty() {
+                // Normalize formatting whitespace while preserving source fidelity
+                // Collapse '\n', '\t', '\r' to ' ' but preserve content
+                let normalized = self.normalize_whitespace(raw);
+                self.write(&normalized);
+            } else {
+                // Empty value - use semantic formatting
+                self.print_css_value_semantic(value);
+            }
+        } else {
+            // Fallback: span is invalid, use semantic formatting
+            self.print_css_value_semantic(value);
+        }
+    }
+
+    /// Normalize whitespace in extracted source text
+    ///
+    /// Collapses consecutive whitespace characters (including \n, \t, \r) to single spaces
+    /// while preserving whitespace inside quoted strings.
+    ///
+    /// This enables source extraction to work correctly with multiline input.
+    fn normalize_whitespace(&self, s: &str) -> String {
+        let mut result = String::with_capacity(s.len());
+        let mut in_string = false;
+        let mut string_delim = '\0';
+        let mut prev_was_whitespace = false;
+
+        for ch in s.chars() {
+            match ch {
+                '\'' | '"' if !in_string => {
+                    in_string = true;
+                    string_delim = ch;
+                    result.push(ch);
+                    prev_was_whitespace = false;
+                }
+                c if in_string && c == string_delim => {
+                    in_string = false;
+                    result.push(ch);
+                    prev_was_whitespace = false;
+                }
+                _ if in_string => {
+                    // Inside string - preserve everything
+                    result.push(ch);
+                    prev_was_whitespace = false;
+                }
+                ' ' | '\n' | '\t' | '\r' => {
+                    // Outside string - collapse consecutive whitespace
+                    if !prev_was_whitespace {
+                        result.push(' ');
+                        prev_was_whitespace = true;
+                    }
+                }
+                _ => {
+                    // Regular character
+                    result.push(ch);
+                    prev_was_whitespace = false;
+                }
+            }
+        }
+
+        result.trim().to_string()
+    }
+
+    /// Format a CSS value semantically (from AST, no source extraction)
+    ///
+    /// Used as fallback when source extraction is not possible.
+    /// Always formats from AST structure, never extracts from source.
+    fn print_css_value_semantic(&mut self, value: &CssValue) {
+        match value {
+            CssValue::Identifier { name, .. } => {
+                let formatted = source_fidelity::format_identifier_value(name);
+                self.write(&formatted);
+            }
+            CssValue::String { content, quote, .. } => {
+                let formatted = source_fidelity::format_string_value(content, *quote);
+                self.write(&formatted);
+            }
+            CssValue::Dimension { value, unit, .. } => {
+                let formatted = source_fidelity::format_dimension_value(*value, unit);
+                self.write(&formatted);
+            }
+            CssValue::Color { color, .. } => {
+                let formatted = source_fidelity::format_color_value(color);
+                self.write(&formatted);
+            }
+            CssValue::Function { name, args, .. } => {
+                self.write(name);
+                self.write("(");
+                for (i, arg) in args.iter().enumerate() {
+                    if i > 0 {
+                        self.write(", ");
+                    }
+                    self.print_nested_value(arg);  // Use nested_value to preserve source fidelity
+                }
+                self.write(")");
+            }
+            CssValue::List { values, .. } => {
+                for (i, val) in values.iter().enumerate() {
+                    if i > 0 {
+                        self.write(" ");
+                    }
+                    self.print_nested_value(val);  // Use nested_value to preserve source fidelity
+                }
+            }
+            CssValue::CommaSeparated { values, .. } => {
+                for (i, val) in values.iter().enumerate() {
+                    if i > 0 {
+                        self.write(", ");
+                    }
+                    self.print_nested_value(val);  // Use nested_value to preserve source fidelity
+                }
             }
         }
     }
@@ -126,87 +312,62 @@ impl<'a> Printer<'a> {
     /// Format a CSS value (right-hand side of declaration)
     pub(super) fn print_css_value(&mut self, value: &CssValue) {
         match value {
-            CssValue::Identifier(ident) => {
-                self.write(ident);
+            CssValue::Identifier { name, .. } => {
+                self.write(name);
             }
-            CssValue::String { content, quote } => {
-                // LIMITATION: CssValue::String doesn't have a span, so we can't extract raw from source.
-                // This path is hit for strings in comma-separated values (e.g., font-family: 'Arial', 'Helvetica').
-                //
-                // We use format_string_literal which handles quote selection and escape swapping,
-                // but we lose the ability to preserve Svelte quirks (backslash doubling, etc.) because
-                // we're working with decoded content from the AST, not raw source.
-                //
-                // TODO: Add span to CssValue::String in the parser to enable source extraction
-                let formatted =
-                    format_string_literal(content, *quote, StringFormatOptions::default());
+            CssValue::String { content, quote, span } => {
+                // Extract raw source to preserve escape sequences
+                let raw = &self.source[span.start as usize..span.end as usize];
+
+                // Use raw source if it looks valid (starts and ends with quotes)
+                if raw.starts_with(*quote) && raw.ends_with(*quote) {
+                    self.write(raw);
+                } else {
+                    // Fallback: format from decoded content
+                    let formatted = source_fidelity::format_string_value(content, *quote);
+                    self.write(&formatted);
+                }
+            }
+            CssValue::Dimension { span, .. } => {
+                // Extract raw dimension from source to preserve leading zeros, etc.
+                let raw = &self.source[span.start as usize..span.end as usize];
+                self.write(raw);
+            }
+            CssValue::Color { color, .. } => {
+                let formatted = source_fidelity::format_color_value(color);
                 self.write(&formatted);
             }
-            CssValue::Dimension { source, .. } => {
-                self.write(source);
-            }
-            CssValue::Color(color) => {
-                self.print_css_color(color);
-            }
-            CssValue::Function { name, args } => {
+            CssValue::Function { name, args, .. } => {
                 self.write(name);
                 self.write("(");
                 for (i, arg) in args.iter().enumerate() {
                     if i > 0 {
                         self.write(", ");
                     }
-                    self.print_css_value(arg);
+                    // Try source extraction first (spans are now accurate from ValueCursor!)
+                    // Falls back to semantic formatting if extraction fails
+                    self.print_nested_value(arg);
                 }
                 self.write(")");
             }
-            CssValue::List { values } => {
+            CssValue::List { values, .. } => {
                 for (i, val) in values.iter().enumerate() {
                     if i > 0 {
                         self.write(" ");
                     }
-                    self.print_css_value(val);
+                    // Try source extraction first (spans are now accurate from ValueCursor!)
+                    // Falls back to semantic formatting if extraction fails
+                    self.print_nested_value(val);
                 }
             }
-            CssValue::CommaSeparated { values } => {
+            CssValue::CommaSeparated { values, .. } => {
                 for (i, val) in values.iter().enumerate() {
                     if i > 0 {
                         self.write(", ");
                     }
-                    self.print_css_value(val);
-                }
-            }
-        }
-    }
-
-    /// Format a CSS color value
-    fn print_css_color(&mut self, color: &Color) {
-        match color {
-            Color::Named(name) => {
-                self.write(name);
-            }
-            Color::Hex(hex) => {
-                self.write(hex);
-            }
-            Color::Rgb { r, g, b, alpha } => {
-                if let Some(a) = alpha {
-                    self.write(&format!("rgba({}, {}, {}, {})", r, g, b, a));
-                } else {
-                    self.write(&format!("rgb({}, {}, {})", r, g, b));
-                }
-            }
-            Color::Hsl {
-                hue,
-                saturation,
-                lightness,
-                alpha,
-            } => {
-                if let Some(a) = alpha {
-                    self.write(&format!(
-                        "hsla({}%, {}%, {}%, {})",
-                        hue, saturation, lightness, a
-                    ));
-                } else {
-                    self.write(&format!("hsl({}%, {}%, {}%)", hue, saturation, lightness));
+                    // Try source extraction first (spans are now accurate from ValueCursor!)
+                    // Falls back to semantic formatting if extraction fails
+                    self.print_nested_value(val);
                 }
             }
         }

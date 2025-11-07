@@ -48,7 +48,7 @@ struct ParseExecutable {
 
 impl Executable for ParseExecutable {
     fn execute(&self) {
-        match parse_to_json(self.input.content(), self.pretty) {
+        match parse_to_json(&self.input, self.pretty) {
             Ok(json) => println!("{}", json),
             Err(e) => {
                 eprintln!("Parse error: {}", e);
@@ -61,46 +61,60 @@ impl Executable for ParseExecutable {
 /// Parse source code and convert to JSON
 ///
 /// Automatically detects whether input is Svelte, TypeScript, or CSS
-fn parse_to_json(source: &str, pretty: bool) -> Result<String, String> {
-    // Detect whether this is a Svelte file, TypeScript file, or CSS file
-    // Simple heuristic: if it starts with '<', it's Svelte; otherwise check for CSS-like content
-    let trimmed = source.trim_start();
-    let is_svelte = trimmed.starts_with('<');
-    let is_css =
-        !is_svelte && (trimmed.ends_with('}') || trimmed.contains('{') && trimmed.contains(':'));
+fn parse_to_json(input: &Input, pretty: bool) -> Result<String, String> {
+    use crate::cli::input::ParserType;
 
-    let json = if is_svelte {
-        // Parse as Svelte
-        let ast = tsv_svelte::parse(source).map_err(|e| e.to_string())?;
-        let public_ast = tsv_svelte::convert_ast(&ast, source);
+    let source = input.content();
 
-        // Serialize to JSON
-        if pretty {
-            serde_json::to_string_pretty(&public_ast)
+    // Try file extension first (most reliable), then fall back to content heuristics
+    let parser_type = input.parser_type().unwrap_or_else(|| {
+        // Content-based detection for stdin/content input
+        let trimmed = source.trim_start();
+        if trimmed.starts_with('<') {
+            ParserType::Svelte
+        } else if trimmed.ends_with('}') || (trimmed.contains('{') && trimmed.contains(':')) {
+            ParserType::Css
         } else {
-            serde_json::to_string(&public_ast)
+            ParserType::TypeScript
         }
-    } else if is_css {
-        // Parse as CSS
-        let nodes = tsv_css::parse(source, 0).map_err(|e| e.to_string())?;
-        let json_value = tsv_css::convert_ast(&nodes, source);
+    });
 
-        // Serialize to JSON
-        if pretty {
-            serde_json::to_string_pretty(&json_value)
-        } else {
-            serde_json::to_string(&json_value)
+    let json = match parser_type {
+        ParserType::Svelte => {
+            // Parse as Svelte
+            let ast = tsv_svelte::parse(source).map_err(|e| e.to_string())?;
+            let public_ast = tsv_svelte::convert_ast(&ast, source);
+
+            // Serialize to JSON
+            if pretty {
+                serde_json::to_string_pretty(&public_ast)
+            } else {
+                serde_json::to_string(&public_ast)
+            }
         }
-    } else {
-        // Parse as TypeScript
-        let ast = tsv_ts::parse(source).map_err(|e| e.to_string())?;
-        let public_ast = tsv_ts::convert_ast(&ast, source);
+        ParserType::Css => {
+            // Parse as CSS
+            let nodes = tsv_css::parse(source, 0).map_err(|e| e.to_string())?;
+            let json_value = tsv_css::convert_ast(&nodes, source);
 
-        // Serialize to JSON
-        if pretty {
-            serde_json::to_string_pretty(&public_ast)
-        } else {
-            serde_json::to_string(&public_ast)
+            // Serialize to JSON
+            if pretty {
+                serde_json::to_string_pretty(&json_value)
+            } else {
+                serde_json::to_string(&json_value)
+            }
+        }
+        ParserType::TypeScript => {
+            // Parse as TypeScript
+            let ast = tsv_ts::parse(source).map_err(|e| e.to_string())?;
+            let public_ast = tsv_ts::convert_ast(&ast, source);
+
+            // Serialize to JSON
+            if pretty {
+                serde_json::to_string_pretty(&public_ast)
+            } else {
+                serde_json::to_string(&public_ast)
+            }
         }
     };
 

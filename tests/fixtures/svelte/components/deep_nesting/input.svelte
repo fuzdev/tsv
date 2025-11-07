@@ -1,1 +1,1 @@
-<A><B><C><D /></C></B></A>
+<Comp1><Comp2><Comp3><Comp4 /></Comp3></Comp2></Comp1>

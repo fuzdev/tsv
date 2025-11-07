@@ -1,4 +1,4 @@
 <script lang="ts">
- const  a  :  number  =  5  ;
+ const  expr  :  number  =  5  ;
 
 </script>

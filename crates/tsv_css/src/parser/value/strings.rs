@@ -1,5 +1,6 @@
 use crate::ast::internal::CssValue;
 use crate::escapes;
+use tsv_lang::Span;
 
 /// Parse CSS string with proper quote handling and escape decoding
 ///
@@ -17,7 +18,7 @@ use crate::escapes;
 /// - Conversion: Re-applies Svelte quirks when generating public JSON AST
 ///
 /// This matches TypeScript's architecture and keeps the internal AST clean.
-pub fn parse_string_literal(s: &str) -> Option<CssValue> {
+pub fn parse_string_literal(s: &str, span: Span) -> Option<CssValue> {
     if let Some(quote) = s.chars().next()
         && ((quote == '"' && s.ends_with('"')) || (quote == '\'' && s.ends_with('\'')))
     {
@@ -28,7 +29,11 @@ pub fn parse_string_literal(s: &str) -> Option<CssValue> {
         // Internal AST stores decoded values; conversion layer re-applies Svelte quirks
         let content = escapes::decode_escape_sequences(raw_content);
 
-        return Some(CssValue::String { content, quote });
+        return Some(CssValue::String {
+            content,
+            quote,
+            span,
+        });
     }
     None
 }

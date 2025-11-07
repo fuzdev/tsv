@@ -1,1 +1,1 @@
-<span> a </span> <span> b </span>
+<span> inline1 </span> <span> inline2 </span>

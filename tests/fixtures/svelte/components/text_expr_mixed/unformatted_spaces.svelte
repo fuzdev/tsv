@@ -1,1 +1,1 @@
-<Comp>Count:  { count }  items</Comp>
+<Comp>text1  { expr }  text2</Comp>

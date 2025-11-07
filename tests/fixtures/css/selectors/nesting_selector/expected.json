@@ -2,7 +2,7 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 169,
+    "end": 170,
     "attributes": [],
     "children": [
       {
@@ -23,7 +23,7 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "button",
+                      "name": "class1",
                       "start": 55,
                       "end": 62
                     }
@@ -161,12 +161,12 @@
         "prelude": {
           "type": "SelectorList",
           "start": 126,
-          "end": 142,
+          "end": 143,
           "children": [
             {
               "type": "ComplexSelector",
               "start": 126,
-              "end": 142,
+              "end": 143,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -174,7 +174,7 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "parent",
+                      "name": "class2",
                       "start": 126,
                       "end": 133
                     }
@@ -212,13 +212,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "child",
+                      "name": "class3",
                       "start": 136,
-                      "end": 142
+                      "end": 143
                     }
                   ],
                   "start": 135,
-                  "end": 142
+                  "end": 143
                 }
               ]
             }
@@ -226,26 +226,26 @@
         },
         "block": {
           "type": "Block",
-          "start": 143,
-          "end": 160,
+          "start": 144,
+          "end": 161,
           "children": [
             {
               "type": "Declaration",
-              "start": 147,
-              "end": 156,
+              "start": 148,
+              "end": 157,
               "property": "margin",
               "value": "0"
             }
           ]
         },
         "start": 126,
-        "end": 160
+        "end": 161
       }
     ],
     "content": {
       "start": 7,
-      "end": 161,
-      "styles": "\n\t/* Test nesting selector (&) in selectors */\n\t.button & {\n\t\tcolor: black;\n\t}\n\n\tdiv & > span {\n\t\tdisplay: block;\n\t}\n\n\t.parent & .child {\n\t\tmargin: 0;\n\t}\n",
+      "end": 162,
+      "styles": "\n\t/* Test nesting selector (&) in selectors */\n\t.class1 & {\n\t\tcolor: black;\n\t}\n\n\tdiv & > span {\n\t\tdisplay: block;\n\t}\n\n\t.class2 & .class3 {\n\t\tmargin: 0;\n\t}\n",
       "comment": null
     }
   },

@@ -1,21 +1,21 @@
 <style>
-	.gradient {
+	.class1 {
 		background: linear-gradient(90deg, red, blue);
 	}
 
-	.complex-gradient {
+	.class2 {
 		background: linear-gradient(45deg, #ff0000 0%, #00ff00 50%, #0000ff 100%);
 	}
 
-	.shadow {
+	.class3 {
 		filter: drop-shadow(5px 5px 10px black);
 	}
 
-	.radial {
+	.class4 {
 		background: radial-gradient(circle, white, black);
 	}
 
-	.multiple-shadows {
+	.class5 {
 		box-shadow:
 			0 2px 4px rgba(0, 0, 0, 0.1),
 			0 4px 8px rgba(0, 0, 0, 0.2);

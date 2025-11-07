@@ -12,11 +12,27 @@ use crate::ast::internal;
 impl<'a> Printer<'a> {
     /// Format a selector list (comma-separated complex selectors)
     pub(super) fn print_selector_list(&mut self, list: &internal::SelectorList) {
-        for (i, complex) in list.selectors.iter().enumerate() {
-            if i > 0 {
-                self.write(", ");
+        // Check if source contains comments (/* ... */)
+        let source_text = &self.source[list.span.start as usize..list.span.end as usize];
+        let has_comments = source_text.contains("/*");
+
+        if has_comments {
+            // Extract from source and normalize whitespace around comments
+            // Replace patterns like ",/*" with ", /*" and "*/" with "*/ "
+            let normalized = source_text
+                .replace(",/*", ", /*")
+                .replace("*/.", "*/ .")
+                .replace(",  /*", ", /*")  // Reduce multiple spaces after comma
+                .replace("*/  .", "*/ .");  // Reduce multiple spaces after comment
+            self.write(&normalized);
+        } else {
+            // No comments - use AST formatting
+            for (i, complex) in list.selectors.iter().enumerate() {
+                if i > 0 {
+                    self.write(", ");
+                }
+                self.print_complex_selector(complex);
             }
-            self.print_complex_selector(complex);
         }
     }
 

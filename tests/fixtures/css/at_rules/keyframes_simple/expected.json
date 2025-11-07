@@ -10,7 +10,7 @@
         "start": 9,
         "end": 116,
         "name": "keyframes",
-        "prelude": "slide",
+        "prelude": "anim1",
         "block": {
           "type": "Block",
           "start": 26,
@@ -117,7 +117,7 @@
     "content": {
       "start": 7,
       "end": 117,
-      "styles": "\n\t@keyframes slide {\n\t\t0% {\n\t\t\ttransform: translateX(0);\n\t\t}\n\t\t100% {\n\t\t\ttransform: translateX(100px);\n\t\t}\n\t}\n",
+      "styles": "\n\t@keyframes anim1 {\n\t\t0% {\n\t\t\ttransform: translateX(0);\n\t\t}\n\t\t100% {\n\t\t\ttransform: translateX(100px);\n\t\t}\n\t}\n",
       "comment": null
     }
   },

@@ -1,6 +1,6 @@
 <style>
 	/* Test nesting selector (&) in selectors */
-	.button & {
+	.class1 & {
 		color: black;
 	}
 
@@ -8,7 +8,7 @@
 		display: block;
 	}
 
-	.parent & .child {
+	.class2 & .class3 {
 		margin: 0;
 	}
 </style>

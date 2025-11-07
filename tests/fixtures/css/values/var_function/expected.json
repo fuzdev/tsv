@@ -2,7 +2,7 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 391,
+    "end": 340,
     "attributes": [],
     "children": [
       {
@@ -39,52 +39,52 @@
         "block": {
           "type": "Block",
           "start": 15,
-          "end": 117,
+          "end": 89,
           "children": [
             {
               "type": "Declaration",
               "start": 19,
-              "end": 43,
-              "property": "--primary-color",
+              "end": 34,
+              "property": "--var1",
               "value": "#007bff"
             },
             {
               "type": "Declaration",
-              "start": 47,
-              "end": 73,
-              "property": "--secondary-color",
+              "start": 38,
+              "end": 53,
+              "property": "--var2",
               "value": "#6c757d"
             },
             {
               "type": "Declaration",
-              "start": 77,
-              "end": 92,
-              "property": "--spacing",
+              "start": 57,
+              "end": 69,
+              "property": "--var3",
               "value": "16px"
             },
             {
               "type": "Declaration",
-              "start": 96,
-              "end": 113,
-              "property": "--font-size",
+              "start": 73,
+              "end": 85,
+              "property": "--var4",
               "value": "14px"
             }
           ]
         },
         "start": 9,
-        "end": 117
+        "end": 89
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 120,
-          "end": 127,
+          "start": 92,
+          "end": 99,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 120,
-              "end": 127,
+              "start": 92,
+              "end": 99,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -92,13 +92,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "button",
-                      "start": 120,
-                      "end": 127
+                      "name": "class1",
+                      "start": 92,
+                      "end": 99
                     }
                   ],
-                  "start": 120,
-                  "end": 127
+                  "start": 92,
+                  "end": 99
                 }
               ]
             }
@@ -106,46 +106,46 @@
         },
         "block": {
           "type": "Block",
-          "start": 128,
-          "end": 232,
+          "start": 100,
+          "end": 187,
           "children": [
             {
               "type": "Declaration",
-              "start": 132,
-              "end": 170,
+              "start": 104,
+              "end": 133,
               "property": "background-color",
-              "value": "var(--primary-color)"
+              "value": "var(--var1)"
             },
             {
               "type": "Declaration",
-              "start": 174,
-              "end": 197,
+              "start": 137,
+              "end": 157,
               "property": "padding",
-              "value": "var(--spacing)"
+              "value": "var(--var3)"
             },
             {
               "type": "Declaration",
-              "start": 201,
-              "end": 228,
+              "start": 161,
+              "end": 183,
               "property": "font-size",
-              "value": "var(--font-size)"
+              "value": "var(--var4)"
             }
           ]
         },
-        "start": 120,
-        "end": 232
+        "start": 92,
+        "end": 187
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 235,
-          "end": 240,
+          "start": 190,
+          "end": 197,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 235,
-              "end": 240,
+              "start": 190,
+              "end": 197,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -153,13 +153,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "card",
-                      "start": 235,
-                      "end": 240
+                      "name": "class2",
+                      "start": 190,
+                      "end": 197
                     }
                   ],
-                  "start": 235,
-                  "end": 240
+                  "start": 190,
+                  "end": 197
                 }
               ]
             }
@@ -167,39 +167,39 @@
         },
         "block": {
           "type": "Block",
-          "start": 241,
-          "end": 308,
+          "start": 198,
+          "end": 257,
           "children": [
             {
               "type": "Declaration",
-              "start": 245,
-              "end": 276,
+              "start": 202,
+              "end": 227,
               "property": "color",
-              "value": "var(--text-color, black)"
+              "value": "var(--var5, black)"
             },
             {
               "type": "Declaration",
-              "start": 280,
-              "end": 304,
+              "start": 231,
+              "end": 253,
               "property": "margin",
-              "value": "var(--margin, 0)"
+              "value": "var(--var6, 0)"
             }
           ]
         },
-        "start": 235,
-        "end": 308
+        "start": 190,
+        "end": 257
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 311,
-          "end": 318,
+          "start": 260,
+          "end": 267,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 311,
-              "end": 318,
+              "start": 260,
+              "end": 267,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -207,13 +207,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "nested",
-                      "start": 311,
-                      "end": 318
+                      "name": "class3",
+                      "start": 260,
+                      "end": 267
                     }
                   ],
-                  "start": 311,
-                  "end": 318
+                  "start": 260,
+                  "end": 267
                 }
               ]
             }
@@ -221,33 +221,33 @@
         },
         "block": {
           "type": "Block",
-          "start": 319,
-          "end": 382,
+          "start": 268,
+          "end": 331,
           "children": [
             {
               "type": "Declaration",
-              "start": 323,
-              "end": 348,
+              "start": 272,
+              "end": 297,
               "property": "width",
-              "value": "var(--size, 100px)"
+              "value": "var(--var7, 100px)"
             },
             {
               "type": "Declaration",
-              "start": 352,
-              "end": 378,
+              "start": 301,
+              "end": 327,
               "property": "height",
-              "value": "var(--size, 100px)"
+              "value": "var(--var7, 100px)"
             }
           ]
         },
-        "start": 311,
-        "end": 382
+        "start": 260,
+        "end": 331
       }
     ],
     "content": {
       "start": 7,
-      "end": 383,
-      "styles": "\n\t:root {\n\t\t--primary-color: #007bff;\n\t\t--secondary-color: #6c757d;\n\t\t--spacing: 16px;\n\t\t--font-size: 14px;\n\t}\n\n\t.button {\n\t\tbackground-color: var(--primary-color);\n\t\tpadding: var(--spacing);\n\t\tfont-size: var(--font-size);\n\t}\n\n\t.card {\n\t\tcolor: var(--text-color, black);\n\t\tmargin: var(--margin, 0);\n\t}\n\n\t.nested {\n\t\twidth: var(--size, 100px);\n\t\theight: var(--size, 100px);\n\t}\n",
+      "end": 332,
+      "styles": "\n\t:root {\n\t\t--var1: #007bff;\n\t\t--var2: #6c757d;\n\t\t--var3: 16px;\n\t\t--var4: 14px;\n\t}\n\n\t.class1 {\n\t\tbackground-color: var(--var1);\n\t\tpadding: var(--var3);\n\t\tfont-size: var(--var4);\n\t}\n\n\t.class2 {\n\t\tcolor: var(--var5, black);\n\t\tmargin: var(--var6, 0);\n\t}\n\n\t.class3 {\n\t\twidth: var(--var7, 100px);\n\t\theight: var(--var7, 100px);\n\t}\n",
       "comment": null
     }
   },

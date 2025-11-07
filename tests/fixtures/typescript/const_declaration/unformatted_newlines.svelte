@@ -1,10 +1,10 @@
 <script lang="ts">
 
 const
-a
+expr
 
 =
-5
+'value'
 
 
 ;

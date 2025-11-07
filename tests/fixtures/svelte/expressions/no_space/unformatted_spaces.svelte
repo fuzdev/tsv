@@ -1,1 +1,1 @@
-<div>{  'a'  }{  2  }</div>
+<div>{  'expr1'  }{  'expr2'  }</div>

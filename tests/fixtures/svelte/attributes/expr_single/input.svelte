@@ -1,1 +1,1 @@
-<div class={name}></div>
+<div data-attr={expr}></div>

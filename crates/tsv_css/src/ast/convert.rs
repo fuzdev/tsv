@@ -52,52 +52,36 @@ fn convert_pseudo_class_args(args: &internal::PseudoClassArgs) -> serde_json::Va
     }
 }
 
-/// Format a CssValue as a string for semantic output
-/// NOTE: Currently unused - we use source_value for JSON compatibility with Svelte
-/// This function is kept for future use by the printer and other semantic tools
+/// Format a CssValue as a string for semantic output (no Svelte quirks)
+///
+/// Uses centralized formatting utilities from `printer::source_fidelity` to ensure
+/// consistency between formatter and JSON output.
+///
+/// This function implements clean semantic formatting without Svelte quirks.
+///
+/// # Current Status
+/// Not currently used - source extraction is required to preserve ALL fidelity
+/// (leading zeros, original formatting). Kept as infrastructure for future optimization.
+///
+/// # Future Use
+/// Could be used for values without backslashes IF we add raw value storage to AST.
+/// Trade-off: cleaner JSON vs increased AST memory usage (Sprint 1 removed raw values).
 #[allow(dead_code)]
 fn format_css_value_for_json(value: &internal::CssValue) -> String {
+    use crate::printer::source_fidelity;
+
     match value {
-        internal::CssValue::Identifier(id) => id.clone(),
-        internal::CssValue::String { content, quote } => {
-            // Format with original quotes, escape backslashes for JSON
-            let escaped_content = content.replace('\\', "\\\\");
-            format!("{}{}{}", quote, escaped_content, quote)
+        internal::CssValue::Identifier { name, .. } => {
+            source_fidelity::format_identifier_value(name)
         }
-        internal::CssValue::Dimension { source, .. } => source.clone(),
-        internal::CssValue::Color(color) => match color {
-            internal::Color::Named(name) => name.clone(),
-            internal::Color::Hex(hex) => hex.clone(),
-            internal::Color::Rgb {
-                r,
-                g,
-                b,
-                alpha: None,
-            } => format!("rgb({}, {}, {})", r, g, b),
-            internal::Color::Rgb {
-                r,
-                g,
-                b,
-                alpha: Some(a),
-            } => format!("rgba({}, {}, {}, {})", r, g, b, a),
-            internal::Color::Hsl {
-                hue,
-                saturation,
-                lightness,
-                alpha: None,
-            } => {
-                format!("hsl({}, {}%, {}%)", hue, saturation, lightness)
-            }
-            internal::Color::Hsl {
-                hue,
-                saturation,
-                lightness,
-                alpha: Some(a),
-            } => {
-                format!("hsla({}, {}%, {}%, {})", hue, saturation, lightness, a)
-            }
-        },
-        internal::CssValue::Function { name, args } => {
+        internal::CssValue::String { content, quote, .. } => {
+            source_fidelity::format_string_value(content, *quote)
+        }
+        internal::CssValue::Dimension { value, unit, .. } => {
+            source_fidelity::format_dimension_value(*value, unit)
+        }
+        internal::CssValue::Color { color, .. } => source_fidelity::format_color_value(color),
+        internal::CssValue::Function { name, args, .. } => {
             let args_str = args
                 .iter()
                 .map(format_css_value_for_json)
@@ -105,12 +89,12 @@ fn format_css_value_for_json(value: &internal::CssValue) -> String {
                 .join(", ");
             format!("{}({})", name, args_str)
         }
-        internal::CssValue::List { values } => values
+        internal::CssValue::List { values, .. } => values
             .iter()
             .map(format_css_value_for_json)
             .collect::<Vec<_>>()
             .join(" "),
-        internal::CssValue::CommaSeparated { values } => values
+        internal::CssValue::CommaSeparated { values, .. } => values
             .iter()
             .map(format_css_value_for_json)
             .collect::<Vec<_>>()
@@ -139,9 +123,18 @@ fn convert_css_comment(comment: &internal::CssComment) -> serde_json::Value {
 
 /// Convert a CSS rule to JSON representation
 fn convert_css_rule(rule: &internal::CssRule, source: &str) -> serde_json::Value {
+    // Filter out comments to match Svelte's CSS parser output
+    // (Our internal AST has comments for the formatter, but public JSON AST should match Svelte)
     let declarations: Vec<serde_json::Value> = rule
         .declarations
         .iter()
+        .filter_map(|child| {
+            if let internal::CssBlockChild::Declaration(decl) = child {
+                Some(decl)
+            } else {
+                None
+            }
+        })
         .map(|decl| {
             // SVELTE QUIRK: Extract property and value from source to preserve raw escapes
             // Svelte does NOT decode escape sequences in property names (only in selectors)
@@ -159,6 +152,9 @@ fn convert_css_rule(rule: &internal::CssRule, source: &str) -> serde_json::Value
             };
 
             // Apply Svelte quirks to value (backslash doubling, unicode duplication)
+            // TODO(Sprint 3 - Future): Consider selective semantic formatting for values without backslashes
+            // Current approach: Always extract from source to preserve ALL fidelity (leading zeros, etc.)
+            // Semantic formatting would require storing raw values in AST, which was removed in Sprint 1
             let value_with_quirks = escapes::apply_svelte_quirks(value_source);
 
             serde_json::json!({
@@ -461,8 +457,8 @@ fn convert_simple_selector(simple: &internal::SimpleSelector) -> serde_json::Val
 
 /// Convert a list of CSS nodes to a StyleSheet JSON structure
 pub fn convert_css_nodes(nodes: &[internal::CssNode], source: &str) -> serde_json::Value {
-    // Filter out comments (Svelte's CSS parser doesn't include them in the AST)
-    // but convert rules and at-rules
+    // Filter out comments to match Svelte's CSS parser output
+    // (Our internal AST has comments for the formatter, but public JSON AST should match Svelte)
     let children: Vec<serde_json::Value> = nodes
         .iter()
         .filter(|node| !matches!(node, internal::CssNode::Comment(_)))

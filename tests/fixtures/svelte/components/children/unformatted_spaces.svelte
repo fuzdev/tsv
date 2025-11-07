@@ -1,1 +1,1 @@
-<Comp>  <p>text  content</p>  </Comp>
+<Comp>  <p>text1  text2</p>  </Comp>

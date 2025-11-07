@@ -2,31 +2,31 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 92,
+    "end": 93,
     "attributes": [],
     "children": [
       {
         "type": "Atrule",
         "start": 9,
-        "end": 83,
+        "end": 84,
         "name": "keyframes",
-        "prelude": "fade",
+        "prelude": "anim1",
         "block": {
           "type": "Block",
-          "start": 25,
-          "end": 83,
+          "start": 26,
+          "end": 84,
           "children": [
             {
               "type": "Rule",
               "prelude": {
                 "type": "SelectorList",
-                "start": 29,
-                "end": 33,
+                "start": 30,
+                "end": 34,
                 "children": [
                   {
                     "type": "ComplexSelector",
-                    "start": 29,
-                    "end": 33,
+                    "start": 30,
+                    "end": 34,
                     "children": [
                       {
                         "type": "RelativeSelector",
@@ -35,12 +35,12 @@
                           {
                             "type": "TypeSelector",
                             "name": "from",
-                            "start": 29,
-                            "end": 33
+                            "start": 30,
+                            "end": 34
                           }
                         ],
-                        "start": 29,
-                        "end": 33
+                        "start": 30,
+                        "end": 34
                       }
                     ]
                   }
@@ -48,32 +48,32 @@
               },
               "block": {
                 "type": "Block",
-                "start": 34,
-                "end": 54,
+                "start": 35,
+                "end": 55,
                 "children": [
                   {
                     "type": "Declaration",
-                    "start": 39,
-                    "end": 49,
+                    "start": 40,
+                    "end": 50,
                     "property": "opacity",
                     "value": "0"
                   }
                 ]
               },
-              "start": 29,
-              "end": 54
+              "start": 30,
+              "end": 55
             },
             {
               "type": "Rule",
               "prelude": {
                 "type": "SelectorList",
-                "start": 57,
-                "end": 59,
+                "start": 58,
+                "end": 60,
                 "children": [
                   {
                     "type": "ComplexSelector",
-                    "start": 57,
-                    "end": 59,
+                    "start": 58,
+                    "end": 60,
                     "children": [
                       {
                         "type": "RelativeSelector",
@@ -82,12 +82,12 @@
                           {
                             "type": "TypeSelector",
                             "name": "to",
-                            "start": 57,
-                            "end": 59
+                            "start": 58,
+                            "end": 60
                           }
                         ],
-                        "start": 57,
-                        "end": 59
+                        "start": 58,
+                        "end": 60
                       }
                     ]
                   }
@@ -95,20 +95,20 @@
               },
               "block": {
                 "type": "Block",
-                "start": 60,
-                "end": 80,
+                "start": 61,
+                "end": 81,
                 "children": [
                   {
                     "type": "Declaration",
-                    "start": 65,
-                    "end": 75,
+                    "start": 66,
+                    "end": 76,
                     "property": "opacity",
                     "value": "1"
                   }
                 ]
               },
-              "start": 57,
-              "end": 80
+              "start": 58,
+              "end": 81
             }
           ]
         }
@@ -116,8 +116,8 @@
     ],
     "content": {
       "start": 7,
-      "end": 84,
-      "styles": "\n\t@keyframes fade {\n\t\tfrom {\n\t\t\topacity: 0;\n\t\t}\n\t\tto {\n\t\t\topacity: 1;\n\t\t}\n\t}\n",
+      "end": 85,
+      "styles": "\n\t@keyframes anim1 {\n\t\tfrom {\n\t\t\topacity: 0;\n\t\t}\n\t\tto {\n\t\t\topacity: 1;\n\t\t}\n\t}\n",
       "comment": null
     }
   },

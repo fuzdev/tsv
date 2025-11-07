@@ -6,7 +6,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
-use tsv_css::ast::internal::CssNode;
+use tsv_css::ast::internal::CssStyleSheet;
 use tsv_lang::Span;
 use tsv_ts::ast::internal::{Expression, Program};
 
@@ -160,5 +160,5 @@ pub struct Style {
     pub span: Span,         // Full <style>...</style> span
     pub content_span: Span, // Just the CSS text inside the tags
     pub attributes: Vec<Attribute>,
-    pub css_nodes: Vec<CssNode>, // Parsed CSS AST
+    pub css_stylesheet: CssStyleSheet, // Parsed CSS stylesheet (nodes + value comments)
 }

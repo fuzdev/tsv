@@ -2,7 +2,7 @@
   "css": null,
   "js": [],
   "start": 0,
-  "end": 25,
+  "end": 33,
   "type": "Root",
   "fragment": {
     "type": "Fragment",
@@ -10,7 +10,7 @@
       {
         "type": "RegularElement",
         "start": 0,
-        "end": 25,
+        "end": 33,
         "name": "div",
         "attributes": [],
         "fragment": {
@@ -19,11 +19,11 @@
             {
               "type": "ExpressionTag",
               "start": 5,
-              "end": 10,
+              "end": 14,
               "expression": {
                 "type": "Literal",
                 "start": 6,
-                "end": 9,
+                "end": 13,
                 "loc": {
                   "start": {
                     "line": 1,
@@ -31,40 +31,39 @@
                   },
                   "end": {
                     "line": 1,
-                    "column": 9
+                    "column": 13
                   }
                 },
-                "value": "a",
-                "raw": "'a'"
+                "value": "expr1",
+                "raw": "'expr1'"
               }
             },
             {
               "type": "Text",
-              "start": 10,
-              "end": 16,
+              "start": 14,
+              "end": 20,
               "raw": " text ",
               "data": " text "
             },
             {
               "type": "ExpressionTag",
-              "start": 16,
-              "end": 19,
+              "start": 20,
+              "end": 27,
               "expression": {
-                "type": "Literal",
-                "start": 17,
-                "end": 18,
+                "type": "Identifier",
+                "start": 21,
+                "end": 26,
                 "loc": {
                   "start": {
                     "line": 1,
-                    "column": 17
+                    "column": 21
                   },
                   "end": {
                     "line": 1,
-                    "column": 18
+                    "column": 26
                   }
                 },
-                "value": 2,
-                "raw": "2"
+                "name": "expr2"
               }
             }
           ]

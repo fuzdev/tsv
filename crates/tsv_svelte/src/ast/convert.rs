@@ -16,23 +16,24 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
     //
     // The Root node's start/end positions follow conditional rules based on fragment content:
     //
-    // Rule 1: NULL when fragment has no non-Text nodes
-    //   - Script-only files: `<script>...</script>` → start=null, end=null
-    //   - CSS-only files: `<style>...</style>` → start=null, end=null
-    //   - Empty files or whitespace-only → start=null, end=null
+    // Rule 1: NULL when fragment is EMPTY (no nodes at all)
+    //   - Script-only files: `<script>...</script>` → start=null, end=null (0 fragment nodes)
+    //   - CSS-only files: `<style>...</style>` → start=null, end=null (0 fragment nodes)
+    //   - Empty files or whitespace-only → start=null, end=null (0 fragment nodes)
     //
-    // Rule 2: SET when fragment has at least one non-Text node
-    //   - Template-only: `<div></div>` → start=0, end=11
+    // Rule 2: SET when fragment has ANY nodes (including Text nodes)
+    //   - Text-only: `plain text` → start=0, end=10 (1 Text node)
+    //   - Template-only: `<div></div>` → start=0, end=11 (1 Element node)
     //   - Script+template: `<script>...</script>\n<div></div>` → start=div_start, end=div_end
-    //   - Any combination with actual markup (elements, expression tags, etc.)
+    //   - Any combination with fragment content (Text, Element, ExpressionTag, etc.)
     //
     // Rule 3: What the positions span
-    //   - start: Position of the FIRST non-Text fragment node (Element, ExpressionTag, etc.)
-    //   - end: Position AFTER the LAST fragment node (including trailing Text nodes)
+    //   - start: Position of the FIRST fragment node (Text, Element, or ExpressionTag)
+    //   - end: Position AFTER the LAST fragment node (Text, Element, or ExpressionTag)
     //
-    // Critical insight: Text nodes (whitespace) are asymmetric:
-    //   - Leading text does NOT affect start (ignored when finding first non-Text node)
-    //   - Trailing text DOES affect end (included in final position)
+    // Critical insight: Text nodes ARE fragment content
+    //   - Text-only files get start/end set (e.g., "hello" → start=0, end=5)
+    //   - Script/style-only files have empty fragments, so start=null, end=null
     //
     // Examples:
     //   `<div></div>` → start=0, end=11
@@ -67,18 +68,15 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
     // - Proper root.start positioning (first non-instance-script item)
     // - Maximum end across all top-level nodes
     let (start, end) = {
-        // Check if we have actual template markup (non-Text fragment nodes)
-        let has_template_markup = root
-            .fragment
-            .nodes
-            .iter()
-            .any(|node| !matches!(node, internal::FragmentNode::Text(_)));
+        // Check if fragment has ANY nodes (Text, Element, or ExpressionTag)
+        // Text nodes ARE content - text-only files should get start/end set
+        let has_fragment_content = !root.fragment.nodes.is_empty();
 
-        if has_template_markup {
-            // Use the parser's calculated span
+        if has_fragment_content {
+            // Fragment has content (Text, Element, or ExpressionTag) - use parser's calculated span
             (Some(root.span.start), Some(root.span.end))
         } else {
-            // No template markup - check for the script+CSS bug case
+            // Fragment is empty (script-only, CSS-only, or empty file)
 
             // ⚠️ BUG REPLICATION: Detect script+CSS with no template
             // Svelte produces inverted positions (start > end) in this case
@@ -89,10 +87,10 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
                 // BUG: start=css.start, end=module.end (inverted!)
                 (Some(css.span.start), Some(script.span.end))
             } else if root.instance.is_some() || root.module.is_some() || root.css.is_some() {
-                // Script-only, CSS-only, or only text nodes: null/null (correct behavior)
+                // Script-only or CSS-only: null/null
                 (None, None)
             } else {
-                // Empty file
+                // Empty file (no script, no CSS, no fragment content)
                 (Some(0), Some(0))
             }
         }
@@ -334,9 +332,11 @@ fn convert_style(
         source[style.content_span.start as usize..style.content_span.end as usize].to_string();
 
     // Delegate to tsv_css for CSS node conversion
-    // Filter out comments (Svelte's CSS parser doesn't include them in the AST)
+    // Filter out comments to match Svelte's CSS parser output
+    // (Our internal AST has comments for the formatter, but public JSON AST should match Svelte)
     let children: Vec<serde_json::Value> = style
-        .css_nodes
+        .css_stylesheet
+        .nodes
         .iter()
         .filter(|node| !matches!(node, tsv_css::ast::internal::CssNode::Comment(_)))
         .map(|node| tsv_css::ast::convert::convert_css_node(node, source))

@@ -1,7 +1,7 @@
 <script lang="ts">
 
 const
-a
+expr
 :
 
 number

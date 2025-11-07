@@ -2,7 +2,7 @@
   "css": null,
   "js": [],
   "start": 0,
-  "end": 19,
+  "end": 29,
   "type": "Root",
   "fragment": {
     "type": "Fragment",
@@ -10,7 +10,7 @@
       {
         "type": "RegularElement",
         "start": 0,
-        "end": 19,
+        "end": 29,
         "name": "div",
         "attributes": [],
         "fragment": {
@@ -19,11 +19,11 @@
             {
               "type": "ExpressionTag",
               "start": 5,
-              "end": 10,
+              "end": 14,
               "expression": {
                 "type": "Literal",
                 "start": 6,
-                "end": 9,
+                "end": 13,
                 "loc": {
                   "start": {
                     "line": 1,
@@ -31,33 +31,33 @@
                   },
                   "end": {
                     "line": 1,
-                    "column": 9
+                    "column": 13
                   }
                 },
-                "value": "a",
-                "raw": "'a'"
+                "value": "expr1",
+                "raw": "'expr1'"
               }
             },
             {
               "type": "ExpressionTag",
-              "start": 10,
-              "end": 13,
+              "start": 14,
+              "end": 23,
               "expression": {
                 "type": "Literal",
-                "start": 11,
-                "end": 12,
+                "start": 15,
+                "end": 22,
                 "loc": {
                   "start": {
                     "line": 1,
-                    "column": 11
+                    "column": 15
                   },
                   "end": {
                     "line": 1,
-                    "column": 12
+                    "column": 22
                   }
                 },
-                "value": 2,
-                "raw": "2"
+                "value": "expr2",
+                "raw": "'expr2'"
               }
             }
           ]

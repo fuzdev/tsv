@@ -1,3 +1,3 @@
-<span>text <Comp
->5</Comp
-> items</span>
+<span>text1 <Comp
+>text2</Comp
+> text3</span>

@@ -92,12 +92,54 @@ impl<'a> Printer<'a> {
             internal::CssBlockChild::Rule(rule) => {
                 // Format rule selector and opening brace
                 self.print_selector_list(&rule.selector);
+
+                // Check if first child is a comment after selector (before {)
+                let mut start_index = 0;
+                if let Some(internal::CssBlockChild::Comment(comment)) = rule.declarations.first() {
+                    // Check if comment is on same line as selector (inline after selector)
+                    if self.is_same_line(rule.selector.span.end, comment.span.start) {
+                        // Print comment inline after selector
+                        self.write(" /*");
+                        self.write(&comment.content);
+                        self.write("*/");
+                        start_index = 1; // Skip this comment when processing declarations
+                    }
+                }
+
                 self.write(" {\n");
 
-                // Format declarations with proper indentation
+                // Format declarations and comments with proper indentation
                 self.indent_level += 1;
-                for decl in &rule.declarations {
-                    self.print_css_declaration(decl);
+                let mut i = start_index;
+                while i < rule.declarations.len() {
+                    let child = &rule.declarations[i];
+                    match child {
+                        internal::CssBlockChild::Declaration(decl) => {
+                            self.print_css_declaration(decl);
+
+                            // Check if next child is an inline comment
+                            if let Some(internal::CssBlockChild::Comment(next_comment)) =
+                                rule.declarations.get(i + 1)
+                                && self.is_same_line(decl.span.end, next_comment.span.start) {
+                                    // Print comment inline
+                                    self.buffer_remove_trailing_newline();
+                                    self.write(" /*");
+                                    self.write(&next_comment.content);
+                                    self.write("*/\n");
+                                    i += 1; // Skip the comment in the next iteration
+                                }
+                        }
+                        internal::CssBlockChild::Comment(comment) => {
+                            // Standalone comment (not inline after a declaration)
+                            self.write_indent();
+                            self.print_css_comment(comment);
+                            self.write("\n");
+                        }
+                        internal::CssBlockChild::Rule(_) | internal::CssBlockChild::Atrule(_) => {
+                            // Nested rules not expected here
+                        }
+                    }
+                    i += 1;
                 }
                 self.indent_level -= 1;
 

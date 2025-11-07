@@ -1,1 +1,1 @@
-<span><strong>bold text</strong></span>
+<span><strong>inline1</strong></span>

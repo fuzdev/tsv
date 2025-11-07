@@ -5,25 +5,25 @@
 	const cedilla = 'c\u0327';
 </script>
 
-<p>Combining acute: e&#769;</p>
-<p>Combining grave: a&#x0300;</p>
-<p>Combining tilde: n&#771;</p>
-<p>Combining cedilla: c&#807;</p>
+<p>combining acute: e&#769;</p>
+<p>combining grave: a&#x0300;</p>
+<p>combining tilde: n&#771;</p>
+<p>combining cedilla: c&#807;</p>
 
 <style>
-	.acute::before {
+	.class1::before {
 		content: 'e\301';
 	}
 
-	.grave::before {
+	.class2::before {
 		content: 'a\300';
 	}
 
-	.tilde::before {
+	.class3::before {
 		content: 'n\303';
 	}
 
-	.cedilla::before {
+	.class4::before {
 		content: 'c\327';
 	}
 </style>

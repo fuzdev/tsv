@@ -181,8 +181,8 @@
               "type": "Text",
               "start": 117,
               "end": 144,
-              "raw": "Emoji via entity: &#128169;",
-              "data": "Emoji via entity: 💩"
+              "raw": "emoji via entity: &#128169;",
+              "data": "emoji via entity: 💩"
             }
           ]
         }
@@ -207,8 +207,8 @@
               "type": "Text",
               "start": 152,
               "end": 183,
-              "raw": "Heart via hex entity: &#x1F496;",
-              "data": "Heart via hex entity: 💖"
+              "raw": "heart via hex entity: &#x1F496;",
+              "data": "heart via hex entity: 💖"
             }
           ]
         }
@@ -233,8 +233,8 @@
               "type": "Text",
               "start": 191,
               "end": 220,
-              "raw": "Rocket via decimal: &#128640;",
-              "data": "Rocket via decimal: 🚀"
+              "raw": "rocket via decimal: &#128640;",
+              "data": "rocket via decimal: 🚀"
             }
           ]
         }

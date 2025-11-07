@@ -1,17 +1,18 @@
 use crate::ast::internal::CssValue;
+use tsv_lang::Span;
 
 /// Parse dimension value: "10px", "1.5em", "50%", or unitless number
-pub fn parse_dimension(s: &str) -> Option<CssValue> {
-    let (number, unit, source) = parse_dimension_parts(s)?;
+pub fn parse_dimension(s: &str, span: Span) -> Option<CssValue> {
+    let (number, unit) = parse_dimension_parts(s)?;
     Some(CssValue::Dimension {
         value: number,
         unit,
-        source,
+        span,
     })
 }
 
 /// Extract numeric part and unit from a dimension string
-fn parse_dimension_parts(s: &str) -> Option<(f64, String, String)> {
+fn parse_dimension_parts(s: &str) -> Option<(f64, String)> {
     let mut num_end = 0;
     let mut found_dot = false;
     let bytes = s.as_bytes();
@@ -45,7 +46,6 @@ fn parse_dimension_parts(s: &str) -> Option<(f64, String, String)> {
     let num_str = &s[..num_end];
     let number = num_str.parse::<f64>().ok()?;
     let unit = s[num_end..].to_string();
-    let source = s.to_string(); // preserve full source including leading zeros
 
-    Some((number, unit, source))
+    Some((number, unit))
 }

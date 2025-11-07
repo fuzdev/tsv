@@ -1,10 +1,10 @@
 
 
 <Comp
-primary
+prop1
 
 
-disabled
+prop2
 
 />
 

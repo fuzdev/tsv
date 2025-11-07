@@ -2,7 +2,7 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 358,
+    "end": 359,
     "attributes": [],
     "children": [
       {
@@ -25,9 +25,9 @@
                       "type": "AttributeSelector",
                       "start": 9,
                       "end": 30,
-                      "name": "data-type",
+                      "name": "data-attr1",
                       "matcher": "=",
-                      "value": "primary",
+                      "value": "value1",
                       "flags": null
                     }
                   ],
@@ -67,12 +67,12 @@
         "prelude": {
           "type": "SelectorList",
           "start": 74,
-          "end": 88,
+          "end": 95,
           "children": [
             {
               "type": "ComplexSelector",
               "start": 74,
-              "end": 88,
+              "end": 95,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -81,15 +81,15 @@
                     {
                       "type": "AttributeSelector",
                       "start": 74,
-                      "end": 88,
-                      "name": "lang",
+                      "end": 95,
+                      "name": "data-attr2",
                       "matcher": "=",
-                      "value": "en-US",
+                      "value": "value2",
                       "flags": null
                     }
                   ],
                   "start": 74,
-                  "end": 88
+                  "end": 95
                 }
               ]
             }
@@ -97,32 +97,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 89,
-          "end": 138,
+          "start": 96,
+          "end": 122,
           "children": [
             {
               "type": "Declaration",
-              "start": 93,
-              "end": 134,
+              "start": 100,
+              "end": 118,
               "property": "font-family",
-              "value": "'American Typewriter', serif"
+              "value": "serif"
             }
           ]
         },
         "start": 74,
-        "end": 138
+        "end": 122
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 141,
-          "end": 159,
+          "start": 125,
+          "end": 151,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 141,
-              "end": 159,
+              "start": 125,
+              "end": 151,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -131,21 +131,21 @@
                     {
                       "type": "TypeSelector",
                       "name": "input",
-                      "start": 141,
-                      "end": 146
+                      "start": 125,
+                      "end": 130
                     },
                     {
                       "type": "AttributeSelector",
-                      "start": 146,
-                      "end": 159,
-                      "name": "type",
+                      "start": 130,
+                      "end": 151,
+                      "name": "data-attr3",
                       "matcher": "=",
-                      "value": "text",
+                      "value": "value3",
                       "flags": null
                     }
                   ],
-                  "start": 141,
-                  "end": 159
+                  "start": 125,
+                  "end": 151
                 }
               ]
             }
@@ -153,32 +153,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 160,
-          "end": 190,
+          "start": 152,
+          "end": 182,
           "children": [
             {
               "type": "Declaration",
-              "start": 164,
-              "end": 186,
+              "start": 156,
+              "end": 178,
               "property": "border",
               "value": "1px solid gray"
             }
           ]
         },
-        "start": 141,
-        "end": 190
+        "start": 125,
+        "end": 182
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 193,
-          "end": 215,
+          "start": 185,
+          "end": 211,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 193,
-              "end": 215,
+              "start": 185,
+              "end": 211,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -187,21 +187,21 @@
                     {
                       "type": "TypeSelector",
                       "name": "input",
-                      "start": 193,
-                      "end": 198
+                      "start": 185,
+                      "end": 190
                     },
                     {
                       "type": "AttributeSelector",
-                      "start": 198,
-                      "end": 215,
-                      "name": "type",
+                      "start": 190,
+                      "end": 211,
+                      "name": "data-attr4",
                       "matcher": "=",
-                      "value": "password",
+                      "value": "value4",
                       "flags": null
                     }
                   ],
-                  "start": 193,
-                  "end": 215
+                  "start": 185,
+                  "end": 211
                 }
               ]
             }
@@ -209,31 +209,31 @@
         },
         "block": {
           "type": "Block",
-          "start": 216,
-          "end": 246,
+          "start": 212,
+          "end": 242,
           "children": [
             {
               "type": "Declaration",
-              "start": 220,
-              "end": 242,
+              "start": 216,
+              "end": 238,
               "property": "font-family",
               "value": "monospace"
             }
           ]
         },
-        "start": 193,
-        "end": 246
+        "start": 185,
+        "end": 242
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 249,
+          "start": 245,
           "end": 267,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 249,
+              "start": 245,
               "end": 267,
               "children": [
                 {
@@ -243,20 +243,20 @@
                     {
                       "type": "TypeSelector",
                       "name": "a",
-                      "start": 249,
-                      "end": 250
+                      "start": 245,
+                      "end": 246
                     },
                     {
                       "type": "AttributeSelector",
-                      "start": 250,
+                      "start": 246,
                       "end": 267,
-                      "name": "target",
+                      "name": "data-attr5",
                       "matcher": "=",
-                      "value": "_blank",
+                      "value": "value5",
                       "flags": null
                     }
                   ],
-                  "start": 249,
+                  "start": 245,
                   "end": 267
                 }
               ]
@@ -277,7 +277,7 @@
             }
           ]
         },
-        "start": 249,
+        "start": 245,
         "end": 302
       },
       {
@@ -285,12 +285,12 @@
         "prelude": {
           "type": "SelectorList",
           "start": 305,
-          "end": 325,
+          "end": 326,
           "children": [
             {
               "type": "ComplexSelector",
               "start": 305,
-              "end": 325,
+              "end": 326,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -299,15 +299,15 @@
                     {
                       "type": "AttributeSelector",
                       "start": 305,
-                      "end": 325,
-                      "name": "aria-label",
+                      "end": 326,
+                      "name": "data-attr6",
                       "matcher": "=",
-                      "value": "Close",
+                      "value": "value6",
                       "flags": null
                     }
                   ],
                   "start": 305,
-                  "end": 325
+                  "end": 326
                 }
               ]
             }
@@ -315,26 +315,26 @@
         },
         "block": {
           "type": "Block",
-          "start": 326,
-          "end": 349,
+          "start": 327,
+          "end": 350,
           "children": [
             {
               "type": "Declaration",
-              "start": 330,
-              "end": 345,
+              "start": 331,
+              "end": 346,
               "property": "cursor",
               "value": "pointer"
             }
           ]
         },
         "start": 305,
-        "end": 349
+        "end": 350
       }
     ],
     "content": {
       "start": 7,
-      "end": 350,
-      "styles": "\n\t[data-type='primary'] {\n\t\tbackground: blue;\n\t\tcolor: white;\n\t}\n\n\t[lang='en-US'] {\n\t\tfont-family: 'American Typewriter', serif;\n\t}\n\n\tinput[type='text'] {\n\t\tborder: 1px solid gray;\n\t}\n\n\tinput[type='password'] {\n\t\tfont-family: monospace;\n\t}\n\n\ta[target='_blank'] {\n\t\ttext-decoration: underline;\n\t}\n\n\t[aria-label='Close'] {\n\t\tcursor: pointer;\n\t}\n",
+      "end": 351,
+      "styles": "\n\t[data-attr1='value1'] {\n\t\tbackground: blue;\n\t\tcolor: white;\n\t}\n\n\t[data-attr2='value2'] {\n\t\tfont-family: serif;\n\t}\n\n\tinput[data-attr3='value3'] {\n\t\tborder: 1px solid gray;\n\t}\n\n\tinput[data-attr4='value4'] {\n\t\tfont-family: monospace;\n\t}\n\n\ta[data-attr5='value5'] {\n\t\ttext-decoration: underline;\n\t}\n\n\t[data-attr6='value6'] {\n\t\tcursor: pointer;\n\t}\n",
       "comment": null
     }
   },

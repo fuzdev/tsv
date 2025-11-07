@@ -6,34 +6,34 @@
 	const rlm = '\u200F';
 </script>
 
-<p>Zero-width space: &#8203;word</p>
-<p>Non-breaking space:&nbsp;word</p>
-<p>Zero-width joiner: &#x200D;word</p>
-<p>Left-to-right mark: &#8206;text</p>
-<p>Right-to-left mark: &#x200F;text</p>
+<p>zero-width space: &#8203;text</p>
+<p>non-breaking space:&nbsp;text</p>
+<p>zero-width joiner: &#x200D;text</p>
+<p>left-to-right mark: &#8206;text</p>
+<p>right-to-left mark: &#x200F;text</p>
 
 <style>
-	.zwsp {
+	.class1 {
 		content: '\200B';
 	}
 
-	.nbsp {
+	.class2 {
 		content: '\A0';
 	}
 
-	.zwnj {
+	.class3 {
 		content: '\200C';
 	}
 
-	.zwj {
+	.class4 {
 		content: '\200D';
 	}
 
-	.lrm {
+	.class5 {
 		content: '\200E';
 	}
 
-	.rlm {
+	.class6 {
 		content: '\200F';
 	}
 </style>

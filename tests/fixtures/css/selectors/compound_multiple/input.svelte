@@ -1,19 +1,19 @@
 <style>
 	/* Test multiple compound selectors chained together */
-	a.link.external#nav-link {
+	a.class1.class2#id1 {
 		color: blue;
 		text-decoration: underline;
 	}
 
-	input.field.required#email {
+	input.class3.class4#id2 {
 		border: 1px solid red;
 	}
 
-	.btn.btn-primary.btn-large#action-btn {
+	.class5.class6.class7#id3 {
 		padding: 10px 20px;
 	}
 
-	div.container.flex.col#wrapper {
+	div.class8.class9.class10#id4 {
 		display: flex;
 		flex-direction: column;
 	}

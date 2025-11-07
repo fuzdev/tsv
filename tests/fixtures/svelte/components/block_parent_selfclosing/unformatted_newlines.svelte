@@ -1,2 +1,2 @@
-<p>text <Comp
-/> more</p>
+<p>text1 <Comp
+/> text2</p>

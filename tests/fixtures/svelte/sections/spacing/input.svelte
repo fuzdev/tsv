@@ -1,18 +1,18 @@
 <script module>
-	const m = '';
+	const expr1 = '';
 </script>
 
 <script lang="ts">
-	const a: number = 5;
+	const expr2: number = 5;
 </script>
 
-<div>{a}</div>
+<div>{expr2}</div>
 
-<div>{a}</div>
+<div>{expr2}</div>
 
-<div>{a}</div>
+<div>{expr2}</div>
 
-<div>{a}</div>
+<div>{expr2}</div>
 
 <style>
 	div {

@@ -13,12 +13,12 @@
   "instance": {
     "type": "Script",
     "start": 0,
-    "end": 74,
+    "end": 71,
     "context": "default",
     "content": {
       "type": "Program",
       "start": 18,
-      "end": 65,
+      "end": 62,
       "loc": {
         "start": {
           "line": 1,
@@ -33,7 +33,7 @@
         {
           "type": "VariableDeclaration",
           "start": 20,
-          "end": 45,
+          "end": 42,
           "loc": {
             "start": {
               "line": 2,
@@ -41,14 +41,14 @@
             },
             "end": {
               "line": 2,
-              "column": 26
+              "column": 23
             }
           },
           "declarations": [
             {
               "type": "VariableDeclarator",
               "start": 26,
-              "end": 44,
+              "end": 41,
               "loc": {
                 "start": {
                   "line": 2,
@@ -56,13 +56,13 @@
                 },
                 "end": {
                   "line": 2,
-                  "column": 25
+                  "column": 22
                 }
               },
               "id": {
                 "type": "Identifier",
                 "start": 26,
-                "end": 34,
+                "end": 31,
                 "loc": {
                   "start": {
                     "line": 2,
@@ -70,27 +70,27 @@
                   },
                   "end": {
                     "line": 2,
-                    "column": 15
+                    "column": 12
                   }
                 },
-                "name": "greeting"
+                "name": "expr1"
               },
               "init": {
                 "type": "Literal",
-                "start": 37,
-                "end": 44,
+                "start": 34,
+                "end": 41,
                 "loc": {
                   "start": {
                     "line": 2,
-                    "column": 18
+                    "column": 15
                   },
                   "end": {
                     "line": 2,
-                    "column": 25
+                    "column": 22
                   }
                 },
-                "value": "hello",
-                "raw": "'hello'"
+                "value": "value",
+                "raw": "'value'"
               }
             }
           ],
@@ -98,8 +98,8 @@
         },
         {
           "type": "VariableDeclaration",
-          "start": 47,
-          "end": 64,
+          "start": 44,
+          "end": 61,
           "loc": {
             "start": {
               "line": 3,
@@ -113,8 +113,8 @@
           "declarations": [
             {
               "type": "VariableDeclarator",
-              "start": 53,
-              "end": 63,
+              "start": 50,
+              "end": 60,
               "loc": {
                 "start": {
                   "line": 3,
@@ -127,8 +127,8 @@
               },
               "id": {
                 "type": "Identifier",
-                "start": 53,
-                "end": 58,
+                "start": 50,
+                "end": 55,
                 "loc": {
                   "start": {
                     "line": 3,
@@ -139,12 +139,12 @@
                     "column": 12
                   }
                 },
-                "name": "empty"
+                "name": "expr2"
               },
               "init": {
                 "type": "Literal",
-                "start": 61,
-                "end": 63,
+                "start": 58,
+                "end": 60,
                 "loc": {
                   "start": {
                     "line": 3,

@@ -2,7 +2,7 @@
   "css": null,
   "js": [],
   "start": 0,
-  "end": 541,
+  "end": 577,
   "type": "Root",
   "fragment": {
     "type": "Fragment",
@@ -10,18 +10,18 @@
       {
         "type": "RegularElement",
         "start": 0,
-        "end": 62,
+        "end": 66,
         "name": "div",
         "attributes": [
           {
             "type": "Attribute",
             "start": 5,
-            "end": 35,
-            "name": "title",
+            "end": 39,
+            "name": "data-attr",
             "value": [
               {
-                "start": 12,
-                "end": 34,
+                "start": 16,
+                "end": 38,
                 "type": "Text",
                 "raw": "&lt;tag&gt; &amp; more",
                 "data": "<tag> & more"
@@ -34,36 +34,36 @@
           "nodes": [
             {
               "type": "Text",
-              "start": 36,
-              "end": 56,
-              "raw": "Basic named entities",
-              "data": "Basic named entities"
+              "start": 40,
+              "end": 60,
+              "raw": "basic named entities",
+              "data": "basic named entities"
             }
           ]
         }
       },
       {
         "type": "Text",
-        "start": 62,
-        "end": 64,
+        "start": 66,
+        "end": 68,
         "raw": "\n\n",
         "data": "\n\n"
       },
       {
         "type": "RegularElement",
-        "start": 64,
-        "end": 121,
+        "start": 68,
+        "end": 129,
         "name": "div",
         "attributes": [
           {
             "type": "Attribute",
-            "start": 69,
-            "end": 100,
-            "name": "title",
+            "start": 73,
+            "end": 108,
+            "name": "data-attr",
             "value": [
               {
-                "start": 76,
-                "end": 99,
+                "start": 84,
+                "end": 107,
                 "type": "Text",
                 "raw": "&quot;quoted&quot; text",
                 "data": "\"quoted\" text"
@@ -76,36 +76,36 @@
           "nodes": [
             {
               "type": "Text",
-              "start": 101,
-              "end": 115,
-              "raw": "Quote entities",
-              "data": "Quote entities"
+              "start": 109,
+              "end": 123,
+              "raw": "quote entities",
+              "data": "quote entities"
             }
           ]
         }
       },
       {
         "type": "Text",
-        "start": 121,
-        "end": 123,
+        "start": 129,
+        "end": 131,
         "raw": "\n\n",
         "data": "\n\n"
       },
       {
         "type": "RegularElement",
-        "start": 123,
-        "end": 176,
+        "start": 131,
+        "end": 188,
         "name": "div",
         "attributes": [
           {
             "type": "Attribute",
-            "start": 128,
-            "end": 152,
-            "name": "title",
+            "start": 136,
+            "end": 164,
+            "name": "data-attr",
             "value": [
               {
-                "start": 135,
-                "end": 151,
+                "start": 147,
+                "end": 163,
                 "type": "Text",
                 "raw": "It&#39;s working",
                 "data": "It's working"
@@ -118,36 +118,36 @@
           "nodes": [
             {
               "type": "Text",
-              "start": 153,
-              "end": 170,
-              "raw": "Apostrophe entity",
-              "data": "Apostrophe entity"
+              "start": 165,
+              "end": 182,
+              "raw": "apostrophe entity",
+              "data": "apostrophe entity"
             }
           ]
         }
       },
       {
         "type": "Text",
-        "start": 176,
-        "end": 178,
+        "start": 188,
+        "end": 190,
         "raw": "\n\n",
         "data": "\n\n"
       },
       {
         "type": "RegularElement",
-        "start": 178,
-        "end": 261,
+        "start": 190,
+        "end": 273,
         "name": "div",
         "attributes": [
           {
             "type": "Attribute",
-            "start": 183,
-            "end": 240,
-            "name": "data-text",
+            "start": 195,
+            "end": 252,
+            "name": "data-attr",
             "value": [
               {
-                "start": 194,
-                "end": 239,
+                "start": 206,
+                "end": 251,
                 "type": "Text",
                 "raw": "Copyright &copy; 2024 &ndash; Example &trade;",
                 "data": "Copyright © 2024 – Example ™"
@@ -160,36 +160,36 @@
           "nodes": [
             {
               "type": "Text",
-              "start": 241,
-              "end": 255,
-              "raw": "Mixed entities",
-              "data": "Mixed entities"
+              "start": 253,
+              "end": 267,
+              "raw": "mixed entities",
+              "data": "mixed entities"
             }
           ]
         }
       },
       {
         "type": "Text",
-        "start": 261,
-        "end": 263,
+        "start": 273,
+        "end": 275,
         "raw": "\n\n",
         "data": "\n\n"
       },
       {
         "type": "RegularElement",
-        "start": 263,
-        "end": 328,
+        "start": 275,
+        "end": 346,
         "name": "div",
         "attributes": [
           {
             "type": "Attribute",
-            "start": 268,
-            "end": 305,
-            "name": "alt",
+            "start": 280,
+            "end": 323,
+            "name": "data-attr",
             "value": [
               {
-                "start": 273,
-                "end": 304,
+                "start": 291,
+                "end": 322,
                 "type": "Text",
                 "raw": "Arrow &#8594; and &#x2192; same",
                 "data": "Arrow → and → same"
@@ -202,51 +202,51 @@
           "nodes": [
             {
               "type": "Text",
-              "start": 306,
-              "end": 322,
-              "raw": "Numeric entities",
-              "data": "Numeric entities"
+              "start": 324,
+              "end": 340,
+              "raw": "numeric entities",
+              "data": "numeric entities"
             }
           ]
         }
       },
       {
         "type": "Text",
-        "start": 328,
-        "end": 330,
+        "start": 346,
+        "end": 348,
         "raw": "\n\n",
         "data": "\n\n"
       },
       {
         "type": "RegularElement",
-        "start": 330,
-        "end": 398,
+        "start": 348,
+        "end": 436,
         "name": "img",
         "attributes": [
           {
             "type": "Attribute",
-            "start": 335,
-            "end": 349,
-            "name": "src",
+            "start": 353,
+            "end": 375,
+            "name": "data-attr1",
             "value": [
               {
-                "start": 340,
-                "end": 348,
+                "start": 365,
+                "end": 374,
                 "type": "Text",
-                "raw": "test.jpg",
-                "data": "test.jpg"
+                "raw": "image.jpg",
+                "data": "image.jpg"
               }
             ]
           },
           {
             "type": "Attribute",
-            "start": 350,
-            "end": 371,
-            "name": "alt",
+            "start": 376,
+            "end": 404,
+            "name": "data-attr2",
             "value": [
               {
-                "start": 355,
-                "end": 370,
+                "start": 388,
+                "end": 403,
                 "type": "Text",
                 "raw": "Image &lt;1&gt;",
                 "data": "Image <1>"
@@ -255,13 +255,13 @@
           },
           {
             "type": "Attribute",
-            "start": 372,
-            "end": 395,
-            "name": "title",
+            "start": 405,
+            "end": 433,
+            "name": "data-attr3",
             "value": [
               {
-                "start": 379,
-                "end": 394,
+                "start": 417,
+                "end": 432,
                 "type": "Text",
                 "raw": "Test &amp; Demo",
                 "data": "Test & Demo"
@@ -276,26 +276,26 @@
       },
       {
         "type": "Text",
-        "start": 398,
-        "end": 400,
+        "start": 436,
+        "end": 438,
         "raw": "\n\n",
         "data": "\n\n"
       },
       {
         "type": "RegularElement",
-        "start": 400,
-        "end": 483,
+        "start": 438,
+        "end": 520,
         "name": "div",
         "attributes": [
           {
             "type": "Attribute",
-            "start": 405,
-            "end": 459,
-            "name": "data-value",
+            "start": 443,
+            "end": 496,
+            "name": "data-attr",
             "value": [
               {
-                "start": 417,
-                "end": 458,
+                "start": 454,
+                "end": 495,
                 "type": "Text",
                 "raw": "&lt;div&gt;&quot;nested&quot;&lt;/div&gt;",
                 "data": "<div>\"nested\"</div>"
@@ -308,36 +308,36 @@
           "nodes": [
             {
               "type": "Text",
-              "start": 460,
-              "end": 477,
-              "raw": "Complex sequences",
-              "data": "Complex sequences"
+              "start": 497,
+              "end": 514,
+              "raw": "complex sequences",
+              "data": "complex sequences"
             }
           ]
         }
       },
       {
         "type": "Text",
-        "start": 483,
-        "end": 485,
+        "start": 520,
+        "end": 522,
         "raw": "\n\n",
         "data": "\n\n"
       },
       {
         "type": "RegularElement",
-        "start": 485,
-        "end": 541,
+        "start": 522,
+        "end": 577,
         "name": "span",
         "attributes": [
           {
             "type": "Attribute",
-            "start": 491,
-            "end": 515,
-            "name": "data-price",
+            "start": 528,
+            "end": 551,
+            "name": "data-attr",
             "value": [
               {
-                "start": 503,
-                "end": 514,
+                "start": 539,
+                "end": 550,
                 "type": "Text",
                 "raw": "&euro;99.99",
                 "data": "€99.99"
@@ -350,10 +350,10 @@
           "nodes": [
             {
               "type": "Text",
-              "start": 516,
-              "end": 534,
-              "raw": "Special characters",
-              "data": "Special characters"
+              "start": 552,
+              "end": 570,
+              "raw": "special characters",
+              "data": "special characters"
             }
           ]
         }

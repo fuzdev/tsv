@@ -1,18 +1,18 @@
 <style>
 	/* Test compound selectors with type, class, and ID */
-	div.container {
+	div.class1 {
 		width: 1200px;
 	}
 
-	button.btn#submit {
+	button.class2#id1 {
 		color: white;
 	}
 
-	.card#main.highlighted {
+	.class3#id2.class4 {
 		border: 2px solid gold;
 	}
 
-	p.text#intro.lead {
+	p.class5#id3.class6 {
 		font-size: 18px;
 	}
 </style>

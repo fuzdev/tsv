@@ -1,5 +1,5 @@
 <Comp
->text 
+>text1
 
-content</Comp
+text2</Comp
 >

@@ -1,1 +1,1 @@
-<input type="checkbox" checked />
+<input data-attr1="value" data-attr2 />

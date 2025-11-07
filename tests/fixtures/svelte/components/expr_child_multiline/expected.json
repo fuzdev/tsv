@@ -2,7 +2,7 @@
   "css": null,
   "js": [],
   "start": 0,
-  "end": 23,
+  "end": 22,
   "type": "Root",
   "fragment": {
     "type": "Fragment",
@@ -10,7 +10,7 @@
       {
         "type": "Component",
         "start": 0,
-        "end": 23,
+        "end": 22,
         "name": "Comp",
         "attributes": [],
         "fragment": {
@@ -26,11 +26,11 @@
             {
               "type": "ExpressionTag",
               "start": 8,
-              "end": 15,
+              "end": 14,
               "expression": {
                 "type": "Identifier",
                 "start": 9,
-                "end": 14,
+                "end": 13,
                 "loc": {
                   "start": {
                     "line": 2,
@@ -38,16 +38,16 @@
                   },
                   "end": {
                     "line": 2,
-                    "column": 7
+                    "column": 6
                   }
                 },
-                "name": "count"
+                "name": "expr"
               }
             },
             {
               "type": "Text",
-              "start": 15,
-              "end": 16,
+              "start": 14,
+              "end": 15,
               "raw": "\n",
               "data": "\n"
             }

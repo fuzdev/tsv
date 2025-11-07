@@ -2,7 +2,7 @@
   "css": null,
   "js": [],
   "start": 0,
-  "end": 61,
+  "end": 55,
   "type": "Root",
   "fragment": {
     "type": "Fragment",
@@ -10,7 +10,7 @@
       {
         "type": "RegularElement",
         "start": 0,
-        "end": 61,
+        "end": 55,
         "name": "p",
         "attributes": [],
         "fragment": {
@@ -20,14 +20,14 @@
               "type": "Text",
               "start": 3,
               "end": 9,
-              "raw": "start ",
-              "data": "start "
+              "raw": "text1 ",
+              "data": "text1 "
             },
             {
               "type": "Component",
               "start": 9,
-              "end": 17,
-              "name": "Comp",
+              "end": 18,
+              "name": "Comp1",
               "attributes": [],
               "fragment": {
                 "type": "Fragment",
@@ -36,16 +36,16 @@
             },
             {
               "type": "Text",
-              "start": 17,
+              "start": 18,
               "end": 25,
-              "raw": " middle ",
-              "data": " middle "
+              "raw": " text2 ",
+              "data": " text2 "
             },
             {
               "type": "Component",
               "start": 25,
-              "end": 53,
-              "name": "CompB",
+              "end": 45,
+              "name": "Comp2",
               "attributes": [],
               "fragment": {
                 "type": "Fragment",
@@ -53,19 +53,19 @@
                   {
                     "type": "Text",
                     "start": 32,
-                    "end": 45,
-                    "raw": "compb_content",
-                    "data": "compb_content"
+                    "end": 37,
+                    "raw": "text3",
+                    "data": "text3"
                   }
                 ]
               }
             },
             {
               "type": "Text",
-              "start": 53,
-              "end": 57,
-              "raw": " end",
-              "data": " end"
+              "start": 45,
+              "end": 51,
+              "raw": " text4",
+              "data": " text4"
             }
           ]
         }

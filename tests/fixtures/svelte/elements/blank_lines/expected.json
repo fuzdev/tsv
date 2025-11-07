@@ -2,7 +2,7 @@
   "css": null,
   "js": [],
   "start": 0,
-  "end": 62,
+  "end": 80,
   "type": "Root",
   "fragment": {
     "type": "Fragment",
@@ -10,7 +10,7 @@
       {
         "type": "RegularElement",
         "start": 0,
-        "end": 62,
+        "end": 80,
         "name": "div",
         "attributes": [],
         "fragment": {
@@ -26,7 +26,7 @@
             {
               "type": "RegularElement",
               "start": 7,
-              "end": 21,
+              "end": 27,
               "name": "span",
               "attributes": [],
               "fragment": {
@@ -35,24 +35,24 @@
                   {
                     "type": "Text",
                     "start": 13,
-                    "end": 14,
-                    "raw": "a",
-                    "data": "a"
+                    "end": 20,
+                    "raw": "inline1",
+                    "data": "inline1"
                   }
                 ]
               }
             },
             {
               "type": "Text",
-              "start": 21,
-              "end": 24,
+              "start": 27,
+              "end": 30,
               "raw": "\n\n\t",
               "data": "\n\n\t"
             },
             {
               "type": "RegularElement",
-              "start": 24,
-              "end": 38,
+              "start": 30,
+              "end": 50,
               "name": "span",
               "attributes": [],
               "fragment": {
@@ -60,25 +60,25 @@
                 "nodes": [
                   {
                     "type": "Text",
-                    "start": 30,
-                    "end": 31,
-                    "raw": "b",
-                    "data": "b"
+                    "start": 36,
+                    "end": 43,
+                    "raw": "inline2",
+                    "data": "inline2"
                   }
                 ]
               }
             },
             {
               "type": "Text",
-              "start": 38,
-              "end": 41,
+              "start": 50,
+              "end": 53,
               "raw": "\n\n\t",
               "data": "\n\n\t"
             },
             {
               "type": "RegularElement",
-              "start": 41,
-              "end": 55,
+              "start": 53,
+              "end": 73,
               "name": "span",
               "attributes": [],
               "fragment": {
@@ -86,18 +86,18 @@
                 "nodes": [
                   {
                     "type": "Text",
-                    "start": 47,
-                    "end": 48,
-                    "raw": "c",
-                    "data": "c"
+                    "start": 59,
+                    "end": 66,
+                    "raw": "inline3",
+                    "data": "inline3"
                   }
                 ]
               }
             },
             {
               "type": "Text",
-              "start": 55,
-              "end": 56,
+              "start": 73,
+              "end": 74,
               "raw": "\n",
               "data": "\n"
             }

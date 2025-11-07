@@ -2,7 +2,7 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 231,
+    "end": 218,
     "attributes": [],
     "children": [
       {
@@ -10,12 +10,12 @@
         "prelude": {
           "type": "SelectorList",
           "start": 47,
-          "end": 59,
+          "end": 54,
           "children": [
             {
               "type": "ComplexSelector",
               "start": 47,
-              "end": 59,
+              "end": 54,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -23,13 +23,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "rgba-colors",
+                      "name": "class1",
                       "start": 47,
-                      "end": 59
+                      "end": 54
                     }
                   ],
                   "start": 47,
-                  "end": 59
+                  "end": 54
                 }
               ]
             }
@@ -37,46 +37,46 @@
         },
         "block": {
           "type": "Block",
-          "start": 60,
-          "end": 169,
+          "start": 55,
+          "end": 164,
           "children": [
             {
               "type": "Declaration",
-              "start": 64,
-              "end": 91,
+              "start": 59,
+              "end": 86,
               "property": "color",
               "value": "rgba(255, 0, 0, 0.5)"
             },
             {
               "type": "Declaration",
-              "start": 95,
-              "end": 127,
+              "start": 90,
+              "end": 122,
               "property": "background",
               "value": "rgba(0, 255, 0, 0.3)"
             },
             {
               "type": "Declaration",
-              "start": 131,
-              "end": 165,
+              "start": 126,
+              "end": 160,
               "property": "border-color",
               "value": "rgba(0, 0, 255, 0.8)"
             }
           ]
         },
         "start": 47,
-        "end": 169
+        "end": 164
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 172,
-          "end": 187,
+          "start": 167,
+          "end": 174,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 172,
-              "end": 187,
+              "start": 167,
+              "end": 174,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -84,13 +84,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "opacity-colors",
-                      "start": 172,
-                      "end": 187
+                      "name": "class2",
+                      "start": 167,
+                      "end": 174
                     }
                   ],
-                  "start": 172,
-                  "end": 187
+                  "start": 167,
+                  "end": 174
                 }
               ]
             }
@@ -98,33 +98,33 @@
         },
         "block": {
           "type": "Block",
-          "start": 188,
-          "end": 222,
+          "start": 175,
+          "end": 209,
           "children": [
             {
               "type": "Declaration",
-              "start": 192,
-              "end": 202,
+              "start": 179,
+              "end": 189,
               "property": "color",
               "value": "red"
             },
             {
               "type": "Declaration",
-              "start": 206,
-              "end": 218,
+              "start": 193,
+              "end": 205,
               "property": "opacity",
               "value": "0.5"
             }
           ]
         },
-        "start": 172,
-        "end": 222
+        "start": 167,
+        "end": 209
       }
     ],
     "content": {
       "start": 7,
-      "end": 223,
-      "styles": "\n\t/* Test colors with alpha/opacity */\n\t.rgba-colors {\n\t\tcolor: rgba(255, 0, 0, 0.5);\n\t\tbackground: rgba(0, 255, 0, 0.3);\n\t\tborder-color: rgba(0, 0, 255, 0.8);\n\t}\n\n\t.opacity-colors {\n\t\tcolor: red;\n\t\topacity: 0.5;\n\t}\n",
+      "end": 210,
+      "styles": "\n\t/* Test colors with alpha/opacity */\n\t.class1 {\n\t\tcolor: rgba(255, 0, 0, 0.5);\n\t\tbackground: rgba(0, 255, 0, 0.3);\n\t\tborder-color: rgba(0, 0, 255, 0.8);\n\t}\n\n\t.class2 {\n\t\tcolor: red;\n\t\topacity: 0.5;\n\t}\n",
       "comment": null
     }
   },

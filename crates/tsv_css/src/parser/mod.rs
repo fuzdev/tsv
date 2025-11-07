@@ -34,8 +34,9 @@ mod pseudo;
 mod selectors;
 mod value;
 
-use crate::ast::internal::{CssComment, CssNode};
+use crate::ast::internal::{CssComment, CssNode, CssStyleSheet};
 use crate::lexer::{Lexer, TokenKind};
+use std::collections::HashMap;
 use tsv_lang::{ParseError, Span};
 
 #[derive(Debug)]
@@ -54,6 +55,7 @@ pub(crate) struct CssParser<'a> {
     current_decoded: Option<String>, // Decoded value for current token (e.g., identifier escapes)
     peek_cache: Option<PeekData<TokenKind>>,
     base_offset: usize, // Offset in full source (when parsing embedded CSS)
+    pub(crate) value_comments: HashMap<u32, Vec<CssComment>>, // Side table for property value comments
 }
 
 impl<'a> CssParser<'a> {
@@ -72,6 +74,7 @@ impl<'a> CssParser<'a> {
             current_decoded: decoded,
             peek_cache: None,
             base_offset,
+            value_comments: HashMap::new(),
         })
     }
 
@@ -128,6 +131,20 @@ impl<'a> CssParser<'a> {
         Ok(())
     }
 
+    /// Skip whitespace and comments (comments are not included in AST)
+    pub(crate) fn skip_whitespace_and_comments(&mut self) -> Result<(), ParseError> {
+        loop {
+            if self.check(&TokenKind::Whitespace) {
+                self.advance()?;
+            } else if matches!(&self.current_kind, TokenKind::Comment(_)) {
+                self.advance()?;
+            } else {
+                break;
+            }
+        }
+        Ok(())
+    }
+
     /// Get the current token's value from source (for most tokens)
     pub(crate) fn current_value(&self) -> &str {
         &self.source[self.current_start..self.current_end]
@@ -151,7 +168,7 @@ impl<'a> CssParser<'a> {
         self.source
     }
 
-    pub(crate) fn parse(&mut self) -> Result<Vec<CssNode>, ParseError> {
+    pub(crate) fn parse(&mut self) -> Result<CssStyleSheet, ParseError> {
         let mut nodes = Vec::new();
 
         self.skip_whitespace()?;
@@ -159,8 +176,8 @@ impl<'a> CssParser<'a> {
         while !self.check(&TokenKind::Eof) {
             // Handle comments at top level
             if let TokenKind::Comment(content) = &self.current_kind {
-                let comment_start = self.base_offset + self.current_start;
-                let comment_end = self.base_offset + self.current_end;
+                let comment_start = self.base_offset() + self.current_start;
+                let comment_end = self.base_offset() + self.current_end;
                 let content = content.clone();
 
                 self.advance()?;
@@ -191,13 +208,16 @@ impl<'a> CssParser<'a> {
             self.skip_whitespace()?;
         }
 
-        Ok(nodes)
+        Ok(CssStyleSheet {
+            nodes,
+            value_comments: self.value_comments.clone(),
+        })
     }
 }
 
 /// Parse CSS source into AST nodes
 /// base_offset is the position of the CSS source in a larger file (for embedded CSS)
-pub fn parse_css(source: &str, base_offset: usize) -> Result<Vec<CssNode>, ParseError> {
+pub fn parse_css(source: &str, base_offset: usize) -> Result<CssStyleSheet, ParseError> {
     let mut parser = CssParser::new(source, base_offset)?;
     parser.parse()
 }

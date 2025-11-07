@@ -4,20 +4,20 @@
 	const astralPlane = '\u{1F600}';
 </script>
 
-<p>Max valid Unicode: &#x10FFFF;</p>
+<p>max valid Unicode: &#x10FFFF;</p>
 <p>BMP max: &#65535;</p>
-<p>Astral plane emoji: &#x1F600;</p>
+<p>emoji: &#x1F600;</p>
 
 <style>
-	.max-valid {
+	.class1 {
 		content: '\10FFFF';
 	}
 
-	.bmp-max {
+	.class2 {
 		content: '\FFFF';
 	}
 
-	.astral-plane {
+	.class3 {
 		content: '\1F600';
 	}
 </style>

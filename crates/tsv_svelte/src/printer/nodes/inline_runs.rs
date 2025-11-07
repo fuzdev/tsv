@@ -86,8 +86,8 @@ impl<'a> Printer<'a> {
                 // Skip leading/trailing whitespace-only nodes, but preserve ones between content
                 // (they're semantic spacing, e.g., `{a} {b}` needs the space preserved)
                 if text.raw.is_whitespace_only() {
-                    let is_between_content = first_content_idx.map_or(false, |first| j > first)
-                        && last_content_idx.map_or(false, |last| j < last);
+                    let is_between_content = first_content_idx.is_some_and(|first| j > first)
+                        && last_content_idx.is_some_and(|last| j < last);
 
                     if !is_between_content {
                         continue; // Skip leading/trailing whitespace

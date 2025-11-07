@@ -2,7 +2,7 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 219,
+    "end": 225,
     "attributes": [],
     "children": [
       {
@@ -10,12 +10,12 @@
         "prelude": {
           "type": "SelectorList",
           "start": 9,
-          "end": 26,
+          "end": 28,
           "children": [
             {
               "type": "ComplexSelector",
               "start": 9,
-              "end": 26,
+              "end": 28,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -23,20 +23,20 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "item",
+                      "name": "class1",
                       "start": 9,
-                      "end": 14
+                      "end": 16
                     },
                     {
                       "type": "PseudoClassSelector",
                       "name": "first-child",
                       "args": null,
-                      "start": 14,
-                      "end": 26
+                      "start": 16,
+                      "end": 28
                     }
                   ],
                   "start": 9,
-                  "end": 26
+                  "end": 28
                 }
               ]
             }
@@ -44,32 +44,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 27,
-          "end": 45,
+          "start": 29,
+          "end": 47,
           "children": [
             {
               "type": "Declaration",
-              "start": 31,
-              "end": 41,
+              "start": 33,
+              "end": 43,
               "property": "color",
               "value": "red"
             }
           ]
         },
         "start": 9,
-        "end": 45
+        "end": 47
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 48,
-          "end": 64,
+          "start": 50,
+          "end": 68,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 48,
-              "end": 64,
+              "start": 50,
+              "end": 68,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -77,20 +77,20 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "item",
-                      "start": 48,
-                      "end": 53
+                      "name": "class1",
+                      "start": 50,
+                      "end": 57
                     },
                     {
                       "type": "PseudoClassSelector",
                       "name": "last-child",
                       "args": null,
-                      "start": 53,
-                      "end": 64
+                      "start": 57,
+                      "end": 68
                     }
                   ],
-                  "start": 48,
-                  "end": 64
+                  "start": 50,
+                  "end": 68
                 }
               ]
             }
@@ -98,32 +98,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 65,
-          "end": 84,
+          "start": 69,
+          "end": 88,
           "children": [
             {
               "type": "Declaration",
-              "start": 69,
-              "end": 80,
+              "start": 73,
+              "end": 84,
               "property": "color",
               "value": "blue"
             }
           ]
         },
-        "start": 48,
-        "end": 84
+        "start": 50,
+        "end": 88
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 87,
-          "end": 103,
+          "start": 91,
+          "end": 109,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 87,
-              "end": 103,
+              "start": 91,
+              "end": 109,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -131,20 +131,20 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "item",
-                      "start": 87,
-                      "end": 92
+                      "name": "class1",
+                      "start": 91,
+                      "end": 98
                     },
                     {
                       "type": "PseudoClassSelector",
                       "name": "only-child",
                       "args": null,
-                      "start": 92,
-                      "end": 103
+                      "start": 98,
+                      "end": 109
                     }
                   ],
-                  "start": 87,
-                  "end": 103
+                  "start": 91,
+                  "end": 109
                 }
               ]
             }
@@ -152,32 +152,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 104,
-          "end": 124,
+          "start": 110,
+          "end": 130,
           "children": [
             {
               "type": "Declaration",
-              "start": 108,
-              "end": 120,
+              "start": 114,
+              "end": 126,
               "property": "color",
               "value": "green"
             }
           ]
         },
-        "start": 87,
-        "end": 124
+        "start": 91,
+        "end": 130
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 127,
-          "end": 142,
+          "start": 133,
+          "end": 148,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 127,
-              "end": 142,
+              "start": 133,
+              "end": 148,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -186,19 +186,19 @@
                     {
                       "type": "TypeSelector",
                       "name": "p",
-                      "start": 127,
-                      "end": 128
+                      "start": 133,
+                      "end": 134
                     },
                     {
                       "type": "PseudoClassSelector",
                       "name": "first-of-type",
                       "args": null,
-                      "start": 128,
-                      "end": 142
+                      "start": 134,
+                      "end": 148
                     }
                   ],
-                  "start": 127,
-                  "end": 142
+                  "start": 133,
+                  "end": 148
                 }
               ]
             }
@@ -206,32 +206,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 143,
-          "end": 168,
+          "start": 149,
+          "end": 174,
           "children": [
             {
               "type": "Declaration",
-              "start": 147,
-              "end": 164,
+              "start": 153,
+              "end": 170,
               "property": "font-weight",
               "value": "bold"
             }
           ]
         },
-        "start": 127,
-        "end": 168
+        "start": 133,
+        "end": 174
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 171,
-          "end": 185,
+          "start": 177,
+          "end": 191,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 171,
-              "end": 185,
+              "start": 177,
+              "end": 191,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -240,19 +240,19 @@
                     {
                       "type": "TypeSelector",
                       "name": "p",
-                      "start": 171,
-                      "end": 172
+                      "start": 177,
+                      "end": 178
                     },
                     {
                       "type": "PseudoClassSelector",
                       "name": "last-of-type",
                       "args": null,
-                      "start": 172,
-                      "end": 185
+                      "start": 178,
+                      "end": 191
                     }
                   ],
-                  "start": 171,
-                  "end": 185
+                  "start": 177,
+                  "end": 191
                 }
               ]
             }
@@ -260,26 +260,26 @@
         },
         "block": {
           "type": "Block",
-          "start": 186,
-          "end": 210,
+          "start": 192,
+          "end": 216,
           "children": [
             {
               "type": "Declaration",
-              "start": 190,
-              "end": 206,
+              "start": 196,
+              "end": 212,
               "property": "margin-bottom",
               "value": "0"
             }
           ]
         },
-        "start": 171,
-        "end": 210
+        "start": 177,
+        "end": 216
       }
     ],
     "content": {
       "start": 7,
-      "end": 211,
-      "styles": "\n\t.item:first-child {\n\t\tcolor: red;\n\t}\n\n\t.item:last-child {\n\t\tcolor: blue;\n\t}\n\n\t.item:only-child {\n\t\tcolor: green;\n\t}\n\n\tp:first-of-type {\n\t\tfont-weight: bold;\n\t}\n\n\tp:last-of-type {\n\t\tmargin-bottom: 0;\n\t}\n",
+      "end": 217,
+      "styles": "\n\t.class1:first-child {\n\t\tcolor: red;\n\t}\n\n\t.class1:last-child {\n\t\tcolor: blue;\n\t}\n\n\t.class1:only-child {\n\t\tcolor: green;\n\t}\n\n\tp:first-of-type {\n\t\tfont-weight: bold;\n\t}\n\n\tp:last-of-type {\n\t\tmargin-bottom: 0;\n\t}\n",
       "comment": null
     }
   },

@@ -3,7 +3,7 @@
 		color: gray;
 	}
 
-	.active ~ .item {
+	.class1 ~ .class2 {
 		opacity: 0.5;
 	}
 </style>

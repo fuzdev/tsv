@@ -2,7 +2,7 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 83,
+    "end": 85,
     "attributes": [],
     "children": [
       {
@@ -76,12 +76,12 @@
         "prelude": {
           "type": "SelectorList",
           "start": 38,
-          "end": 53,
+          "end": 55,
           "children": [
             {
               "type": "ComplexSelector",
               "start": 38,
-              "end": 53,
+              "end": 55,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -89,7 +89,7 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "active",
+                      "name": "class1",
                       "start": 38,
                       "end": 45
                     }
@@ -108,13 +108,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "item",
+                      "name": "class2",
                       "start": 48,
-                      "end": 53
+                      "end": 55
                     }
                   ],
                   "start": 46,
-                  "end": 53
+                  "end": 55
                 }
               ]
             }
@@ -122,26 +122,26 @@
         },
         "block": {
           "type": "Block",
-          "start": 54,
-          "end": 74,
+          "start": 56,
+          "end": 76,
           "children": [
             {
               "type": "Declaration",
-              "start": 58,
-              "end": 70,
+              "start": 60,
+              "end": 72,
               "property": "opacity",
               "value": "0.5"
             }
           ]
         },
         "start": 38,
-        "end": 74
+        "end": 76
       }
     ],
     "content": {
       "start": 7,
-      "end": 75,
-      "styles": "\n\th1 ~ p {\n\t\tcolor: gray;\n\t}\n\n\t.active ~ .item {\n\t\topacity: 0.5;\n\t}\n",
+      "end": 77,
+      "styles": "\n\th1 ~ p {\n\t\tcolor: gray;\n\t}\n\n\t.class1 ~ .class2 {\n\t\topacity: 0.5;\n\t}\n",
       "comment": null
     }
   },

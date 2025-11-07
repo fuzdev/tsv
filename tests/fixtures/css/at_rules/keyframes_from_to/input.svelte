@@ -1,5 +1,5 @@
 <style>
-	@keyframes fade {
+	@keyframes anim1 {
 		from {
 			opacity: 0;
 		}

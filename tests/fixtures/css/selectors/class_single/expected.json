@@ -2,7 +2,7 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 47,
+    "end": 45,
     "attributes": [],
     "children": [
       {
@@ -10,12 +10,12 @@
         "prelude": {
           "type": "SelectorList",
           "start": 9,
-          "end": 18,
+          "end": 16,
           "children": [
             {
               "type": "ComplexSelector",
               "start": 9,
-              "end": 18,
+              "end": 16,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -23,13 +23,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "my-class",
+                      "name": "class1",
                       "start": 9,
-                      "end": 18
+                      "end": 16
                     }
                   ],
                   "start": 9,
-                  "end": 18
+                  "end": 16
                 }
               ]
             }
@@ -37,26 +37,26 @@
         },
         "block": {
           "type": "Block",
-          "start": 19,
-          "end": 38,
+          "start": 17,
+          "end": 36,
           "children": [
             {
               "type": "Declaration",
-              "start": 23,
-              "end": 34,
+              "start": 21,
+              "end": 32,
               "property": "color",
               "value": "blue"
             }
           ]
         },
         "start": 9,
-        "end": 38
+        "end": 36
       }
     ],
     "content": {
       "start": 7,
-      "end": 39,
-      "styles": "\n\t.my-class {\n\t\tcolor: blue;\n\t}\n",
+      "end": 37,
+      "styles": "\n\t.class1 {\n\t\tcolor: blue;\n\t}\n",
       "comment": null
     }
   },

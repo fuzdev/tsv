@@ -34,8 +34,8 @@
                     "column": 11
                   }
                 },
-                "value": "hello",
-                "raw": "'hello'"
+                "value": "expr1",
+                "raw": "'expr1'"
               }
             },
             {
@@ -63,8 +63,8 @@
                     "column": 21
                   }
                 },
-                "value": "world",
-                "raw": "'world'"
+                "value": "expr2",
+                "raw": "'expr2'"
               }
             }
           ]

@@ -3,7 +3,7 @@
 		margin-top: 0;
 	}
 
-	.button + .button {
+	.class1 + .class1 {
 		margin-left: 10px;
 	}
 </style>

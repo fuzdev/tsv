@@ -1,7 +1,7 @@
 <div>
-	<span>a</span>
+	<span>inline1</span>
 
-	<span>b</span>
+	<span>inline2</span>
 
-	<span>c</span>
+	<span>inline3</span>
 </div>

@@ -1,5 +1,5 @@
 <style>
-	@keyframes bounce {
+	@keyframes anim1 {
 		0% {
 			bottom: 0;
 		}

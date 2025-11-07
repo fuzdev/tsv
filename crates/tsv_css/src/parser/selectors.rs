@@ -14,7 +14,7 @@ pub(crate) fn parse_selector_list(parser: &mut CssParser) -> Result<SelectorList
     // Parse additional selectors separated by commas
     while parser.check(&TokenKind::Comma) {
         parser.advance()?; // consume comma
-        parser.skip_whitespace()?;
+        parser.skip_whitespace_and_comments()?;  // Skip whitespace and comments
         selectors.push(parse_complex_selector(parser)?);
     }
 
@@ -41,11 +41,18 @@ pub(crate) fn parse_complex_selector(
     children.push(parse_relative_selector(parser, None, None)?);
 
     // Parse additional relative selectors with combinators
-    while !parser.check(&TokenKind::LeftBrace)
-        && !parser.check(&TokenKind::Comma)
-        && !parser.check(&TokenKind::Eof)
-    {
-        // Check for combinator
+    loop {
+        // Don't skip comments here - let parse_combinator handle them
+        // Comments before {, ,, or EOF will cause parse_combinator to return None
+        if parser.check(&TokenKind::LeftBrace)
+            || parser.check(&TokenKind::Comma)
+            || parser.check(&TokenKind::Eof)
+            || matches!(&parser.current_kind, TokenKind::Comment(_))
+        {
+            break;
+        }
+
+        // Check for combinator (this will skip whitespace internally)
         let combinator_info = parse_combinator(parser)?;
         if combinator_info.is_none() {
             break; // No more combinators, we're done
@@ -79,6 +86,10 @@ pub(crate) fn parse_combinator(
     // Capture position before skipping whitespace for descendant combinator
     let whitespace_start = parser.base_offset() + parser.current_start();
     parser.skip_whitespace()?;
+
+    // Don't skip comments - parse_complex_selector checks for them before calling this
+    // If we're here and there's a comment, it means it's terminal (before {, ,, or EOF)
+    // and we should return None to stop parsing selectors
 
     let combinator_start = parser.base_offset() + parser.current_start();
 

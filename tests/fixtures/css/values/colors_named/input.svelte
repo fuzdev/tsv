@@ -1,22 +1,22 @@
 <style>
 	/* Test named color values */
-	.error {
+	.class1 {
 		color: red;
 	}
 
-	.success {
+	.class2 {
 		color: green;
 	}
 
-	.info {
+	.class3 {
 		color: blue;
 	}
 
-	.inherit-color {
+	.class4 {
 		color: currentColor;
 	}
 
-	.transparent-color {
+	.class5 {
 		color: transparent;
 	}
 </style>

@@ -1,9 +1,9 @@
 <Comp>
 
 	{
-	  a
+	  expr1
 	}  {
-	  b
+	  expr2
 	}  {
-	  c
+	  expr3
 	} </Comp>

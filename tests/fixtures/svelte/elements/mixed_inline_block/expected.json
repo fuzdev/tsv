@@ -2,7 +2,7 @@
   "css": null,
   "js": [],
   "start": 0,
-  "end": 51,
+  "end": 53,
   "type": "Root",
   "fragment": {
     "type": "Fragment",
@@ -10,7 +10,7 @@
       {
         "type": "RegularElement",
         "start": 0,
-        "end": 51,
+        "end": 53,
         "name": "div",
         "attributes": [],
         "fragment": {
@@ -26,7 +26,7 @@
             {
               "type": "RegularElement",
               "start": 7,
-              "end": 26,
+              "end": 27,
               "name": "span",
               "attributes": [],
               "fragment": {
@@ -35,24 +35,24 @@
                   {
                     "type": "Text",
                     "start": 13,
-                    "end": 19,
-                    "raw": "inline",
-                    "data": "inline"
+                    "end": 20,
+                    "raw": "inline1",
+                    "data": "inline1"
                   }
                 ]
               }
             },
             {
               "type": "Text",
-              "start": 26,
-              "end": 28,
+              "start": 27,
+              "end": 29,
               "raw": "\n\t",
               "data": "\n\t"
             },
             {
               "type": "RegularElement",
-              "start": 28,
-              "end": 44,
+              "start": 29,
+              "end": 46,
               "name": "div",
               "attributes": [],
               "fragment": {
@@ -60,18 +60,18 @@
                 "nodes": [
                   {
                     "type": "Text",
-                    "start": 33,
-                    "end": 38,
-                    "raw": "block",
-                    "data": "block"
+                    "start": 34,
+                    "end": 40,
+                    "raw": "block1",
+                    "data": "block1"
                   }
                 ]
               }
             },
             {
               "type": "Text",
-              "start": 44,
-              "end": 45,
+              "start": 46,
+              "end": 47,
               "raw": "\n",
               "data": "\n"
             }

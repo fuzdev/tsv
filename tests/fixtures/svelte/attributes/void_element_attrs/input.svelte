@@ -1,1 +1,1 @@
-<br class="spacer" />
+<br data-attr="value" />

@@ -1,3 +1,3 @@
-<p>text <Comp
->inside_comp</Comp
-> more</p>
+<p>text1 <Comp
+>text2</Comp
+> text3</p>

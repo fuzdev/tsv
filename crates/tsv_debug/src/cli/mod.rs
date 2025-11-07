@@ -2,7 +2,8 @@ pub mod commands;
 
 use commands::{
     ast_diff::AstDiffCommand, canonical_parse::CanonicalParseCommand, compare::CompareCommand,
-    fixtures_update_expected::FixturesUpdateExpectedCommand,
+    fixtures_update::FixturesUpdateCommand,
+    fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
 };
@@ -21,7 +22,8 @@ pub fn build_registry() -> CommandRegistry {
     registry.register(Box::new(FormatPrettierCommand));
 
     // Register fixture management commands
-    registry.register(Box::new(FixturesUpdateExpectedCommand));
+    registry.register(Box::new(FixturesUpdateCommand));
+    registry.register(Box::new(FixturesUpdateParsedCommand));
     registry.register(Box::new(FixturesUpdateFormattedCommand));
     registry.register(Box::new(FixturesValidateCommand));
 

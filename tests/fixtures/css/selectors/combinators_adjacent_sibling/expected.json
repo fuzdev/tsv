@@ -89,7 +89,7 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "button",
+                      "name": "class1",
                       "start": 40,
                       "end": 47
                     }
@@ -108,7 +108,7 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "button",
+                      "name": "class1",
                       "start": 50,
                       "end": 57
                     }
@@ -141,7 +141,7 @@
     "content": {
       "start": 7,
       "end": 84,
-      "styles": "\n\th1 + p {\n\t\tmargin-top: 0;\n\t}\n\n\t.button + .button {\n\t\tmargin-left: 10px;\n\t}\n",
+      "styles": "\n\th1 + p {\n\t\tmargin-top: 0;\n\t}\n\n\t.class1 + .class1 {\n\t\tmargin-left: 10px;\n\t}\n",
       "comment": null
     }
   },

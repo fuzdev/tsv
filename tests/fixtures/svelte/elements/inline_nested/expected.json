@@ -2,7 +2,7 @@
   "css": null,
   "js": [],
   "start": 0,
-  "end": 46,
+  "end": 70,
   "type": "Root",
   "fragment": {
     "type": "Fragment",
@@ -10,7 +10,7 @@
       {
         "type": "RegularElement",
         "start": 0,
-        "end": 46,
+        "end": 70,
         "name": "span",
         "attributes": [],
         "fragment": {
@@ -19,14 +19,14 @@
             {
               "type": "Text",
               "start": 6,
-              "end": 8,
-              "raw": "a ",
-              "data": "a "
+              "end": 14,
+              "raw": "inline1 ",
+              "data": "inline1 "
             },
             {
               "type": "RegularElement",
-              "start": 8,
-              "end": 37,
+              "start": 14,
+              "end": 55,
               "name": "strong",
               "attributes": [],
               "fragment": {
@@ -34,15 +34,15 @@
                 "nodes": [
                   {
                     "type": "Text",
-                    "start": 16,
-                    "end": 18,
-                    "raw": "b ",
-                    "data": "b "
+                    "start": 22,
+                    "end": 30,
+                    "raw": "inline2 ",
+                    "data": "inline2 "
                   },
                   {
                     "type": "RegularElement",
-                    "start": 18,
-                    "end": 28,
+                    "start": 30,
+                    "end": 46,
                     "name": "em",
                     "attributes": [],
                     "fragment": {
@@ -50,10 +50,10 @@
                       "nodes": [
                         {
                           "type": "Text",
-                          "start": 22,
-                          "end": 23,
-                          "raw": "c",
-                          "data": "c"
+                          "start": 34,
+                          "end": 41,
+                          "raw": "inline3",
+                          "data": "inline3"
                         }
                       ]
                     }
@@ -63,10 +63,10 @@
             },
             {
               "type": "Text",
-              "start": 37,
-              "end": 39,
-              "raw": " d",
-              "data": " d"
+              "start": 55,
+              "end": 63,
+              "raw": " inline4",
+              "data": " inline4"
             }
           ]
         }

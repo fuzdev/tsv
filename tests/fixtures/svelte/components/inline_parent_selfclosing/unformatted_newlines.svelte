@@ -1,2 +1,2 @@
-<a href="#">Click <Comp
-/> here</a>
+<a href="#">text1 <Comp
+/> text2</a>

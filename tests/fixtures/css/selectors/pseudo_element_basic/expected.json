@@ -2,7 +2,7 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 90,
+    "end": 92,
     "attributes": [],
     "children": [
       {
@@ -10,12 +10,12 @@
         "prelude": {
           "type": "SelectorList",
           "start": 9,
-          "end": 23,
+          "end": 24,
           "children": [
             {
               "type": "ComplexSelector",
               "start": 9,
-              "end": 23,
+              "end": 24,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -23,19 +23,19 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "quote",
+                      "name": "class1",
                       "start": 9,
-                      "end": 15
+                      "end": 16
                     },
                     {
                       "type": "PseudoElementSelector",
                       "name": "before",
-                      "start": 15,
-                      "end": 23
+                      "start": 16,
+                      "end": 24
                     }
                   ],
                   "start": 9,
-                  "end": 23
+                  "end": 24
                 }
               ]
             }
@@ -43,32 +43,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 24,
-          "end": 44,
+          "start": 25,
+          "end": 45,
           "children": [
             {
               "type": "Declaration",
-              "start": 28,
-              "end": 40,
+              "start": 29,
+              "end": 41,
               "property": "content",
               "value": "'\"'"
             }
           ]
         },
         "start": 9,
-        "end": 44
+        "end": 45
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 47,
-          "end": 60,
+          "start": 48,
+          "end": 62,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 47,
-              "end": 60,
+              "start": 48,
+              "end": 62,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -76,19 +76,19 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "quote",
-                      "start": 47,
-                      "end": 53
+                      "name": "class1",
+                      "start": 48,
+                      "end": 55
                     },
                     {
                       "type": "PseudoElementSelector",
                       "name": "after",
-                      "start": 53,
-                      "end": 60
+                      "start": 55,
+                      "end": 62
                     }
                   ],
-                  "start": 47,
-                  "end": 60
+                  "start": 48,
+                  "end": 62
                 }
               ]
             }
@@ -96,26 +96,26 @@
         },
         "block": {
           "type": "Block",
-          "start": 61,
-          "end": 81,
+          "start": 63,
+          "end": 83,
           "children": [
             {
               "type": "Declaration",
-              "start": 65,
-              "end": 77,
+              "start": 67,
+              "end": 79,
               "property": "content",
               "value": "'\"'"
             }
           ]
         },
-        "start": 47,
-        "end": 81
+        "start": 48,
+        "end": 83
       }
     ],
     "content": {
       "start": 7,
-      "end": 82,
-      "styles": "\n\t.quote::before {\n\t\tcontent: '\"';\n\t}\n\n\t.quote::after {\n\t\tcontent: '\"';\n\t}\n",
+      "end": 84,
+      "styles": "\n\t.class1::before {\n\t\tcontent: '\"';\n\t}\n\n\t.class1::after {\n\t\tcontent: '\"';\n\t}\n",
       "comment": null
     }
   },

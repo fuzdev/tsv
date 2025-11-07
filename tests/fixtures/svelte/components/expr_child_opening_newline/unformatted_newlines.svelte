@@ -1,6 +1,6 @@
 <Comp>
 
 	{
-	  count
+	  expr
 	}</Comp
 >

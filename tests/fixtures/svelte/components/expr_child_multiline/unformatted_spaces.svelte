@@ -1,3 +1,3 @@
 <Comp>
-	  { count }
+	  { expr }
 </Comp>

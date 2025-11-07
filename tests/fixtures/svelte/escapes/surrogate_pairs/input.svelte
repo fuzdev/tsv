@@ -4,9 +4,9 @@
 	const rocket = '\uD83D\uDE80';
 </script>
 
-<p>Emoji via entity: &#128169;</p>
-<p>Heart via hex entity: &#x1F496;</p>
-<p>Rocket via decimal: &#128640;</p>
+<p>emoji via entity: &#128169;</p>
+<p>heart via hex entity: &#x1F496;</p>
+<p>rocket via decimal: &#128640;</p>
 
 <style>
 	.emoji {

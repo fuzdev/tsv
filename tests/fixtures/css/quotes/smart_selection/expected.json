@@ -2,7 +2,7 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 148,
+    "end": 163,
     "attributes": [],
     "children": [
       {
@@ -10,12 +10,12 @@
         "prelude": {
           "type": "SelectorList",
           "start": 9,
-          "end": 11,
+          "end": 16,
           "children": [
             {
               "type": "ComplexSelector",
               "start": 9,
-              "end": 11,
+              "end": 16,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -23,13 +23,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "a",
+                      "name": "class1",
                       "start": 9,
-                      "end": 11
+                      "end": 16
                     }
                   ],
                   "start": 9,
-                  "end": 11
+                  "end": 16
                 }
               ]
             }
@@ -37,32 +37,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 12,
-          "end": 50,
+          "start": 17,
+          "end": 55,
           "children": [
             {
               "type": "Declaration",
-              "start": 16,
-              "end": 46,
+              "start": 21,
+              "end": 51,
               "property": "content",
               "value": "\"has 'single' quotes\""
             }
           ]
         },
         "start": 9,
-        "end": 50
+        "end": 55
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 53,
-          "end": 55,
+          "start": 58,
+          "end": 65,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 53,
-              "end": 55,
+              "start": 58,
+              "end": 65,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -70,13 +70,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "b",
-                      "start": 53,
-                      "end": 55
+                      "name": "class2",
+                      "start": 58,
+                      "end": 65
                     }
                   ],
-                  "start": 53,
-                  "end": 55
+                  "start": 58,
+                  "end": 65
                 }
               ]
             }
@@ -84,32 +84,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 56,
-          "end": 94,
+          "start": 66,
+          "end": 104,
           "children": [
             {
               "type": "Declaration",
-              "start": 60,
-              "end": 90,
+              "start": 70,
+              "end": 100,
               "property": "content",
               "value": "'has \"double\" quotes'"
             }
           ]
         },
-        "start": 53,
-        "end": 94
+        "start": 58,
+        "end": 104
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 97,
-          "end": 99,
+          "start": 107,
+          "end": 114,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 97,
-              "end": 99,
+              "start": 107,
+              "end": 114,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -117,13 +117,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "c",
-                      "start": 97,
-                      "end": 99
+                      "name": "class3",
+                      "start": 107,
+                      "end": 114
                     }
                   ],
-                  "start": 97,
-                  "end": 99
+                  "start": 107,
+                  "end": 114
                 }
               ]
             }
@@ -131,26 +131,26 @@
         },
         "block": {
           "type": "Block",
-          "start": 100,
-          "end": 139,
+          "start": 115,
+          "end": 154,
           "children": [
             {
               "type": "Declaration",
-              "start": 104,
-              "end": 135,
+              "start": 119,
+              "end": 150,
               "property": "content",
               "value": "'has \\\\''both\\\\'' \"types\"'"
             }
           ]
         },
-        "start": 97,
-        "end": 139
+        "start": 107,
+        "end": 154
       }
     ],
     "content": {
       "start": 7,
-      "end": 140,
-      "styles": "\n\t.a {\n\t\tcontent: \"has 'single' quotes\";\n\t}\n\n\t.b {\n\t\tcontent: 'has \"double\" quotes';\n\t}\n\n\t.c {\n\t\tcontent: 'has \\'both\\' \"types\"';\n\t}\n",
+      "end": 155,
+      "styles": "\n\t.class1 {\n\t\tcontent: \"has 'single' quotes\";\n\t}\n\n\t.class2 {\n\t\tcontent: 'has \"double\" quotes';\n\t}\n\n\t.class3 {\n\t\tcontent: 'has \\'both\\' \"types\"';\n\t}\n",
       "comment": null
     }
   },

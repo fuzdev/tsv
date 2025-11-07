@@ -122,18 +122,40 @@ impl<'a> SvelteParser<'a> {
             }
         }
 
+        // Capture any trailing text after the last element
+        // Svelte's behavior: skip trailing whitespace entirely
+        if self.current_start > last_end {
+            let trailing_text = &self.source[last_end..self.current_start];
+            let trimmed = trailing_text.trim_end();
+            if !trimmed.is_empty() {
+                // Only capture up to the end of non-whitespace content
+                let end_pos = last_end + trimmed.len();
+                let text = self.parse_text(last_end, end_pos)?;
+                fragment_nodes.push(FragmentNode::Text(text));
+            }
+        }
+
         let fragment = Fragment {
             nodes: fragment_nodes,
         };
 
-        // root.start is determined by the first fragment node (if present):
-        // - If first node is Text: use text.end (point after whitespace)
-        // - If first node is Element/Expression: use node.start (point to element)
-        // This overrides the complex "leading script doesn't count" logic when markup is present
+        // Root span calculation: Skip leading/trailing whitespace-only text nodes
+        //
+        // Whitespace-only text at root level is formatting (blank lines, indentation), not content.
+        // root.span semantically covers meaningful content; full fidelity is in fragment.nodes.
+        // This matches Svelte's parser exactly and aligns with JS AST conventions.
+
+        // root.start: First fragment node (whitespace-only → skip, content/element → include)
         if let Some(first_node) = fragment.nodes.first() {
             match first_node {
                 FragmentNode::Text(text) => {
-                    root_start = Some(text.span.end as usize);
+                    if text.data.trim().is_empty() {
+                        // Whitespace-only: skip it (start after the whitespace)
+                        root_start = Some(text.span.end as usize);
+                    } else {
+                        // Has content: include it
+                        root_start = Some(text.span.start as usize);
+                    }
                 }
                 _ => {
                     root_start = Some(first_node.span().start as usize);
@@ -141,13 +163,18 @@ impl<'a> SvelteParser<'a> {
             }
         }
 
-        // Calculate end position following Svelte's rules:
-        // - If last fragment node is Text: use text.start (exclude trailing whitespace)
-        // - If last fragment node is non-Text: use node.end (include it)
-        // - If no fragment nodes: use max of script/module/style
+        // root.end: Last fragment node (whitespace-only → exclude, content/element → include)
         let end = if let Some(last_node) = fragment.nodes.last() {
             match last_node {
-                FragmentNode::Text(text) => text.span.start,
+                FragmentNode::Text(text) => {
+                    if text.data.trim().is_empty() {
+                        // Whitespace-only: exclude it (end before the whitespace)
+                        text.span.start
+                    } else {
+                        // Has content: include it
+                        text.span.end
+                    }
+                }
                 _ => last_node.span().end,
             }
         } else {

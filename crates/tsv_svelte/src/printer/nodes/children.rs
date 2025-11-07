@@ -133,10 +133,10 @@ impl<'a> Printer<'a> {
                     let mut first = true;
                     for run_node in &nodes[i..=run_end] {
                         // Skip whitespace-only text nodes
-                        if let FragmentNode::Text(text) = run_node {
-                            if text.raw.is_whitespace_only() {
-                                continue;
-                            }
+                        if let FragmentNode::Text(text) = run_node
+                            && text.raw.is_whitespace_only()
+                        {
+                            continue;
                         }
 
                         // Add newline before each node except the first
@@ -237,10 +237,10 @@ impl<'a> Printer<'a> {
             // Print nodes, skipping leading/trailing whitespace-only text
             for (i, node) in fragment.nodes.iter().enumerate() {
                 // Skip if before first content or after last content
-                if let (Some(first), Some(last)) = (first_content_idx, last_content_idx) {
-                    if i < first || i > last {
-                        continue;
-                    }
+                if let (Some(first), Some(last)) = (first_content_idx, last_content_idx)
+                    && (i < first || i > last)
+                {
+                    continue;
                 }
                 self.print_fragment_node(node, child_parent_is_block, preserves_ws);
             }

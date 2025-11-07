@@ -1,8 +1,8 @@
 <style>
- .a  {  content :  "has 'single' quotes"  ;  }
+ .class1  {  content :  "has 'single' quotes"  ;  }
 
- .b  {  content :  'has "double" quotes'  ;  }
+ .class2  {  content :  'has "double" quotes'  ;  }
 
- .c  {  content :  'has \'both\' "types"'  ;  }
+ .class3  {  content :  'has \'both\' "types"'  ;  }
 
 </style>

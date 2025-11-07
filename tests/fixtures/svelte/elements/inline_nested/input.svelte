@@ -1,1 +1,1 @@
-<span>a <strong>b <em>c</em></strong> d</span>
+<span>inline1 <strong>inline2 <em>inline3</em></strong> inline4</span>

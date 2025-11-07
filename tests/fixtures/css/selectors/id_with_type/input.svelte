@@ -1,9 +1,9 @@
 <style>
-	div#header {
+	div#id1 {
 		height: 100px;
 	}
 
-	span#logo {
+	span#id2 {
 		font-size: 24px;
 	}
 </style>

@@ -2,7 +2,7 @@
   "css": null,
   "js": [],
   "start": 0,
-  "end": 40,
+  "end": 48,
   "type": "Root",
   "fragment": {
     "type": "Fragment",
@@ -10,48 +10,48 @@
       {
         "type": "RegularElement",
         "start": 0,
-        "end": 40,
+        "end": 48,
         "name": "div",
         "attributes": [
           {
             "type": "Attribute",
             "start": 5,
-            "end": 17,
-            "name": "class",
+            "end": 23,
+            "name": "data-attr1",
             "value": [
               {
-                "start": 12,
-                "end": 16,
+                "start": 17,
+                "end": 22,
                 "type": "Text",
-                "raw": "base",
-                "data": "base"
+                "raw": "value",
+                "data": "value"
               }
             ]
           },
           {
             "type": "Attribute",
-            "start": 18,
-            "end": 33,
-            "name": "title",
+            "start": 24,
+            "end": 41,
+            "name": "data-attr2",
             "value": {
               "type": "ExpressionTag",
-              "start": 24,
-              "end": 33,
+              "start": 35,
+              "end": 41,
               "expression": {
                 "type": "Identifier",
-                "start": 25,
-                "end": 32,
+                "start": 36,
+                "end": 40,
                 "loc": {
                   "start": {
                     "line": 1,
-                    "column": 25
+                    "column": 36
                   },
                   "end": {
                     "line": 1,
-                    "column": 32
+                    "column": 40
                   }
                 },
-                "name": "message"
+                "name": "expr"
               }
             }
           }

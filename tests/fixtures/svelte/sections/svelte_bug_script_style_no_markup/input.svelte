@@ -1,5 +1,5 @@
 <script>
-	const a = 5;
+	const expr = 5;
 </script>
 
 <style></style>

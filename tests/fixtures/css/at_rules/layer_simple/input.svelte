@@ -1,5 +1,5 @@
 <style>
-	@layer components {
+	@layer layer1 {
 		div {
 			margin: 0;
 		}

@@ -1,9 +1,9 @@
 <style>
-	.quote::before {
+	.class1::before {
 		content: '"';
 	}
 
-	.quote::after {
+	.class1::after {
 		content: '"';
 	}
 </style>

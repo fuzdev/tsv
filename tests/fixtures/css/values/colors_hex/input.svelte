@@ -1,14 +1,14 @@
 <style>
 	/* Test hex color values */
-	.primary {
+	.class1 {
 		background: #ff0000;
 	}
 
-	.secondary {
+	.class2 {
 		color: #ff1234;
 	}
 
-	.white {
+	.class3 {
 		background-color: #ffffff;
 	}
 </style>

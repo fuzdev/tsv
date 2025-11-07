@@ -1,1 +1,1 @@
-<Comp /><div>html</div><CompB />
+<Comp1 /><div>block1</div><Comp2 />

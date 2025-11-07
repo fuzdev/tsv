@@ -5,23 +5,35 @@ use std::str::FromStr;
 /// Input source for parsing or formatting
 #[derive(Debug)]
 pub enum Input {
-    File(String),    // File path (original) + content
-    Content(String), // Direct string content
-    Stdin(String),   // Content read from stdin
+    File { path: String, content: String }, // File path + content
+    Content(String),                        // Direct string content
+    Stdin(String),                          // Content read from stdin
 }
 
 impl Input {
     pub fn content(&self) -> &str {
         match self {
-            Input::File(s) | Input::Content(s) | Input::Stdin(s) => s,
+            Input::File { content, .. } => content,
+            Input::Content(s) | Input::Stdin(s) => s,
+        }
+    }
+
+    /// Get parser type from input source
+    pub fn parser_type(&self) -> Option<ParserType> {
+        match self {
+            Input::File { path, .. } => Some(ParserType::from_extension(path)),
+            Input::Content(_) | Input::Stdin(_) => None,
         }
     }
 
     /// Read from file path
     pub fn from_file(path: &str) -> Result<Self, String> {
-        let source = fs::read_to_string(path)
+        let content = fs::read_to_string(path)
             .map_err(|e| format!("Error reading file '{}': {}", path, e))?;
-        Ok(Input::File(source))
+        Ok(Input::File {
+            path: path.to_string(),
+            content,
+        })
     }
 
     /// Read from stdin

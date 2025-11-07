@@ -1,18 +1,18 @@
 <style>
 	/* Test url() function values */
-	.background-image {
+	.class1 {
 		background: url('image.png');
 	}
 
-	.unquoted-url {
+	.class2 {
 		background-image: url(image.png);
 	}
 
-	.complex-path {
+	.class3 {
 		background: url('../images/bg.jpg');
 	}
 
-	.font-face-url {
+	.class4 {
 		font-family: 'Custom';
 		src: url('font.woff2') format('woff2');
 	}

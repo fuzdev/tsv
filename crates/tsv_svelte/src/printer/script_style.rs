@@ -64,12 +64,12 @@ impl<'a> Printer<'a> {
         self.write(">");
 
         // Format CSS content if present
-        if !style.css_nodes.is_empty() {
+        if !style.css_stylesheet.nodes.is_empty() {
             self.write("\n");
 
             // Pass the entire source to CSS printer (CSS node spans are absolute)
             // The CSS printer will use the spans to detect blank lines correctly
-            let formatted_css = tsv_css::format(&style.css_nodes, self.source());
+            let formatted_css = tsv_css::format(&style.css_stylesheet, self.source());
 
             // Indent each line - trim trailing newline first to avoid extra blank lines
             let css_trimmed = formatted_css.trim_end_matches('\n');

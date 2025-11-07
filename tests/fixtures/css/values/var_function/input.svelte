@@ -1,24 +1,24 @@
 <style>
 	:root {
-		--primary-color: #007bff;
-		--secondary-color: #6c757d;
-		--spacing: 16px;
-		--font-size: 14px;
+		--var1: #007bff;
+		--var2: #6c757d;
+		--var3: 16px;
+		--var4: 14px;
 	}
 
-	.button {
-		background-color: var(--primary-color);
-		padding: var(--spacing);
-		font-size: var(--font-size);
+	.class1 {
+		background-color: var(--var1);
+		padding: var(--var3);
+		font-size: var(--var4);
 	}
 
-	.card {
-		color: var(--text-color, black);
-		margin: var(--margin, 0);
+	.class2 {
+		color: var(--var5, black);
+		margin: var(--var6, 0);
 	}
 
-	.nested {
-		width: var(--size, 100px);
-		height: var(--size, 100px);
+	.class3 {
+		width: var(--var7, 100px);
+		height: var(--var7, 100px);
 	}
 </style>

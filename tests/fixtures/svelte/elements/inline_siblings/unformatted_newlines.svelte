@@ -3,14 +3,14 @@
 <span
 >
 
-	a
+	inline1
 </span
 
 >  <span
 
 
 >
-b
+inline2
 
 </span
 >

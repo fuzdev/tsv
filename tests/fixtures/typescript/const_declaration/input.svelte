@@ -1,3 +1,3 @@
 <script lang="ts">
-	const a = 5;
+	const expr = 'value';
 </script>

@@ -2,7 +2,7 @@
   "css": null,
   "js": [],
   "start": 0,
-  "end": 27,
+  "end": 39,
   "type": "Root",
   "fragment": {
     "type": "Fragment",
@@ -10,7 +10,7 @@
       {
         "type": "Component",
         "start": 0,
-        "end": 27,
+        "end": 39,
         "name": "Comp",
         "attributes": [],
         "fragment": {
@@ -26,11 +26,11 @@
             {
               "type": "ExpressionTag",
               "start": 8,
-              "end": 11,
+              "end": 15,
               "expression": {
                 "type": "Identifier",
                 "start": 9,
-                "end": 10,
+                "end": 14,
                 "loc": {
                   "start": {
                     "line": 2,
@@ -38,38 +38,10 @@
                   },
                   "end": {
                     "line": 2,
-                    "column": 3
-                  }
-                },
-                "name": "a"
-              }
-            },
-            {
-              "type": "Text",
-              "start": 11,
-              "end": 12,
-              "raw": " ",
-              "data": " "
-            },
-            {
-              "type": "ExpressionTag",
-              "start": 12,
-              "end": 15,
-              "expression": {
-                "type": "Identifier",
-                "start": 13,
-                "end": 14,
-                "loc": {
-                  "start": {
-                    "line": 2,
-                    "column": 6
-                  },
-                  "end": {
-                    "line": 2,
                     "column": 7
                   }
                 },
-                "name": "b"
+                "name": "expr1"
               }
             },
             {
@@ -82,11 +54,11 @@
             {
               "type": "ExpressionTag",
               "start": 16,
-              "end": 19,
+              "end": 23,
               "expression": {
                 "type": "Identifier",
                 "start": 17,
-                "end": 18,
+                "end": 22,
                 "loc": {
                   "start": {
                     "line": 2,
@@ -94,10 +66,38 @@
                   },
                   "end": {
                     "line": 2,
-                    "column": 11
+                    "column": 15
                   }
                 },
-                "name": "c"
+                "name": "expr2"
+              }
+            },
+            {
+              "type": "Text",
+              "start": 23,
+              "end": 24,
+              "raw": " ",
+              "data": " "
+            },
+            {
+              "type": "ExpressionTag",
+              "start": 24,
+              "end": 31,
+              "expression": {
+                "type": "Identifier",
+                "start": 25,
+                "end": 30,
+                "loc": {
+                  "start": {
+                    "line": 2,
+                    "column": 18
+                  },
+                  "end": {
+                    "line": 2,
+                    "column": 23
+                  }
+                },
+                "name": "expr3"
               }
             }
           ]

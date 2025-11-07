@@ -1,1 +1,1 @@
-<Comp  primary  disabled  />
+<Comp  prop1  prop2  />

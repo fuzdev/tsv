@@ -2,31 +2,31 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 66,
+    "end": 62,
     "attributes": [],
     "children": [
       {
         "type": "Atrule",
         "start": 9,
-        "end": 57,
+        "end": 53,
         "name": "layer",
-        "prelude": "components",
+        "prelude": "layer1",
         "block": {
           "type": "Block",
-          "start": 27,
-          "end": 57,
+          "start": 23,
+          "end": 53,
           "children": [
             {
               "type": "Rule",
               "prelude": {
                 "type": "SelectorList",
-                "start": 31,
-                "end": 34,
+                "start": 27,
+                "end": 30,
                 "children": [
                   {
                     "type": "ComplexSelector",
-                    "start": 31,
-                    "end": 34,
+                    "start": 27,
+                    "end": 30,
                     "children": [
                       {
                         "type": "RelativeSelector",
@@ -35,12 +35,12 @@
                           {
                             "type": "TypeSelector",
                             "name": "div",
-                            "start": 31,
-                            "end": 34
+                            "start": 27,
+                            "end": 30
                           }
                         ],
-                        "start": 31,
-                        "end": 34
+                        "start": 27,
+                        "end": 30
                       }
                     ]
                   }
@@ -48,20 +48,20 @@
               },
               "block": {
                 "type": "Block",
-                "start": 35,
-                "end": 54,
+                "start": 31,
+                "end": 50,
                 "children": [
                   {
                     "type": "Declaration",
-                    "start": 40,
-                    "end": 49,
+                    "start": 36,
+                    "end": 45,
                     "property": "margin",
                     "value": "0"
                   }
                 ]
               },
-              "start": 31,
-              "end": 54
+              "start": 27,
+              "end": 50
             }
           ]
         }
@@ -69,8 +69,8 @@
     ],
     "content": {
       "start": 7,
-      "end": 58,
-      "styles": "\n\t@layer components {\n\t\tdiv {\n\t\t\tmargin: 0;\n\t\t}\n\t}\n",
+      "end": 54,
+      "styles": "\n\t@layer layer1 {\n\t\tdiv {\n\t\t\tmargin: 0;\n\t\t}\n\t}\n",
       "comment": null
     }
   },

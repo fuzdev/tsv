@@ -243,11 +243,14 @@ impl<'a> Printer<'a> {
     /// Root-level formatting has special rules:
     /// - Blank lines preserved from source (authorial intent for logical grouping)
     /// - Multiple blank lines collapse to single blank line
-    /// - Whitespace between inline elements is preserved
+    /// - Whitespace between inline elements is preserved (INCLUDING newlines)
+    /// - Format preservation: inline stays inline, multiline stays multiline
     /// - Leading/trailing whitespace-only nodes are removed
     fn print_root_fragment(&mut self, fragment: &internal::Fragment) {
         let mut prev_was_block = false;
         let mut prev_had_blank_line = false;
+        let mut had_newline_before_current = false; // Track if source has newline before current
+        let mut has_output_content = false; // Track if we've output any content yet
 
         // Find first non-whitespace node index
         let first_non_ws_idx = fragment.nodes.iter().position(
@@ -269,25 +272,64 @@ impl<'a> Printer<'a> {
                             // Blank line found - skip this node entirely and remember the blank line
                             // The blank line will be added before the next element
                             prev_had_blank_line = true;
+                            had_newline_before_current = true;
                             continue;
                         }
+
+                        // Check if whitespace contains a single newline
+                        let has_newline = text.raw.contains('\n');
 
                         // Whitespace without blank line - skip if previous was block,
                         // otherwise preserve (semantically meaningful between inline elements)
                         if prev_was_block {
+                            had_newline_before_current = has_newline;
                             continue;
                         }
 
-                        // Whitespace after inline element: preserve it
-                        self.print_text(text, false, false);
+                        // Whitespace after inline element: preserve format from source
+                        // If source has newline, preserve it; if just spaces, preserve space
+                        if has_newline {
+                            // Source has newline - preserve it (format preservation)
+                            had_newline_before_current = true;
+                            // Don't write anything here - let next element handle spacing
+                        } else {
+                            // Just spaces - preserve single space between inline elements
+                            self.write(" ");
+                            had_newline_before_current = false;
+                        }
                         prev_was_block = false;
                         prev_had_blank_line = false;
                     } else {
-                        // Text with content: treat as block-like for newline separation
-                        // Add newline before text if previous was block (same as elements)
+                        // Text with content
+                        // Check if text itself has leading whitespace with newlines
+                        let text_has_leading_newline = {
+                            let trimmed = text.raw.trim_start();
+                            if trimmed.len() < text.raw.len() {
+                                let leading = &text.raw[..text.raw.len() - trimmed.len()];
+                                leading.contains('\n')
+                            } else {
+                                false
+                            }
+                        };
+
+                        // Check if text has trailing newline (determines if next element should be on new line)
+                        let text_has_trailing_newline = {
+                            let trimmed = text.raw.trim_end();
+                            if trimmed.len() < text.raw.len() {
+                                let trailing = &text.raw[trimmed.len()..];
+                                trailing.contains('\n')
+                            } else {
+                                false
+                            }
+                        };
+
+                        // Add newline before text if previous was block OR if we had newline before OR text has leading newline
                         if prev_had_blank_line {
                             self.write("\n\n");
-                        } else if prev_was_block {
+                        } else if prev_was_block
+                            || had_newline_before_current
+                            || text_has_leading_newline
+                        {
                             self.write("\n");
                         }
 
@@ -295,45 +337,51 @@ impl<'a> Printer<'a> {
                         // to trim boundary whitespace (newlines become line breaks, not spaces)
                         self.print_text(text, true, false);
 
-                        // Treat text with content as block-like so next element gets proper spacing
-                        prev_was_block = true;
+                        // Text with trailing newline is treated as block-like (forces newline after)
+                        // Text without trailing newline is treated as inline (no forced newline)
+                        has_output_content = true;
+                        prev_was_block = text_has_trailing_newline;
                         prev_had_blank_line = false;
+                        had_newline_before_current = false;
                     }
                 }
                 FragmentNode::Element(el) => {
-                    // At root level, components are treated as block elements for spacing
-                    // (preserves newlines between components). In child contexts, they're
-                    // treated as inline (preserves whitespace in parents like <p>).
-                    use crate::ast::internal::ElementKind;
-                    let is_block = self.is_block_element(el) || el.kind == ElementKind::Component;
+                    let is_block = self.is_block_element(el);
 
-                    // Add spacing before this element:
-                    // - Blank line if source had one (preserve authorial intent)
-                    // - Single newline if previous was block (separator between blocks)
-                    // - No spacing if previous was inline (stays on same line)
+                    // At root level, spacing rules:
+                    // 1. Blank line if source had one (preserve authorial intent)
+                    // 2. Block elements: always separated by newlines (unless first)
+                    // 3. Inline elements/components: preserve source format (newline if source had it)
+
                     if prev_had_blank_line {
                         self.write("\n\n");
-                    } else if prev_was_block {
+                    } else if is_block && has_output_content {
+                        // Block elements always get newline (unless first element)
+                        self.write("\n");
+                    } else if prev_was_block || had_newline_before_current {
+                        // Inline elements/components: newline only if prev was block or source had newline
                         self.write("\n");
                     }
 
                     self.print_element(el);
+                    has_output_content = true;
                     prev_was_block = is_block;
                     prev_had_blank_line = false;
+                    had_newline_before_current = false;
                 }
                 FragmentNode::ExpressionTag(tag) => {
-                    // Expression tags: add spacing similar to elements
-                    // - Blank line if source had one
-                    // - Single newline if previous was block
+                    // Expression tags: add spacing if previous was block or source had newline
                     if prev_had_blank_line {
                         self.write("\n\n");
-                    } else if prev_was_block {
+                    } else if prev_was_block || had_newline_before_current {
                         self.write("\n");
                     }
 
                     self.print_expression_tag(tag);
+                    has_output_content = true;
                     prev_was_block = false;
                     prev_had_blank_line = false;
+                    had_newline_before_current = false;
                 }
             }
         }

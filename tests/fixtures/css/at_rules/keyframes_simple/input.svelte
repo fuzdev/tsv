@@ -1,5 +1,5 @@
 <style>
-	@keyframes slide {
+	@keyframes anim1 {
 		0% {
 			transform: translateX(0);
 		}

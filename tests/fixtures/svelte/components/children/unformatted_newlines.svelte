@@ -1,5 +1,5 @@
 <Comp
-><p>text
-  
-  content</p></Comp
+><p>text1
+
+  text2</p></Comp
 >

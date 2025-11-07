@@ -20,7 +20,7 @@
               "type": "Component",
               "start": 7,
               "end": 17,
-              "name": "InnerA",
+              "name": "Inner1",
               "attributes": [],
               "fragment": {
                 "type": "Fragment",
@@ -31,7 +31,7 @@
               "type": "Component",
               "start": 17,
               "end": 27,
-              "name": "InnerB",
+              "name": "Inner2",
               "attributes": [],
               "fragment": {
                 "type": "Fragment",
@@ -42,7 +42,7 @@
               "type": "Component",
               "start": 27,
               "end": 37,
-              "name": "InnerC",
+              "name": "Inner3",
               "attributes": [],
               "fragment": {
                 "type": "Fragment",

@@ -1,21 +1,21 @@
 {
   "css": {
     "type": "StyleSheet",
-    "start": 212,
-    "end": 345,
+    "start": 199,
+    "end": 322,
     "attributes": [],
     "children": [
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 221,
-          "end": 231,
+          "start": 208,
+          "end": 215,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 221,
-              "end": 231,
+              "start": 208,
+              "end": 215,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -23,13 +23,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "max-valid",
-                      "start": 221,
-                      "end": 231
+                      "name": "class1",
+                      "start": 208,
+                      "end": 215
                     }
                   ],
-                  "start": 221,
-                  "end": 231
+                  "start": 208,
+                  "end": 215
                 }
               ]
             }
@@ -37,32 +37,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 232,
-          "end": 258,
+          "start": 216,
+          "end": 242,
           "children": [
             {
               "type": "Declaration",
-              "start": 236,
-              "end": 254,
+              "start": 220,
+              "end": 238,
               "property": "content",
               "value": "'\\\\110FFFF'"
             }
           ]
         },
-        "start": 221,
-        "end": 258
+        "start": 208,
+        "end": 242
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 261,
-          "end": 269,
+          "start": 245,
+          "end": 252,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 261,
-              "end": 269,
+              "start": 245,
+              "end": 252,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -70,13 +70,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "bmp-max",
-                      "start": 261,
-                      "end": 269
+                      "name": "class2",
+                      "start": 245,
+                      "end": 252
                     }
                   ],
-                  "start": 261,
-                  "end": 269
+                  "start": 245,
+                  "end": 252
                 }
               ]
             }
@@ -84,32 +84,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 270,
-          "end": 294,
+          "start": 253,
+          "end": 277,
           "children": [
             {
               "type": "Declaration",
-              "start": 274,
-              "end": 290,
+              "start": 257,
+              "end": 273,
               "property": "content",
               "value": "'\\\\FFFFF'"
             }
           ]
         },
-        "start": 261,
-        "end": 294
+        "start": 245,
+        "end": 277
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 297,
-          "end": 310,
+          "start": 280,
+          "end": 287,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 297,
-              "end": 310,
+              "start": 280,
+              "end": 287,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -117,13 +117,13 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "astral-plane",
-                      "start": 297,
-                      "end": 310
+                      "name": "class3",
+                      "start": 280,
+                      "end": 287
                     }
                   ],
-                  "start": 297,
-                  "end": 310
+                  "start": 280,
+                  "end": 287
                 }
               ]
             }
@@ -131,32 +131,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 311,
-          "end": 336,
+          "start": 288,
+          "end": 313,
           "children": [
             {
               "type": "Declaration",
-              "start": 315,
-              "end": 332,
+              "start": 292,
+              "end": 309,
               "property": "content",
               "value": "'\\\\11F600'"
             }
           ]
         },
-        "start": 297,
-        "end": 336
+        "start": 280,
+        "end": 313
       }
     ],
     "content": {
-      "start": 219,
-      "end": 337,
-      "styles": "\n\t.max-valid {\n\t\tcontent: '\\10FFFF';\n\t}\n\n\t.bmp-max {\n\t\tcontent: '\\FFFF';\n\t}\n\n\t.astral-plane {\n\t\tcontent: '\\1F600';\n\t}\n",
+      "start": 206,
+      "end": 314,
+      "styles": "\n\t.class1 {\n\t\tcontent: '\\10FFFF';\n\t}\n\n\t.class2 {\n\t\tcontent: '\\FFFF';\n\t}\n\n\t.class3 {\n\t\tcontent: '\\1F600';\n\t}\n",
       "comment": null
     }
   },
   "js": [],
   "start": 112,
-  "end": 210,
+  "end": 197,
   "type": "Root",
   "fragment": {
     "type": "Fragment",
@@ -181,8 +181,8 @@
               "type": "Text",
               "start": 115,
               "end": 144,
-              "raw": "Max valid Unicode: &#x10FFFF;",
-              "data": "Max valid Unicode: \u0000"
+              "raw": "max valid Unicode: &#x10FFFF;",
+              "data": "max valid Unicode: \u0000"
             }
           ]
         }
@@ -223,7 +223,7 @@
       {
         "type": "RegularElement",
         "start": 174,
-        "end": 210,
+        "end": 197,
         "name": "p",
         "attributes": [],
         "fragment": {
@@ -232,17 +232,17 @@
             {
               "type": "Text",
               "start": 177,
-              "end": 206,
-              "raw": "Astral plane emoji: &#x1F600;",
-              "data": "Astral plane emoji: 😀"
+              "end": 193,
+              "raw": "emoji: &#x1F600;",
+              "data": "emoji: 😀"
             }
           ]
         }
       },
       {
         "type": "Text",
-        "start": 210,
-        "end": 212,
+        "start": 197,
+        "end": 199,
         "raw": "\n\n",
         "data": "\n\n"
       }

@@ -2,7 +2,7 @@
   "css": {
     "type": "StyleSheet",
     "start": 259,
-    "end": 444,
+    "end": 446,
     "attributes": [],
     "children": [
       {
@@ -10,12 +10,12 @@
         "prelude": {
           "type": "SelectorList",
           "start": 268,
-          "end": 282,
+          "end": 283,
           "children": [
             {
               "type": "ComplexSelector",
               "start": 268,
-              "end": 282,
+              "end": 283,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -23,19 +23,19 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "acute",
+                      "name": "class1",
                       "start": 268,
-                      "end": 274
+                      "end": 275
                     },
                     {
                       "type": "PseudoElementSelector",
                       "name": "before",
-                      "start": 274,
-                      "end": 282
+                      "start": 275,
+                      "end": 283
                     }
                   ],
                   "start": 268,
-                  "end": 282
+                  "end": 283
                 }
               ]
             }
@@ -43,32 +43,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 283,
-          "end": 307,
+          "start": 284,
+          "end": 308,
           "children": [
             {
               "type": "Declaration",
-              "start": 287,
-              "end": 303,
+              "start": 288,
+              "end": 304,
               "property": "content",
               "value": "'e\\\\3301'"
             }
           ]
         },
         "start": 268,
-        "end": 307
+        "end": 308
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 310,
-          "end": 324,
+          "start": 311,
+          "end": 326,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 310,
-              "end": 324,
+              "start": 311,
+              "end": 326,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -76,19 +76,19 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "grave",
-                      "start": 310,
-                      "end": 316
+                      "name": "class2",
+                      "start": 311,
+                      "end": 318
                     },
                     {
                       "type": "PseudoElementSelector",
                       "name": "before",
-                      "start": 316,
-                      "end": 324
+                      "start": 318,
+                      "end": 326
                     }
                   ],
-                  "start": 310,
-                  "end": 324
+                  "start": 311,
+                  "end": 326
                 }
               ]
             }
@@ -96,32 +96,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 325,
-          "end": 349,
+          "start": 327,
+          "end": 351,
           "children": [
             {
               "type": "Declaration",
-              "start": 329,
-              "end": 345,
+              "start": 331,
+              "end": 347,
               "property": "content",
               "value": "'a\\\\3300'"
             }
           ]
         },
-        "start": 310,
-        "end": 349
+        "start": 311,
+        "end": 351
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 352,
-          "end": 366,
+          "start": 354,
+          "end": 369,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 352,
-              "end": 366,
+              "start": 354,
+              "end": 369,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -129,19 +129,19 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "tilde",
-                      "start": 352,
-                      "end": 358
+                      "name": "class3",
+                      "start": 354,
+                      "end": 361
                     },
                     {
                       "type": "PseudoElementSelector",
                       "name": "before",
-                      "start": 358,
-                      "end": 366
+                      "start": 361,
+                      "end": 369
                     }
                   ],
-                  "start": 352,
-                  "end": 366
+                  "start": 354,
+                  "end": 369
                 }
               ]
             }
@@ -149,32 +149,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 367,
-          "end": 391,
+          "start": 370,
+          "end": 394,
           "children": [
             {
               "type": "Declaration",
-              "start": 371,
-              "end": 387,
+              "start": 374,
+              "end": 390,
               "property": "content",
               "value": "'n\\\\3303'"
             }
           ]
         },
-        "start": 352,
-        "end": 391
+        "start": 354,
+        "end": 394
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 394,
-          "end": 410,
+          "start": 397,
+          "end": 412,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 394,
-              "end": 410,
+              "start": 397,
+              "end": 412,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -182,19 +182,19 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "cedilla",
-                      "start": 394,
-                      "end": 402
+                      "name": "class4",
+                      "start": 397,
+                      "end": 404
                     },
                     {
                       "type": "PseudoElementSelector",
                       "name": "before",
-                      "start": 402,
-                      "end": 410
+                      "start": 404,
+                      "end": 412
                     }
                   ],
-                  "start": 394,
-                  "end": 410
+                  "start": 397,
+                  "end": 412
                 }
               ]
             }
@@ -202,26 +202,26 @@
         },
         "block": {
           "type": "Block",
-          "start": 411,
-          "end": 435,
+          "start": 413,
+          "end": 437,
           "children": [
             {
               "type": "Declaration",
-              "start": 415,
-              "end": 431,
+              "start": 417,
+              "end": 433,
               "property": "content",
               "value": "'c\\\\3327'"
             }
           ]
         },
-        "start": 394,
-        "end": 435
+        "start": 397,
+        "end": 437
       }
     ],
     "content": {
       "start": 266,
-      "end": 436,
-      "styles": "\n\t.acute::before {\n\t\tcontent: 'e\\301';\n\t}\n\n\t.grave::before {\n\t\tcontent: 'a\\300';\n\t}\n\n\t.tilde::before {\n\t\tcontent: 'n\\303';\n\t}\n\n\t.cedilla::before {\n\t\tcontent: 'c\\327';\n\t}\n",
+      "end": 438,
+      "styles": "\n\t.class1::before {\n\t\tcontent: 'e\\301';\n\t}\n\n\t.class2::before {\n\t\tcontent: 'a\\300';\n\t}\n\n\t.class3::before {\n\t\tcontent: 'n\\303';\n\t}\n\n\t.class4::before {\n\t\tcontent: 'c\\327';\n\t}\n",
       "comment": null
     }
   },
@@ -252,8 +252,8 @@
               "type": "Text",
               "start": 129,
               "end": 153,
-              "raw": "Combining acute: e&#769;",
-              "data": "Combining acute: é"
+              "raw": "combining acute: e&#769;",
+              "data": "combining acute: é"
             }
           ]
         }
@@ -278,8 +278,8 @@
               "type": "Text",
               "start": 161,
               "end": 187,
-              "raw": "Combining grave: a&#x0300;",
-              "data": "Combining grave: à"
+              "raw": "combining grave: a&#x0300;",
+              "data": "combining grave: à"
             }
           ]
         }
@@ -304,8 +304,8 @@
               "type": "Text",
               "start": 195,
               "end": 219,
-              "raw": "Combining tilde: n&#771;",
-              "data": "Combining tilde: ñ"
+              "raw": "combining tilde: n&#771;",
+              "data": "combining tilde: ñ"
             }
           ]
         }
@@ -330,8 +330,8 @@
               "type": "Text",
               "start": 227,
               "end": 253,
-              "raw": "Combining cedilla: c&#807;",
-              "data": "Combining cedilla: ç"
+              "raw": "combining cedilla: c&#807;",
+              "data": "combining cedilla: ç"
             }
           ]
         }

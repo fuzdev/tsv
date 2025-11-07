@@ -1,13 +1,13 @@
 <style>
-	.item:first-child {
+	.class1:first-child {
 		color: red;
 	}
 
-	.item:last-child {
+	.class1:last-child {
 		color: blue;
 	}
 
-	.item:only-child {
+	.class1:only-child {
 		color: green;
 	}
 

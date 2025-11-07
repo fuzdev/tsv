@@ -1,4 +1,4 @@
 <div>
-	<div>a</div>
-	<div>b</div>
+	<div>block1</div>
+	<div>block2</div>
 </div>

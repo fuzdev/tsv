@@ -2,7 +2,7 @@
   "css": null,
   "js": [],
   "start": 0,
-  "end": 62,
+  "end": 59,
   "type": "Root",
   "fragment": {
     "type": "Fragment",
@@ -10,7 +10,7 @@
       {
         "type": "Component",
         "start": 0,
-        "end": 62,
+        "end": 59,
         "name": "Comp",
         "attributes": [],
         "fragment": {
@@ -19,7 +19,7 @@
             {
               "type": "RegularElement",
               "start": 8,
-              "end": 22,
+              "end": 21,
               "name": "p",
               "attributes": [],
               "fragment": {
@@ -28,50 +28,50 @@
                   {
                     "type": "Text",
                     "start": 11,
-                    "end": 18,
-                    "raw": "block_a",
-                    "data": "block_a"
+                    "end": 17,
+                    "raw": "block1",
+                    "data": "block1"
                   }
                 ]
               }
             },
             {
               "type": "Text",
-              "start": 22,
-              "end": 24,
+              "start": 21,
+              "end": 23,
               "raw": "\n\t",
               "data": "\n\t"
             },
             {
               "type": "RegularElement",
-              "start": 24,
+              "start": 23,
+              "end": 36,
+              "name": "p",
+              "attributes": [],
+              "fragment": {
+                "type": "Fragment",
+                "nodes": [
+                  {
+                    "type": "Text",
+                    "start": 26,
+                    "end": 32,
+                    "raw": "block2",
+                    "data": "block2"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Text",
+              "start": 36,
               "end": 38,
-              "name": "p",
-              "attributes": [],
-              "fragment": {
-                "type": "Fragment",
-                "nodes": [
-                  {
-                    "type": "Text",
-                    "start": 27,
-                    "end": 34,
-                    "raw": "block_b",
-                    "data": "block_b"
-                  }
-                ]
-              }
-            },
-            {
-              "type": "Text",
-              "start": 38,
-              "end": 40,
               "raw": "\n\t",
               "data": "\n\t"
             },
             {
               "type": "RegularElement",
-              "start": 40,
-              "end": 54,
+              "start": 38,
+              "end": 51,
               "name": "p",
               "attributes": [],
               "fragment": {
@@ -79,10 +79,10 @@
                 "nodes": [
                   {
                     "type": "Text",
-                    "start": 43,
-                    "end": 50,
-                    "raw": "block_c",
-                    "data": "block_c"
+                    "start": 41,
+                    "end": 47,
+                    "raw": "block3",
+                    "data": "block3"
                   }
                 ]
               }

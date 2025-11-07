@@ -1,12 +1,7 @@
-<script>
-	const tag = 'div';
-	const content = 'nested';
-</script>
+<p>&lt;{expr1}&gt;{expr2}&lt;/{expr1}&gt;</p>
 
-<p>&lt;{tag}&gt;{content}&lt;/{tag}&gt;</p>
+<p>&copy; {2024} &ndash; text</p>
 
-<p>&copy; {2024} &ndash; Example</p>
+<p>{expr1}: &quot;{expr2}&quot;</p>
 
-<p>{tag}: &quot;{content}&quot;</p>
-
-<p>&amp; more &amp; {tag}</p>
+<p>&amp; text &amp; {expr1}</p>

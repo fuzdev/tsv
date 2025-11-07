@@ -6,8 +6,8 @@ use tsv_debug::fixtures::{
 };
 
 /// Test round-trip: parse → format → parse → compare ASTs (ignoring spans)
-/// Uses formatted.* as baseline if it exists (for fixtures with structural changes),
-/// otherwise uses input.* (for fixtures where printer only changes formatting)
+/// Uses formatted.svelte as baseline if it exists (for fixtures with structural changes),
+/// otherwise uses input.svelte (for fixtures where printer only changes formatting)
 fn test_format_round_trip(fixture: &Fixture) -> Result<(), String> {
     let fixture_dir = &fixture.path;
 
@@ -22,8 +22,8 @@ fn test_format_round_trip(fixture: &Fixture) -> Result<(), String> {
         return Ok(()); // No supported input file
     };
 
-    // Use formatted.* as baseline if it exists (for structural changes like reordering),
-    // otherwise use input.* (for pure formatting changes)
+    // Use formatted.svelte as baseline if it exists (for structural changes like reordering),
+    // otherwise use input.svelte (for pure formatting changes)
     let baseline_file = if fixture_dir.join(formatted_file).exists() {
         formatted_file
     } else {
@@ -107,9 +107,15 @@ fn test_format_round_trip(fixture: &Fixture) -> Result<(), String> {
     Ok(())
 }
 
-/// Test prettier baseline: format → compare against formatted.* or input.*
+/// Test prettier baseline: format → compare against formatted.svelte or input.svelte
 fn test_format_matches_prettier(fixture: &Fixture) -> Result<(), String> {
     let fixture_dir = &fixture.path;
+
+    // Skip if our formatter intentionally differs from prettier
+    // (implicit detection via output_prettier.svelte existence)
+    if fixture.output_prettier_path().exists() {
+        return Ok(());
+    }
 
     // Check for Svelte, TypeScript, or CSS file
     let (input_file, formatted_file, file_type) = if fixture_dir.join("input.svelte").exists() {
@@ -137,7 +143,7 @@ fn test_format_matches_prettier(fixture: &Fixture) -> Result<(), String> {
         tsv_css::format(&ast, &input)
     };
 
-    // Check against formatted.* if it exists, otherwise input.*
+    // Check against formatted.svelte if it exists, otherwise input.svelte
     let expected = if fixture_dir.join(formatted_file).exists() {
         fs::read_to_string(fixture_dir.join(formatted_file))
             .map_err(|e| format!("Failed to read {}: {}", formatted_file, e))?
@@ -156,8 +162,8 @@ fn test_format_matches_prettier(fixture: &Fixture) -> Result<(), String> {
 }
 
 /// Test idempotency: format → parse → format → should be identical
-/// Uses formatted.* as baseline if it exists (for fixtures with structural changes),
-/// otherwise uses input.* (for fixtures where printer only changes formatting)
+/// Uses formatted.svelte as baseline if it exists (for fixtures with structural changes),
+/// otherwise uses input.svelte (for fixtures where printer only changes formatting)
 fn test_format_idempotent(fixture: &Fixture) -> Result<(), String> {
     let fixture_dir = &fixture.path;
 
@@ -172,8 +178,8 @@ fn test_format_idempotent(fixture: &Fixture) -> Result<(), String> {
         return Ok(()); // No supported input file
     };
 
-    // Use formatted.* as baseline if it exists (for structural changes like reordering),
-    // otherwise use input.* (for pure formatting changes)
+    // Use formatted.svelte as baseline if it exists (for structural changes like reordering),
+    // otherwise use input.svelte (for pure formatting changes)
     let baseline_file = if fixture_dir.join(formatted_file).exists() {
         formatted_file
     } else {
@@ -386,7 +392,7 @@ fn test_formatter_output_quality() {
     let passed = results.iter().filter(|r| r.passed()).count();
     let failed = total - passed;
 
-    println!("\n════════════════════════════════════════\n");
+    println!("\n════════════════════\n");
 
     // Print summary
     if failed > 0 {

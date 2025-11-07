@@ -2,7 +2,7 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 89,
+    "end": 86,
     "attributes": [],
     "children": [
       {
@@ -76,12 +76,12 @@
         "prelude": {
           "type": "SelectorList",
           "start": 43,
-          "end": 55,
+          "end": 52,
           "children": [
             {
               "type": "ComplexSelector",
               "start": 43,
-              "end": 55,
+              "end": 52,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -89,32 +89,32 @@
                   "selectors": [
                     {
                       "type": "ClassSelector",
-                      "name": "container",
+                      "name": "class1",
                       "start": 43,
-                      "end": 53
+                      "end": 50
                     }
                   ],
                   "start": 43,
-                  "end": 53
+                  "end": 50
                 },
                 {
                   "type": "RelativeSelector",
                   "combinator": {
                     "type": "Combinator",
                     "name": " ",
-                    "start": 53,
-                    "end": 54
+                    "start": 50,
+                    "end": 51
                   },
                   "selectors": [
                     {
                       "type": "TypeSelector",
                       "name": "p",
-                      "start": 54,
-                      "end": 55
+                      "start": 51,
+                      "end": 52
                     }
                   ],
-                  "start": 53,
-                  "end": 55
+                  "start": 50,
+                  "end": 52
                 }
               ]
             }
@@ -122,26 +122,26 @@
         },
         "block": {
           "type": "Block",
-          "start": 56,
-          "end": 80,
+          "start": 53,
+          "end": 77,
           "children": [
             {
               "type": "Declaration",
-              "start": 60,
-              "end": 76,
+              "start": 57,
+              "end": 73,
               "property": "line-height",
               "value": "1.5"
             }
           ]
         },
         "start": 43,
-        "end": 80
+        "end": 77
       }
     ],
     "content": {
       "start": 7,
-      "end": 81,
-      "styles": "\n\tdiv span {\n\t\tcolor: inherit;\n\t}\n\n\t.container p {\n\t\tline-height: 1.5;\n\t}\n",
+      "end": 78,
+      "styles": "\n\tdiv span {\n\t\tcolor: inherit;\n\t}\n\n\t.class1 p {\n\t\tline-height: 1.5;\n\t}\n",
       "comment": null
     }
   },

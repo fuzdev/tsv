@@ -1,4 +1,4 @@
 <script lang="ts">
-	const greeting = 'hello';
-	const empty = '';
+	const expr1 = 'value';
+	const expr2 = '';
 </script>

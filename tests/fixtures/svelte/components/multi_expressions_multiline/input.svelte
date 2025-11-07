@@ -1,5 +1,5 @@
 <Comp>
-	{a}
-	{b}
-	{c}
+	{expr1}
+	{expr2}
+	{expr3}
 </Comp>

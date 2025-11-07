@@ -2,7 +2,7 @@
   "css": null,
   "js": [],
   "start": 0,
-  "end": 80,
+  "end": 77,
   "type": "Root",
   "fragment": {
     "type": "Fragment",
@@ -10,7 +10,7 @@
       {
         "type": "Component",
         "start": 0,
-        "end": 80,
+        "end": 77,
         "name": "Outer",
         "attributes": [],
         "fragment": {
@@ -36,8 +36,8 @@
                     "type": "Text",
                     "start": 12,
                     "end": 23,
-                    "raw": "Hello world",
-                    "data": "Hello world"
+                    "raw": "text1 text2",
+                    "data": "text1 text2"
                   }
                 ]
               }
@@ -52,14 +52,14 @@
             {
               "type": "Component",
               "start": 29,
-              "end": 62,
+              "end": 60,
               "name": "Inner",
               "attributes": [
                 {
                   "type": "Attribute",
                   "start": 36,
-                  "end": 43,
-                  "name": "primary",
+                  "end": 40,
+                  "name": "prop",
                   "value": true
                 }
               ],
@@ -68,29 +68,29 @@
                 "nodes": [
                   {
                     "type": "Text",
-                    "start": 44,
-                    "end": 54,
-                    "raw": "inner text",
-                    "data": "inner text"
+                    "start": 41,
+                    "end": 52,
+                    "raw": "text3 text4",
+                    "data": "text3 text4"
                   }
                 ]
               }
             },
             {
               "type": "Text",
-              "start": 62,
-              "end": 64,
+              "start": 60,
+              "end": 62,
               "raw": "\n\t",
               "data": "\n\t"
             },
             {
               "type": "ExpressionTag",
-              "start": 64,
-              "end": 71,
+              "start": 62,
+              "end": 68,
               "expression": {
                 "type": "Identifier",
-                "start": 65,
-                "end": 70,
+                "start": 63,
+                "end": 67,
                 "loc": {
                   "start": {
                     "line": 4,
@@ -98,16 +98,16 @@
                   },
                   "end": {
                     "line": 4,
-                    "column": 7
+                    "column": 6
                   }
                 },
-                "name": "count"
+                "name": "expr"
               }
             },
             {
               "type": "Text",
-              "start": 71,
-              "end": 72,
+              "start": 68,
+              "end": 69,
               "raw": "\n",
               "data": "\n"
             }

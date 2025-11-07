@@ -2,7 +2,7 @@
   "css": {
     "type": "StyleSheet",
     "start": 0,
-    "end": 86,
+    "end": 82,
     "attributes": [],
     "children": [
       {
@@ -10,12 +10,12 @@
         "prelude": {
           "type": "SelectorList",
           "start": 9,
-          "end": 19,
+          "end": 16,
           "children": [
             {
               "type": "ComplexSelector",
               "start": 9,
-              "end": 19,
+              "end": 16,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -29,13 +29,13 @@
                     },
                     {
                       "type": "IdSelector",
-                      "name": "header",
+                      "name": "id1",
                       "start": 12,
-                      "end": 19
+                      "end": 16
                     }
                   ],
                   "start": 9,
-                  "end": 19
+                  "end": 16
                 }
               ]
             }
@@ -43,32 +43,32 @@
         },
         "block": {
           "type": "Block",
-          "start": 20,
-          "end": 41,
+          "start": 17,
+          "end": 38,
           "children": [
             {
               "type": "Declaration",
-              "start": 24,
-              "end": 37,
+              "start": 21,
+              "end": 34,
               "property": "height",
               "value": "100px"
             }
           ]
         },
         "start": 9,
-        "end": 41
+        "end": 38
       },
       {
         "type": "Rule",
         "prelude": {
           "type": "SelectorList",
-          "start": 44,
-          "end": 53,
+          "start": 41,
+          "end": 49,
           "children": [
             {
               "type": "ComplexSelector",
-              "start": 44,
-              "end": 53,
+              "start": 41,
+              "end": 49,
               "children": [
                 {
                   "type": "RelativeSelector",
@@ -77,18 +77,18 @@
                     {
                       "type": "TypeSelector",
                       "name": "span",
-                      "start": 44,
-                      "end": 48
+                      "start": 41,
+                      "end": 45
                     },
                     {
                       "type": "IdSelector",
-                      "name": "logo",
-                      "start": 48,
-                      "end": 53
+                      "name": "id2",
+                      "start": 45,
+                      "end": 49
                     }
                   ],
-                  "start": 44,
-                  "end": 53
+                  "start": 41,
+                  "end": 49
                 }
               ]
             }
@@ -96,26 +96,26 @@
         },
         "block": {
           "type": "Block",
-          "start": 54,
-          "end": 77,
+          "start": 50,
+          "end": 73,
           "children": [
             {
               "type": "Declaration",
-              "start": 58,
-              "end": 73,
+              "start": 54,
+              "end": 69,
               "property": "font-size",
               "value": "24px"
             }
           ]
         },
-        "start": 44,
-        "end": 77
+        "start": 41,
+        "end": 73
       }
     ],
     "content": {
       "start": 7,
-      "end": 78,
-      "styles": "\n\tdiv#header {\n\t\theight: 100px;\n\t}\n\n\tspan#logo {\n\t\tfont-size: 24px;\n\t}\n",
+      "end": 74,
+      "styles": "\n\tdiv#id1 {\n\t\theight: 100px;\n\t}\n\n\tspan#id2 {\n\t\tfont-size: 24px;\n\t}\n",
       "comment": null
     }
   },

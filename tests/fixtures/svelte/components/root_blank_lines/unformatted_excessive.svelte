@@ -1,6 +1,6 @@
-<Comp />
+<Comp1 />
 
 
 
 
-<CompB />
+<Comp2 />
