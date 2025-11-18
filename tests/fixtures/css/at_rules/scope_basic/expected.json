@@ -1,0 +1,392 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 528,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 30,
+				"end": 83,
+				"name": "scope",
+				"prelude": "(.card)",
+				"block": {
+					"type": "Block",
+					"start": 45,
+					"end": 83,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 49,
+								"end": 52,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 49,
+										"end": 52,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "img",
+														"start": 49,
+														"end": 52
+													}
+												],
+												"start": 49,
+												"end": 52
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 53,
+								"end": 80,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 58,
+										"end": 75,
+										"property": "border",
+										"value": "1px solid"
+									}
+								]
+							},
+							"start": 49,
+							"end": 80
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 110,
+				"end": 168,
+				"name": "scope",
+				"prelude": "(.card) to (.ignore)",
+				"block": {
+					"type": "Block",
+					"start": 138,
+					"end": 168,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 142,
+								"end": 143,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 142,
+										"end": 143,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "p",
+														"start": 142,
+														"end": 143
+													}
+												],
+												"start": 142,
+												"end": 143
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 144,
+								"end": 165,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 149,
+										"end": 160,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 142,
+							"end": 165
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 197,
+				"end": 261,
+				"name": "scope",
+				"prelude": "(.card, .panel)",
+				"block": {
+					"type": "Block",
+					"start": 220,
+					"end": 261,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 224,
+								"end": 230,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 224,
+										"end": 230,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "title",
+														"start": 224,
+														"end": 230
+													}
+												],
+												"start": 224,
+												"end": 230
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 231,
+								"end": 258,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 236,
+										"end": 253,
+										"property": "font-weight",
+										"value": "bold"
+									}
+								]
+							},
+							"start": 224,
+							"end": 258
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 285,
+				"end": 371,
+				"name": "scope",
+				"prelude": "(.container) to (.skip, .exclude)",
+				"block": {
+					"type": "Block",
+					"start": 326,
+					"end": 371,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 330,
+								"end": 331,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 330,
+										"end": 331,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 330,
+														"end": 331
+													}
+												],
+												"start": 330,
+												"end": 331
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 332,
+								"end": 368,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 337,
+										"end": 363,
+										"property": "text-decoration",
+										"value": "underline"
+									}
+								]
+							},
+							"start": 330,
+							"end": 368
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 395,
+				"end": 519,
+				"name": "scope",
+				"prelude": "(.outer)",
+				"block": {
+					"type": "Block",
+					"start": 411,
+					"end": 519,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 415,
+								"end": 429,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 415,
+										"end": 429,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "outer-content",
+														"start": 415,
+														"end": 429
+													}
+												],
+												"start": 415,
+												"end": 429
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 430,
+								"end": 453,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 435,
+										"end": 448,
+										"property": "padding",
+										"value": "1rem"
+									}
+								]
+							},
+							"start": 415,
+							"end": 453
+						},
+						{
+							"type": "Atrule",
+							"start": 457,
+							"end": 516,
+							"name": "scope",
+							"prelude": "(.inner)",
+							"block": {
+								"type": "Block",
+								"start": 473,
+								"end": 516,
+								"children": [
+									{
+										"type": "Rule",
+										"prelude": {
+											"type": "SelectorList",
+											"start": 478,
+											"end": 482,
+											"children": [
+												{
+													"type": "ComplexSelector",
+													"start": 478,
+													"end": 482,
+													"children": [
+														{
+															"type": "RelativeSelector",
+															"combinator": null,
+															"selectors": [
+																{
+																	"type": "TypeSelector",
+																	"name": "span",
+																	"start": 478,
+																	"end": 482
+																}
+															],
+															"start": 478,
+															"end": 482
+														}
+													]
+												}
+											]
+										},
+										"block": {
+											"type": "Block",
+											"start": 483,
+											"end": 512,
+											"children": [
+												{
+													"type": "Declaration",
+													"start": 489,
+													"end": 506,
+													"property": "font-weight",
+													"value": "bold"
+												}
+											]
+										},
+										"start": 478,
+										"end": 512
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 520,
+			"styles": "\n\t/* Basic scoping */\n\t@scope (.card) {\n\t\timg {\n\t\t\tborder: 1px solid;\n\t\t}\n\t}\n\n\t/* Scope with limit */\n\t@scope (.card) to (.ignore) {\n\t\tp {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n\n\t/* Multiple selectors */\n\t@scope (.card, .panel) {\n\t\t.title {\n\t\t\tfont-weight: bold;\n\t\t}\n\t}\n\n\t/* Complex limit */\n\t@scope (.container) to (.skip, .exclude) {\n\t\ta {\n\t\t\ttext-decoration: underline;\n\t\t}\n\t}\n\n\t/* Nested scopes */\n\t@scope (.outer) {\n\t\t.outer-content {\n\t\t\tpadding: 1rem;\n\t\t}\n\n\t\t@scope (.inner) {\n\t\t\tspan {\n\t\t\t\tfont-weight: bold;\n\t\t\t}\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": null,
+	"end": null,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,17 +1,17 @@
 <style>
-	.test1 {
+	.class1 {
 		content: '\ ';
 	}
 
-	.test2 {
+	.class2 {
 		content: '\\';
 	}
 
-	.test3 {
+	.class3 {
 		content: '\\ \\ \\';
 	}
 
-	.test4 {
+	.class4 {
 		content: 'test\\slash';
 	}
 </style>

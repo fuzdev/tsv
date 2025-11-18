@@ -272,7 +272,10 @@ mod tests {
     #[test]
     fn test_new_cursor() {
         let source = "red 01%, blue 02%";
-        let span = Span { start: 100, end: 117 };
+        let span = Span {
+            start: 100,
+            end: 117,
+        };
         let cursor = ValueCursor::new(source, span);
 
         assert_eq!(cursor.pos, 0);
@@ -383,7 +386,10 @@ mod tests {
     #[test]
     fn test_extract() {
         let source = "red 01%";
-        let span = Span { start: 100, end: 107 };
+        let span = Span {
+            start: 100,
+            end: 107,
+        };
         let cursor = ValueCursor::new(source, span);
 
         let (text, result_span) = cursor.extract(0, 7);
@@ -395,7 +401,10 @@ mod tests {
     #[test]
     fn test_extract_trimmed() {
         let source = "  red 01%  ";
-        let span = Span { start: 100, end: 111 };
+        let span = Span {
+            start: 100,
+            end: 111,
+        };
         let cursor = ValueCursor::new(source, span);
 
         let (text, result_span) = cursor.extract_trimmed(0, 11);
@@ -407,7 +416,10 @@ mod tests {
     #[test]
     fn test_extract_trimmed_no_whitespace() {
         let source = "red 01%";
-        let span = Span { start: 100, end: 107 };
+        let span = Span {
+            start: 100,
+            end: 107,
+        };
         let cursor = ValueCursor::new(source, span);
 
         let (text, result_span) = cursor.extract_trimmed(0, 7);

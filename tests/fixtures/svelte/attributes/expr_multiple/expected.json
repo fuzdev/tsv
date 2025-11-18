@@ -1,80 +1,80 @@
 {
-  "css": null,
-  "js": [],
-  "start": 0,
-  "end": 49,
-  "type": "Root",
-  "fragment": {
-    "type": "Fragment",
-    "nodes": [
-      {
-        "type": "RegularElement",
-        "start": 0,
-        "end": 49,
-        "name": "div",
-        "attributes": [
-          {
-            "type": "Attribute",
-            "start": 5,
-            "end": 23,
-            "name": "data-attr1",
-            "value": {
-              "type": "ExpressionTag",
-              "start": 16,
-              "end": 23,
-              "expression": {
-                "type": "Identifier",
-                "start": 17,
-                "end": 22,
-                "loc": {
-                  "start": {
-                    "line": 1,
-                    "column": 17
-                  },
-                  "end": {
-                    "line": 1,
-                    "column": 22
-                  }
-                },
-                "name": "expr1"
-              }
-            }
-          },
-          {
-            "type": "Attribute",
-            "start": 24,
-            "end": 42,
-            "name": "data-attr2",
-            "value": {
-              "type": "ExpressionTag",
-              "start": 35,
-              "end": 42,
-              "expression": {
-                "type": "Identifier",
-                "start": 36,
-                "end": 41,
-                "loc": {
-                  "start": {
-                    "line": 1,
-                    "column": 36
-                  },
-                  "end": {
-                    "line": 1,
-                    "column": 41
-                  }
-                },
-                "name": "expr2"
-              }
-            }
-          }
-        ],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": []
-        }
-      }
-    ]
-  },
-  "options": null,
-  "comments": []
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 49,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 49,
+				"name": "div",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 5,
+						"end": 23,
+						"name": "data-attr1",
+						"value": {
+							"type": "ExpressionTag",
+							"start": 16,
+							"end": 23,
+							"expression": {
+								"type": "Identifier",
+								"start": 17,
+								"end": 22,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 17
+									},
+									"end": {
+										"line": 1,
+										"column": 22
+									}
+								},
+								"name": "expr1"
+							}
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 24,
+						"end": 42,
+						"name": "data-attr2",
+						"value": {
+							"type": "ExpressionTag",
+							"start": 35,
+							"end": 42,
+							"expression": {
+								"type": "Identifier",
+								"start": 36,
+								"end": 41,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 36
+									},
+									"end": {
+										"line": 1,
+										"column": 41
+									}
+								},
+								"name": "expr2"
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
 }

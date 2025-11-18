@@ -1,40 +1,40 @@
 {
-  "css": null,
-  "js": [],
-  "start": 0,
-  "end": 20,
-  "type": "Root",
-  "fragment": {
-    "type": "Fragment",
-    "nodes": [
-      {
-        "type": "Component",
-        "start": 0,
-        "end": 20,
-        "name": "Comp",
-        "attributes": [
-          {
-            "type": "Attribute",
-            "start": 6,
-            "end": 11,
-            "name": "prop1",
-            "value": true
-          },
-          {
-            "type": "Attribute",
-            "start": 12,
-            "end": 17,
-            "name": "prop2",
-            "value": true
-          }
-        ],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": []
-        }
-      }
-    ]
-  },
-  "options": null,
-  "comments": []
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 20,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Component",
+				"start": 0,
+				"end": 20,
+				"name": "Comp",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 6,
+						"end": 11,
+						"name": "prop1",
+						"value": true
+					},
+					{
+						"type": "Attribute",
+						"start": 12,
+						"end": 17,
+						"name": "prop2",
+						"value": true
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
 }

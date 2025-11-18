@@ -1,0 +1,134 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 98,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 98,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 5,
+							"end": 7,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 7,
+							"end": 54,
+							"name": "img",
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 12,
+									"end": 31,
+									"name": "data-attr1",
+									"value": [
+										{
+											"start": 24,
+											"end": 30,
+											"type": "Text",
+											"raw": "value1",
+											"data": "value1"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 32,
+									"end": 51,
+									"name": "data-attr2",
+									"value": [
+										{
+											"start": 44,
+											"end": 50,
+											"type": "Text",
+											"raw": "value2",
+											"data": "value2"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 54,
+							"end": 56,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 56,
+							"end": 83,
+							"name": "input",
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 63,
+									"end": 80,
+									"name": "data-attr",
+									"value": [
+										{
+											"start": 74,
+											"end": 79,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 83,
+							"end": 85,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 85,
+							"end": 91,
+							"name": "hr",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 91,
+							"end": 92,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

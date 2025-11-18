@@ -49,6 +49,7 @@ pub struct ExpressionStatement {
 pub enum Expression {
     Literal(Literal),
     Identifier(Identifier),
+    ObjectExpression(ObjectExpression),
     // TODO: BinaryExpression, etc.
 }
 
@@ -74,6 +75,31 @@ pub struct Identifier {
     pub name: String,
     #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
     pub type_annotation: Option<TSTypeAnnotation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObjectExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub properties: Vec<Property>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Property {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub method: bool,
+    pub shorthand: bool,
+    pub computed: bool,
+    pub key: Box<Expression>,
+    pub value: Box<Expression>,
+    pub kind: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

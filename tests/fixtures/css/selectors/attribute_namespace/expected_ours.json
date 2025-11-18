@@ -1,0 +1,449 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 560,
+		"attributes": [],
+		"children": [
+			{
+				"block": {
+					"children": [
+						{
+							"end": 57,
+							"property": "fill",
+							"start": 48,
+							"type": "Declaration",
+							"value": "red"
+						}
+					],
+					"end": 61,
+					"start": 44,
+					"type": "Block"
+				},
+				"end": 61,
+				"prelude": {
+					"children": [
+						{
+							"children": [
+								{
+									"combinator": null,
+									"end": 43,
+									"selectors": [
+										{
+											"end": 43,
+											"flags": null,
+											"matcher": null,
+											"name": "href",
+											"namespace": "svg",
+											"start": 33,
+											"type": "AttributeSelector",
+											"value": null
+										}
+									],
+									"start": 33,
+									"type": "RelativeSelector"
+								}
+							],
+							"end": 43,
+							"start": 33,
+							"type": "ComplexSelector"
+						}
+					],
+					"end": 43,
+					"start": 33,
+					"type": "SelectorList"
+				},
+				"start": 33,
+				"type": "Rule"
+			},
+			{
+				"block": {
+					"children": [
+						{
+							"end": 116,
+							"property": "color",
+							"start": 105,
+							"type": "Declaration",
+							"value": "blue"
+						}
+					],
+					"end": 120,
+					"start": 101,
+					"type": "Block"
+				},
+				"end": 120,
+				"prelude": {
+					"children": [
+						{
+							"children": [
+								{
+									"combinator": null,
+									"end": 100,
+									"selectors": [
+										{
+											"end": 100,
+											"flags": null,
+											"matcher": null,
+											"name": "title",
+											"namespace": "*",
+											"start": 91,
+											"type": "AttributeSelector",
+											"value": null
+										}
+									],
+									"start": 91,
+									"type": "RelativeSelector"
+								}
+							],
+							"end": 100,
+							"start": 91,
+							"type": "ComplexSelector"
+						}
+					],
+					"end": 100,
+					"start": 91,
+					"type": "SelectorList"
+				},
+				"start": 91,
+				"type": "Rule"
+			},
+			{
+				"block": {
+					"children": [
+						{
+							"end": 181,
+							"property": "font-weight",
+							"start": 164,
+							"type": "Declaration",
+							"value": "bold"
+						}
+					],
+					"end": 185,
+					"start": 160,
+					"type": "Block"
+				},
+				"end": 185,
+				"prelude": {
+					"children": [
+						{
+							"children": [
+								{
+									"combinator": null,
+									"end": 159,
+									"selectors": [
+										{
+											"end": 159,
+											"flags": null,
+											"matcher": null,
+											"name": "lang",
+											"namespace": "",
+											"start": 152,
+											"type": "AttributeSelector",
+											"value": null
+										}
+									],
+									"start": 152,
+									"type": "RelativeSelector"
+								}
+							],
+							"end": 159,
+							"start": 152,
+							"type": "ComplexSelector"
+						}
+					],
+					"end": 159,
+					"start": 152,
+					"type": "SelectorList"
+				},
+				"start": 152,
+				"type": "Rule"
+			},
+			{
+				"block": {
+					"children": [
+						{
+							"end": 248,
+							"property": "margin",
+							"start": 239,
+							"type": "Declaration",
+							"value": "0"
+						}
+					],
+					"end": 252,
+					"start": 235,
+					"type": "Block"
+				},
+				"end": 252,
+				"prelude": {
+					"children": [
+						{
+							"children": [
+								{
+									"combinator": null,
+									"end": 234,
+									"selectors": [
+										{
+											"end": 234,
+											"flags": null,
+											"matcher": null,
+											"name": "class",
+											"start": 227,
+											"type": "AttributeSelector",
+											"value": null
+										}
+									],
+									"start": 227,
+									"type": "RelativeSelector"
+								}
+							],
+							"end": 234,
+							"start": 227,
+							"type": "ComplexSelector"
+						}
+					],
+					"end": 234,
+					"start": 227,
+					"type": "SelectorList"
+				},
+				"start": 227,
+				"type": "Rule"
+			},
+			{
+				"block": {
+					"children": [
+						{
+							"end": 307,
+							"property": "color",
+							"start": 295,
+							"type": "Declaration",
+							"value": "green"
+						}
+					],
+					"end": 311,
+					"start": 291,
+					"type": "Block"
+				},
+				"end": 311,
+				"prelude": {
+					"children": [
+						{
+							"children": [
+								{
+									"combinator": null,
+									"end": 290,
+									"selectors": [
+										{
+											"end": 290,
+											"flags": null,
+											"matcher": "=",
+											"name": "att",
+											"namespace": "foo",
+											"start": 275,
+											"type": "AttributeSelector",
+											"value": "val"
+										}
+									],
+									"start": 275,
+									"type": "RelativeSelector"
+								}
+							],
+							"end": 290,
+							"start": 275,
+							"type": "ComplexSelector"
+						}
+					],
+					"end": 290,
+					"start": 275,
+					"type": "SelectorList"
+				},
+				"start": 275,
+				"type": "Rule"
+			},
+			{
+				"block": {
+					"children": [
+						{
+							"end": 394,
+							"property": "text-decoration",
+							"start": 368,
+							"type": "Declaration",
+							"value": "underline"
+						}
+					],
+					"end": 398,
+					"start": 364,
+					"type": "Block"
+				},
+				"end": 398,
+				"prelude": {
+					"children": [
+						{
+							"children": [
+								{
+									"combinator": null,
+									"end": 363,
+									"selectors": [
+										{
+											"end": 363,
+											"flags": null,
+											"matcher": "^=",
+											"name": "href",
+											"namespace": "svg",
+											"start": 344,
+											"type": "AttributeSelector",
+											"value": "https"
+										}
+									],
+									"start": 344,
+									"type": "RelativeSelector"
+								}
+							],
+							"end": 363,
+							"start": 344,
+							"type": "ComplexSelector"
+						}
+					],
+					"end": 363,
+					"start": 344,
+					"type": "SelectorList"
+				},
+				"start": 344,
+				"type": "Rule"
+			},
+			{
+				"block": {
+					"children": [
+						{
+							"end": 477,
+							"property": "border",
+							"start": 456,
+							"type": "Declaration",
+							"value": "1px solid red"
+						}
+					],
+					"end": 481,
+					"start": 452,
+					"type": "Block"
+				},
+				"end": 481,
+				"prelude": {
+					"children": [
+						{
+							"children": [
+								{
+									"combinator": null,
+									"end": 451,
+									"selectors": [
+										{
+											"end": 441,
+											"name": "div",
+											"start": 438,
+											"type": "TypeSelector"
+										},
+										{
+											"end": 451,
+											"flags": null,
+											"matcher": null,
+											"name": "href",
+											"namespace": "svg",
+											"start": 441,
+											"type": "AttributeSelector",
+											"value": null
+										}
+									],
+									"start": 438,
+									"type": "RelativeSelector"
+								}
+							],
+							"end": 451,
+							"start": 438,
+							"type": "ComplexSelector"
+						}
+					],
+					"end": 451,
+					"start": 438,
+					"type": "SelectorList"
+				},
+				"start": 438,
+				"type": "Rule"
+			},
+			{
+				"block": {
+					"children": [
+						{
+							"end": 547,
+							"property": "opacity",
+							"start": 535,
+							"type": "Declaration",
+							"value": "0.5"
+						}
+					],
+					"end": 551,
+					"start": 531,
+					"type": "Block"
+				},
+				"end": 551,
+				"prelude": {
+					"children": [
+						{
+							"children": [
+								{
+									"combinator": null,
+									"end": 530,
+									"selectors": [
+										{
+											"end": 521,
+											"flags": null,
+											"matcher": null,
+											"name": "href",
+											"namespace": "svg",
+											"start": 511,
+											"type": "AttributeSelector",
+											"value": null
+										},
+										{
+											"end": 530,
+											"flags": null,
+											"matcher": null,
+											"name": "title",
+											"namespace": "*",
+											"start": 521,
+											"type": "AttributeSelector",
+											"value": null
+										}
+									],
+									"start": 511,
+									"type": "RelativeSelector"
+								}
+							],
+							"end": 530,
+							"start": 511,
+							"type": "ComplexSelector"
+						}
+					],
+					"end": 530,
+					"start": 511,
+					"type": "SelectorList"
+				},
+				"start": 511,
+				"type": "Rule"
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 552,
+			"styles": "\n\t/* Namespace prefix */\n\t[svg|href] {\n\t\tfill: red;\n\t}\n\n\t/* Universal namespace */\n\t[*|title] {\n\t\tcolor: blue;\n\t}\n\n\t/* Explicit no namespace */\n\t[|lang] {\n\t\tfont-weight: bold;\n\t}\n\n\t/* Implicit no namespace (default) */\n\t[class] {\n\t\tmargin: 0;\n\t}\n\n\t/* With matcher */\n\t[foo|att='val'] {\n\t\tcolor: green;\n\t}\n\n\t/* With matcher operators */\n\t[svg|href^='https'] {\n\t\ttext-decoration: underline;\n\t}\n\n\t/* Combined with other selectors */\n\tdiv[svg|href] {\n\t\tborder: 1px solid red;\n\t}\n\n\t/* Multiple attributes */\n\t[svg|href][*|title] {\n\t\topacity: 0.5;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": null,
+	"end": null,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

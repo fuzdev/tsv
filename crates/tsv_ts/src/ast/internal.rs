@@ -5,8 +5,16 @@ use string_interner::{DefaultStringInterner, DefaultSymbol};
 use tsv_lang::Span;
 
 #[derive(Debug, Clone)]
+pub struct Comment {
+    pub content: String,
+    pub is_block: bool,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
 pub struct Program {
     pub body: Vec<Statement>,
+    pub comments: Vec<Comment>,
     pub span: Span,
     pub interner: std::rc::Rc<std::cell::RefCell<DefaultStringInterner>>,
 }
@@ -36,6 +44,7 @@ pub struct ExpressionStatement {
 pub enum Expression {
     Literal(Literal),
     Identifier(Identifier),
+    ObjectExpression(ObjectExpression),
     // TODO: BinaryExpression, etc.
 }
 
@@ -44,8 +53,40 @@ impl Expression {
         match self {
             Expression::Literal(lit) => lit.span,
             Expression::Identifier(id) => id.span,
+            Expression::ObjectExpression(obj) => obj.span,
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct ObjectExpression {
+    pub properties: Vec<Property>,
+    pub span: Span,
+}
+
+// TODO: Refactor Property to use PropertyKind enum for type safety
+// Current: Separate bool fields (shorthand, computed, method)
+// Proposed: PropertyKind enum with Init/Get/Set variants
+// Benefits: Type-safe, easier to add getters/setters, cleaner pattern matching
+// Example:
+//   enum PropertyKind {
+//     Init { shorthand: bool, computed: bool, method: bool },
+//     Get { computed: bool },
+//     Set { computed: bool },
+//   }
+// This would make it impossible to have invalid combinations like shorthand getter
+
+#[derive(Debug, Clone)]
+pub struct Property {
+    pub key: Expression,
+    pub value: Expression,
+    pub shorthand: bool,   // true for `{ prop }`, false for `{ prop: value }`
+    pub computed: bool,    // true for `{ [expr]: value }`, false for `{ prop: value }`
+    pub method: bool,      // true for `{ foo() {} }`, false for regular properties
+    // TODO: Add support for property decorators (TypeScript)
+    // Requires: decorators: Vec<Decorator> field
+    // See: TypeScript AST PropertyDeclaration
+    pub span: Span,
 }
 
 /// Literal value type - supports numbers and strings

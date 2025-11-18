@@ -1,21 +1,21 @@
 <style>
-	.test1 {
+	.class1 {
 		content: '\0000FF';
 	}
 
-	.test2 {
+	.class2 {
 		content: '\10FFFF';
 	}
 
-	.test3 {
+	.class3 {
 		content: '\41';
 	}
 
-	.test4 {
+	.class4 {
 		content: '\20AC';
 	}
 
-	.test5 {
+	.class5 {
 		content: '\1F4A9';
 	}
 </style>

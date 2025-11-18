@@ -1,365 +1,365 @@
 {
-  "css": null,
-  "js": [],
-  "start": 0,
-  "end": 577,
-  "type": "Root",
-  "fragment": {
-    "type": "Fragment",
-    "nodes": [
-      {
-        "type": "RegularElement",
-        "start": 0,
-        "end": 66,
-        "name": "div",
-        "attributes": [
-          {
-            "type": "Attribute",
-            "start": 5,
-            "end": 39,
-            "name": "data-attr",
-            "value": [
-              {
-                "start": 16,
-                "end": 38,
-                "type": "Text",
-                "raw": "&lt;tag&gt; &amp; more",
-                "data": "<tag> & more"
-              }
-            ]
-          }
-        ],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": [
-            {
-              "type": "Text",
-              "start": 40,
-              "end": 60,
-              "raw": "basic named entities",
-              "data": "basic named entities"
-            }
-          ]
-        }
-      },
-      {
-        "type": "Text",
-        "start": 66,
-        "end": 68,
-        "raw": "\n\n",
-        "data": "\n\n"
-      },
-      {
-        "type": "RegularElement",
-        "start": 68,
-        "end": 129,
-        "name": "div",
-        "attributes": [
-          {
-            "type": "Attribute",
-            "start": 73,
-            "end": 108,
-            "name": "data-attr",
-            "value": [
-              {
-                "start": 84,
-                "end": 107,
-                "type": "Text",
-                "raw": "&quot;quoted&quot; text",
-                "data": "\"quoted\" text"
-              }
-            ]
-          }
-        ],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": [
-            {
-              "type": "Text",
-              "start": 109,
-              "end": 123,
-              "raw": "quote entities",
-              "data": "quote entities"
-            }
-          ]
-        }
-      },
-      {
-        "type": "Text",
-        "start": 129,
-        "end": 131,
-        "raw": "\n\n",
-        "data": "\n\n"
-      },
-      {
-        "type": "RegularElement",
-        "start": 131,
-        "end": 188,
-        "name": "div",
-        "attributes": [
-          {
-            "type": "Attribute",
-            "start": 136,
-            "end": 164,
-            "name": "data-attr",
-            "value": [
-              {
-                "start": 147,
-                "end": 163,
-                "type": "Text",
-                "raw": "It&#39;s working",
-                "data": "It's working"
-              }
-            ]
-          }
-        ],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": [
-            {
-              "type": "Text",
-              "start": 165,
-              "end": 182,
-              "raw": "apostrophe entity",
-              "data": "apostrophe entity"
-            }
-          ]
-        }
-      },
-      {
-        "type": "Text",
-        "start": 188,
-        "end": 190,
-        "raw": "\n\n",
-        "data": "\n\n"
-      },
-      {
-        "type": "RegularElement",
-        "start": 190,
-        "end": 273,
-        "name": "div",
-        "attributes": [
-          {
-            "type": "Attribute",
-            "start": 195,
-            "end": 252,
-            "name": "data-attr",
-            "value": [
-              {
-                "start": 206,
-                "end": 251,
-                "type": "Text",
-                "raw": "Copyright &copy; 2024 &ndash; Example &trade;",
-                "data": "Copyright © 2024 – Example ™"
-              }
-            ]
-          }
-        ],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": [
-            {
-              "type": "Text",
-              "start": 253,
-              "end": 267,
-              "raw": "mixed entities",
-              "data": "mixed entities"
-            }
-          ]
-        }
-      },
-      {
-        "type": "Text",
-        "start": 273,
-        "end": 275,
-        "raw": "\n\n",
-        "data": "\n\n"
-      },
-      {
-        "type": "RegularElement",
-        "start": 275,
-        "end": 346,
-        "name": "div",
-        "attributes": [
-          {
-            "type": "Attribute",
-            "start": 280,
-            "end": 323,
-            "name": "data-attr",
-            "value": [
-              {
-                "start": 291,
-                "end": 322,
-                "type": "Text",
-                "raw": "Arrow &#8594; and &#x2192; same",
-                "data": "Arrow → and → same"
-              }
-            ]
-          }
-        ],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": [
-            {
-              "type": "Text",
-              "start": 324,
-              "end": 340,
-              "raw": "numeric entities",
-              "data": "numeric entities"
-            }
-          ]
-        }
-      },
-      {
-        "type": "Text",
-        "start": 346,
-        "end": 348,
-        "raw": "\n\n",
-        "data": "\n\n"
-      },
-      {
-        "type": "RegularElement",
-        "start": 348,
-        "end": 436,
-        "name": "img",
-        "attributes": [
-          {
-            "type": "Attribute",
-            "start": 353,
-            "end": 375,
-            "name": "data-attr1",
-            "value": [
-              {
-                "start": 365,
-                "end": 374,
-                "type": "Text",
-                "raw": "image.jpg",
-                "data": "image.jpg"
-              }
-            ]
-          },
-          {
-            "type": "Attribute",
-            "start": 376,
-            "end": 404,
-            "name": "data-attr2",
-            "value": [
-              {
-                "start": 388,
-                "end": 403,
-                "type": "Text",
-                "raw": "Image &lt;1&gt;",
-                "data": "Image <1>"
-              }
-            ]
-          },
-          {
-            "type": "Attribute",
-            "start": 405,
-            "end": 433,
-            "name": "data-attr3",
-            "value": [
-              {
-                "start": 417,
-                "end": 432,
-                "type": "Text",
-                "raw": "Test &amp; Demo",
-                "data": "Test & Demo"
-              }
-            ]
-          }
-        ],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": []
-        }
-      },
-      {
-        "type": "Text",
-        "start": 436,
-        "end": 438,
-        "raw": "\n\n",
-        "data": "\n\n"
-      },
-      {
-        "type": "RegularElement",
-        "start": 438,
-        "end": 520,
-        "name": "div",
-        "attributes": [
-          {
-            "type": "Attribute",
-            "start": 443,
-            "end": 496,
-            "name": "data-attr",
-            "value": [
-              {
-                "start": 454,
-                "end": 495,
-                "type": "Text",
-                "raw": "&lt;div&gt;&quot;nested&quot;&lt;/div&gt;",
-                "data": "<div>\"nested\"</div>"
-              }
-            ]
-          }
-        ],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": [
-            {
-              "type": "Text",
-              "start": 497,
-              "end": 514,
-              "raw": "complex sequences",
-              "data": "complex sequences"
-            }
-          ]
-        }
-      },
-      {
-        "type": "Text",
-        "start": 520,
-        "end": 522,
-        "raw": "\n\n",
-        "data": "\n\n"
-      },
-      {
-        "type": "RegularElement",
-        "start": 522,
-        "end": 577,
-        "name": "span",
-        "attributes": [
-          {
-            "type": "Attribute",
-            "start": 528,
-            "end": 551,
-            "name": "data-attr",
-            "value": [
-              {
-                "start": 539,
-                "end": 550,
-                "type": "Text",
-                "raw": "&euro;99.99",
-                "data": "€99.99"
-              }
-            ]
-          }
-        ],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": [
-            {
-              "type": "Text",
-              "start": 552,
-              "end": 570,
-              "raw": "special characters",
-              "data": "special characters"
-            }
-          ]
-        }
-      }
-    ]
-  },
-  "options": null,
-  "comments": []
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 577,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 66,
+				"name": "div",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 5,
+						"end": 39,
+						"name": "data-attr",
+						"value": [
+							{
+								"start": 16,
+								"end": 38,
+								"type": "Text",
+								"raw": "&lt;tag&gt; &amp; more",
+								"data": "<tag> & more"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 40,
+							"end": 60,
+							"raw": "basic named entities",
+							"data": "basic named entities"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 66,
+				"end": 68,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 68,
+				"end": 129,
+				"name": "div",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 73,
+						"end": 108,
+						"name": "data-attr",
+						"value": [
+							{
+								"start": 84,
+								"end": 107,
+								"type": "Text",
+								"raw": "&quot;quoted&quot; text",
+								"data": "\"quoted\" text"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 109,
+							"end": 123,
+							"raw": "quote entities",
+							"data": "quote entities"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 129,
+				"end": 131,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 131,
+				"end": 188,
+				"name": "div",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 136,
+						"end": 164,
+						"name": "data-attr",
+						"value": [
+							{
+								"start": 147,
+								"end": 163,
+								"type": "Text",
+								"raw": "It&#39;s working",
+								"data": "It's working"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 165,
+							"end": 182,
+							"raw": "apostrophe entity",
+							"data": "apostrophe entity"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 188,
+				"end": 190,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 190,
+				"end": 273,
+				"name": "div",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 195,
+						"end": 252,
+						"name": "data-attr",
+						"value": [
+							{
+								"start": 206,
+								"end": 251,
+								"type": "Text",
+								"raw": "Copyright &copy; 2024 &ndash; Example &trade;",
+								"data": "Copyright © 2024 – Example ™"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 253,
+							"end": 267,
+							"raw": "mixed entities",
+							"data": "mixed entities"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 273,
+				"end": 275,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 275,
+				"end": 346,
+				"name": "div",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 280,
+						"end": 323,
+						"name": "data-attr",
+						"value": [
+							{
+								"start": 291,
+								"end": 322,
+								"type": "Text",
+								"raw": "Arrow &#8594; and &#x2192; same",
+								"data": "Arrow → and → same"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 324,
+							"end": 340,
+							"raw": "numeric entities",
+							"data": "numeric entities"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 346,
+				"end": 348,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 348,
+				"end": 436,
+				"name": "img",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 353,
+						"end": 375,
+						"name": "data-attr1",
+						"value": [
+							{
+								"start": 365,
+								"end": 374,
+								"type": "Text",
+								"raw": "image.jpg",
+								"data": "image.jpg"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 376,
+						"end": 404,
+						"name": "data-attr2",
+						"value": [
+							{
+								"start": 388,
+								"end": 403,
+								"type": "Text",
+								"raw": "Image &lt;1&gt;",
+								"data": "Image <1>"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 405,
+						"end": 433,
+						"name": "data-attr3",
+						"value": [
+							{
+								"start": 417,
+								"end": 432,
+								"type": "Text",
+								"raw": "Test &amp; Demo",
+								"data": "Test & Demo"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 436,
+				"end": 438,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 438,
+				"end": 520,
+				"name": "div",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 443,
+						"end": 496,
+						"name": "data-attr",
+						"value": [
+							{
+								"start": 454,
+								"end": 495,
+								"type": "Text",
+								"raw": "&lt;div&gt;&quot;nested&quot;&lt;/div&gt;",
+								"data": "<div>\"nested\"</div>"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 497,
+							"end": 514,
+							"raw": "complex sequences",
+							"data": "complex sequences"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 520,
+				"end": 522,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 522,
+				"end": 577,
+				"name": "span",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 528,
+						"end": 551,
+						"name": "data-attr",
+						"value": [
+							{
+								"start": 539,
+								"end": 550,
+								"type": "Text",
+								"raw": "&euro;99.99",
+								"data": "€99.99"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 552,
+							"end": 570,
+							"raw": "special characters",
+							"data": "special characters"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
 }

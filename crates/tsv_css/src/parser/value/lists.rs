@@ -19,6 +19,9 @@ pub fn contains_comma(s: &str) -> bool {
 }
 
 /// Check if a string contains a space separator (not in parens/quotes)
+///
+/// Note: This checks for ANY whitespace character (space, tab, newline, etc.),
+/// not just literal spaces. This is important for handling multiline values.
 pub fn contains_space_separator(s: &str) -> bool {
     let mut in_parens = 0;
     let mut in_quote = false;
@@ -35,7 +38,7 @@ pub fn contains_space_separator(s: &str) -> bool {
             }
             '(' if !in_quote => in_parens += 1,
             ')' if !in_quote => in_parens -= 1,
-            ' ' if in_parens == 0 && !in_quote => return true,
+            c if c.is_whitespace() && in_parens == 0 && !in_quote => return true,
             _ => {}
         }
     }

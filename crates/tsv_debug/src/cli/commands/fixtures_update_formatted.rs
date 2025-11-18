@@ -91,7 +91,10 @@ impl Executable for FixturesUpdateFormattedExecutable {
                     removed += 1;
                 }
                 FormattedResult::Unchanged => {
-                    println!("- {}/output_prettier.svelte is up to date", fixture.relative_path);
+                    println!(
+                        "- {}/output_prettier.svelte is up to date",
+                        fixture.relative_path
+                    );
                     unchanged += 1;
                 }
                 FormattedResult::NotNeeded => {

@@ -1,77 +1,77 @@
 {
-  "css": null,
-  "js": [],
-  "start": 0,
-  "end": 32,
-  "type": "Root",
-  "fragment": {
-    "type": "Fragment",
-    "nodes": [
-      {
-        "type": "RegularElement",
-        "start": 0,
-        "end": 32,
-        "name": "span",
-        "attributes": [],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": [
-            {
-              "type": "ExpressionTag",
-              "start": 6,
-              "end": 15,
-              "expression": {
-                "type": "Literal",
-                "start": 7,
-                "end": 14,
-                "loc": {
-                  "start": {
-                    "line": 1,
-                    "column": 7
-                  },
-                  "end": {
-                    "line": 1,
-                    "column": 14
-                  }
-                },
-                "value": "expr1",
-                "raw": "'expr1'"
-              }
-            },
-            {
-              "type": "Text",
-              "start": 15,
-              "end": 16,
-              "raw": " ",
-              "data": " "
-            },
-            {
-              "type": "ExpressionTag",
-              "start": 16,
-              "end": 25,
-              "expression": {
-                "type": "Literal",
-                "start": 17,
-                "end": 24,
-                "loc": {
-                  "start": {
-                    "line": 1,
-                    "column": 17
-                  },
-                  "end": {
-                    "line": 1,
-                    "column": 24
-                  }
-                },
-                "value": "expr2",
-                "raw": "'expr2'"
-              }
-            }
-          ]
-        }
-      }
-    ]
-  },
-  "options": null,
-  "comments": []
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 32,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 32,
+				"name": "span",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 6,
+							"end": 15,
+							"expression": {
+								"type": "Literal",
+								"start": 7,
+								"end": 14,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 7
+									},
+									"end": {
+										"line": 1,
+										"column": 14
+									}
+								},
+								"value": "expr1",
+								"raw": "'expr1'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 15,
+							"end": 16,
+							"raw": " ",
+							"data": " "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 16,
+							"end": 25,
+							"expression": {
+								"type": "Literal",
+								"start": 17,
+								"end": 24,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 17
+									},
+									"end": {
+										"line": 1,
+										"column": 24
+									}
+								},
+								"value": "expr2",
+								"raw": "'expr2'"
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
 }

@@ -13,4 +13,5 @@ tsv_cli = { path = "../tsv_cli" }
 tsv_svelte.workspace = true
 tsv_ts.workspace = true
 tsv_css.workspace = true
+serde.workspace = true
 serde_json.workspace = true

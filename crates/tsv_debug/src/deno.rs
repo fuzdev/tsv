@@ -136,7 +136,7 @@ const source = Deno.args[0];
 
 try {{
     const ast = parse(source, {{ modern: true }});
-    const json = JSON.stringify(ast, null, 2);
+    const json = JSON.stringify(ast, null, '\t');
     Deno.stdout.writeSync(new TextEncoder().encode(json));
 }} catch (err) {{
     Deno.stderr.writeSync(new TextEncoder().encode(err.message + '\n'));
@@ -183,7 +183,7 @@ try {{
         ecmaVersion: 16,
         locations: true,
     }});
-    const json = JSON.stringify(ast, null, 2);
+    const json = JSON.stringify(ast, null, '\t');
     Deno.stdout.writeSync(new TextEncoder().encode(json));
 }} catch (err) {{
     Deno.stderr.writeSync(new TextEncoder().encode(err.message + '\n'));

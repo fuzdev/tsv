@@ -3,12 +3,58 @@ use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 
+/// Check if we're looking at the start of a nested rule (selector) rather than a declaration.
+///
+/// Nested rules can start with:
+/// - `&` (nesting selector)
+/// - `.` (class selector)
+/// - `#` (ID selector)
+/// - `*` (universal selector)
+/// - `:` (pseudo-class/element)
+/// - `[` (attribute selector)
+/// - Identifier (type selector - but could also be a property name)
+///
+/// For identifiers, we need to look ahead: if next non-whitespace/comment token is `:`, it's a declaration.
+pub(crate) fn is_nested_rule_start(parser: &mut CssParser) -> Result<bool, ParseError> {
+    match &parser.current_kind {
+        // Unambiguous selector start tokens
+        TokenKind::Ampersand
+        | TokenKind::Dot
+        | TokenKind::Hash
+        | TokenKind::Asterisk
+        | TokenKind::Colon
+        | TokenKind::LeftBracket => Ok(true),
+
+        // Ambiguous: identifier could be type selector (nested rule) or property name (declaration)
+        // Look ahead to check if next non-whitespace/comment token is `:` (declaration) or not (nested rule)
+        TokenKind::Identifier => {
+            // Peek ahead to see what comes after the identifier
+            // Note: We only peek one token, so if there's a comment between property and colon,
+            // we need to handle that case. Comments in property values are stored in the side table.
+            let next_kind = parser.peek()?;
+            match next_kind {
+                // Colon right after identifier = declaration
+                TokenKind::Colon => Ok(false),
+                // Comment or whitespace could be followed by colon (declaration) or selector token (nested rule)
+                // For safety, assume declaration if we see comment/whitespace after identifier
+                // (nested rules typically don't have comments/whitespace before the next selector token)
+                TokenKind::Whitespace | TokenKind::Comment(_) => Ok(false),
+                // Anything else after identifier = nested rule
+                _ => Ok(true),
+            }
+        }
+
+        _ => Ok(false),
+    }
+}
+
 /// Parse a CSS rule: `selector { property: value; }`
 pub(crate) fn parse_rule(parser: &mut CssParser) -> Result<CssRule, ParseError> {
     let start = parser.base_offset() + parser.current_start;
 
-    // Parse selector list
-    let selector = super::selectors::parse_selector_list(parser)?;
+    // Parse selector list (complex selectors for top-level rules)
+    // Top-level rules use strict parsing (not forgiving like :is/:where)
+    let selector = super::selectors::parse_complex_selector_list(parser)?;
 
     // Capture any comment after selector (before {)
     let mut declarations = Vec::new();
@@ -36,7 +82,7 @@ pub(crate) fn parse_rule(parser: &mut CssParser) -> Result<CssRule, ParseError> 
     parser.expect(&TokenKind::LeftBrace)?;
     parser.skip_whitespace()?;
 
-    // Parse declarations and comments
+    // Parse declarations, comments, and nested rules
     while !parser.check(&TokenKind::RightBrace) && !parser.check(&TokenKind::Eof) {
         // Capture comments in declaration blocks
         if let TokenKind::Comment(content) = &parser.current_kind {
@@ -57,6 +103,26 @@ pub(crate) fn parse_rule(parser: &mut CssParser) -> Result<CssRule, ParseError> 
             continue;
         }
 
+        // Check for nested at-rule (CSS Nesting Module)
+        if parser.check(&TokenKind::AtSign) {
+            // Parse nested at-rule (e.g., @media inside a rule)
+            // Pass true for nested_in_rule since we're inside a regular rule's declaration block
+            let nested_atrule = super::atrules::parse_atrule(parser, true)?;
+            declarations.push(CssBlockChild::Atrule(nested_atrule));
+            parser.skip_whitespace()?;
+            continue;
+        }
+
+        // Check if we're looking at a nested rule (CSS Nesting Module)
+        if is_nested_rule_start(parser)? {
+            // Parse nested rule recursively
+            let nested_rule = parse_rule(parser)?;
+            declarations.push(CssBlockChild::Rule(nested_rule));
+            parser.skip_whitespace()?;
+            continue;
+        }
+
+        // Otherwise, parse as declaration
         if parser.check(&TokenKind::Identifier) {
             let decl = parse_declaration(parser)?;
             declarations.push(CssBlockChild::Declaration(decl));
@@ -128,12 +194,14 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
     let value_start = parser.base_offset() + parser.current_start;
 
     // Parse value (collect tokens until ; or })
+    // IMPORTANT: Track parenthesis depth to handle semicolons inside functions like url(data:image/png;base64,...)
     let mut value_parts = Vec::new();
     let mut value_comments = Vec::new(); // Collect comments found in the value
     let mut value_end = value_start;
-    while !parser.check(&TokenKind::Semicolon)
-        && !parser.check(&TokenKind::RightBrace)
-        && !parser.check(&TokenKind::Eof)
+    let mut paren_depth: i32 = 0; // Track nesting level of parentheses
+    while !parser.check(&TokenKind::Eof)
+        && !(paren_depth == 0
+            && (parser.check(&TokenKind::Semicolon) || parser.check(&TokenKind::RightBrace)))
     {
         // Convert token to string representation for value
         let value_str = match &parser.current_kind {
@@ -166,6 +234,14 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
                 parser.advance()?;
                 continue;
             }
+            TokenKind::LeftParen => {
+                paren_depth += 1;
+                parser.current_value().to_string()
+            }
+            TokenKind::RightParen => {
+                paren_depth = paren_depth.saturating_sub(1);
+                parser.current_value().to_string()
+            }
             _ => {
                 // Other tokens - include them as-is from source
                 parser.current_value().to_string()
@@ -197,7 +273,9 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
         result
     };
 
-    if value_str.is_empty() {
+    // Allow empty value_str if we have comments (e.g., `color: /* comment */;`)
+    // Svelte treats the comment as the value in this case
+    if value_str.is_empty() && value_comments.is_empty() {
         return Err(ParseError::InvalidSyntax {
             message: "Empty CSS value".to_string(),
             position: start,

@@ -67,7 +67,7 @@ fn test_fixture(fixture: &Fixture) -> Result<(), String> {
     let file_type = if fixture.input_file.ends_with(".svelte.ts") {
         // .svelte.ts files are TypeScript, but expected.json comes from acorn (external parser)
         // Since our Rust TypeScript parser doesn't support all features yet,
-        // we should skip these for now and only test with fixtures_update_expected
+        // we should skip these for now and only test with fixtures_update_parsed
         return Ok(()); // Skip .svelte.ts files in parser tests for now
     } else if fixture.input_file.ends_with(".ts") {
         "typescript"
@@ -155,9 +155,6 @@ fn test_parser_ast_correctness() {
     );
 
     if !failures.is_empty() {
-        panic!(
-            "\nParser test failed: {} failures",
-            failures.len()
-        );
+        panic!("\nParser test failed: {} failures", failures.len());
     }
 }

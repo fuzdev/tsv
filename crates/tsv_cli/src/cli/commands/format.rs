@@ -59,7 +59,7 @@ impl Executable for FormatExecutable {
             ParserType::Svelte => match tsv_svelte::parse(source) {
                 Ok(ast) => {
                     let formatted = tsv_svelte::format(&ast, source);
-                    println!("{}", formatted);
+                    print!("{}", formatted);
                 }
                 Err(e) => {
                     eprintln!("Parse error: {}", e);
@@ -69,7 +69,7 @@ impl Executable for FormatExecutable {
             ParserType::Css => match tsv_css::parse(source, 0) {
                 Ok(ast) => {
                     let formatted = tsv_css::format(&ast, source);
-                    println!("{}", formatted);
+                    print!("{}", formatted);
                 }
                 Err(e) => {
                     eprintln!("Parse error: {}", e);
@@ -79,7 +79,7 @@ impl Executable for FormatExecutable {
             ParserType::TypeScript => match tsv_ts::parse(source) {
                 Ok(ast) => {
                     let formatted = tsv_ts::format(&ast, source);
-                    println!("{}", formatted);
+                    print!("{}", formatted);
                 }
                 Err(e) => {
                     eprintln!("Parse error: {}", e);

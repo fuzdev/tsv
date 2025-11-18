@@ -1,13 +1,13 @@
 <style>
-	.test1 {
+	.class1 {
 		content: '\n\t';
 	}
 
-	.test2 {
+	.class2 {
 		content: '\r\b\f\v';
 	}
 
-	.test3 {
+	.class3 {
 		content: 'test\nline';
 	}
 </style>

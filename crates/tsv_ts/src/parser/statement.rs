@@ -28,7 +28,7 @@ impl<'a> Parser<'a> {
                 let expr = self.parse_expression()?;
                 let expr_span = expr.span();
                 let semi_end = self.current_pos().1;
-                self.expect(TokenKind::Semicolon)?;
+                self.expect(&TokenKind::Semicolon)?;
                 Ok(Statement::ExpressionStatement(ExpressionStatement {
                     expression: expr,
                     span: Span::new(expr_span.start, semi_end as u32),
@@ -55,7 +55,7 @@ impl<'a> Parser<'a> {
         let declarations = vec![declarator];
 
         let semi_end = self.current_pos().1;
-        self.expect(TokenKind::Semicolon)?;
+        self.expect(&TokenKind::Semicolon)?;
 
         Ok(Statement::VariableDeclaration(VariableDeclaration {
             kind,
@@ -79,7 +79,7 @@ impl<'a> Parser<'a> {
         self.advance()?;
 
         // Check for type annotation
-        let type_annotation = if self.check(TokenKind::Colon) {
+        let type_annotation = if self.check(&TokenKind::Colon) {
             Some(self.parse_type_annotation()?)
         } else {
             None
@@ -98,7 +98,7 @@ impl<'a> Parser<'a> {
         };
 
         // Check for initializer
-        let init = if self.check(TokenKind::Equals) {
+        let init = if self.check(&TokenKind::Equals) {
             self.advance()?;
             Some(self.parse_expression()?)
         } else {
@@ -119,7 +119,7 @@ impl<'a> Parser<'a> {
 
     fn parse_type_annotation(&mut self) -> Result<TSTypeAnnotation, ParseError> {
         let start = self.current_pos().0;
-        self.expect(TokenKind::Colon)?;
+        self.expect(&TokenKind::Colon)?;
 
         let type_node = self.parse_type()?;
         let end = type_node.span().end;

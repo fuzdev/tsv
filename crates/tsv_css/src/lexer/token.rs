@@ -12,19 +12,25 @@ pub enum TokenKind {
     RightParen,   // )
 
     // Punctuation
-    Colon,       // :
-    Semicolon,   // ;
-    Comma,       // ,
-    Dot,         // .
-    Hash,        // #
-    GreaterThan, // >
-    Plus,        // +
-    Tilde,       // ~
-    Asterisk,    // *
-    Ampersand,   // &
-    AtSign,      // @
-    Slash,       // / (division operator)
-    Equals,      // =
+    Colon,            // :
+    Semicolon,        // ;
+    Comma,            // ,
+    Dot,              // .
+    Hash,             // #
+    GreaterThan,      // >
+    LessThan,         // <
+    Plus,             // +
+    Tilde,            // ~
+    Asterisk,         // *
+    Ampersand,        // &
+    AtSign,           // @
+    Slash,            // / (division operator)
+    Equals,           // =
+    Percent,          // % (for percent-encoding in URLs like %20)
+    Caret,            // ^ (for attribute selectors: ^=)
+    Dollar,           // $ (for attribute selectors: $=)
+    Pipe,             // | (for attribute selectors: |=, namespace selectors)
+    ColumnCombinator, // || (CSS Grid column combinator)
 
     // Values - composite tokens per CSS Syntax Level 3
     String {

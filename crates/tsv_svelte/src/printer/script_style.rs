@@ -71,8 +71,9 @@ impl<'a> Printer<'a> {
             // The CSS printer will use the spans to detect blank lines correctly
             let formatted_css = tsv_css::format(&style.css_stylesheet, self.source());
 
-            // Indent each line - trim trailing newline first to avoid extra blank lines
-            let css_trimmed = formatted_css.trim_end_matches('\n');
+            // Indent each line - trim trailing newlines first to avoid extra blank lines
+            // Note: CSS formatter adds trailing newline, we need to remove it before line processing
+            let css_trimmed = formatted_css.trim_end();
             self.indent_level += 1;
             let mut in_multiline_comment = false;
             for line in css_trimmed.lines() {

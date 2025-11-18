@@ -94,6 +94,20 @@ impl<'a> CssParser<'a> {
         Ok(())
     }
 
+    /// Peek at the next token without consuming it.
+    /// Result is cached so repeated peeks are efficient.
+    pub(crate) fn peek(&mut self) -> Result<&TokenKind, ParseError> {
+        if self.peek_cache.is_none() {
+            let token = self.lexer.next_token()?;
+            self.peek_cache = Some(PeekData {
+                kind: token.kind,
+                start: token.start,
+                end: token.end,
+            });
+        }
+        Ok(&self.peek_cache.as_ref().unwrap().kind)
+    }
+
     pub(crate) fn check(&self, kind: &TokenKind) -> bool {
         &self.current_kind == kind
     }
@@ -134,9 +148,9 @@ impl<'a> CssParser<'a> {
     /// Skip whitespace and comments (comments are not included in AST)
     pub(crate) fn skip_whitespace_and_comments(&mut self) -> Result<(), ParseError> {
         loop {
-            if self.check(&TokenKind::Whitespace) {
-                self.advance()?;
-            } else if matches!(&self.current_kind, TokenKind::Comment(_)) {
+            if self.check(&TokenKind::Whitespace)
+                || matches!(&self.current_kind, TokenKind::Comment(_))
+            {
                 self.advance()?;
             } else {
                 break;
@@ -195,7 +209,8 @@ impl<'a> CssParser<'a> {
 
             // Handle at-rules (@media, @keyframes, etc.)
             if self.check(&TokenKind::AtSign) {
-                let atrule = atrules::parse_atrule(self)?;
+                // Top-level at-rules are not nested in rules
+                let atrule = atrules::parse_atrule(self, false)?;
                 nodes.push(CssNode::Atrule(atrule));
                 self.skip_whitespace()?;
                 continue;

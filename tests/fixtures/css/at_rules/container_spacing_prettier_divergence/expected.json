@@ -1,0 +1,460 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 817,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 38,
+				"end": 104,
+				"name": "container",
+				"prelude": "(min-width: 700px)",
+				"block": {
+					"type": "Block",
+					"start": 68,
+					"end": 104,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 72,
+								"end": 77,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 72,
+										"end": 77,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "card",
+														"start": 72,
+														"end": 77
+													}
+												],
+												"start": 72,
+												"end": 77
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 78,
+								"end": 101,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 83,
+										"end": 96,
+										"property": "display",
+										"value": "grid"
+									}
+								]
+							},
+							"start": 72,
+							"end": 101
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 130,
+				"end": 212,
+				"name": "container",
+				"prelude": "sidebar (min-width: 400px)",
+				"block": {
+					"type": "Block",
+					"start": 168,
+					"end": 212,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 172,
+								"end": 179,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 172,
+										"end": 179,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "widget",
+														"start": 172,
+														"end": 179
+													}
+												],
+												"start": 172,
+												"end": 179
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 180,
+								"end": 209,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 185,
+										"end": 204,
+										"property": "flex-direction",
+										"value": "row"
+									}
+								]
+							},
+							"start": 172,
+							"end": 209
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 246,
+				"end": 336,
+				"name": "container",
+				"prelude": "(min-width: 700px) and (max-width: 1000px)",
+				"block": {
+					"type": "Block",
+					"start": 300,
+					"end": 336,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 304,
+								"end": 312,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 304,
+										"end": 312,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "content",
+														"start": 304,
+														"end": 312
+													}
+												],
+												"start": 304,
+												"end": 312
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 313,
+								"end": 333,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 318,
+										"end": 328,
+										"property": "columns",
+										"value": "2"
+									}
+								]
+							},
+							"start": 304,
+							"end": 333
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 369,
+				"end": 464,
+				"name": "container",
+				"prelude": "(min-width: 700px) or (orientation: portrait)",
+				"block": {
+					"type": "Block",
+					"start": 426,
+					"end": 464,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 430,
+								"end": 437,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 430,
+										"end": 437,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "banner",
+														"start": 430,
+														"end": 437
+													}
+												],
+												"start": 430,
+												"end": 437
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 438,
+								"end": 461,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 443,
+										"end": 456,
+										"property": "padding",
+										"value": "1rem"
+									}
+								]
+							},
+							"start": 430,
+							"end": 461
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 498,
+				"end": 571,
+				"name": "container",
+				"prelude": "not (min-width: 400px)",
+				"block": {
+					"type": "Block",
+					"start": 532,
+					"end": 571,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 536,
+								"end": 543,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 536,
+										"end": 543,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "mobile",
+														"start": 536,
+														"end": 543
+													}
+												],
+												"start": 536,
+												"end": 543
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 544,
+								"end": 568,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 549,
+										"end": 563,
+										"property": "display",
+										"value": "block"
+									}
+								]
+							},
+							"start": 536,
+							"end": 568
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 595,
+				"end": 684,
+				"name": "container",
+				"prelude": "style(--theme: dark)",
+				"block": {
+					"type": "Block",
+					"start": 627,
+					"end": 684,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 631,
+								"end": 636,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 631,
+										"end": 636,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "card",
+														"start": 631,
+														"end": 636
+													}
+												],
+												"start": 631,
+												"end": 636
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 637,
+								"end": 681,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 642,
+										"end": 659,
+										"property": "background",
+										"value": "black"
+									},
+									{
+										"type": "Declaration",
+										"start": 664,
+										"end": 676,
+										"property": "color",
+										"value": "white"
+									}
+								]
+							},
+							"start": 631,
+							"end": 681
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 727,
+				"end": 808,
+				"name": "container",
+				"prelude": "sidebar style(--highlight: true)",
+				"block": {
+					"type": "Block",
+					"start": 771,
+					"end": 808,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 775,
+								"end": 781,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 775,
+										"end": 781,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "strong",
+														"start": 775,
+														"end": 781
+													}
+												],
+												"start": 775,
+												"end": 781
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 782,
+								"end": 805,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 787,
+										"end": 800,
+										"property": "color",
+										"value": "violet"
+									}
+								]
+							},
+							"start": 775,
+							"end": 805
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 809,
+			"styles": "\n\t/* Basic container query */\n\t@container (min-width: 700px) {\n\t\t.card {\n\t\t\tdisplay: grid;\n\t\t}\n\t}\n\n\t/* Named container */\n\t@container sidebar (min-width: 400px) {\n\t\t.widget {\n\t\t\tflex-direction: row;\n\t\t}\n\t}\n\n\t/* Boolean operators - and */\n\t@container (min-width: 700px) and (max-width: 1000px) {\n\t\t.content {\n\t\t\tcolumns: 2;\n\t\t}\n\t}\n\n\t/* Boolean operators - or */\n\t@container (min-width: 700px) or (orientation: portrait) {\n\t\t.banner {\n\t\t\tpadding: 1rem;\n\t\t}\n\t}\n\n\t/* Boolean operators - not */\n\t@container not (min-width: 400px) {\n\t\t.mobile {\n\t\t\tdisplay: block;\n\t\t}\n\t}\n\n\t/* Style queries */\n\t@container style(--theme: dark) {\n\t\t.card {\n\t\t\tbackground: black;\n\t\t\tcolor: white;\n\t\t}\n\t}\n\n\t/* Named container with style query */\n\t@container sidebar style(--highlight: true) {\n\t\tstrong {\n\t\t\tcolor: violet;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": null,
+	"end": null,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

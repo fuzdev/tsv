@@ -2,6 +2,18 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Canonical error message used in expected_svelte.json when Svelte's parser fails
+///
+/// When Svelte's parser cannot parse a fixture (e.g., spec-compliant CSS that Svelte doesn't support),
+/// the expected_svelte.json file contains this error marker instead of an AST.
+pub const EXPECTED_SVELTE_ERROR_MARKER: &str = "failed to parse";
+
+/// Canonical error JSON format for expected_svelte.json files
+///
+/// This is the complete JSON content (with trailing newline) written to expected_svelte.json
+/// when Svelte's parser fails to parse the input.
+pub const EXPECTED_SVELTE_ERROR_JSON: &str = "{\"error\": \"failed to parse\"}\n";
+
 /// A test fixture with its input file
 #[derive(Debug, Clone)]
 pub struct Fixture {
@@ -35,14 +47,8 @@ impl Fixture {
     }
 
     /// Check if this fixture uses the expected_ours.json + expected_svelte.json pattern
-    #[allow(dead_code)] // Used by tests/1_parser_tests.rs
     pub fn has_expected_ours(&self) -> bool {
         self.expected_ours_path().exists()
-    }
-
-    /// Get the full path to formatted file (always formatted.svelte)
-    pub fn formatted_path(&self) -> PathBuf {
-        self.path.join("formatted.svelte")
     }
 
     /// Get the full path to output_prettier.svelte
@@ -59,12 +65,6 @@ impl Fixture {
         filters
             .iter()
             .any(|filter| lower_path.contains(&filter.to_lowercase()))
-    }
-
-    /// Check if this fixture is marked as a Svelte parser quirk
-    #[allow(dead_code)] // Used by tests/1_parser_tests.rs, not by tsv_debug binary
-    pub fn is_svelte_parser_quirk(&self) -> bool {
-        self.path.join(".svelte_parser_quirk").exists()
     }
 }
 
@@ -133,6 +133,7 @@ fn walk_fixtures_recursive(
 }
 
 /// Discover unformatted_*.svelte variant files in a fixture directory
+/// (excludes unformatted_ours_*.svelte files, which are handled separately)
 pub fn discover_unformatted_variants(fixture_dir: &Path) -> Vec<String> {
     let mut variants = Vec::new();
 
@@ -140,6 +141,7 @@ pub fn discover_unformatted_variants(fixture_dir: &Path) -> Vec<String> {
         for entry in entries.flatten() {
             if let Some(filename) = entry.file_name().to_str()
                 && filename.starts_with("unformatted_")
+                && !filename.starts_with("unformatted_ours_")
                 && filename.ends_with(".svelte")
             {
                 variants.push(filename.to_string());
@@ -170,30 +172,26 @@ pub fn discover_prettier_quirk_variants(fixture_dir: &Path) -> Vec<String> {
     variants
 }
 
-// formatted.svelte allowlist: fixtures where input.svelte is intentionally malformed
-//
-// ⚠️  WARNING TO AI AGENTS: DO NOT UPDATE THIS ALLOWLIST ⚠️
-//
-// formatted.svelte files decouple parser tests (use malformed input) from formatter tests (need correct output).
-//
-// WHEN TO USE formatted.svelte: (RARE)
-//   • input.svelte is intentionally malformed/weird (to test parser robustness)
-//   • formatted.svelte shows the correct formatted output (to test formatter fixes it)
-//   • Example: Section reordering - input has wrong order, formatted has correct order
-//
-// WHEN NOT TO USE formatted.svelte: (COMMON)
-//   • input.svelte is already correctly formatted (the baseline)
-//   • Use unformatted_*.* variants to test normalization instead
-//   • Example: Hug mode - input uses hug mode, unformatted_compact tests normalization
-//
-// Current legitimate cases:
-//   • Svelte section reordering: formatter reorders <script>, <style>, and markup sections
-//     into canonical order (module script → instance script → markup → style).
-//
-// If you're an AI agent and think you need to add to this list:
-//   1. STOP - Can input.svelte be the formatted version instead?
-//   2. If yes: rename formatted.svelte → input.svelte, old input.svelte → unformatted_something.*
-//   3. If no: explain to human why input.svelte must be malformed, get approval
+/// Discover unformatted_ours_*.svelte variant files in a fixture directory
+/// These files test OUR formatter's normalization capability in _prettier_divergence directories
+/// where prettier validation is skipped.
+pub fn discover_unformatted_ours_variants(fixture_dir: &Path) -> Vec<String> {
+    let mut variants = Vec::new();
+
+    if let Ok(entries) = fs::read_dir(fixture_dir) {
+        for entry in entries.flatten() {
+            if let Some(filename) = entry.file_name().to_str()
+                && filename.starts_with("unformatted_ours_")
+                && filename.ends_with(".svelte")
+            {
+                variants.push(filename.to_string());
+            }
+        }
+    }
+
+    variants.sort();
+    variants
+}
 
 /// Validate fixture structure and conventions
 ///
@@ -205,6 +203,13 @@ pub fn discover_prettier_quirk_variants(fixture_dir: &Path) -> Vec<String> {
 /// 5. `expected.json` cannot coexist with `expected_*.json` files
 /// 6. `output_prettier.svelte` differs from `input.svelte` (no dead files)
 /// 7. `prettier_quirk_*.svelte` variants differ from `input.svelte`
+/// 8. Directory name must end with `_prettier_divergence` when prettier validation should be skipped:
+///    - `output_prettier.svelte` exists (prettier formats input differently), OR
+///    - `prettier_quirk_*.svelte` files exist (documents quirks), OR
+///    - `unformatted_ours_*.svelte` files exist (tests our normalization only)
+/// 9. `_prettier_divergence` directories CANNOT have `unformatted_*.svelte` files (only `unformatted_ours_*`)
+/// 10. `prettier_quirk_*.svelte` files MUST be in `_prettier_divergence` directories
+/// 11. `unformatted_ours_*.svelte` files MUST be in `_prettier_divergence` directories
 pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
     let fixture_dir = &fixture.path;
 
@@ -245,16 +250,16 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
                 Use either:\n\
                 - expected.json (default: our parser matches Svelte)\n\
                 - expected_ours.json + expected_svelte.json (our parser intentionally differs)\n\
-                Remove expected.json or rename it to expected_svelte.json".to_string()
+                Remove expected.json or rename it to expected_svelte.json"
+                    .to_string(),
             );
         }
     } else {
         // Old pattern: expected.json (required)
         if !has_expected {
-            return Err(
-                "Missing expected.json (required for parser tests).\n\
-                Run: deno task fixtures_update_expected".to_string()
-            );
+            return Err("Missing expected.json (required for parser tests).\n\
+                Run: deno task fixtures_update_parsed"
+                .to_string());
         }
     }
 
@@ -322,6 +327,161 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         }
     }
 
+    // Discover unformatted_ours_*.svelte variants (needed for S8 validation)
+    let unformatted_ours_variants = discover_unformatted_ours_variants(fixture_dir);
+
+    // S8: Check directory naming - _prettier_divergence suffix required when prettier validation should be skipped
+    let has_prettier_quirk_files = !prettier_quirk_variants.is_empty();
+    let has_output_prettier = output_prettier_path.exists();
+    let dir_name = fixture_dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+    let has_prettier_divergence_suffix = dir_name.ends_with("_prettier_divergence");
+
+    // Divergence suffix is required when ANY prettier divergence files exist
+    let needs_divergence_suffix = has_output_prettier
+        || has_prettier_quirk_files
+        || !unformatted_ours_variants.is_empty();
+
+    if needs_divergence_suffix && !has_prettier_divergence_suffix {
+        let mut reasons = Vec::new();
+        if has_output_prettier {
+            reasons.push("output_prettier.svelte".to_string());
+        }
+        if has_prettier_quirk_files {
+            reasons.push(format!(
+                "{} prettier_quirk_*.svelte file(s)",
+                prettier_quirk_variants.len()
+            ));
+        }
+        if !unformatted_ours_variants.is_empty() {
+            reasons.push(format!(
+                "{} unformatted_ours_*.svelte file(s)",
+                unformatted_ours_variants.len()
+            ));
+        }
+        let reason = reasons.join(" and ");
+
+        return Err(format!(
+            "Directory name must end with '_prettier_divergence' when prettier validation should be skipped.\n\
+            Found {} but directory '{}' lacks the suffix.\n\
+            This makes the 'skipped prettier validation' behavior explicit and discoverable.\n\
+            Rename directory to '{}_prettier_divergence'",
+            reason,
+            dir_name,
+            dir_name
+        ));
+    }
+
+    if !needs_divergence_suffix && has_prettier_divergence_suffix {
+        return Err(format!(
+            "Directory name ends with '_prettier_divergence' but lacks files requiring it.\n\
+            Directory '{}' should either:\n\
+            - Add output_prettier.svelte (if prettier formats input differently), OR\n\
+            - Add prettier_quirk_*.svelte files (if prettier has quirks to document), OR\n\
+            - Add unformatted_ours_*.svelte files (if testing our formatter only), OR\n\
+            - Remove '_prettier_divergence' suffix from directory name (if testing both formatters)",
+            dir_name
+        ));
+    }
+
+    // S9: _prettier_divergence directories CANNOT have unformatted_*.svelte files (only unformatted_ours_*)
+    if has_prettier_divergence_suffix && !unformatted_variants.is_empty() {
+        let renamed_files = unformatted_variants
+            .iter()
+            .map(|f| format!("  {} → {}", f, f.replace("unformatted_", "unformatted_ours_")))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let dir_without_suffix = dir_name.trim_end_matches("_prettier_divergence");
+
+        return Err(format!(
+            "Directory with '_prettier_divergence' suffix cannot have unformatted_*.svelte files.\n\
+            Found {} unformatted_*.svelte file(s) in directory '{}'.\n\
+            \n\
+            Choose one solution:\n\
+            \n\
+            Option 1: Rename files to unformatted_ours_*.svelte (if testing our formatter only)\n\
+            {}\n\
+            \n\
+            Option 2: Remove '_prettier_divergence' suffix from directory (if testing both formatters)\n\
+            - Rename directory: '{}' → '{}'\n\
+            - This will enable prettier validation for these files",
+            unformatted_variants.len(),
+            dir_name,
+            renamed_files,
+            dir_name,
+            dir_without_suffix
+        ));
+    }
+
+    // Check unformatted_ours_*.svelte variants
+    for variant_name in &unformatted_ours_variants {
+        // Check extension is .svelte
+        if !variant_name.ends_with(".svelte") {
+            return Err(format!(
+                "unformatted_ours_*.svelte variant '{}' must have .svelte extension",
+                variant_name
+            ));
+        }
+
+        let variant_path = fixture_dir.join(variant_name);
+        let variant_content = read_file(&variant_path)?;
+
+        // Must differ from input.svelte
+        if variant_content == input_content {
+            return Err(format!(
+                "unformatted_ours_*.svelte variant '{}' is identical to input.svelte (should be different for testing normalization)",
+                variant_name
+            ));
+        }
+    }
+
+    // S11: unformatted_ours_*.svelte files MUST be in _prettier_divergence directories
+    if !has_prettier_divergence_suffix && !unformatted_ours_variants.is_empty() {
+        return Err(format!(
+            "unformatted_ours_*.svelte files can only exist in '_prettier_divergence' directories.\n\
+            Found {} unformatted_ours_*.svelte file(s) in directory '{}'.\n\
+            Either:\n\
+            - Rename directory to '{}_prettier_divergence' (if prettier validation should be skipped)\n\
+            - Rename files to unformatted_*.svelte (if prettier validation should run)",
+            unformatted_ours_variants.len(),
+            dir_name,
+            dir_name
+        ));
+    }
+
+    // Check if README.md should exist (D1 validation)
+    let has_parser_divergence = has_expected_ours && has_expected_svelte;
+    let has_formatter_divergence = output_prettier_path.exists();
+    let has_prettier_quirks = !prettier_quirk_variants.is_empty();
+
+    let needs_readme = has_parser_divergence || has_formatter_divergence || has_prettier_quirks;
+    let readme_path = fixture_dir.join("README.md");
+
+    if needs_readme && !readme_path.exists() {
+        let mut reasons = Vec::new();
+        if has_parser_divergence {
+            reasons.push("- Parser divergence (expected_ours.json + expected_svelte.json)");
+        }
+        if has_formatter_divergence {
+            reasons.push("- Formatter divergence (output_prettier.svelte)");
+        }
+        if has_prettier_quirks {
+            reasons.push("- Prettier quirks (prettier_quirk_*.svelte)");
+        }
+
+        return Err(format!(
+            "README.md required when quirks/divergences exist.\n\
+            This fixture has:\n\
+            {}\n\
+            README.md should document WHY we differ and provide context.\n\
+            See docs/fixtures.md for README requirements.",
+            reasons.join("\n")
+        ));
+    }
+
     Ok(())
 }
 
@@ -363,4 +523,45 @@ pub fn delete_file_if_exists(path: &Path) -> Result<(), String> {
         fs::remove_file(path).map_err(|e| format!("Failed to delete file {:?}: {}", path, e))?;
     }
     Ok(())
+}
+
+/// Format content using our formatter
+///
+/// Determines file type from filepath extension and calls the appropriate formatter.
+/// Only supports .svelte files currently.
+pub fn format_with_our_formatter(content: &str, filepath: &str) -> Result<String, String> {
+    if filepath.ends_with(".svelte") {
+        let ast =
+            tsv_svelte::parse(content).map_err(|e| format!("Format error (parse): {:?}", e))?;
+        Ok(tsv_svelte::format(&ast, content))
+    } else {
+        Err(format!(
+            "Unsupported file type for formatting: {}",
+            filepath
+        ))
+    }
+}
+
+/// Parse content using our parser and return JSON AST
+///
+/// Determines file type from filepath extension and calls the appropriate parser.
+/// Only supports .svelte files currently.
+pub fn parse_with_our_parser(content: &str, filepath: &str) -> Result<serde_json::Value, String> {
+    if filepath.ends_with(".svelte") {
+        let ast = tsv_svelte::parse(content).map_err(|e| format!("Parse error: {:?}", e))?;
+        let public_ast = tsv_svelte::convert_ast(&ast, content);
+        serde_json::to_value(&public_ast)
+            .map_err(|e| format!("Failed to serialize AST to JSON: {}", e))
+    } else {
+        Err(format!("Unsupported file type for parsing: {}", filepath))
+    }
+}
+
+/// Read and parse JSON file
+///
+/// Returns the parsed JSON value for comparison with generated ASTs.
+pub fn read_json_file(path: &Path) -> Result<serde_json::Value, String> {
+    let content = read_file(path)?;
+    serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse JSON from {:?}: {}", path, e))
 }

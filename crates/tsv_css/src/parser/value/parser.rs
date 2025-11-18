@@ -95,7 +95,7 @@ impl<'a> ValueParser<'a> {
     /// New parser with same source but adjusted range
     fn sub_parser(&self, range_start: usize, range_end: usize) -> ValueParser<'a> {
         ValueParser {
-            source: self.source, // ✅ SAME source!
+            source: self.source,             // ✅ SAME source!
             start: self.start + range_start, // Offset into same source
             end: self.start + range_end,
             base_offset: self.base_offset, // Same base offset
@@ -237,7 +237,10 @@ mod tests {
     #[test]
     fn test_new_parser() {
         let source = "red, blue";
-        let span = Span { start: 100, end: 109 };
+        let span = Span {
+            start: 100,
+            end: 109,
+        };
         let parser = ValueParser::new(source, span);
 
         assert_eq!(parser.source, "red, blue");
@@ -249,7 +252,10 @@ mod tests {
     #[test]
     fn test_text() {
         let source = "red, blue";
-        let span = Span { start: 100, end: 109 };
+        let span = Span {
+            start: 100,
+            end: 109,
+        };
         let parser = ValueParser::new(source, span);
 
         assert_eq!(parser.text(), "red, blue");
@@ -258,7 +264,6 @@ mod tests {
     #[test]
     fn test_text_with_range() {
         let source = "red, blue";
-        let span = Span { start: 100, end: 109 };
         let parser = ValueParser {
             source,
             start: 5,
@@ -272,7 +277,10 @@ mod tests {
     #[test]
     fn test_absolute_span() {
         let source = "red, blue";
-        let span = Span { start: 100, end: 109 };
+        let span = Span {
+            start: 100,
+            end: 109,
+        };
         let parser = ValueParser::new(source, span);
 
         let abs_span = parser.absolute_span();
@@ -283,7 +291,6 @@ mod tests {
     #[test]
     fn test_absolute_span_with_range() {
         let source = "red, blue";
-        let span = Span { start: 100, end: 109 };
         let parser = ValueParser {
             source,
             start: 5, // "blue" starts at byte 5
@@ -293,13 +300,16 @@ mod tests {
 
         let abs_span = parser.absolute_span();
         assert_eq!(abs_span.start, 105); // 100 + 5
-        assert_eq!(abs_span.end, 109);   // 100 + 9
+        assert_eq!(abs_span.end, 109); // 100 + 9
     }
 
     #[test]
     fn test_sub_parser() {
         let source = "red, blue, green";
-        let span = Span { start: 100, end: 116 };
+        let span = Span {
+            start: 100,
+            end: 116,
+        };
         let parser = ValueParser::new(source, span);
 
         // Create sub-parser for "blue" (bytes 5-9 in source)
@@ -313,7 +323,7 @@ mod tests {
 
         let sub_span = sub.absolute_span();
         assert_eq!(sub_span.start, 105); // 100 + 5
-        assert_eq!(sub_span.end, 109);   // 100 + 9
+        assert_eq!(sub_span.end, 109); // 100 + 9
     }
 
     #[test]
@@ -335,13 +345,16 @@ mod tests {
         assert_eq!(sub2.source, "a, b, c"); // Still same source!
         assert_eq!(sub2.text(), "c");
         assert_eq!(sub2.absolute_span().start, 6); // 0 + 3 + 3
-        assert_eq!(sub2.absolute_span().end, 7);   // 0 + 3 + 4
+        assert_eq!(sub2.absolute_span().end, 7); // 0 + 3 + 4
     }
 
     #[test]
     fn test_multiline_source() {
         let source = "val1,\n    val2";
-        let span = Span { start: 100, end: 114 };
+        let span = Span {
+            start: 100,
+            end: 114,
+        };
         let parser = ValueParser::new(source, span);
 
         assert_eq!(parser.text(), "val1,\n    val2");
@@ -351,7 +364,6 @@ mod tests {
     #[test]
     fn test_empty_range() {
         let source = "test";
-        let span = Span { start: 0, end: 4 };
         let parser = ValueParser {
             source,
             start: 2,
@@ -383,7 +395,10 @@ mod tests {
     #[test]
     fn test_parse_comma_separated_simple() {
         let source = "red, blue, green";
-        let span = Span { start: 100, end: 116 };
+        let span = Span {
+            start: 100,
+            end: 116,
+        };
         let parser = ValueParser::new(source, span);
 
         let value = parser.parse();
@@ -410,7 +425,10 @@ mod tests {
     fn test_parse_multiline_comma_separated() {
         // Simulate box-shadow with multiline formatting
         let source = "0 1px rgba(0, 0, 0, 0.1),\n    0 2px rgba(0, 0, 0, 0.2)";
-        let span = Span { start: 100, end: 154 };
+        let span = Span {
+            start: 100,
+            end: 154,
+        };
         let parser = ValueParser::new(source, span);
 
         let value = parser.parse();

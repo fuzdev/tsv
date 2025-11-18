@@ -31,6 +31,25 @@ use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
 use tsv_lang::OutputBuffer;
 
+/// Pending whitespace state - buffers whitespace decisions until next node is known
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PendingWhitespace {
+    /// No pending whitespace
+    None,
+    /// Whitespace already handled by previous node (e.g., text with trailing space)
+    /// Don't add any additional spacing
+    AlreadyHandled,
+    /// Space(s) detected in source (no newlines)
+    /// Will output as space before inline elements, newline before blocks
+    Space,
+    /// Single newline detected in source
+    /// Will output as newline before any element
+    Newline,
+    /// Blank line (2+ newlines) detected in source
+    /// Will output as double newline before any element
+    BlankLine,
+}
+
 /// Print configuration
 #[derive(Debug, Clone)]
 pub struct PrintConfig {
@@ -248,9 +267,8 @@ impl<'a> Printer<'a> {
     /// - Leading/trailing whitespace-only nodes are removed
     fn print_root_fragment(&mut self, fragment: &internal::Fragment) {
         let mut prev_was_block = false;
-        let mut prev_had_blank_line = false;
-        let mut had_newline_before_current = false; // Track if source has newline before current
-        let mut has_output_content = false; // Track if we've output any content yet
+        let mut has_output_content = false;
+        let mut pending_ws = PendingWhitespace::None;
 
         // Find first non-whitespace node index
         let first_non_ws_idx = fragment.nodes.iter().position(
@@ -267,38 +285,24 @@ impl<'a> Printer<'a> {
 
                     // Check if this is a whitespace-only node
                     if text.raw.is_whitespace_only() {
-                        // Check if it contains a blank line (2+ newlines)
+                        // Buffer whitespace type - don't output yet, let next node decide
+                        // Use upgrade semantics: don't overwrite blank lines with lesser whitespace
                         if text.raw.has_blank_line() {
-                            // Blank line found - skip this node entirely and remember the blank line
-                            // The blank line will be added before the next element
-                            prev_had_blank_line = true;
-                            had_newline_before_current = true;
-                            continue;
-                        }
-
-                        // Check if whitespace contains a single newline
-                        let has_newline = text.raw.contains('\n');
-
-                        // Whitespace without blank line - skip if previous was block,
-                        // otherwise preserve (semantically meaningful between inline elements)
-                        if prev_was_block {
-                            had_newline_before_current = has_newline;
-                            continue;
-                        }
-
-                        // Whitespace after inline element: preserve format from source
-                        // If source has newline, preserve it; if just spaces, preserve space
-                        if has_newline {
-                            // Source has newline - preserve it (format preservation)
-                            had_newline_before_current = true;
-                            // Don't write anything here - let next element handle spacing
+                            pending_ws = PendingWhitespace::BlankLine;
+                        } else if text.raw.contains('\n') {
+                            // Only upgrade to Newline if not already BlankLine
+                            if pending_ws != PendingWhitespace::BlankLine {
+                                pending_ws = PendingWhitespace::Newline;
+                            }
                         } else {
-                            // Just spaces - preserve single space between inline elements
-                            self.write(" ");
-                            had_newline_before_current = false;
+                            // Space only upgrades from None
+                            if pending_ws == PendingWhitespace::None {
+                                pending_ws = PendingWhitespace::Space;
+                            }
                         }
+
                         prev_was_block = false;
-                        prev_had_blank_line = false;
+                        continue;
                     } else {
                         // Text with content
                         // Check if text itself has leading whitespace with newlines
@@ -323,65 +327,125 @@ impl<'a> Printer<'a> {
                             }
                         };
 
-                        // Add newline before text if previous was block OR if we had newline before OR text has leading newline
-                        if prev_had_blank_line {
-                            self.write("\n\n");
-                        } else if prev_was_block
-                            || had_newline_before_current
-                            || text_has_leading_newline
-                        {
-                            self.write("\n");
+                        // Upgrade pending whitespace if text has leading newline
+                        if text_has_leading_newline {
+                            pending_ws = match pending_ws {
+                                PendingWhitespace::BlankLine => PendingWhitespace::BlankLine,
+                                _ => PendingWhitespace::Newline,
+                            };
                         }
 
-                        // Normalize the text content, treating root level as block context
-                        // to trim boundary whitespace (newlines become line breaks, not spaces)
-                        self.print_text(text, true, false);
+                        // Resolve pending whitespace before outputting text
+                        if has_output_content {
+                            match pending_ws {
+                                PendingWhitespace::None => {
+                                    // No explicit whitespace, but add newline if previous was block
+                                    if prev_was_block {
+                                        self.write("\n");
+                                    }
+                                }
+                                PendingWhitespace::AlreadyHandled => {}
+                                PendingWhitespace::Space => self.write(" "),
+                                PendingWhitespace::Newline => self.write("\n"),
+                                PendingWhitespace::BlankLine => self.write("\n\n"),
+                            }
+                        }
 
-                        // Text with trailing newline is treated as block-like (forces newline after)
-                        // Text without trailing newline is treated as inline (no forced newline)
+                        // Check if text has trailing space (not newline) - those are semantic
+                        let has_trailing_space = {
+                            let trimmed = text.raw.trim_end();
+                            if trimmed.len() < text.raw.len() {
+                                let trailing = &text.raw[trimmed.len()..];
+                                trailing.chars().any(|c| c == ' ' || c == '\t')
+                                    && !trailing.contains('\n')
+                            } else {
+                                false
+                            }
+                        };
+
+                        // Root-level text normalization: always trim leading, preserve internal spaces,
+                        // preserve trailing space only if it's not a newline
+                        let normalized = {
+                            let mut result = self.normalize_whitespace(&text.raw, true); // Trim completely first
+                            if has_trailing_space {
+                                result.push(' '); // Add back trailing space (semantic)
+                            }
+                            result
+                        };
+                        self.write(&normalized);
+
+                        // Update state
                         has_output_content = true;
-                        prev_was_block = text_has_trailing_newline;
-                        prev_had_blank_line = false;
-                        had_newline_before_current = false;
+                        prev_was_block = false;
+
+                        // Set pending whitespace for next node based on trailing whitespace
+                        // If text has trailing space, space is already output - don't add newline before blocks
+                        // If text has trailing newline, next element should be on new line
+                        pending_ws = if has_trailing_space {
+                            PendingWhitespace::AlreadyHandled // Space already output, block should stay on same line
+                        } else if text_has_trailing_newline {
+                            PendingWhitespace::Newline
+                        } else {
+                            PendingWhitespace::None
+                        };
                     }
                 }
                 FragmentNode::Element(el) => {
                     let is_block = self.is_block_element(el);
 
-                    // At root level, spacing rules:
-                    // 1. Blank line if source had one (preserve authorial intent)
-                    // 2. Block elements: always separated by newlines (unless first)
-                    // 3. Inline elements/components: preserve source format (newline if source had it)
-
-                    if prev_had_blank_line {
-                        self.write("\n\n");
-                    } else if is_block && has_output_content {
-                        // Block elements always get newline (unless first element)
-                        self.write("\n");
-                    } else if prev_was_block || had_newline_before_current {
-                        // Inline elements/components: newline only if prev was block or source had newline
-                        self.write("\n");
+                    // Resolve pending whitespace before element
+                    if has_output_content {
+                        match pending_ws {
+                            PendingWhitespace::None => {
+                                // No explicit whitespace
+                                // Blocks always need newlines
+                                // Inline elements need newlines if previous was block
+                                if is_block || prev_was_block {
+                                    self.write("\n");
+                                }
+                            }
+                            PendingWhitespace::AlreadyHandled => {
+                                // Previous node already handled spacing (e.g., text with trailing space)
+                                // Don't add any additional spacing
+                            }
+                            PendingWhitespace::Space => {
+                                // Space before block → newline, space before inline → preserve
+                                if is_block {
+                                    self.write("\n");
+                                } else {
+                                    self.write(" ");
+                                }
+                            }
+                            PendingWhitespace::Newline => self.write("\n"),
+                            PendingWhitespace::BlankLine => self.write("\n\n"),
+                        }
                     }
 
                     self.print_element(el);
+
+                    // Update state
                     has_output_content = true;
                     prev_was_block = is_block;
-                    prev_had_blank_line = false;
-                    had_newline_before_current = false;
+                    pending_ws = PendingWhitespace::None;
                 }
                 FragmentNode::ExpressionTag(tag) => {
-                    // Expression tags: add spacing if previous was block or source had newline
-                    if prev_had_blank_line {
-                        self.write("\n\n");
-                    } else if prev_was_block || had_newline_before_current {
-                        self.write("\n");
+                    // Resolve pending whitespace before expression (treat as inline)
+                    if has_output_content {
+                        match pending_ws {
+                            PendingWhitespace::None => {}
+                            PendingWhitespace::AlreadyHandled => {}
+                            PendingWhitespace::Space => self.write(" "), // Expressions are inline
+                            PendingWhitespace::Newline => self.write("\n"),
+                            PendingWhitespace::BlankLine => self.write("\n\n"),
+                        }
                     }
 
                     self.print_expression_tag(tag);
+
+                    // Update state
                     has_output_content = true;
-                    prev_was_block = false;
-                    prev_had_blank_line = false;
-                    had_newline_before_current = false;
+                    prev_was_block = false; // Expressions are inline
+                    pending_ws = PendingWhitespace::None;
                 }
             }
         }

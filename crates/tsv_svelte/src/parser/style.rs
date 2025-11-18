@@ -112,8 +112,7 @@ impl<'a> SvelteParser<'a> {
 
         // Parse CSS content
         let css_content = &self.source[content_start..content_end];
-        let css_stylesheet = tsv_css::parse_css(css_content, content_start)
-            .unwrap_or_else(|_| tsv_css::CssStyleSheet::new()); // If CSS parsing fails, use empty stylesheet
+        let css_stylesheet = tsv_css::parse_css(css_content, content_start)?;
 
         Ok(Style {
             span: Span {

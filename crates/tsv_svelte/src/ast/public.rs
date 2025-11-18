@@ -6,7 +6,7 @@
 use crate::ast::internal::ElementKind;
 use serde::{Deserialize, Serialize};
 use tsv_css::ast::public::StyleSheet;
-use tsv_ts::ast::public::{Expression, Program};
+use tsv_ts::ast::public::Expression;
 
 /// Svelte Root node - top level of a .svelte file
 ///
@@ -109,6 +109,6 @@ pub struct Script {
     pub start: u32,
     pub end: u32,
     pub context: String, // "default" or "module"
-    pub content: Program,
+    pub content: serde_json::Value, // Program with leadingComments/trailingComments injected
     pub attributes: Vec<Attribute>,
 }

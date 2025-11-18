@@ -1,6 +1,7 @@
 use super::{Command, Executable};
 use crate::cli::args::Args;
 use crate::cli::input::Input;
+use crate::json_utils::to_json_with_tabs;
 use std::process;
 
 /// Parse command implementation
@@ -87,7 +88,7 @@ fn parse_to_json(input: &Input, pretty: bool) -> Result<String, String> {
 
             // Serialize to JSON
             if pretty {
-                serde_json::to_string_pretty(&public_ast)
+                to_json_with_tabs(&public_ast)
             } else {
                 serde_json::to_string(&public_ast)
             }
@@ -99,7 +100,7 @@ fn parse_to_json(input: &Input, pretty: bool) -> Result<String, String> {
 
             // Serialize to JSON
             if pretty {
-                serde_json::to_string_pretty(&json_value)
+                to_json_with_tabs(&json_value)
             } else {
                 serde_json::to_string(&json_value)
             }
@@ -111,7 +112,7 @@ fn parse_to_json(input: &Input, pretty: bool) -> Result<String, String> {
 
             // Serialize to JSON
             if pretty {
-                serde_json::to_string_pretty(&public_ast)
+                to_json_with_tabs(&public_ast)
             } else {
                 serde_json::to_string(&public_ast)
             }

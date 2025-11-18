@@ -177,6 +177,17 @@ pub enum SimpleSelector {
         value: f64,
         span: Span, // Phase 3b: @keyframes percentage selectors (0%, 50%, 100%)
     },
+    /// Invalid selector - unparseable syntax preserved for forgiving parsing
+    ///
+    /// Used in :is() and :where() pseudo-classes which use forgiving selector lists.
+    /// Per CSS Selectors Level 4, invalid selectors are ignored for matching purposes
+    /// but preserved in the source for formatter output.
+    ///
+    /// Examples: `.` (incomplete class), `[` (incomplete attribute), etc.
+    Invalid {
+        raw: String, // Raw selector text as written
+        span: Span,
+    },
 }
 
 /// Pseudo-class/pseudo-element argument types (semantic representation)
@@ -188,10 +199,71 @@ pub enum PseudoClassArgs {
     /// Nth expression for :nth-child(), :nth-of-type(), :nth-last-child(), :nth-last-of-type()
     ///
     /// Values: "2n + 1", "odd", "even", "3", "-n+6", etc.
+    /// Optional selector list for `:nth-child(An+B of S)` syntax (CSS Selectors Level 4)
     /// Span covers the argument content (inside the parentheses)
-    Nth { value: String, span: Span },
-    // Future extensions:
-    // SelectorList(Vec<ComplexSelector>, Span),  // For :is(), :not(), :where(), :has()
+    Nth {
+        value: String,
+        of_selector: Option<SelectorList>,
+        span: Span,
+    },
+
+    /// Selector list for :is(), :not(), :where(), :has()
+    ///
+    /// Contains a full SelectorList that can include multiple complex selectors.
+    /// Used for logical combinations and relational selectors.
+    SelectorList { selectors: SelectorList, span: Span },
+
+    /// Compound selector for ::slotted() pseudo-element
+    ///
+    /// Per CSS Scoping Module Level 1: `::slotted( <compound-selector> )`
+    /// A compound selector is a sequence of simple selectors without combinators.
+    ///
+    /// Examples: `*`, `div`, `.foo`, `div.foo#bar:hover`, `[slot]`
+    /// Invalid: `div span` (combinator), `div > span` (combinator)
+    Slotted {
+        selectors: Vec<SimpleSelector>, // Compound selector (no combinators)
+        span: Span,
+    },
+
+    /// Part names for ::part() pseudo-element
+    ///
+    /// Per CSS Shadow Parts Specification: `::part( <ident>+ )`
+    /// One or more space-separated identifiers (NOT selectors).
+    ///
+    /// Multiple idents = intersection semantics (element must have ALL part names).
+    /// Order-independent: `::part(tab active)` = `::part(active tab)`
+    ///
+    /// Examples: `label`, `tab`, `tab active`, `button primary`
+    Part {
+        idents: Vec<String>, // Space-separated part names
+        span: Span,
+    },
+
+    /// Identifier argument for spec-compliant pseudo-classes/elements
+    ///
+    /// Used for pseudo-classes and pseudo-elements that take a single identifier per spec:
+    /// - :dir() - takes direction identifier (ltr, rtl)
+    /// - :lang() - takes language code (en, en-US, fr-CA, etc.)
+    /// - ::highlight() - takes custom highlight name
+    ///
+    /// Note: Svelte's parser treats these as selectors in public AST (quirk applied at conversion)
+    Identifier {
+        value: String, // Identifier value (without quotes or parentheses)
+        span: Span,
+    },
+}
+
+impl PseudoClassArgs {
+    /// Get the span of the pseudo-class/pseudo-element arguments
+    pub fn span(&self) -> Span {
+        match self {
+            PseudoClassArgs::Nth { span, .. } => *span,
+            PseudoClassArgs::SelectorList { span, .. } => *span,
+            PseudoClassArgs::Slotted { span, .. } => *span,
+            PseudoClassArgs::Part { span, .. } => *span,
+            PseudoClassArgs::Identifier { span, .. } => *span,
+        }
+    }
 }
 
 /// Attribute selector matcher type
@@ -238,10 +310,7 @@ pub struct CssDeclaration {
 #[derive(Debug, Clone)]
 pub enum CssValue {
     /// Identifier: auto, bold, inherit, currentColor, etc.
-    Identifier {
-        name: String,
-        span: Span,
-    },
+    Identifier { name: String, span: Span },
 
     /// String literal: "Arial", 'font.woff'
     /// Content includes decoded escape sequences (internal representation)
@@ -259,10 +328,7 @@ pub enum CssValue {
     },
 
     /// Color - various formats (rgb, hsl, hex, named)
-    Color {
-        color: Color,
-        span: Span,
-    },
+    Color { color: Color, span: Span },
 
     /// Function call: calc(), var(), rgb(), url(), etc.
     Function {
@@ -272,16 +338,10 @@ pub enum CssValue {
     },
 
     /// Space-separated list of values
-    List {
-        values: Vec<CssValue>,
-        span: Span,
-    },
+    List { values: Vec<CssValue>, span: Span },
 
     /// Comma-separated list of values
-    CommaSeparated {
-        values: Vec<CssValue>,
-        span: Span,
-    },
+    CommaSeparated { values: Vec<CssValue>, span: Span },
 }
 
 impl CssValue {
@@ -301,6 +361,30 @@ impl CssValue {
 
 /// CSS color value
 ///
+/// Color channel value - supports numbers, percentages, and CSS Color 4 `none`
+#[derive(Debug, Clone, PartialEq)]
+pub enum ColorChannel {
+    /// Numeric value: 255, 0.5, etc.
+    Number(f64),
+    /// Percentage value: 50%, 100%, etc.
+    Percentage(f64),
+    /// CSS Color 4 `none` keyword
+    None,
+}
+
+/// Angle unit for hue values in HSL
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AngleUnit {
+    /// Degrees (default, can be omitted)
+    Deg,
+    /// Radians
+    Rad,
+    /// Turns (1turn = 360deg)
+    Turn,
+    /// Gradians (400grad = 360deg)
+    Grad,
+}
+
 /// Internal representation - converted to JSON via convert layer.
 #[derive(Debug, Clone)]
 pub enum Color {
@@ -310,20 +394,23 @@ pub enum Color {
     /// Hex color: #ff0000, #f00, etc.
     Hex(String),
 
-    /// RGB color: rgb(255, 0, 0) or rgb(255 0 0 / 1)
+    /// RGB color: rgb(255, 0, 0) or rgb(255 0 0 / 1) or rgb(100% 0% 0%)
+    /// Supports CSS Color 4: numbers, percentages, none, alpha as percentage
     Rgb {
-        r: u8,
-        g: u8,
-        b: u8,
-        alpha: Option<f64>,
+        r: ColorChannel,
+        g: ColorChannel,
+        b: ColorChannel,
+        alpha: Option<ColorChannel>,
     },
 
-    /// HSL color: hsl(0, 100%, 50%)
+    /// HSL color: hsl(0, 100%, 50%) or hsl(120deg 75% 25%)
+    /// Supports CSS Color 4: angle units, none keyword, alpha as percentage
     Hsl {
-        hue: f64,
-        saturation: f64,
-        lightness: f64,
-        alpha: Option<f64>,
+        hue: ColorChannel,
+        hue_unit: Option<AngleUnit>, // None = unitless number (treated as degrees)
+        saturation: ColorChannel,
+        lightness: ColorChannel,
+        alpha: Option<ColorChannel>,
     },
 }
 
@@ -355,16 +442,57 @@ pub struct CssComment {
 //   - Descriptor at-rules (@font-face, @page): Contains declarations
 //   - Statement at-rules (@import, @charset): No block
 
+/// At-rule prelude value
+///
+/// At-rules have different prelude structures:
+/// - @import: structured values (url, layer, supports, media)
+/// - @media, @supports, @container: raw condition strings
+/// - @keyframes: raw animation name
+#[derive(Debug, Clone)]
+pub enum PreludeValue {
+    /// Structured values (for @import)
+    /// Example: `url('styles.css') layer(base)` → [Function(url), Function(layer)]
+    Values { values: Vec<CssValue>, span: Span },
+
+    /// Raw string (for @media, @keyframes, @supports, etc.)
+    /// Example: `screen and (min-width: 768px)`
+    Raw { content: String, span: Span },
+
+    /// Selector lists (for @scope)
+    /// Example: `@scope (.card) to (.footer)` → root: [.card], limit: Some([.footer])
+    Selectors {
+        root: SelectorList,
+        limit: Option<SelectorList>,
+        span: Span,
+    },
+}
+
+impl PreludeValue {
+    pub fn span(&self) -> Span {
+        match self {
+            PreludeValue::Values { span, .. } => *span,
+            PreludeValue::Raw { span, .. } => *span,
+            PreludeValue::Selectors { span, .. } => *span,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            PreludeValue::Values { values, .. } => values.is_empty(),
+            PreludeValue::Raw { content, .. } => content.is_empty(),
+            PreludeValue::Selectors { root, .. } => root.selectors.is_empty(),
+        }
+    }
+}
+
 /// At-rule (@media, @keyframes, @supports, @import, @layer, @font-face, etc.)
 #[derive(Debug, Clone)]
 pub struct CssAtrule {
     /// At-rule name without @ (e.g., "media", "keyframes")
     pub name: String,
 
-    /// Raw unparsed prelude string
-    /// Examples: "screen and (min-width: 768px)", "slide", "url('file.css')"
-    /// Deferred to Phase 4 for structured parsing
-    pub prelude: String,
+    /// Prelude value (structured for @import, raw string for others)
+    pub prelude: PreludeValue,
 
     /// Block contents (Some for conditional/descriptor, None for statement at-rules)
     pub block: Option<CssAtruleBlock>,

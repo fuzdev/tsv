@@ -112,14 +112,15 @@ impl<'a> Printer<'a> {
 
                 // Special case: consecutive comments on same line
                 if let (CssNode::Comment(_), CssNode::Comment(curr_comment)) = (prev_node, node)
-                    && self.is_same_line(prev_node.span().end, curr_comment.span.start) {
-                        // Print comment inline with space separator
-                        self.write(" /*");
-                        self.write(&curr_comment.content);
-                        self.write("*/");
-                        i += 1;
-                        continue;
-                    }
+                    && self.is_same_line(prev_node.span().end, curr_comment.span.start)
+                {
+                    // Print comment inline with space separator
+                    self.write(" /*");
+                    self.write(&curr_comment.content);
+                    self.write("*/");
+                    i += 1;
+                    continue;
+                }
 
                 let has_blank_line_in_source = self.has_blank_line_between(prev_node, node);
 
@@ -137,13 +138,14 @@ impl<'a> Printer<'a> {
             // Check if next node is an inline comment after a rule/at-rule closing brace
             if matches!(node, CssNode::Rule(_) | CssNode::Atrule(_))
                 && let Some(CssNode::Comment(next_comment)) = nodes.get(i + 1)
-                    && self.is_same_line(node.span().end, next_comment.span.start) {
-                        // Print comment inline after the closing brace
-                        self.write(" /*");
-                        self.write(&next_comment.content);
-                        self.write("*/");
-                        i += 1; // Skip the comment in next iteration
-                    }
+                && self.is_same_line(node.span().end, next_comment.span.start)
+            {
+                // Print comment inline after the closing brace
+                self.write(" /*");
+                self.write(&next_comment.content);
+                self.write("*/");
+                i += 1; // Skip the comment in next iteration
+            }
 
             i += 1;
         }
@@ -213,6 +215,80 @@ impl<'a> Printer<'a> {
 
         let between = &self.source[prev_end..curr_start];
         !between.contains('\n')
+    }
+
+    /// Check if there's a blank line between two spans (for block children)
+    ///
+    /// Returns true if there are 2+ newlines between the spans
+    pub(crate) fn has_blank_line_between_spans(&self, prev_end: u32, curr_start: u32) -> bool {
+        let prev_end = prev_end as usize;
+        let curr_start = curr_start as usize;
+
+        if prev_end > curr_start || curr_start > self.source.len() {
+            return false;
+        }
+
+        let between = &self.source[prev_end..curr_start];
+        // Blank line = 2+ newlines in the whitespace
+        between.matches('\n').count() >= 2
+    }
+
+    /// Check if there's an opening brace between two spans
+    ///
+    /// Used to detect if a comment is inside a block (after `{`) vs after a selector (before `{`)
+    pub(crate) fn has_opening_brace_between(&self, prev_end: u32, curr_start: u32) -> bool {
+        let prev_end = prev_end as usize;
+        let curr_start = curr_start as usize;
+
+        if prev_end > curr_start || curr_start > self.source.len() {
+            return false;
+        }
+
+        let between = &self.source[prev_end..curr_start];
+        between.contains('{')
+    }
+
+    /// Normalize comment spacing in raw strings
+    ///
+    /// Ensures spaces around comment delimiters:
+    /// - Add space before `/*` if there isn't one (unless at start)
+    /// - Add space after `*/` if there isn't one (unless at end)
+    ///
+    /// Examples:
+    /// - `"foo/* comment */bar"` → `"foo /* comment */ bar"`
+    /// - `"/* comment */bar"` → `"/* comment */ bar"`
+    /// - `"foo/* comment */"` → `"foo /* comment */"`
+    pub(crate) fn normalize_comment_spacing(&self, s: &str) -> String {
+        let mut result = String::with_capacity(s.len() + 10);
+        let mut chars = s.char_indices().peekable();
+
+        while let Some((i, ch)) = chars.next() {
+            if ch == '/' && chars.peek().map(|(_, c)| c) == Some(&'*') {
+                // Found start of comment
+                // Add space before /* if not at start and previous char isn't whitespace
+                if i > 0 && !result.ends_with(char::is_whitespace) {
+                    result.push(' ');
+                }
+                result.push('/');
+                chars.next(); // consume the '*'
+                result.push('*');
+            } else if ch == '*' && chars.peek().map(|(_, c)| c) == Some(&'/') {
+                // Found end of comment
+                result.push('*');
+                chars.next(); // consume the '/'
+                result.push('/');
+                // Add space after */ if next char exists and isn't whitespace
+                if let Some((_, next_ch)) = chars.peek()
+                    && !next_ch.is_whitespace()
+                {
+                    result.push(' ');
+                }
+            } else {
+                result.push(ch);
+            }
+        }
+
+        result
     }
 
     /// Print a single CSS node

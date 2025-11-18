@@ -32,6 +32,27 @@ impl<'a> Printer<'a> {
                 let name = self.resolve_symbol(id.name);
                 self.write(&name);
             }
+            tsv_ts::Expression::ObjectExpression(obj) => {
+                // TODO: This is a simplified implementation that should be replaced
+                // with proper TypeScript printer delegation for complex formatting.
+                // For now, handle simple inline objects.
+                self.write("{");
+                if !obj.properties.is_empty() {
+                    self.write(" ");
+                    for (i, prop) in obj.properties.iter().enumerate() {
+                        self.print_ts_expression(&prop.key);
+                        if !prop.shorthand {
+                            self.write(": ");
+                            self.print_ts_expression(&prop.value);
+                        }
+                        if i < obj.properties.len() - 1 {
+                            self.write(", ");
+                        }
+                    }
+                    self.write(" ");
+                }
+                self.write("}");
+            }
         }
     }
 

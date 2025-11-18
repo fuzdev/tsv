@@ -1,43 +1,43 @@
 {
-  "css": null,
-  "js": [],
-  "start": 0,
-  "end": 20,
-  "type": "Root",
-  "fragment": {
-    "type": "Fragment",
-    "nodes": [
-      {
-        "type": "Component",
-        "start": 0,
-        "end": 9,
-        "name": "Comp1",
-        "attributes": [],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": []
-        }
-      },
-      {
-        "type": "Text",
-        "start": 9,
-        "end": 11,
-        "raw": "\n\n",
-        "data": "\n\n"
-      },
-      {
-        "type": "Component",
-        "start": 11,
-        "end": 20,
-        "name": "Comp2",
-        "attributes": [],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": []
-        }
-      }
-    ]
-  },
-  "options": null,
-  "comments": []
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 20,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Component",
+				"start": 0,
+				"end": 9,
+				"name": "Comp1",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 9,
+				"end": 11,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Component",
+				"start": 11,
+				"end": 20,
+				"name": "Comp2",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
 }

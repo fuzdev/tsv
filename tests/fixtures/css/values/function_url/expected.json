@@ -1,0 +1,171 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 746,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 652,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 53,
+							"end": 81,
+							"property": "background",
+							"value": "url('image.png')"
+						},
+						{
+							"type": "Declaration",
+							"start": 85,
+							"end": 126,
+							"property": "background-image",
+							"value": "url('../assets/bg.jpg')"
+						},
+						{
+							"type": "Declaration",
+							"start": 166,
+							"end": 196,
+							"property": "border-image",
+							"value": "url('font.woff')"
+						},
+						{
+							"type": "Declaration",
+							"start": 200,
+							"end": 252,
+							"property": "mask-image",
+							"value": "url('https://example.tsv.dev/image.png')"
+						},
+						{
+							"type": "Declaration",
+							"start": 278,
+							"end": 310,
+							"property": "list-style-image",
+							"value": "url(image.png)"
+						},
+						{
+							"type": "Declaration",
+							"start": 314,
+							"end": 344,
+							"property": "content",
+							"value": "url(../assets/bg.jpg)"
+						},
+						{
+							"type": "Declaration",
+							"start": 348,
+							"end": 385,
+							"property": "cursor",
+							"value": "url(/absolute/path.svg), auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 407,
+							"end": 458,
+							"property": "background-color",
+							"value": "url(data:image/png;base64,ABC123)"
+						},
+						{
+							"type": "Declaration",
+							"start": 462,
+							"end": 531,
+							"property": "background-position",
+							"value": "url(data:text/plain;charset=utf-8,Hello%20World)"
+						},
+						{
+							"type": "Declaration",
+							"start": 577,
+							"end": 613,
+							"property": "outline",
+							"value": "url('file with spaces.png')"
+						},
+						{
+							"type": "Declaration",
+							"start": 617,
+							"end": 648,
+							"property": "border",
+							"value": "url('path to file.jpg')"
+						}
+					]
+				},
+				"start": 9,
+				"end": 652
+			},
+			{
+				"type": "Atrule",
+				"start": 655,
+				"end": 737,
+				"name": "font-face",
+				"prelude": "",
+				"block": {
+					"type": "Block",
+					"start": 666,
+					"end": 737,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 670,
+							"end": 691,
+							"property": "font-family",
+							"value": "'Custom'"
+						},
+						{
+							"type": "Declaration",
+							"start": 695,
+							"end": 733,
+							"property": "src",
+							"value": "url('font.woff2') format('woff2')"
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 738,
+			"styles": "\n\tdiv {\n\t\t/* Quoted URLs - single quotes */\n\t\tbackground: url('image.png');\n\t\tbackground-image: url('../assets/bg.jpg');\n\t\t/* Quoted URLs - double quotes */\n\t\tborder-image: url('font.woff');\n\t\tmask-image: url('https://example.tsv.dev/image.png');\n\t\t/* Unquoted URLs */\n\t\tlist-style-image: url(image.png);\n\t\tcontent: url(../assets/bg.jpg);\n\t\tcursor: url(/absolute/path.svg), auto;\n\t\t/* Data URIs */\n\t\tbackground-color: url(data:image/png;base64,ABC123);\n\t\tbackground-position: url(data:text/plain;charset=utf-8,Hello%20World);\n\t\t/* URLs with spaces (must be quoted) */\n\t\toutline: url('file with spaces.png');\n\t\tborder: url('path to file.jpg');\n\t}\n\n\t@font-face {\n\t\tfont-family: 'Custom';\n\t\tsrc: url('font.woff2') format('woff2');\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": null,
+	"end": null,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

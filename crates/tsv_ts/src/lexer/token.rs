@@ -22,7 +22,7 @@ impl fmt::Display for KeywordKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
     Number,
     String,
@@ -31,9 +31,22 @@ pub enum TokenKind {
     Equals,
     Colon,
     Semicolon,
+    Comma,
+    BraceOpen,   // {
+    BraceClose,  // }
+    Comment { content: String, is_block: bool },
     Eof,
 }
 
+// TODO: Consider refining Display implementation for better error messages
+// Current approach: Quoted tokens like '=', lowercase for others
+// Alternative: Could match TypeScript/JavaScript terminology more closely
+// Examples:
+// - "identifier token" instead of "identifier"
+// - "number literal" instead of "number"
+// - "string literal" instead of "string"
+// Trade-off: Current is concise, alternative is more descriptive
+// Usage in errors: "Expected property key, found {token_kind}"
 impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -44,6 +57,16 @@ impl fmt::Display for TokenKind {
             TokenKind::Equals => write!(f, "'='"),
             TokenKind::Colon => write!(f, "':'"),
             TokenKind::Semicolon => write!(f, "';'"),
+            TokenKind::Comma => write!(f, "','"),
+            TokenKind::BraceOpen => write!(f, "'{{'"),
+            TokenKind::BraceClose => write!(f, "'}}'"),
+            TokenKind::Comment { is_block, .. } => {
+                if *is_block {
+                    write!(f, "block comment")
+                } else {
+                    write!(f, "line comment")
+                }
+            }
             TokenKind::Eof => write!(f, "end of file"),
         }
     }

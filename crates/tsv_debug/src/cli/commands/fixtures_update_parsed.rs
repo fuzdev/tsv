@@ -2,6 +2,7 @@ use crate::{deno, fixtures};
 use std::path::Path;
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
+use tsv_cli::json_utils::{ensure_trailing_newline, to_json_with_tabs};
 
 /// fixtures-update-parsed command - regenerate expected.json (or expected_ours.json + expected_svelte.json) files
 pub struct FixturesUpdateParsedCommand;
@@ -96,15 +97,36 @@ impl Executable for FixturesUpdateParsedExecutable {
         for fixture in &fixtures {
             match generate_expected_fixture(fixture) {
                 FixtureResult::Created => {
-                    println!("✓ Created {}/expected.json", fixture.relative_path);
+                    if fixture.has_expected_ours() {
+                        println!(
+                            "✓ Created {}/expected_ours.json + expected_svelte.json",
+                            fixture.relative_path
+                        );
+                    } else {
+                        println!("✓ Created {}/expected.json", fixture.relative_path);
+                    }
                     created += 1;
                 }
                 FixtureResult::Updated => {
-                    println!("✓ Updated {}/expected.json", fixture.relative_path);
+                    if fixture.has_expected_ours() {
+                        println!(
+                            "✓ Updated {}/expected_ours.json + expected_svelte.json",
+                            fixture.relative_path
+                        );
+                    } else {
+                        println!("✓ Updated {}/expected.json", fixture.relative_path);
+                    }
                     updated += 1;
                 }
                 FixtureResult::Unchanged => {
-                    println!("- {}/expected.json is up to date", fixture.relative_path);
+                    if fixture.has_expected_ours() {
+                        println!(
+                            "- {}/expected_ours.json + expected_svelte.json are up to date",
+                            fixture.relative_path
+                        );
+                    } else {
+                        println!("- {}/expected.json is up to date", fixture.relative_path);
+                    }
                     unchanged += 1;
                 }
                 FixtureResult::Failed(err) => {
@@ -159,17 +181,16 @@ fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult {
         Err(e) => return FixtureResult::Failed(e),
     };
 
-    // Parse using Svelte's official parser
-    let json = match deno::parse_svelte(&source) {
-        Ok(json) => json,
-        Err(e) => return FixtureResult::Failed(format!("Svelte parse error: {}", e)),
-    };
+    // Check if this fixture uses the divergence pattern
+    if fixture.has_expected_ours() {
+        // Generate expected_ours.json + expected_svelte.json
+        return generate_divergence_fixture(fixture, &source);
+    }
 
-    // Ensure JSON ends with newline
-    let json = if json.ends_with('\n') {
-        json
-    } else {
-        format!("{}\n", json)
+    // Standard pattern: generate expected.json from Svelte's parser
+    let json = match deno::parse_svelte(&source) {
+        Ok(json) => ensure_trailing_newline(json),
+        Err(e) => return FixtureResult::Failed(format!("Svelte parse error: {}", e)),
     };
 
     let expected_path = fixture.expected_path();
@@ -189,5 +210,61 @@ fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult {
             Ok(_) => FixtureResult::Updated,
             Err(e) => FixtureResult::Failed(e),
         }
+    }
+}
+
+fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) -> FixtureResult {
+    // Generate expected_ours.json from our parser
+    // Parse directly and serialize the struct (not via serde_json::Value) to preserve field order
+    let ast = match tsv_svelte::parse(source) {
+        Ok(ast) => ast,
+        Err(e) => return FixtureResult::Failed(format!("Our parser error: {:?}", e)),
+    };
+    let public_ast = tsv_svelte::convert_ast(&ast, source);
+
+    // Serialize with tab indentation (matching CLI and existing expected.json files)
+    let our_json = match to_json_with_tabs(&public_ast) {
+        Ok(json) => format!("{}\n", json),
+        Err(e) => return FixtureResult::Failed(format!("Failed to serialize our AST: {}", e)),
+    };
+
+    // Generate expected_svelte.json from Svelte's parser (or error marker)
+    let svelte_json = match deno::parse_svelte(source) {
+        Ok(json) => ensure_trailing_newline(json),
+        Err(_) => {
+            // Svelte parse failed - use canonical error marker
+            fixtures::EXPECTED_SVELTE_ERROR_JSON.to_string()
+        }
+    };
+
+    let expected_ours_path = fixture.expected_ours_path();
+    let expected_svelte_path = fixture.expected_svelte_path();
+
+    // Check if files exist and compare
+    let existing_ours = fixtures::read_file(&expected_ours_path).ok();
+    let existing_svelte = fixtures::read_file(&expected_svelte_path).ok();
+
+    let ours_unchanged = Some(&our_json) == existing_ours.as_ref();
+    let svelte_unchanged = Some(&svelte_json) == existing_svelte.as_ref();
+
+    if ours_unchanged && svelte_unchanged {
+        return FixtureResult::Unchanged;
+    }
+
+    // Write expected_ours.json
+    if !ours_unchanged && let Err(e) = fixtures::write_file(&expected_ours_path, &our_json) {
+        return FixtureResult::Failed(format!("Failed to write expected_ours.json: {}", e));
+    }
+
+    // Write expected_svelte.json
+    if !svelte_unchanged && let Err(e) = fixtures::write_file(&expected_svelte_path, &svelte_json) {
+        return FixtureResult::Failed(format!("Failed to write expected_svelte.json: {}", e));
+    }
+
+    // Determine result based on what existed before
+    if existing_ours.is_none() || existing_svelte.is_none() {
+        FixtureResult::Created
+    } else {
+        FixtureResult::Updated
     }
 }

@@ -1,22 +1,10 @@
 <style>
 	/* Test named color values */
-	.class1 {
+	div {
 		color: red;
-	}
-
-	.class2 {
-		color: green;
-	}
-
-	.class3 {
-		color: blue;
-	}
-
-	.class4 {
-		color: currentColor;
-	}
-
-	.class5 {
-		color: transparent;
+		background: green;
+		border-color: blue;
+		outline-color: currentColor;
+		text-decoration-color: transparent;
 	}
 </style>

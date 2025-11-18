@@ -1,111 +1,111 @@
 {
-  "css": null,
-  "js": [],
-  "start": 0,
-  "end": 100,
-  "type": "Root",
-  "fragment": {
-    "type": "Fragment",
-    "nodes": [
-      {
-        "type": "RegularElement",
-        "start": 0,
-        "end": 27,
-        "name": "p",
-        "attributes": [],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": [
-            {
-              "type": "Text",
-              "start": 3,
-              "end": 23,
-              "raw": "&#x41; &#x42; &#x43;",
-              "data": "A B C"
-            }
-          ]
-        }
-      },
-      {
-        "type": "Text",
-        "start": 27,
-        "end": 28,
-        "raw": "\n",
-        "data": "\n"
-      },
-      {
-        "type": "RegularElement",
-        "start": 28,
-        "end": 57,
-        "name": "p",
-        "attributes": [],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": [
-            {
-              "type": "Text",
-              "start": 31,
-              "end": 53,
-              "raw": "&#x20AC; &#xA9; &#xAE;",
-              "data": "€ © ®"
-            }
-          ]
-        }
-      },
-      {
-        "type": "Text",
-        "start": 57,
-        "end": 58,
-        "raw": "\n",
-        "data": "\n"
-      },
-      {
-        "type": "RegularElement",
-        "start": 58,
-        "end": 84,
-        "name": "p",
-        "attributes": [],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": [
-            {
-              "type": "Text",
-              "start": 61,
-              "end": 80,
-              "raw": "&#x1F4A9; &#x1F389;",
-              "data": "💩 🎉"
-            }
-          ]
-        }
-      },
-      {
-        "type": "Text",
-        "start": 84,
-        "end": 85,
-        "raw": "\n",
-        "data": "\n"
-      },
-      {
-        "type": "RegularElement",
-        "start": 85,
-        "end": 100,
-        "name": "p",
-        "attributes": [],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": [
-            {
-              "type": "Text",
-              "start": 88,
-              "end": 96,
-              "raw": "&#x0041;",
-              "data": "A"
-            }
-          ]
-        }
-      }
-    ]
-  },
-  "options": null,
-  "comments": []
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 100,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 27,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 3,
+							"end": 23,
+							"raw": "&#x41; &#x42; &#x43;",
+							"data": "A B C"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 27,
+				"end": 28,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 28,
+				"end": 57,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 31,
+							"end": 53,
+							"raw": "&#x20AC; &#xA9; &#xAE;",
+							"data": "€ © ®"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 57,
+				"end": 58,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 58,
+				"end": 84,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 61,
+							"end": 80,
+							"raw": "&#x1F4A9; &#x1F389;",
+							"data": "💩 🎉"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 84,
+				"end": 85,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 85,
+				"end": 100,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 88,
+							"end": 96,
+							"raw": "&#x0041;",
+							"data": "A"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
 }

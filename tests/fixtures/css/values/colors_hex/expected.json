@@ -1,167 +1,122 @@
 {
-  "css": {
-    "type": "StyleSheet",
-    "start": 0,
-    "end": 159,
-    "attributes": [],
-    "children": [
-      {
-        "type": "Rule",
-        "prelude": {
-          "type": "SelectorList",
-          "start": 38,
-          "end": 45,
-          "children": [
-            {
-              "type": "ComplexSelector",
-              "start": 38,
-              "end": 45,
-              "children": [
-                {
-                  "type": "RelativeSelector",
-                  "combinator": null,
-                  "selectors": [
-                    {
-                      "type": "ClassSelector",
-                      "name": "class1",
-                      "start": 38,
-                      "end": 45
-                    }
-                  ],
-                  "start": 38,
-                  "end": 45
-                }
-              ]
-            }
-          ]
-        },
-        "block": {
-          "type": "Block",
-          "start": 46,
-          "end": 73,
-          "children": [
-            {
-              "type": "Declaration",
-              "start": 50,
-              "end": 69,
-              "property": "background",
-              "value": "#ff0000"
-            }
-          ]
-        },
-        "start": 38,
-        "end": 73
-      },
-      {
-        "type": "Rule",
-        "prelude": {
-          "type": "SelectorList",
-          "start": 76,
-          "end": 83,
-          "children": [
-            {
-              "type": "ComplexSelector",
-              "start": 76,
-              "end": 83,
-              "children": [
-                {
-                  "type": "RelativeSelector",
-                  "combinator": null,
-                  "selectors": [
-                    {
-                      "type": "ClassSelector",
-                      "name": "class2",
-                      "start": 76,
-                      "end": 83
-                    }
-                  ],
-                  "start": 76,
-                  "end": 83
-                }
-              ]
-            }
-          ]
-        },
-        "block": {
-          "type": "Block",
-          "start": 84,
-          "end": 106,
-          "children": [
-            {
-              "type": "Declaration",
-              "start": 88,
-              "end": 102,
-              "property": "color",
-              "value": "#ff1234"
-            }
-          ]
-        },
-        "start": 76,
-        "end": 106
-      },
-      {
-        "type": "Rule",
-        "prelude": {
-          "type": "SelectorList",
-          "start": 109,
-          "end": 116,
-          "children": [
-            {
-              "type": "ComplexSelector",
-              "start": 109,
-              "end": 116,
-              "children": [
-                {
-                  "type": "RelativeSelector",
-                  "combinator": null,
-                  "selectors": [
-                    {
-                      "type": "ClassSelector",
-                      "name": "class3",
-                      "start": 109,
-                      "end": 116
-                    }
-                  ],
-                  "start": 109,
-                  "end": 116
-                }
-              ]
-            }
-          ]
-        },
-        "block": {
-          "type": "Block",
-          "start": 117,
-          "end": 150,
-          "children": [
-            {
-              "type": "Declaration",
-              "start": 121,
-              "end": 146,
-              "property": "background-color",
-              "value": "#ffffff"
-            }
-          ]
-        },
-        "start": 109,
-        "end": 150
-      }
-    ],
-    "content": {
-      "start": 7,
-      "end": 151,
-      "styles": "\n\t/* Test hex color values */\n\t.class1 {\n\t\tbackground: #ff0000;\n\t}\n\n\t.class2 {\n\t\tcolor: #ff1234;\n\t}\n\n\t.class3 {\n\t\tbackground-color: #ffffff;\n\t}\n",
-      "comment": null
-    }
-  },
-  "js": [],
-  "start": null,
-  "end": null,
-  "type": "Root",
-  "fragment": {
-    "type": "Fragment",
-    "nodes": []
-  },
-  "options": null,
-  "comments": []
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 245,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 236,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 39,
+							"end": 50,
+							"property": "color",
+							"value": "#fff"
+						},
+						{
+							"type": "Declaration",
+							"start": 54,
+							"end": 70,
+							"property": "background",
+							"value": "#f00"
+						},
+						{
+							"type": "Declaration",
+							"start": 74,
+							"end": 92,
+							"property": "border-color",
+							"value": "#0f0"
+						},
+						{
+							"type": "Declaration",
+							"start": 96,
+							"end": 115,
+							"property": "outline-color",
+							"value": "#00f"
+						},
+						{
+							"type": "Declaration",
+							"start": 141,
+							"end": 160,
+							"property": "background",
+							"value": "#ff0000"
+						},
+						{
+							"type": "Declaration",
+							"start": 164,
+							"end": 178,
+							"property": "color",
+							"value": "#00ff00"
+						},
+						{
+							"type": "Declaration",
+							"start": 182,
+							"end": 207,
+							"property": "background-color",
+							"value": "#ffffff"
+						},
+						{
+							"type": "Declaration",
+							"start": 211,
+							"end": 232,
+							"property": "border-color",
+							"value": "#ff1234"
+						}
+					]
+				},
+				"start": 9,
+				"end": 236
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 237,
+			"styles": "\n\tdiv {\n\t\t/* 3-char format */\n\t\tcolor: #fff;\n\t\tbackground: #f00;\n\t\tborder-color: #0f0;\n\t\toutline-color: #00f;\n\t\t/* 6-char format */\n\t\tbackground: #ff0000;\n\t\tcolor: #00ff00;\n\t\tbackground-color: #ffffff;\n\t\tborder-color: #ff1234;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": null,
+	"end": null,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
 }

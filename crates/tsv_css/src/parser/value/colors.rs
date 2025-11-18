@@ -1,4 +1,4 @@
-use crate::ast::internal::Color;
+use crate::ast::internal::{AngleUnit, Color, ColorChannel};
 use phf::phf_set;
 
 /// Parse a color value: hex, named, rgb(), hsl(), etc.
@@ -25,9 +25,68 @@ pub fn parse_color_function(name: &str, args_str: &str) -> Option<Color> {
     }
 }
 
+/// Parse a color channel value: number, percentage, or "none"
+fn parse_color_channel(s: &str) -> Option<ColorChannel> {
+    let s = s.trim();
+
+    // CSS Color 4 "none" keyword
+    if s.eq_ignore_ascii_case("none") {
+        return Some(ColorChannel::None);
+    }
+
+    // Percentage: 50%, 100%, etc.
+    if let Some(percent_str) = s.strip_suffix('%')
+        && let Ok(value) = percent_str.parse::<f64>()
+    {
+        return Some(ColorChannel::Percentage(value));
+    }
+
+    // Numeric value: 255, 0.5, etc.
+    if let Ok(value) = s.parse::<f64>() {
+        return Some(ColorChannel::Number(value));
+    }
+
+    None
+}
+
+/// Parse hue value with optional angle unit
+fn parse_hue(s: &str) -> Option<(ColorChannel, Option<AngleUnit>)> {
+    let s = s.trim();
+
+    // Check for "none" keyword
+    if s.eq_ignore_ascii_case("none") {
+        return Some((ColorChannel::None, None));
+    }
+
+    // Try to extract angle unit
+    let (value_str, unit) = if s.ends_with("deg") {
+        (s.trim_end_matches("deg"), Some(AngleUnit::Deg))
+    } else if s.ends_with("rad") {
+        (s.trim_end_matches("rad"), Some(AngleUnit::Rad))
+    } else if s.ends_with("turn") {
+        (s.trim_end_matches("turn"), Some(AngleUnit::Turn))
+    } else if s.ends_with("grad") {
+        (s.trim_end_matches("grad"), Some(AngleUnit::Grad))
+    } else {
+        // No unit = unitless number (treated as degrees)
+        (s, None)
+    };
+
+    // Parse numeric value
+    if let Ok(value) = value_str.trim().parse::<f64>() {
+        return Some((ColorChannel::Number(value), unit));
+    }
+
+    None
+}
+
 /// Parse rgb() or rgba() color
 ///
-/// Supports both old format "r, g, b" and new format "r g b / a"
+/// Supports CSS Color 4:
+/// - Old format: rgb(255, 0, 0), rgba(255, 0, 0, 0.5)
+/// - New format: rgb(255 0 0), rgb(255 0 0 / 0.5)
+/// - Percentages: rgb(100% 0% 0%), rgb(100% 0% 0% / 50%)
+/// - None keyword: rgb(255 0 none)
 fn parse_rgb(args_str: &str) -> Option<Color> {
     let args_str = args_str.trim();
     let parts: Vec<&str> = if args_str.contains('/') {
@@ -41,19 +100,28 @@ fn parse_rgb(args_str: &str) -> Option<Color> {
         parts.push(alpha_part.trim());
         parts
     } else {
-        // Old format: r, g, b or r, g, b, a
-        args_str.split(',').map(|s| s.trim()).collect::<Vec<_>>()
+        // Old format: r, g, b or r, g, b, a OR space-separated: r g b
+        if args_str.contains(',') {
+            args_str.split(',').map(|s| s.trim()).collect::<Vec<_>>()
+        } else {
+            // Space-separated
+            args_str
+                .split(' ')
+                .filter(|s| !s.is_empty())
+                .map(|s| s.trim())
+                .collect::<Vec<_>>()
+        }
     };
 
     if parts.len() < 3 {
         return None;
     }
 
-    let r = parts[0].parse::<u8>().ok()?;
-    let g = parts[1].parse::<u8>().ok()?;
-    let b = parts[2].parse::<u8>().ok()?;
+    let r = parse_color_channel(parts[0])?;
+    let g = parse_color_channel(parts[1])?;
+    let b = parse_color_channel(parts[2])?;
     let alpha = if parts.len() > 3 {
-        parts[3].parse::<f64>().ok()
+        Some(parse_color_channel(parts[3])?)
     } else {
         None
     };
@@ -63,7 +131,12 @@ fn parse_rgb(args_str: &str) -> Option<Color> {
 
 /// Parse hsl() or hsla() color
 ///
-/// Supports both old format "h, s%, l%" and new format "h s% l% / a"
+/// Supports CSS Color 4:
+/// - Old format: hsl(0, 100%, 50%), hsla(0, 100%, 50%, 0.5)
+/// - New format: hsl(0 100% 50%), hsl(0 100% 50% / 0.5)
+/// - Angle units: hsl(120deg 75% 25%), hsl(1.57rad 50% 50%)
+/// - None keyword: hsl(none 50% 50%)
+/// - Alpha as percentage: hsl(0 100% 50% / 50%)
 fn parse_hsl(args_str: &str) -> Option<Color> {
     let args_str = args_str.trim();
     let parts: Vec<&str> = if args_str.contains('/') {
@@ -76,24 +149,35 @@ fn parse_hsl(args_str: &str) -> Option<Color> {
         parts.push(alpha_part.trim());
         parts
     } else {
-        args_str.split(',').map(|s| s.trim()).collect::<Vec<_>>()
+        // Old format: h, s%, l% OR space-separated: h s% l%
+        if args_str.contains(',') {
+            args_str.split(',').map(|s| s.trim()).collect::<Vec<_>>()
+        } else {
+            // Space-separated
+            args_str
+                .split(' ')
+                .filter(|s| !s.is_empty())
+                .map(|s| s.trim())
+                .collect::<Vec<_>>()
+        }
     };
 
     if parts.len() < 3 {
         return None;
     }
 
-    let hue = parts[0].trim_end_matches('%').parse::<f64>().ok()?;
-    let saturation = parts[1].trim_end_matches('%').parse::<f64>().ok()?;
-    let lightness = parts[2].trim_end_matches('%').parse::<f64>().ok()?;
+    let (hue, hue_unit) = parse_hue(parts[0])?;
+    let saturation = parse_color_channel(parts[1])?;
+    let lightness = parse_color_channel(parts[2])?;
     let alpha = if parts.len() > 3 {
-        parts[3].trim_end_matches('%').parse::<f64>().ok()
+        Some(parse_color_channel(parts[3])?)
     } else {
         None
     };
 
     Some(Color::Hsl {
         hue,
+        hue_unit,
         saturation,
         lightness,
         alpha,

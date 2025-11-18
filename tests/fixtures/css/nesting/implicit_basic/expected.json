@@ -1,0 +1,217 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 145,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 16,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 16,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "parent",
+											"start": 9,
+											"end": 16
+										}
+									],
+									"start": 9,
+									"end": 16
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 17,
+					"end": 136,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 21,
+							"end": 31,
+							"property": "color",
+							"value": "red"
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 36,
+								"end": 42,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 36,
+										"end": 42,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "child",
+														"start": 36,
+														"end": 42
+													}
+												],
+												"start": 36,
+												"end": 42
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 43,
+								"end": 64,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 48,
+										"end": 59,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 36,
+							"end": 64
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 68,
+								"end": 71,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 68,
+										"end": 71,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "IdSelector",
+														"name": "id",
+														"start": 68,
+														"end": 71
+													}
+												],
+												"start": 68,
+												"end": 71
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 72,
+								"end": 94,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 77,
+										"end": 89,
+										"property": "color",
+										"value": "green"
+									}
+								]
+							},
+							"start": 68,
+							"end": 94
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 98,
+								"end": 109,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 98,
+										"end": 109,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "AttributeSelector",
+														"start": 98,
+														"end": 109,
+														"name": "data-attr",
+														"matcher": null,
+														"value": null,
+														"flags": null
+													}
+												],
+												"start": 98,
+												"end": 109
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 110,
+								"end": 133,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 115,
+										"end": 128,
+										"property": "color",
+										"value": "yellow"
+									}
+								]
+							},
+							"start": 98,
+							"end": 133
+						}
+					]
+				},
+				"start": 9,
+				"end": 136
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 137,
+			"styles": "\n\t.parent {\n\t\tcolor: red;\n\n\t\t.child {\n\t\t\tcolor: blue;\n\t\t}\n\n\t\t#id {\n\t\t\tcolor: green;\n\t\t}\n\n\t\t[data-attr] {\n\t\t\tcolor: yellow;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": null,
+	"end": null,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

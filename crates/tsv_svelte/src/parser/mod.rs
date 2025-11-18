@@ -195,11 +195,34 @@ impl<'a> SvelteParser<'a> {
         // Use calculated root_start (from first fragment node), or 0 if no fragments
         let start = root_start.unwrap_or(0) as u32;
 
+        // Extract comments from TypeScript instance/module scripts
+        let mut comments = Vec::new();
+        if let Some(ref script) = instance {
+            for ts_comment in &script.content.comments {
+                comments.push(Comment {
+                    content: ts_comment.content.clone(),
+                    is_block: ts_comment.is_block,
+                    span: ts_comment.span,
+                });
+            }
+        }
+        if let Some(ref script) = module {
+            for ts_comment in &script.content.comments {
+                comments.push(Comment {
+                    content: ts_comment.content.clone(),
+                    is_block: ts_comment.is_block,
+                    span: ts_comment.span,
+                });
+            }
+        }
+        // TODO: Extract from CSS and collect HTML comments
+
         Ok(Root {
             fragment,
             instance,
             module,
             css,
+            comments,
             span: Span { start, end },
             interner: self.interner.clone(),
         })

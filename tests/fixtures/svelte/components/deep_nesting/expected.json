@@ -1,61 +1,61 @@
 {
-  "css": null,
-  "js": [],
-  "start": 0,
-  "end": 54,
-  "type": "Root",
-  "fragment": {
-    "type": "Fragment",
-    "nodes": [
-      {
-        "type": "Component",
-        "start": 0,
-        "end": 54,
-        "name": "Comp1",
-        "attributes": [],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": [
-            {
-              "type": "Component",
-              "start": 7,
-              "end": 46,
-              "name": "Comp2",
-              "attributes": [],
-              "fragment": {
-                "type": "Fragment",
-                "nodes": [
-                  {
-                    "type": "Component",
-                    "start": 14,
-                    "end": 38,
-                    "name": "Comp3",
-                    "attributes": [],
-                    "fragment": {
-                      "type": "Fragment",
-                      "nodes": [
-                        {
-                          "type": "Component",
-                          "start": 21,
-                          "end": 30,
-                          "name": "Comp4",
-                          "attributes": [],
-                          "fragment": {
-                            "type": "Fragment",
-                            "nodes": []
-                          }
-                        }
-                      ]
-                    }
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      }
-    ]
-  },
-  "options": null,
-  "comments": []
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 54,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Component",
+				"start": 0,
+				"end": 54,
+				"name": "Comp1",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Component",
+							"start": 7,
+							"end": 46,
+							"name": "Comp2",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Component",
+										"start": 14,
+										"end": 38,
+										"name": "Comp3",
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Component",
+													"start": 21,
+													"end": 30,
+													"name": "Comp4",
+													"attributes": [],
+													"fragment": {
+														"type": "Fragment",
+														"nodes": []
+													}
+												}
+											]
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
 }

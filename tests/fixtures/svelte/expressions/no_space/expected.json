@@ -1,70 +1,70 @@
 {
-  "css": null,
-  "js": [],
-  "start": 0,
-  "end": 29,
-  "type": "Root",
-  "fragment": {
-    "type": "Fragment",
-    "nodes": [
-      {
-        "type": "RegularElement",
-        "start": 0,
-        "end": 29,
-        "name": "div",
-        "attributes": [],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": [
-            {
-              "type": "ExpressionTag",
-              "start": 5,
-              "end": 14,
-              "expression": {
-                "type": "Literal",
-                "start": 6,
-                "end": 13,
-                "loc": {
-                  "start": {
-                    "line": 1,
-                    "column": 6
-                  },
-                  "end": {
-                    "line": 1,
-                    "column": 13
-                  }
-                },
-                "value": "expr1",
-                "raw": "'expr1'"
-              }
-            },
-            {
-              "type": "ExpressionTag",
-              "start": 14,
-              "end": 23,
-              "expression": {
-                "type": "Literal",
-                "start": 15,
-                "end": 22,
-                "loc": {
-                  "start": {
-                    "line": 1,
-                    "column": 15
-                  },
-                  "end": {
-                    "line": 1,
-                    "column": 22
-                  }
-                },
-                "value": "expr2",
-                "raw": "'expr2'"
-              }
-            }
-          ]
-        }
-      }
-    ]
-  },
-  "options": null,
-  "comments": []
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 29,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 29,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 5,
+							"end": 14,
+							"expression": {
+								"type": "Literal",
+								"start": 6,
+								"end": 13,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 6
+									},
+									"end": {
+										"line": 1,
+										"column": 13
+									}
+								},
+								"value": "expr1",
+								"raw": "'expr1'"
+							}
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 14,
+							"end": 23,
+							"expression": {
+								"type": "Literal",
+								"start": 15,
+								"end": 22,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 15
+									},
+									"end": {
+										"line": 1,
+										"column": 22
+									}
+								},
+								"value": "expr2",
+								"raw": "'expr2'"
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
 }

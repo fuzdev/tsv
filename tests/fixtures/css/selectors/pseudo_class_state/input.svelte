@@ -31,4 +31,16 @@
 	input:optional {
 		border-left: 3px solid gray;
 	}
+
+	input:user-valid {
+		border-color: green;
+	}
+
+	input:user-invalid {
+		border-color: red;
+	}
+
+	input:autofill {
+		background: lightyellow;
+	}
 </style>

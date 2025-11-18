@@ -1,4 +1,10 @@
 // TypeScript parser - main entry point and coordination
+//
+// TODO(parser): Expand TypeScript support to unblock comment tests
+// Currently blocking comment tests:
+// - around_braces, mixed_positions: Need object literal support `{ prop: value }`
+// - More generally: Need full expression parsing (arrays, objects, etc.)
+// See TODO_COMMENTS.md "Issue 3" for impact on comment tests.
 
 use crate::ast::internal::*;
 use crate::lexer::{Lexer, TokenKind};
@@ -29,6 +35,7 @@ pub struct Parser<'a> {
     peek_cache: Option<PeekData<TokenKind>>,
     interner: Rc<RefCell<DefaultStringInterner>>,
     base_offset: usize, // Offset in full source (for embedded expressions)
+    comments: Vec<Comment>, // Collected comments during parsing
 }
 
 impl<'a> Parser<'a> {
@@ -51,10 +58,29 @@ impl<'a> Parser<'a> {
     ) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
         // Extract token data immediately to avoid keeping token alive
-        let (kind, start, end, decoded) = {
+        let (mut kind, mut start, mut end, mut decoded) = {
             let token = lexer.next_token()?;
             (token.kind, token.start, token.end, token.decoded)
         };
+
+        // Collect leading comment tokens
+        let mut comments = Vec::new();
+        while let TokenKind::Comment { content, is_block } = &kind {
+            comments.push(Comment {
+                content: content.clone(),
+                is_block: *is_block,
+                span: Span::new(
+                    (start + base_offset) as u32,
+                    (end + base_offset) as u32,
+                ),
+            });
+            let token = lexer.next_token()?;
+            kind = token.kind;
+            start = token.start;
+            end = token.end;
+            decoded = token.decoded;
+        }
+
         Ok(Self {
             source,
             lexer,
@@ -65,10 +91,12 @@ impl<'a> Parser<'a> {
             peek_cache: None,
             interner,
             base_offset,
+            comments,
         })
     }
 
     pub(super) fn advance(&mut self) -> Result<(), ParseError> {
+        // Get next token (from peek cache or lexer)
         if let Some(peek) = self.peek_cache.take() {
             self.current_kind = peek.kind;
             self.current_start = peek.start;
@@ -81,6 +109,24 @@ impl<'a> Parser<'a> {
             self.current_end = token.end;
             self.current_decoded = token.decoded;
         }
+
+        // Collect comment tokens into comments Vec
+        while let TokenKind::Comment { content, is_block } = &self.current_kind {
+            self.comments.push(Comment {
+                content: content.clone(),
+                is_block: *is_block,
+                span: Span::new(
+                    (self.current_start + self.base_offset) as u32,
+                    (self.current_end + self.base_offset) as u32,
+                ),
+            });
+            let token = self.lexer.next_token()?;
+            self.current_kind = token.kind;
+            self.current_start = token.start;
+            self.current_end = token.end;
+            self.current_decoded = token.decoded;
+        }
+
         Ok(())
     }
 
@@ -91,7 +137,7 @@ impl<'a> Parser<'a> {
     // Helper methods for extract-then-advance pattern
 
     pub(super) fn current_kind(&self) -> TokenKind {
-        self.current_kind
+        self.current_kind.clone()
     }
 
     pub(super) fn current_pos(&self) -> (usize, usize) {
@@ -119,8 +165,8 @@ impl<'a> Parser<'a> {
         self.current_decoded.as_deref()
     }
 
-    pub(super) fn check(&self, kind: TokenKind) -> bool {
-        self.current_kind == kind
+    pub(super) fn check(&self, kind: &TokenKind) -> bool {
+        &self.current_kind == kind
     }
 
     // Peek helpers for lookahead (needed for type annotations, operators, etc.)
@@ -138,16 +184,16 @@ impl<'a> Parser<'a> {
         }
         self.peek_cache
             .as_ref()
-            .map(|p| p.kind)
+            .map(|p| p.kind.clone())
             .unwrap_or(TokenKind::Eof)
     }
 
     #[expect(dead_code, reason = "Convenience wrapper for peek_kind() == kind")]
-    pub(super) fn peek_check(&mut self, kind: TokenKind) -> bool {
-        self.peek_kind() == kind
+    pub(super) fn peek_check(&mut self, kind: &TokenKind) -> bool {
+        &self.peek_kind() == kind
     }
 
-    pub(super) fn expect(&mut self, kind: TokenKind) -> Result<(), ParseError> {
+    pub(super) fn expect(&mut self, kind: &TokenKind) -> Result<(), ParseError> {
         if self.check(kind) {
             self.advance()
         } else {
@@ -175,6 +221,40 @@ impl<'a> Parser<'a> {
     // - Optional semicolons in some contexts
     // - Optional type annotations: eat(Colon) to check presence
 
+    // TODO: Add expect_list_separator() helper method
+    // Consolidates comma/terminator handling across:
+    // - Object properties (see expression.rs parse_object_expression)
+    // - Array elements (future)
+    // - Function parameters (future)
+    // - Type parameters (future)
+    // Returns Ok(true) if more elements expected, Ok(false) if terminated
+    // Handles trailing separators uniformly
+    // Example implementation:
+    // ```rust
+    // pub(super) fn expect_list_separator(
+    //     &mut self,
+    //     separator: &TokenKind,     // TokenKind::Comma
+    //     terminator: &TokenKind,    // TokenKind::BraceClose, etc.
+    // ) -> Result<bool, ParseError> {
+    //     if self.check(separator) {
+    //         self.advance()?;
+    //         if self.check(terminator) {
+    //             Ok(false) // Trailing separator, end of list
+    //         } else {
+    //             Ok(true) // More elements expected
+    //         }
+    //     } else if self.check(terminator) {
+    //         Ok(false) // End of list
+    //     } else {
+    //         Err(ParseError::InvalidSyntax {
+    //             message: format!("Expected {} or {}", separator, terminator),
+    //             position: self.current_pos().0,
+    //             context: None,
+    //         })
+    //     }
+    // }
+    // ```
+
     pub fn parse(&mut self) -> Result<Program, ParseError> {
         let start = self.base_offset; // Start at base_offset for embedded contexts
         let mut body = Vec::new();
@@ -188,6 +268,7 @@ impl<'a> Parser<'a> {
 
         Ok(Program {
             body,
+            comments: std::mem::take(&mut self.comments),
             span: Span::new(start as u32, end as u32),
             interner: Rc::clone(&self.interner),
         })

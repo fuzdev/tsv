@@ -1,71 +1,71 @@
 {
-  "css": null,
-  "js": [],
-  "start": 0,
-  "end": 58,
-  "type": "Root",
-  "fragment": {
-    "type": "Fragment",
-    "nodes": [
-      {
-        "type": "RegularElement",
-        "start": 0,
-        "end": 58,
-        "name": "div",
-        "attributes": [],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": [
-            {
-              "type": "RegularElement",
-              "start": 5,
-              "end": 25,
-              "name": "span",
-              "attributes": [],
-              "fragment": {
-                "type": "Fragment",
-                "nodes": [
-                  {
-                    "type": "Text",
-                    "start": 11,
-                    "end": 18,
-                    "raw": "inline1",
-                    "data": "inline1"
-                  }
-                ]
-              }
-            },
-            {
-              "type": "Text",
-              "start": 25,
-              "end": 32,
-              "raw": " text1 ",
-              "data": " text1 "
-            },
-            {
-              "type": "RegularElement",
-              "start": 32,
-              "end": 52,
-              "name": "span",
-              "attributes": [],
-              "fragment": {
-                "type": "Fragment",
-                "nodes": [
-                  {
-                    "type": "Text",
-                    "start": 38,
-                    "end": 45,
-                    "raw": "inline2",
-                    "data": "inline2"
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      }
-    ]
-  },
-  "options": null,
-  "comments": []
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 58,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 58,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 5,
+							"end": 25,
+							"name": "span",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 11,
+										"end": 18,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 25,
+							"end": 32,
+							"raw": " text1 ",
+							"data": " text1 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 32,
+							"end": 52,
+							"name": "span",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 38,
+										"end": 45,
+										"raw": "inline2",
+										"data": "inline2"
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
 }

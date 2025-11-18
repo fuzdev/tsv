@@ -1,0 +1,40 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 24,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 0,
+				"end": 5,
+				"raw": "text\n",
+				"data": "text\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 5,
+				"end": 24,
+				"name": "span",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 11,
+							"end": 17,
+							"raw": "inline",
+							"data": "inline"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

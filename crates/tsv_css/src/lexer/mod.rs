@@ -122,6 +122,14 @@ impl<'a> Lexer<'a> {
             '.' if self.peek_char(1).is_some_and(|ch| ch.is_ascii_digit()) => {
                 read_number(self.source, &mut self.pos)
             }
+            // Negative numbers: -10px, -100%, -.5em (lookahead to distinguish from identifier)
+            '-' if matches!(self.peek_char(1), Some(c) if c.is_ascii_digit() || c == '.') => {
+                read_number(self.source, &mut self.pos)
+            }
+            // Positive numbers with explicit + sign: +10px, +100%
+            '+' if matches!(self.peek_char(1), Some(c) if c.is_ascii_digit() || c == '.') => {
+                read_number(self.source, &mut self.pos)
+            }
 
             // Braces and delimiters
             '{' => single_char_token!(TokenKind::LeftBrace),
@@ -138,6 +146,7 @@ impl<'a> Lexer<'a> {
             '.' => single_char_token!(TokenKind::Dot),
             '#' => single_char_token!(TokenKind::Hash),
             '>' => single_char_token!(TokenKind::GreaterThan),
+            '<' => single_char_token!(TokenKind::LessThan),
             '+' => single_char_token!(TokenKind::Plus),
             '~' => single_char_token!(TokenKind::Tilde),
             '*' => single_char_token!(TokenKind::Asterisk),
@@ -145,6 +154,25 @@ impl<'a> Lexer<'a> {
             '@' => single_char_token!(TokenKind::AtSign),
             '/' => single_char_token!(TokenKind::Slash),
             '=' => single_char_token!(TokenKind::Equals),
+            '%' => single_char_token!(TokenKind::Percent),
+            '^' => single_char_token!(TokenKind::Caret),
+            '$' => single_char_token!(TokenKind::Dollar),
+            '|' => {
+                // Check for || (column combinator)
+                if self.peek_char(1) == Some('|') {
+                    let start = self.pos;
+                    self.pos += 1; // skip first |
+                    self.pos += 1; // skip second |
+                    Ok(Token {
+                        kind: TokenKind::ColumnCombinator,
+                        start,
+                        end: self.pos,
+                        decoded: None,
+                    })
+                } else {
+                    single_char_token!(TokenKind::Pipe)
+                }
+            }
 
             // Identifiers (including those with unicode escapes)
             _ if ch.is_alphabetic() || ch == '-' || ch == '_' || ch == '\\' => {

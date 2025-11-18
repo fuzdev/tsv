@@ -12,20 +12,20 @@
 //!
 //! # Svelte Compatibility
 //!
-//! **⚠️ IMPORTANT**: Quirks are ONLY applied to the AST's `source_value` field for
-//! JSON/Svelte compatibility. The **printer normalizes these quirks away** to
-//! produce clean, standards-compliant CSS output.
+//! **⚠️ IMPORTANT**: Quirks are ONLY applied during JSON conversion (extracted from
+//! source via span) for Svelte compatibility. The **printer normalizes these quirks away**
+//! to produce clean, standards-compliant CSS output.
 //!
 //! See SVELTE_COMPATIBILITY.md for full details. Summary:
 //! 1. **Backslash doubling**: All `\` become `\\` in CSS values (AST only)
 //! 2. **Unicode first-digit duplication**: `\0001F4A9` becomes `\00001F4A9` (AST only)
 //!
-//! Both quirks are applied together in [`apply_svelte_quirks()`] (parser uses this).
-//! The printer uses `normalize_css_string()` to reverse them.
+//! Both quirks are applied together in [`apply_svelte_quirks()`] (conversion layer uses this).
+//! The printer outputs clean CSS without quirks.
 
 /// Apply Svelte compatibility quirks to CSS value string.
 ///
-/// **Used by**: Parser only (to populate `CssDeclaration.source_value`)
+/// **Used by**: AST conversion layer (JSON output) - extracts source via span, applies quirks
 /// **Not used by**: Printer (which normalizes these quirks away)
 ///
 /// This function applies two transformations:

@@ -3,8 +3,8 @@ pub mod commands;
 use commands::{
     ast_diff::AstDiffCommand, canonical_parse::CanonicalParseCommand, compare::CompareCommand,
     fixtures_update::FixturesUpdateCommand,
-    fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
+    fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
 };
 use tsv_cli::cli::commands::CommandRegistry;

@@ -193,6 +193,47 @@ pub fn convert_expression(
                     .map(|ta| convert_type_annotation(ta, loc, offset)),
             })
         }
+        internal::Expression::ObjectExpression(obj) => {
+            public::Expression::ObjectExpression(public::ObjectExpression {
+                node_type: "ObjectExpression".to_string(),
+                start: obj.span.start,
+                end: obj.span.end,
+                loc: create_location(obj.span, loc, offset),
+                properties: obj
+                    .properties
+                    .iter()
+                    .map(|p| convert_property(p, source, loc, interner, offset))
+                    .collect(),
+            })
+        }
+    }
+}
+
+// TODO: Support property decorators in conversion
+// Convert decorator AST nodes from internal to public format
+// Needed when internal::Property gains decorators field
+fn convert_property(
+    prop: &internal::Property,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::Property {
+    // TODO: Handle PropertyKind enum when refactored
+    // Currently: Direct field access (method, shorthand, computed)
+    // After refactor: Match on PropertyKind to extract fields
+    // Also needed: Support for Get/Set property kinds (change kind: String field)
+    public::Property {
+        node_type: "Property".to_string(),
+        start: prop.span.start,
+        end: prop.span.end,
+        loc: create_location(prop.span, loc, offset),
+        method: prop.method,
+        shorthand: prop.shorthand,
+        computed: prop.computed,
+        key: Box::new(convert_expression(&prop.key, source, loc, interner, offset)),
+        value: Box::new(convert_expression(&prop.value, source, loc, interner, offset)),
+        kind: "init".to_string(),
     }
 }
 

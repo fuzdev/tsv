@@ -68,7 +68,7 @@ pub fn parse(source: &str) -> Result<ast::internal::Program> {
 /// assert_eq!(formatted, "const x = 42;\n");
 /// ```
 pub fn format(program: &ast::internal::Program, source: &str) -> String {
-    let mut printer = printer::Printer::new(program.interner.clone(), source);
+    let mut printer = printer::Printer::new(program.interner.clone(), source, &program.comments);
     printer.print_program(program);
     printer.into_string()
 }

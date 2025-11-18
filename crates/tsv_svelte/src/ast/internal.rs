@@ -10,6 +10,14 @@ use tsv_css::ast::internal::CssStyleSheet;
 use tsv_lang::Span;
 use tsv_ts::ast::internal::{Expression, Program};
 
+/// Comment node - can be HTML comment or JS/TS comment
+#[derive(Debug, Clone)]
+pub struct Comment {
+    pub content: String,
+    pub is_block: bool, // true for /* */ or <!-- -->, false for //
+    pub span: Span,
+}
+
 /// Svelte Root - top-level AST node
 ///
 /// Represents a complete Svelte component with template, scripts, and styles.
@@ -20,6 +28,7 @@ pub struct Root {
     pub instance: Option<Box<Script>>,
     pub module: Option<Box<Script>>,
     pub css: Option<Box<Style>>,
+    pub comments: Vec<Comment>,
     pub span: Span,
     pub interner: Rc<RefCell<DefaultStringInterner>>,
 }

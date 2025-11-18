@@ -1,41 +1,41 @@
 {
-  "css": null,
-  "js": [],
-  "start": 0,
-  "end": 24,
-  "type": "Root",
-  "fragment": {
-    "type": "Fragment",
-    "nodes": [
-      {
-        "type": "RegularElement",
-        "start": 0,
-        "end": 24,
-        "name": "br",
-        "attributes": [
-          {
-            "type": "Attribute",
-            "start": 4,
-            "end": 21,
-            "name": "data-attr",
-            "value": [
-              {
-                "start": 15,
-                "end": 20,
-                "type": "Text",
-                "raw": "value",
-                "data": "value"
-              }
-            ]
-          }
-        ],
-        "fragment": {
-          "type": "Fragment",
-          "nodes": []
-        }
-      }
-    ]
-  },
-  "options": null,
-  "comments": []
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 24,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 24,
+				"name": "br",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 4,
+						"end": 21,
+						"name": "data-attr",
+						"value": [
+							{
+								"start": 15,
+								"end": 20,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
 }

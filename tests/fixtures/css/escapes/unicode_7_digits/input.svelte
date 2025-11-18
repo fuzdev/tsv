@@ -1,13 +1,13 @@
 <style>
-	.test1 {
+	.class1 {
 		content: '\00001F4A9';
 	}
 
-	.test2 {
+	.class2 {
 		content: '\0000419';
 	}
 
-	.test3 {
+	.class3 {
 		content: '\000000ABC';
 	}
 </style>

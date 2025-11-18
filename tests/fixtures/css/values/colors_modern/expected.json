@@ -1,0 +1,164 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 905,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 896,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 55,
+							"end": 76,
+							"property": "color",
+							"value": "lab(50% 40 60)"
+						},
+						{
+							"type": "Declaration",
+							"start": 80,
+							"end": 107,
+							"property": "background",
+							"value": "lch(60% 50 180)"
+						},
+						{
+							"type": "Declaration",
+							"start": 151,
+							"end": 186,
+							"property": "border-color",
+							"value": "oklab(60% 0.15 -0.12)"
+						},
+						{
+							"type": "Declaration",
+							"start": 190,
+							"end": 224,
+							"property": "outline-color",
+							"value": "oklch(60% 0.15 180)"
+						},
+						{
+							"type": "Declaration",
+							"start": 267,
+							"end": 302,
+							"property": "fill",
+							"value": "color(display-p3 0.5 0.7 0.3)"
+						},
+						{
+							"type": "Declaration",
+							"start": 306,
+							"end": 337,
+							"property": "stroke",
+							"value": "color(srgb 0.8 0.2 0.1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 384,
+							"end": 437,
+							"property": "box-shadow",
+							"value": "0 0 10px color-mix(in lch, red 30%, blue)"
+						},
+						{
+							"type": "Declaration",
+							"start": 441,
+							"end": 512,
+							"property": "text-shadow",
+							"value": "1px 1px color-mix(in oklch, currentColor 50%, transparent)"
+						},
+						{
+							"type": "Declaration",
+							"start": 554,
+							"end": 599,
+							"property": "--adjusted",
+							"value": "oklch(from red calc(l * 1.2) c h)"
+						},
+						{
+							"type": "Declaration",
+							"start": 603,
+							"end": 645,
+							"property": "--lighter",
+							"value": "lab(from blue calc(l + 10) a b)"
+						},
+						{
+							"type": "Declaration",
+							"start": 693,
+							"end": 724,
+							"property": "color",
+							"value": "light-dark(black, white)"
+						},
+						{
+							"type": "Declaration",
+							"start": 728,
+							"end": 762,
+							"property": "background",
+							"value": "light-dark(#fff, #000)"
+						},
+						{
+							"type": "Declaration",
+							"start": 814,
+							"end": 848,
+							"property": "border-color",
+							"value": "contrast-color(blue)"
+						},
+						{
+							"type": "Declaration",
+							"start": 852,
+							"end": 892,
+							"property": "outline-color",
+							"value": "contrast-color(var(--bg))"
+						}
+					]
+				},
+				"start": 9,
+				"end": 896
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 897,
+			"styles": "\n\tdiv {\n\t\t/* Lab color space (CSS Color 4) */\n\t\tcolor: lab(50% 40 60);\n\t\tbackground: lch(60% 50 180);\n\t\t/* OKLab color space (CSS Color 4) */\n\t\tborder-color: oklab(60% 0.15 -0.12);\n\t\toutline-color: oklch(60% 0.15 180);\n\t\t/* color() function (CSS Color 4) */\n\t\tfill: color(display-p3 0.5 0.7 0.3);\n\t\tstroke: color(srgb 0.8 0.2 0.1);\n\t\t/* color-mix() function (CSS Color 5) */\n\t\tbox-shadow: 0 0 10px color-mix(in lch, red 30%, blue);\n\t\ttext-shadow: 1px 1px color-mix(in oklch, currentColor 50%, transparent);\n\t\t/* Relative colors (CSS Color 5) */\n\t\t--adjusted: oklch(from red calc(l * 1.2) c h);\n\t\t--lighter: lab(from blue calc(l + 10) a b);\n\t\t/* light-dark() function (CSS Color 5) */\n\t\tcolor: light-dark(black, white);\n\t\tbackground: light-dark(#fff, #000);\n\t\t/* contrast-color() function (CSS Color 6) */\n\t\tborder-color: contrast-color(blue);\n\t\toutline-color: contrast-color(var(--bg));\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": null,
+	"end": null,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

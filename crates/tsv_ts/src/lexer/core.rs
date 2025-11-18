@@ -1,5 +1,6 @@
 // Core lexer implementation
 
+use super::comments;
 use super::escapes;
 use super::token::{Token, TokenKind, keyword_kind};
 use std::str::Chars;
@@ -180,6 +181,71 @@ impl<'a> Lexer<'a> {
                     position: start,
                     context: None,
                 })
+            }
+            Some(',') => {
+                self.advance();
+                Ok(Token {
+                    kind: TokenKind::Comma,
+                    start,
+                    end: self.position,
+                    raw: &self.source[start..self.position],
+                    decoded: None,
+                })
+            }
+            Some('{') => {
+                self.advance();
+                Ok(Token {
+                    kind: TokenKind::BraceOpen,
+                    start,
+                    end: self.position,
+                    raw: &self.source[start..self.position],
+                    decoded: None,
+                })
+            }
+            Some('}') => {
+                self.advance();
+                Ok(Token {
+                    kind: TokenKind::BraceClose,
+                    start,
+                    end: self.position,
+                    raw: &self.source[start..self.position],
+                    decoded: None,
+                })
+            }
+            Some('/') => {
+                // Could be: // line comment, /* block comment */, or / division operator
+                // Peek ahead to determine which
+                let peek = self.source[self.position + 1..].chars().next();
+                match peek {
+                    Some('/') => {
+                        // Line comment
+                        let mut pos = self.position;
+                        let token = comments::read_line_comment(self.source, &mut pos)?;
+                        // Update lexer state
+                        self.position = pos;
+                        self.chars = self.source[pos..].chars();
+                        self.current = self.chars.next();
+                        Ok(token)
+                    }
+                    Some('*') => {
+                        // Block comment
+                        let mut pos = self.position;
+                        let token = comments::read_block_comment(self.source, &mut pos)?;
+                        // Update lexer state
+                        self.position = pos;
+                        self.chars = self.source[pos..].chars();
+                        self.current = self.chars.next();
+                        Ok(token)
+                    }
+                    _ => {
+                        // TODO: Division operator / or /= (not yet implemented)
+                        Err(ParseError::InvalidSyntax {
+                            message: "Division operator not yet implemented".to_string(),
+                            position: start,
+                            context: None,
+                        })
+                    }
+                }
             }
             Some(ch) => Err(ParseError::InvalidSyntax {
                 message: format!("Unexpected character: '{}'", ch),

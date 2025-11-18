@@ -1,0 +1,1 @@
+<Comp />   <span>inline</span>

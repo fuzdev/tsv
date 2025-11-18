@@ -1,21 +1,23 @@
 <style>
-	.class1/* comment */  {
-		color: red;
+	.class1 /* comment */  {
+		color:   red  ;
 	}
 
-	.class2 {  /* comment */
-		color: blue;
+	.class2   {
+		/* comment */ 
+		color:blue;
 	}
 
-	.class3   {
-		color: green;
-  /* comment */  }
-
-	  .class4 {
-		color: yellow;
-	}  /* comment */
-
-	.class5  {
-		  color: purple  ;  /* comment */ 
+	.class3 {
+		color: green  ;
+/* comment */ 
 	}
-  </style>  
+
+.class4 {
+	color:yellow;
+}  /* comment */ 
+
+	.class5 {
+color:  purple  ; /* comment */
+	}
+</style>
