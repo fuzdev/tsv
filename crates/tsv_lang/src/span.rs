@@ -19,4 +19,16 @@ impl Span {
             end: end.end,
         }
     }
+
+    /// Extract the source text for this span
+    #[inline]
+    pub fn extract<'a>(&self, source: &'a str) -> &'a str {
+        &source[self.start as usize..self.end as usize]
+    }
+
+    /// Convert to std::ops::Range<usize> for indexing
+    #[inline]
+    pub fn range(&self) -> std::ops::Range<usize> {
+        self.start as usize..self.end as usize
+    }
 }

@@ -46,7 +46,7 @@ pub use tsv_lang::{ParseError, Result};
 /// let ast = tsv_ts::parse("const x = 42;")?;
 /// ```
 pub fn parse(source: &str) -> Result<ast::internal::Program> {
-    parser::parse_typescript(source)
+    parser::parse_typescript(source).map_err(|e| e.with_context(source))
 }
 
 /// Format a TypeScript AST back to source code
@@ -117,7 +117,7 @@ pub fn parse_with_interner(
     interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
 ) -> Result<ast::internal::Program> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
-    parser.parse()
+    parser.parse().map_err(|e| e.with_context(source))
 }
 
 /// Parse a single TypeScript expression
@@ -140,7 +140,7 @@ pub fn parse_expression(
     interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
 ) -> Result<ast::internal::Expression> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
-    parser.parse_expression_public()
+    parser.parse_expression_public().map_err(|e| e.with_context(source))
 }
 
 // Re-export key types for convenience

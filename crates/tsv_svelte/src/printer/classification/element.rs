@@ -10,6 +10,7 @@
 use crate::ast::internal;
 use crate::printer::Printer;
 use tsv_html as html;
+use tsv_lang::SymbolResolver;
 
 impl<'a> Printer<'a> {
     /// Check if element is inline (phrasing content)

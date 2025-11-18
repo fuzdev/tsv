@@ -249,6 +249,9 @@ dependencies = [
 [[package]]
 name = "tsv_lang"
 version = "0.1.0"
+dependencies = [
+ "string-interner",
+]
 
 [[package]]
 name = "tsv_svelte"

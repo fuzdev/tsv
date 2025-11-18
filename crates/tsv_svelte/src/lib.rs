@@ -11,7 +11,7 @@ pub use tsv_lang::{ParseError, Result};
 
 /// Parse Svelte source code into an internal AST
 pub fn parse(source: &str) -> Result<ast::Root> {
-    parser::parse_svelte(source)
+    parser::parse_svelte(source).map_err(|e| e.with_context(source))
 }
 
 /// Format a Svelte AST back to source code

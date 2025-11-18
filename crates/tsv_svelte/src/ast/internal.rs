@@ -7,16 +7,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
 use tsv_css::ast::internal::CssStyleSheet;
-use tsv_lang::Span;
+pub use tsv_lang::{Comment, Span};
 use tsv_ts::ast::internal::{Expression, Program};
-
-/// Comment node - can be HTML comment or JS/TS comment
-#[derive(Debug, Clone)]
-pub struct Comment {
-    pub content: String,
-    pub is_block: bool, // true for /* */ or <!-- -->, false for //
-    pub span: Span,
-}
 
 /// Svelte Root - top-level AST node
 ///

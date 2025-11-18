@@ -192,7 +192,7 @@ fn convert_css_rule(rule: &internal::CssRule, source: &str) -> serde_json::Value
                     // SVELTE QUIRK: Extract property and value from source to preserve raw escapes
                     // Svelte does NOT decode escape sequences in property names (only in selectors)
                     // Example: `\00e9motion` stays as `\00e9motion`, not `émotion`
-                    let decl_source = &source[decl.span.start as usize..decl.span.end as usize];
+                    let decl_source = decl.span.extract(source);
 
                     // Find the colon separator between property and value
                     let (property_source, value_source) =
@@ -296,7 +296,7 @@ fn convert_prelude_to_string(prelude: &internal::PreludeValue, source: &str) -> 
         internal::PreludeValue::Selectors { root: _, limit: _, span } => {
             // Format selector lists for @scope: (root) [to (limit)]
             // Extract from source for maximum fidelity
-            source[span.start as usize..span.end as usize].to_string()
+            span.extract(source).to_string()
         }
     }
 }
@@ -306,7 +306,7 @@ fn value_to_string(value: &internal::CssValue, source: &str) -> String {
     match value {
         internal::CssValue::String { span, .. } => {
             // Extract from source to preserve quotes
-            source[span.start as usize..span.end as usize].to_string()
+            span.extract(source).to_string()
         }
         internal::CssValue::Identifier { name, .. } => name.clone(),
         internal::CssValue::Function { name, args, span } => {
@@ -314,7 +314,7 @@ fn value_to_string(value: &internal::CssValue, source: &str) -> String {
             // For functions without args (like supports with complex conditions), extract from source
             if args.is_empty() {
                 // Extract from source (includes the function name and parentheses)
-                source[span.start as usize..span.end as usize].to_string()
+                span.extract(source).to_string()
             } else {
                 // Reconstruct function call from args
                 let args_str = args

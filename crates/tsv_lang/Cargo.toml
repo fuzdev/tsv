@@ -5,4 +5,4 @@ edition.workspace = true
 description = "Language-agnostic foundation primitives for TSV"
 
 [dependencies]
-# No external dependencies - pure foundation crate
+string-interner.workspace = true

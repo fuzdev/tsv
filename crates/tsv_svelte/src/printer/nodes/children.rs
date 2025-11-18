@@ -6,6 +6,7 @@
 use super::super::text::TextAnalysis;
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
+use tsv_lang::printing;
 
 impl<'a> Printer<'a> {
     /// Format children in multiline mode with inline run grouping
@@ -86,7 +87,7 @@ impl<'a> Printer<'a> {
                         // It's a block element - check if on same line AND preceded by space
                         let run_span = self.get_content_span(&nodes[run_end]);
                         let next_span = self.get_content_span(next_node);
-                        if self.are_on_same_line(run_span, next_span) {
+                        if printing::spans_on_same_line(self.source, run_span, next_span) {
                             // Check if last content in run ends with space
                             if let FragmentNode::Text(text) = &nodes[run_end] {
                                 let trimmed = text.raw.trim_end();
@@ -116,8 +117,7 @@ impl<'a> Printer<'a> {
                         }
                         // Expression tags with newlines in source (check span)
                         FragmentNode::ExpressionTag(expr) => {
-                            let source_slice =
-                                &self.source[expr.span.start as usize..expr.span.end as usize];
+                            let source_slice = expr.span.extract(self.source);
                             source_slice.contains('\n')
                         }
                         _ => false,

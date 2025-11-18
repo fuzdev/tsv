@@ -98,8 +98,7 @@ impl<'a> Parser<'a> {
         };
 
         // Check for initializer
-        let init = if self.check(&TokenKind::Equals) {
-            self.advance()?;
+        let init = if self.eat(TokenKind::Equals) {
             Some(self.parse_expression()?)
         } else {
             None

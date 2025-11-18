@@ -8,7 +8,7 @@
 
 use super::{Printer, source_fidelity};
 use crate::ast::internal::{self, CssValue};
-use tsv_lang::Span;
+use tsv_lang::{printing, Span};
 
 impl<'a> Printer<'a> {
     /// Format a CSS rule (selector + declarations block)
@@ -49,7 +49,7 @@ impl<'a> Printer<'a> {
 
                     while let Some(internal::CssBlockChild::Comment(next_comment)) =
                         rule.declarations.get(i + 1 + inline_comments)
-                        && self.is_same_line(last_end, next_comment.span.start)
+                        && printing::is_same_line(self.source, last_end, next_comment.span.start)
                     {
                         if inline_comments == 0 {
                             // First inline comment - remove the trailing newline from declaration
@@ -73,8 +73,7 @@ impl<'a> Printer<'a> {
                     let mut added_blank_line = false;
                     if i > start_index
                         && let Some(prev_child) = rule.declarations.get(i - 1)
-                        && self
-                            .has_blank_line_between_spans(prev_child.span().end, comment.span.start)
+                        && printing::has_blank_line_between(self.source, prev_child.span().end, comment.span.start)
                     {
                         self.write("\n");
                         added_blank_line = true;
@@ -119,7 +118,7 @@ impl<'a> Printer<'a> {
                         rule.declarations.get(i + 1)
                     {
                         // Check if comment is on same line as nested rule's closing brace
-                        if self.is_same_line(nested_rule.span.end, next_comment.span.start) {
+                        if printing::is_same_line(self.source, nested_rule.span.end, next_comment.span.start) {
                             self.write(" /*");
                             self.write(&next_comment.content);
                             self.write("*/");
@@ -198,7 +197,7 @@ impl<'a> Printer<'a> {
         }
 
         // Check source: is there a newline between `:` and the first value?
-        let decl_source = &self.source[decl.span.start as usize..decl.span.end as usize];
+        let decl_source = decl.span.extract(self.source);
         if let Some(colon_pos) = decl_source.find(':') {
             let after_colon = &decl_source[colon_pos + 1..];
             for ch in after_colon.chars() {
@@ -223,7 +222,7 @@ impl<'a> Printer<'a> {
 
         // Extract property name from source to preserve escape sequences
         // See: docs/SVELTE_COMPATIBILITY.md (CSS Quirks section)
-        let decl_source = &self.source[decl.span.start as usize..decl.span.end as usize];
+        let decl_source = decl.span.extract(self.source);
         let property_normalized = source_fidelity::extract_property_name(decl_source);
 
         // Write property name (normalized with spaces around comments)
@@ -331,7 +330,7 @@ impl<'a> Printer<'a> {
 
         // Try source extraction (spans are now accurate from ValueParser!)
         if span.end as usize <= self.source.len() {
-            let raw = &self.source[span.start as usize..span.end as usize];
+            let raw = span.extract(self.source);
 
             if !raw.is_empty() {
                 // Normalize formatting whitespace while preserving source fidelity
@@ -448,7 +447,7 @@ impl<'a> Printer<'a> {
             CssValue::Function { name, args, span } => {
                 // For functions with no parsed args (like supports()), extract from source
                 if args.is_empty() && span.end as usize <= self.source.len() {
-                    let raw = &self.source[span.start as usize..span.end as usize];
+                    let raw = span.extract(self.source);
                     self.write(raw);
                 } else {
                     // Reconstruct function from name and args
@@ -494,7 +493,7 @@ impl<'a> Printer<'a> {
     /// trailing zeros (1.50px → 1.5px) and adding leading zeros (.5px → 0.5px).
     /// Matches prettier's exact behavior.
     fn print_dimension(&mut self, span: Span) {
-        let raw = &self.source[span.start as usize..span.end as usize];
+        let raw = span.extract(self.source);
         let normalized = source_fidelity::normalize_dimension_from_source(raw);
         self.write(&normalized);
     }
@@ -511,7 +510,7 @@ impl<'a> Printer<'a> {
                 span,
             } => {
                 // Extract raw source to preserve escape sequences
-                let raw = &self.source[span.start as usize..span.end as usize];
+                let raw = span.extract(self.source);
 
                 // Use raw source if it looks valid (starts and ends with quotes)
                 if raw.starts_with(*quote) && raw.ends_with(*quote) {

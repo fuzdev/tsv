@@ -37,14 +37,7 @@ mod value;
 use crate::ast::internal::{CssComment, CssNode, CssStyleSheet};
 use crate::lexer::{Lexer, TokenKind};
 use std::collections::HashMap;
-use tsv_lang::{ParseError, Span};
-
-#[derive(Debug)]
-struct PeekData<K> {
-    kind: K,
-    start: usize,
-    end: usize,
-}
+use tsv_lang::{ParseError, PeekData, Span};
 
 pub(crate) struct CssParser<'a> {
     source: &'a str,
@@ -99,11 +92,7 @@ impl<'a> CssParser<'a> {
     pub(crate) fn peek(&mut self) -> Result<&TokenKind, ParseError> {
         if self.peek_cache.is_none() {
             let token = self.lexer.next_token()?;
-            self.peek_cache = Some(PeekData {
-                kind: token.kind,
-                start: token.start,
-                end: token.end,
-            });
+            self.peek_cache = Some(PeekData::new(token.kind, token.start, token.end));
         }
         Ok(&self.peek_cache.as_ref().unwrap().kind)
     }

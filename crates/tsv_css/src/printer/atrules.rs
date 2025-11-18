@@ -6,6 +6,7 @@
 
 use super::Printer;
 use crate::ast::internal;
+use tsv_lang::printing;
 
 impl<'a> Printer<'a> {
     /// Format a CSS at-rule (@media, @keyframes, @supports, etc.)
@@ -165,7 +166,7 @@ impl<'a> Printer<'a> {
                 if let Some(internal::CssBlockChild::Comment(comment)) = rule.declarations.first() {
                     // Check if comment is on same line as selector AND before the opening brace
                     // If there's a '{' between selector and comment, the comment is inside the block, not after selector
-                    if self.is_same_line(rule.selector.span.end, comment.span.start)
+                    if printing::is_same_line(self.source, rule.selector.span.end, comment.span.start)
                         && !self.has_opening_brace_between(rule.selector.span.end, comment.span.start)
                     {
                         // Print comment inline after selector
@@ -190,7 +191,7 @@ impl<'a> Printer<'a> {
                             // Check if next child is an inline comment
                             if let Some(internal::CssBlockChild::Comment(next_comment)) =
                                 rule.declarations.get(i + 1)
-                                && self.is_same_line(decl.span.end, next_comment.span.start)
+                                && printing::is_same_line(self.source, decl.span.end, next_comment.span.start)
                             {
                                 // Print comment inline
                                 self.buffer_remove_trailing_newline();
@@ -205,7 +206,8 @@ impl<'a> Printer<'a> {
                             // Check if there's a blank line before this comment in source
                             if i > start_index
                                 && let Some(prev_child) = rule.declarations.get(i - 1)
-                                && self.has_blank_line_between_spans(
+                                && printing::has_blank_line_between(
+                                    self.source,
                                     prev_child.span().end,
                                     comment.span.start,
                                 )
@@ -235,7 +237,7 @@ impl<'a> Printer<'a> {
                             let mut has_inline_comment = false;
                             if let Some(internal::CssBlockChild::Comment(next_comment)) =
                                 rule.declarations.get(i + 1)
-                                && self.is_same_line(nested_rule.span.end, next_comment.span.start)
+                                && printing::is_same_line(self.source, nested_rule.span.end, next_comment.span.start)
                             {
                                 self.write(" /*");
                                 self.write(&next_comment.content);

@@ -4,6 +4,7 @@
 // (TypeScript, CSS, Svelte) to eliminate code duplication.
 
 use crate::escapes::swap_quote_escaping;
+use crate::Span;
 
 /// Options for string literal formatting
 #[derive(Debug, Clone, Copy)]
@@ -97,6 +98,212 @@ pub fn format_string_literal(
 
     // Return formatted string with quotes
     format!("{}{}{}", optimal_quote, final_content, optimal_quote)
+}
+
+/// Check if two positions are on the same line (no newline between them)
+///
+/// Returns `true` if there is no newline character between `prev_end` and `curr_start`.
+/// Adjacent positions (where `prev_end == curr_start`) are considered to be on the same line.
+///
+/// # Arguments
+///
+/// * `source` - The source text
+/// * `prev_end` - End position of the first element
+/// * `curr_start` - Start position of the second element
+///
+/// # Returns
+///
+/// `true` if the positions are on the same line, `false` otherwise.
+/// Returns `false` if positions are invalid (out of order or out of bounds).
+///
+/// # Examples
+///
+/// ```
+/// use tsv_lang::printing::is_same_line;
+///
+/// let source = "foo\nbar";
+/// assert_eq!(is_same_line(source, 0, 3), true);   // "foo" on same line
+/// assert_eq!(is_same_line(source, 3, 4), false);  // crosses newline
+/// assert_eq!(is_same_line(source, 4, 7), true);   // "bar" on same line
+/// ```
+pub fn is_same_line(source: &str, prev_end: u32, curr_start: u32) -> bool {
+    let prev_end = prev_end as usize;
+    let curr_start = curr_start as usize;
+
+    // Adjacent tokens (no whitespace between them) are on the same line
+    if prev_end == curr_start {
+        return true;
+    }
+
+    // Validate positions are in order and within bounds
+    if prev_end > curr_start || curr_start > source.len() {
+        return false;
+    }
+
+    // Check if there's a newline between the positions
+    let between = &source[prev_end..curr_start];
+    !between.contains('\n')
+}
+
+/// Check if two spans are on the same line
+///
+/// This is a span-aware version of [`is_same_line`] that handles span ordering
+/// and overlap detection. Spans can be provided in any order.
+///
+/// Returns `true` if:
+/// - The spans overlap or touch (share a boundary)
+/// - There is no newline between the end of the first span and start of the second
+///
+/// # Arguments
+///
+/// * `source` - The source text
+/// * `span1` - First span
+/// * `span2` - Second span
+///
+/// # Returns
+///
+/// `true` if the spans are on the same line, `false` otherwise.
+/// Returns `false` if span positions are out of bounds.
+///
+/// # Examples
+///
+/// ```
+/// use tsv_lang::{Span, printing::spans_on_same_line};
+///
+/// let source = "foo bar\nbaz";
+/// let span1 = Span::new(0, 3);  // "foo"
+/// let span2 = Span::new(4, 7);  // "bar"
+/// let span3 = Span::new(8, 11); // "baz"
+///
+/// assert_eq!(spans_on_same_line(source, span1, span2), true);  // foo and bar
+/// assert_eq!(spans_on_same_line(source, span1, span3), false); // crosses newline
+/// assert_eq!(spans_on_same_line(source, span2, span1), true);  // order doesn't matter
+/// ```
+pub fn spans_on_same_line(source: &str, span1: Span, span2: Span) -> bool {
+    // Determine which span comes first
+    let (first, second) = if span1.start <= span2.start {
+        (span1, span2)
+    } else {
+        (span2, span1)
+    };
+
+    // If spans overlap or touch, they're on the same line
+    if first.end >= second.start {
+        return true;
+    }
+
+    // Check if there's a newline between the spans
+    is_same_line(source, first.end, second.start)
+}
+
+/// Check if there's a blank line (2+ newlines) between two positions
+///
+/// A blank line is defined as having 2 or more newline characters between the positions.
+/// This is used to preserve source formatting when blank lines are significant.
+///
+/// # Arguments
+///
+/// * `source` - The source text
+/// * `prev_end` - End position of the first element
+/// * `curr_start` - Start position of the second element
+///
+/// # Returns
+///
+/// `true` if there are 2 or more newlines between the positions, `false` otherwise.
+/// Returns `false` if positions are invalid (out of order or out of bounds).
+///
+/// # Examples
+///
+/// ```
+/// use tsv_lang::printing::has_blank_line_between;
+///
+/// let source = "foo\n\nbar";  // Two newlines = blank line
+/// assert_eq!(has_blank_line_between(source, 3, 5), true);
+///
+/// let source2 = "foo\nbar";   // One newline = no blank line
+/// assert_eq!(has_blank_line_between(source2, 3, 4), false);
+/// ```
+pub fn has_blank_line_between(source: &str, prev_end: u32, curr_start: u32) -> bool {
+    let prev_end = prev_end as usize;
+    let curr_start = curr_start as usize;
+
+    // Validate positions are in order and within bounds
+    if prev_end > curr_start || curr_start > source.len() {
+        return false;
+    }
+
+    // Check if there are 2+ newlines (blank line) between the positions
+    let between = &source[prev_end..curr_start];
+    between.matches('\n').count() >= 2
+}
+
+/// Strip common indentation from comment content based on its position in source
+///
+/// Detects the indentation level at the comment's position and removes that
+/// same indentation from each line of the comment content. This is used when
+/// formatting multi-line comments to preserve their internal structure while
+/// removing the baseline indentation from the source code.
+///
+/// # Arguments
+///
+/// * `source` - The source text
+/// * `content` - The comment content to process
+/// * `comment_start` - The start position of the comment in the source
+///
+/// # Returns
+///
+/// The comment content with common indentation stripped from each line.
+///
+/// # Examples
+///
+/// ```
+/// use tsv_lang::printing::strip_comment_indentation;
+///
+/// let source = "    /* Line 1\n       Line 2 */";
+/// let content = " Line 1\n   Line 2 ";
+/// let result = strip_comment_indentation(source, content, 4);
+/// // Result: " Line 1\n   Line 2 " (4 spaces of indentation removed from each line)
+/// ```
+pub fn strip_comment_indentation(source: &str, content: &str, comment_start: u32) -> String {
+    let comment_start = comment_start as usize;
+
+    // Find start of line where comment begins
+    let mut line_start = comment_start;
+    while line_start > 0 && source.as_bytes()[line_start - 1] != b'\n' {
+        line_start -= 1;
+    }
+
+    // Find the indentation characters (spaces/tabs before the comment)
+    let mut indentation_end = line_start;
+    while indentation_end < source.len() {
+        let ch = source.as_bytes()[indentation_end];
+        if ch == b' ' || ch == b'\t' {
+            indentation_end += 1;
+        } else {
+            break;
+        }
+    }
+
+    let indentation = &source[line_start..indentation_end];
+
+    // Strip this indentation from the start of each line in the comment
+    if indentation.is_empty() {
+        return content.to_string();
+    }
+
+    // Process line by line, stripping indentation from the start of each line
+    let mut result = String::with_capacity(content.len());
+    let line_iter = content.split_inclusive('\n');
+
+    for line in line_iter {
+        if let Some(stripped) = line.strip_prefix(indentation) {
+            result.push_str(stripped);
+        } else {
+            result.push_str(line);
+        }
+    }
+
+    result
 }
 
 #[cfg(test)]

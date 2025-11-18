@@ -22,28 +22,8 @@ mod types;
 use crate::ast::internal;
 use std::cell::RefCell;
 use std::rc::Rc;
-use string_interner::{DefaultStringInterner, DefaultSymbol};
-use tsv_lang::OutputBuffer;
-
-/// Print configuration
-#[derive(Debug, Clone)]
-pub struct PrintConfig {
-    /// Indent string (default: tabs)
-    #[allow(dead_code)]
-    pub indent: &'static str,
-    /// Maximum line width (default: 100)
-    #[expect(dead_code, reason = "TODO: Use for line wrapping decisions")]
-    pub print_width: usize,
-}
-
-impl Default for PrintConfig {
-    fn default() -> Self {
-        Self {
-            indent: "\t",
-            print_width: 100,
-        }
-    }
-}
+use string_interner::DefaultStringInterner;
+use tsv_lang::{printing, OutputBuffer, PrintConfig, SymbolResolver};
 
 /// Printer state for building output
 pub struct Printer<'a> {
@@ -95,38 +75,6 @@ impl<'a> Printer<'a> {
         self.buffer.write(s);
     }
 
-    /// Resolve a symbol from the interner to a string
-    ///
-    /// This centralizes symbol resolution and provides a single point
-    /// for error handling and potential debugging/logging.
-    ///
-    /// Note: This allocates a String on every call. For hot paths where multiple
-    /// operations are needed on the same symbol, use `with_resolved_symbol()` instead.
-    pub(crate) fn resolve_symbol(&self, symbol: DefaultSymbol) -> String {
-        self.interner
-            .borrow()
-            .resolve(symbol)
-            .expect("Symbol not found in interner")
-            .to_string()
-    }
-
-    /// Execute a callback with a borrowed string for a symbol (zero-allocation)
-    ///
-    /// This is more efficient than `resolve_symbol()` when you need to perform
-    /// multiple operations on the resolved string without needing ownership.
-    #[inline]
-    #[allow(dead_code)]
-    pub(crate) fn with_resolved_symbol<F, R>(&self, symbol: DefaultSymbol, f: F) -> R
-    where
-        F: FnOnce(&str) -> R,
-    {
-        let interner = self.interner.borrow();
-        let s = interner
-            .resolve(symbol)
-            .expect("Symbol not found in interner");
-        f(s)
-    }
-
     /// Write indentation based on current indent level
     #[allow(dead_code)]
     pub(crate) fn write_indent(&mut self) {
@@ -146,7 +94,7 @@ impl<'a> Printer<'a> {
 
             // Check if multi-line - if so, strip and re-apply indentation
             if comment.content.contains('\n') {
-                let stripped = self.strip_comment_indentation(&comment.content, comment.span.start);
+                let stripped = printing::strip_comment_indentation(self.source, &comment.content, comment.span.start);
                 let lines: Vec<&str> = stripped.split('\n').collect();
                 for (i, line) in lines.iter().enumerate() {
                     if i > 0 {
@@ -167,85 +115,6 @@ impl<'a> Printer<'a> {
             self.write("//");
             self.write(&comment.content);
         }
-    }
-
-    /// Strip leading indentation from multi-line comment content
-    ///
-    /// Matches Svelte's acorn.js:115-124 behavior
-    fn strip_comment_indentation(&self, content: &str, comment_start: u32) -> String {
-        let comment_start = comment_start as usize;
-
-        // Find start of line where comment begins
-        let mut line_start = comment_start;
-        while line_start > 0 && self.source.as_bytes()[line_start - 1] != b'\n' {
-            line_start -= 1;
-        }
-
-        // Find the indentation characters (spaces/tabs before the comment)
-        let mut indentation_end = line_start;
-        while indentation_end < self.source.len() {
-            let ch = self.source.as_bytes()[indentation_end];
-            if ch == b' ' || ch == b'\t' {
-                indentation_end += 1;
-            } else {
-                break;
-            }
-        }
-
-        let indentation = &self.source[line_start..indentation_end];
-
-        // Strip this indentation from the start of each line in the comment
-        if indentation.is_empty() {
-            return content.to_string();
-        }
-
-        // Process line by line, stripping indentation from the start of each line
-        let mut result = String::with_capacity(content.len());
-        let line_iter = content.split_inclusive('\n');
-
-        for line in line_iter {
-            if let Some(stripped) = line.strip_prefix(indentation) {
-                result.push_str(stripped);
-            } else {
-                result.push_str(line);
-            }
-        }
-
-        result
-    }
-
-    /// Check if two positions are on the same line
-    pub(crate) fn is_same_line(&self, prev_end: u32, curr_start: u32) -> bool {
-        let prev_end = prev_end as usize;
-        let curr_start = curr_start as usize;
-
-        // Adjacent tokens are on the same line
-        if prev_end == curr_start {
-            return true;
-        }
-
-        if prev_end > curr_start || curr_start > self.source.len() {
-            return false;
-        }
-
-        let between = &self.source[prev_end..curr_start];
-        !between.contains('\n')
-    }
-
-    /// Check if there's a blank line between two spans
-    ///
-    /// Returns true if there are 2+ newlines between the spans
-    pub(crate) fn has_blank_line_between_spans(&self, prev_end: u32, curr_start: u32) -> bool {
-        let prev_end = prev_end as usize;
-        let curr_start = curr_start as usize;
-
-        if prev_end > curr_start || curr_start > self.source.len() {
-            return false;
-        }
-
-        let between = &self.source[prev_end..curr_start];
-        // Blank line = 2+ newlines in the whitespace
-        between.matches('\n').count() >= 2
     }
 
     /// Print a TypeScript program
@@ -288,13 +157,13 @@ impl<'a> Printer<'a> {
             if comment.span.start >= prev_end && comment.span.end <= curr_start {
                 // Skip comments that are on the same line as prev_end
                 // (those are trailing inline comments, already printed)
-                if self.is_same_line(prev_end, comment.span.start) {
+                if printing::is_same_line(self.source, prev_end, comment.span.start) {
                     continue;
                 }
 
                 // Check if comment is on the same line as curr_start
                 // (those are same-line leading comments, print inline without newline)
-                if self.is_same_line(comment.span.end, curr_start) {
+                if printing::is_same_line(self.source, comment.span.end, curr_start) {
                     self.write_indent();
                     self.print_comment(comment);
                     self.write(" ");
@@ -305,7 +174,7 @@ impl<'a> Printer<'a> {
 
                 // Check if we need a blank line before this comment
                 if comment.span.start > last_comment_end
-                    && self.has_blank_line_between_spans(last_comment_end, comment.span.start)
+                    && printing::has_blank_line_between(self.source, last_comment_end, comment.span.start)
                 {
                     self.write("\n");
                 }
@@ -322,7 +191,7 @@ impl<'a> Printer<'a> {
 
         // Check if there's a blank line after the last comment and before curr_start
         if printed_any && last_comment_end < curr_start
-            && self.has_blank_line_between_spans(last_comment_end, curr_start)
+            && printing::has_blank_line_between(self.source, last_comment_end, curr_start)
         {
             self.write("\n");
         }
@@ -341,7 +210,7 @@ impl<'a> Printer<'a> {
             // Comments between expression end and statement end (before semicolon)
             // OR comments after statement end on same line (after semicolon)
             if (comment.span.start >= expr_end && comment.span.end <= stmt_end)
-                || (comment.span.start >= stmt_end && self.is_same_line(stmt_end, comment.span.start))
+                || (comment.span.start >= stmt_end && printing::is_same_line(self.source, stmt_end, comment.span.start))
             {
                 if !has_comments {
                     self.write(" ");
@@ -384,5 +253,12 @@ impl<'a> Printer<'a> {
             }
         }
         printed_any
+    }
+}
+
+// Implement SymbolResolver trait for shared symbol resolution utilities
+impl<'a> SymbolResolver for Printer<'a> {
+    fn interner(&self) -> &Rc<RefCell<DefaultStringInterner>> {
+        &self.interner
     }
 }

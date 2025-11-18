@@ -44,7 +44,7 @@ use tsv_lang::Span;
 /// printer.write(raw);  // Preserves "01px" not "1px", "\0041" not "A"
 /// ```
 pub fn extract_raw_value(source: &str, span: Span) -> &str {
-    &source[span.start as usize..span.end as usize]
+    span.extract(source)
 }
 
 /// Check if value needs source extraction (has comments, complex escapes, etc.)
@@ -365,7 +365,7 @@ pub fn format_color_from_source(
     }
 
     // Extract raw text to detect syntax
-    let raw = &source[span.start as usize..span.end as usize];
+    let raw = span.extract(source);
 
     // Detect function name and syntax
     if let Some(open_paren) = raw.find('(') {

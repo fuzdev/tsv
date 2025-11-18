@@ -2,7 +2,7 @@
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{ParseError, PeekData, Span};
 
 // Module declarations
 mod attribute;
@@ -20,13 +20,6 @@ use parser_impl::SvelteParser;
 pub fn parse_svelte(source: &str) -> Result<Root, ParseError> {
     let mut parser = SvelteParser::new(source)?;
     parser.parse_root()
-}
-
-/// PeekData struct used by parser helpers
-pub(crate) struct PeekData<T> {
-    pub(crate) kind: T,
-    pub(crate) start: usize,
-    pub(crate) end: usize,
 }
 
 impl<'a> SvelteParser<'a> {

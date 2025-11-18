@@ -2,14 +2,7 @@
 // Uses string interning for memory efficiency
 
 use string_interner::{DefaultStringInterner, DefaultSymbol};
-use tsv_lang::Span;
-
-#[derive(Debug, Clone)]
-pub struct Comment {
-    pub content: String,
-    pub is_block: bool,
-    pub span: Span,
-}
+pub use tsv_lang::{Comment, Span};
 
 #[derive(Debug, Clone)]
 pub struct Program {

@@ -6,6 +6,7 @@
 use crate::ast::internal::FragmentNode;
 use crate::printer::Printer;
 use tsv_lang::printing::{StringFormatOptions, format_string_literal};
+use tsv_lang::SymbolResolver;
 
 impl<'a> Printer<'a> {
     /// Format an ExpressionTag

@@ -7,7 +7,8 @@
 
 use super::Printer;
 use crate::ast::internal::{self, Expression, LiteralValue};
-use tsv_lang::printing::{StringFormatOptions, format_string_literal};
+use tsv_lang::printing::{is_same_line, format_string_literal, StringFormatOptions};
+use tsv_lang::SymbolResolver;
 
 impl<'a> Printer<'a> {
     /// Print an expression
@@ -92,7 +93,7 @@ impl<'a> Printer<'a> {
 
                 let mut prev_end = obj.span.start + 1; // After opening brace
 
-                for (_i, prop) in obj.properties.iter().enumerate() {
+                for prop in &obj.properties {
                     // Print leading comments before property
                     self.print_leading_comments(prev_end, prop.span.start);
 
@@ -118,7 +119,7 @@ impl<'a> Printer<'a> {
                     for comment in self.comments.iter() {
                         if comment.span.start >= prop_end
                             && comment.span.start < obj.span.end
-                            && self.is_same_line(prop_end, comment.span.start)
+                            && is_same_line(self.source, prop_end, comment.span.start)
                         {
                             if comment.is_block {
                                 // Block comment: print before comma
@@ -138,7 +139,7 @@ impl<'a> Printer<'a> {
                         for comment in self.comments.iter() {
                             if comment.span.start >= prop_end
                                 && comment.span.start < obj.span.end
-                                && self.is_same_line(prop_end, comment.span.start)
+                                && is_same_line(self.source, prop_end, comment.span.start)
                                 && !comment.is_block
                             {
                                 self.write(" ");

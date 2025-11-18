@@ -13,7 +13,7 @@ impl<'a> Printer<'a> {
     /// Format a selector list (comma-separated complex selectors)
     pub(super) fn print_selector_list(&mut self, list: &internal::SelectorList) {
         // Check if source contains comments (/* ... */)
-        let source_text = &self.source[list.span.start as usize..list.span.end as usize];
+        let source_text = list.span.extract(self.source);
         let has_comments = source_text.contains("/*");
 
         if has_comments {
@@ -123,7 +123,7 @@ impl<'a> Printer<'a> {
                 // - docs/SVELTE_COMPATIBILITY.md (CSS Quirks section)
                 // - tests/fixtures/css/escapes/type_selector_escaped (demonstrates this behavior)
                 // - Svelte source: node_modules/svelte/src/compiler/phases/1-parse/read/style.js:575-611
-                let raw = &self.source[span.start as usize..span.end as usize];
+                let raw = span.extract(self.source);
                 self.write(raw);
             }
             internal::SimpleSelector::Universal { namespace, .. } => {
@@ -144,7 +144,7 @@ impl<'a> Printer<'a> {
                 // - docs/SVELTE_COMPATIBILITY.md (CSS Quirks section)
                 // - tests/fixtures/css/escapes/unicode_in_identifiers (demonstrates this behavior)
                 // - Svelte source: node_modules/svelte/src/compiler/phases/1-parse/read/style.js:575-611
-                let raw = &self.source[span.start as usize..span.end as usize];
+                let raw = span.extract(self.source);
                 self.write(raw); // Includes the '.' prefix
             }
             internal::SimpleSelector::Id { name: _, span } => {
@@ -153,7 +153,7 @@ impl<'a> Printer<'a> {
                 // Example: `#\1F4A9-id` stays as `#\1F4A9-id` (escape not decoded)
                 //
                 // See docs/SVELTE_COMPATIBILITY.md and tests/fixtures/css/escapes/unicode_in_identifiers
-                let raw = &self.source[span.start as usize..span.end as usize];
+                let raw = span.extract(self.source);
                 self.write(raw); // Includes the '#' prefix
             }
             internal::SimpleSelector::Attribute {

@@ -146,8 +146,7 @@ impl<'a> Parser<'a> {
             };
 
             // Check for shorthand property: `{ prop }` vs `{ prop: value }`
-            let (value, shorthand) = if self.check(&TokenKind::Colon) {
-                self.advance()?; // consume ':'
+            let (value, shorthand) = if self.eat(TokenKind::Colon) {
                 (self.parse_expression()?, false)
             } else {
                 // Shorthand: key is duplicated as value
@@ -179,32 +178,9 @@ impl<'a> Parser<'a> {
             // Requires new AST node type or Property variant
             // See: ECMAScript spec SpreadElement in ObjectLiteral
 
-            // TODO: Refactor to use expect_list_separator() helper method
-            // This comma/terminator pattern is duplicated across:
-            // - Object properties (here)
-            // - Array elements (future)
-            // - Function parameters (future)
-            // - Type parameters (future)
-            // Extract to Parser helper for consistency
-
-            // Check for comma or closing brace
-            if self.check(&TokenKind::Comma) {
-                self.advance()?; // consume ','
-                // Allow trailing comma: `{ a: 1, }`
-                if self.check(&TokenKind::BraceClose) {
-                    break;
-                }
-            } else if self.check(&TokenKind::BraceClose) {
+            // Check for comma or closing brace (with trailing comma support)
+            if !self.expect_list_separator(&TokenKind::Comma, &TokenKind::BraceClose)? {
                 break;
-            } else {
-                return Err(ParseError::InvalidSyntax {
-                    message: format!(
-                        "Expected ',' or '}}' after property, found {}",
-                        self.current_kind()
-                    ),
-                    position: self.current_pos().0,
-                    context: None,
-                });
             }
         }
 

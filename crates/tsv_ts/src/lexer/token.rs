@@ -76,30 +76,39 @@ impl fmt::Display for TokenKind {
 // - `decoded`: owned string for escape-processed values (only allocated when needed)
 // - Raw text: extracted via source[start..end] on demand (zero duplication)
 //
-// TODO: REMOVE `raw` FIELD - Code smell / redundant duplication
-// We consistently use source[start..end] everywhere for raw text.
-// The `raw` field duplicates data and violates our architecture principle:
-// "Raw strings are NEVER duplicated in the AST" (see CLAUDE.md).
-// This applies to tokens too - tokens are just pre-AST.
-//
-// Removal steps:
-// 1. Remove `raw` field and lifetime parameter from Token struct
-// 2. Update all token construction sites to not pass raw
-// 3. Update parser to use source[token.start..token.end] if needed
-// 4. Verify no performance regression (source slicing is already what we do)
+// This follows the "single source of truth" principle from ARCHITECTURE.md:
+// "Raw strings are NEVER duplicated in the AST" - applies to tokens too (pre-AST).
 #[derive(Debug, Clone)]
-pub struct Token<'a> {
+pub struct Token {
     pub kind: TokenKind,
     pub start: usize,
     pub end: usize,
-    /// Raw token value (borrowed from source)
-    ///
-    /// TODO: REMOVE THIS - redundant with start/end + source. See comment above.
-    #[allow(dead_code)]
-    pub raw: &'a str,
     /// Decoded value (for strings with escape sequences)
     /// None for non-string tokens or strings without escapes
     pub decoded: Option<String>,
+}
+
+impl Token {
+    /// Extract raw source text for this token
+    ///
+    /// Currently unused but available as a utility method if needed in the future.
+    /// Raw text extraction is typically done directly via `source[token.start..token.end]`.
+    ///
+    /// TODO: Consider removing this method if it remains unused long-term.
+    /// The direct extraction pattern is preferred and already used throughout the codebase.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let source = "const x = 42;";
+    /// let mut lexer = Lexer::new(source);
+    /// let token = lexer.next_token().unwrap();
+    /// assert_eq!(token.raw(source), "const");
+    /// ```
+    #[inline]
+    #[allow(dead_code)]
+    pub fn raw<'a>(&self, source: &'a str) -> &'a str {
+        &source[self.start..self.end]
+    }
 }
 
 // TODO: Expand keyword list for:

@@ -94,11 +94,11 @@ impl<'a> SvelteParser<'a> {
         // Peek at next token
         if self.peek_cache.is_none() {
             let token = self.lexer.next_token()?;
-            self.peek_cache = Some(PeekData {
-                kind: token.kind,
-                start: self.base_offset + token.start,
-                end: self.base_offset + token.end,
-            });
+            self.peek_cache = Some(PeekData::new(
+                token.kind,
+                self.base_offset + token.start,
+                self.base_offset + token.end,
+            ));
         }
 
         if let Some(peek) = &self.peek_cache
@@ -119,11 +119,11 @@ impl<'a> SvelteParser<'a> {
         // Populate peek cache if not already cached
         if self.peek_cache.is_none() {
             let token = self.lexer.next_token()?;
-            self.peek_cache = Some(PeekData {
-                kind: token.kind,
-                start: self.base_offset + token.start,
-                end: self.base_offset + token.end,
-            });
+            self.peek_cache = Some(PeekData::new(
+                token.kind,
+                self.base_offset + token.start,
+                self.base_offset + token.end,
+            ));
         }
 
         Ok(self

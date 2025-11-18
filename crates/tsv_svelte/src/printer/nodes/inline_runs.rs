@@ -6,6 +6,7 @@
 use super::super::text::TextAnalysis;
 use crate::ast::internal::FragmentNode;
 use crate::printer::Printer;
+use tsv_lang::printing;
 
 impl<'a> Printer<'a> {
     /// Find the end index of an inline run starting at `start_idx`
@@ -58,7 +59,7 @@ impl<'a> Printer<'a> {
 
         // Different source line ends the run (preserves source layout)
         let node_span = self.get_content_span(node);
-        !self.are_on_same_line(current_span, node_span)
+        !printing::spans_on_same_line(self.source, current_span, node_span)
     }
 
     /// Format an inline run (consecutive inline content on same source line)

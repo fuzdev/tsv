@@ -5,36 +5,22 @@ use super::public;
 use string_interner::DefaultStringInterner;
 use tsv_lang::{LocationTracker, Span};
 
-// Helper to create SourceLocation from Span
-fn create_source_location(span: Span, tracker: &LocationTracker) -> public::SourceLocation {
-    let (start_line, start_col) = tracker.get_line_column(span.start as usize);
-    let (end_line, end_col) = tracker.get_line_column(span.end as usize);
-
+/// Convert tsv_lang::SourceLocation to public::SourceLocation
+///
+/// Converts from the generic location type to the TypeScript-specific public type
+/// with serde derives.
+#[inline]
+fn to_public_location(loc: tsv_lang::SourceLocation) -> public::SourceLocation {
     public::SourceLocation {
         start: public::Position {
-            line: start_line,
-            column: start_col,
+            line: loc.start.line,
+            column: loc.start.column,
         },
         end: public::Position {
-            line: end_line,
-            column: end_col,
+            line: loc.end.line,
+            column: loc.end.column,
         },
     }
-}
-
-// Helper to create SourceLocation with position offset
-// Used for embedded content where AST has global positions but LocationTracker is from substring
-fn create_source_location_with_offset(
-    span: Span,
-    tracker: &LocationTracker,
-    offset: usize,
-) -> public::SourceLocation {
-    // Subtract offset to get positions relative to the tracker's source
-    let adjusted_span = Span {
-        start: span.start - offset as u32,
-        end: span.end - offset as u32,
-    };
-    create_source_location(adjusted_span, tracker)
 }
 
 /// Create source location, automatically handling offset if needed
@@ -43,11 +29,12 @@ fn create_source_location_with_offset(
 /// When offset is 0, uses fast path directly. When offset is non-zero, adjusts span accordingly.
 #[inline]
 fn create_location(span: Span, tracker: &LocationTracker, offset: usize) -> public::SourceLocation {
-    if offset == 0 {
-        create_source_location(span, tracker)
+    let loc = if offset == 0 {
+        tracker.span_to_location(span)
     } else {
-        create_source_location_with_offset(span, tracker, offset)
-    }
+        tracker.span_to_location_with_offset(span, offset)
+    };
+    to_public_location(loc)
 }
 
 pub fn convert_program(
@@ -170,7 +157,7 @@ pub fn convert_expression(
                 }
             };
             // Extract raw from source using span
-            let raw = &source[lit.span.start as usize..lit.span.end as usize];
+            let raw = lit.span.extract(source);
             public::Expression::Literal(public::Literal {
                 node_type: "Literal".to_string(),
                 start: lit.span.start,

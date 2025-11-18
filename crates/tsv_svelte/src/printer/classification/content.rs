@@ -12,6 +12,7 @@ use super::super::text::TextAnalysis;
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
 use tsv_html as html;
+use tsv_lang::SymbolResolver;
 
 impl<'a> Printer<'a> {
     /// Check if a fragment node is inline content

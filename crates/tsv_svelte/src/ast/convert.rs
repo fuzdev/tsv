@@ -5,7 +5,17 @@
 
 use crate::ast::{internal, public};
 use string_interner::DefaultStringInterner;
-use tsv_lang::LocationTracker;
+use tsv_lang::{printing, LocationTracker};
+
+/// Context for comment attachment process
+///
+/// Holds shared state and data used throughout the comment attachment traversal.
+/// Reduces parameter count from 9 to 7 for better readability.
+pub(crate) struct CommentAttachmentContext<'a> {
+    pub all_comments: &'a [tsv_ts::ast::internal::Comment],
+    pub source: &'a str,
+    pub attached_indices: &'a mut std::collections::HashSet<usize>,
+}
 
 /// Attach comments to a node based on position
 ///
@@ -19,26 +29,8 @@ use tsv_lang::LocationTracker;
 /// **Deduplication**: Uses `attached_indices` HashSet to prevent double-attachment
 ///
 /// Called recursively for all nodes in the AST tree by `attach_comments_recursively`.
-///
-/// TODO: Refactor to use context struct to reduce parameter count
-/// Currently has 9 parameters which makes the function signature unwieldy. Consider:
-/// ```ignore
-/// struct AttachmentContext<'a> {
-///     all_comments: &'a [Comment],
-///     source: &'a str,
-///     node_start: u32,
-///     node_end: u32,
-///     prev_end: Option<u32>,
-///     next_start: Option<u32>,
-///     parent_end: Option<u32>,
-///     is_last_in_array: bool,
-///     attached_indices: &'a mut HashSet<usize>,
-/// }
-/// fn attach_comments(ctx: &mut AttachmentContext) -> (Vec<Value>, Vec<Value>)
-/// ```
 fn attach_comments(
-    all_comments: &[tsv_ts::ast::internal::Comment],
-    source: &str,
+    ctx: &mut CommentAttachmentContext,
     node_start: u32,
     node_end: u32,
     prev_end: Option<u32>,
@@ -47,14 +39,13 @@ fn attach_comments(
     is_last_in_array: bool,  // True only if this is the last element in a parent array
                               // TODO: Consider using enum for better type safety:
                               // enum NodePosition { LastInArray, NotLast, Standalone }
-    attached_indices: &mut std::collections::HashSet<usize>,
 ) -> (Vec<serde_json::Value>, Vec<serde_json::Value>) {
     let mut leading: Vec<serde_json::Value> = Vec::new();
     let mut trailing: Vec<serde_json::Value> = Vec::new();
 
-    for (idx, comment) in all_comments.iter().enumerate() {
+    for (idx, comment) in ctx.all_comments.iter().enumerate() {
         // Skip if already attached
-        if attached_indices.contains(&idx) {
+        if ctx.attached_indices.contains(&idx) {
             continue;
         }
 
@@ -65,13 +56,13 @@ fn attach_comments(
         if comment_end <= node_start {
             if let Some(prev) = prev_end {
                 if comment_start >= prev {
-                    leading.push(comment_to_json(comment, source));
-                    attached_indices.insert(idx);
+                    leading.push(comment_to_json(comment, ctx.source));
+                    ctx.attached_indices.insert(idx);
                 }
             } else {
                 // No previous node - all comments before this node are leading
-                leading.push(comment_to_json(comment, source));
-                attached_indices.insert(idx);
+                leading.push(comment_to_json(comment, ctx.source));
+                ctx.attached_indices.insert(idx);
             }
         }
         // Trailing: comments after node end, with only whitespace/punctuation between
@@ -101,9 +92,9 @@ fn attach_comments(
     // impact is negligible (comments list is typically small, <100 items).
 
     let mut trailing_end = node_end;
-    for (idx, comment) in all_comments.iter().enumerate() {
+    for (idx, comment) in ctx.all_comments.iter().enumerate() {
         // Skip already attached comments
-        if attached_indices.contains(&idx) {
+        if ctx.attached_indices.contains(&idx) {
             continue;
         }
 
@@ -122,8 +113,8 @@ fn attach_comments(
                 };
 
                 if should_attach {
-                    trailing.push(comment_to_json(comment, source));
-                    attached_indices.insert(idx);
+                    trailing.push(comment_to_json(comment, ctx.source));
+                    ctx.attached_indices.insert(idx);
                     trailing_end = comment_end;
                 }
             } else {
@@ -131,7 +122,7 @@ fn attach_comments(
                 // TODO: Extract this pattern check into a helper function
                 // Pattern matches Svelte's /^[,) \t]*$/ regex (see acorn.js:183)
                 // Could be: fn is_trailing_punctuation_only(s: &str) -> bool
-                let slice = &source[trailing_end as usize..comment_start as usize];
+                let slice = &ctx.source[trailing_end as usize..comment_start as usize];
                 let is_trailing = slice.chars().all(|c| matches!(c, ',' | ')' | ' ' | '\t'));
 
                 if is_trailing {
@@ -143,8 +134,8 @@ fn attach_comments(
                     };
 
                     if should_attach {
-                        trailing.push(comment_to_json(comment, source));
-                        attached_indices.insert(idx);
+                        trailing.push(comment_to_json(comment, ctx.source));
+                        ctx.attached_indices.insert(idx);
                         trailing_end = comment_end;
                     }
                 }
@@ -161,13 +152,10 @@ fn attach_comments(
 /// that has start/end positions, matching Svelte's behavior.
 fn attach_comments_recursively(
     node: &mut serde_json::Value,
-    all_comments: &[tsv_ts::ast::internal::Comment],
-    loc: &LocationTracker,
-    source: &str,
+    ctx: &mut CommentAttachmentContext,
     parent_start: Option<u32>,
     parent_end: Option<u32>,
     is_last_in_array: bool,  // True if this node is the last element in a parent array
-    attached_indices: &mut std::collections::HashSet<usize>,
 ) {
     // Only process objects (AST nodes)
     if let Some(obj) = node.as_object_mut() {
@@ -187,15 +175,13 @@ fn attach_comments_recursively(
             // Attach comments to this node
             // Note: parent_start/parent_end from recursively() are actually prev_end/next_start in array context
             let (leading, trailing) = attach_comments(
-                all_comments,
-                source,
+                ctx,
                 start,
                 end,
                 parent_start,  // prev_end in array context
                 parent_end,    // next_start in array context (contains parent end for last element)
                 parent_end,    // parent boundary for trailing comment check
                 is_last_in_array,  // Passed down from parent context
-                attached_indices,
             );
 
             if !leading.is_empty() {
@@ -251,13 +237,10 @@ fn attach_comments_recursively(
 
                             attach_comments_recursively(
                                 item,
-                                all_comments,
-                                loc,
-                                source,
+                                ctx,
                                 prev_end,
                                 next_start,
                                 is_last,  // Pass true only for last element
-                                attached_indices,
                             );
                         }
                     }
@@ -266,13 +249,10 @@ fn attach_comments_recursively(
                         // Object children are not in arrays, so is_last_in_array = false
                         attach_comments_recursively(
                             value,
-                            all_comments,
-                            loc,
-                            source,
+                            ctx,
                             node_start,
                             node_end,
                             false,  // Not in array context
-                            attached_indices,
                         );
                     }
                     _ => {}
@@ -288,7 +268,7 @@ fn attach_comments_recursively(
 /// See: svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js:115-124
 fn get_comment_value(comment: &tsv_ts::ast::internal::Comment, source: &str) -> String {
     if comment.is_block && comment.content.contains('\n') {
-        strip_comment_indentation(&comment.content, comment.span.start as usize, source)
+        printing::strip_comment_indentation(source, &comment.content, comment.span.start)
     } else {
         comment.content.clone()
     }
@@ -305,56 +285,6 @@ fn comment_to_json(comment: &tsv_ts::ast::internal::Comment, source: &str) -> se
         "start": comment.span.start,
         "end": comment.span.end,
     })
-}
-
-/// Strip leading indentation from multi-line block comments
-///
-/// Matches Svelte's behavior:
-/// 1. Find the indentation of the line where the comment starts
-/// 2. Remove that exact indentation pattern from the start of each line
-///
-/// Example:
-///   Source: `\t/*\n\t * comment\n\t */`
-///   Indentation: `\t`
-///   Result: `\n * comment\n */`
-fn strip_comment_indentation(content: &str, comment_start: usize, source: &str) -> String {
-    // Find start of line where comment begins
-    let mut line_start = comment_start;
-    while line_start > 0 && source.as_bytes()[line_start - 1] != b'\n' {
-        line_start -= 1;
-    }
-
-    // Find the indentation characters (spaces/tabs before the comment)
-    let mut indentation_end = line_start;
-    while indentation_end < source.len() {
-        let ch = source.as_bytes()[indentation_end];
-        if ch == b' ' || ch == b'\t' {
-            indentation_end += 1;
-        } else {
-            break;
-        }
-    }
-
-    let indentation = &source[line_start..indentation_end];
-
-    // Strip this indentation from the start of each line in the comment
-    if indentation.is_empty() {
-        return content.to_string();
-    }
-
-    // Process line by line, stripping indentation from the start of each line
-    let mut result = String::with_capacity(content.len());
-    let line_iter = content.split_inclusive('\n');
-
-    for line in line_iter {
-        if let Some(stripped) = line.strip_prefix(indentation) {
-            result.push_str(stripped);
-        } else {
-            result.push_str(line);
-        }
-    }
-
-    result
 }
 
 /// Convert Svelte Root AST to public format
@@ -463,12 +393,11 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
             .iter()
             .map(|comment| {
                 let comment_type = if comment.is_block { "Block" } else { "Line" };
-                let (start_line, start_column) = loc.get_line_column(comment.span.start as usize);
-                let (end_line, end_column) = loc.get_line_column(comment.span.end as usize);
+                let location = loc.span_to_location(comment.span);
 
                 // Apply Svelte's indentation stripping for multi-line block comments
                 let value = if comment.is_block && comment.content.contains('\n') {
-                    strip_comment_indentation(&comment.content, comment.span.start as usize, source)
+                    printing::strip_comment_indentation(source, &comment.content, comment.span.start)
                 } else {
                     comment.content.clone()
                 };
@@ -481,12 +410,12 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
                 map.insert("end".to_string(), serde_json::Value::Number(comment.span.end.into()));
                 map.insert("loc".to_string(), serde_json::json!({
                     "start": {
-                        "line": start_line,
-                        "column": start_column,
+                        "line": location.start.line,
+                        "column": location.start.column,
                     },
                     "end": {
-                        "line": end_line,
-                        "column": end_column,
+                        "line": location.end.line,
+                        "column": location.end.column,
                     },
                 }));
                 serde_json::Value::Object(map)
@@ -701,16 +630,20 @@ fn convert_script(
     // Track which comments have been attached to prevent duplicates
     let mut attached_indices = std::collections::HashSet::new();
 
+    // Create context for comment attachment
+    let mut ctx = CommentAttachmentContext {
+        all_comments: &script.content.comments,
+        source,
+        attached_indices: &mut attached_indices,
+    };
+
     // Recursively attach comments to all nodes in the AST
     attach_comments_recursively(
         &mut program_json,
-        &script.content.comments,
-        &loc,
-        source,
+        &mut ctx,
         None,  // No parent for root Program node
         None,
         false, // Root node is not in an array
-        &mut attached_indices,
     );
 
     // TODO: Consider handling orphaned comments (comments that didn't attach anywhere)
@@ -749,8 +682,7 @@ fn convert_style(
     let full_loc = LocationTracker::new(source);
 
     // Extract the raw CSS content
-    let styles =
-        source[style.content_span.start as usize..style.content_span.end as usize].to_string();
+    let styles = style.content_span.extract(source).to_string();
 
     // Delegate to tsv_css for CSS node conversion
     // Filter out comments to match Svelte's CSS parser output

@@ -12,8 +12,8 @@ pub mod printer;
 // Re-export commonly used types and functions
 pub use ast::{CssDeclaration, CssNode, CssRule, CssStyleSheet, StyleContent, StyleSheet};
 pub use parser::parse_css;
-pub use printer::{PrintConfig, Printer, format_css};
-pub use tsv_lang::{ParseError, Result, Span};
+pub use printer::{Printer, format_css};
+pub use tsv_lang::{ParseError, PrintConfig, Result, Span};
 
 /// Parse CSS source into internal AST
 ///
@@ -33,7 +33,7 @@ pub use tsv_lang::{ParseError, Result, Span};
 /// let stylesheet = parse(css, 0).expect("Failed to parse CSS");
 /// ```
 pub fn parse(source: &str, base_offset: usize) -> Result<CssStyleSheet> {
-    parse_css(source, base_offset)
+    parse_css(source, base_offset).map_err(|e| e.with_context(source))
 }
 
 /// Format CSS stylesheet to a formatted string

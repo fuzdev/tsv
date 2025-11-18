@@ -23,26 +23,7 @@ pub mod source_fidelity;
 
 use crate::ast::internal::{CssComment, CssNode, CssStyleSheet};
 use std::collections::HashMap;
-use tsv_lang::OutputBuffer;
-
-/// Print configuration
-#[derive(Debug, Clone)]
-pub struct PrintConfig {
-    /// Indent string (default: tabs)
-    pub indent: &'static str,
-    /// Maximum line width (default: 100)
-    #[allow(dead_code)] // TODO: Use for line wrapping decisions
-    pub print_width: usize,
-}
-
-impl Default for PrintConfig {
-    fn default() -> Self {
-        Self {
-            indent: "\t",
-            print_width: 100,
-        }
-    }
-}
+use tsv_lang::{printing, OutputBuffer, PrintConfig};
 
 /// Printer state for building output
 pub struct Printer<'a> {
@@ -112,7 +93,7 @@ impl<'a> Printer<'a> {
 
                 // Special case: consecutive comments on same line
                 if let (CssNode::Comment(_), CssNode::Comment(curr_comment)) = (prev_node, node)
-                    && self.is_same_line(prev_node.span().end, curr_comment.span.start)
+                    && printing::is_same_line(self.source, prev_node.span().end, curr_comment.span.start)
                 {
                     // Print comment inline with space separator
                     self.write(" /*");
@@ -138,7 +119,7 @@ impl<'a> Printer<'a> {
             // Check if next node is an inline comment after a rule/at-rule closing brace
             if matches!(node, CssNode::Rule(_) | CssNode::Atrule(_))
                 && let Some(CssNode::Comment(next_comment)) = nodes.get(i + 1)
-                && self.is_same_line(node.span().end, next_comment.span.start)
+                && printing::is_same_line(self.source, node.span().end, next_comment.span.start)
             {
                 // Print comment inline after the closing brace
                 self.write(" /*");
@@ -195,42 +176,6 @@ impl<'a> Printer<'a> {
         } else {
             false
         }
-    }
-
-    /// Check if two positions are on the same line in the source
-    ///
-    /// Returns true if there's no newline between prev_end and curr_start
-    pub(crate) fn is_same_line(&self, prev_end: u32, curr_start: u32) -> bool {
-        let prev_end = prev_end as usize;
-        let curr_start = curr_start as usize;
-
-        // Adjacent tokens (no whitespace) are on the same line
-        if prev_end == curr_start {
-            return true;
-        }
-
-        if prev_end > curr_start || curr_start > self.source.len() {
-            return false;
-        }
-
-        let between = &self.source[prev_end..curr_start];
-        !between.contains('\n')
-    }
-
-    /// Check if there's a blank line between two spans (for block children)
-    ///
-    /// Returns true if there are 2+ newlines between the spans
-    pub(crate) fn has_blank_line_between_spans(&self, prev_end: u32, curr_start: u32) -> bool {
-        let prev_end = prev_end as usize;
-        let curr_start = curr_start as usize;
-
-        if prev_end > curr_start || curr_start > self.source.len() {
-            return false;
-        }
-
-        let between = &self.source[prev_end..curr_start];
-        // Blank line = 2+ newlines in the whitespace
-        between.matches('\n').count() >= 2
     }
 
     /// Check if there's an opening brace between two spans

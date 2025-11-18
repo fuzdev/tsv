@@ -7,6 +7,7 @@ use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
 use tsv_html as html;
+use tsv_lang::SymbolResolver;
 
 impl<'a> Printer<'a> {
     /// Format a Svelte element with context-aware formatting
@@ -39,25 +40,33 @@ impl<'a> Printer<'a> {
         self.write("<");
         self.write(&tag_name);
 
-        // Format attributes
-        for attr in &element.attributes {
-            self.write(" ");
-            self.print_attribute(attr);
-        }
+        // Format attributes with line wrapping support (hybrid doc-builder approach)
+        let attrs_multiline = self.print_attributes_with_wrapping(element, &tag_name, is_void);
 
         // Void elements are self-closing
         if is_void {
-            self.write(" />");
+            // If attributes wrapped to multiple lines, closing tag goes at column 0
+            // Otherwise, add a space before the closing tag
+            if attrs_multiline {
+                self.write("/>");
+            } else {
+                self.write(" />");
+            }
             return; // No children or closing tag
         }
 
         // Components with no children: preserve author's choice (self-closing vs explicit closing tag)
         if element.kind == ElementKind::Component && element.fragment.nodes.is_empty() {
-            let source_slice = &self.source[element.span.start as usize..element.span.end as usize];
+            let source_slice = element.span.extract(self.source);
             let was_self_closing = source_slice.trim_end().ends_with("/>");
 
             if was_self_closing {
-                self.write(" />");
+                // If attributes wrapped, no space before />; otherwise add space
+                if attrs_multiline {
+                    self.write("/>");
+                } else {
+                    self.write(" />");
+                }
                 return;
             }
             // Otherwise, fall through to write explicit closing tag below
@@ -277,5 +286,83 @@ impl<'a> Printer<'a> {
 
         // Opening newline only pattern: opening has newline, NO trailing text node
         has_opening_newline && !has_trailing_text
+    }
+
+    /// Format attributes with line wrapping support (hybrid doc-builder approach)
+    ///
+    /// Uses prettier's doc-builder pattern to decide whether to wrap attributes:
+    /// - If all attributes fit on one line: print inline with spaces
+    /// - If they don't fit: print each attribute on its own line with indentation
+    ///
+    /// Matches prettier's behavior from prettier-plugin-svelte:
+    /// ```javascript
+    /// group([
+    ///     '<', node.name,
+    ///     indent(group([
+    ///         ...attributes,  // Each prepended with `line`
+    ///         dedent(line()),
+    ///     ])),
+    ///     '/>'
+    /// ])
+    /// ```
+    fn print_attributes_with_wrapping(
+        &mut self,
+        element: &internal::Element,
+        tag_name: &str,
+        is_void: bool,
+    ) -> bool {
+        use tsv_lang::doc;
+
+        if element.attributes.is_empty() {
+            return false; // No attributes, not multiline
+        }
+
+        // Build a doc for all attributes
+        let mut attr_docs = Vec::new();
+        for attr in &element.attributes {
+            attr_docs.push(doc::line()); // Soft line before each attribute
+            attr_docs.push(self.build_attribute_doc(attr));
+        }
+
+        // For line length calculation, we need to include the tag name and closing
+        // Build a complete doc to let the fits() algorithm make the right decision
+        let closing = if is_void || element.fragment.nodes.is_empty() {
+            "/>"
+        } else {
+            ">"
+        };
+
+        // Build the complete doc structure matching prettier
+        // group([ '<', name, indent(group([ ...attributes ])), closing ])
+        let complete_doc = doc::group(doc::concat(vec![
+            doc::text("<"),
+            doc::text(tag_name),
+            doc::indent(doc::group(doc::concat(attr_docs))),
+            doc::text(closing),
+        ]));
+
+        // Check if the complete tag fits on one line
+        let fits = doc::fits(&complete_doc, self.config.print_width, doc::Mode::Flat, &self.config);
+
+        if fits {
+            // Print inline: space before each attribute
+            for attr in &element.attributes {
+                self.write(" ");
+                self.print_attribute(attr);
+            }
+            false // Not multiline
+        } else {
+            // Print multiline: each attribute on its own line
+            for attr in &element.attributes {
+                self.write("\n");
+                self.indent_level += 1;
+                self.write_indent();
+                self.indent_level -= 1;
+                self.print_attribute(attr);
+            }
+            // Add newline before closing (which element code will write)
+            self.write("\n");
+            true // Multiline
+        }
     }
 }

@@ -5,19 +5,33 @@
 //! - `LocationTracker` - line/column information
 //! - `ParseError` - error types and result aliases
 //! - `OutputBuffer` - shared printer output utilities
+//! - `PrintConfig` - shared printer configuration
+//! - `Comment` - shared comment type
+//! - `doc` - document builder primitives for prettier-compatible formatting
 //! - `quotes` - smart quote selection for string literals
 //! - `escapes` - escape sequence utilities for printers
 //! - `printing` - shared printing utilities for printers
+//! - `parser` - shared parser utilities
+//! - `interner` - string interner utilities for printers
 
+mod comment;
+mod config;
+pub mod doc;
 mod error;
 pub mod escapes;
+mod interner;
 mod location;
 mod output;
+mod parser;
 pub mod printing;
 pub mod quotes;
 mod span;
 
+pub use comment::Comment;
+pub use config::PrintConfig;
 pub use error::{ErrorContext, ParseError, Result};
-pub use location::LocationTracker;
+pub use interner::SymbolResolver;
+pub use location::{LocationTracker, Position, SourceLocation};
 pub use output::{OutputBuffer, write_indent};
+pub use parser::PeekData;
 pub use span::Span;

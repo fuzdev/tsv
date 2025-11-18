@@ -50,7 +50,7 @@ impl<'a> Lexer<'a> {
     // - More number formats: floats (1.5), hex (0x10), binary (0b10), octal (0o10)
     // - Template literals: `hello ${world}`
     // - Regular expressions: /pattern/flags
-    pub fn next_token(&mut self) -> Result<Token<'_>, ParseError> {
+    pub fn next_token(&mut self) -> Result<Token, ParseError> {
         self.skip_whitespace();
 
         let start = self.position;
@@ -60,7 +60,6 @@ impl<'a> Lexer<'a> {
                 kind: TokenKind::Eof,
                 start,
                 end: start,
-                raw: "",
                 decoded: None,
             }),
             Some(';') => {
@@ -69,7 +68,6 @@ impl<'a> Lexer<'a> {
                     kind: TokenKind::Semicolon,
                     start,
                     end: self.position,
-                    raw: &self.source[start..self.position],
                     decoded: None,
                 })
             }
@@ -79,7 +77,6 @@ impl<'a> Lexer<'a> {
                     kind: TokenKind::Colon,
                     start,
                     end: self.position,
-                    raw: &self.source[start..self.position],
                     decoded: None,
                 })
             }
@@ -89,7 +86,6 @@ impl<'a> Lexer<'a> {
                     kind: TokenKind::Equals,
                     start,
                     end: self.position,
-                    raw: &self.source[start..self.position],
                     decoded: None,
                 })
             }
@@ -106,7 +102,6 @@ impl<'a> Lexer<'a> {
                     kind: TokenKind::Number,
                     start,
                     end: self.position,
-                    raw: &self.source[start..self.position],
                     decoded: None,
                 })
             }
@@ -128,7 +123,6 @@ impl<'a> Lexer<'a> {
                     kind,
                     start,
                     end: self.position,
-                    raw,
                     decoded: None,
                 })
             }
@@ -145,7 +139,6 @@ impl<'a> Lexer<'a> {
                         let content_end = self.position;
                         self.advance(); // consume closing quote
 
-                        let raw = &self.source[start..self.position];
                         let content = &self.source[content_start..content_end];
 
                         // Decode escape sequences if present
@@ -160,7 +153,6 @@ impl<'a> Lexer<'a> {
                             kind: TokenKind::String,
                             start,
                             end: self.position,
-                            raw,
                             decoded,
                         });
                     } else if ch == '\\' {
@@ -188,7 +180,6 @@ impl<'a> Lexer<'a> {
                     kind: TokenKind::Comma,
                     start,
                     end: self.position,
-                    raw: &self.source[start..self.position],
                     decoded: None,
                 })
             }
@@ -198,7 +189,6 @@ impl<'a> Lexer<'a> {
                     kind: TokenKind::BraceOpen,
                     start,
                     end: self.position,
-                    raw: &self.source[start..self.position],
                     decoded: None,
                 })
             }
@@ -208,7 +198,6 @@ impl<'a> Lexer<'a> {
                     kind: TokenKind::BraceClose,
                     start,
                     end: self.position,
-                    raw: &self.source[start..self.position],
                     decoded: None,
                 })
             }

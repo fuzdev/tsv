@@ -11,19 +11,11 @@ use crate::lexer::{Lexer, TokenKind};
 use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{ParseError, PeekData, Span};
 
 // Import parsing implementations
 mod expression;
 mod statement;
-
-// PeekData for lookahead caching
-struct PeekData<T> {
-    kind: T,
-    start: usize,
-    end: usize,
-    decoded: Option<String>,
-}
 
 pub struct Parser<'a> {
     source: &'a str,
@@ -175,12 +167,12 @@ impl<'a> Parser<'a> {
         if self.peek_cache.is_none()
             && let Ok(token) = self.lexer.next_token()
         {
-            self.peek_cache = Some(PeekData {
-                kind: token.kind,
-                start: token.start,
-                end: token.end,
-                decoded: token.decoded,
-            });
+            self.peek_cache = Some(PeekData::with_decoded(
+                token.kind,
+                token.start,
+                token.end,
+                token.decoded,
+            ));
         }
         self.peek_cache
             .as_ref()
@@ -206,54 +198,80 @@ impl<'a> Parser<'a> {
         }
     }
 
-    // TODO: Add eat() helper for optional token consumption:
-    // ```rust
-    // pub(super) fn eat(&mut self, kind: TokenKind) -> bool {
-    //     if self.check(kind) {
-    //         self.advance().is_ok()
-    //     } else {
-    //         false
-    //     }
-    // }
-    // ```
-    // Useful for optional syntax elements like:
-    // - Trailing commas: `[1, 2, 3,]` - eat(Comma) at end
-    // - Optional semicolons in some contexts
-    // - Optional type annotations: eat(Colon) to check presence
+    /// Consume a token if it matches the given kind (optional token consumption)
+    ///
+    /// Returns `true` if the token was consumed, `false` otherwise.
+    ///
+    /// Useful for optional syntax elements like:
+    /// - Trailing commas: `[1, 2, 3,]` - eat(Comma) at end
+    /// - Optional semicolons in some contexts
+    /// - Optional type annotations: eat(Colon) to check presence
+    ///
+    /// # Example
+    /// ```ignore
+    /// let has_init = if self.eat(TokenKind::Equals) {
+    ///     Some(self.parse_expression()?)
+    /// } else {
+    ///     None
+    /// };
+    /// ```
+    pub(super) fn eat(&mut self, kind: TokenKind) -> bool {
+        if self.check(&kind) {
+            self.advance().is_ok()
+        } else {
+            false
+        }
+    }
 
-    // TODO: Add expect_list_separator() helper method
-    // Consolidates comma/terminator handling across:
-    // - Object properties (see expression.rs parse_object_expression)
-    // - Array elements (future)
-    // - Function parameters (future)
-    // - Type parameters (future)
-    // Returns Ok(true) if more elements expected, Ok(false) if terminated
-    // Handles trailing separators uniformly
-    // Example implementation:
-    // ```rust
-    // pub(super) fn expect_list_separator(
-    //     &mut self,
-    //     separator: &TokenKind,     // TokenKind::Comma
-    //     terminator: &TokenKind,    // TokenKind::BraceClose, etc.
-    // ) -> Result<bool, ParseError> {
-    //     if self.check(separator) {
-    //         self.advance()?;
-    //         if self.check(terminator) {
-    //             Ok(false) // Trailing separator, end of list
-    //         } else {
-    //             Ok(true) // More elements expected
-    //         }
-    //     } else if self.check(terminator) {
-    //         Ok(false) // End of list
-    //     } else {
-    //         Err(ParseError::InvalidSyntax {
-    //             message: format!("Expected {} or {}", separator, terminator),
-    //             position: self.current_pos().0,
-    //             context: None,
-    //         })
-    //     }
-    // }
-    // ```
+    /// Handle list separator (comma) and terminator in list parsing
+    ///
+    /// Consolidates comma/terminator handling across:
+    /// - Object properties: `{ a: 1, b: 2 }`
+    /// - Array elements: `[1, 2, 3]`
+    /// - Function parameters: `fn(a, b, c)`
+    /// - Type parameters: `Array<T, U>`
+    ///
+    /// Returns:
+    /// - `Ok(true)` if more elements expected (found separator, not at terminator)
+    /// - `Ok(false)` if list ended (found terminator or trailing separator)
+    /// - `Err(ParseError)` if neither separator nor terminator found
+    ///
+    /// Handles trailing separators uniformly: `[1, 2,]` is valid
+    ///
+    /// # Example
+    /// ```ignore
+    /// loop {
+    ///     properties.push(self.parse_property()?);
+    ///     if !self.expect_list_separator(&TokenKind::Comma, &TokenKind::BraceClose)? {
+    ///         break;
+    ///     }
+    /// }
+    /// ```
+    pub(super) fn expect_list_separator(
+        &mut self,
+        separator: &TokenKind,
+        terminator: &TokenKind,
+    ) -> Result<bool, ParseError> {
+        if self.check(separator) {
+            self.advance()?;
+            if self.check(terminator) {
+                Ok(false) // Trailing separator, end of list
+            } else {
+                Ok(true) // More elements expected
+            }
+        } else if self.check(terminator) {
+            Ok(false) // End of list
+        } else {
+            Err(ParseError::InvalidSyntax {
+                message: format!(
+                    "Expected '{}' or '{}' after list element, found {}",
+                    separator, terminator, self.current_kind
+                ),
+                position: self.current_pos().0,
+                context: None,
+            })
+        }
+    }
 
     pub fn parse(&mut self) -> Result<Program, ParseError> {
         let start = self.base_offset; // Start at base_offset for embedded contexts
