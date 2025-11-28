@@ -5,7 +5,7 @@
 
 use crate::ast::{internal, public};
 use string_interner::DefaultStringInterner;
-use tsv_lang::{printing, LocationTracker};
+use tsv_lang::{LocationTracker, printing};
 
 /// Context for comment attachment process
 ///
@@ -36,9 +36,9 @@ fn attach_comments(
     prev_end: Option<u32>,
     next_start: Option<u32>,
     parent_end: Option<u32>,
-    is_last_in_array: bool,  // True only if this is the last element in a parent array
-                              // TODO: Consider using enum for better type safety:
-                              // enum NodePosition { LastInArray, NotLast, Standalone }
+    is_last_in_array: bool, // True only if this is the last element in a parent array
+                            // TODO: Consider using enum for better type safety:
+                            // enum NodePosition { LastInArray, NotLast, Standalone }
 ) -> (Vec<serde_json::Value>, Vec<serde_json::Value>) {
     let mut leading: Vec<serde_json::Value> = Vec::new();
     let mut trailing: Vec<serde_json::Value> = Vec::new();
@@ -155,7 +155,7 @@ fn attach_comments_recursively(
     ctx: &mut CommentAttachmentContext,
     parent_start: Option<u32>,
     parent_end: Option<u32>,
-    is_last_in_array: bool,  // True if this node is the last element in a parent array
+    is_last_in_array: bool, // True if this node is the last element in a parent array
 ) {
     // Only process objects (AST nodes)
     if let Some(obj) = node.as_object_mut() {
@@ -178,17 +178,23 @@ fn attach_comments_recursively(
                 ctx,
                 start,
                 end,
-                parent_start,  // prev_end in array context
-                parent_end,    // next_start in array context (contains parent end for last element)
-                parent_end,    // parent boundary for trailing comment check
-                is_last_in_array,  // Passed down from parent context
+                parent_start,     // prev_end in array context
+                parent_end, // next_start in array context (contains parent end for last element)
+                parent_end, // parent boundary for trailing comment check
+                is_last_in_array, // Passed down from parent context
             );
 
             if !leading.is_empty() {
-                obj.insert("leadingComments".to_string(), serde_json::Value::Array(leading));
+                obj.insert(
+                    "leadingComments".to_string(),
+                    serde_json::Value::Array(leading),
+                );
             }
             if !trailing.is_empty() {
-                obj.insert("trailingComments".to_string(), serde_json::Value::Array(trailing));
+                obj.insert(
+                    "trailingComments".to_string(),
+                    serde_json::Value::Array(trailing),
+                );
             }
         }
 
@@ -211,8 +217,10 @@ fn attach_comments_recursively(
                         let positions: Vec<(Option<u32>, Option<u32>)> = arr
                             .iter()
                             .map(|item| {
-                                let start = item.get("start").and_then(|v| v.as_u64()).map(|v| v as u32);
-                                let end = item.get("end").and_then(|v| v.as_u64()).map(|v| v as u32);
+                                let start =
+                                    item.get("start").and_then(|v| v.as_u64()).map(|v| v as u32);
+                                let end =
+                                    item.get("end").and_then(|v| v.as_u64()).map(|v| v as u32);
                                 (start, end)
                             })
                             .collect();
@@ -236,11 +244,8 @@ fn attach_comments_recursively(
                             let is_last = i + 1 >= positions.len();
 
                             attach_comments_recursively(
-                                item,
-                                ctx,
-                                prev_end,
-                                next_start,
-                                is_last,  // Pass true only for last element
+                                item, ctx, prev_end, next_start,
+                                is_last, // Pass true only for last element
                             );
                         }
                     }
@@ -248,11 +253,7 @@ fn attach_comments_recursively(
                         // Process nested object (e.g., id, init, callee)
                         // Object children are not in arrays, so is_last_in_array = false
                         attach_comments_recursively(
-                            value,
-                            ctx,
-                            node_start,
-                            node_end,
-                            false,  // Not in array context
+                            value, ctx, node_start, node_end, false, // Not in array context
                         );
                     }
                     _ => {}
@@ -397,27 +398,43 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
 
                 // Apply Svelte's indentation stripping for multi-line block comments
                 let value = if comment.is_block && comment.content.contains('\n') {
-                    printing::strip_comment_indentation(source, &comment.content, comment.span.start)
+                    printing::strip_comment_indentation(
+                        source,
+                        &comment.content,
+                        comment.span.start,
+                    )
                 } else {
                     comment.content.clone()
                 };
 
                 // Manually construct JSON object with specific field order: type, value, start, end, loc
                 let mut map = serde_json::Map::new();
-                map.insert("type".to_string(), serde_json::Value::String(comment_type.to_string()));
+                map.insert(
+                    "type".to_string(),
+                    serde_json::Value::String(comment_type.to_string()),
+                );
                 map.insert("value".to_string(), serde_json::Value::String(value));
-                map.insert("start".to_string(), serde_json::Value::Number(comment.span.start.into()));
-                map.insert("end".to_string(), serde_json::Value::Number(comment.span.end.into()));
-                map.insert("loc".to_string(), serde_json::json!({
-                    "start": {
-                        "line": location.start.line,
-                        "column": location.start.column,
-                    },
-                    "end": {
-                        "line": location.end.line,
-                        "column": location.end.column,
-                    },
-                }));
+                map.insert(
+                    "start".to_string(),
+                    serde_json::Value::Number(comment.span.start.into()),
+                );
+                map.insert(
+                    "end".to_string(),
+                    serde_json::Value::Number(comment.span.end.into()),
+                );
+                map.insert(
+                    "loc".to_string(),
+                    serde_json::json!({
+                        "start": {
+                            "line": location.start.line,
+                            "column": location.start.column,
+                        },
+                        "end": {
+                            "line": location.end.line,
+                            "column": location.end.column,
+                        },
+                    }),
+                );
                 serde_json::Value::Object(map)
             })
             .collect(),
@@ -641,7 +658,7 @@ fn convert_script(
     attach_comments_recursively(
         &mut program_json,
         &mut ctx,
-        None,  // No parent for root Program node
+        None, // No parent for root Program node
         None,
         false, // Root node is not in an array
     );

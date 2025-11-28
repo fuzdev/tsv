@@ -1,7 +1,6 @@
 use std::env;
 
 mod cli;
-mod deno;
 mod fixtures;
 
 fn main() {

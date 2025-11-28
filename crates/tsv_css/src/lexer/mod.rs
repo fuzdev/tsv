@@ -123,11 +123,19 @@ impl<'a> Lexer<'a> {
                 read_number(self.source, &mut self.pos)
             }
             // Negative numbers: -10px, -100%, -.5em (lookahead to distinguish from identifier)
-            '-' if matches!(self.peek_char(1), Some(c) if c.is_ascii_digit() || c == '.') => {
+            // Note: -. must be followed by digit (-.5), otherwise it's identifier prefix (-.class is combinator + class)
+            '-' if matches!(self.peek_char(1), Some(c) if c.is_ascii_digit())
+                || (self.peek_char(1) == Some('.')
+                    && matches!(self.peek_char(2), Some(c) if c.is_ascii_digit())) =>
+            {
                 read_number(self.source, &mut self.pos)
             }
-            // Positive numbers with explicit + sign: +10px, +100%
-            '+' if matches!(self.peek_char(1), Some(c) if c.is_ascii_digit() || c == '.') => {
+            // Positive numbers with explicit + sign: +10px, +100%, +.5em
+            // Note: +. must be followed by digit (+.5), otherwise it's combinator + class (+.class)
+            '+' if matches!(self.peek_char(1), Some(c) if c.is_ascii_digit())
+                || (self.peek_char(1) == Some('.')
+                    && matches!(self.peek_char(2), Some(c) if c.is_ascii_digit())) =>
+            {
                 read_number(self.source, &mut self.pos)
             }
 

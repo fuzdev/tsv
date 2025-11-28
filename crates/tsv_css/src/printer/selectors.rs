@@ -11,7 +11,76 @@ use crate::ast::internal;
 
 impl<'a> Printer<'a> {
     /// Format a selector list (comma-separated complex selectors)
+    ///
+    /// Supports line wrapping for top-level selector lists (in rules).
+    /// Nested selector lists (inside :is(), :where(), etc.) are NOT wrapped.
     pub(super) fn print_selector_list(&mut self, list: &internal::SelectorList) {
+        self.print_selector_list_internal(list, false);
+    }
+
+    /// Format a selector list in nested context (inside pseudo-class arguments or @scope)
+    ///
+    /// For short lists: prints inline (e.g., `:is(.a, .b)`)
+    /// For long lists: wraps each selector on its own line with indentation
+    pub(super) fn print_selector_list_nested(&mut self, list: &internal::SelectorList) {
+        use tsv_lang::doc;
+
+        if list.selectors.is_empty() {
+            return;
+        }
+
+        // Check if source contains comments
+        let source_text = list.span.extract(self.source);
+        if source_text.contains("/*") {
+            // Extract from source and normalize whitespace around comments
+            let normalized = source_text
+                .replace(",/*", ", /*")
+                .replace("*/.", "*/ .")
+                .replace(",  /*", ", /*")
+                .replace("*/  .", "*/ .");
+            self.write(&normalized);
+            return;
+        }
+
+        // Build a doc for the selector list to check if it fits
+        let list_doc = self.build_selector_list_doc(list);
+
+        // Check if it fits on one line
+        // For nested selector lists, we use a smaller threshold since they're inside parens
+        // and need to account for the surrounding context
+        let available_width = self.config.print_width.saturating_sub(20); // Conservative threshold
+        let fits = doc::fits(&list_doc, available_width, doc::Mode::Flat, &self.config);
+
+        if fits {
+            // Print inline
+            for (i, complex) in list.selectors.iter().enumerate() {
+                if i > 0 {
+                    self.write(", ");
+                }
+                self.print_complex_selector(complex);
+            }
+        } else {
+            // Print multiline with indentation
+            self.write("\n");
+            self.indent_level += 1;
+            for (i, complex) in list.selectors.iter().enumerate() {
+                if i > 0 {
+                    self.write(",\n");
+                }
+                self.write_indent();
+                self.print_complex_selector(complex);
+            }
+            self.write("\n");
+            self.indent_level -= 1;
+            self.write_indent();
+        }
+    }
+
+    /// Internal implementation of selector list formatting
+    ///
+    /// - `nested`: if true, never wrap (for :is(), :where(), :not() arguments)
+    /// - if false, wrap top-level selector lists with 2+ selectors (prettier's rule)
+    fn print_selector_list_internal(&mut self, list: &internal::SelectorList, nested: bool) {
         // Check if source contains comments (/* ... */)
         let source_text = list.span.extract(self.source);
         let has_comments = source_text.contains("/*");
@@ -29,7 +98,35 @@ impl<'a> Printer<'a> {
                 .replace("*/  .", "*/ ."); // Reduce multiple spaces after comment
             self.write(&normalized);
         } else {
-            // No comments - use AST formatting
+            self.print_selector_list_with_wrapping(list, nested);
+        }
+    }
+
+    /// Format a selector list with optional line wrapping
+    ///
+    /// Prettier's rule for top-level selector lists: ALWAYS break with 2+ selectors.
+    /// Nested selector lists (in :is(), :where(), etc.) never wrap.
+    fn print_selector_list_with_wrapping(&mut self, list: &internal::SelectorList, nested: bool) {
+        if list.selectors.is_empty() {
+            return;
+        }
+
+        // Prettier's rule: top-level selector lists with 2+ selectors ALWAYS break
+        // Nested selector lists (in pseudo-classes) NEVER break
+        let should_break = !nested && list.selectors.len() >= 2;
+
+        if should_break {
+            // Print multiline: each selector on its own line
+            for (i, complex) in list.selectors.iter().enumerate() {
+                if i > 0 {
+                    self.write(",");
+                    self.write("\n");
+                    self.write_indent();
+                }
+                self.print_complex_selector(complex);
+            }
+        } else {
+            // Print inline: ", " between selectors
             for (i, complex) in list.selectors.iter().enumerate() {
                 if i > 0 {
                     self.write(", ");
@@ -40,32 +137,231 @@ impl<'a> Printer<'a> {
     }
 
     /// Format a complex selector (relative selectors with combinators)
+    ///
+    /// Supports line wrapping for long selectors (>100 chars):
+    /// - If selector fits on one line: print inline
+    /// - If too long: break at combinators with indentation
     pub(super) fn print_complex_selector(&mut self, complex: &internal::ComplexSelector) {
+        use tsv_lang::doc;
+
+        // Single selector part - always print inline
+        if complex.children.len() == 1 {
+            self.print_relative_selector_internal(&complex.children[0], true, false);
+            return;
+        }
+
+        // Build a doc for the entire complex selector to check if it fits
+        let selector_doc = self.build_complex_selector_doc(complex);
+
+        // Check if it fits on one line
+        // Account for: indent (1 tab = 2 chars) + trailing " {" (2 chars) = 4 chars overhead
+        // Tab width is counted based on config.tab_width (default: 2)
+        let indent_width = self.indent_level * self.config.tab_width;
+        let overhead = indent_width + 2; // " {" or ", "
+        let available_width = self.config.print_width.saturating_sub(overhead);
+        let fits = doc::fits(
+            &selector_doc,
+            available_width,
+            doc::Mode::Flat,
+            &self.config,
+        );
+
+        if fits {
+            // Print inline
+            for (i, relative) in complex.children.iter().enumerate() {
+                let is_first = i == 0;
+                self.print_relative_selector_internal(relative, is_first, false);
+            }
+        } else {
+            // Print with line breaks at combinators
+            for (i, relative) in complex.children.iter().enumerate() {
+                let is_first = i == 0;
+
+                if !is_first {
+                    // Break before combinator with indentation
+                    self.write("\n");
+                    self.indent_level += 1;
+                    self.write_indent();
+                    self.indent_level -= 1;
+                }
+
+                // When wrapping, all parts after the first are at line start (no leading space needed)
+                self.print_relative_selector_internal(relative, is_first, !is_first);
+            }
+        }
+    }
+
+    /// Build a doc representation of a selector list for width checking
+    fn build_selector_list_doc(&self, list: &internal::SelectorList) -> tsv_lang::doc::Doc {
+        use tsv_lang::doc;
+
+        let mut parts = Vec::new();
+        for (i, complex) in list.selectors.iter().enumerate() {
+            if i > 0 {
+                parts.push(doc::text(", "));
+            }
+            parts.push(self.build_complex_selector_doc(complex));
+        }
+        doc::concat(parts)
+    }
+
+    /// Build a doc representation of a complex selector for width checking
+    fn build_complex_selector_doc(
+        &self,
+        complex: &internal::ComplexSelector,
+    ) -> tsv_lang::doc::Doc {
+        use tsv_lang::doc;
+
+        let mut parts = Vec::new();
+
         for (i, relative) in complex.children.iter().enumerate() {
-            // Pass whether this is the first selector (index 0) to determine combinator spacing
             let is_first = i == 0;
-            self.print_relative_selector_internal(relative, is_first);
+
+            // Add combinator if present
+            if let Some(combinator) = &relative.combinator {
+                let combinator_text = match combinator {
+                    internal::Combinator::Descendant => {
+                        if is_first {
+                            "".to_string()
+                        } else {
+                            " ".to_string()
+                        }
+                    }
+                    internal::Combinator::Child => {
+                        if is_first {
+                            "> ".to_string()
+                        } else {
+                            " > ".to_string()
+                        }
+                    }
+                    internal::Combinator::NextSibling => {
+                        if is_first {
+                            "+ ".to_string()
+                        } else {
+                            " + ".to_string()
+                        }
+                    }
+                    internal::Combinator::SubsequentSibling => {
+                        if is_first {
+                            "~ ".to_string()
+                        } else {
+                            " ~ ".to_string()
+                        }
+                    }
+                    internal::Combinator::Column => {
+                        if is_first {
+                            "|| ".to_string()
+                        } else {
+                            " || ".to_string()
+                        }
+                    }
+                };
+                if !combinator_text.is_empty() {
+                    parts.push(doc::text(combinator_text));
+                }
+            }
+
+            // Add simple selectors
+            for simple in &relative.selectors {
+                parts.push(doc::text(self.simple_selector_to_string(simple)));
+            }
+        }
+
+        doc::concat(parts)
+    }
+
+    /// Convert a simple selector to a string for doc building
+    fn simple_selector_to_string(&self, simple: &internal::SimpleSelector) -> String {
+        match simple {
+            internal::SimpleSelector::Type { span, .. } => span.extract(self.source).to_string(),
+            internal::SimpleSelector::Universal { namespace, .. } => {
+                if let Some(ns) = namespace {
+                    format!("{}|*", ns)
+                } else {
+                    "*".to_string()
+                }
+            }
+            internal::SimpleSelector::Class { span, .. } => span.extract(self.source).to_string(),
+            internal::SimpleSelector::Id { span, .. } => span.extract(self.source).to_string(),
+            internal::SimpleSelector::Attribute {
+                namespace,
+                name,
+                matcher,
+                value,
+                flags,
+                ..
+            } => {
+                let mut result = String::from("[");
+                if let Some(ns) = namespace {
+                    result.push_str(ns);
+                    result.push('|');
+                }
+                result.push_str(name);
+                if let Some(m) = matcher {
+                    let op = match m {
+                        internal::AttributeMatcher::Exact => "=",
+                        internal::AttributeMatcher::Contains => "~=",
+                        internal::AttributeMatcher::DashMatch => "|=",
+                        internal::AttributeMatcher::Prefix => "^=",
+                        internal::AttributeMatcher::Suffix => "$=",
+                        internal::AttributeMatcher::Substring => "*=",
+                    };
+                    result.push_str(op);
+                    if let Some(v) = value {
+                        result.push('\'');
+                        result.push_str(v);
+                        result.push('\'');
+                    }
+                }
+                if let Some(f) = flags {
+                    result.push(' ');
+                    result.push_str(f);
+                }
+                result.push(']');
+                result
+            }
+            internal::SimpleSelector::PseudoClass { span, .. } => {
+                // For width calculation, extract from source to get accurate length
+                // This includes the pseudo-class name and all its arguments
+                span.extract(self.source).to_string()
+            }
+            internal::SimpleSelector::PseudoElement { span, .. } => {
+                // For width calculation, extract from source to get accurate length
+                span.extract(self.source).to_string()
+            }
+            internal::SimpleSelector::Nesting { .. } => "&".to_string(),
+            internal::SimpleSelector::Percentage { value, .. } => format!("{}%", value),
+            internal::SimpleSelector::Invalid { raw, .. } => raw.to_string(),
         }
     }
 
     /// Internal helper to format a relative selector with context
+    ///
+    /// - `is_first_in_complex`: true if this is the first relative selector in a complex selector
+    /// - `at_line_start`: true if this selector is at the start of a line (after a line break)
     fn print_relative_selector_internal(
         &mut self,
         relative: &internal::RelativeSelector,
         is_first_in_complex: bool,
+        at_line_start: bool,
     ) {
         // Print combinator if present
         if let Some(combinator) = &relative.combinator {
-            // Leading combinator: first selector in a complex selector with a combinator
+            // Leading combinator: first selector in a complex selector with a combinator,
+            // or at start of line (after line break in wrapped selector)
             // Example: :has(> img) - the > is leading (no space before)
-            // Between combinator: subsequent selectors in a complex selector
+            // Example (wrapped): <newline><indent>> .class - the > is leading (no space before)
+            // Between combinator: subsequent selectors in a complex selector on same line
             // Example: div > span - the > is between (space before and after)
-            let is_leading = is_first_in_complex;
+            let is_leading = is_first_in_complex || at_line_start;
 
             match combinator {
                 internal::Combinator::Descendant => {
-                    // Descendant combinator is just a space (no extra space needed)
-                    self.write(" ");
+                    // Descendant combinator is just a space
+                    // When at line start (wrapping), skip it - the line break serves as the separator
+                    if !at_line_start {
+                        self.write(" ");
+                    }
                 }
                 internal::Combinator::Child => {
                     if is_leading {
@@ -297,11 +593,11 @@ impl<'a> Printer<'a> {
                 // CSS Selectors Level 4: :nth-child(An+B of S)
                 if let Some(selectors) = of_selector {
                     self.write(" of ");
-                    self.print_selector_list(selectors);
+                    self.print_selector_list_nested(selectors);
                 }
             }
             internal::PseudoClassArgs::SelectorList { selectors, .. } => {
-                self.print_selector_list(selectors);
+                self.print_selector_list_nested(selectors);
             }
             internal::PseudoClassArgs::Slotted { selectors, .. } => {
                 // Format compound selector: sequence of simple selectors (no combinators)

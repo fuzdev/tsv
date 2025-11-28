@@ -8,6 +8,9 @@ pub enum KeywordKind {
     Let,
     Var,
     Number,
+    True,
+    False,
+    Null,
     // TODO: String, Boolean, etc.
 }
 
@@ -18,6 +21,9 @@ impl fmt::Display for KeywordKind {
             KeywordKind::Let => write!(f, "let"),
             KeywordKind::Var => write!(f, "var"),
             KeywordKind::Number => write!(f, "number"),
+            KeywordKind::True => write!(f, "true"),
+            KeywordKind::False => write!(f, "false"),
+            KeywordKind::Null => write!(f, "null"),
         }
     }
 }
@@ -32,8 +38,35 @@ pub enum TokenKind {
     Colon,
     Semicolon,
     Comma,
-    BraceOpen,   // {
-    BraceClose,  // }
+    BraceOpen,          // {
+    BraceClose,         // }
+    BracketOpen,        // [
+    BracketClose,       // ]
+    ParenOpen,          // (
+    ParenClose,         // )
+    Arrow,              // =>
+    Dot,                // .
+    DotDotDot,          // ...
+    Minus,              // -
+    Plus,               // +
+    Star,               // *
+    Slash,              // /
+    Percent,            // %
+    LessThan,           // <
+    GreaterThan,        // >
+    LessThanEquals,     // <=
+    GreaterThanEquals,  // >=
+    EqualsEquals,       // ==
+    EqualsEqualsEquals, // ===
+    BangEquals,         // !=
+    BangEqualsEquals,   // !==
+    Ampersand,          // &
+    AmpersandAmpersand, // &&
+    Pipe,               // |
+    PipePipe,           // ||
+    QuestionQuestion,   // ??
+    Bang,               // !
+    Question,           // ?
     Comment { content: String, is_block: bool },
     Eof,
 }
@@ -60,6 +93,33 @@ impl fmt::Display for TokenKind {
             TokenKind::Comma => write!(f, "','"),
             TokenKind::BraceOpen => write!(f, "'{{'"),
             TokenKind::BraceClose => write!(f, "'}}'"),
+            TokenKind::BracketOpen => write!(f, "'['"),
+            TokenKind::BracketClose => write!(f, "']'"),
+            TokenKind::ParenOpen => write!(f, "'('"),
+            TokenKind::ParenClose => write!(f, "')'"),
+            TokenKind::Arrow => write!(f, "'=>'"),
+            TokenKind::Dot => write!(f, "'.'"),
+            TokenKind::DotDotDot => write!(f, "'...'"),
+            TokenKind::Minus => write!(f, "'-'"),
+            TokenKind::Plus => write!(f, "'+'"),
+            TokenKind::Star => write!(f, "'*'"),
+            TokenKind::Slash => write!(f, "'/'"),
+            TokenKind::Percent => write!(f, "'%'"),
+            TokenKind::LessThan => write!(f, "'<'"),
+            TokenKind::GreaterThan => write!(f, "'>'"),
+            TokenKind::LessThanEquals => write!(f, "'<='"),
+            TokenKind::GreaterThanEquals => write!(f, "'>='"),
+            TokenKind::EqualsEquals => write!(f, "'=='"),
+            TokenKind::EqualsEqualsEquals => write!(f, "'==='"),
+            TokenKind::BangEquals => write!(f, "'!='"),
+            TokenKind::BangEqualsEquals => write!(f, "'!=='"),
+            TokenKind::Ampersand => write!(f, "'&'"),
+            TokenKind::AmpersandAmpersand => write!(f, "'&&'"),
+            TokenKind::Pipe => write!(f, "'|'"),
+            TokenKind::PipePipe => write!(f, "'||'"),
+            TokenKind::QuestionQuestion => write!(f, "'??'"),
+            TokenKind::Bang => write!(f, "'!'"),
+            TokenKind::Question => write!(f, "'?'"),
             TokenKind::Comment { is_block, .. } => {
                 if *is_block {
                     write!(f, "block comment")
@@ -121,6 +181,9 @@ pub fn keyword_kind(s: &str) -> Option<KeywordKind> {
         "let" => Some(KeywordKind::Let),
         "var" => Some(KeywordKind::Var),
         "number" => Some(KeywordKind::Number),
+        "true" => Some(KeywordKind::True),
+        "false" => Some(KeywordKind::False),
+        "null" => Some(KeywordKind::Null),
         _ => None,
     }
 }

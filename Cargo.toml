@@ -28,7 +28,8 @@ tsv_svelte = { path = "crates/tsv_svelte" }
 
 # External dependencies
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
+smallvec = "1.11"
 string-interner = "0.19"
 
 # Root package for integration tests
@@ -47,3 +48,5 @@ serde_json.workspace = true
 
 [dev-dependencies]
 tsv_debug = { path = "crates/tsv_debug" }
+tsv_cli = { path = "crates/tsv_cli" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

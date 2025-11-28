@@ -57,10 +57,35 @@ impl OutputBuffer {
         self.buffer.is_empty()
     }
 
+    /// Get the last n characters of the buffer (for debugging)
+    #[inline]
+    #[allow(dead_code)]
+    pub fn tail(&self, n: usize) -> &str {
+        let start = self.buffer.len().saturating_sub(n);
+        &self.buffer[start..]
+    }
+
     /// Consume the buffer and return the formatted string
     #[inline]
     pub fn into_string(self) -> String {
         self.buffer
+    }
+
+    /// Get the current column position (chars since last newline)
+    ///
+    /// Used for width calculations when embedding doc-builder output into
+    /// imperative printing. Tabs are counted as `tab_width` characters.
+    #[inline]
+    pub fn current_column(&self, tab_width: usize) -> usize {
+        // Find the last newline and count chars after it
+        let last_newline = self.buffer.rfind('\n');
+        let line_start = last_newline.map(|pos| pos + 1).unwrap_or(0);
+        let line = &self.buffer[line_start..];
+
+        // Count column width, treating tabs as tab_width
+        line.chars()
+            .map(|ch| if ch == '\t' { tab_width } else { 1 })
+            .sum()
     }
 }
 

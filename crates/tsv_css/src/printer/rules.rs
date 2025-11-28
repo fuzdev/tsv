@@ -8,7 +8,7 @@
 
 use super::{Printer, source_fidelity};
 use crate::ast::internal::{self, CssValue};
-use tsv_lang::{printing, Span};
+use tsv_lang::{PrintConfig, Span, doc, printing};
 
 impl<'a> Printer<'a> {
     /// Format a CSS rule (selector + declarations block)
@@ -73,7 +73,11 @@ impl<'a> Printer<'a> {
                     let mut added_blank_line = false;
                     if i > start_index
                         && let Some(prev_child) = rule.declarations.get(i - 1)
-                        && printing::has_blank_line_between(self.source, prev_child.span().end, comment.span.start)
+                        && printing::has_blank_line_between(
+                            self.source,
+                            prev_child.span().end,
+                            comment.span.start,
+                        )
                     {
                         self.write("\n");
                         added_blank_line = true;
@@ -118,7 +122,11 @@ impl<'a> Printer<'a> {
                         rule.declarations.get(i + 1)
                     {
                         // Check if comment is on same line as nested rule's closing brace
-                        if printing::is_same_line(self.source, nested_rule.span.end, next_comment.span.start) {
+                        if printing::is_same_line(
+                            self.source,
+                            nested_rule.span.end,
+                            next_comment.span.start,
+                        ) {
                             self.write(" /*");
                             self.write(&next_comment.content);
                             self.write("*/");
@@ -213,7 +221,177 @@ impl<'a> Printer<'a> {
         // Structure-based: check if any comma-separated item has space-separated values
         // This catches cases like: `opacity 0.3s ease, transform 0.3s ease-out`
         // where each item is a space-separated list (the "one bad apple" rule)
-        values.iter().any(|v| matches!(v, CssValue::List { .. }))
+        //
+        // Also check if any item is a function that would wrap (shouldBreakList behavior)
+        // This catches cases like: `linear-gradient(...), radial-gradient(...)`
+        // where if one function wraps, all items go one-per-line
+        values.iter().any(|v| {
+            // Space-separated list
+            if matches!(v, CssValue::List { .. }) {
+                return true;
+            }
+            // Function that would wrap
+            if let CssValue::Function { name, args, .. } = v
+                && self.should_wrap_function(name, args)
+            {
+                return true;
+            }
+            false
+        })
+    }
+
+    /// Check if a value should use width-based wrapping
+    ///
+    /// Prettier uses width-based wrapping for:
+    /// - Long comma-separated lists (font-family, animation-name, etc.)
+    /// - Long space-separated lists (transform chains, filter chains, etc.)
+    ///
+    /// Returns (needs_wrapping, is_comma_separated)
+    fn should_wrap_value_width_based(&self, value: &CssValue, property: &str) -> (bool, bool) {
+        // Custom properties never wrap width-based
+        if property.starts_with("--") {
+            return (false, false);
+        }
+
+        match value {
+            CssValue::CommaSeparated { values, .. } => {
+                let doc = self.build_list_doc(values, ", ");
+                let context_offset = property.len() + 4; // property + `: ` + `; `
+                let exceeds_width =
+                    !doc::fits_at(&doc, &self.config, self.indent_level, 0, context_offset);
+                (exceeds_width, true)
+            }
+            CssValue::List { values, .. } => {
+                let doc = self.build_list_doc(values, " ");
+                let context_offset = property.len() + 4; // property + `: ` + `; `
+                let exceeds_width =
+                    !doc::fits_at(&doc, &self.config, self.indent_level, 0, context_offset);
+                (exceeds_width, false)
+            }
+            _ => (false, false),
+        }
+    }
+
+    /// Build doc representation of a list for width checking
+    ///
+    /// Consolidates comma-separated and space-separated list building.
+    fn build_list_doc(&self, values: &[CssValue], separator: &str) -> doc::Doc {
+        let docs: Vec<_> = values.iter().map(|v| self.build_value_doc(v)).collect();
+        doc::join(docs, separator)
+    }
+
+    /// Check if a function should wrap its arguments
+    ///
+    /// Prettier wraps ALL multi-arg functions when they exceed print width.
+    /// This includes: gradients, polygon(), calc(), clamp(), min(), max(), var(), rgb(), hsl(), etc.
+    ///
+    /// Single-arg functions (like url('long-path')) never wrap because they have no
+    /// natural break points. But functions with space-separated args (like drop-shadow)
+    /// CAN wrap because they have multiple logical items.
+    fn should_wrap_function(&self, name: &str, args: &[CssValue]) -> bool {
+        // Check if we have wrappable content:
+        // 1. Multiple comma-separated args (linear-gradient, rgb, etc.)
+        // 2. Single arg that is a List with multiple space-separated items (drop-shadow)
+        let has_wrappable_content = args.len() >= 2
+            || (args.len() == 1
+                && matches!(&args[0], CssValue::List { values, .. } if values.len() >= 2));
+
+        if !has_wrappable_content {
+            return false;
+        }
+
+        // Build doc representation and check if it fits
+        let func_doc = self.build_function_doc(name, args);
+
+        // Reserve space for property name (~15 chars estimate) + `: ` + `; `
+        let context_offset = 15 + 4;
+        !doc::fits_at(
+            &func_doc,
+            &self.config,
+            self.indent_level,
+            0,
+            context_offset,
+        )
+    }
+
+    /// Build a doc representation of a function for width checking
+    ///
+    /// This builds a doc tree representing the function as it would appear inline,
+    /// which is then used with `fits()` to check if it exceeds the print width.
+    fn build_function_doc(&self, name: &str, args: &[CssValue]) -> doc::Doc {
+        let mut parts = vec![doc::text(name), doc::text("(")];
+
+        // WORKAROUND: url() data URIs contain commas that our parser incorrectly treats as
+        // argument separators (e.g., "url(data:image/png;base64,ABC)" is parsed as 2 args).
+        // Use no space after commas for url() to preserve the original data URI format.
+        let is_url = name == "url";
+
+        for (i, arg) in args.iter().enumerate() {
+            if i > 0 {
+                if is_url {
+                    parts.push(doc::text(","));
+                } else {
+                    parts.push(doc::text(", "));
+                }
+            }
+            parts.push(self.build_value_doc(arg));
+        }
+
+        parts.push(doc::text(")"));
+        doc::concat(parts)
+    }
+
+    /// Build a doc representation of a value for width checking
+    ///
+    /// This recursively builds doc representations of nested values.
+    fn build_value_doc(&self, value: &CssValue) -> doc::Doc {
+        match value {
+            CssValue::Identifier { name, .. } => doc::text(name.to_string()),
+            CssValue::String { content, .. } => {
+                // Approximate string width (with quotes)
+                doc::text(format!("'{}'", content))
+            }
+            CssValue::Dimension { span, .. } => {
+                let raw = span.extract(self.source);
+                doc::text(raw.to_string())
+            }
+            CssValue::Color { span, .. } => {
+                let raw = span.extract(self.source);
+                doc::text(raw.to_string())
+            }
+            CssValue::Function { name, args, .. } => {
+                // Recursively build nested functions
+                let mut parts = vec![doc::text(name.to_string()), doc::text("(")];
+                for (i, arg) in args.iter().enumerate() {
+                    if i > 0 {
+                        parts.push(doc::text(", "));
+                    }
+                    parts.push(self.build_value_doc(arg));
+                }
+                parts.push(doc::text(")"));
+                doc::concat(parts)
+            }
+            CssValue::List { values, .. } => {
+                let mut parts = Vec::new();
+                for (i, val) in values.iter().enumerate() {
+                    if i > 0 {
+                        parts.push(doc::text(" "));
+                    }
+                    parts.push(self.build_value_doc(val));
+                }
+                doc::concat(parts)
+            }
+            CssValue::CommaSeparated { values, .. } => {
+                let mut parts = Vec::new();
+                for (i, val) in values.iter().enumerate() {
+                    if i > 0 {
+                        parts.push(doc::text(", "));
+                    }
+                    parts.push(self.build_value_doc(val));
+                }
+                doc::concat(parts)
+            }
+        }
     }
 
     /// Format a CSS declaration (property: value;)
@@ -228,12 +406,33 @@ impl<'a> Printer<'a> {
         // Write property name (normalized with spaces around comments)
         self.write(&property_normalized);
 
-        // Check if property needs multiline formatting
+        // Check if property needs multiline formatting (structure-based)
         if self.should_use_multiline(decl) {
             self.write(":\n");
             self.indent_level += 1;
             self.print_css_value_multiline(&decl.value);
             self.indent_level -= 1;
+            self.write(";\n");
+        // Check if value needs width-based wrapping
+        } else if let (true, is_comma) =
+            self.should_wrap_value_width_based(&decl.value, &decl.property)
+        {
+            // Width-based wrapping
+            if is_comma {
+                // Comma-separated: property:\n\titem1, item2
+                self.write(":\n");
+                self.indent_level += 1;
+                self.print_comma_list_wrapped(&decl.value);
+                self.indent_level -= 1;
+            } else {
+                // Space-separated: property: item1 item2\n\titem3
+                self.write(": ");
+                self.indent_level += 1;
+                // First line already has property name + ": " consumed
+                let first_line_offset = decl.property.len() + 2; // property + ": "
+                self.print_space_list_wrapped(&decl.value, first_line_offset);
+                self.indent_level -= 1;
+            }
             self.write(";\n");
         } else if self.value_comments.contains_key(&decl.span.start) {
             // Value has comments - extract from source to preserve them
@@ -274,29 +473,320 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Format a CSS value on multiple lines (for shadow properties)
+    /// Format a CSS value on multiple lines with greedy packing
     ///
-    /// Used for properties like box-shadow and text-shadow that should format
-    /// comma-separated values on multiple lines for readability.
+    /// This is called when value needs wrapping (detected via newline in source or width).
+    /// Uses greedy packing (like prettier's fill algorithm) to pack multiple items per line.
     ///
-    /// Uses hybrid formatting: preserves source fidelity for leaf values (dimensions, strings)
-    /// while normalizing spacing for composite structures (functions, lists).
+    /// Exception: Properties with space-separated items (like box-shadow, text-shadow)
+    /// or wrappable functions (like gradients) use true one-per-line formatting.
     fn print_css_value_multiline(&mut self, value: &CssValue) {
         match value {
             CssValue::CommaSeparated { values, .. } => {
-                for (i, val) in values.iter().enumerate() {
-                    self.write_indent();
-                    self.print_nested_value(val); // Use nested_value for normalization
-                    if i < values.len() - 1 {
-                        self.write(",\n");
+                // Check if any item needs one-per-line formatting:
+                // - Space-separated list (box-shadow, text-shadow, etc.)
+                // - Function that would wrap (linear-gradient, polygon, etc.)
+                let needs_one_per_line = values.iter().any(|v| {
+                    // Space-separated list
+                    if matches!(v, CssValue::List { .. }) {
+                        return true;
                     }
+                    // Function that would wrap
+                    if let CssValue::Function { name, args, .. } = v
+                        && self.should_wrap_function(name, args)
+                    {
+                        return true;
+                    }
+                    false
+                });
+
+                if needs_one_per_line {
+                    // True one-per-line for shadow-like properties and wrappable functions
+                    for (i, val) in values.iter().enumerate() {
+                        self.write_indent();
+                        self.print_nested_value(val);
+                        if i < values.len() - 1 {
+                            self.write(",\n");
+                        }
+                    }
+                } else {
+                    // Greedy packing for simple lists (font-family, animation-name, etc.)
+                    self.print_comma_list_wrapped(value);
                 }
             }
             _ => {
                 // Fallback to regular formatting
-                self.print_nested_value(value); // Use nested_value for normalization
+                self.print_nested_value(value);
             }
         }
+    }
+
+    /// Format a comma-separated list with width-based wrapping using greedy packing
+    ///
+    /// Breaks long comma-separated lists intelligently to fit within print width.
+    /// Uses pair-based lookahead (like prettier's fill algorithm) to pack multiple items per line.
+    /// Pattern: property:\n\titem1, item2,\n\titem3;
+    fn print_comma_list_wrapped(&mut self, value: &CssValue) {
+        let values = match value {
+            CssValue::CommaSeparated { values, .. } => values,
+            _ => {
+                // Fallback
+                self.print_nested_value(value);
+                return;
+            }
+        };
+
+        // Calculate available width on continuation lines
+        // Account for base_indent_offset (e.g., when CSS is formatted inside Svelte)
+        let total_indent = self.indent_level + self.config.base_indent_offset;
+        let indent_width = total_indent * self.config.tab_width;
+        let available = self.config.print_width.saturating_sub(indent_width);
+
+        // Pre-calculate all item widths for lookahead
+        let item_widths: Vec<usize> = values
+            .iter()
+            .map(|v| self.value_to_string(v).len())
+            .collect();
+
+        let mut current_line_items: Vec<&CssValue> = Vec::new();
+        let mut current_width = 0;
+
+        for (i, val) in values.iter().enumerate() {
+            let val_width = item_widths[i];
+
+            // Calculate what adding this item to the current line would cost
+            let separator_width = if current_line_items.is_empty() { 0 } else { 2 }; // ", " before this item
+            let item_contribution = separator_width + val_width;
+
+            // Pair-based lookahead: check if adding THIS item AND NEXT item would fit
+            // This is the key to greedy packing - we only break when we MUST
+            let next_contribution = if i + 1 < values.len() {
+                2 + item_widths[i + 1] // ", " + next item width
+            } else {
+                0 // No next item
+            };
+
+            // Width if we add current item + trailing comma (for non-final lines)
+            let line_width_with_item = current_width + item_contribution;
+            // Width if we also add the next item
+            let line_width_with_pair = line_width_with_item + next_contribution;
+
+            // Three-way decision (matching prettier's fill algorithm):
+            // 1. Both current and next fit → add current, continue
+            // 2. Only current fits → add current, break AFTER current, next goes to new line
+            // 3. Neither fits → break BEFORE current
+
+            // Note: prettier's greedy fill allows 1 char overflow (emergent behavior)
+            // We use <= instead of < to allow fitting exactly at the boundary
+            let both_fit = next_contribution == 0 || line_width_with_pair <= available;
+            let current_fits = line_width_with_item <= available;
+
+            if both_fit {
+                // Case 1: Both fit - add current to line
+                current_line_items.push(val);
+                current_width += item_contribution;
+            } else if current_fits && !current_line_items.is_empty() {
+                // Case 2: Only current fits - add current, then break
+                current_line_items.push(val);
+
+                // Write current line with items and trailing comma
+                self.write_indent();
+                for (j, item) in current_line_items.iter().enumerate() {
+                    if j > 0 {
+                        self.write(", ");
+                    }
+                    self.print_nested_value(item);
+                }
+                self.write(",\n");
+
+                // Start fresh for next iteration
+                current_line_items = Vec::new();
+                current_width = 0;
+            } else if !current_line_items.is_empty() {
+                // Case 3: Neither fits - break before current
+                self.write_indent();
+                for (j, item) in current_line_items.iter().enumerate() {
+                    if j > 0 {
+                        self.write(", ");
+                    }
+                    self.print_nested_value(item);
+                }
+                self.write(",\n");
+
+                // Start new line with this item
+                current_line_items = vec![val];
+                current_width = val_width;
+            } else {
+                // First item on a line - just add it
+                current_line_items.push(val);
+                current_width += item_contribution;
+            }
+        }
+
+        // Write final line (no trailing comma on final line)
+        if !current_line_items.is_empty() {
+            self.write_indent();
+            for (j, item) in current_line_items.iter().enumerate() {
+                if j > 0 {
+                    self.write(", ");
+                }
+                self.print_nested_value(item);
+            }
+        }
+    }
+
+    /// Format a space-separated list with width-based wrapping using greedy packing
+    ///
+    /// Breaks long space-separated lists (like transform chains) when they exceed print width.
+    /// Uses pair-based lookahead (like prettier's fill algorithm) to pack multiple items per line.
+    /// Pattern: property: item1 item2\n\titem3;
+    /// Note: First line stays inline with property, subsequent lines are indented
+    ///
+    /// `first_line_offset` is the width already consumed on the first line (property + ": ")
+    fn print_space_list_wrapped(&mut self, value: &CssValue, first_line_offset: usize) {
+        let values = match value {
+            CssValue::List { values, .. } => values,
+            _ => {
+                // Fallback
+                self.print_nested_value(value);
+                return;
+            }
+        };
+
+        // Calculate available width on continuation lines
+        // Account for base_indent_offset (e.g., when CSS is formatted inside Svelte)
+        let total_indent = self.indent_level + self.config.base_indent_offset;
+        let indent_width = total_indent * self.config.tab_width;
+        let continuation_available = self.config.print_width.saturating_sub(indent_width);
+
+        // First line has less space (property name already written)
+        // Calculate first line available: print_width - (prev indent + property + ": ")
+        let prev_indent_width = (total_indent - 1) * self.config.tab_width; // one less indent on first line
+        let first_line_available = self
+            .config
+            .print_width
+            .saturating_sub(prev_indent_width + first_line_offset);
+
+        // Pre-calculate all item widths for lookahead
+        let item_widths: Vec<usize> = values
+            .iter()
+            .map(|v| self.value_to_string(v).len())
+            .collect();
+
+        let mut current_line_items: Vec<&CssValue> = Vec::new();
+        let mut current_width = 0;
+        let mut is_first_line = true;
+
+        for (i, val) in values.iter().enumerate() {
+            let val_width = item_widths[i];
+
+            // Calculate what adding this item would cost
+            let separator_width = if current_line_items.is_empty() { 0 } else { 1 }; // " "
+            let item_contribution = separator_width + val_width;
+
+            // Pair-based lookahead: check if adding THIS item AND NEXT item would fit
+            let next_contribution = if i + 1 < values.len() {
+                1 + item_widths[i + 1] // " " + next item width
+            } else {
+                0 // No next item
+            };
+
+            let line_width_with_item = current_width + item_contribution;
+            let line_width_with_pair = line_width_with_item + next_contribution;
+
+            // Use different available width for first line vs continuation lines
+            let available = if is_first_line {
+                first_line_available
+            } else {
+                continuation_available
+            };
+
+            // Three-way decision (matching prettier's fill algorithm):
+            // 1. Both current and next fit → add current, continue
+            // 2. Only current fits → add current, break AFTER current, next goes to new line
+            // 3. Neither fits → break BEFORE current
+            let both_fit = next_contribution == 0 || line_width_with_pair <= available;
+            let current_fits = line_width_with_item <= available;
+
+            if both_fit {
+                // Case 1: Both fit - add current to line
+                current_line_items.push(val);
+                current_width += item_contribution;
+            } else if current_fits && !current_line_items.is_empty() {
+                // Case 2: Only current fits - add current, then break
+                current_line_items.push(val);
+
+                // Write current line
+                for (j, item) in current_line_items.iter().enumerate() {
+                    if j > 0 {
+                        self.write(" ");
+                    }
+                    self.print_nested_value(item);
+                }
+                self.write("\n");
+
+                // Start new line
+                if is_first_line {
+                    is_first_line = false;
+                }
+                self.write_indent();
+                current_line_items = Vec::new();
+                current_width = 0;
+            } else if !current_line_items.is_empty() {
+                // Case 3: Neither fits - break before current
+                for (j, item) in current_line_items.iter().enumerate() {
+                    if j > 0 {
+                        self.write(" ");
+                    }
+                    self.print_nested_value(item);
+                }
+                self.write("\n");
+
+                // Start new line with this item
+                if is_first_line {
+                    is_first_line = false;
+                }
+                self.write_indent();
+                current_line_items = vec![val];
+                current_width = val_width;
+            } else {
+                // First item on a line - just add it
+                current_line_items.push(val);
+                current_width += item_contribution;
+            }
+        }
+
+        // Write final line
+        if !current_line_items.is_empty() {
+            for (j, item) in current_line_items.iter().enumerate() {
+                if j > 0 {
+                    self.write(" ");
+                }
+                self.print_nested_value(item);
+            }
+        }
+    }
+
+    /// Convert a value to a string for width calculation
+    fn value_to_string(&self, value: &CssValue) -> String {
+        use tsv_lang::OutputBuffer;
+
+        let buffer = OutputBuffer::new();
+        // Use a very large print width to prevent any wrapping during width calculation
+        let no_wrap_config = PrintConfig {
+            print_width: 10000,
+            ..self.config
+        };
+        let mut temp_printer = Printer {
+            buffer,
+            source: self.source,
+            indent_level: 0, // Don't include indentation in width calculation
+            config: no_wrap_config,
+            value_comments: self.value_comments,
+        };
+        // Use semantic printing to avoid source extraction (which includes original formatting)
+        temp_printer.print_css_value_semantic(value);
+        temp_printer.buffer.into_string()
     }
 
     /// Format a nested value (function arg, list item)
@@ -450,22 +940,42 @@ impl<'a> Printer<'a> {
                     let raw = span.extract(self.source);
                     self.write(raw);
                 } else {
-                    // Reconstruct function from name and args
-                    self.write(name);
-                    self.write("(");
-                    // url() functions don't get spaces after commas (prettier behavior)
-                    let is_url = name == "url";
-                    for (i, arg) in args.iter().enumerate() {
-                        if i > 0 {
-                            if is_url {
-                                self.write(",");
-                            } else {
-                                self.write(", ");
+                    // Check if function should wrap
+                    if self.should_wrap_function(name, args) {
+                        // Wrap function arguments
+                        self.write(name);
+                        self.write("(\n");
+                        self.indent_level += 1;
+                        for (i, arg) in args.iter().enumerate() {
+                            self.write_indent();
+                            self.print_nested_value(arg);
+                            if i < args.len() - 1 {
+                                self.write(",\n");
                             }
                         }
-                        self.print_nested_value(arg); // Use nested_value to preserve source fidelity
+                        self.indent_level -= 1;
+                        self.write("\n");
+                        self.write_indent();
+                        self.write(")");
+                    } else {
+                        // Inline function (no wrapping)
+                        self.write(name);
+                        self.write("(");
+                        // WORKAROUND: url() data URIs contain commas that our parser incorrectly treats as
+                        // argument separators. Use no space after commas to preserve data URI format.
+                        let is_url = name == "url";
+                        for (i, arg) in args.iter().enumerate() {
+                            if i > 0 {
+                                if is_url {
+                                    self.write(",");
+                                } else {
+                                    self.write(", ");
+                                }
+                            }
+                            self.print_nested_value(arg);
+                        }
+                        self.write(")");
                     }
-                    self.write(")");
                 }
             }
             CssValue::List { values, .. } => {
@@ -531,23 +1041,42 @@ impl<'a> Printer<'a> {
                 self.write(&formatted);
             }
             CssValue::Function { name, args, .. } => {
-                self.write(name);
-                self.write("(");
-                // url() functions don't get spaces after commas (prettier behavior)
-                let is_url = name == "url";
-                for (i, arg) in args.iter().enumerate() {
-                    if i > 0 {
-                        if is_url {
-                            self.write(",");
-                        } else {
-                            self.write(", ");
+                // Check if function should wrap
+                if self.should_wrap_function(name, args) {
+                    // Wrap function arguments
+                    self.write(name);
+                    self.write("(\n");
+                    self.indent_level += 1;
+                    for (i, arg) in args.iter().enumerate() {
+                        self.write_indent();
+                        self.print_nested_value(arg);
+                        if i < args.len() - 1 {
+                            self.write(",\n");
                         }
                     }
-                    // Try source extraction first (spans are now accurate from ValueCursor!)
-                    // Falls back to semantic formatting if extraction fails
-                    self.print_nested_value(arg);
+                    self.indent_level -= 1;
+                    self.write("\n");
+                    self.write_indent();
+                    self.write(")");
+                } else {
+                    // Inline function (no wrapping)
+                    self.write(name);
+                    self.write("(");
+                    // WORKAROUND: url() data URIs contain commas that our parser incorrectly treats as
+                    // argument separators. Use no space after commas to preserve data URI format.
+                    let is_url = name == "url";
+                    for (i, arg) in args.iter().enumerate() {
+                        if i > 0 {
+                            if is_url {
+                                self.write(",");
+                            } else {
+                                self.write(", ");
+                            }
+                        }
+                        self.print_nested_value(arg);
+                    }
+                    self.write(")");
                 }
-                self.write(")");
             }
             CssValue::List { values, .. } => {
                 for (i, val) in values.iter().enumerate() {

@@ -24,16 +24,12 @@ impl<'a> Printer<'a> {
             )
         });
 
-        // Components are always treated as block elements (matches prettier behavior)
+        // Components are treated as block for general formatting but inline for hug logic
         use crate::ast::internal::ElementKind;
         let is_block = is_block || element.kind == ElementKind::Component;
 
-        // Check if we need Prettier's "hug mode" (>< pattern) formatting
-        let use_hug_mode = self.needs_hug_mode(element, is_block);
-
-        // Decide if children should be multiline (skip if using hug mode)
-        let multiline =
-            !use_hug_mode && self.should_format_multiline(element, is_block, preserves_ws);
+        // For hug logic, Components are treated as inline (they can hug children)
+        let is_block_for_hug = is_block && element.kind != ElementKind::Component;
 
         // Opening tag
         let tag_name = self.resolve_symbol(element.name);
@@ -43,11 +39,29 @@ impl<'a> Printer<'a> {
         // Format attributes with line wrapping support (hybrid doc-builder approach)
         let attrs_multiline = self.print_attributes_with_wrapping(element, &tag_name, is_void);
 
+        // Check if we need Prettier's "hug mode" (>< pattern) formatting
+        // Must check AFTER attributes to know if opening tag wrapped
+        // TODO: Rename `needs_hug_mode` → `should_break_children` or similar
+        // The name "hug mode" conflates two concepts: break children vs whitespace detection
+        let use_hug_mode = self.needs_hug_mode(element, is_block, attrs_multiline);
+
+        // Determine hugging behavior based on semantic whitespace (prettier's approach)
+        // hugStart: true if first child has NO leading whitespace
+        // hugEnd: true if last child has NO trailing whitespace
+        // Note: Use is_block_for_hug (Components are inline for hug logic)
+        let hug_start = self.should_hug_start(element, is_block_for_hug);
+        let hug_end = self.should_hug_end(element, is_block_for_hug);
+
+        // Decide if children should be multiline (skip if using hug mode)
+        let multiline =
+            !use_hug_mode && self.should_format_multiline(element, is_block, preserves_ws);
+
         // Void elements are self-closing
         if is_void {
             // If attributes wrapped to multiple lines, closing tag goes at column 0
             // Otherwise, add a space before the closing tag
             if attrs_multiline {
+                self.write("\n");
                 self.write("/>");
             } else {
                 self.write(" />");
@@ -61,8 +75,10 @@ impl<'a> Printer<'a> {
             let was_self_closing = source_slice.trim_end().ends_with("/>");
 
             if was_self_closing {
-                // If attributes wrapped, no space before />; otherwise add space
+                // If attributes wrapped, add newline + indent before />; otherwise add space
                 if attrs_multiline {
+                    self.write("\n");
+                    self.write_indent();
                     self.write("/>");
                 } else {
                     self.write(" />");
@@ -72,25 +88,141 @@ impl<'a> Printer<'a> {
             // Otherwise, fall through to write explicit closing tag below
         }
 
-        // Format children based on mode
-        if use_hug_mode {
-            // Hug mode: <Tag\n\t><child></Tag\n>
-            self.print_hug_mode_element(&tag_name, &element.fragment.nodes, preserves_ws);
-        } else {
-            // Check for "opening newline only" pattern (prettier's split closing tag format)
-            // Pattern: opening tag followed by newline, but closing tag NOT preceded by newline
-            // Output: <Tag>\n\t{content}</Tag\n>
-            let use_split_closing_tag =
-                multiline && self.has_opening_newline_only(&element.fragment.nodes);
-
-            // Normal mode
+        // Format children based on mode and hugging behavior
+        // Prettier has 4 separate code paths for hugStart/hugEnd combinations:
+        // 1. hugStart && hugEnd (lines 1180-1189): Full hug with ><content</Tag\n>
+        // 2. hugStart && !hugEnd (lines 1221-1227): Indented opening, normal closing
+        // 3. !hugStart && hugEnd (lines 1229-1236): Normal opening, split closing
+        // 4. !hugStart && !hugEnd (lines 1241-1247): Normal formatting
+        //
+        // TODO: Refactor into separate functions (see research notes):
+        // - print_hug_both_element() - Case 1
+        // - print_hug_start_element() - Case 2
+        // - print_hug_end_element() - Case 3
+        // - Normal flow for Case 4
+        // This would reduce code duplication and make the logic clearer.
+        if use_hug_mode && hug_start && hug_end {
+            // Case 1: Full hug mode (prettier lines 1180-1189)
+            // Pattern: ><content</Tag\n> (with wrapped attrs) or \n\t><content</Tag\n> (no attrs)
+            // IMPORTANT: attrs_multiline parameter is critical - controls opening > indentation
+            self.print_hug_mode_element(
+                &tag_name,
+                &element.fragment.nodes,
+                preserves_ws,
+                hug_start,
+                hug_end,
+                attrs_multiline,
+            );
+        } else if use_hug_mode && hug_start && !hug_end {
+            // Case 2: Hug start only (prettier lines 1221-1227)
+            // Pattern: \t><content>\n</Tag>
+            // Opening: indented > on new line
+            self.write("\n");
+            self.indent_level += 1;
+            self.write_indent();
             self.write(">");
 
-            if use_split_closing_tag {
-                // Opening newline only: content on one indented line, split closing tag
-                self.write("\n");
-                self.indent_level += 1;
+            // Children: print inline, skipping whitespace-only text nodes
+            for node in &element.fragment.nodes {
+                if !matches!(node, FragmentNode::Text(text) if text.raw.is_whitespace_only()) {
+                    self.print_fragment_node(node, false, preserves_ws);
+                }
+            }
+
+            // Closing: normal closing tag on new line with indent
+            self.write("\n");
+            self.indent_level -= 1;
+            self.write_indent();
+            self.write("</");
+            self.write(&tag_name);
+            self.write(">");
+        } else if use_hug_mode && !hug_start && hug_end {
+            // Case 3: Hug end only (prettier lines 1229-1236)
+            // Pattern: >\n\t<content></Tag\n>
+            // Opening: normal opening with newline
+            self.write("\n");
+            self.write(">");
+
+            // Children: print with multiline formatting but no trailing newline
+            self.write("\n");
+            self.indent_level += 1;
+            for (i, node) in element.fragment.nodes.iter().enumerate() {
+                // Skip leading whitespace-only text node
+                if i == 0
+                    && matches!(node, FragmentNode::Text(text) if text.raw.is_whitespace_only())
+                {
+                    continue;
+                }
+
                 self.write_indent();
+                self.print_fragment_node(node, false, preserves_ws);
+
+                // Add newline before next node (but not after last)
+                if i < element.fragment.nodes.len() - 1 {
+                    self.write("\n");
+                }
+            }
+            self.indent_level -= 1;
+
+            // Closing: split closing tag (immediately after last child)
+            self.write("</");
+            self.write(&tag_name);
+            self.write("\n");
+            self.write_indent();
+            self.write(">");
+        } else if use_hug_mode && !hug_start && !hug_end {
+            // Case 4: Neither hug (prettier lines 1241-1247)
+            // Pattern: >\n\t<content>\n</Tag>
+            // This is just normal multiline formatting
+            self.write("\n");
+            self.write(">");
+
+            // Children: normal multiline formatting
+            self.print_multiline_children(&element.fragment.nodes, preserves_ws);
+
+            // Closing: normal closing tag
+            self.write("</");
+            self.write(&tag_name);
+            self.write(">");
+        } else {
+            // Check if this is the "attrs wrapped + 1 native block child" case
+            // This uses inline opening (no newline after >) + split closing tag
+            // Only applies when source has NO opening newline (preserve author intent)
+            let has_source_opening_newline = element.fragment.nodes.first().is_some_and(|node| {
+                matches!(node, FragmentNode::Text(text)
+                    if text.raw.is_whitespace_only() && text.raw.contains('\n'))
+            });
+
+            let is_wrapped_attrs_single_block = attrs_multiline
+                && !has_source_opening_newline
+                && {
+                    let non_ws_children: Vec<_> = element.fragment.nodes.iter().filter(|node| !matches!(node, FragmentNode::Text(text) if text.raw.is_whitespace_only())).collect();
+                    non_ws_children.len() == 1
+                        && matches!(non_ws_children.first(), Some(FragmentNode::Element(el)) if self.is_block_element(el))
+                };
+
+            // Add newline before > only if:
+            // - Attributes wrapped AND
+            // - NOT the special single-block case
+            if attrs_multiline && !is_wrapped_attrs_single_block {
+                self.write("\n");
+            }
+            self.write(">");
+
+            // Check for split closing tag patterns:
+            // 1. "wrapped attrs + single block" pattern: <Tag attrs...><content></Tag\n>
+            // 2. "opening newline only" pattern: <Tag>\n\t{content}</Tag\n>
+            let use_split_closing_tag = is_wrapped_attrs_single_block
+                || (multiline && self.has_opening_newline_only(&element.fragment.nodes));
+
+            if use_split_closing_tag {
+                // Split closing tag with optional opening newline
+                if !is_wrapped_attrs_single_block {
+                    // Regular split closing: add opening newline + indent
+                    self.write("\n");
+                    self.indent_level += 1;
+                    self.write_indent();
+                }
 
                 // Print content inline (skip leading whitespace, preserve rest)
                 for (i, node) in element.fragment.nodes.iter().enumerate() {
@@ -106,7 +238,9 @@ impl<'a> Printer<'a> {
                 // Split closing tag
                 self.write("</");
                 self.write(&tag_name);
-                self.indent_level -= 1;
+                if !is_wrapped_attrs_single_block {
+                    self.indent_level -= 1;
+                }
                 self.write("\n");
                 self.write_indent();
                 self.write(">");
@@ -215,9 +349,16 @@ impl<'a> Printer<'a> {
     ///
     /// This is triggered when:
     /// - Parent is an inline element OR component
-    /// - Children contain at least one block element
+    /// - Children are all block HTML elements OR all components
+    /// - For native block children: 2+ children OR (1 child AND attrs wrapped)
+    /// - For component children: attrs wrapped AND 1+ children
     /// - Children don't already have newlines (compact source)
-    pub fn needs_hug_mode(&self, element: &internal::Element, is_block: bool) -> bool {
+    pub fn needs_hug_mode(
+        &self,
+        element: &internal::Element,
+        is_block: bool,
+        attrs_wrapped: bool,
+    ) -> bool {
         use crate::ast::internal::ElementKind;
 
         // Only inline elements and components can use hug mode
@@ -238,17 +379,38 @@ impl<'a> Printer<'a> {
             )
             .collect();
 
-        // Need at least 2 children for hug mode
-        if non_whitespace_children.len() < 2 {
+        // Need at least 1 child for hug mode
+        let child_count = non_whitespace_children.len();
+        if child_count == 0 {
             return false;
         }
 
-        // All children must be block HTML elements (not components, not expressions, not text)
-        let all_block_elements = non_whitespace_children
+        // Hug mode rules:
+        // 1. Native block children → hug mode if (2+ children) OR (1 child AND attrs wrapped)
+        // 2. Component children → hug mode if (attrs wrapped AND 1+ children)
+        // NOTE: Component *parents* with 1 native block child + wrapped attrs is a common case
+        let all_native_block = non_whitespace_children
             .iter()
             .all(|node| matches!(node, FragmentNode::Element(el) if self.is_block_element(el)));
 
-        if !all_block_elements {
+        let all_components = non_whitespace_children.iter().all(
+            |node| matches!(node, FragmentNode::Element(el) if el.kind == ElementKind::Component),
+        );
+
+        // Determine if hug mode applies
+        let should_use_hug = if all_native_block {
+            // Native block children: 2+ children OR (1 child AND attrs wrapped)
+            // The (1 child AND attrs wrapped) case is critical for Component parents
+            child_count >= 2 || (child_count == 1 && attrs_wrapped)
+        } else if all_components {
+            // Component children: attrs wrapped AND 1+ children
+            attrs_wrapped && child_count >= 1
+        } else {
+            // Mixed or non-element children: no hug mode
+            false
+        };
+
+        if !should_use_hug {
             return false;
         }
 
@@ -288,6 +450,81 @@ impl<'a> Printer<'a> {
         has_opening_newline && !has_trailing_text
     }
 
+    /// Check if element should "hug" the start (opening tag hugs first child)
+    ///
+    /// Based on prettier-plugin-svelte's `shouldHugStart()` logic:
+    /// - Block elements never hug
+    /// - Inline elements hug if first child has NO leading whitespace
+    /// - Returns true for ><child pattern, false for >\n\t<child pattern
+    ///
+    /// TODO: Consider extracting helper predicates:
+    /// - `is_whitespace_node(&FragmentNode) -> bool`
+    /// - `has_leading_whitespace(&Element) -> bool`
+    /// - `has_trailing_whitespace(&Element) -> bool`
+    fn should_hug_start(&self, element: &internal::Element, is_block: bool) -> bool {
+        // Block elements never hug
+        if is_block {
+            return false;
+        }
+
+        // Empty elements hug by default
+        if element.fragment.nodes.is_empty() {
+            return true;
+        }
+
+        // Check if first child starts with whitespace
+        let first_child = &element.fragment.nodes[0];
+        match first_child {
+            FragmentNode::Text(text) => {
+                // If it's whitespace-only, check if it's formatting whitespace (newline)
+                // If it has a newline, don't hug (spaced pattern)
+                if text.raw.is_whitespace_only() {
+                    !text.raw.contains('\n')
+                } else {
+                    // Text content with no leading whitespace → hug
+                    !text.raw.starts_with(char::is_whitespace)
+                }
+            }
+            // Non-text first child → hug
+            _ => true,
+        }
+    }
+
+    /// Check if element should "hug" the end (closing tag hugs last child)
+    ///
+    /// Based on prettier-plugin-svelte's `shouldHugEnd()` logic:
+    /// - Block elements never hug
+    /// - Inline elements hug if last child has NO trailing whitespace
+    /// - Returns true for child</Tag\n> pattern, false for child\n</Tag> pattern
+    fn should_hug_end(&self, element: &internal::Element, is_block: bool) -> bool {
+        // Block elements never hug
+        if is_block {
+            return false;
+        }
+
+        // Empty elements hug by default
+        if element.fragment.nodes.is_empty() {
+            return true;
+        }
+
+        // Check if last child ends with whitespace
+        let last_child = &element.fragment.nodes[element.fragment.nodes.len() - 1];
+        match last_child {
+            FragmentNode::Text(text) => {
+                // If it's whitespace-only, check if it's formatting whitespace (newline)
+                // If it has a newline, don't hug (spaced pattern)
+                if text.raw.is_whitespace_only() {
+                    !text.raw.contains('\n')
+                } else {
+                    // Text content with no trailing whitespace → hug
+                    !text.raw.ends_with(char::is_whitespace)
+                }
+            }
+            // Non-text last child → hug
+            _ => true,
+        }
+    }
+
     /// Format attributes with line wrapping support (hybrid doc-builder approach)
     ///
     /// Uses prettier's doc-builder pattern to decide whether to wrap attributes:
@@ -324,6 +561,11 @@ impl<'a> Printer<'a> {
             attr_docs.push(self.build_attribute_doc(attr));
         }
 
+        // Add dedent(line()) at the end for proper spacing before closing tag
+        // In flat mode: becomes a space
+        // In break mode: becomes newline at dedented level
+        attr_docs.push(doc::dedent(doc::line()));
+
         // For line length calculation, we need to include the tag name and closing
         // Build a complete doc to let the fits() algorithm make the right decision
         let closing = if is_void || element.fragment.nodes.is_empty() {
@@ -342,7 +584,12 @@ impl<'a> Printer<'a> {
         ]));
 
         // Check if the complete tag fits on one line
-        let fits = doc::fits(&complete_doc, self.config.print_width, doc::Mode::Flat, &self.config);
+        let fits = doc::fits(
+            &complete_doc,
+            self.config.print_width,
+            doc::Mode::Flat,
+            &self.config,
+        );
 
         if fits {
             // Print inline: space before each attribute
@@ -360,8 +607,8 @@ impl<'a> Printer<'a> {
                 self.indent_level -= 1;
                 self.print_attribute(attr);
             }
-            // Add newline before closing (which element code will write)
-            self.write("\n");
+            // NOTE: Newline before closing tag is handled by caller
+            // (different behavior for hug mode vs normal mode)
             true // Multiline
         }
     }

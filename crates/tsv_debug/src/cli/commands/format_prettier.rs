@@ -1,4 +1,3 @@
-use crate::deno;
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
 use tsv_cli::cli::input::{Input, ParserType};
@@ -55,19 +54,24 @@ struct FormatPrettierExecutable {
 
 impl Executable for FormatPrettierExecutable {
     fn execute(&self) {
-        let content = self.input.content();
-        let filepath = match self.parser_type {
-            ParserType::Svelte => "temp.svelte",
-            ParserType::TypeScript => "temp.ts",
-            ParserType::Css => "temp.css",
-        };
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        rt.block_on(run(&self.input, self.parser_type));
+    }
+}
 
-        match deno::run_prettier(content, filepath) {
-            Ok(formatted) => print!("{}", formatted),
-            Err(err) => {
-                eprintln!("Error formatting with prettier: {}", err);
-                std::process::exit(1);
-            }
+async fn run(input: &Input, parser_type: ParserType) {
+    let content = input.content();
+    let filepath = match parser_type {
+        ParserType::Svelte => "temp.svelte",
+        ParserType::TypeScript => "temp.ts",
+        ParserType::Css => "temp.css",
+    };
+
+    match fuz_client::run_prettier(content, filepath).await {
+        Ok(formatted) => print!("{}", formatted),
+        Err(err) => {
+            eprintln!("Error formatting with prettier: {}", err);
+            std::process::exit(1);
         }
     }
 }

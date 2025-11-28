@@ -3,8 +3,8 @@
 // This module provides common printing logic used across language printers
 // (TypeScript, CSS, Svelte) to eliminate code duplication.
 
-use crate::escapes::swap_quote_escaping;
 use crate::Span;
+use crate::escapes::swap_quote_escaping;
 
 /// Options for string literal formatting
 #[derive(Debug, Clone, Copy)]
@@ -235,6 +235,44 @@ pub fn has_blank_line_between(source: &str, prev_end: u32, curr_start: u32) -> b
     // Check if there are 2+ newlines (blank line) between the positions
     let between = &source[prev_end..curr_start];
     between.matches('\n').count() >= 2
+}
+
+/// Check if there's any newline between two positions in source
+///
+/// Used to detect source-triggered line breaks, e.g., newline after `{` in objects.
+/// This is the key trigger for prettier's "source preservation" behavior where
+/// objects expand to multiline when the source has a newline after opening brace.
+///
+/// # Arguments
+///
+/// * `source` - The source text
+/// * `start` - Start position (e.g., after opening `{`)
+/// * `end` - End position (e.g., start of first property)
+///
+/// # Returns
+///
+/// `true` if there's at least one newline between positions.
+///
+/// # Examples
+///
+/// ```
+/// use tsv_lang::printing::has_newline_between;
+///
+/// let source = "{\na: 1}";
+/// assert_eq!(has_newline_between(source, 1, 2), true);
+///
+/// let source2 = "{a: 1}";
+/// assert_eq!(has_newline_between(source2, 1, 2), false);
+/// ```
+pub fn has_newline_between(source: &str, start: u32, end: u32) -> bool {
+    let start = start as usize;
+    let end = end as usize;
+
+    if start > end || end > source.len() {
+        return false;
+    }
+
+    source[start..end].contains('\n')
 }
 
 /// Strip common indentation from comment content based on its position in source

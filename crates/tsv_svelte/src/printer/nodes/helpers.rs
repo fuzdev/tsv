@@ -5,8 +5,8 @@
 
 use crate::ast::internal::FragmentNode;
 use crate::printer::Printer;
-use tsv_lang::printing::{StringFormatOptions, format_string_literal};
 use tsv_lang::SymbolResolver;
+use tsv_lang::printing::{StringFormatOptions, format_string_literal};
 
 impl<'a> Printer<'a> {
     /// Format an ExpressionTag
@@ -41,10 +41,18 @@ impl<'a> Printer<'a> {
                 if !obj.properties.is_empty() {
                     self.write(" ");
                     for (i, prop) in obj.properties.iter().enumerate() {
-                        self.print_ts_expression(&prop.key);
-                        if !prop.shorthand {
-                            self.write(": ");
-                            self.print_ts_expression(&prop.value);
+                        match prop {
+                            tsv_ts::ObjectProperty::Property(p) => {
+                                self.print_ts_expression(&p.key);
+                                if !p.shorthand {
+                                    self.write(": ");
+                                    self.print_ts_expression(&p.value);
+                                }
+                            }
+                            tsv_ts::ObjectProperty::SpreadElement(s) => {
+                                self.write("...");
+                                self.print_ts_expression(&s.argument);
+                            }
                         }
                         if i < obj.properties.len() - 1 {
                             self.write(", ");
@@ -53,6 +61,95 @@ impl<'a> Printer<'a> {
                     self.write(" ");
                 }
                 self.write("}");
+            }
+            tsv_ts::Expression::ArrayExpression(arr) => {
+                // Basic array formatting
+                self.write("[");
+                for (i, elem) in arr.elements.iter().enumerate() {
+                    if let Some(e) = elem {
+                        self.print_ts_expression(e);
+                    }
+                    if i < arr.elements.len() - 1 {
+                        self.write(", ");
+                    }
+                }
+                self.write("]");
+            }
+            tsv_ts::Expression::UnaryExpression(unary) => {
+                self.write(unary.operator.as_str());
+                self.print_ts_expression(&unary.argument);
+            }
+            tsv_ts::Expression::BinaryExpression(binary) => {
+                self.print_ts_expression(&binary.left);
+                self.write(" ");
+                self.write(binary.operator.as_str());
+                self.write(" ");
+                self.print_ts_expression(&binary.right);
+            }
+            tsv_ts::Expression::ArrowFunctionExpression(arrow) => {
+                // Print arrow function: (params) => body
+                self.write("(");
+                for (i, param) in arrow.params.iter().enumerate() {
+                    if i > 0 {
+                        self.write(", ");
+                    }
+                    let name = self.resolve_symbol(param.name);
+                    self.write(&name);
+                }
+                self.write(") => ");
+                match &arrow.body {
+                    tsv_ts::ArrowFunctionBody::Expression(expr) => {
+                        self.print_ts_expression(expr);
+                    }
+                    tsv_ts::ArrowFunctionBody::BlockStatement { span } => {
+                        // Extract raw block from source
+                        let raw = span.extract(self.source);
+                        self.write(raw);
+                    }
+                }
+            }
+            tsv_ts::Expression::SpreadElement(spread) => {
+                self.write("...");
+                self.print_ts_expression(&spread.argument);
+            }
+            tsv_ts::Expression::CallExpression(call) => {
+                self.print_ts_expression(&call.callee);
+                if call.optional {
+                    self.write("?.");
+                }
+                self.write("(");
+                for (i, arg) in call.arguments.iter().enumerate() {
+                    if i > 0 {
+                        self.write(", ");
+                    }
+                    self.print_ts_expression(arg);
+                }
+                self.write(")");
+            }
+            tsv_ts::Expression::MemberExpression(member) => {
+                self.print_ts_expression(&member.object);
+                if member.computed {
+                    if member.optional {
+                        self.write("?.");
+                    }
+                    self.write("[");
+                    self.print_ts_expression(&member.property);
+                    self.write("]");
+                } else {
+                    if member.optional {
+                        self.write("?.");
+                    } else {
+                        self.write(".");
+                    }
+                    self.print_ts_expression(&member.property);
+                }
+            }
+            tsv_ts::Expression::ConditionalExpression(cond) => {
+                self.print_ts_expression(&cond.test);
+                self.write(" ? ");
+                self.print_ts_expression(&cond.consequent);
+                self.write(" : ");
+                self.print_ts_expression(&cond.alternate);
             }
         }
     }
@@ -84,6 +181,12 @@ impl<'a> Printer<'a> {
                     format_string_literal(raw_content, *quote, StringFormatOptions::default());
 
                 self.write(&formatted);
+            }
+            tsv_ts::LiteralValue::Boolean(b) => {
+                self.write(if *b { "true" } else { "false" });
+            }
+            tsv_ts::LiteralValue::Null => {
+                self.write("null");
             }
         }
     }

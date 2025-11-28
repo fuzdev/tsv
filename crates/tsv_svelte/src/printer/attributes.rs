@@ -8,8 +8,8 @@
 
 use crate::ast::internal;
 use crate::printer::Printer;
-use tsv_lang::doc::{self, Doc};
 use tsv_lang::SymbolResolver;
+use tsv_lang::doc::{self, Doc};
 
 impl<'a> Printer<'a> {
     /// Format an attribute (name="value" or name)
@@ -85,17 +85,12 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an attribute value part
     fn build_attribute_value_doc(&self, value: &internal::AttributeValue) -> Doc {
         match value {
-            internal::AttributeValue::Text(text) => {
-                doc::text(&text.raw)
-            }
+            internal::AttributeValue::Text(text) => doc::text(&text.raw),
             internal::AttributeValue::ExpressionTag(expr_tag) => {
                 // TODO: For now, render the expression tag to a string
                 // In future full refactor, this would build a Doc tree for the expression
-                let mut temp_printer = Printer::with_config(
-                    self.source,
-                    self.interner.clone(),
-                    self.config,
-                );
+                let mut temp_printer =
+                    Printer::with_config(self.source, self.interner.clone(), self.config);
                 temp_printer.print_expression_tag(expr_tag);
                 doc::text(temp_printer.into_string())
             }

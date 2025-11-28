@@ -1,4 +1,4 @@
-use crate::deno;
+use anyhow::Result;
 use std::process::Command as ProcessCommand;
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
@@ -57,16 +57,8 @@ struct CanonicalParseExecutable {
 
 impl Executable for CanonicalParseExecutable {
     fn execute(&self) {
-        let content = self.input.content();
-
-        let result = match self.parser_type {
-            ParserType::Svelte => deno::parse_svelte(content),
-            ParserType::TypeScript => deno::parse_typescript(content),
-            ParserType::Css => {
-                // CSS uses our Rust parser (no external canonical parser available)
-                parse_css_with_rust(content)
-            }
-        };
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        let result = rt.block_on(run(&self.input, self.parser_type));
 
         match result {
             Ok(json) => print!("{}", json),
@@ -78,8 +70,21 @@ impl Executable for CanonicalParseExecutable {
     }
 }
 
+async fn run(input: &Input, parser_type: ParserType) -> Result<String> {
+    let content = input.content();
+
+    match parser_type {
+        ParserType::Svelte => fuz_client::parse_svelte(content).await,
+        ParserType::TypeScript => fuz_client::parse_typescript(content).await,
+        ParserType::Css => {
+            // CSS uses our Rust parser (no external canonical parser available)
+            parse_css_with_rust(content)
+        }
+    }
+}
+
 /// Parse CSS using our Rust parser (no external canonical parser available)
-fn parse_css_with_rust(content: &str) -> Result<String, String> {
+fn parse_css_with_rust(content: &str) -> Result<String> {
     let output = ProcessCommand::new("cargo")
         .args([
             "run",
@@ -91,12 +96,11 @@ fn parse_css_with_rust(content: &str) -> Result<String, String> {
             "--content",
         ])
         .arg(content)
-        .output()
-        .map_err(|e| format!("Failed to execute cargo: {}", e))?;
+        .output()?;
 
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        anyhow::bail!("{}", String::from_utf8_lossy(&output.stderr))
     }
 }

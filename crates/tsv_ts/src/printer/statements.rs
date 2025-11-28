@@ -5,8 +5,9 @@
 // - Variable declarations (const, let, var)
 // - Future: Function declarations, class declarations, import/export, etc.
 
-use super::Printer;
+use super::{Printer, is_pure_property_chain};
 use crate::ast::internal::{self, Statement, VariableDeclarationKind};
+use tsv_lang::doc;
 
 impl<'a> Printer<'a> {
     /// Print a statement
@@ -80,48 +81,79 @@ impl<'a> Printer<'a> {
         self.print_inline_comments_in_statement(last_declarator_end, decl.span.end);
     }
 
-    /// Print a variable declarator
+    /// Print a variable declarator with "fluid" assignment wrapping
+    ///
+    /// When the declaration exceeds print_width, wraps after `=`:
+    /// ```javascript
+    /// const medium =
+    ///     obj1.prop1.prop2.prop3...;
+    /// ```
+    ///
+    /// Uses `group(id + " =" + indent(line + rhs))` so the group decision
+    /// determines whether to break. Property chains use greedy line packing
+    /// via `fill()` for long chains that need internal breaks.
     fn print_variable_declarator(&mut self, declarator: &internal::VariableDeclarator) {
-        // Print the identifier
-        self.print_identifier(&declarator.id);
+        // Check if we have an initializer - if not, just print the identifier
+        let Some(init) = &declarator.init else {
+            self.print_identifier(&declarator.id);
+            return;
+        };
 
-        // Print the initializer if present
-        if let Some(init) = &declarator.init {
-            // Handle comments around the equals sign
-            // Find equals position and split comments into before/after groups
-            let id_end = declarator.id.span.end;
-            let init_start = init.span().start;
+        // Handle comments around the equals sign
+        let id_end = declarator.id.span.end;
+        let init_start = init.span().start;
+        let equals_pos = self.find_equals_position(id_end, init_start);
+        let has_comments_before_eq = self.has_comments_between(id_end, equals_pos);
+        let has_comments_after_eq = self.has_comments_between(equals_pos + 1, init_start);
 
-            // Find the `=` character position in the source
-            let equals_pos = self.find_equals_position(id_end, init_start);
-
-            // Print comments before `=`
-            let has_before_comments = self.print_inline_comments_between(id_end, equals_pos);
-
-            // Print comments after `=` (need to check before writing equals to know if we need trailing space)
-            let has_after_comments_temp = self.has_comments_between(equals_pos + 1, init_start);
-
-            // Print equals with appropriate spacing
-            if has_before_comments {
-                if has_after_comments_temp {
-                    self.write(" ="); // Comment added leading space, trailing space will be added by print_inline_comments_between
-                } else {
-                    self.write(" = ");
-                }
-            } else if has_after_comments_temp {
-                self.write(" ="); // Trailing space will be added by print_inline_comments_between
+        // If there are comments, use direct printing (comment handling with doc IR is complex)
+        if has_comments_before_eq || has_comments_after_eq {
+            self.print_identifier(&declarator.id);
+            let _ = self.print_inline_comments_between(id_end, equals_pos);
+            if has_comments_after_eq {
+                self.write(" =");
             } else {
                 self.write(" = ");
             }
-
-            // Print comments after `=`
-            let has_after_comments = self.print_inline_comments_between(equals_pos + 1, init_start);
-
-            // Add trailing space after comments (before expression)
-            if has_after_comments {
+            let _ = self.print_inline_comments_between(equals_pos + 1, init_start);
+            if has_comments_after_eq {
                 self.write(" ");
             }
+            self.print_expression(init);
+            return;
+        }
 
+        // Check if RHS needs "fluid" assignment wrapping
+        // Fluid layout applies to property chains (member expressions without calls)
+        // that don't have internal breaking points. Objects, arrays, calls, and
+        // ternaries handle their own wrapping internally.
+        let needs_fluid_layout = is_pure_property_chain(init);
+
+        if needs_fluid_layout {
+            // Build doc for "fluid" assignment layout:
+            // - If RHS fits after `= `, stay on one line: `id = value`
+            // - If RHS doesn't fit, break after `=` and indent: `id =\n\tvalue`
+            //
+            // Structure: group(id + " =" + indent(line + rhs))
+            // When the group decides to break, line() becomes newline + indent
+            let id_str = declarator.id.span.extract(self.source);
+            let id_doc = doc::text(id_str);
+            let init_doc = self.build_expression_doc(init);
+
+            let assignment_doc = doc::group(doc::concat(vec![
+                id_doc,
+                doc::text(" ="),
+                doc::indent(doc::concat(vec![doc::line(), init_doc])),
+            ]));
+
+            let base_offset = self.config.base_indent_offset * self.config.tab_width;
+            let current_col = self.current_column() + base_offset;
+            let output = doc::print_doc_at_column(&assignment_doc, &self.config, current_col);
+            self.write(&output);
+        } else {
+            // Direct printing for expressions that handle their own wrapping
+            self.print_identifier(&declarator.id);
+            self.write(" = ");
             self.print_expression(init);
         }
     }

@@ -1,4 +1,4 @@
-use crate::{deno, fixtures};
+use crate::fixtures;
 use std::path::Path;
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
@@ -44,126 +44,135 @@ struct FixturesUpdateParsedExecutable {
 
 impl Executable for FixturesUpdateParsedExecutable {
     fn execute(&self) {
-        let fixtures_dir = Path::new("tests/fixtures");
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        rt.block_on(run(self.list_only, &self.filters));
+    }
+}
 
-        if !fixtures_dir.exists() {
-            eprintln!("Error: fixtures directory not found: tests/fixtures");
+async fn run(list_only: bool, filters: &[String]) {
+    let fixtures_dir = Path::new("tests/fixtures");
+
+    if !fixtures_dir.exists() {
+        eprintln!("Error: fixtures directory not found: tests/fixtures");
+        std::process::exit(1);
+    }
+
+    let all_fixtures = match fixtures::walk_fixtures(fixtures_dir) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("Error walking fixtures: {}", e);
             std::process::exit(1);
         }
+    };
 
-        let all_fixtures = match fixtures::walk_fixtures(fixtures_dir) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error walking fixtures: {}", e);
-                std::process::exit(1);
-            }
-        };
+    let total_count = all_fixtures.len();
 
-        let total_count = all_fixtures.len();
+    // Apply filters
+    let fixture_list: Vec<_> = all_fixtures
+        .into_iter()
+        .filter(|f| f.matches_filters(filters))
+        .collect();
 
-        // Apply filters
-        let fixtures: Vec<_> = all_fixtures
-            .into_iter()
-            .filter(|f| f.matches_filters(&self.filters))
-            .collect();
-
-        if fixtures.is_empty() {
-            if self.filters.is_empty() {
-                eprintln!("No fixtures found");
-            } else {
-                eprintln!("No fixtures found matching: {}", self.filters.join(" "));
-            }
-            std::process::exit(1);
+    if fixture_list.is_empty() {
+        if filters.is_empty() {
+            eprintln!("No fixtures found");
+        } else {
+            eprintln!("No fixtures found matching: {}", filters.join(" "));
         }
+        std::process::exit(1);
+    }
 
-        if self.list_only {
-            println!("Found fixtures:");
-            for fixture in &fixtures {
-                println!("  {} ({})", fixture.relative_path, fixture.input_file);
-            }
-            if self.filters.is_empty() {
-                println!("\nTotal: {}", fixtures.len());
-            } else {
-                println!("\nMatched: {} of {} fixtures", fixtures.len(), total_count);
-            }
-            return;
+    if list_only {
+        println!("Found fixtures:");
+        for fixture in &fixture_list {
+            println!("  {} ({})", fixture.relative_path, fixture.input_file);
         }
-
-        let mut created = 0;
-        let mut updated = 0;
-        let mut unchanged = 0;
-        let mut failed = 0;
-
-        for fixture in &fixtures {
-            match generate_expected_fixture(fixture) {
-                FixtureResult::Created => {
-                    if fixture.has_expected_ours() {
-                        println!(
-                            "✓ Created {}/expected_ours.json + expected_svelte.json",
-                            fixture.relative_path
-                        );
-                    } else {
-                        println!("✓ Created {}/expected.json", fixture.relative_path);
-                    }
-                    created += 1;
-                }
-                FixtureResult::Updated => {
-                    if fixture.has_expected_ours() {
-                        println!(
-                            "✓ Updated {}/expected_ours.json + expected_svelte.json",
-                            fixture.relative_path
-                        );
-                    } else {
-                        println!("✓ Updated {}/expected.json", fixture.relative_path);
-                    }
-                    updated += 1;
-                }
-                FixtureResult::Unchanged => {
-                    if fixture.has_expected_ours() {
-                        println!(
-                            "- {}/expected_ours.json + expected_svelte.json are up to date",
-                            fixture.relative_path
-                        );
-                    } else {
-                        println!("- {}/expected.json is up to date", fixture.relative_path);
-                    }
-                    unchanged += 1;
-                }
-                FixtureResult::Failed(err) => {
-                    eprintln!("✗ Failed to generate {}: {}", fixture.relative_path, err);
-                    failed += 1;
-                }
-            }
-        }
-
-        if self.filters.is_empty() {
-            println!(
-                "\nSummary: {} created, {} updated, {} unchanged, {} failed ({} fixtures)",
-                created,
-                updated,
-                unchanged,
-                failed,
-                fixtures.len()
-            );
+        if filters.is_empty() {
+            println!("\nTotal: {}", fixture_list.len());
         } else {
             println!(
-                "\nSummary: {} created, {} updated, {} unchanged, {} failed (matched {} of {} fixtures)",
-                created,
-                updated,
-                unchanged,
-                failed,
-                fixtures.len(),
+                "\nMatched: {} of {} fixtures",
+                fixture_list.len(),
                 total_count
             );
         }
+        return;
+    }
 
-        if created > 0 || updated > 0 {
-            println!("⚠️  Updated source of truth files (expected.json)");
-        }
+    let mut created = 0;
+    let mut updated = 0;
+    let mut unchanged = 0;
+    let mut failed = 0;
 
-        if failed > 0 {
-            std::process::exit(1);
+    for fixture in &fixture_list {
+        match generate_expected_fixture(fixture).await {
+            FixtureResult::Created => {
+                if fixture.has_expected_ours() {
+                    println!(
+                        "✓ Created {}/expected_ours.json + expected_svelte.json",
+                        fixture.relative_path
+                    );
+                } else {
+                    println!("✓ Created {}/expected.json", fixture.relative_path);
+                }
+                created += 1;
+            }
+            FixtureResult::Updated => {
+                if fixture.has_expected_ours() {
+                    println!(
+                        "✓ Updated {}/expected_ours.json + expected_svelte.json",
+                        fixture.relative_path
+                    );
+                } else {
+                    println!("✓ Updated {}/expected.json", fixture.relative_path);
+                }
+                updated += 1;
+            }
+            FixtureResult::Unchanged => {
+                if fixture.has_expected_ours() {
+                    println!(
+                        "- {}/expected_ours.json + expected_svelte.json are up to date",
+                        fixture.relative_path
+                    );
+                } else {
+                    println!("- {}/expected.json is up to date", fixture.relative_path);
+                }
+                unchanged += 1;
+            }
+            FixtureResult::Failed(err) => {
+                eprintln!("✗ Failed to generate {}: {}", fixture.relative_path, err);
+                failed += 1;
+            }
         }
+    }
+
+    if filters.is_empty() {
+        println!(
+            "\nSummary: {} created, {} updated, {} unchanged, {} failed ({} fixtures)",
+            created,
+            updated,
+            unchanged,
+            failed,
+            fixture_list.len()
+        );
+    } else {
+        println!(
+            "\nSummary: {} created, {} updated, {} unchanged, {} failed (matched {} of {} fixtures)",
+            created,
+            updated,
+            unchanged,
+            failed,
+            fixture_list.len(),
+            total_count
+        );
+    }
+
+    if created > 0 || updated > 0 {
+        println!("⚠️  Updated source of truth files (expected.json)");
+    }
+
+    if failed > 0 {
+        std::process::exit(1);
     }
 }
 
@@ -174,7 +183,7 @@ enum FixtureResult {
     Failed(String),
 }
 
-fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult {
+async fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult {
     // Read input file
     let source = match fixtures::read_file(&fixture.input_path()) {
         Ok(s) => s,
@@ -184,11 +193,11 @@ fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult {
     // Check if this fixture uses the divergence pattern
     if fixture.has_expected_ours() {
         // Generate expected_ours.json + expected_svelte.json
-        return generate_divergence_fixture(fixture, &source);
+        return generate_divergence_fixture(fixture, &source).await;
     }
 
     // Standard pattern: generate expected.json from Svelte's parser
-    let json = match deno::parse_svelte(&source) {
+    let json = match fuz_client::parse_svelte(&source).await {
         Ok(json) => ensure_trailing_newline(json),
         Err(e) => return FixtureResult::Failed(format!("Svelte parse error: {}", e)),
     };
@@ -213,7 +222,7 @@ fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult {
     }
 }
 
-fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) -> FixtureResult {
+async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) -> FixtureResult {
     // Generate expected_ours.json from our parser
     // Parse directly and serialize the struct (not via serde_json::Value) to preserve field order
     let ast = match tsv_svelte::parse(source) {
@@ -229,7 +238,7 @@ fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) -> Fix
     };
 
     // Generate expected_svelte.json from Svelte's parser (or error marker)
-    let svelte_json = match deno::parse_svelte(source) {
+    let svelte_json = match fuz_client::parse_svelte(source).await {
         Ok(json) => ensure_trailing_newline(json),
         Err(_) => {
             // Svelte parse failed - use canonical error marker

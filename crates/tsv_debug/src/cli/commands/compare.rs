@@ -1,4 +1,4 @@
-use crate::deno;
+use anyhow::Result;
 use std::process::Command as ProcessCommand;
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
@@ -58,31 +58,36 @@ struct CompareExecutable {
 
 impl Executable for CompareExecutable {
     fn execute(&self) {
-        let content = self.input.content();
-        let parser_name = match self.parser_type {
-            ParserType::Svelte => "svelte",
-            ParserType::TypeScript => "typescript",
-            ParserType::Css => "css",
-        };
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        rt.block_on(run(&self.input, self.parser_type));
+    }
+}
 
-        println!("=== Input ===");
-        println!("{}", content);
-        println!();
+async fn run(input: &Input, parser_type: ParserType) {
+    let content = input.content();
+    let parser_name = match parser_type {
+        ParserType::Svelte => "svelte",
+        ParserType::TypeScript => "typescript",
+        ParserType::Css => "css",
+    };
 
-        // Run our formatter
-        println!("=== Our Formatter ===");
-        match run_our_formatter(content, parser_name) {
-            Ok(output) => println!("{}", output),
-            Err(err) => eprintln!("Error running our formatter: {}", err),
-        }
-        println!();
+    println!("=== Input ===");
+    println!("{}", content);
+    println!();
 
-        // Run prettier
-        println!("=== Prettier ===");
-        match run_prettier(content, parser_name) {
-            Ok(output) => println!("{}", output),
-            Err(err) => eprintln!("Error running prettier: {}", err),
-        }
+    // Run our formatter
+    println!("=== Our Formatter ===");
+    match run_our_formatter(content, parser_name) {
+        Ok(output) => println!("{}", output),
+        Err(err) => eprintln!("Error running our formatter: {}", err),
+    }
+    println!();
+
+    // Run prettier
+    println!("=== Prettier ===");
+    match run_prettier(content, parser_name).await {
+        Ok(output) => println!("{}", output),
+        Err(err) => eprintln!("Error running prettier: {}", err),
     }
 }
 
@@ -109,12 +114,12 @@ fn run_our_formatter(content: &str, parser: &str) -> Result<String, String> {
     }
 }
 
-fn run_prettier(content: &str, parser: &str) -> Result<String, String> {
+async fn run_prettier(content: &str, parser: &str) -> Result<String> {
     let filepath = match parser {
         "svelte" => "temp.svelte",
         "css" => "temp.css",
         _ => "temp.ts",
     };
 
-    deno::run_prettier(content, filepath)
+    fuz_client::run_prettier(content, filepath).await
 }

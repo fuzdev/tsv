@@ -23,7 +23,7 @@ pub mod source_fidelity;
 
 use crate::ast::internal::{CssComment, CssNode, CssStyleSheet};
 use std::collections::HashMap;
-use tsv_lang::{printing, OutputBuffer, PrintConfig};
+use tsv_lang::{OutputBuffer, PrintConfig, printing};
 
 /// Printer state for building output
 pub struct Printer<'a> {
@@ -93,7 +93,11 @@ impl<'a> Printer<'a> {
 
                 // Special case: consecutive comments on same line
                 if let (CssNode::Comment(_), CssNode::Comment(curr_comment)) = (prev_node, node)
-                    && printing::is_same_line(self.source, prev_node.span().end, curr_comment.span.start)
+                    && printing::is_same_line(
+                        self.source,
+                        prev_node.span().end,
+                        curr_comment.span.start,
+                    )
                 {
                     // Print comment inline with space separator
                     self.write(" /*");
@@ -258,6 +262,19 @@ impl<'a> Printer<'a> {
 /// Requires source for blank line preservation and raw value extraction
 pub fn format_css(stylesheet: &CssStyleSheet, source: &str) -> String {
     let mut printer = Printer::new(source, &stylesheet.value_comments);
+    printer.print_css_nodes(&stylesheet.nodes);
+    printer.into_string()
+}
+
+/// Format CSS stylesheet with custom configuration
+/// Use this when CSS is nested inside another language (e.g., Svelte)
+/// with base_indent_offset to account for wrapper indentation
+pub fn format_css_with_config(
+    stylesheet: &CssStyleSheet,
+    source: &str,
+    config: PrintConfig,
+) -> String {
+    let mut printer = Printer::with_config(source, &stylesheet.value_comments, config);
     printer.print_css_nodes(&stylesheet.nodes);
     printer.into_string()
 }

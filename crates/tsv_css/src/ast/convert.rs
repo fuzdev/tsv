@@ -293,7 +293,11 @@ fn convert_prelude_to_string(prelude: &internal::PreludeValue, source: &str) -> 
                 .join(" ")
         }
         internal::PreludeValue::Raw { content, .. } => content.clone(),
-        internal::PreludeValue::Selectors { root: _, limit: _, span } => {
+        internal::PreludeValue::Selectors {
+            root: _,
+            limit: _,
+            span,
+        } => {
             // Format selector lists for @scope: (root) [to (limit)]
             // Extract from source for maximum fidelity
             span.extract(source).to_string()

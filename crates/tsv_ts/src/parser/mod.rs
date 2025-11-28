@@ -26,7 +26,7 @@ pub struct Parser<'a> {
     current_decoded: Option<String>, // Decoded string value (for strings with escapes)
     peek_cache: Option<PeekData<TokenKind>>,
     interner: Rc<RefCell<DefaultStringInterner>>,
-    base_offset: usize, // Offset in full source (for embedded expressions)
+    base_offset: usize,     // Offset in full source (for embedded expressions)
     comments: Vec<Comment>, // Collected comments during parsing
 }
 
@@ -61,10 +61,7 @@ impl<'a> Parser<'a> {
             comments.push(Comment {
                 content: content.clone(),
                 is_block: *is_block,
-                span: Span::new(
-                    (start + base_offset) as u32,
-                    (end + base_offset) as u32,
-                ),
+                span: Span::new((start + base_offset) as u32, (end + base_offset) as u32),
             });
             let token = lexer.next_token()?;
             kind = token.kind;

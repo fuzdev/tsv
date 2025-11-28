@@ -1,5 +1,5 @@
-use super::selectors::parse_complex_selector_list;
 use super::CssParser;
+use super::selectors::parse_complex_selector_list;
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
@@ -511,11 +511,18 @@ pub(crate) fn parse_atrule(
                 // - Before/after '=' (attribute selectors) - only for selector list preludes
                 let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
                     || matches!(parser.peek(), Ok(TokenKind::RightParen))
-                    || (is_selector_list_prelude && paren_depth > 0 && matches!(prev_token_kind, Some(TokenKind::Colon)))
-                    || (is_selector_list_prelude && paren_depth > 0 && matches!(parser.peek(), Ok(TokenKind::Comma)))
-                    || (is_selector_list_prelude && matches!(prev_token_kind, Some(TokenKind::LeftBracket)))
-                    || (is_selector_list_prelude && matches!(parser.peek(), Ok(TokenKind::RightBracket)))
-                    || (is_selector_list_prelude && matches!(prev_token_kind, Some(TokenKind::Equals)))
+                    || (is_selector_list_prelude
+                        && paren_depth > 0
+                        && matches!(prev_token_kind, Some(TokenKind::Colon)))
+                    || (is_selector_list_prelude
+                        && paren_depth > 0
+                        && matches!(parser.peek(), Ok(TokenKind::Comma)))
+                    || (is_selector_list_prelude
+                        && matches!(prev_token_kind, Some(TokenKind::LeftBracket)))
+                    || (is_selector_list_prelude
+                        && matches!(parser.peek(), Ok(TokenKind::RightBracket)))
+                    || (is_selector_list_prelude
+                        && matches!(prev_token_kind, Some(TokenKind::Equals)))
                     || (is_selector_list_prelude && matches!(parser.peek(), Ok(TokenKind::Equals)));
 
                 parser.advance()?;

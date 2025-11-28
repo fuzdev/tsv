@@ -108,7 +108,7 @@ pub struct Script {
     pub node_type: String,
     pub start: u32,
     pub end: u32,
-    pub context: String, // "default" or "module"
+    pub context: String,            // "default" or "module"
     pub content: serde_json::Value, // Program with leadingComments/trailingComments injected
     pub attributes: Vec<Attribute>,
 }

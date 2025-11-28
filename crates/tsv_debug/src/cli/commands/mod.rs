@@ -6,3 +6,4 @@ pub mod fixtures_update_formatted;
 pub mod fixtures_update_parsed;
 pub mod fixtures_validate;
 pub mod format_prettier;
+pub mod line_width;

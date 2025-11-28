@@ -33,12 +33,13 @@ impl<'a> Printer<'a> {
             }
             internal::PreludeValue::Selectors { root, limit, .. } => {
                 // @scope selector lists: @scope (root) to (limit)
+                // These are nested context, so they don't wrap (same as :is(), :where())
                 self.write(" (");
-                self.print_selector_list(root);
+                self.print_selector_list_nested(root);
                 self.write(")");
                 if let Some(limit_selectors) = limit {
                     self.write(" to (");
-                    self.print_selector_list(limit_selectors);
+                    self.print_selector_list_nested(limit_selectors);
                     self.write(")");
                 }
             }
@@ -110,7 +111,9 @@ impl<'a> Printer<'a> {
                             let comment_start = next_comment.span.start as usize;
 
                             // Extract text between closing brace and comment
-                            let has_newline_between = if child_end < comment_start && comment_start <= self.source.len() {
+                            let has_newline_between = if child_end < comment_start
+                                && comment_start <= self.source.len()
+                            {
                                 self.source[child_end..comment_start].contains('\n')
                             } else {
                                 false
@@ -166,8 +169,12 @@ impl<'a> Printer<'a> {
                 if let Some(internal::CssBlockChild::Comment(comment)) = rule.declarations.first() {
                     // Check if comment is on same line as selector AND before the opening brace
                     // If there's a '{' between selector and comment, the comment is inside the block, not after selector
-                    if printing::is_same_line(self.source, rule.selector.span.end, comment.span.start)
-                        && !self.has_opening_brace_between(rule.selector.span.end, comment.span.start)
+                    if printing::is_same_line(
+                        self.source,
+                        rule.selector.span.end,
+                        comment.span.start,
+                    ) && !self
+                        .has_opening_brace_between(rule.selector.span.end, comment.span.start)
                     {
                         // Print comment inline after selector
                         self.write(" /*");
@@ -191,7 +198,11 @@ impl<'a> Printer<'a> {
                             // Check if next child is an inline comment
                             if let Some(internal::CssBlockChild::Comment(next_comment)) =
                                 rule.declarations.get(i + 1)
-                                && printing::is_same_line(self.source, decl.span.end, next_comment.span.start)
+                                && printing::is_same_line(
+                                    self.source,
+                                    decl.span.end,
+                                    next_comment.span.start,
+                                )
                             {
                                 // Print comment inline
                                 self.buffer_remove_trailing_newline();
@@ -237,7 +248,11 @@ impl<'a> Printer<'a> {
                             let mut has_inline_comment = false;
                             if let Some(internal::CssBlockChild::Comment(next_comment)) =
                                 rule.declarations.get(i + 1)
-                                && printing::is_same_line(self.source, nested_rule.span.end, next_comment.span.start)
+                                && printing::is_same_line(
+                                    self.source,
+                                    nested_rule.span.end,
+                                    next_comment.span.start,
+                                )
                             {
                                 self.write(" /*");
                                 self.write(&next_comment.content);

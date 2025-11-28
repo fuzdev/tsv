@@ -50,7 +50,14 @@ pub enum Expression {
     Literal(Literal),
     Identifier(Identifier),
     ObjectExpression(ObjectExpression),
-    // TODO: BinaryExpression, etc.
+    ArrayExpression(ArrayExpression),
+    UnaryExpression(UnaryExpression),
+    BinaryExpression(BinaryExpression),
+    CallExpression(CallExpression),
+    MemberExpression(MemberExpression),
+    ConditionalExpression(ConditionalExpression),
+    ArrowFunctionExpression(ArrowFunctionExpression),
+    SpreadElement(SpreadElement),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,7 +91,131 @@ pub struct ObjectExpression {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    pub properties: Vec<Property>,
+    pub properties: Vec<ObjectProperty>,
+}
+
+/// Object property - either a regular property or a spread element
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ObjectProperty {
+    Property(Property),
+    SpreadElement(SpreadElement),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArrayExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub elements: Vec<Option<Expression>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnaryExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub operator: String,
+    pub prefix: bool,
+    pub argument: Box<Expression>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BinaryExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub left: Box<Expression>,
+    pub operator: String,
+    pub right: Box<Expression>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CallExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub callee: Box<Expression>,
+    pub arguments: Vec<Expression>,
+    pub optional: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemberExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub object: Box<Expression>,
+    pub property: Box<Expression>,
+    pub computed: bool,
+    pub optional: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConditionalExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub test: Box<Expression>,
+    pub consequent: Box<Expression>,
+    pub alternate: Box<Expression>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArrowFunctionExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub id: Option<()>, // always null for arrow functions
+    pub expression: bool,
+    pub generator: bool,
+    #[serde(rename = "async")]
+    pub is_async: bool,
+    pub params: Vec<Identifier>,
+    pub body: ArrowFunctionBody,
+}
+
+/// Arrow function body - either expression or block statement
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ArrowFunctionBody {
+    Expression(Box<Expression>),
+    BlockStatement(BlockStatement),
+}
+
+/// Block statement (function body with braces)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub body: Vec<Statement>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpreadElement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub argument: Box<Expression>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

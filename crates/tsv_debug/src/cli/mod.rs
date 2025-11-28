@@ -6,6 +6,7 @@ use commands::{
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
     fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
+    line_width::LineWidthCommand,
 };
 use tsv_cli::cli::commands::CommandRegistry;
 
@@ -16,6 +17,7 @@ pub fn build_registry() -> CommandRegistry {
     // Register debug commands
     registry.register(Box::new(CompareCommand));
     registry.register(Box::new(AstDiffCommand));
+    registry.register(Box::new(LineWidthCommand));
 
     // Register parser commands
     registry.register(Box::new(CanonicalParseCommand));

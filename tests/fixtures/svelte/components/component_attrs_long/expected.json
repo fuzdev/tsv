@@ -1,0 +1,41 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 107,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Component",
+				"start": 0,
+				"end": 107,
+				"name": "Comp",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 7,
+						"end": 104,
+						"name": "very-long-attribute-name",
+						"value": [
+							{
+								"start": 33,
+								"end": 103,
+								"type": "Text",
+								"raw": "value1 value2 value3 value4 value5 value6 value7 value8 value9 value10",
+								"data": "value1 value2 value3 value4 value5 value6 value7 value8 value9 value10"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

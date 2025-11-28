@@ -1,4 +1,5 @@
-use crate::{deno, fixtures};
+use crate::fixtures;
+use anyhow::Result;
 use std::process::Command as ProcessCommand;
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
@@ -80,12 +81,13 @@ struct AstDiffExecutable {
 
 impl Executable for AstDiffExecutable {
     fn execute(&self) {
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
         let result = if let Some(ref input2) = self.input2 {
             // Two input mode: compare both directly
-            compare_two_inputs(&self.input1, input2, self.parser_type)
+            rt.block_on(compare_two_inputs(&self.input1, input2, self.parser_type))
         } else {
             // Single input mode: parse → format → parse → compare
-            compare_round_trip(&self.input1, self.parser_type)
+            rt.block_on(compare_round_trip(&self.input1, self.parser_type))
         };
 
         match result {
@@ -105,41 +107,41 @@ impl Executable for AstDiffExecutable {
 }
 
 /// Compare two inputs directly
-fn compare_two_inputs(
+async fn compare_two_inputs(
     input1: &Input,
     input2: &Input,
     parser_type: ParserType,
-) -> Result<bool, String> {
+) -> Result<bool> {
     let content1 = input1.content();
     let content2 = input2.content();
 
-    let ast1 = parse_to_json(content1, parser_type)?;
-    let ast2 = parse_to_json(content2, parser_type)?;
+    let ast1 = parse_to_json(content1, parser_type).await?;
+    let ast2 = parse_to_json(content2, parser_type).await?;
 
     compare_asts(&ast1, &ast2)
 }
 
 /// Compare round-trip: parse → format → parse → compare
-fn compare_round_trip(input: &Input, parser_type: ParserType) -> Result<bool, String> {
+async fn compare_round_trip(input: &Input, parser_type: ParserType) -> Result<bool> {
     let content = input.content();
 
     // Parse original
-    let ast1 = parse_to_json(content, parser_type)?;
+    let ast1 = parse_to_json(content, parser_type).await?;
 
     // Format
     let formatted = format_content(content, parser_type)?;
 
     // Parse formatted
-    let ast2 = parse_to_json(&formatted, parser_type)?;
+    let ast2 = parse_to_json(&formatted, parser_type).await?;
 
     compare_asts(&ast1, &ast2)
 }
 
 /// Parse content to JSON AST string
-fn parse_to_json(content: &str, parser_type: ParserType) -> Result<String, String> {
+async fn parse_to_json(content: &str, parser_type: ParserType) -> Result<String> {
     match parser_type {
-        ParserType::Svelte => deno::parse_svelte(content),
-        ParserType::TypeScript => deno::parse_typescript(content),
+        ParserType::Svelte => fuz_client::parse_svelte(content).await,
+        ParserType::TypeScript => fuz_client::parse_typescript(content).await,
         ParserType::Css => {
             // Use our Rust parser for CSS
             let output = ProcessCommand::new("cargo")
@@ -154,20 +156,19 @@ fn parse_to_json(content: &str, parser_type: ParserType) -> Result<String, Strin
                 ])
                 .arg(content)
                 .args(["--pretty"])
-                .output()
-                .map_err(|e| format!("Failed to execute cargo: {}", e))?;
+                .output()?;
 
             if output.status.success() {
                 Ok(String::from_utf8_lossy(&output.stdout).to_string())
             } else {
-                Err(String::from_utf8_lossy(&output.stderr).to_string())
+                anyhow::bail!("{}", String::from_utf8_lossy(&output.stderr))
             }
         }
     }
 }
 
 /// Format content using our Rust printer
-fn format_content(content: &str, parser_type: ParserType) -> Result<String, String> {
+fn format_content(content: &str, parser_type: ParserType) -> Result<String> {
     let parser_name = match parser_type {
         ParserType::Svelte => "svelte",
         ParserType::TypeScript => "typescript",
@@ -186,22 +187,19 @@ fn format_content(content: &str, parser_type: ParserType) -> Result<String, Stri
         ])
         .arg(content)
         .args(["--parser", parser_name])
-        .output()
-        .map_err(|e| format!("Failed to execute cargo: {}", e))?;
+        .output()?;
 
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        anyhow::bail!("{}", String::from_utf8_lossy(&output.stderr))
     }
 }
 
 /// Compare two AST JSON strings (ignoring spans/locations)
-fn compare_asts(json1: &str, json2: &str) -> Result<bool, String> {
-    let ast1: serde_json::Value = serde_json::from_str(json1)
-        .map_err(|e| format!("Failed to parse first AST JSON: {}", e))?;
-    let ast2: serde_json::Value = serde_json::from_str(json2)
-        .map_err(|e| format!("Failed to parse second AST JSON: {}", e))?;
+fn compare_asts(json1: &str, json2: &str) -> Result<bool> {
+    let ast1: serde_json::Value = serde_json::from_str(json1)?;
+    let ast2: serde_json::Value = serde_json::from_str(json2)?;
 
     // Remove locations from both
     let ast1_clean = fixtures::remove_locations(ast1);

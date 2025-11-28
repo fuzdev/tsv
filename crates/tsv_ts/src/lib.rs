@@ -68,7 +68,20 @@ pub fn parse(source: &str) -> Result<ast::internal::Program> {
 /// assert_eq!(formatted, "const x = 42;\n");
 /// ```
 pub fn format(program: &ast::internal::Program, source: &str) -> String {
-    let mut printer = printer::Printer::new(program.interner.clone(), source, &program.comments);
+    format_with_config(program, source, tsv_lang::PrintConfig::default())
+}
+
+/// Format an internal AST back to source code with custom configuration
+///
+/// This allows specifying print configuration like `base_indent_offset` for
+/// when TypeScript is embedded inside another format (e.g., Svelte `<script>` tags).
+pub fn format_with_config(
+    program: &ast::internal::Program,
+    source: &str,
+    config: tsv_lang::PrintConfig,
+) -> String {
+    let mut printer =
+        printer::Printer::with_config(program.interner.clone(), source, &program.comments, config);
     printer.print_program(program);
     printer.into_string()
 }
@@ -140,11 +153,14 @@ pub fn parse_expression(
     interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
 ) -> Result<ast::internal::Expression> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
-    parser.parse_expression_public().map_err(|e| e.with_context(source))
+    parser
+        .parse_expression_public()
+        .map_err(|e| e.with_context(source))
 }
 
 // Re-export key types for convenience
 pub use ast::internal::{
-    Expression, Identifier, Literal, LiteralValue, Program, Statement, TSNumberKeyword, TSType,
+    ArrowFunctionBody, ArrowFunctionExpression, Expression, Identifier, Literal, LiteralValue,
+    ObjectProperty, Program, Property, SpreadElement, Statement, TSNumberKeyword, TSType,
     TSTypeAnnotation, VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
 };

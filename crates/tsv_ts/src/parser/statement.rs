@@ -14,6 +14,17 @@ impl<'a> Parser<'a> {
                 KeywordKind::Const | KeywordKind::Let | KeywordKind::Var => {
                     self.parse_variable_declaration()
                 }
+                KeywordKind::True | KeywordKind::False | KeywordKind::Null => {
+                    // These are literals, parse as expression statement
+                    let expr = self.parse_expression()?;
+                    let expr_span = expr.span();
+                    let semi_end = self.current_pos().1;
+                    self.expect(&TokenKind::Semicolon)?;
+                    Ok(Statement::ExpressionStatement(ExpressionStatement {
+                        expression: expr,
+                        span: Span::new(expr_span.start, semi_end as u32),
+                    }))
+                }
                 KeywordKind::Number => {
                     // Type keywords are not valid at statement level
                     Err(ParseError::InvalidSyntax {

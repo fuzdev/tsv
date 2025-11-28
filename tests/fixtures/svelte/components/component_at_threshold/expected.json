@@ -1,0 +1,251 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 116,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Component",
+				"start": 0,
+				"end": 116,
+				"name": "Comp",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 7,
+						"end": 12,
+						"name": "a",
+						"value": [
+							{
+								"start": 10,
+								"end": 11,
+								"type": "Text",
+								"raw": "v",
+								"data": "v"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 14,
+						"end": 19,
+						"name": "b",
+						"value": [
+							{
+								"start": 17,
+								"end": 18,
+								"type": "Text",
+								"raw": "v",
+								"data": "v"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 21,
+						"end": 26,
+						"name": "c",
+						"value": [
+							{
+								"start": 24,
+								"end": 25,
+								"type": "Text",
+								"raw": "v",
+								"data": "v"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 28,
+						"end": 33,
+						"name": "d",
+						"value": [
+							{
+								"start": 31,
+								"end": 32,
+								"type": "Text",
+								"raw": "v",
+								"data": "v"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 35,
+						"end": 40,
+						"name": "e",
+						"value": [
+							{
+								"start": 38,
+								"end": 39,
+								"type": "Text",
+								"raw": "v",
+								"data": "v"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 42,
+						"end": 47,
+						"name": "f",
+						"value": [
+							{
+								"start": 45,
+								"end": 46,
+								"type": "Text",
+								"raw": "v",
+								"data": "v"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 49,
+						"end": 54,
+						"name": "g",
+						"value": [
+							{
+								"start": 52,
+								"end": 53,
+								"type": "Text",
+								"raw": "v",
+								"data": "v"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 56,
+						"end": 61,
+						"name": "h",
+						"value": [
+							{
+								"start": 59,
+								"end": 60,
+								"type": "Text",
+								"raw": "v",
+								"data": "v"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 63,
+						"end": 68,
+						"name": "i",
+						"value": [
+							{
+								"start": 66,
+								"end": 67,
+								"type": "Text",
+								"raw": "v",
+								"data": "v"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 70,
+						"end": 75,
+						"name": "j",
+						"value": [
+							{
+								"start": 73,
+								"end": 74,
+								"type": "Text",
+								"raw": "v",
+								"data": "v"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 77,
+						"end": 82,
+						"name": "k",
+						"value": [
+							{
+								"start": 80,
+								"end": 81,
+								"type": "Text",
+								"raw": "v",
+								"data": "v"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 84,
+						"end": 89,
+						"name": "l",
+						"value": [
+							{
+								"start": 87,
+								"end": 88,
+								"type": "Text",
+								"raw": "v",
+								"data": "v"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 91,
+						"end": 96,
+						"name": "m",
+						"value": [
+							{
+								"start": 94,
+								"end": 95,
+								"type": "Text",
+								"raw": "v",
+								"data": "v"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 98,
+						"end": 103,
+						"name": "n",
+						"value": [
+							{
+								"start": 101,
+								"end": 102,
+								"type": "Text",
+								"raw": "v",
+								"data": "v"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 105,
+						"end": 113,
+						"name": "o",
+						"value": [
+							{
+								"start": 108,
+								"end": 112,
+								"type": "Text",
+								"raw": "val0",
+								"data": "val0"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

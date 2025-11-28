@@ -58,6 +58,30 @@ pub fn format(stylesheet: &CssStyleSheet, source: &str) -> String {
     printer::format_css(stylesheet, source)
 }
 
+/// Format CSS stylesheet with custom configuration
+///
+/// Use this when CSS is nested inside another language (e.g., Svelte)
+/// with base_indent_offset to account for wrapper indentation.
+///
+/// # Arguments
+/// * `stylesheet` - CSS stylesheet (nodes + value comments)
+/// * `source` - Original CSS source code (for blank line preservation)
+/// * `config` - Print configuration with optional base_indent_offset
+///
+/// # Example
+/// ```
+/// use tsv_css::{parse, format_with_config};
+/// use tsv_lang::PrintConfig;
+///
+/// let css = "div{color:red;}";
+/// let stylesheet = parse(css, 0).expect("Failed to parse CSS");
+/// let config = PrintConfig { base_indent_offset: 1, ..Default::default() };
+/// let formatted = format_with_config(&stylesheet, css, config);
+/// ```
+pub fn format_with_config(stylesheet: &CssStyleSheet, source: &str, config: PrintConfig) -> String {
+    printer::format_css_with_config(stylesheet, source, config)
+}
+
 /// Convert CSS AST to JSON representation
 ///
 /// # Arguments

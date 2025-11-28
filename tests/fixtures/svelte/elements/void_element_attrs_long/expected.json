@@ -1,0 +1,93 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 115,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 115,
+				"name": "input",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 8,
+						"end": 19,
+						"name": "type",
+						"value": [
+							{
+								"start": 14,
+								"end": 18,
+								"type": "Text",
+								"raw": "text",
+								"data": "text"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 21,
+						"end": 33,
+						"name": "name",
+						"value": [
+							{
+								"start": 27,
+								"end": 32,
+								"type": "Text",
+								"raw": "name1",
+								"data": "name1"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 35,
+						"end": 74,
+						"name": "placeholder",
+						"value": [
+							{
+								"start": 48,
+								"end": 73,
+								"type": "Text",
+								"raw": "placeholder1 placeholder2",
+								"data": "placeholder1 placeholder2"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 76,
+						"end": 102,
+						"name": "aria-label",
+						"value": [
+							{
+								"start": 88,
+								"end": 101,
+								"type": "Text",
+								"raw": "label1 label2",
+								"data": "label1 label2"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 104,
+						"end": 112,
+						"name": "required",
+						"value": true
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

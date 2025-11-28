@@ -155,6 +155,8 @@ pub fn convert_expression(
                 internal::LiteralValue::String { content, .. } => {
                     serde_json::Value::String(content.clone())
                 }
+                internal::LiteralValue::Boolean(b) => serde_json::Value::Bool(*b),
+                internal::LiteralValue::Null => serde_json::Value::Null,
             };
             // Extract raw from source using span
             let raw = lit.span.extract(source);
@@ -189,8 +191,227 @@ pub fn convert_expression(
                 properties: obj
                     .properties
                     .iter()
-                    .map(|p| convert_property(p, source, loc, interner, offset))
+                    .map(|p| convert_object_property(p, source, loc, interner, offset))
                     .collect(),
+            })
+        }
+        internal::Expression::ArrayExpression(arr) => {
+            public::Expression::ArrayExpression(public::ArrayExpression {
+                node_type: "ArrayExpression".to_string(),
+                start: arr.span.start,
+                end: arr.span.end,
+                loc: create_location(arr.span, loc, offset),
+                elements: arr
+                    .elements
+                    .iter()
+                    .map(|e| {
+                        e.as_ref()
+                            .map(|expr| convert_expression(expr, source, loc, interner, offset))
+                    })
+                    .collect(),
+            })
+        }
+        internal::Expression::UnaryExpression(unary) => {
+            public::Expression::UnaryExpression(public::UnaryExpression {
+                node_type: "UnaryExpression".to_string(),
+                start: unary.span.start,
+                end: unary.span.end,
+                loc: create_location(unary.span, loc, offset),
+                operator: unary.operator.as_str().to_string(),
+                prefix: unary.prefix,
+                argument: Box::new(convert_expression(
+                    &unary.argument,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
+        internal::Expression::BinaryExpression(binary) => {
+            // Determine node type: LogicalExpression for &&, ||, ?? - otherwise BinaryExpression
+            let node_type = match binary.operator {
+                internal::BinaryOperator::AmpersandAmpersand
+                | internal::BinaryOperator::PipePipe
+                | internal::BinaryOperator::QuestionQuestion => "LogicalExpression",
+                _ => "BinaryExpression",
+            };
+
+            public::Expression::BinaryExpression(public::BinaryExpression {
+                node_type: node_type.to_string(),
+                start: binary.span.start,
+                end: binary.span.end,
+                loc: create_location(binary.span, loc, offset),
+                left: Box::new(convert_expression(
+                    &binary.left,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+                operator: binary.operator.as_str().to_string(),
+                right: Box::new(convert_expression(
+                    &binary.right,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
+        internal::Expression::ArrowFunctionExpression(arrow) => {
+            let body = match &arrow.body {
+                internal::ArrowFunctionBody::Expression(expr) => {
+                    public::ArrowFunctionBody::Expression(Box::new(convert_expression(
+                        expr, source, loc, interner, offset,
+                    )))
+                }
+                internal::ArrowFunctionBody::BlockStatement { span } => {
+                    public::ArrowFunctionBody::BlockStatement(public::BlockStatement {
+                        node_type: "BlockStatement".to_string(),
+                        start: span.start,
+                        end: span.end,
+                        loc: create_location(*span, loc, offset),
+                        body: vec![], // TODO: Parse block body statements
+                    })
+                }
+            };
+            public::Expression::ArrowFunctionExpression(public::ArrowFunctionExpression {
+                node_type: "ArrowFunctionExpression".to_string(),
+                start: arrow.span.start,
+                end: arrow.span.end,
+                loc: create_location(arrow.span, loc, offset),
+                id: None,
+                expression: arrow.expression,
+                generator: false,
+                is_async: false,
+                params: arrow
+                    .params
+                    .iter()
+                    .map(|p| public::Identifier {
+                        node_type: "Identifier".to_string(),
+                        start: p.span.start,
+                        end: p.span.end,
+                        loc: create_location(p.span, loc, offset),
+                        name: interner.resolve(p.name).unwrap().to_string(),
+                        type_annotation: None,
+                    })
+                    .collect(),
+                body,
+            })
+        }
+        internal::Expression::SpreadElement(spread) => {
+            public::Expression::SpreadElement(public::SpreadElement {
+                node_type: "SpreadElement".to_string(),
+                start: spread.span.start,
+                end: spread.span.end,
+                loc: create_location(spread.span, loc, offset),
+                argument: Box::new(convert_expression(
+                    &spread.argument,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
+        internal::Expression::CallExpression(call) => {
+            public::Expression::CallExpression(public::CallExpression {
+                node_type: "CallExpression".to_string(),
+                start: call.span.start,
+                end: call.span.end,
+                loc: create_location(call.span, loc, offset),
+                callee: Box::new(convert_expression(
+                    &call.callee,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+                arguments: call
+                    .arguments
+                    .iter()
+                    .map(|arg| convert_expression(arg, source, loc, interner, offset))
+                    .collect(),
+                optional: call.optional,
+            })
+        }
+        internal::Expression::MemberExpression(member) => {
+            public::Expression::MemberExpression(public::MemberExpression {
+                node_type: "MemberExpression".to_string(),
+                start: member.span.start,
+                end: member.span.end,
+                loc: create_location(member.span, loc, offset),
+                object: Box::new(convert_expression(
+                    &member.object,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+                property: Box::new(convert_expression(
+                    &member.property,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+                computed: member.computed,
+                optional: member.optional,
+            })
+        }
+        internal::Expression::ConditionalExpression(cond) => {
+            public::Expression::ConditionalExpression(public::ConditionalExpression {
+                node_type: "ConditionalExpression".to_string(),
+                start: cond.span.start,
+                end: cond.span.end,
+                loc: create_location(cond.span, loc, offset),
+                test: Box::new(convert_expression(
+                    &cond.test, source, loc, interner, offset,
+                )),
+                consequent: Box::new(convert_expression(
+                    &cond.consequent,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+                alternate: Box::new(convert_expression(
+                    &cond.alternate,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
+    }
+}
+
+fn convert_object_property(
+    prop: &internal::ObjectProperty,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::ObjectProperty {
+    match prop {
+        internal::ObjectProperty::Property(p) => {
+            public::ObjectProperty::Property(convert_property(p, source, loc, interner, offset))
+        }
+        internal::ObjectProperty::SpreadElement(s) => {
+            public::ObjectProperty::SpreadElement(public::SpreadElement {
+                node_type: "SpreadElement".to_string(),
+                start: s.span.start,
+                end: s.span.end,
+                loc: create_location(s.span, loc, offset),
+                argument: Box::new(convert_expression(
+                    &s.argument,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
             })
         }
     }
@@ -219,7 +440,13 @@ fn convert_property(
         shorthand: prop.shorthand,
         computed: prop.computed,
         key: Box::new(convert_expression(&prop.key, source, loc, interner, offset)),
-        value: Box::new(convert_expression(&prop.value, source, loc, interner, offset)),
+        value: Box::new(convert_expression(
+            &prop.value,
+            source,
+            loc,
+            interner,
+            offset,
+        )),
         kind: "init".to_string(),
     }
 }

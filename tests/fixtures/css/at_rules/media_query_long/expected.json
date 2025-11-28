@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 290,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 93,
+				"end": 281,
+				"name": "media",
+				"prelude": "(min-width: 768px) and (max-width: 1024px) and (orientation: landscape) and (prefers-color-scheme: dark) and (prefers-reduced-motion: no-preference)",
+				"block": {
+					"type": "Block",
+					"start": 249,
+					"end": 281,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 253,
+								"end": 256,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 253,
+										"end": 256,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 253,
+														"end": 256
+													}
+												],
+												"start": 253,
+												"end": 256
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 257,
+								"end": 278,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 262,
+										"end": 273,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 253,
+							"end": 278
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 282,
+			"styles": "\n\t/* Media queries DON'T wrap - even when exceeding 100 chars (this is 183 chars) */\n\t@media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) and (prefers-color-scheme: dark) and (prefers-reduced-motion: no-preference) {\n\t\tdiv {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": null,
+	"end": null,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

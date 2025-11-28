@@ -269,13 +269,32 @@ impl<'a> Printer<'a> {
         tag_name: &str,
         nodes: &[FragmentNode],
         preserves_ws: bool,
+        _hug_start: bool,
+        _hug_end: bool,
+        attrs_multiline: bool,
     ) {
-        // Write newline after opening tag
-        self.write("\n");
-        self.indent_level += 1;
-        self.write_indent();
+        // This function now ONLY handles the hug_both case (hugStart && hugEnd)
+        // Pattern depends on whether attributes wrapped:
+        // - With wrapped attrs: ><content</Tag\n> (tight opening, prettier lines 1180-1189)
+        // - Without attrs: \n\t><content</Tag\n> (indented opening)
+        //
+        // Other hug combinations are handled in separate code paths in element.rs (lines 104-167)
+        // We tried unifying all 4 cases here but it led to bugs - keep them separate!
+        // TODO: Consider renaming to `print_hug_both_element()` to make this clearer
 
-        // Write `>` followed by first child
+        // Opening: conditionally add newline+indent before >
+        // When attrs wrap, they already added the newline/indent, so > comes immediately after
+        // When no attrs (or attrs didn't wrap), we need to add newline+indent
+        if !attrs_multiline {
+            self.write("\n");
+        }
+
+        // Increment indent for children (and for > in no-attrs case)
+        self.indent_level += 1;
+
+        if !attrs_multiline {
+            self.write_indent();
+        }
         self.write(">");
 
         // Print all children with proper indentation
@@ -287,8 +306,8 @@ impl<'a> Printer<'a> {
                 continue;
             }
 
-            // Print the node
-            self.print_fragment_node(node, true, preserves_ws);
+            // Print the node (inline, not multiline)
+            self.print_fragment_node(node, false, preserves_ws);
 
             // Add newline and indent before next child (if not last)
             if i < nodes.len() - 1 {
@@ -304,7 +323,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Write closing tag with hug pattern: </Tag\n>
+        // Closing: </Tag\n> (split closing, always for hug_both case)
         self.write("</");
         self.write(tag_name);
         self.indent_level -= 1;

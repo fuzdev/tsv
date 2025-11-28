@@ -1,11 +1,8 @@
-use crate::fixtures;
+use crate::fixtures::{self, validation};
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
 
-mod reporting;
-mod validations;
-
-/// fixtures-validate command - validate all fixture files (input.svelte, output_prettier.svelte, prettier_quirk_*.svelte, unformatted_*.svelte)
+/// fixtures-validate command - validate all fixture files
 pub struct FixturesValidateCommand;
 
 impl Command for FixturesValidateCommand {
@@ -15,6 +12,7 @@ impl Command for FixturesValidateCommand {
 
     fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
         let list_only = args.flag("list");
+        let verbose = args.flag("verbose") || args.flag("v");
 
         // Collect remaining args as filters
         let mut filters = Vec::new();
@@ -22,7 +20,11 @@ impl Command for FixturesValidateCommand {
             filters.push(filter);
         }
 
-        Ok(Box::new(FixturesValidateExecutable { list_only, filters }))
+        Ok(Box::new(FixturesValidateExecutable {
+            list_only,
+            verbose,
+            filters,
+        }))
     }
 
     fn usage(&self) -> Vec<String> {
@@ -30,6 +32,7 @@ impl Command for FixturesValidateCommand {
             "fixtures_validate                           Validate all fixture files (CI)"
                 .to_string(),
             "fixtures_validate --list                    List all fixtures".to_string(),
+            "fixtures_validate --verbose                 Show successful checks too".to_string(),
             "fixtures_validate <filter>...               Validate matching fixtures".to_string(),
         ]
     }
@@ -37,11 +40,19 @@ impl Command for FixturesValidateCommand {
 
 struct FixturesValidateExecutable {
     list_only: bool,
+    verbose: bool,
     filters: Vec<String>,
 }
 
 impl Executable for FixturesValidateExecutable {
     fn execute(&self) {
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        rt.block_on(self.run());
+    }
+}
+
+impl FixturesValidateExecutable {
+    async fn run(&self) {
         let fixtures_dir = std::path::Path::new("tests/fixtures");
 
         if !fixtures_dir.exists() {
@@ -60,12 +71,12 @@ impl Executable for FixturesValidateExecutable {
         let total_count = all_fixtures.len();
 
         // Apply filters
-        let fixtures: Vec<_> = all_fixtures
+        let fixture_list: Vec<_> = all_fixtures
             .into_iter()
             .filter(|f| f.matches_filters(&self.filters))
             .collect();
 
-        if fixtures.is_empty() {
+        if fixture_list.is_empty() {
             if self.filters.is_empty() {
                 eprintln!("No fixtures found");
             } else {
@@ -76,87 +87,44 @@ impl Executable for FixturesValidateExecutable {
 
         if self.list_only {
             println!("Found fixtures:");
-            for fixture in &fixtures {
+            for fixture in &fixture_list {
                 println!("  {} ({})", fixture.relative_path, fixture.input_file);
             }
             if self.filters.is_empty() {
-                println!("\nTotal: {}", fixtures.len());
+                println!("\nTotal: {}", fixture_list.len());
             } else {
-                println!("\nMatched: {} of {} fixtures", fixtures.len(), total_count);
+                println!(
+                    "\nMatched: {} of {} fixtures",
+                    fixture_list.len(),
+                    total_count
+                );
             }
             return;
         }
 
-        // Run validations
-        let results = validations::run_validations(&fixtures, &self.filters);
+        // Create validation context for cross-fixture duplicate detection
+        let mut context = validation::ValidationContext::new();
+        let mut summary = validation::ValidationSummary::new();
 
-        // Check for errors
-        let has_errors = !results.invalid_inputs.is_empty()
-            || !results.structure_errors.is_empty()
-            || !results.unformatted_mismatch.is_empty()
-            || !results.duplicates.is_empty()
-            || !results.unformatted_duplicates.is_empty()
-            || !results.prettier_quirk_duplicates.is_empty()
-            || !results.prettier_quirk_not_idempotent.is_empty()
-            || !results.non_idempotent.is_empty()
-            || !results.prettier_quirk_not_normalized.is_empty()
-            || !results.unformatted_not_normalized.is_empty()
-            || !results.unformatted_ours_not_normalized.is_empty()
-            || !results.outdated_expected_ours.is_empty()
-            || !results.outdated_expected.is_empty()
-            || !results.outdated_expected_svelte.is_empty()
-            || !results.outdated_output_prettier.is_empty()
-            || !results.redundant_unformatted.is_empty();
+        // Validate each fixture
+        for fixture in &fixture_list {
+            let result = validation::validate_fixture(fixture, &mut context).await;
+            summary.add(result);
+        }
 
-        if !has_errors {
-            if self.filters.is_empty() {
-                println!(
-                    "✓ All {} fixtures validated ({} unformatted_*.svelte, {} unformatted_ours_*.svelte, {} prettier_quirk_*.svelte)",
-                    results.checked, results.unformatted_checked, results.unformatted_ours_checked, results.prettier_quirk_checked
-                );
-            } else {
-                println!(
-                    "✓ Matched {} of {} fixtures pass validation ({} unformatted_*.svelte, {} unformatted_ours_*.svelte, {} prettier_quirk_*.svelte)",
-                    results.checked,
-                    total_count,
-                    results.unformatted_checked,
-                    results.unformatted_ours_checked,
-                    results.prettier_quirk_checked
-                );
-                println!(
-                    "⚠️  Skipping cross-fixture duplicate detection (run without filters for full validation)"
-                );
-            }
+        // Check for cross-fixture duplicates (only when not filtering)
+        if self.filters.is_empty() {
+            summary.cross_fixture_duplicates = context.find_duplicates();
+        }
+
+        // Print results with verbose mode
+        validation::print_validation_results(&summary, self.verbose);
+
+        // Exit with appropriate code
+        if summary.is_valid() {
             std::process::exit(0);
+        } else {
+            std::process::exit(1);
         }
-
-        // Report all errors
-        reporting::report_all_errors(&results);
-
-        // Show summary of failed fixtures
-        let mut failed_list: Vec<String> = results.failed_fixtures.into_iter().collect();
-        failed_list.sort();
-        let passed = results.checked - failed_list.len();
-
-        eprintln!("\n════════════════════");
-        eprintln!();
-        eprintln!(
-            "{} / {} fixtures failed:\n",
-            failed_list.len(),
-            results.checked
-        );
-        for fixture in &failed_list {
-            eprintln!("  ✗ {}", fixture);
-        }
-        eprintln!();
-        eprintln!(
-            "Results Summary: {} passed, {} failed out of {} total",
-            passed,
-            failed_list.len(),
-            results.checked
-        );
-        eprintln!();
-
-        std::process::exit(1);
     }
 }

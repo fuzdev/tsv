@@ -7,10 +7,7 @@ use tsv_lang::ParseError;
 ///
 /// NOTE: Content is preserved exactly as written. Indentation stripping for multi-line
 /// block comments happens in the conversion layer (matching Svelte's behavior).
-pub(crate) fn read_line_comment(
-    source: &str,
-    pos: &mut usize,
-) -> Result<Token, ParseError> {
+pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, ParseError> {
     let start = *pos;
 
     // Skip //
@@ -52,10 +49,7 @@ pub(crate) fn read_line_comment(
 ///
 /// NOTE: Content is preserved exactly as written. Indentation stripping for multi-line
 /// comments happens in the conversion layer (matching Svelte's behavior).
-pub(crate) fn read_block_comment(
-    source: &str,
-    pos: &mut usize,
-) -> Result<Token, ParseError> {
+pub(crate) fn read_block_comment(source: &str, pos: &mut usize) -> Result<Token, ParseError> {
     let start = *pos;
 
     // Skip /*

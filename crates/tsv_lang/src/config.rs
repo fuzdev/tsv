@@ -9,6 +9,10 @@ pub struct PrintConfig {
     pub print_width: usize,
     /// Tab width for visual width calculations (default: 2)
     pub tab_width: usize,
+    /// Base indent offset for width calculations (default: 0)
+    /// Used when formatting nested content (e.g., CSS inside Svelte)
+    /// where the output will be wrapped with additional indentation
+    pub base_indent_offset: usize,
 }
 
 impl Default for PrintConfig {
@@ -17,6 +21,7 @@ impl Default for PrintConfig {
             indent: "\t",
             print_width: 100,
             tab_width: 2,
+            base_indent_offset: 0,
         }
     }
 }

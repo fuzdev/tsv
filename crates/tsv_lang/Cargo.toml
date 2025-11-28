@@ -5,4 +5,5 @@ edition.workspace = true
 description = "Language-agnostic foundation primitives for TSV"
 
 [dependencies]
+smallvec.workspace = true
 string-interner.workspace = true

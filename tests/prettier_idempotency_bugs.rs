@@ -6,15 +6,16 @@
 ///
 /// See: tests/fixtures/svelte/elements/prettier_bug_space_after_block/README.md
 
-#[test]
-fn prettier_bug_space_after_block() {
+#[tokio::test]
+async fn prettier_bug_space_after_block() {
     // Prettier preserves leading space after block element on first pass,
     // but removes it on second pass (non-idempotent behavior)
     assert_prettier_idempotency_bug(
         r#"<div><div>block</div> text</div>"#,
         "<div>\n\t<div>block</div>\n\t text\n</div>\n", // First pass (preserves space)
         "<div>\n\t<div>block</div>\n\ttext\n</div>\n",  // Second pass (removes space)
-    );
+    )
+    .await;
 }
 
 /// Asserts that prettier has an idempotency bug and our printer doesn't.
@@ -29,15 +30,19 @@ fn prettier_bug_space_after_block() {
 /// 2. Prettier's second pass produces stable output (demonstrating non-idempotency)
 /// 3. Our printer produces stable output in a single pass
 /// 4. Our printer is idempotent
-fn assert_prettier_idempotency_bug(input: &str, prettier_first_pass: &str, stable_output: &str) {
+async fn assert_prettier_idempotency_bug(
+    input: &str,
+    prettier_first_pass: &str,
+    stable_output: &str,
+) {
     // Verify prettier's idempotency bug
-    let prettier_once = format_with_prettier(input);
+    let prettier_once = format_with_prettier(input).await;
     assert_eq!(
         prettier_once, prettier_first_pass,
         "Prettier first pass should match expected buggy output"
     );
 
-    let prettier_twice = format_with_prettier(&prettier_once);
+    let prettier_twice = format_with_prettier(&prettier_once).await;
     assert_eq!(
         prettier_twice, stable_output,
         "Prettier second pass should produce stable output"
@@ -66,6 +71,8 @@ fn assert_prettier_idempotency_bug(input: &str, prettier_first_pass: &str, stabl
     );
 }
 
-fn format_with_prettier(content: &str) -> String {
-    tsv_debug::deno::run_prettier(content, "temp.svelte").expect("prettier formatting failed")
+async fn format_with_prettier(content: &str) -> String {
+    tsv_debug::fuz_client::run_prettier(content, "temp.svelte")
+        .await
+        .expect("prettier formatting failed")
 }

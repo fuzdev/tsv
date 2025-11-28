@@ -82,15 +82,51 @@ impl<'a> Lexer<'a> {
             }
             Some('=') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::Equals,
-                    start,
-                    end: self.position,
-                    decoded: None,
-                })
+                match self.current {
+                    Some('>') => {
+                        // =>
+                        self.advance();
+                        Ok(Token {
+                            kind: TokenKind::Arrow,
+                            start,
+                            end: self.position,
+                            decoded: None,
+                        })
+                    }
+                    Some('=') => {
+                        self.advance();
+                        if self.current == Some('=') {
+                            // ===
+                            self.advance();
+                            Ok(Token {
+                                kind: TokenKind::EqualsEqualsEquals,
+                                start,
+                                end: self.position,
+                                decoded: None,
+                            })
+                        } else {
+                            // ==
+                            Ok(Token {
+                                kind: TokenKind::EqualsEquals,
+                                start,
+                                end: self.position,
+                                decoded: None,
+                            })
+                        }
+                    }
+                    _ => {
+                        // =
+                        Ok(Token {
+                            kind: TokenKind::Equals,
+                            start,
+                            end: self.position,
+                            decoded: None,
+                        })
+                    }
+                }
             }
             Some(ch) if ch.is_ascii_digit() => {
-                // TODO: Support floats (1.5, 1e10), hex (0x10), binary (0b10), octal (0o10)
+                // Parse integer part
                 while let Some(ch) = self.current {
                     if ch.is_ascii_digit() {
                         self.advance();
@@ -98,6 +134,26 @@ impl<'a> Lexer<'a> {
                         break;
                     }
                 }
+
+                // Check for decimal point (float: 1.5)
+                if self.current == Some('.') {
+                    // Peek ahead to ensure it's not a method call like 1.toString()
+                    let next_char = self.source[self.position + 1..].chars().next();
+                    if next_char.is_some_and(|c| c.is_ascii_digit()) {
+                        self.advance(); // consume '.'
+                        while let Some(ch) = self.current {
+                            if ch.is_ascii_digit() {
+                                self.advance();
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // TODO: Support scientific notation (1e10, 1.5e-3)
+                // TODO: Support hex (0x10), binary (0b10), octal (0o10)
+
                 Ok(Token {
                     kind: TokenKind::Number,
                     start,
@@ -201,6 +257,85 @@ impl<'a> Lexer<'a> {
                     decoded: None,
                 })
             }
+            Some('[') => {
+                self.advance();
+                Ok(Token {
+                    kind: TokenKind::BracketOpen,
+                    start,
+                    end: self.position,
+                    decoded: None,
+                })
+            }
+            Some(']') => {
+                self.advance();
+                Ok(Token {
+                    kind: TokenKind::BracketClose,
+                    start,
+                    end: self.position,
+                    decoded: None,
+                })
+            }
+            Some('(') => {
+                self.advance();
+                Ok(Token {
+                    kind: TokenKind::ParenOpen,
+                    start,
+                    end: self.position,
+                    decoded: None,
+                })
+            }
+            Some(')') => {
+                self.advance();
+                Ok(Token {
+                    kind: TokenKind::ParenClose,
+                    start,
+                    end: self.position,
+                    decoded: None,
+                })
+            }
+            Some('.') => {
+                // Could be: ... (spread) or . (member access - not yet implemented)
+                let peek1 = self.source[self.position + 1..].chars().next();
+                let peek2 = self.source[self.position + 2..].chars().next();
+                if peek1 == Some('.') && peek2 == Some('.') {
+                    self.advance(); // consume first .
+                    self.advance(); // consume second .
+                    self.advance(); // consume third .
+                    Ok(Token {
+                        kind: TokenKind::DotDotDot,
+                        start,
+                        end: self.position,
+                        decoded: None,
+                    })
+                } else {
+                    // Single dot: member access operator
+                    self.advance();
+                    Ok(Token {
+                        kind: TokenKind::Dot,
+                        start,
+                        end: self.position,
+                        decoded: None,
+                    })
+                }
+            }
+            Some('-') => {
+                self.advance();
+                Ok(Token {
+                    kind: TokenKind::Minus,
+                    start,
+                    end: self.position,
+                    decoded: None,
+                })
+            }
+            Some('+') => {
+                self.advance();
+                Ok(Token {
+                    kind: TokenKind::Plus,
+                    start,
+                    end: self.position,
+                    decoded: None,
+                })
+            }
             Some('/') => {
                 // Could be: // line comment, /* block comment */, or / division operator
                 // Peek ahead to determine which
@@ -227,13 +362,157 @@ impl<'a> Lexer<'a> {
                         Ok(token)
                     }
                     _ => {
-                        // TODO: Division operator / or /= (not yet implemented)
-                        Err(ParseError::InvalidSyntax {
-                            message: "Division operator not yet implemented".to_string(),
-                            position: start,
-                            context: None,
+                        // Division operator /
+                        self.advance();
+                        Ok(Token {
+                            kind: TokenKind::Slash,
+                            start,
+                            end: self.position,
+                            decoded: None,
                         })
                     }
+                }
+            }
+            Some('*') => {
+                self.advance();
+                Ok(Token {
+                    kind: TokenKind::Star,
+                    start,
+                    end: self.position,
+                    decoded: None,
+                })
+            }
+            Some('%') => {
+                self.advance();
+                Ok(Token {
+                    kind: TokenKind::Percent,
+                    start,
+                    end: self.position,
+                    decoded: None,
+                })
+            }
+            Some('<') => {
+                self.advance();
+                if self.current == Some('=') {
+                    self.advance();
+                    Ok(Token {
+                        kind: TokenKind::LessThanEquals,
+                        start,
+                        end: self.position,
+                        decoded: None,
+                    })
+                } else {
+                    Ok(Token {
+                        kind: TokenKind::LessThan,
+                        start,
+                        end: self.position,
+                        decoded: None,
+                    })
+                }
+            }
+            Some('>') => {
+                self.advance();
+                if self.current == Some('=') {
+                    self.advance();
+                    Ok(Token {
+                        kind: TokenKind::GreaterThanEquals,
+                        start,
+                        end: self.position,
+                        decoded: None,
+                    })
+                } else {
+                    Ok(Token {
+                        kind: TokenKind::GreaterThan,
+                        start,
+                        end: self.position,
+                        decoded: None,
+                    })
+                }
+            }
+            Some('!') => {
+                self.advance();
+                if self.current == Some('=') {
+                    self.advance();
+                    if self.current == Some('=') {
+                        self.advance();
+                        Ok(Token {
+                            kind: TokenKind::BangEqualsEquals,
+                            start,
+                            end: self.position,
+                            decoded: None,
+                        })
+                    } else {
+                        Ok(Token {
+                            kind: TokenKind::BangEquals,
+                            start,
+                            end: self.position,
+                            decoded: None,
+                        })
+                    }
+                } else {
+                    Ok(Token {
+                        kind: TokenKind::Bang,
+                        start,
+                        end: self.position,
+                        decoded: None,
+                    })
+                }
+            }
+            Some('&') => {
+                self.advance();
+                if self.current == Some('&') {
+                    self.advance();
+                    Ok(Token {
+                        kind: TokenKind::AmpersandAmpersand,
+                        start,
+                        end: self.position,
+                        decoded: None,
+                    })
+                } else {
+                    Ok(Token {
+                        kind: TokenKind::Ampersand,
+                        start,
+                        end: self.position,
+                        decoded: None,
+                    })
+                }
+            }
+            Some('|') => {
+                self.advance();
+                if self.current == Some('|') {
+                    self.advance();
+                    Ok(Token {
+                        kind: TokenKind::PipePipe,
+                        start,
+                        end: self.position,
+                        decoded: None,
+                    })
+                } else {
+                    Ok(Token {
+                        kind: TokenKind::Pipe,
+                        start,
+                        end: self.position,
+                        decoded: None,
+                    })
+                }
+            }
+            Some('?') => {
+                self.advance();
+                if self.current == Some('?') {
+                    self.advance();
+                    Ok(Token {
+                        kind: TokenKind::QuestionQuestion,
+                        start,
+                        end: self.position,
+                        decoded: None,
+                    })
+                } else {
+                    Ok(Token {
+                        kind: TokenKind::Question,
+                        start,
+                        end: self.position,
+                        decoded: None,
+                    })
                 }
             }
             Some(ch) => Err(ParseError::InvalidSyntax {

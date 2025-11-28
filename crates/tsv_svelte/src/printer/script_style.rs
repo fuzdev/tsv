@@ -28,7 +28,12 @@ impl<'a> Printer<'a> {
         // Use the TypeScript printer from tsv_ts crate
         // IMPORTANT: TypeScript AST was parsed with base_offset, so spans are absolute
         // positions in the full Svelte source. Pass the full source for correct slicing.
-        let formatted_content = tsv_ts::format(&script.content, self.source());
+        // Use base_indent_offset=1 to account for the Svelte wrapper indent (width calculations)
+        let config = tsv_lang::PrintConfig {
+            base_indent_offset: 1,
+            ..Default::default()
+        };
+        let formatted_content = tsv_ts::format_with_config(&script.content, self.source(), config);
 
         // Indent each line - trim trailing newline first to avoid extra blank lines
         let content_trimmed = formatted_content.trim_end_matches('\n');
@@ -69,7 +74,13 @@ impl<'a> Printer<'a> {
 
             // Pass the entire source to CSS printer (CSS node spans are absolute)
             // The CSS printer will use the spans to detect blank lines correctly
-            let formatted_css = tsv_css::format(&style.css_stylesheet, self.source());
+            // Use base_indent_offset=1 to account for the Svelte wrapper indent
+            let config = tsv_lang::PrintConfig {
+                base_indent_offset: 1,
+                ..Default::default()
+            };
+            let formatted_css =
+                tsv_css::format_with_config(&style.css_stylesheet, self.source(), config);
 
             // Indent each line - trim trailing newlines first to avoid extra blank lines
             // Note: CSS formatter adds trailing newline, we need to remove it before line processing

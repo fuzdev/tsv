@@ -23,7 +23,23 @@ use crate::ast::internal;
 use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::DefaultStringInterner;
-use tsv_lang::{printing, OutputBuffer, PrintConfig, SymbolResolver};
+use tsv_lang::{OutputBuffer, PrintConfig, SymbolResolver, printing};
+
+/// Check if an expression is a pure property chain (member expressions without calls)
+///
+/// Pure property chains like `obj.a.b.c` should use fluid assignment wrapping
+/// (break after `=` if doesn't fit). Expressions containing calls, objects,
+/// arrays, or ternaries handle their own wrapping internally.
+pub(crate) fn is_pure_property_chain(expr: &internal::Expression) -> bool {
+    match expr {
+        // A member expression is a property chain if its object is also a pure chain
+        internal::Expression::MemberExpression(member) => is_pure_property_chain(&member.object),
+        // Base case: identifiers are valid chain roots
+        internal::Expression::Identifier(_) => true,
+        // Everything else (calls, objects, arrays, ternaries, etc.) is NOT a pure chain
+        _ => false,
+    }
+}
 
 /// Printer state for building output
 pub struct Printer<'a> {
@@ -44,15 +60,6 @@ pub struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    /// Create a new printer with the given interner, source, comments, and default config
-    pub fn new(
-        interner: Rc<RefCell<DefaultStringInterner>>,
-        source: &'a str,
-        comments: &'a Vec<internal::Comment>,
-    ) -> Self {
-        Self::with_config(interner, source, comments, PrintConfig::default())
-    }
-
     /// Create a new printer with the given interner, source, comments, and config
     pub fn with_config(
         interner: Rc<RefCell<DefaultStringInterner>>,
@@ -86,6 +93,11 @@ impl<'a> Printer<'a> {
         self.buffer.into_string()
     }
 
+    /// Get the current column position (for doc-builder width calculations)
+    pub(crate) fn current_column(&self) -> usize {
+        self.buffer.current_column(self.config.tab_width)
+    }
+
     /// Print a TypeScript comment
     pub(crate) fn print_comment(&mut self, comment: &internal::Comment) {
         if comment.is_block {
@@ -94,7 +106,11 @@ impl<'a> Printer<'a> {
 
             // Check if multi-line - if so, strip and re-apply indentation
             if comment.content.contains('\n') {
-                let stripped = printing::strip_comment_indentation(self.source, &comment.content, comment.span.start);
+                let stripped = printing::strip_comment_indentation(
+                    self.source,
+                    &comment.content,
+                    comment.span.start,
+                );
                 let lines: Vec<&str> = stripped.split('\n').collect();
                 for (i, line) in lines.iter().enumerate() {
                     if i > 0 {
@@ -119,7 +135,7 @@ impl<'a> Printer<'a> {
 
     /// Print a TypeScript program
     pub fn print_program(&mut self, program: &internal::Program) {
-        let mut prev_end = 0u32;  // Start of file
+        let mut prev_end = 0u32; // Start of file
 
         for (i, statement) in program.body.iter().enumerate() {
             // Always add newline between statements (separator)
@@ -174,7 +190,11 @@ impl<'a> Printer<'a> {
 
                 // Check if we need a blank line before this comment
                 if comment.span.start > last_comment_end
-                    && printing::has_blank_line_between(self.source, last_comment_end, comment.span.start)
+                    && printing::has_blank_line_between(
+                        self.source,
+                        last_comment_end,
+                        comment.span.start,
+                    )
                 {
                     self.write("\n");
                 }
@@ -190,7 +210,8 @@ impl<'a> Printer<'a> {
         }
 
         // Check if there's a blank line after the last comment and before curr_start
-        if printed_any && last_comment_end < curr_start
+        if printed_any
+            && last_comment_end < curr_start
             && printing::has_blank_line_between(self.source, last_comment_end, curr_start)
         {
             self.write("\n");
@@ -210,7 +231,8 @@ impl<'a> Printer<'a> {
             // Comments between expression end and statement end (before semicolon)
             // OR comments after statement end on same line (after semicolon)
             if (comment.span.start >= expr_end && comment.span.end <= stmt_end)
-                || (comment.span.start >= stmt_end && printing::is_same_line(self.source, stmt_end, comment.span.start))
+                || (comment.span.start >= stmt_end
+                    && printing::is_same_line(self.source, stmt_end, comment.span.start))
             {
                 if !has_comments {
                     self.write(" ");
@@ -237,7 +259,16 @@ impl<'a> Printer<'a> {
 
     /// Check if there are comments between two positions (read-only check)
     pub(crate) fn has_comments_between(&self, start: u32, end: u32) -> bool {
-        self.comments.iter().any(|c| c.span.start >= start && c.span.end <= end)
+        self.comments
+            .iter()
+            .any(|c| c.span.start >= start && c.span.end <= end)
+    }
+
+    /// Check if there are line comments (// style) between two positions
+    pub(crate) fn has_line_comments_between(&self, start: u32, end: u32) -> bool {
+        self.comments
+            .iter()
+            .any(|c| c.span.start >= start && c.span.end <= end && !c.is_block)
     }
 
     /// Print inline comments between two positions (same-line comments only)
@@ -253,6 +284,81 @@ impl<'a> Printer<'a> {
             }
         }
         printed_any
+    }
+
+    /// Print leading comments before an object property
+    ///
+    /// Different from `print_leading_comments` because it handles same-line leading comments
+    /// (like `{/* comment */ a: 1}`), but still skips trailing comments from the previous property.
+    ///
+    /// - `prev_end`: Position after the previous property's value (or opening brace for first property)
+    /// - `curr_start`: Position of the current property's key
+    /// - `is_first_prop`: True if this is the first property (prev_end is opening brace position)
+    ///
+    /// Returns true if a same-line leading comment was printed (caller should skip its indent).
+    /// For comments on their own line, prints with proper indentation and newline.
+    pub(crate) fn print_object_leading_comments(
+        &mut self,
+        prev_end: u32,
+        curr_start: u32,
+        is_first_prop: bool,
+    ) -> bool {
+        let mut last_comment_end = prev_end;
+        let mut printed_same_line = false;
+
+        for comment in self.comments.iter() {
+            // Check if comment is between prev and current position
+            if comment.span.start >= prev_end && comment.span.end <= curr_start {
+                // Skip comments on the same line as prev_end - those are trailing comments
+                // for the previous property (already printed by the trailing comment logic).
+                // EXCEPT for the first property: same-line comments after `{` are leading comments.
+                if !is_first_prop
+                    && printing::is_same_line(self.source, prev_end, comment.span.start)
+                {
+                    continue;
+                }
+
+                // Check if comment is on the same line as curr_start
+                // (inline leading comment like `{/* comment */ a: 1}`)
+                if printing::is_same_line(self.source, comment.span.end, curr_start) {
+                    // Same-line comment: always print indent (we're at start of a new line),
+                    // then comment and space
+                    self.write_indent();
+                    self.print_comment(comment);
+                    self.write(" ");
+                    last_comment_end = comment.span.end;
+                    printed_same_line = true;
+                    continue;
+                }
+
+                // Comment on its own line: check for blank lines
+                if comment.span.start > last_comment_end
+                    && printing::has_blank_line_between(
+                        self.source,
+                        last_comment_end,
+                        comment.span.start,
+                    )
+                {
+                    self.write("\n");
+                }
+
+                self.write_indent();
+                self.print_comment(comment);
+                self.write("\n");
+
+                last_comment_end = comment.span.end;
+            }
+        }
+
+        // Check for blank line after the last comment before the property
+        if last_comment_end > prev_end
+            && last_comment_end < curr_start
+            && printing::has_blank_line_between(self.source, last_comment_end, curr_start)
+        {
+            self.write("\n");
+        }
+
+        printed_same_line
     }
 }
 
