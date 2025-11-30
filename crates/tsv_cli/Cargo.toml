@@ -14,3 +14,6 @@ tsv_ts.workspace = true
 tsv_css.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+[lints]
+workspace = true

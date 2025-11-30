@@ -210,10 +210,10 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
                 .current_identifier()
                 .unwrap_or_else(|| parser.current_value())
                 .to_string(),
-            TokenKind::String { content, quote } => format!("{}{}{}", quote, content, quote),
+            TokenKind::String { content, quote } => format!("{quote}{content}{quote}"),
             TokenKind::Number(n) => n.clone(),
-            TokenKind::Percentage(n) => format!("{}%", n),
-            TokenKind::Dimension(n, unit) => format!("{}{}", n, unit),
+            TokenKind::Percentage(n) => format!("{n}%"),
+            TokenKind::Dimension(n, unit) => format!("{n}{unit}"),
             TokenKind::Whitespace => {
                 parser.advance()?;
                 continue;
@@ -222,7 +222,7 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
                 // Capture comment for value comments side table
                 let comment_start = parser.base_offset() + parser.current_start;
                 let comment_end = parser.base_offset() + parser.current_end;
-                value_comments.push(crate::ast::internal::CssComment {
+                value_comments.push(CssComment {
                     content: content.clone(),
                     span: Span {
                         start: comment_start as u32,

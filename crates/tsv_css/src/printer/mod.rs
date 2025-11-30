@@ -250,7 +250,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Print a CSS comment
-    fn print_css_comment(&mut self, comment: &crate::ast::internal::CssComment) {
+    fn print_css_comment(&mut self, comment: &CssComment) {
         // Write comment with delimiters - content is preserved exactly as written
         self.write("/*");
         self.write(&comment.content);

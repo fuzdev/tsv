@@ -9,3 +9,6 @@ tsv_lang.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 phf = { version = "0.11", features = ["macros"] }
+
+[lints]
+workspace = true

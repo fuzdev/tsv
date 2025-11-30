@@ -38,6 +38,7 @@
 ///     decoded: Some("hello\n".to_string()),  // Escaped \n decoded
 /// };
 /// ```
+#[derive(Debug)]
 pub struct PeekData<K> {
     pub kind: K,
     pub start: usize,

@@ -20,6 +20,7 @@ pub struct SourceLocation {
     pub end: Position,
 }
 
+#[derive(Debug)]
 pub struct LocationTracker {
     line_starts: Vec<usize>,
 }

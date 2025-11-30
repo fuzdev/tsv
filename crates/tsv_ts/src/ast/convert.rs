@@ -3,7 +3,7 @@
 use super::internal;
 use super::public;
 use string_interner::DefaultStringInterner;
-use tsv_lang::{LocationTracker, Span};
+use tsv_lang::{InfallibleResolve, LocationTracker, Span};
 
 /// Convert tsv_lang::SourceLocation to public::SourceLocation
 ///
@@ -105,6 +105,190 @@ fn convert_statement(
                 kind: var_decl.kind.as_str().to_string(),
             })
         }
+        internal::Statement::TSTypeAliasDeclaration(type_alias) => {
+            public::Statement::TSTypeAliasDeclaration(public::TSTypeAliasDeclaration {
+                node_type: "TSTypeAliasDeclaration".to_string(),
+                start: type_alias.span.start,
+                end: type_alias.span.end,
+                loc: create_location(type_alias.span, loc, offset),
+                id: public::Identifier {
+                    node_type: "Identifier".to_string(),
+                    start: type_alias.id.span.start,
+                    end: type_alias.id.span.end,
+                    loc: create_location(type_alias.id.span, loc, offset),
+                    name: interner.must_resolve(type_alias.id.name).to_string(),
+                    type_annotation: None,
+                },
+                type_annotation: convert_type(&type_alias.type_annotation, loc, offset),
+            })
+        }
+        internal::Statement::ReturnStatement(ret) => {
+            public::Statement::ReturnStatement(public::ReturnStatement {
+                node_type: "ReturnStatement".to_string(),
+                start: ret.span.start,
+                end: ret.span.end,
+                loc: create_location(ret.span, loc, offset),
+                argument: ret
+                    .argument
+                    .as_ref()
+                    .map(|expr| Box::new(convert_expression(expr, source, loc, interner, offset))),
+            })
+        }
+        internal::Statement::BlockStatement(block) => public::Statement::BlockStatement(
+            convert_block_statement(block, source, loc, interner, offset),
+        ),
+        internal::Statement::FunctionDeclaration(func_decl) => {
+            public::Statement::FunctionDeclaration(public::FunctionDeclaration {
+                node_type: "FunctionDeclaration".to_string(),
+                start: func_decl.span.start,
+                end: func_decl.span.end,
+                loc: create_location(func_decl.span, loc, offset),
+                id: public::Identifier {
+                    node_type: "Identifier".to_string(),
+                    start: func_decl.id.span.start,
+                    end: func_decl.id.span.end,
+                    loc: create_location(func_decl.id.span, loc, offset),
+                    name: interner.must_resolve(func_decl.id.name).to_string(),
+                    type_annotation: None,
+                },
+                expression: false,
+                generator: func_decl.generator,
+                is_async: func_decl.r#async,
+                params: func_decl
+                    .params
+                    .iter()
+                    .map(|p| public::Identifier {
+                        node_type: "Identifier".to_string(),
+                        start: p.span.start,
+                        end: p.span.end,
+                        loc: create_location(p.span, loc, offset),
+                        name: interner.must_resolve(p.name).to_string(),
+                        type_annotation: None,
+                    })
+                    .collect(),
+                body: convert_block_statement(&func_decl.body, source, loc, interner, offset),
+            })
+        }
+        internal::Statement::ClassDeclaration(class_decl) => {
+            public::Statement::ClassDeclaration(public::ClassDeclaration {
+                node_type: "ClassDeclaration".to_string(),
+                start: class_decl.span.start,
+                end: class_decl.span.end,
+                loc: create_location(class_decl.span, loc, offset),
+                id: public::Identifier {
+                    node_type: "Identifier".to_string(),
+                    start: class_decl.id.span.start,
+                    end: class_decl.id.span.end,
+                    loc: create_location(class_decl.id.span, loc, offset),
+                    name: interner.must_resolve(class_decl.id.name).to_string(),
+                    type_annotation: None,
+                },
+                super_class: class_decl
+                    .super_class
+                    .as_ref()
+                    .map(|e| Box::new(convert_expression(e, source, loc, interner, offset))),
+                body: convert_class_body(&class_decl.body, source, loc, interner, offset),
+            })
+        }
+    }
+}
+
+fn convert_class_body(
+    body: &internal::ClassBody,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::ClassBody {
+    public::ClassBody {
+        node_type: "ClassBody".to_string(),
+        start: body.span.start,
+        end: body.span.end,
+        loc: create_location(body.span, loc, offset),
+        body: body
+            .body
+            .iter()
+            .map(|m| convert_method_definition(m, source, loc, interner, offset))
+            .collect(),
+    }
+}
+
+fn convert_method_definition(
+    method: &internal::MethodDefinition,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::MethodDefinition {
+    // Convert the FunctionExpression value for the method
+    let func = &method.value;
+    let value = public::FunctionExpression {
+        node_type: "FunctionExpression".to_string(),
+        start: func.span.start,
+        end: func.span.end,
+        loc: create_location(func.span, loc, offset),
+        id: func.id.as_ref().map(|id| public::Identifier {
+            node_type: "Identifier".to_string(),
+            start: id.span.start,
+            end: id.span.end,
+            loc: create_location(id.span, loc, offset),
+            name: interner.must_resolve(id.name).to_string(),
+            type_annotation: None,
+        }),
+        expression: false,
+        generator: false,
+        is_async: false,
+        params: func
+            .params
+            .iter()
+            .map(|p| public::Identifier {
+                node_type: "Identifier".to_string(),
+                start: p.span.start,
+                end: p.span.end,
+                loc: create_location(p.span, loc, offset),
+                name: interner.must_resolve(p.name).to_string(),
+                type_annotation: None,
+            })
+            .collect(),
+        body: convert_block_statement(&func.body, source, loc, interner, offset),
+    };
+
+    public::MethodDefinition {
+        node_type: "MethodDefinition".to_string(),
+        start: method.span.start,
+        end: method.span.end,
+        loc: create_location(method.span, loc, offset),
+        is_static: method.is_static,
+        computed: method.computed,
+        key: Box::new(convert_expression(
+            &method.key,
+            source,
+            loc,
+            interner,
+            offset,
+        )),
+        kind: method.kind.as_str().to_string(),
+        value,
+    }
+}
+
+fn convert_block_statement(
+    block: &internal::BlockStatement,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::BlockStatement {
+    public::BlockStatement {
+        node_type: "BlockStatement".to_string(),
+        start: block.span.start,
+        end: block.span.end,
+        loc: create_location(block.span, loc, offset),
+        body: block
+            .body
+            .iter()
+            .map(|s| convert_statement(s, source, loc, interner, offset))
+            .collect(),
     }
 }
 
@@ -125,7 +309,7 @@ fn convert_variable_declarator(
             start: declarator.id.span.start,
             end: declarator.id.span.end,
             loc: create_location(declarator.id.span, loc, offset),
-            name: interner.resolve(declarator.id.name).unwrap().to_string(),
+            name: interner.must_resolve(declarator.id.name).to_string(),
             type_annotation: declarator
                 .id
                 .type_annotation
@@ -157,6 +341,9 @@ pub fn convert_expression(
                 }
                 internal::LiteralValue::Boolean(b) => serde_json::Value::Bool(*b),
                 internal::LiteralValue::Null => serde_json::Value::Null,
+                // undefined is represented as a special identifier in most ASTs
+                // but as a literal in ours - serialize as null for JSON compatibility
+                internal::LiteralValue::Undefined => serde_json::Value::Null,
             };
             // Extract raw from source using span
             let raw = lit.span.extract(source);
@@ -175,7 +362,7 @@ pub fn convert_expression(
                 start: id.span.start,
                 end: id.span.end,
                 loc: create_location(id.span, loc, offset),
-                name: interner.resolve(id.name).unwrap().to_string(),
+                name: interner.must_resolve(id.name).to_string(),
                 type_annotation: id
                     .type_annotation
                     .as_ref()
@@ -221,6 +408,23 @@ pub fn convert_expression(
                 prefix: unary.prefix,
                 argument: Box::new(convert_expression(
                     &unary.argument,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
+        internal::Expression::UpdateExpression(update) => {
+            public::Expression::UpdateExpression(public::UpdateExpression {
+                node_type: "UpdateExpression".to_string(),
+                start: update.span.start,
+                end: update.span.end,
+                loc: create_location(update.span, loc, offset),
+                operator: update.operator.as_str().to_string(),
+                prefix: update.prefix,
+                argument: Box::new(convert_expression(
+                    &update.argument,
                     source,
                     loc,
                     interner,
@@ -293,11 +497,43 @@ pub fn convert_expression(
                         start: p.span.start,
                         end: p.span.end,
                         loc: create_location(p.span, loc, offset),
-                        name: interner.resolve(p.name).unwrap().to_string(),
+                        name: interner.must_resolve(p.name).to_string(),
                         type_annotation: None,
                     })
                     .collect(),
                 body,
+            })
+        }
+        internal::Expression::FunctionExpression(func) => {
+            public::Expression::FunctionExpression(public::FunctionExpression {
+                node_type: "FunctionExpression".to_string(),
+                start: func.span.start,
+                end: func.span.end,
+                loc: create_location(func.span, loc, offset),
+                id: func.id.as_ref().map(|id| public::Identifier {
+                    node_type: "Identifier".to_string(),
+                    start: id.span.start,
+                    end: id.span.end,
+                    loc: create_location(id.span, loc, offset),
+                    name: interner.must_resolve(id.name).to_string(),
+                    type_annotation: None,
+                }),
+                expression: false,
+                generator: false,
+                is_async: false,
+                params: func
+                    .params
+                    .iter()
+                    .map(|p| public::Identifier {
+                        node_type: "Identifier".to_string(),
+                        start: p.span.start,
+                        end: p.span.end,
+                        loc: create_location(p.span, loc, offset),
+                        name: interner.must_resolve(p.name).to_string(),
+                        type_annotation: None,
+                    })
+                    .collect(),
+                body: convert_block_statement(&func.body, source, loc, interner, offset),
             })
         }
         internal::Expression::SpreadElement(spread) => {
@@ -334,6 +570,26 @@ pub fn convert_expression(
                     .map(|arg| convert_expression(arg, source, loc, interner, offset))
                     .collect(),
                 optional: call.optional,
+            })
+        }
+        internal::Expression::NewExpression(new_expr) => {
+            public::Expression::NewExpression(public::NewExpression {
+                node_type: "NewExpression".to_string(),
+                start: new_expr.span.start,
+                end: new_expr.span.end,
+                loc: create_location(new_expr.span, loc, offset),
+                callee: Box::new(convert_expression(
+                    &new_expr.callee,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+                arguments: new_expr
+                    .arguments
+                    .iter()
+                    .map(|arg| convert_expression(arg, source, loc, interner, offset))
+                    .collect(),
             })
         }
         internal::Expression::MemberExpression(member) => {
@@ -385,6 +641,119 @@ pub fn convert_expression(
                 )),
             })
         }
+        internal::Expression::TemplateLiteral(template) => public::Expression::TemplateLiteral(
+            convert_template_literal(template, source, loc, interner, offset),
+        ),
+        internal::Expression::TaggedTemplateExpression(tagged) => {
+            public::Expression::TaggedTemplateExpression(public::TaggedTemplateExpression {
+                node_type: "TaggedTemplateExpression".to_string(),
+                start: tagged.span.start,
+                end: tagged.span.end,
+                loc: create_location(tagged.span, loc, offset),
+                tag: Box::new(convert_expression(
+                    &tagged.tag,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+                quasi: convert_template_literal(&tagged.quasi, source, loc, interner, offset),
+            })
+        }
+        internal::Expression::AwaitExpression(await_expr) => {
+            public::Expression::AwaitExpression(public::AwaitExpression {
+                node_type: "AwaitExpression".to_string(),
+                start: await_expr.span.start,
+                end: await_expr.span.end,
+                loc: create_location(await_expr.span, loc, offset),
+                argument: Box::new(convert_expression(
+                    &await_expr.argument,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
+        internal::Expression::SequenceExpression(seq) => {
+            public::Expression::SequenceExpression(public::SequenceExpression {
+                node_type: "SequenceExpression".to_string(),
+                start: seq.span.start,
+                end: seq.span.end,
+                loc: create_location(seq.span, loc, offset),
+                expressions: seq
+                    .expressions
+                    .iter()
+                    .map(|e| convert_expression(e, source, loc, interner, offset))
+                    .collect(),
+            })
+        }
+        internal::Expression::RegexLiteral(regex) => {
+            // Reconstruct raw from source: /pattern/flags
+            let raw = regex.span.extract(source).to_string();
+            public::Expression::RegexLiteral(public::RegexLiteral {
+                node_type: "Literal".to_string(), // Regex uses "Literal" type in acorn/Svelte AST
+                start: regex.span.start,
+                end: regex.span.end,
+                loc: create_location(regex.span, loc, offset),
+                value: serde_json::Value::Object(serde_json::Map::new()), // Empty object {}
+                raw,
+                regex: public::RegexValue {
+                    pattern: regex.pattern.clone(),
+                    flags: regex.flags.clone(),
+                },
+            })
+        }
+        internal::Expression::Super(s) => public::Expression::Super(public::Super {
+            node_type: "Super".to_string(),
+            start: s.span.start,
+            end: s.span.end,
+            loc: create_location(s.span, loc, offset),
+        }),
+    }
+}
+
+fn convert_template_literal(
+    template: &internal::TemplateLiteral,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::TemplateLiteral {
+    let _ = (source, interner); // Suppress unused warnings - available for future use
+    public::TemplateLiteral {
+        node_type: "TemplateLiteral".to_string(),
+        start: template.span.start,
+        end: template.span.end,
+        loc: create_location(template.span, loc, offset),
+        quasis: template
+            .quasis
+            .iter()
+            .map(|q| convert_template_element(q, loc, offset))
+            .collect(),
+        expressions: template
+            .expressions
+            .iter()
+            .map(|e| convert_expression(e, source, loc, interner, offset))
+            .collect(),
+    }
+}
+
+fn convert_template_element(
+    element: &internal::TemplateElement,
+    loc: &LocationTracker,
+    offset: usize,
+) -> public::TemplateElement {
+    public::TemplateElement {
+        node_type: "TemplateElement".to_string(),
+        start: element.span.start,
+        end: element.span.end,
+        loc: create_location(element.span, loc, offset),
+        value: public::TemplateElementValue {
+            raw: element.raw.clone(),
+            cooked: element.cooked.clone(),
+        },
+        tail: element.tail,
     }
 }
 
@@ -447,7 +816,7 @@ fn convert_property(
             interner,
             offset,
         )),
-        kind: "init".to_string(),
+        kind: prop.kind.as_str().to_string(),
     }
 }
 
@@ -471,13 +840,104 @@ fn convert_type(
     offset: usize,
 ) -> public::TSType {
     match ts_type {
-        internal::TSType::TSNumberKeyword(node) => {
-            public::TSType::TSNumberKeyword(public::TSNumberKeyword {
-                node_type: "TSNumberKeyword".to_string(),
-                start: node.span.start,
-                end: node.span.end,
-                loc: create_location(node.span, loc, offset),
+        internal::TSType::Keyword(kw) => convert_keyword_type(kw, loc, offset),
+        internal::TSType::Literal(lit) => convert_literal_type(lit, loc, offset),
+    }
+}
+
+fn convert_literal_type(
+    lit: &internal::TSLiteralType,
+    loc: &LocationTracker,
+    offset: usize,
+) -> public::TSType {
+    match lit {
+        internal::TSLiteralType::TemplateLiteral(template) => {
+            public::TSType::TSLiteralType(public::TSLiteralType {
+                node_type: "TSLiteralType".to_string(),
+                start: template.span.start,
+                end: template.span.end,
+                loc: create_location(template.span, loc, offset),
+                literal: public::TSLiteralTypeLiteral::TemplateLiteral(
+                    convert_template_literal_type(template, loc, offset),
+                ),
             })
         }
+    }
+}
+
+fn convert_template_literal_type(
+    template: &internal::TemplateLiteralType,
+    loc: &LocationTracker,
+    offset: usize,
+) -> public::TemplateLiteralType {
+    public::TemplateLiteralType {
+        node_type: "TemplateLiteral".to_string(),
+        start: template.span.start,
+        end: template.span.end,
+        loc: create_location(template.span, loc, offset),
+        quasis: template
+            .quasis
+            .iter()
+            .map(|q| convert_template_element_type(q, loc, offset))
+            .collect(),
+        expressions: template
+            .types
+            .iter()
+            .map(|t| convert_type(t, loc, offset))
+            .collect(),
+    }
+}
+
+fn convert_template_element_type(
+    elem: &internal::TemplateElement,
+    loc: &LocationTracker,
+    offset: usize,
+) -> public::TemplateElement {
+    public::TemplateElement {
+        node_type: "TemplateElement".to_string(),
+        start: elem.span.start,
+        end: elem.span.end,
+        loc: create_location(elem.span, loc, offset),
+        value: public::TemplateElementValue {
+            raw: elem.raw.clone(),
+            cooked: elem.cooked.clone(),
+        },
+        tail: elem.tail,
+    }
+}
+
+/// Convert internal TSKeywordType to the appropriate public type variant
+fn convert_keyword_type(
+    kw: &internal::TSKeywordType,
+    loc: &LocationTracker,
+    offset: usize,
+) -> public::TSType {
+    use internal::TSKeywordKind;
+
+    // Helper macro to reduce boilerplate - creates the public type struct
+    macro_rules! make_public {
+        ($variant:ident) => {{
+            public::TSType::$variant(public::$variant {
+                node_type: kw.kind.node_type_name().to_string(),
+                start: kw.span.start,
+                end: kw.span.end,
+                loc: create_location(kw.span, loc, offset),
+            })
+        }};
+    }
+
+    match kw.kind {
+        TSKeywordKind::Number => make_public!(TSNumberKeyword),
+        TSKeywordKind::String => make_public!(TSStringKeyword),
+        TSKeywordKind::Boolean => make_public!(TSBooleanKeyword),
+        TSKeywordKind::Any => make_public!(TSAnyKeyword),
+        TSKeywordKind::Void => make_public!(TSVoidKeyword),
+        TSKeywordKind::Undefined => make_public!(TSUndefinedKeyword),
+        TSKeywordKind::Null => make_public!(TSNullKeyword),
+        TSKeywordKind::Never => make_public!(TSNeverKeyword),
+        TSKeywordKind::Unknown => make_public!(TSUnknownKeyword),
+        TSKeywordKind::Object => make_public!(TSObjectKeyword),
+        TSKeywordKind::Symbol => make_public!(TSSymbolKeyword),
+        TSKeywordKind::BigInt => make_public!(TSBigIntKeyword),
     }
 }

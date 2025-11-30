@@ -17,7 +17,7 @@ impl Args {
 
     /// Check if a flag is present (e.g., "--pretty")
     pub fn flag(&mut self, name: &str) -> bool {
-        let flag = format!("--{}", name);
+        let flag = format!("--{name}");
         let is_present = self.args.iter().any(|arg| arg == &flag);
         if is_present {
             // Track this as a boolean flag
@@ -28,7 +28,7 @@ impl Args {
 
     /// Get value for an option (e.g., "--parser svelte" returns Some("svelte"))
     pub fn option(&self, name: &str) -> Option<String> {
-        let flag = format!("--{}", name);
+        let flag = format!("--{name}");
         self.args
             .iter()
             .position(|arg| arg == &flag)
@@ -38,7 +38,7 @@ impl Args {
     /// Get required option or return error
     pub fn required_option(&self, name: &str) -> Result<String, String> {
         self.option(name)
-            .ok_or_else(|| format!("Missing required option: --{}", name))
+            .ok_or_else(|| format!("Missing required option: --{name}"))
     }
 
     /// Get next positional argument

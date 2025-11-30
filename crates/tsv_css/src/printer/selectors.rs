@@ -222,7 +222,7 @@ impl<'a> Printer<'a> {
                 let combinator_text = match combinator {
                     internal::Combinator::Descendant => {
                         if is_first {
-                            "".to_string()
+                            String::new()
                         } else {
                             " ".to_string()
                         }
@@ -276,7 +276,7 @@ impl<'a> Printer<'a> {
             internal::SimpleSelector::Type { span, .. } => span.extract(self.source).to_string(),
             internal::SimpleSelector::Universal { namespace, .. } => {
                 if let Some(ns) = namespace {
-                    format!("{}|*", ns)
+                    format!("{ns}|*")
                 } else {
                     "*".to_string()
                 }
@@ -298,15 +298,7 @@ impl<'a> Printer<'a> {
                 }
                 result.push_str(name);
                 if let Some(m) = matcher {
-                    let op = match m {
-                        internal::AttributeMatcher::Exact => "=",
-                        internal::AttributeMatcher::Contains => "~=",
-                        internal::AttributeMatcher::DashMatch => "|=",
-                        internal::AttributeMatcher::Prefix => "^=",
-                        internal::AttributeMatcher::Suffix => "$=",
-                        internal::AttributeMatcher::Substring => "*=",
-                    };
-                    result.push_str(op);
+                    result.push_str(m.as_str());
                     if let Some(v) = value {
                         result.push('\'');
                         result.push_str(v);
@@ -330,7 +322,7 @@ impl<'a> Printer<'a> {
                 span.extract(self.source).to_string()
             }
             internal::SimpleSelector::Nesting { .. } => "&".to_string(),
-            internal::SimpleSelector::Percentage { value, .. } => format!("{}%", value),
+            internal::SimpleSelector::Percentage { value, .. } => format!("{value}%"),
             internal::SimpleSelector::Invalid { raw, .. } => raw.to_string(),
         }
     }
@@ -467,15 +459,7 @@ impl<'a> Printer<'a> {
                 }
                 self.write(name);
                 if let Some(m) = matcher {
-                    let op = match m {
-                        internal::AttributeMatcher::Exact => "=",
-                        internal::AttributeMatcher::Contains => "~=",
-                        internal::AttributeMatcher::DashMatch => "|=",
-                        internal::AttributeMatcher::Prefix => "^=",
-                        internal::AttributeMatcher::Suffix => "$=",
-                        internal::AttributeMatcher::Substring => "*=",
-                    };
-                    self.write(op);
+                    self.write(m.as_str());
                     if let Some(v) = value {
                         // TODO: Determine if value needs quotes
                         self.write("'");
@@ -511,7 +495,7 @@ impl<'a> Printer<'a> {
                 self.write("&");
             }
             internal::SimpleSelector::Percentage { value, .. } => {
-                self.write(&format!("{}%", value));
+                self.write(&format!("{value}%"));
             }
             internal::SimpleSelector::Invalid { raw, .. } => {
                 // Forgiving selector list - preserve invalid selector as-is

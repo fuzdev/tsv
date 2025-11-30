@@ -5,7 +5,7 @@ use crate::lexer::TokenKind;
 use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::DefaultStringInterner;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{InfallibleResolve, ParseError, Span};
 
 use super::parser_impl::SvelteParser;
 
@@ -153,7 +153,7 @@ impl<'a> SvelteParser<'a> {
     ) -> ScriptContext {
         for attr in attributes {
             // Resolve attribute name to string
-            let name = interner.borrow().resolve(attr.name).unwrap().to_string();
+            let name = interner.borrow().must_resolve(attr.name).to_string();
 
             // Check for boolean module attribute: <script module>
             if name == "module" && attr.value.is_none() {

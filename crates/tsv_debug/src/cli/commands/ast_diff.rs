@@ -81,7 +81,7 @@ struct AstDiffExecutable {
 
 impl Executable for AstDiffExecutable {
     fn execute(&self) {
-        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        let rt = super::create_runtime();
         let result = if let Some(ref input2) = self.input2 {
             // Two input mode: compare both directly
             rt.block_on(compare_two_inputs(&self.input1, input2, self.parser_type))
@@ -99,7 +99,7 @@ impl Executable for AstDiffExecutable {
                 std::process::exit(1);
             }
             Err(err) => {
-                eprintln!("Error: {}", err);
+                eprintln!("Error: {err}");
                 std::process::exit(1);
             }
         }

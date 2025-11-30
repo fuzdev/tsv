@@ -55,7 +55,7 @@ pub fn parse(source: &str, base_offset: usize) -> Result<CssStyleSheet> {
 /// assert_eq!(formatted, "div {\n\tcolor: red;\n}\n");
 /// ```
 pub fn format(stylesheet: &CssStyleSheet, source: &str) -> String {
-    printer::format_css(stylesheet, source)
+    format_css(stylesheet, source)
 }
 
 /// Format CSS stylesheet with custom configuration

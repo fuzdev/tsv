@@ -230,7 +230,9 @@ fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span),
     let end = if values.is_empty() {
         start as u32
     } else {
-        values.last().unwrap().span().end
+        // SAFETY: We just checked is_empty() is false
+        #[allow(clippy::unwrap_used)]
+        { values.last().unwrap().span().end }
     };
 
     Ok((
@@ -345,10 +347,10 @@ fn parse_function_value(parser: &mut CssParser) -> Result<CssValue, ParseError> 
                     .current_identifier()
                     .unwrap_or_else(|| parser.current_value())
                     .to_string(),
-                TokenKind::String { content, quote } => format!("{}{}{}", quote, content, quote),
+                TokenKind::String { content, quote } => format!("{quote}{content}{quote}"),
                 TokenKind::Number(n) => n.to_string(),
-                TokenKind::Percentage(n) => format!("{}%", n),
-                TokenKind::Dimension(n, unit) => format!("{}{}", n, unit),
+                TokenKind::Percentage(n) => format!("{n}%"),
+                TokenKind::Dimension(n, unit) => format!("{n}{unit}"),
                 _ => parser.current_value().to_string(),
             };
 
@@ -541,10 +543,10 @@ pub(crate) fn parse_atrule(
                     .current_identifier()
                     .unwrap_or_else(|| parser.current_value())
                     .to_string(),
-                TokenKind::String { content, quote } => format!("{}{}{}", quote, content, quote),
+                TokenKind::String { content, quote } => format!("{quote}{content}{quote}"),
                 TokenKind::Number(n) => n.to_string(),
-                TokenKind::Percentage(n) => format!("{}%", n),
-                TokenKind::Dimension(n, unit) => format!("{}{}", n, unit),
+                TokenKind::Percentage(n) => format!("{n}%"),
+                TokenKind::Dimension(n, unit) => format!("{n}{unit}"),
                 TokenKind::Comment(_) => {
                     // Include comments in prelude (Svelte includes them in the prelude string)
                     parser.current_value().to_string()
@@ -775,7 +777,7 @@ fn parse_atrule_block(
 
         // Fallback: unexpected token
         return Err(ParseError::InvalidSyntax {
-            message: format!("Unexpected token in @{} block", atrule_name),
+            message: format!("Unexpected token in @{atrule_name} block"),
             position: parser.base_offset() + parser.current_start,
             context: None,
         });

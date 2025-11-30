@@ -3,7 +3,7 @@
 use std::fmt;
 
 /// Rich error context with source snippet and position
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ErrorContext {
     /// The source line containing the error
     pub source_line: String,
@@ -24,19 +24,13 @@ impl ErrorContext {
 
         let position = position.min(source.len());
 
-        // Find line boundaries
-        let mut line_start = position;
-        while line_start > 0 && !source[..line_start].ends_with('\n') {
-            line_start -= 1;
-        }
-        if line_start > 0 && source.as_bytes()[line_start] == b'\n' {
-            line_start += 1;
-        }
+        // Find line start: search backwards for '\n' and go past it
+        let line_start = source[..position].rfind('\n').map_or(0, |i| i + 1);
 
-        let mut line_end = position;
-        while line_end < source.len() && source.as_bytes()[line_end] != b'\n' {
-            line_end += 1;
-        }
+        // Find line end: search forwards for '\n' or end of string
+        let line_end = source[position..]
+            .find('\n')
+            .map_or(source.len(), |i| position + i);
 
         // Extract the line
         let source_line = source[line_start..line_end].to_string();
@@ -68,7 +62,7 @@ impl ErrorContext {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseError {
     UnexpectedToken {
         expected: String,
@@ -160,11 +154,11 @@ impl fmt::Display for ParseError {
                 position,
                 context,
             } => {
-                let base_msg = format!("Expected {}, found {}", expected, found);
+                let base_msg = format!("Expected {expected}, found {found}");
                 if let Some(ctx) = context {
                     write!(f, "{}", ctx.format_with_caret(&base_msg))
                 } else {
-                    write!(f, "{} at position {}", base_msg, position)
+                    write!(f, "{base_msg} at position {position}")
                 }
             }
             ParseError::UnexpectedEof { position, context } => {
@@ -172,7 +166,7 @@ impl fmt::Display for ParseError {
                 if let Some(ctx) = context {
                     write!(f, "{}", ctx.format_with_caret(base_msg))
                 } else {
-                    write!(f, "{} at position {}", base_msg, position)
+                    write!(f, "{base_msg} at position {position}")
                 }
             }
             ParseError::InvalidSyntax {
@@ -183,7 +177,7 @@ impl fmt::Display for ParseError {
                 if let Some(ctx) = context {
                     write!(f, "{}", ctx.format_with_caret(message))
                 } else {
-                    write!(f, "{} at position {}", message, position)
+                    write!(f, "{message} at position {position}")
                 }
             }
             ParseError::InvalidExpression {
@@ -191,18 +185,17 @@ impl fmt::Display for ParseError {
                 position,
                 context,
             } => {
-                let base_msg = format!("Expected expression, found {}", found);
+                let base_msg = format!("Expected expression, found {found}");
                 if let Some(ctx) = context {
                     write!(f, "{}", ctx.format_with_caret(&base_msg))
                 } else {
-                    write!(f, "{} at position {}", base_msg, position)
+                    write!(f, "{base_msg} at position {position}")
                 }
             }
             ParseError::FileTooLarge { size, max } => {
                 write!(
                     f,
-                    "File too large: {} bytes (maximum: {} bytes / 4GB)",
-                    size, max
+                    "File too large: {size} bytes (maximum: {max} bytes / 4GB)"
                 )
             }
         }
@@ -210,3 +203,56 @@ impl fmt::Display for ParseError {
 }
 
 impl std::error::Error for ParseError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_context_at_eof_no_newline() {
+        // Position at EOF, source doesn't end with newline
+        let source = "hello";
+        let ctx = ErrorContext::from_source(source, 5).unwrap();
+        assert_eq!(ctx.source_line, "hello");
+        assert_eq!(ctx.column, 5);
+        assert_eq!(ctx.line_number, 1);
+    }
+
+    #[test]
+    fn test_error_context_at_eof_with_newline() {
+        // Position at EOF, source ends with newline
+        let source = "hello\n";
+        let ctx = ErrorContext::from_source(source, 6).unwrap();
+        assert_eq!(ctx.source_line, ""); // Empty line after newline
+        assert_eq!(ctx.column, 0);
+        assert_eq!(ctx.line_number, 2);
+    }
+
+    #[test]
+    fn test_error_context_middle_of_line() {
+        let source = "abc\ndef\nghi";
+        let ctx = ErrorContext::from_source(source, 5).unwrap(); // 'e' in "def"
+        assert_eq!(ctx.source_line, "def");
+        assert_eq!(ctx.column, 1);
+        assert_eq!(ctx.line_number, 2);
+    }
+
+    #[test]
+    fn test_error_context_start_of_file() {
+        let source = "hello";
+        let ctx = ErrorContext::from_source(source, 0).unwrap();
+        assert_eq!(ctx.source_line, "hello");
+        assert_eq!(ctx.column, 0);
+        assert_eq!(ctx.line_number, 1);
+    }
+
+    #[test]
+    fn test_error_context_empty_source() {
+        assert!(ErrorContext::from_source("", 0).is_none());
+    }
+
+    #[test]
+    fn test_error_context_position_out_of_bounds() {
+        assert!(ErrorContext::from_source("hello", 10).is_none());
+    }
+}

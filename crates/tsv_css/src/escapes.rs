@@ -87,13 +87,12 @@ pub fn apply_svelte_quirks(source: &str) -> String {
             // - `\41` → `\\441` (backslash doubled, `4` duplicated, `1` preserved)
             // - `\0001F4A9` → `\\00001F4A9` (backslash doubled, first `0` duplicated, rest preserved)
 
-            if let Some(&_next_ch) = chars.peek() {
+            if let Some(first_ch) = chars.next() {
                 // Add backslash twice
                 result.push('\\');
                 result.push('\\');
 
                 // Add first character after backslash twice
-                let first_ch = chars.next().unwrap();
                 result.push(first_ch); // First occurrence
                 result.push(first_ch); // Duplicated (Svelte quirk)
 
@@ -101,14 +100,12 @@ pub fn apply_svelte_quirks(source: &str) -> String {
                 if first_ch.is_ascii_hexdigit() {
                     // Collect remaining hex digits (up to 5 more, for max 6 total)
                     for _ in 0..5 {
-                        if let Some(&digit) = chars.peek() {
-                            if digit.is_ascii_hexdigit() {
-                                result.push(chars.next().unwrap());
-                            } else {
-                                break;
+                        match chars.peek() {
+                            Some(&digit) if digit.is_ascii_hexdigit() => {
+                                chars.next();
+                                result.push(digit);
                             }
-                        } else {
-                            break;
+                            _ => break,
                         }
                     }
                 }
@@ -165,14 +162,12 @@ pub fn decode_escape_sequences(source: &str) -> String {
                     // Unicode escape sequence
                     let mut hex_digits = String::new();
                     for _ in 0..6 {
-                        if let Some(&digit) = chars.peek() {
-                            if digit.is_ascii_hexdigit() {
-                                hex_digits.push(chars.next().unwrap());
-                            } else {
-                                break;
+                        match chars.peek() {
+                            Some(&digit) if digit.is_ascii_hexdigit() => {
+                                chars.next();
+                                hex_digits.push(digit);
                             }
-                        } else {
-                            break;
+                            _ => break,
                         }
                     }
 
@@ -194,9 +189,8 @@ pub fn decode_escape_sequences(source: &str) -> String {
                     // Invalid unicode - keep as-is
                     result.push('\\');
                     result.push_str(&hex_digits);
-                } else {
+                } else if let Some(escaped) = chars.next() {
                     // Simple escape - consume next char
-                    let escaped = chars.next().unwrap();
                     match escaped {
                         'n' => result.push('\n'),
                         'r' => result.push('\r'),

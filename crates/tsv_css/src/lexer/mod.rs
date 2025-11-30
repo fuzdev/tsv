@@ -189,7 +189,7 @@ impl<'a> Lexer<'a> {
 
             // Unknown character
             _ => Err(ParseError::InvalidSyntax {
-                message: format!("Unexpected character in CSS: '{}'", ch),
+                message: format!("Unexpected character in CSS: '{ch}'"),
                 position: self.pos,
                 context: None,
             }),

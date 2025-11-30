@@ -54,7 +54,7 @@ impl CommandRegistry {
         let command = match self.find(command_name) {
             Some(cmd) => cmd,
             None => {
-                eprintln!("Unknown command: '{}'", command_name);
+                eprintln!("Unknown command: '{command_name}'");
                 eprintln!();
                 self.print_usage(&args[0]);
                 process::exit(1);
@@ -67,7 +67,7 @@ impl CommandRegistry {
         match command.parse_args(&mut parsed_args) {
             Ok(executable) => executable.execute(),
             Err(err) => {
-                eprintln!("Error: {}", err);
+                eprintln!("Error: {err}");
                 eprintln!();
                 self.print_command_usage(&args[0], command);
                 process::exit(1);
@@ -77,23 +77,23 @@ impl CommandRegistry {
 
     /// Print usage for all commands
     fn print_usage(&self, program: &str) {
-        eprintln!("Usage: {} <command> [options]", program);
+        eprintln!("Usage: {program} <command> [options]");
         eprintln!();
         eprintln!("Commands:");
         for cmd in &self.commands {
             for line in cmd.usage() {
-                eprintln!("  {}", line);
+                eprintln!("  {line}");
             }
         }
         eprintln!();
-        eprintln!("Use '{} <command> --help' for more information", program);
+        eprintln!("Use '{program} <command> --help' for more information");
     }
 
     /// Print usage for specific command
     fn print_command_usage(&self, program: &str, command: &dyn Command) {
         eprintln!("Usage: {} {}", program, command.name());
         for line in command.usage() {
-            eprintln!("  {}", line);
+            eprintln!("  {line}");
         }
     }
 }

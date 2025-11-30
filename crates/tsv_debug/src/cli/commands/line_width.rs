@@ -27,7 +27,7 @@ impl Command for LineWidthCommand {
             .option("line")
             .map(|s| {
                 s.parse::<usize>()
-                    .map_err(|_| format!("Invalid line number: {}", s))
+                    .map_err(|_| format!("Invalid line number: {s}"))
             })
             .transpose()?;
 
@@ -35,7 +35,7 @@ impl Command for LineWidthCommand {
             .option("tab-width")
             .map(|s| {
                 s.parse::<usize>()
-                    .map_err(|_| format!("Invalid tab width: {}", s))
+                    .map_err(|_| format!("Invalid tab width: {s}"))
             })
             .transpose()?
             .unwrap_or(2); // Default to prettier's tabWidth: 2
@@ -146,13 +146,12 @@ impl Executable for LineWidthExecutable {
                 };
 
                 println!(
-                    "Line {}: {} chars ({} tabs = {}, content = {}) {}",
-                    line_num, total, tab_count, tab_width_total, content_len, status
+                    "Line {line_num}: {total} chars ({tab_count} tabs = {tab_width_total}, content = {content_len}) {status}"
                 );
 
                 // Show line preview for specific line queries
                 if self.line.is_some() {
-                    println!("  {}", line);
+                    println!("  {line}");
                 }
             }
         }
@@ -170,7 +169,10 @@ impl Executable for LineWidthExecutable {
         // Print JSON output
         if self.json {
             let output = serde_json::json!({"lines": json_results});
-            println!("{}", serde_json::to_string_pretty(&output).unwrap());
+            // SAFETY: serde_json Value types always serialize successfully
+            #[allow(clippy::unwrap_used)]
+            let json_str = serde_json::to_string_pretty(&output).unwrap();
+            println!("{json_str}");
         }
     }
 }

@@ -144,7 +144,7 @@ fn format_css_value_for_json(value: &internal::CssValue) -> String {
                 .map(format_css_value_for_json)
                 .collect::<Vec<_>>()
                 .join(", ");
-            format!("{}({})", name, args_str)
+            format!("{name}({args_str})")
         }
         internal::CssValue::List { values, .. } => values
             .iter()
@@ -326,7 +326,7 @@ fn value_to_string(value: &internal::CssValue, source: &str) -> String {
                     .map(|arg| value_to_string(arg, source))
                     .collect::<Vec<_>>()
                     .join(", ");
-                format!("{}({})", name, args_str)
+                format!("{name}({args_str})")
             }
         }
         _ => {
@@ -452,13 +452,7 @@ fn convert_complex_selector(complex: &internal::ComplexSelector) -> serde_json::
 fn convert_relative_selector(relative: &internal::RelativeSelector) -> serde_json::Value {
     let combinator =
         if let (Some(comb), Some(span)) = (&relative.combinator, &relative.combinator_span) {
-            let name = match comb {
-                internal::Combinator::Descendant => " ",
-                internal::Combinator::Child => ">",
-                internal::Combinator::NextSibling => "+",
-                internal::Combinator::SubsequentSibling => "~",
-                internal::Combinator::Column => "||",
-            };
+            let name = comb.as_str();
             serde_json::json!({
                 "type": "Combinator",
                 "name": name,
@@ -537,17 +531,7 @@ fn convert_simple_selector(simple: &internal::SimpleSelector) -> serde_json::Val
             span,
         } => {
             let matcher_val = matcher.as_ref().map_or(serde_json::Value::Null, |m| {
-                serde_json::Value::String(
-                    match m {
-                        internal::AttributeMatcher::Exact => "=",
-                        internal::AttributeMatcher::Contains => "~=",
-                        internal::AttributeMatcher::DashMatch => "|=",
-                        internal::AttributeMatcher::Prefix => "^=",
-                        internal::AttributeMatcher::Suffix => "$=",
-                        internal::AttributeMatcher::Substring => "*=",
-                    }
-                    .to_string(),
-                )
+                serde_json::Value::String(m.as_str().to_string())
             });
             let value_val = value.as_ref().map_or(serde_json::Value::Null, |v| {
                 serde_json::Value::String(v.clone())
@@ -573,8 +557,7 @@ fn convert_simple_selector(simple: &internal::SimpleSelector) -> serde_json::Val
         internal::SimpleSelector::PseudoClass { name, args, span } => {
             let args_val = args
                 .as_ref()
-                .map(convert_pseudo_class_args)
-                .unwrap_or(serde_json::Value::Null);
+                .map_or(serde_json::Value::Null, convert_pseudo_class_args);
 
             serde_json::json!({
                 "type": "PseudoClassSelector",
@@ -615,7 +598,7 @@ fn convert_simple_selector(simple: &internal::SimpleSelector) -> serde_json::Val
             let value_str = if value.fract() == 0.0 {
                 format!("{}%", *value as i64)
             } else {
-                format!("{}%", value)
+                format!("{value}%")
             };
             serde_json::json!({
                 "type": "Percentage",
@@ -649,6 +632,8 @@ pub fn convert_css_nodes(nodes: &[internal::CssNode], source: &str) -> serde_jso
             internal::CssNode::Comment(comment) => comment.span.start,
             internal::CssNode::Atrule(atrule) => atrule.span.start,
         };
+        // SAFETY: We're inside `if let Some(first) = nodes.first()`, so slice is non-empty
+        #[allow(clippy::unwrap_used)]
         let end = match nodes.last().unwrap() {
             internal::CssNode::Rule(rule) => rule.span.end,
             internal::CssNode::Comment(comment) => comment.span.end,

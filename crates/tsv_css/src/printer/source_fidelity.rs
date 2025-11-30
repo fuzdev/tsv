@@ -123,7 +123,7 @@ pub fn format_dimension_value(value: f64, unit: &str) -> String {
     if unit.is_empty() {
         normalized
     } else {
-        format!("{}{}", normalized, unit)
+        format!("{normalized}{unit}")
     }
 }
 
@@ -204,7 +204,7 @@ pub fn normalize_dimension_from_source(raw: &str) -> String {
     // Normalize the number part (preserve sign, leading zeros, add leading zero, trim trailing zeros)
     let normalized_num = normalize_decimal_preserving_prefix(num_part);
 
-    format!("{}{}", normalized_num, unit_part)
+    format!("{normalized_num}{unit_part}")
 }
 
 /// Normalize decimal number while preserving sign and leading zeros
@@ -226,7 +226,7 @@ fn normalize_decimal_preserving_prefix(num: &str) -> String {
 
     // Add leading zero if starts with decimal point
     let with_leading = if rest.starts_with('.') {
-        format!("0{}", rest)
+        format!("0{rest}")
     } else {
         rest.to_string()
     };
@@ -247,7 +247,7 @@ fn normalize_decimal_preserving_prefix(num: &str) -> String {
         with_leading
     };
 
-    format!("{}{}", sign, trimmed)
+    format!("{sign}{trimmed}")
 }
 
 /// Format a color value semantically
@@ -275,9 +275,9 @@ pub fn format_color_value(color: &crate::ast::internal::Color) -> String {
 
             if let Some(a) = alpha {
                 let a_str = format_color_channel(a);
-                format!("rgba({}, {}, {}, {})", r_str, g_str, b_str, a_str)
+                format!("rgba({r_str}, {g_str}, {b_str}, {a_str})")
             } else {
-                format!("rgb({}, {}, {})", r_str, g_str, b_str)
+                format!("rgb({r_str}, {g_str}, {b_str})")
             }
         }
         Color::Hsl {
@@ -289,7 +289,7 @@ pub fn format_color_value(color: &crate::ast::internal::Color) -> String {
         } => {
             // Format hue with optional unit
             let hue_str = if let Some(unit) = hue_unit {
-                format!("{}{}", format_color_channel(hue), format_angle_unit(*unit))
+                format!("{}{}", format_color_channel(hue), unit.as_str())
             } else {
                 format_color_channel(hue)
             };
@@ -298,9 +298,9 @@ pub fn format_color_value(color: &crate::ast::internal::Color) -> String {
 
             if let Some(a) = alpha {
                 let a_str = format_color_channel(a);
-                format!("hsla({}, {}, {}, {})", hue_str, sat_str, light_str, a_str)
+                format!("hsla({hue_str}, {sat_str}, {light_str}, {a_str})")
             } else {
-                format!("hsl({}, {}, {})", hue_str, sat_str, light_str)
+                format!("hsl({hue_str}, {sat_str}, {light_str})")
             }
         }
     }
@@ -315,7 +315,7 @@ fn format_color_channel(channel: &crate::ast::internal::ColorChannel) -> String 
             if n.fract() == 0.0 {
                 format!("{}", *n as i64)
             } else {
-                format!("{}", n)
+                format!("{n}")
             }
         }
         ColorChannel::Percentage(p) => {
@@ -323,21 +323,10 @@ fn format_color_channel(channel: &crate::ast::internal::ColorChannel) -> String 
             if p.fract() == 0.0 {
                 format!("{}%", *p as i64)
             } else {
-                format!("{}%", p)
+                format!("{p}%")
             }
         }
         ColorChannel::None => "none".to_string(),
-    }
-}
-
-/// Format an angle unit
-fn format_angle_unit(unit: crate::ast::internal::AngleUnit) -> &'static str {
-    use crate::ast::internal::AngleUnit;
-    match unit {
-        AngleUnit::Deg => "deg",
-        AngleUnit::Rad => "rad",
-        AngleUnit::Turn => "turn",
-        AngleUnit::Grad => "grad",
     }
 }
 
@@ -353,7 +342,7 @@ fn format_angle_unit(unit: crate::ast::internal::AngleUnit) -> &'static str {
 pub fn format_color_from_source(
     color: &crate::ast::internal::Color,
     source: &str,
-    span: tsv_lang::Span,
+    span: Span,
 ) -> String {
     use crate::ast::internal::Color;
 
@@ -383,18 +372,18 @@ pub fn format_color_from_source(
                     let a_str = format_color_channel(a);
                     if has_slash {
                         // rgb(r g b / a) syntax
-                        format!("rgb({} {} {} / {})", r_str, g_str, b_str, a_str)
+                        format!("rgb({r_str} {g_str} {b_str} / {a_str})")
                     } else if func_name == "rgba" {
                         // rgba(r, g, b, a) syntax
-                        format!("rgba({}, {}, {}, {})", r_str, g_str, b_str, a_str)
+                        format!("rgba({r_str}, {g_str}, {b_str}, {a_str})")
                     } else {
                         // Fallback: rgba with comma
-                        format!("rgba({}, {}, {}, {})", r_str, g_str, b_str, a_str)
+                        format!("rgba({r_str}, {g_str}, {b_str}, {a_str})")
                     }
                 } else if has_comma {
-                    format!("rgb({}, {}, {})", r_str, g_str, b_str)
+                    format!("rgb({r_str}, {g_str}, {b_str})")
                 } else {
-                    format!("rgb({} {} {})", r_str, g_str, b_str)
+                    format!("rgb({r_str} {g_str} {b_str})")
                 }
             }
             Color::Hsl {
@@ -406,7 +395,7 @@ pub fn format_color_from_source(
             } => {
                 // Format hue with optional unit
                 let hue_str = if let Some(unit) = hue_unit {
-                    format!("{}{}", format_color_channel(hue), format_angle_unit(*unit))
+                    format!("{}{}", format_color_channel(hue), unit.as_str())
                 } else {
                     format_color_channel(hue)
                 };
@@ -417,18 +406,18 @@ pub fn format_color_from_source(
                     let a_str = format_color_channel(a);
                     if has_slash {
                         // hsl(h s% l% / a) syntax
-                        format!("hsl({} {} {} / {})", hue_str, sat_str, light_str, a_str)
+                        format!("hsl({hue_str} {sat_str} {light_str} / {a_str})")
                     } else if func_name == "hsla" {
                         // hsla(h, s%, l%, a) syntax
-                        format!("hsla({}, {}, {}, {})", hue_str, sat_str, light_str, a_str)
+                        format!("hsla({hue_str}, {sat_str}, {light_str}, {a_str})")
                     } else {
                         // Fallback: hsla with comma
-                        format!("hsla({}, {}, {}, {})", hue_str, sat_str, light_str, a_str)
+                        format!("hsla({hue_str}, {sat_str}, {light_str}, {a_str})")
                     }
                 } else if has_comma {
-                    format!("hsl({}, {}, {})", hue_str, sat_str, light_str)
+                    format!("hsl({hue_str}, {sat_str}, {light_str})")
                 } else {
-                    format!("hsl({} {} {})", hue_str, sat_str, light_str)
+                    format!("hsl({hue_str} {sat_str} {light_str})")
                 }
             }
             _ => unreachable!(),
@@ -495,7 +484,7 @@ pub fn extract_property_name(decl_source: &str) -> String {
                 let comment = &property_part[comment_start..comment_end];
 
                 // Normalize: property + space + comment (no trailing space)
-                format!("{} {}", before_comment, comment)
+                format!("{before_comment} {comment}")
             } else {
                 // Malformed comment - just trim
                 property_part.trim().to_string()
@@ -600,13 +589,15 @@ pub fn normalize_value_spacing(value: &str) -> String {
                 result.push(' ');
             }
             result.push('/');
-            result.push(chars.next().unwrap()); // consume '*'
+            chars.next(); // consume '*'
+            result.push('*');
             in_comment = true;
             pending_space = false;
         } else if in_comment && c == '*' && chars.peek() == Some(&'/') {
             // End of comment
             result.push('*');
-            result.push(chars.next().unwrap()); // consume '/'
+            chars.next(); // consume '/'
+            result.push('/');
             in_comment = false;
             pending_space = true; // Mark that we need a space before next token
         } else if in_comment {

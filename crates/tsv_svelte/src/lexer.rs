@@ -2,7 +2,7 @@ use std::fmt;
 use std::str::Chars;
 use tsv_lang::ParseError;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
     LeftAngle,  // <
     RightAngle, // >
@@ -206,7 +206,7 @@ impl<'a> Lexer<'a> {
                 })
             }
             Some(ch) => Err(ParseError::InvalidSyntax {
-                message: format!("Unexpected character in template: '{}'", ch),
+                message: format!("Unexpected character in template: '{ch}'"),
                 position: start,
                 context: None,
             }),

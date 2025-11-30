@@ -31,6 +31,8 @@ pub(crate) fn parse_complex_selector_list(
     }
 
     // End position should be the end of the last selector, not the next token
+    // SAFETY: We pushed the first selector unconditionally above
+    #[allow(clippy::unwrap_used)]
     let end = selectors.last().unwrap().span.end;
 
     Ok(SelectorList {
@@ -104,7 +106,7 @@ pub(crate) fn parse_forgiving_selector_list(
     }
 
     // Calculate end position from last selector, or use start if empty
-    let end = selectors.last().map(|s| s.span.end).unwrap_or(start as u32);
+    let end = selectors.last().map_or(start as u32, |s| s.span.end);
 
     Ok(SelectorList {
         selectors,
@@ -223,6 +225,8 @@ pub(crate) fn parse_relative_selector_list(
     }
 
     // End position should be the end of the last selector, not the next token
+    // SAFETY: We pushed the first selector unconditionally above
+    #[allow(clippy::unwrap_used)]
     let end = selectors.last().unwrap().span.end;
 
     Ok(SelectorList {
@@ -287,6 +291,8 @@ fn parse_relative_complex_selector(parser: &mut CssParser) -> Result<ComplexSele
             break; // No more combinators, we're done
         }
 
+        // SAFETY: We just checked is_none() above
+        #[allow(clippy::unwrap_used)]
         let (combinator, combinator_span) = combinator_info.unwrap();
         children.push(parse_relative_selector(
             parser,
@@ -296,6 +302,8 @@ fn parse_relative_complex_selector(parser: &mut CssParser) -> Result<ComplexSele
     }
 
     // End position should be the end of the last child, not the next token
+    // SAFETY: We pushed at least one child unconditionally above (if/else at start)
+    #[allow(clippy::unwrap_used)]
     let end = children.last().unwrap().span.end;
 
     Ok(ComplexSelector {
@@ -337,6 +345,8 @@ pub(crate) fn parse_complex_selector(
             break; // No more combinators, we're done
         }
 
+        // SAFETY: We just checked is_none() above
+        #[allow(clippy::unwrap_used)]
         let (combinator, combinator_span) = combinator_info.unwrap();
         children.push(parse_relative_selector(
             parser,
@@ -346,6 +356,8 @@ pub(crate) fn parse_complex_selector(
     }
 
     // End position should be the end of the last child, not the next token
+    // SAFETY: We pushed the first child unconditionally on line 326
+    #[allow(clippy::unwrap_used)]
     let end = children.last().unwrap().span.end;
 
     Ok(ComplexSelector {
@@ -474,9 +486,7 @@ fn parse_relative_selector(
     combinator_span: Option<Span>,
 ) -> Result<RelativeSelector, ParseError> {
     // Start position is either the combinator start (if present) or the current selector start
-    let start = combinator_span
-        .map(|s| s.start as usize)
-        .unwrap_or_else(|| parser.base_offset() + parser.current_start());
+    let start = combinator_span.map_or_else(|| parser.base_offset() + parser.current_start(), |s| s.start as usize);
     let mut selectors = Vec::new();
 
     // Parse one or more simple selectors
@@ -713,7 +723,7 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
             let value = value_str
                 .parse::<f64>()
                 .map_err(|_| ParseError::InvalidSyntax {
-                    message: format!("Invalid percentage value: {}", value_str),
+                    message: format!("Invalid percentage value: {value_str}"),
                     position: start,
                     context: None,
                 })?;

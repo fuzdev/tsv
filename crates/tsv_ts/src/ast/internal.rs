@@ -16,6 +16,11 @@ pub struct Program {
 pub enum Statement {
     ExpressionStatement(ExpressionStatement),
     VariableDeclaration(VariableDeclaration),
+    TSTypeAliasDeclaration(TSTypeAliasDeclaration),
+    ReturnStatement(ReturnStatement),
+    BlockStatement(BlockStatement),
+    FunctionDeclaration(FunctionDeclaration),
+    ClassDeclaration(ClassDeclaration),
 }
 
 impl Statement {
@@ -23,6 +28,11 @@ impl Statement {
         match self {
             Statement::ExpressionStatement(stmt) => stmt.span,
             Statement::VariableDeclaration(decl) => decl.span,
+            Statement::TSTypeAliasDeclaration(decl) => decl.span,
+            Statement::ReturnStatement(stmt) => stmt.span,
+            Statement::BlockStatement(block) => block.span,
+            Statement::FunctionDeclaration(decl) => decl.span,
+            Statement::ClassDeclaration(decl) => decl.span,
         }
     }
 }
@@ -40,12 +50,21 @@ pub enum Expression {
     ObjectExpression(ObjectExpression),
     ArrayExpression(ArrayExpression),
     UnaryExpression(UnaryExpression),
+    UpdateExpression(UpdateExpression),
     BinaryExpression(BinaryExpression),
     CallExpression(CallExpression),
+    NewExpression(NewExpression),
     MemberExpression(MemberExpression),
     ConditionalExpression(ConditionalExpression),
     ArrowFunctionExpression(ArrowFunctionExpression),
+    FunctionExpression(FunctionExpression),
     SpreadElement(SpreadElement),
+    TemplateLiteral(TemplateLiteral),
+    TaggedTemplateExpression(TaggedTemplateExpression),
+    AwaitExpression(AwaitExpression),
+    SequenceExpression(SequenceExpression),
+    RegexLiteral(RegexLiteral),
+    Super(Super),
 }
 
 impl Expression {
@@ -56,12 +75,21 @@ impl Expression {
             Expression::ObjectExpression(obj) => obj.span,
             Expression::ArrayExpression(arr) => arr.span,
             Expression::UnaryExpression(unary) => unary.span,
+            Expression::UpdateExpression(update) => update.span,
             Expression::BinaryExpression(binary) => binary.span,
             Expression::CallExpression(call) => call.span,
+            Expression::NewExpression(new) => new.span,
             Expression::MemberExpression(member) => member.span,
             Expression::ConditionalExpression(cond) => cond.span,
             Expression::ArrowFunctionExpression(arrow) => arrow.span,
+            Expression::FunctionExpression(func) => func.span,
             Expression::SpreadElement(spread) => spread.span,
+            Expression::TemplateLiteral(template) => template.span,
+            Expression::TaggedTemplateExpression(tagged) => tagged.span,
+            Expression::AwaitExpression(await_expr) => await_expr.span,
+            Expression::SequenceExpression(seq) => seq.span,
+            Expression::RegexLiteral(regex) => regex.span,
+            Expression::Super(s) => s.span,
         }
     }
 }
@@ -136,22 +164,71 @@ pub struct ArrayExpression {
     pub span: Span,
 }
 
+/// Update expression operator: `++` or `--`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum UpdateOperator {
+    Increment = 0, // ++
+    Decrement = 1, // --
+}
+
+impl UpdateOperator {
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            UpdateOperator::Increment => "++",
+            UpdateOperator::Decrement => "--",
+        }
+    }
+}
+
+/// Update expression: `++x`, `x++`, `--x`, `x--`
+///
+/// Used for increment and decrement operations. The `prefix` field
+/// indicates whether the operator appears before (true) or after (false)
+/// the argument.
+#[derive(Debug, Clone)]
+pub struct UpdateExpression {
+    pub operator: UpdateOperator,
+    pub argument: Box<Expression>,
+    pub prefix: bool, // true for `++x`/`--x`, false for `x++`/`x--`
+    pub span: Span,
+}
+
 /// Unary expression operator
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum UnaryOperator {
-    Minus, // -
-    Plus,  // +
-    Bang,  // !
-           // TODO: typeof, void, delete, ~
+    Minus = 0,  // -
+    Plus = 1,   // +
+    Bang = 2,   // !
+    Typeof = 3, // typeof
+    Void = 4,   // void
+    Delete = 5, // delete
+    Tilde = 6,  // ~
 }
 
 impl UnaryOperator {
-    pub fn as_str(&self) -> &'static str {
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
         match self {
             UnaryOperator::Minus => "-",
             UnaryOperator::Plus => "+",
             UnaryOperator::Bang => "!",
+            UnaryOperator::Typeof => "typeof",
+            UnaryOperator::Void => "void",
+            UnaryOperator::Delete => "delete",
+            UnaryOperator::Tilde => "~",
         }
+    }
+
+    /// Returns true if this is a keyword operator (needs space after)
+    #[inline]
+    pub const fn is_keyword_operator(self) -> bool {
+        matches!(
+            self,
+            UnaryOperator::Typeof | UnaryOperator::Void | UnaryOperator::Delete
+        )
     }
 }
 
@@ -165,34 +242,46 @@ pub struct UnaryExpression {
 }
 
 /// Binary expression operator
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum BinaryOperator {
     // Arithmetic
-    Plus,    // +
-    Minus,   // -
-    Star,    // *
-    Slash,   // /
-    Percent, // %
+    Plus = 0,    // +
+    Minus = 1,   // -
+    Star = 2,    // *
+    Slash = 3,   // /
+    Percent = 4, // %
     // Comparison
-    LessThan,           // <
-    GreaterThan,        // >
-    LessThanEquals,     // <=
-    GreaterThanEquals,  // >=
-    EqualsEquals,       // ==
-    EqualsEqualsEquals, // ===
-    BangEquals,         // !=
-    BangEqualsEquals,   // !==
+    LessThan = 5,            // <
+    GreaterThan = 6,         // >
+    LessThanEquals = 7,      // <=
+    GreaterThanEquals = 8,   // >=
+    EqualsEquals = 9,        // ==
+    EqualsEqualsEquals = 10, // ===
+    BangEquals = 11,         // !=
+    BangEqualsEquals = 12,   // !==
     // Logical
-    AmpersandAmpersand, // &&
-    PipePipe,           // ||
-    QuestionQuestion,   // ??
+    AmpersandAmpersand = 13, // &&
+    PipePipe = 14,           // ||
+    QuestionQuestion = 15,   // ??
     // Bitwise
-    Ampersand, // &
-    Pipe,      // |
+    Ampersand = 16, // &
+    Pipe = 17,      // |
+    Caret = 18,     // ^
+    // Bitshift
+    LeftShift = 19,          // <<
+    RightShift = 20,         // >>
+    UnsignedRightShift = 21, // >>>
+    // Exponentiation
+    StarStar = 22, // **
+    // Relational keywords
+    Instanceof = 23, // instanceof
+    In = 24,         // in
 }
 
 impl BinaryOperator {
-    pub fn as_str(&self) -> &'static str {
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
         match self {
             BinaryOperator::Plus => "+",
             BinaryOperator::Minus => "-",
@@ -212,6 +301,13 @@ impl BinaryOperator {
             BinaryOperator::QuestionQuestion => "??",
             BinaryOperator::Ampersand => "&",
             BinaryOperator::Pipe => "|",
+            BinaryOperator::Caret => "^",
+            BinaryOperator::LeftShift => "<<",
+            BinaryOperator::RightShift => ">>",
+            BinaryOperator::UnsignedRightShift => ">>>",
+            BinaryOperator::StarStar => "**",
+            BinaryOperator::Instanceof => "instanceof",
+            BinaryOperator::In => "in",
         }
     }
 
@@ -241,6 +337,17 @@ pub struct CallExpression {
     pub callee: Box<Expression>,
     pub arguments: Vec<Expression>,
     pub optional: bool, // true for `foo?.()` (optional chaining)
+    pub span: Span,
+}
+
+/// New expression: `new Date()`, `new Map()`
+///
+/// Constructor call with the `new` keyword. The callee is typically an
+/// identifier or member expression, and arguments are optional.
+#[derive(Debug, Clone)]
+pub struct NewExpression {
+    pub callee: Box<Expression>,
+    pub arguments: Vec<Expression>,
     pub span: Span,
 }
 
@@ -298,6 +405,124 @@ impl ArrowFunctionBody {
     }
 }
 
+/// Function expression: `function() {}` or method shorthand `{ foo() {} }`
+///
+/// Used for:
+/// - Method shorthand in objects: `{ foo() { return 1; } }`
+/// - Anonymous function expressions: `const f = function() {}`
+/// - Named function expressions: `const f = function name() {}`
+#[derive(Debug, Clone)]
+pub struct FunctionExpression {
+    /// Optional function name (for named function expressions)
+    pub id: Option<Identifier>,
+    /// Function parameters
+    pub params: Vec<Identifier>,
+    /// Function body (block statement with statements)
+    pub body: BlockStatement,
+    pub span: Span,
+}
+
+/// Block statement: `{ stmt1; stmt2; }`
+///
+/// A block of statements surrounded by braces. Used for:
+/// - Function bodies
+/// - If/else bodies (future)
+/// - Loop bodies (future)
+#[derive(Debug, Clone)]
+pub struct BlockStatement {
+    pub body: Vec<Statement>,
+    pub span: Span,
+}
+
+/// Function declaration: `function foo(x) { return x + 1; }`
+///
+/// Unlike FunctionExpression, the id (function name) is required.
+/// Declarations are hoisted and can be called before they appear in source.
+#[derive(Debug, Clone)]
+pub struct FunctionDeclaration {
+    /// Function name (required for declarations)
+    pub id: Identifier,
+    /// Function parameters
+    pub params: Vec<Identifier>,
+    /// Function body (block statement with statements)
+    pub body: BlockStatement,
+    /// Whether this is a generator function (`function*`)
+    pub generator: bool,
+    /// Whether this is an async function (`async function`)
+    pub r#async: bool,
+    pub span: Span,
+}
+
+/// Return statement: `return expr;` or `return;`
+///
+/// The argument is optional for void returns.
+#[derive(Debug, Clone)]
+pub struct ReturnStatement {
+    pub argument: Option<Expression>,
+    pub span: Span,
+}
+
+/// Class declaration: `class Foo { ... }` or `class Foo extends Bar { ... }`
+///
+/// Represents a class declaration with optional superclass.
+#[derive(Debug, Clone)]
+pub struct ClassDeclaration {
+    /// Class name (required for declarations)
+    pub id: Identifier,
+    /// Optional superclass expression (for `extends`)
+    pub super_class: Option<Box<Expression>>,
+    /// Class body containing methods and properties
+    pub body: ClassBody,
+    pub span: Span,
+}
+
+/// Class body: `{ constructor() {} method() {} }`
+///
+/// Contains the methods and properties of a class.
+#[derive(Debug, Clone)]
+pub struct ClassBody {
+    pub body: Vec<MethodDefinition>,
+    pub span: Span,
+}
+
+/// Method definition kind
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum MethodKind {
+    Constructor = 0,
+    Method = 1,
+    Get = 2,
+    Set = 3,
+}
+
+impl MethodKind {
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            MethodKind::Constructor => "constructor",
+            MethodKind::Method => "method",
+            MethodKind::Get => "get",
+            MethodKind::Set => "set",
+        }
+    }
+}
+
+/// Method definition in a class body: `method() { ... }` or `get x() { ... }`
+#[derive(Debug, Clone)]
+pub struct MethodDefinition {
+    /// Method name (key)
+    pub key: Expression,
+    /// Method implementation (value)
+    pub value: FunctionExpression,
+    /// Method kind (constructor, method, get, set)
+    pub kind: MethodKind,
+    /// Whether this is a static method
+    pub is_static: bool,
+    /// Whether the key is computed (`[expr]()`)
+    pub computed: bool,
+    pub span: Span,
+}
+
 /// Spread element: `...expr`
 ///
 /// Used in array literals (`[...arr]`) and object literals (`{...obj}`)
@@ -307,32 +532,39 @@ pub struct SpreadElement {
     pub span: Span,
 }
 
-// TODO: Refactor Property to use PropertyKind enum for type safety
-// Current: Separate bool fields (shorthand, computed, method)
-// Proposed: PropertyKind enum with Init/Get/Set variants
-// Benefits: Type-safe, easier to add getters/setters, cleaner pattern matching
-// Example:
-//   enum PropertyKind {
-//     Init { shorthand: bool, computed: bool, method: bool },
-//     Get { computed: bool },
-//     Set { computed: bool },
-//   }
-// This would make it impossible to have invalid combinations like shorthand getter
+/// Property kind: init (regular), get (getter), set (setter)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(u8)]
+pub enum PropertyKind {
+    #[default]
+    Init = 0,
+    Get = 1,
+    Set = 2,
+}
+
+impl PropertyKind {
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            PropertyKind::Init => "init",
+            PropertyKind::Get => "get",
+            PropertyKind::Set => "set",
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Property {
     pub key: Expression,
     pub value: Expression,
-    pub shorthand: bool, // true for `{ prop }`, false for `{ prop: value }`
-    pub computed: bool,  // true for `{ [expr]: value }`, false for `{ prop: value }`
-    pub method: bool,    // true for `{ foo() {} }`, false for regular properties
-    // TODO: Add support for property decorators (TypeScript)
-    // Requires: decorators: Vec<Decorator> field
-    // See: TypeScript AST PropertyDeclaration
+    pub kind: PropertyKind, // init, get, or set
+    pub shorthand: bool,    // true for `{ prop }`, false for `{ prop: value }`
+    pub computed: bool,     // true for `{ [expr]: value }`, false for `{ prop: value }`
+    pub method: bool,       // true for `{ foo() {} }`, false for regular properties
     pub span: Span,
 }
 
-/// Literal value type - supports numbers, strings, booleans, and null
+/// Literal value type - supports numbers, strings, booleans, null, and undefined
 #[derive(Debug, Clone)]
 pub enum LiteralValue {
     Number(f64),
@@ -342,6 +574,99 @@ pub enum LiteralValue {
     },
     Boolean(bool),
     Null,
+    Undefined,
+}
+
+/// Template literal expression: `hello ${name}`
+///
+/// Template literals consist of:
+/// - quasis: Array of TemplateElement nodes (static string parts)
+/// - expressions: Array of interpolated expressions (inside ${})
+///
+/// For a template like `a ${b} c ${d} e`:
+/// - quasis: ["a ", " c ", " e"]
+/// - expressions: [b, d]
+#[derive(Debug, Clone)]
+pub struct TemplateLiteral {
+    pub quasis: Vec<TemplateElement>,
+    pub expressions: Vec<Expression>,
+    pub span: Span,
+}
+
+/// Template element - a static string part of a template literal
+///
+/// Each quasi has:
+/// - raw: The literal source text (preserving escape syntax)
+/// - cooked: The decoded value (escapes interpreted), None if contains invalid escape
+/// - tail: true for the last element in the template
+#[derive(Debug, Clone)]
+pub struct TemplateElement {
+    /// The raw source text (escape sequences NOT decoded)
+    pub raw: String,
+    /// The decoded value (escape sequences interpreted)
+    /// None for tagged templates with invalid escapes
+    pub cooked: Option<String>,
+    /// True if this is the last element (tail)
+    pub tail: bool,
+    pub span: Span,
+}
+
+/// Tagged template expression: tag`content ${expr}`
+///
+/// The tag is called with the template's static parts and interpolated values.
+#[derive(Debug, Clone)]
+pub struct TaggedTemplateExpression {
+    pub tag: Box<Expression>,
+    pub quasi: TemplateLiteral,
+    pub span: Span,
+}
+
+/// Await expression: `await promise`
+///
+/// Used in async functions to wait for a Promise to resolve.
+/// The argument is the expression being awaited.
+#[derive(Debug, Clone)]
+pub struct AwaitExpression {
+    pub argument: Box<Expression>,
+    pub span: Span,
+}
+
+/// Sequence expression: `a, b, c`
+///
+/// Evaluates all expressions left to right, returns the last value.
+/// Created by the comma operator at expression level.
+#[derive(Debug, Clone)]
+pub struct SequenceExpression {
+    pub expressions: Vec<Expression>,
+    pub span: Span,
+}
+
+/// Regular expression literal: `/pattern/flags`
+///
+/// Represents a regex literal with its pattern and flags.
+/// Unlike strings, regex patterns are NOT decoded - escape sequences are preserved.
+///
+/// TODO: Add regex validation (pattern is valid, flags are valid and unique)
+#[derive(Debug, Clone)]
+pub struct RegexLiteral {
+    /// The pattern between the slashes (e.g., "\\d+")
+    /// Contains the raw source text, preserving escape sequences.
+    pub pattern: String,
+    /// The flags after the closing slash (e.g., "gi")
+    pub flags: String,
+    pub span: Span,
+}
+
+/// Super expression: `super`
+///
+/// Used in class methods to reference the parent class:
+/// - `super()` calls the parent constructor
+/// - `super.method()` calls a parent method
+/// - `super.prop` accesses a parent property
+/// - `super[expr]` computed property access on parent
+#[derive(Debug, Clone)]
+pub struct Super {
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -357,16 +682,18 @@ pub struct Identifier {
     pub span: Span,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum VariableDeclarationKind {
-    Const,
-    Let,
-    Var,
+    Const = 0,
+    Let = 1,
+    Var = 2,
 }
 
 impl VariableDeclarationKind {
     /// Returns the string representation of the variable declaration kind
-    pub fn as_str(&self) -> &'static str {
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Const => "const",
             Self::Let => "let",
@@ -412,24 +739,177 @@ pub struct TSTypeAnnotation {
 /// generics, etc.) will be added incrementally.
 #[derive(Debug, Clone)]
 pub enum TSType {
-    /// The `number` type keyword
-    TSNumberKeyword(TSNumberKeyword),
-    // TODO: TSStringKeyword, TSBooleanKeyword, etc.
+    /// Primitive type keywords (number, string, boolean, etc.)
+    Keyword(TSKeywordType),
+    /// Literal types (template literals, string literals, number literals, etc.)
+    Literal(TSLiteralType),
+    // TODO: Union, Intersection, Array, Tuple, Function, Object literal, etc.
 }
 
 impl TSType {
+    #[inline]
     pub fn span(&self) -> Span {
         match self {
-            TSType::TSNumberKeyword(node) => node.span,
+            TSType::Keyword(kw) => kw.span,
+            TSType::Literal(lit) => lit.span(),
         }
     }
 }
 
-/// TypeScript `number` type keyword
+/// TypeScript primitive type keyword
 ///
-/// Represents the primitive `number` type in TypeScript.
-/// The span covers just the keyword itself (not including surrounding whitespace).
+/// Compact representation using a kind enum + span.
+/// Memory: 1 byte (kind) + padding + 8 bytes (span) = 12 bytes total
+#[derive(Debug, Clone, Copy)]
+pub struct TSKeywordType {
+    pub kind: TSKeywordKind,
+    pub span: Span,
+}
+
+impl TSKeywordType {
+    #[inline]
+    pub const fn new(kind: TSKeywordKind, span: Span) -> Self {
+        Self { kind, span }
+    }
+}
+
+/// Enumeration of TypeScript primitive type keywords
+///
+/// Compact representation (1 byte) for all built-in type keywords.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TSKeywordKind {
+    Number = 0,
+    String = 1,
+    Boolean = 2,
+    Any = 3,
+    Void = 4,
+    Undefined = 5,
+    Null = 6,
+    Never = 7,
+    Unknown = 8,
+    Object = 9,
+    Symbol = 10,
+    BigInt = 11,
+}
+
+impl TSKeywordKind {
+    /// Returns the string representation of this type keyword
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            TSKeywordKind::Number => "number",
+            TSKeywordKind::String => "string",
+            TSKeywordKind::Boolean => "boolean",
+            TSKeywordKind::Any => "any",
+            TSKeywordKind::Void => "void",
+            TSKeywordKind::Undefined => "undefined",
+            TSKeywordKind::Null => "null",
+            TSKeywordKind::Never => "never",
+            TSKeywordKind::Unknown => "unknown",
+            TSKeywordKind::Object => "object",
+            TSKeywordKind::Symbol => "symbol",
+            TSKeywordKind::BigInt => "bigint",
+        }
+    }
+
+    /// Returns the AST node type name for JSON serialization
+    #[inline]
+    pub const fn node_type_name(self) -> &'static str {
+        match self {
+            TSKeywordKind::Number => "TSNumberKeyword",
+            TSKeywordKind::String => "TSStringKeyword",
+            TSKeywordKind::Boolean => "TSBooleanKeyword",
+            TSKeywordKind::Any => "TSAnyKeyword",
+            TSKeywordKind::Void => "TSVoidKeyword",
+            TSKeywordKind::Undefined => "TSUndefinedKeyword",
+            TSKeywordKind::Null => "TSNullKeyword",
+            TSKeywordKind::Never => "TSNeverKeyword",
+            TSKeywordKind::Unknown => "TSUnknownKeyword",
+            TSKeywordKind::Object => "TSObjectKeyword",
+            TSKeywordKind::Symbol => "TSSymbolKeyword",
+            TSKeywordKind::BigInt => "TSBigIntKeyword",
+        }
+    }
+
+    /// Convert from lexer KeywordKind to AST TSKeywordKind
+    /// Returns None for non-type keywords (const, let, var, true, false)
+    #[inline]
+    pub fn from_lexer_keyword(kw: crate::lexer::KeywordKind) -> Option<Self> {
+        use crate::lexer::KeywordKind;
+        match kw {
+            KeywordKind::Number => Some(TSKeywordKind::Number),
+            KeywordKind::String => Some(TSKeywordKind::String),
+            KeywordKind::Boolean => Some(TSKeywordKind::Boolean),
+            KeywordKind::Any => Some(TSKeywordKind::Any),
+            KeywordKind::Void => Some(TSKeywordKind::Void),
+            KeywordKind::Undefined => Some(TSKeywordKind::Undefined),
+            KeywordKind::Null => Some(TSKeywordKind::Null),
+            KeywordKind::Never => Some(TSKeywordKind::Never),
+            KeywordKind::Unknown => Some(TSKeywordKind::Unknown),
+            KeywordKind::Object => Some(TSKeywordKind::Object),
+            KeywordKind::Symbol => Some(TSKeywordKind::Symbol),
+            KeywordKind::Bigint => Some(TSKeywordKind::BigInt),
+            // Non-type keywords
+            KeywordKind::Const
+            | KeywordKind::Let
+            | KeywordKind::Var
+            | KeywordKind::True
+            | KeywordKind::False
+            | KeywordKind::New
+            | KeywordKind::Instanceof
+            | KeywordKind::In
+            | KeywordKind::Return
+            | KeywordKind::Function
+            | KeywordKind::Class
+            | KeywordKind::Typeof
+            | KeywordKind::Delete
+            | KeywordKind::Async
+            | KeywordKind::Await
+            | KeywordKind::Super
+            | KeywordKind::Extends => None,
+        }
+    }
+}
+
+/// TypeScript type alias declaration: `type X = T`
+///
+/// Represents a type alias that creates a new name for an existing type.
+/// Supports template literal types: `type X = \`hello\``
 #[derive(Debug, Clone)]
-pub struct TSNumberKeyword {
+pub struct TSTypeAliasDeclaration {
+    pub id: Identifier,
+    pub type_annotation: TSType,
+    // TODO: Add type_parameters for generic type aliases: `type X<T> = T[]`
+    pub span: Span,
+}
+
+/// TypeScript literal type: wraps a literal value as a type
+///
+/// Used for template literal types: `type X = \`hello\``
+/// Also supports string, number, boolean, null, undefined literals as types.
+#[derive(Debug, Clone)]
+pub enum TSLiteralType {
+    TemplateLiteral(TemplateLiteralType),
+    // TODO: Add String, Number, Boolean, Null, Undefined for other literal types
+}
+
+impl TSLiteralType {
+    #[inline]
+    pub fn span(&self) -> Span {
+        match self {
+            TSLiteralType::TemplateLiteral(t) => t.span,
+        }
+    }
+}
+
+/// Template literal used as a type: `\`hello ${string} world\``
+///
+/// Similar to TemplateLiteral but interpolations contain types, not expressions.
+/// Used in TypeScript template literal types.
+#[derive(Debug, Clone)]
+pub struct TemplateLiteralType {
+    pub quasis: Vec<TemplateElement>,
+    pub types: Vec<TSType>,
     pub span: Span,
 }

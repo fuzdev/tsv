@@ -97,7 +97,7 @@ pub fn format_string_literal(
     };
 
     // Return formatted string with quotes
-    format!("{}{}{}", optimal_quote, final_content, optimal_quote)
+    format!("{optimal_quote}{final_content}{optimal_quote}")
 }
 
 /// Check if two positions are on the same line (no newline between them)
@@ -273,6 +273,54 @@ pub fn has_newline_between(source: &str, start: u32, end: u32) -> bool {
     }
 
     source[start..end].contains('\n')
+}
+
+/// Check if a line ends with a JavaScript/TypeScript string line continuation
+///
+/// A line continuation is a backslash (`\`) at the end of a line inside a string literal.
+/// This causes the newline to be escaped, allowing the string to span multiple lines
+/// in the source code without including the newline in the string value.
+///
+/// Example:
+/// ```javascript
+/// const s = 'hello \
+/// world';  // value is "hello world"
+/// ```
+///
+/// # Algorithm
+///
+/// Counts trailing backslashes - an odd number means line continuation,
+/// an even number means escaped backslashes (not a continuation).
+///
+/// # Returns
+///
+/// `true` if the line ends with a line continuation (odd number of trailing backslashes).
+///
+/// # Examples
+///
+/// ```
+/// use tsv_lang::printing::is_line_continuation_ending;
+///
+/// assert!(is_line_continuation_ending("'hello \\"));      // Line continuation
+/// assert!(is_line_continuation_ending("const x = 'a \\")); // Line continuation
+/// assert!(!is_line_continuation_ending("'hello'"));       // Normal string end
+/// assert!(!is_line_continuation_ending("'hello\\\\'"));   // Escaped backslash
+/// assert!(!is_line_continuation_ending(""));              // Empty line
+/// ```
+pub fn is_line_continuation_ending(line: &str) -> bool {
+    // Count trailing backslashes
+    let mut backslash_count = 0;
+    for c in line.chars().rev() {
+        if c == '\\' {
+            backslash_count += 1;
+        } else {
+            break;
+        }
+    }
+
+    // Odd number of trailing backslashes = line continuation
+    // Even number = escaped backslashes (\\) which is not a continuation
+    backslash_count > 0 && backslash_count % 2 == 1
 }
 
 /// Strip common indentation from comment content based on its position in source

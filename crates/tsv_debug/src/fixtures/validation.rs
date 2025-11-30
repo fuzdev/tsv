@@ -4,9 +4,9 @@
 //! enabling better DX with grouped error reporting.
 
 use crate::fixtures::{
-    self, discover_prettier_quirk_variants, discover_unformatted_ours_variants,
+    self, Fixture, discover_prettier_quirk_variants, discover_unformatted_ours_variants,
     discover_unformatted_variants, has_prettier_divergence_suffix, has_svelte_divergence_suffix,
-    read_file, Fixture,
+    read_file,
 };
 use std::collections::HashMap;
 use std::fmt;
@@ -153,16 +153,10 @@ impl fmt::Display for ValidationError {
                 write!(f, "Missing expected_svelte.json in _svelte_divergence dir")
             }
             Self::StructureExpectedOursWithoutSvelteDivergenceSuffix => {
-                write!(
-                    f,
-                    "expected_ours.json requires _svelte_divergence suffix"
-                )
+                write!(f, "expected_ours.json requires _svelte_divergence suffix")
             }
             Self::StructureExpectedSvelteWithoutSvelteDivergenceSuffix => {
-                write!(
-                    f,
-                    "expected_svelte.json requires _svelte_divergence suffix"
-                )
+                write!(f, "expected_svelte.json requires _svelte_divergence suffix")
             }
             Self::StructurePrettierDivergenceMissingSuffix => {
                 write!(f, "Directory needs _prettier_divergence suffix")
@@ -178,20 +172,20 @@ impl fmt::Display for ValidationError {
                 )
             }
             Self::StructurePrettierQuirkWithoutPrettierDivergenceSuffix(file) => {
-                write!(f, "{} requires _prettier_divergence suffix", file)
+                write!(f, "{file} requires _prettier_divergence suffix")
             }
             Self::StructureUnformattedOursWithoutPrettierDivergenceSuffix(file) => {
-                write!(f, "{} requires _prettier_divergence suffix", file)
+                write!(f, "{file} requires _prettier_divergence suffix")
             }
             Self::StructureVariantIdenticalToInput(file) => {
-                write!(f, "{} is identical to input.svelte", file)
+                write!(f, "{file} is identical to input.svelte")
             }
             Self::StructureMissingReadme => write!(f, "README.md required for divergence"),
-            Self::StructureValidationFailed(msg) => write!(f, "{}", msg),
+            Self::StructureValidationFailed(msg) => write!(f, "{msg}"),
             Self::ParserExpectedJsonOutdated => write!(f, "expected.json is outdated"),
             Self::ParserExpectedOursOutdated => write!(f, "expected_ours.json is outdated"),
             Self::ParserExpectedSvelteOutdated => write!(f, "expected_svelte.json is outdated"),
-            Self::ParserError(msg) => write!(f, "Parser error: {}", msg),
+            Self::ParserError(msg) => write!(f, "Parser error: {msg}"),
             Self::FormatterInputNotIdempotent => {
                 write!(f, "input.svelte doesn't format to itself")
             }
@@ -201,21 +195,21 @@ impl fmt::Display for ValidationError {
             Self::FormatterInputDiffersFromPrettier => {
                 write!(f, "input.svelte differs from prettier output")
             }
-            Self::FormatterError(msg) => write!(f, "Formatter error: {}", msg),
+            Self::FormatterError(msg) => write!(f, "Formatter error: {msg}"),
             Self::NormalizationPrettierQuirkNotPreserved(file) => {
-                write!(f, "{} not preserved by prettier", file)
+                write!(f, "{file} not preserved by prettier")
             }
             Self::NormalizationPrettierQuirkNotNormalized(file) => {
-                write!(f, "{} doesn't normalize to input.svelte", file)
+                write!(f, "{file} doesn't normalize to input.svelte")
             }
             Self::NormalizationUnformattedPrettierMismatch(file) => {
-                write!(f, "{} doesn't normalize to input.svelte (prettier)", file)
+                write!(f, "{file} doesn't normalize to input.svelte (prettier)")
             }
             Self::NormalizationUnformattedNotNormalized(file) => {
-                write!(f, "{} doesn't normalize to input.svelte", file)
+                write!(f, "{file} doesn't normalize to input.svelte")
             }
             Self::NormalizationUnformattedOursNotNormalized(file) => {
-                write!(f, "{} doesn't normalize to input.svelte", file)
+                write!(f, "{file} doesn't normalize to input.svelte")
             }
             Self::DuplicateUnformattedWithinFixture(files) => {
                 write!(f, "Duplicate unformatted files: {}", files.join(", "))
@@ -224,7 +218,7 @@ impl fmt::Display for ValidationError {
                 write!(f, "Duplicate prettier_quirk files: {}", files.join(", "))
             }
             Self::RedundantUnformattedMatchesQuirk(file, quirk) => {
-                write!(f, "{} is redundant (identical to {})", file, quirk)
+                write!(f, "{file} is redundant (identical to {quirk})")
             }
         }
     }
@@ -246,7 +240,7 @@ pub enum ValidationSuccess {
 impl fmt::Display for ValidationSuccess {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::StructureValid(n) => write!(f, "{} structure checks passed", n),
+            Self::StructureValid(n) => write!(f, "{n} structure checks passed"),
             Self::ParserExpectedJsonMatches => write!(f, "expected.json matches Svelte parser"),
             Self::ParserExpectedOursMatches => write!(f, "expected_ours.json matches our parser"),
             Self::ParserExpectedSvelteMatches => {
@@ -254,7 +248,7 @@ impl fmt::Display for ValidationSuccess {
             }
             Self::FormatterInputIdempotent => write!(f, "input.svelte is idempotent"),
             Self::FormatterMatchesPrettier => write!(f, "input.svelte matches prettier"),
-            Self::NormalizationVariantsOk(n) => write!(f, "{} variants normalize correctly", n),
+            Self::NormalizationVariantsOk(n) => write!(f, "{n} variants normalize correctly"),
             Self::NormalizationSkipped => write!(f, "SKIPPED (formatter not idempotent)"),
         }
     }
@@ -352,8 +346,7 @@ pub async fn validate_fixture(
         Ok(s) => s,
         Err(e) => {
             result.add_error(ValidationError::ParserError(format!(
-                "Failed to read input: {}",
-                e
+                "Failed to read input: {e}"
             )));
             return result;
         }
@@ -408,8 +401,7 @@ fn validate_parser_ours(result: &mut FixtureValidation, fixture: &Fixture, input
         Ok(s) => s,
         Err(e) => {
             result.add_error(ValidationError::ParserError(format!(
-                "Failed to read expected_ours.json: {}",
-                e
+                "Failed to read expected_ours.json: {e}"
             )));
             return;
         }
@@ -483,8 +475,7 @@ fn validate_normalization_ours(result: &mut FixtureValidation, fixture: &Fixture
             }
             Err(e) => {
                 result.add_error(ValidationError::FormatterError(format!(
-                    "{}: {}",
-                    quirk_name, e
+                    "{quirk_name}: {e}"
                 )));
             }
         }
@@ -529,8 +520,7 @@ fn validate_normalization_ours(result: &mut FixtureValidation, fixture: &Fixture
             }
             Err(e) => {
                 result.add_error(ValidationError::FormatterError(format!(
-                    "{}: {}",
-                    variant_name, e
+                    "{variant_name}: {e}"
                 )));
             }
         }
@@ -582,8 +572,7 @@ fn validate_normalization_ours(result: &mut FixtureValidation, fixture: &Fixture
             }
             Err(e) => {
                 result.add_error(ValidationError::FormatterError(format!(
-                    "{}: {}",
-                    variant_name, e
+                    "{variant_name}: {e}"
                 )));
             }
         }
@@ -677,7 +666,7 @@ async fn validate_formatter_prettier(
     let formatted = match fuz_client::run_prettier(input, "temp.svelte").await {
         Ok(f) => f,
         Err(e) => {
-            result.add_error(ValidationError::FormatterError(format!("Prettier: {}", e)));
+            result.add_error(ValidationError::FormatterError(format!("Prettier: {e}")));
             return;
         }
     };
@@ -809,12 +798,12 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
             if result.is_valid() {
                 println!("✓ {}", result.fixture_path);
                 for success in &result.successes {
-                    println!("    [OK] {}", success);
+                    println!("    [OK] {success}");
                 }
             } else {
                 eprintln!("✗ {}", result.fixture_path);
                 for success in &result.successes {
-                    eprintln!("    [OK] {}", success);
+                    eprintln!("    [OK] {success}");
                 }
                 for error in &result.errors {
                     eprintln!("    [{}] {}", error_type_name(error), error);
@@ -842,7 +831,7 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
         for group in &summary.cross_fixture_duplicates {
             eprintln!("    Duplicate input.svelte content:");
             for path in group {
-                eprintln!("      - {}", path);
+                eprintln!("      - {path}");
             }
         }
         eprintln!();

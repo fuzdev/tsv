@@ -5,7 +5,7 @@
 
 use crate::ast::{internal, public};
 use string_interner::DefaultStringInterner;
-use tsv_lang::{LocationTracker, printing};
+use tsv_lang::{InfallibleResolve, LocationTracker, printing};
 
 /// Context for comment attachment process
 ///
@@ -168,8 +168,8 @@ fn attach_comments_recursively(
         }
 
         // Extract start/end if present
-        let node_start = obj.get("start").and_then(|v| v.as_u64()).map(|v| v as u32);
-        let node_end = obj.get("end").and_then(|v| v.as_u64()).map(|v| v as u32);
+        let node_start = obj.get("start").and_then(serde_json::Value::as_u64).map(|v| v as u32);
+        let node_end = obj.get("end").and_then(serde_json::Value::as_u64).map(|v| v as u32);
 
         if let (Some(start), Some(end)) = (node_start, node_end) {
             // Attach comments to this node
@@ -218,9 +218,9 @@ fn attach_comments_recursively(
                             .iter()
                             .map(|item| {
                                 let start =
-                                    item.get("start").and_then(|v| v.as_u64()).map(|v| v as u32);
+                                    item.get("start").and_then(serde_json::Value::as_u64).map(|v| v as u32);
                                 let end =
-                                    item.get("end").and_then(|v| v.as_u64()).map(|v| v as u32);
+                                    item.get("end").and_then(serde_json::Value::as_u64).map(|v| v as u32);
                                 (start, end)
                             })
                             .collect();
@@ -503,7 +503,7 @@ fn convert_element(
         node_type: node_type.to_string(),
         start: elem.span.start,
         end: elem.span.end,
-        name: interner.resolve(elem.name).unwrap().to_string(),
+        name: interner.must_resolve(elem.name).to_string(),
         kind: elem.kind,
         attributes: elem
             .attributes
@@ -539,7 +539,7 @@ fn convert_attribute(
     interner: &DefaultStringInterner,
 ) -> public::Attribute {
     // Extract attribute name from interner
-    let name = interner.resolve(attr.name).unwrap().to_string();
+    let name = interner.must_resolve(attr.name).to_string();
 
     // Convert attribute value following Svelte's JSON format:
     // - Boolean attributes (no value): serialize as `true`
@@ -560,9 +560,13 @@ fn convert_attribute(
                     .iter()
                     .map(|v| convert_attribute_value(v, source, loc, interner))
                     .collect();
+                // SAFETY: Our types derive Serialize correctly; serialization can't fail
+                #[allow(clippy::unwrap_used)]
                 Some(serde_json::to_value(converted).unwrap())
             } else if values.len() == 1 {
                 // Single expression only: serialize as object
+                // SAFETY: Our types derive Serialize correctly; serialization can't fail
+                #[allow(clippy::unwrap_used)]
                 Some(
                     serde_json::to_value(convert_attribute_value(
                         &values[0], source, loc, interner,
@@ -575,6 +579,8 @@ fn convert_attribute(
                     .iter()
                     .map(|v| convert_attribute_value(v, source, loc, interner))
                     .collect();
+                // SAFETY: Our types derive Serialize correctly; serialization can't fail
+                #[allow(clippy::unwrap_used)]
                 Some(serde_json::to_value(converted).unwrap())
             }
         }
@@ -620,11 +626,7 @@ fn convert_script(
     source: &str,
     interner: &DefaultStringInterner,
 ) -> public::Script {
-    // Convert script context enum to string
-    let context = match script.context {
-        internal::ScriptContext::Default => "default",
-        internal::ScriptContext::Module => "module",
-    };
+    let context = script.context.as_str();
 
     // Use full source LocationTracker for absolute line/column numbers everywhere
     let loc = LocationTracker::new(source);
@@ -642,6 +644,8 @@ fn convert_script(
     // because it keeps the internal TypeScript AST clean (zero Svelte-specific pollution).
     // The trade-off is we lose type safety on Script.content (now serde_json::Value),
     // but this is acceptable for the public API layer.
+    // SAFETY: Our Program type derives Serialize correctly; serialization can't fail
+    #[allow(clippy::expect_used)]
     let mut program_json = serde_json::to_value(&program).expect("Failed to serialize Program");
 
     // Track which comments have been attached to prevent duplicates
@@ -721,6 +725,8 @@ fn convert_style(
             .iter()
             .map(|attr| {
                 let public_attr = convert_attribute(attr, source, &full_loc, interner);
+                // SAFETY: Our Attribute type derives Serialize correctly
+                #[allow(clippy::expect_used)]
                 serde_json::to_value(public_attr).expect("Failed to serialize attribute")
             })
             .collect(),

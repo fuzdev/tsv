@@ -18,13 +18,11 @@ pub(crate) fn read_identifier(source: &str, pos: &mut usize) -> Result<Token, Pa
             }
             Some('\\') => {
                 // Check if this is a valid escape sequence
-                let peek_char = source[*pos + 1..].chars().next();
-                if peek_char.is_none() {
+                let Some(next_ch) = source[*pos + 1..].chars().next() else {
                     // Backslash at end of input - end identifier
                     break;
-                }
+                };
 
-                let next_ch = peek_char.unwrap();
                 if next_ch.is_ascii_hexdigit() {
                     // Unicode escape: \XXXXXX (1-6 hex digits)
                     let ch = decode_unicode_escape(source, pos)?;
@@ -89,13 +87,13 @@ pub(crate) fn decode_unicode_escape(source: &str, pos: &mut usize) -> Result<cha
     }
 
     let code_point = u32::from_str_radix(&hex_str, 16).map_err(|_| ParseError::InvalidSyntax {
-        message: format!("Invalid unicode code point: {}", hex_str),
+        message: format!("Invalid unicode code point: {hex_str}"),
         position: start,
         context: None,
     })?;
 
     char::from_u32(code_point).ok_or_else(|| ParseError::InvalidSyntax {
-        message: format!("Invalid unicode code point: U+{:X}", code_point),
+        message: format!("Invalid unicode code point: U+{code_point:X}"),
         position: start,
         context: None,
     })

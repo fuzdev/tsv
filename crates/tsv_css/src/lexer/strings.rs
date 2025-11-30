@@ -19,7 +19,7 @@ pub(crate) fn read_string(source: &str, pos: &mut usize, quote: char) -> Result<
         match current_char {
             None => {
                 return Err(ParseError::InvalidSyntax {
-                    message: format!("Unterminated string starting with {}", quote),
+                    message: format!("Unterminated string starting with {quote}"),
                     position: start,
                     context: None,
                 });

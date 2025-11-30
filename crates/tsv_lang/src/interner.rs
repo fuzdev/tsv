@@ -4,6 +4,40 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
 
+/// Extension trait for infallible symbol resolution.
+///
+/// Symbols in tsv are always resolved by the same interner that created them.
+/// This is an invariant of the system - if violated, it's a bug in our code.
+/// This trait provides `must_resolve()` which panics with a clear message
+/// rather than returning `Option`.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use tsv_lang::InfallibleResolve;
+///
+/// let interner = program.interner.borrow();
+/// let name = interner.must_resolve(symbol).to_string();
+/// ```
+pub trait InfallibleResolve {
+    /// Resolve a symbol to its string, panicking if not found.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the symbol was not interned by this interner.
+    /// This indicates a bug - symbols should only be resolved by the
+    /// interner that created them.
+    fn must_resolve(&self, symbol: DefaultSymbol) -> &str;
+}
+
+impl InfallibleResolve for DefaultStringInterner {
+    #[allow(clippy::expect_used)]
+    fn must_resolve(&self, symbol: DefaultSymbol) -> &str {
+        self.resolve(symbol)
+            .expect("Symbol not found in interner - this is a bug")
+    }
+}
+
 /// Trait for printers that use string interning
 ///
 /// This trait provides common symbol resolution methods for printers that use
@@ -68,11 +102,7 @@ pub trait SymbolResolver {
     /// println!("Identifier: {}", identifier);
     /// ```
     fn resolve_symbol(&self, symbol: DefaultSymbol) -> String {
-        self.interner()
-            .borrow()
-            .resolve(symbol)
-            .expect("Symbol not found in interner")
-            .to_string()
+        self.interner().borrow().must_resolve(symbol).to_string()
     }
 
     /// Execute a callback with a borrowed string for a symbol (zero-allocation)
@@ -108,9 +138,6 @@ pub trait SymbolResolver {
         F: FnOnce(&str) -> R,
     {
         let interner = self.interner().borrow();
-        let s = interner
-            .resolve(symbol)
-            .expect("Symbol not found in interner");
-        f(s)
+        f(interner.must_resolve(symbol))
     }
 }

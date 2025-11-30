@@ -95,20 +95,20 @@ fn parse_rgb(args_str: &str) -> Option<Color> {
         let mut parts = rgb_part
             .split([',', ' '])
             .filter(|s| !s.is_empty())
-            .map(|s| s.trim())
+            .map(str::trim)
             .collect::<Vec<_>>();
         parts.push(alpha_part.trim());
         parts
     } else {
         // Old format: r, g, b or r, g, b, a OR space-separated: r g b
         if args_str.contains(',') {
-            args_str.split(',').map(|s| s.trim()).collect::<Vec<_>>()
+            args_str.split(',').map(str::trim).collect::<Vec<_>>()
         } else {
             // Space-separated
             args_str
                 .split(' ')
                 .filter(|s| !s.is_empty())
-                .map(|s| s.trim())
+                .map(str::trim)
                 .collect::<Vec<_>>()
         }
     };
@@ -144,20 +144,20 @@ fn parse_hsl(args_str: &str) -> Option<Color> {
         let mut parts = hsl_part
             .split([',', ' '])
             .filter(|s| !s.is_empty())
-            .map(|s| s.trim())
+            .map(str::trim)
             .collect::<Vec<_>>();
         parts.push(alpha_part.trim());
         parts
     } else {
         // Old format: h, s%, l% OR space-separated: h s% l%
         if args_str.contains(',') {
-            args_str.split(',').map(|s| s.trim()).collect::<Vec<_>>()
+            args_str.split(',').map(str::trim).collect::<Vec<_>>()
         } else {
             // Space-separated
             args_str
                 .split(' ')
                 .filter(|s| !s.is_empty())
-                .map(|s| s.trim())
+                .map(str::trim)
                 .collect::<Vec<_>>()
         }
     };

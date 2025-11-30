@@ -129,14 +129,13 @@ impl<'a> SvelteParser<'a> {
         Ok(self
             .peek_cache
             .as_ref()
-            .map(|p| p.kind == kind)
-            .unwrap_or(false))
+            .is_some_and(|p| p.kind == kind))
     }
 
     /// Parse a text node if there's a gap between the last position and current position.
     /// The Svelte lexer skips whitespace, so gaps represent text/whitespace content.
     pub(crate) fn capture_text_if_gap(
-        &mut self,
+        &self,
         last_end: usize,
         nodes: &mut Vec<FragmentNode>,
     ) -> Result<(), ParseError> {

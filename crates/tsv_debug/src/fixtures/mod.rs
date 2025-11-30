@@ -85,22 +85,22 @@ fn walk_fixtures_recursive(
     fixtures: &mut Vec<Fixture>,
 ) -> Result<(), String> {
     let entries = fs::read_dir(current)
-        .map_err(|e| format!("Failed to read directory {:?}: {}", current, e))?;
+        .map_err(|e| format!("Failed to read directory {current:?}: {e}"))?;
 
     for entry in entries {
-        let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+        let entry = entry.map_err(|e| format!("Failed to read entry: {e}"))?;
         let path = entry.path();
 
         if path.is_dir() {
             let dir_name = path
                 .file_name()
                 .and_then(|n| n.to_str())
-                .ok_or_else(|| format!("Invalid directory name: {:?}", path))?;
+                .ok_or_else(|| format!("Invalid directory name: {path:?}"))?;
 
             let new_relative = if relative_base.is_empty() {
                 dir_name.to_string()
             } else {
-                format!("{}/{}", relative_base, dir_name)
+                format!("{relative_base}/{dir_name}")
             };
 
             // Check for input.svelte in this directory
@@ -298,10 +298,9 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
             .unwrap_or("_svelte_divergence");
 
             return Err(format!(
-                "expected_ours.json and expected_svelte.json can only exist in directories with '{}' suffix.\n\
-                Found these files in directory '{}'.\n\
-                Rename directory to '{}{}'",
-                suggested_suffix, dir_name, dir_name, suggested_suffix
+                "expected_ours.json and expected_svelte.json can only exist in directories with '{suggested_suffix}' suffix.\n\
+                Found these files in directory '{dir_name}'.\n\
+                Rename directory to '{dir_name}{suggested_suffix}'"
             ));
         }
 
@@ -319,12 +318,11 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
     } else if is_svelte_divergence_dir {
         // S12-rev: Svelte divergence dir MUST have expected_ours.json + expected_svelte.json
         return Err(format!(
-            "Directory '{}' has '_svelte_divergence' suffix but lacks required files.\n\
+            "Directory '{dir_name}' has '_svelte_divergence' suffix but lacks required files.\n\
             Svelte divergence directories MUST have both:\n\
             - expected_ours.json (our parser's AST)\n\
             - expected_svelte.json (Svelte parser's AST)\n\
-            Either add these files or remove the '_svelte_divergence' suffix from the directory name.",
-            dir_name
+            Either add these files or remove the '_svelte_divergence' suffix from the directory name."
         ));
     } else {
         // Standard pattern: expected.json (required)
@@ -360,8 +358,7 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         // Check extension matches input file (should always be .svelte)
         if !variant_name.ends_with(".svelte") {
             return Err(format!(
-                "unformatted_*.svelte variant '{}' must have .svelte extension (found extension doesn't match)",
-                variant_name
+                "unformatted_*.svelte variant '{variant_name}' must have .svelte extension (found extension doesn't match)"
             ));
         }
 
@@ -370,8 +367,7 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
 
         if variant_content == input_content {
             return Err(format!(
-                "unformatted_*.svelte variant '{}' is identical to input.svelte (should be different for testing normalization)",
-                variant_name
+                "unformatted_*.svelte variant '{variant_name}' is identical to input.svelte (should be different for testing normalization)"
             ));
         }
     }
@@ -382,8 +378,7 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         // Check extension is .svelte
         if !variant_name.ends_with(".svelte") {
             return Err(format!(
-                "prettier_quirk_*.svelte variant '{}' must have .svelte extension",
-                variant_name
+                "prettier_quirk_*.svelte variant '{variant_name}' must have .svelte extension"
             ));
         }
 
@@ -393,8 +388,7 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         // Rule 3: Must differ from input.svelte
         if variant_content == input_content {
             return Err(format!(
-                "prettier_quirk_*.svelte variant '{}' is identical to input.svelte (should demonstrate a quirk)",
-                variant_name
+                "prettier_quirk_*.svelte variant '{variant_name}' is identical to input.svelte (should demonstrate a quirk)"
             ));
         }
     }
@@ -463,12 +457,11 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
     {
         return Err(format!(
             "Directory name ends with '_prettier_divergence' but lacks files requiring it.\n\
-            Directory '{}' should either:\n\
+            Directory '{dir_name}' should either:\n\
             - Add output_prettier.svelte (if prettier formats input differently), OR\n\
             - Add prettier_quirk_*.svelte files (if prettier has quirks to document), OR\n\
             - Add unformatted_ours_*.svelte files (if testing our formatter only), OR\n\
-            - Remove '_prettier_divergence' suffix from directory name (if testing both formatters)",
-            dir_name
+            - Remove '_prettier_divergence' suffix from directory name (if testing both formatters)"
         ));
     }
 
@@ -516,8 +509,7 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         // Check extension is .svelte
         if !variant_name.ends_with(".svelte") {
             return Err(format!(
-                "unformatted_ours_*.svelte variant '{}' must have .svelte extension",
-                variant_name
+                "unformatted_ours_*.svelte variant '{variant_name}' must have .svelte extension"
             ));
         }
 
@@ -527,8 +519,7 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         // Must differ from input.svelte
         if variant_content == input_content {
             return Err(format!(
-                "unformatted_ours_*.svelte variant '{}' is identical to input.svelte (should be different for testing normalization)",
-                variant_name
+                "unformatted_ours_*.svelte variant '{variant_name}' is identical to input.svelte (should be different for testing normalization)"
             ));
         }
     }
@@ -595,7 +586,6 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
 }
 
 /// Recursively remove location/span fields from JSON for AST comparison
-#[allow(dead_code)]
 pub fn remove_locations(mut value: serde_json::Value) -> serde_json::Value {
     match &mut value {
         serde_json::Value::Object(map) => {
@@ -603,12 +593,12 @@ pub fn remove_locations(mut value: serde_json::Value) -> serde_json::Value {
             map.remove("end");
             map.remove("loc");
             for v in map.values_mut() {
-                *v = remove_locations(v.clone());
+                *v = remove_locations(std::mem::take(v));
             }
         }
         serde_json::Value::Array(arr) => {
             for v in arr.iter_mut() {
-                *v = remove_locations(v.clone());
+                *v = remove_locations(std::mem::take(v));
             }
         }
         _ => {}
@@ -618,18 +608,18 @@ pub fn remove_locations(mut value: serde_json::Value) -> serde_json::Value {
 
 /// Read file contents
 pub fn read_file(path: &Path) -> Result<String, String> {
-    fs::read_to_string(path).map_err(|e| format!("Failed to read file {:?}: {}", path, e))
+    fs::read_to_string(path).map_err(|e| format!("Failed to read file {path:?}: {e}"))
 }
 
 /// Write file contents
 pub fn write_file(path: &Path, content: &str) -> Result<(), String> {
-    fs::write(path, content).map_err(|e| format!("Failed to write file {:?}: {}", path, e))
+    fs::write(path, content).map_err(|e| format!("Failed to write file {path:?}: {e}"))
 }
 
 /// Delete file if it exists
 pub fn delete_file_if_exists(path: &Path) -> Result<(), String> {
     if path.exists() {
-        fs::remove_file(path).map_err(|e| format!("Failed to delete file {:?}: {}", path, e))?;
+        fs::remove_file(path).map_err(|e| format!("Failed to delete file {path:?}: {e}"))?;
     }
     Ok(())
 }
@@ -641,12 +631,11 @@ pub fn delete_file_if_exists(path: &Path) -> Result<(), String> {
 pub fn format_with_our_formatter(content: &str, filepath: &str) -> Result<String, String> {
     if filepath.ends_with(".svelte") {
         let ast =
-            tsv_svelte::parse(content).map_err(|e| format!("Format error (parse): {:?}", e))?;
+            tsv_svelte::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
         Ok(tsv_svelte::format(&ast, content))
     } else {
         Err(format!(
-            "Unsupported file type for formatting: {}",
-            filepath
+            "Unsupported file type for formatting: {filepath}"
         ))
     }
 }
@@ -660,13 +649,13 @@ pub fn parse_with_our_parser_to_string(content: &str, filepath: &str) -> Result<
     use tsv_cli::json_utils::to_json_with_tabs;
 
     if filepath.ends_with(".svelte") {
-        let ast = tsv_svelte::parse(content).map_err(|e| format!("Parse error: {:?}", e))?;
+        let ast = tsv_svelte::parse(content).map_err(|e| format!("Parse error: {e:?}"))?;
         let public_ast = tsv_svelte::convert_ast(&ast, content);
         let json = to_json_with_tabs(&public_ast)
-            .map_err(|e| format!("Failed to serialize AST to JSON: {}", e))?;
+            .map_err(|e| format!("Failed to serialize AST to JSON: {e}"))?;
         // Add trailing newline to match fixtures_update_parsed format
-        Ok(format!("{}\n", json))
+        Ok(format!("{json}\n"))
     } else {
-        Err(format!("Unsupported file type for parsing: {}", filepath))
+        Err(format!("Unsupported file type for parsing: {filepath}"))
     }
 }

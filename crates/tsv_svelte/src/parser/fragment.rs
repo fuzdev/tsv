@@ -23,7 +23,7 @@ impl<'a> SvelteParser<'a> {
     ///
     /// The `raw` field stores the original text from source.
     /// The `data` field stores the decoded text with HTML entities converted.
-    pub(crate) fn parse_text(&mut self, start: usize, end: usize) -> Result<Text, ParseError> {
+    pub(crate) fn parse_text(&self, start: usize, end: usize) -> Result<Text, ParseError> {
         let raw = self.source[start..end].to_string();
         let data = decode_html_entities(&raw);
         Ok(Text {

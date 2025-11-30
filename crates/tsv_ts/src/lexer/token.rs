@@ -1,34 +1,135 @@
 // Token types for TypeScript/JavaScript lexer
 
+use phf::phf_map;
 use std::fmt;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum KeywordKind {
-    Const,
-    Let,
-    Var,
-    Number,
-    True,
-    False,
-    Null,
-    // TODO: String, Boolean, etc.
+    // Declaration keywords
+    Const = 0,
+    Let = 1,
+    Var = 2,
+    // Literal keywords
+    True = 3,
+    False = 4,
+    Null = 5,
+    Undefined = 6,
+    // Type keywords
+    Number = 7,
+    String = 8,
+    Boolean = 9,
+    Any = 10,
+    Void = 11,
+    Never = 12,
+    Unknown = 13,
+    Object = 14,
+    Symbol = 15,
+    Bigint = 16,
+    // Expression keywords
+    New = 17,
+    // Binary operator keywords
+    Instanceof = 18,
+    In = 19,
+    // Control flow keywords
+    Return = 20,
+    // Declaration keywords (continued)
+    Function = 21,
+    Class = 22,
+    // Unary keyword operators
+    Typeof = 23,
+    Delete = 24,
+    // Async/await keywords
+    Async = 25,
+    Await = 26,
+    // Class keywords
+    Super = 27,
+    Extends = 28,
+}
+
+impl KeywordKind {
+    /// Returns the string representation of the keyword
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            KeywordKind::Const => "const",
+            KeywordKind::Let => "let",
+            KeywordKind::Var => "var",
+            KeywordKind::True => "true",
+            KeywordKind::False => "false",
+            KeywordKind::Null => "null",
+            KeywordKind::Undefined => "undefined",
+            KeywordKind::Number => "number",
+            KeywordKind::String => "string",
+            KeywordKind::Boolean => "boolean",
+            KeywordKind::Any => "any",
+            KeywordKind::Void => "void",
+            KeywordKind::Never => "never",
+            KeywordKind::Unknown => "unknown",
+            KeywordKind::Object => "object",
+            KeywordKind::Symbol => "symbol",
+            KeywordKind::Bigint => "bigint",
+            KeywordKind::New => "new",
+            KeywordKind::Instanceof => "instanceof",
+            KeywordKind::In => "in",
+            KeywordKind::Return => "return",
+            KeywordKind::Function => "function",
+            KeywordKind::Class => "class",
+            KeywordKind::Typeof => "typeof",
+            KeywordKind::Delete => "delete",
+            KeywordKind::Async => "async",
+            KeywordKind::Await => "await",
+            KeywordKind::Super => "super",
+            KeywordKind::Extends => "extends",
+        }
+    }
+
+    /// Returns true if this is a declaration keyword (const, let, var, function)
+    #[inline]
+    pub const fn is_declaration_keyword(self) -> bool {
+        matches!(
+            self,
+            KeywordKind::Const | KeywordKind::Let | KeywordKind::Var
+        )
+    }
+
+    /// Returns true if this is a literal keyword (true, false, null, undefined)
+    #[inline]
+    pub const fn is_literal_keyword(self) -> bool {
+        matches!(
+            self,
+            KeywordKind::True | KeywordKind::False | KeywordKind::Null | KeywordKind::Undefined
+        )
+    }
+
+    /// Returns true if this is a type keyword (number, string, boolean, etc.)
+    #[inline]
+    pub const fn is_type_keyword(self) -> bool {
+        matches!(
+            self,
+            KeywordKind::Number
+                | KeywordKind::String
+                | KeywordKind::Boolean
+                | KeywordKind::Any
+                | KeywordKind::Void
+                | KeywordKind::Never
+                | KeywordKind::Unknown
+                | KeywordKind::Object
+                | KeywordKind::Symbol
+                | KeywordKind::Bigint
+                | KeywordKind::Null
+                | KeywordKind::Undefined
+        )
+    }
 }
 
 impl fmt::Display for KeywordKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            KeywordKind::Const => write!(f, "const"),
-            KeywordKind::Let => write!(f, "let"),
-            KeywordKind::Var => write!(f, "var"),
-            KeywordKind::Number => write!(f, "number"),
-            KeywordKind::True => write!(f, "true"),
-            KeywordKind::False => write!(f, "false"),
-            KeywordKind::Null => write!(f, "null"),
-        }
+        f.write_str(self.as_str())
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenKind {
     Number,
     String,
@@ -48,10 +149,18 @@ pub enum TokenKind {
     Dot,                // .
     DotDotDot,          // ...
     Minus,              // -
+    MinusMinus,         // --
     Plus,               // +
+    PlusPlus,           // ++
     Star,               // *
+    StarStar,           // **
     Slash,              // /
     Percent,            // %
+    Caret,              // ^
+    Tilde,              // ~
+    LeftShift,          // <<
+    RightShift,         // >>
+    UnsignedRightShift, // >>>
     LessThan,           // <
     GreaterThan,        // >
     LessThanEquals,     // <=
@@ -65,9 +174,22 @@ pub enum TokenKind {
     Pipe,               // |
     PipePipe,           // ||
     QuestionQuestion,   // ??
+    QuestionDot,        // ?. (optional chaining)
     Bang,               // !
     Question,           // ?
     Comment { content: String, is_block: bool },
+    // Template literal tokens
+    // NoSubstitutionTemplate: `content` (no ${} interpolation)
+    NoSubstitutionTemplate,
+    // TemplateHead: `content${  (starts template with interpolation)
+    TemplateHead,
+    // TemplateMiddle: }content${  (between interpolations)
+    TemplateMiddle,
+    // TemplateTail: }content`  (ends template after interpolation)
+    TemplateTail,
+    // Regular expression literal: /pattern/flags
+    // Pattern and flags are stored in token.decoded as "pattern\0flags" (null-separated)
+    RegexLiteral,
     Eof,
 }
 
@@ -86,7 +208,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Number => write!(f, "number"),
             TokenKind::String => write!(f, "string"),
             TokenKind::Identifier => write!(f, "identifier"),
-            TokenKind::Keyword(kw) => write!(f, "'{}'", kw),
+            TokenKind::Keyword(kw) => write!(f, "'{kw}'"),
             TokenKind::Equals => write!(f, "'='"),
             TokenKind::Colon => write!(f, "':'"),
             TokenKind::Semicolon => write!(f, "';'"),
@@ -101,10 +223,18 @@ impl fmt::Display for TokenKind {
             TokenKind::Dot => write!(f, "'.'"),
             TokenKind::DotDotDot => write!(f, "'...'"),
             TokenKind::Minus => write!(f, "'-'"),
+            TokenKind::MinusMinus => write!(f, "'--'"),
             TokenKind::Plus => write!(f, "'+'"),
+            TokenKind::PlusPlus => write!(f, "'++'"),
             TokenKind::Star => write!(f, "'*'"),
+            TokenKind::StarStar => write!(f, "'**'"),
             TokenKind::Slash => write!(f, "'/'"),
             TokenKind::Percent => write!(f, "'%'"),
+            TokenKind::Caret => write!(f, "'^'"),
+            TokenKind::Tilde => write!(f, "'~'"),
+            TokenKind::LeftShift => write!(f, "'<<'"),
+            TokenKind::RightShift => write!(f, "'>>'"),
+            TokenKind::UnsignedRightShift => write!(f, "'>>>'"),
             TokenKind::LessThan => write!(f, "'<'"),
             TokenKind::GreaterThan => write!(f, "'>'"),
             TokenKind::LessThanEquals => write!(f, "'<='"),
@@ -118,6 +248,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Pipe => write!(f, "'|'"),
             TokenKind::PipePipe => write!(f, "'||'"),
             TokenKind::QuestionQuestion => write!(f, "'??'"),
+            TokenKind::QuestionDot => write!(f, "'?.'"),
             TokenKind::Bang => write!(f, "'!'"),
             TokenKind::Question => write!(f, "'?'"),
             TokenKind::Comment { is_block, .. } => {
@@ -127,6 +258,11 @@ impl fmt::Display for TokenKind {
                     write!(f, "line comment")
                 }
             }
+            TokenKind::NoSubstitutionTemplate => write!(f, "template literal"),
+            TokenKind::TemplateHead => write!(f, "template head"),
+            TokenKind::TemplateMiddle => write!(f, "template middle"),
+            TokenKind::TemplateTail => write!(f, "template tail"),
+            TokenKind::RegexLiteral => write!(f, "regular expression"),
             TokenKind::Eof => write!(f, "end of file"),
         }
     }
@@ -171,19 +307,55 @@ impl Token {
     }
 }
 
-// TODO: Expand keyword list for:
-// - Type keywords: interface, type, enum, namespace, etc.
-// - Control flow: if, else, while, for, switch, case, break, continue, return
-// - Other: function, class, import, export, async, await, etc.
+/// Perfect hash map for O(1) keyword lookup
+static KEYWORDS: phf::Map<&'static str, KeywordKind> = phf_map! {
+    // Declaration keywords
+    "const" => KeywordKind::Const,
+    "let" => KeywordKind::Let,
+    "var" => KeywordKind::Var,
+    // Literal keywords
+    "true" => KeywordKind::True,
+    "false" => KeywordKind::False,
+    "null" => KeywordKind::Null,
+    "undefined" => KeywordKind::Undefined,
+    // Type keywords
+    "number" => KeywordKind::Number,
+    "string" => KeywordKind::String,
+    "boolean" => KeywordKind::Boolean,
+    "any" => KeywordKind::Any,
+    "void" => KeywordKind::Void,
+    "never" => KeywordKind::Never,
+    "unknown" => KeywordKind::Unknown,
+    "object" => KeywordKind::Object,
+    "symbol" => KeywordKind::Symbol,
+    "bigint" => KeywordKind::Bigint,
+    // Expression keywords
+    "new" => KeywordKind::New,
+    // Binary operator keywords
+    "instanceof" => KeywordKind::Instanceof,
+    "in" => KeywordKind::In,
+    // Control flow keywords
+    "return" => KeywordKind::Return,
+    // Declaration keywords (continued)
+    "function" => KeywordKind::Function,
+    "class" => KeywordKind::Class,
+    // Unary keyword operators
+    "typeof" => KeywordKind::Typeof,
+    "delete" => KeywordKind::Delete,
+    // Async/await keywords
+    "async" => KeywordKind::Async,
+    "await" => KeywordKind::Await,
+    // Class keywords
+    "super" => KeywordKind::Super,
+    "extends" => KeywordKind::Extends,
+    // TODO: Expand keyword list for:
+    // - Type keywords: interface, type, enum, namespace, etc.
+    // - Control flow: if, else, while, for, switch, case, break, continue
+    // - Other: import, export, async, await, etc.
+};
+
+/// O(1) keyword lookup using perfect hash function
+#[inline]
 pub fn keyword_kind(s: &str) -> Option<KeywordKind> {
-    match s {
-        "const" => Some(KeywordKind::Const),
-        "let" => Some(KeywordKind::Let),
-        "var" => Some(KeywordKind::Var),
-        "number" => Some(KeywordKind::Number),
-        "true" => Some(KeywordKind::True),
-        "false" => Some(KeywordKind::False),
-        "null" => Some(KeywordKind::Null),
-        _ => None,
-    }
+    KEYWORDS.get(s).copied()
 }

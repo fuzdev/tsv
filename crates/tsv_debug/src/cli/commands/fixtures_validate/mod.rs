@@ -46,7 +46,7 @@ struct FixturesValidateExecutable {
 
 impl Executable for FixturesValidateExecutable {
     fn execute(&self) {
-        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        let rt = crate::cli::commands::create_runtime();
         rt.block_on(self.run());
     }
 }
@@ -63,7 +63,7 @@ impl FixturesValidateExecutable {
         let all_fixtures = match fixtures::walk_fixtures(fixtures_dir) {
             Ok(f) => f,
             Err(e) => {
-                eprintln!("Error walking fixtures: {}", e);
+                eprintln!("Error walking fixtures: {e}");
                 std::process::exit(1);
             }
         };

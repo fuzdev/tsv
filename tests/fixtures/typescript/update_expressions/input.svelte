@@ -1,0 +1,10 @@
+<script>
+	++x;
+	x++;
+	--y;
+	y--;
+	++obj.prop;
+	arr[0]++;
+	++a.b.c;
+	--arr[i];
+</script>

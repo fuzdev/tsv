@@ -10,4 +10,4 @@ mod token;
 
 // Re-export public API
 pub use core::Lexer;
-pub use token::{KeywordKind, TokenKind};
+pub use token::{KeywordKind, Token, TokenKind};

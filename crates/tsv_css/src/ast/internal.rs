@@ -124,12 +124,27 @@ pub struct RelativeSelector {
 
 /// Combinator between selectors
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum Combinator {
-    Descendant,        // space (ancestor-descendant)
-    Child,             // > (parent-child)
-    NextSibling,       // + (adjacent sibling)
-    SubsequentSibling, // ~ (general sibling)
-    Column,            // || (column combinator)
+    Descendant = 0,        // space (ancestor-descendant)
+    Child = 1,             // > (parent-child)
+    NextSibling = 2,       // + (adjacent sibling)
+    SubsequentSibling = 3, // ~ (general sibling)
+    Column = 4,            // || (column combinator)
+}
+
+impl Combinator {
+    /// Returns the combinator symbol
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Combinator::Descendant => " ",
+            Combinator::Child => ">",
+            Combinator::NextSibling => "+",
+            Combinator::SubsequentSibling => "~",
+            Combinator::Column => "||",
+        }
+    }
 }
 
 /// Simple selector - the atomic units that make up a complex selector
@@ -268,13 +283,29 @@ impl PseudoClassArgs {
 
 /// Attribute selector matcher type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum AttributeMatcher {
-    Exact,     // [attr="value"] - exact match
-    Contains,  // [attr~="value"] - whitespace-separated list contains value
-    DashMatch, // [attr|="value"] - exact or starts with value followed by -
-    Prefix,    // [attr^="value"] - starts with
-    Suffix,    // [attr$="value"] - ends with
-    Substring, // [attr*="value"] - contains substring
+    Exact = 0,     // [attr="value"] - exact match
+    Contains = 1,  // [attr~="value"] - whitespace-separated list contains value
+    DashMatch = 2, // [attr|="value"] - exact or starts with value followed by -
+    Prefix = 3,    // [attr^="value"] - starts with
+    Suffix = 4,    // [attr$="value"] - ends with
+    Substring = 5, // [attr*="value"] - contains substring
+}
+
+impl AttributeMatcher {
+    /// Returns the matcher operator symbol
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            AttributeMatcher::Exact => "=",
+            AttributeMatcher::Contains => "~=",
+            AttributeMatcher::DashMatch => "|=",
+            AttributeMatcher::Prefix => "^=",
+            AttributeMatcher::Suffix => "$=",
+            AttributeMatcher::Substring => "*=",
+        }
+    }
 }
 
 /// CSS Declaration - property: value pair
@@ -374,15 +405,29 @@ pub enum ColorChannel {
 
 /// Angle unit for hue values in HSL
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum AngleUnit {
     /// Degrees (default, can be omitted)
-    Deg,
+    Deg = 0,
     /// Radians
-    Rad,
+    Rad = 1,
     /// Turns (1turn = 360deg)
-    Turn,
+    Turn = 2,
     /// Gradians (400grad = 360deg)
-    Grad,
+    Grad = 3,
+}
+
+impl AngleUnit {
+    /// Returns the unit suffix string
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            AngleUnit::Deg => "deg",
+            AngleUnit::Rad => "rad",
+            AngleUnit::Turn => "turn",
+            AngleUnit::Grad => "grad",
+        }
+    }
 }
 
 /// Internal representation - converted to JSON via convert layer.

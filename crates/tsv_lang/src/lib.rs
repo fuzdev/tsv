@@ -30,7 +30,7 @@ mod span;
 pub use comment::Comment;
 pub use config::PrintConfig;
 pub use error::{ErrorContext, ParseError, Result};
-pub use interner::SymbolResolver;
+pub use interner::{InfallibleResolve, SymbolResolver};
 pub use location::{LocationTracker, Position, SourceLocation};
 pub use output::{OutputBuffer, write_indent};
 pub use parser::PeekData;

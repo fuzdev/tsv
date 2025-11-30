@@ -51,7 +51,7 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
     num_str
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidSyntax {
-            message: format!("Invalid number: {}", num_str),
+            message: format!("Invalid number: {num_str}"),
             position: start,
             context: None,
         })?;

@@ -44,6 +44,20 @@
 	// Modulo mixing (prettier adds parens when mixing with * or /)
 	const mod1 = a * b % c; // * then % - prettier adds parens
 	const mod3 = a % b * c; // % then * - prettier adds parens
+	const mod4 = a / b % c; // / then % - prettier adds parens
+	const mod5 = a % b / c; // % then / - prettier adds parens
+
+	// Chained modulo (prettier adds parens for same operator - unlike *, /, +, -)
+	const chainMod1 = a % b % c;
+	const chainMod2 = a % b % c % d;
+	const chainMod3 = a % b % c % d % e;
+
+	// Modulo with additive operators (prettier adds parens for clarity)
+	const modAdd1 = a % b + c;
+	const modAdd2 = a + b % c;
+	const modAdd3 = a % b - c;
+	const modAdd4 = a - b % c;
+	const modAddComplex = a * b % c + d; // mult, then mod, then add
 
 	// Nullish coalescing with logical
 	// Note: ?? has LOWER precedence than || and &&, so a ?? b || c parses as a ?? (b || c)

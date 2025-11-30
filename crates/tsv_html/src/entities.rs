@@ -76,6 +76,8 @@ pub fn decode_character_references(html: &str, is_attribute_value: bool) -> Stri
     let mut i = 0;
 
     while i < html.len() {
+        // SAFETY: i < html.len() guarantees at least one char exists
+        #[allow(clippy::unwrap_used)]
         let ch = html[i..].chars().next().unwrap();
 
         if ch != '&' {

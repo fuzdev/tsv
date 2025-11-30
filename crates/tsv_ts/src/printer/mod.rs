@@ -15,7 +15,11 @@
 // 2. **Preserve Semantics**: Never change TypeScript semantics
 // 3. **Modularity**: Each module has single responsibility for future maintainability
 
+mod arrays;
+mod calls;
 mod expressions;
+mod objects;
+mod operators;
 mod statements;
 mod types;
 
@@ -41,6 +45,110 @@ pub(crate) fn is_pure_property_chain(expr: &internal::Expression) -> bool {
     }
 }
 
+/// Check if an expression is a multiline string literal (contains line continuations)
+///
+/// Strings with `\<newline>` need fluid layout because:
+/// 1. They span multiple lines in source
+/// 2. Prettier always wraps the declaration for these
+pub(crate) fn is_multiline_string_literal(expr: &internal::Expression, source: &str) -> bool {
+    if let internal::Expression::Literal(lit) = expr
+        && let internal::LiteralValue::String { .. } = &lit.value
+    {
+        let raw = lit.span.extract(source);
+        // Check for line continuation: backslash followed by newline
+        return raw.contains("\\\n") || raw.contains("\\\r");
+    }
+    false
+}
+
+/// Check if an expression contains multiline string literals at any depth
+///
+/// Recursively traverses nested structures (arrays, objects, calls) to find
+/// multiline strings. Prettier expands ALL containing structures when a multiline
+/// string is found anywhere in the tree.
+pub(crate) fn has_multiline_content(expr: &internal::Expression, source: &str) -> bool {
+    match expr {
+        internal::Expression::Literal(_) => is_multiline_string_literal(expr, source),
+        internal::Expression::ArrayExpression(arr) => arr
+            .elements
+            .iter()
+            .flatten()
+            .any(|elem| has_multiline_content(elem, source)),
+        internal::Expression::ObjectExpression(obj) => {
+            obj.properties.iter().any(|prop| match prop {
+                internal::ObjectProperty::Property(p) => has_multiline_content(&p.value, source),
+                internal::ObjectProperty::SpreadElement(s) => {
+                    has_multiline_content(&s.argument, source)
+                }
+            })
+        }
+        internal::Expression::CallExpression(call) => call
+            .arguments
+            .iter()
+            .any(|arg| has_multiline_content(arg, source)),
+        internal::Expression::NewExpression(new_expr) => new_expr
+            .arguments
+            .iter()
+            .any(|arg| has_multiline_content(arg, source)),
+        internal::Expression::UnaryExpression(unary) => {
+            has_multiline_content(&unary.argument, source)
+        }
+        internal::Expression::UpdateExpression(update) => {
+            has_multiline_content(&update.argument, source)
+        }
+        internal::Expression::BinaryExpression(binary) => {
+            has_multiline_content(&binary.left, source)
+                || has_multiline_content(&binary.right, source)
+        }
+        internal::Expression::ConditionalExpression(cond) => {
+            has_multiline_content(&cond.test, source)
+                || has_multiline_content(&cond.consequent, source)
+                || has_multiline_content(&cond.alternate, source)
+        }
+        internal::Expression::MemberExpression(member) => {
+            has_multiline_content(&member.object, source)
+        }
+        internal::Expression::ArrowFunctionExpression(arrow) => match &arrow.body {
+            internal::ArrowFunctionBody::Expression(expr) => has_multiline_content(expr, source),
+            internal::ArrowFunctionBody::BlockStatement { .. } => false,
+        },
+        internal::Expression::SpreadElement(spread) => {
+            has_multiline_content(&spread.argument, source)
+        }
+        internal::Expression::Identifier(_) => false,
+        internal::Expression::TemplateLiteral(template) => {
+            // Template literals with actual newlines in their content are multiline
+            template.quasis.iter().any(|q| q.raw.contains('\n'))
+                || template
+                    .expressions
+                    .iter()
+                    .any(|e| has_multiline_content(e, source))
+        }
+        internal::Expression::TaggedTemplateExpression(tagged) => {
+            has_multiline_content(&tagged.tag, source)
+                || tagged.quasi.quasis.iter().any(|q| q.raw.contains('\n'))
+                || tagged
+                    .quasi
+                    .expressions
+                    .iter()
+                    .any(|e| has_multiline_content(e, source))
+        }
+        // Function expressions don't contribute to multiline content detection
+        // They have their own block formatting
+        internal::Expression::FunctionExpression(_) => false,
+        internal::Expression::AwaitExpression(await_expr) => {
+            has_multiline_content(&await_expr.argument, source)
+        }
+        internal::Expression::SequenceExpression(seq) => {
+            seq.expressions.iter().any(|e| has_multiline_content(e, source))
+        }
+        // Regex literals don't have multiline content
+        internal::Expression::RegexLiteral(_) => false,
+        // Super is just a keyword, no multiline content
+        internal::Expression::Super(_) => false,
+    }
+}
+
 /// Printer state for building output
 pub struct Printer<'a> {
     /// Output buffer
@@ -57,6 +165,9 @@ pub struct Printer<'a> {
     pub(crate) source: &'a str,
     /// Comments from the program (for printing leading/trailing comments)
     pub(crate) comments: &'a Vec<internal::Comment>,
+    /// Extra indent depth for declaration contexts (0 normally, 1+ in multi-declarator)
+    /// When > 0, multiline objects/arrays get extra indentation
+    pub(crate) declaration_indent_depth: usize,
 }
 
 impl<'a> Printer<'a> {
@@ -74,6 +185,7 @@ impl<'a> Printer<'a> {
             interner,
             source,
             comments,
+            declaration_indent_depth: 0,
         }
     }
 
@@ -253,7 +365,7 @@ impl<'a> Printer<'a> {
             (start + offset) as u32
         } else {
             // Fallback: return midpoint if `=` not found
-            ((start + end) / 2) as u32
+            usize::midpoint(start, end) as u32
         }
     }
 
@@ -279,6 +391,20 @@ impl<'a> Printer<'a> {
         for comment in self.comments.iter() {
             if comment.span.start >= start && comment.span.end <= end {
                 self.write(" ");
+                self.print_comment(comment);
+                printed_any = true;
+            }
+        }
+        printed_any
+    }
+
+    /// Print leading comments for a variable declarator (no leading space)
+    /// Returns true if any comments were printed
+    /// Used for comments between declarators: `const a = 1, /* comment */ b = 2`
+    pub(crate) fn print_leading_comments_for_declarator(&mut self, start: u32, end: u32) -> bool {
+        let mut printed_any = false;
+        for comment in self.comments.iter() {
+            if comment.span.start >= start && comment.span.end <= end {
                 self.print_comment(comment);
                 printed_any = true;
             }

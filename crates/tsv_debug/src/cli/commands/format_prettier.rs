@@ -54,7 +54,7 @@ struct FormatPrettierExecutable {
 
 impl Executable for FormatPrettierExecutable {
     fn execute(&self) {
-        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        let rt = super::create_runtime();
         rt.block_on(run(&self.input, self.parser_type));
     }
 }
@@ -68,9 +68,9 @@ async fn run(input: &Input, parser_type: ParserType) {
     };
 
     match fuz_client::run_prettier(content, filepath).await {
-        Ok(formatted) => print!("{}", formatted),
+        Ok(formatted) => print!("{formatted}"),
         Err(err) => {
-            eprintln!("Error formatting with prettier: {}", err);
+            eprintln!("Error formatting with prettier: {err}");
             std::process::exit(1);
         }
     }

@@ -222,7 +222,7 @@ impl<'a> Printer<'a> {
                         }
 
                         prev_was_block = false;
-                        continue;
+                        // continue to next iteration for whitespace-only nodes
                     } else {
                         // Text with content
                         // Check if text itself has leading whitespace with newlines

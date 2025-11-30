@@ -45,7 +45,7 @@ pub use tsv_lang::{ParseError, Result};
 /// ```rust,ignore
 /// let ast = tsv_ts::parse("const x = 42;")?;
 /// ```
-pub fn parse(source: &str) -> Result<ast::internal::Program> {
+pub fn parse(source: &str) -> Result<Program> {
     parser::parse_typescript(source).map_err(|e| e.with_context(source))
 }
 
@@ -67,7 +67,7 @@ pub fn parse(source: &str) -> Result<ast::internal::Program> {
 /// let formatted = tsv_ts::format(&ast, source);
 /// assert_eq!(formatted, "const x = 42;\n");
 /// ```
-pub fn format(program: &ast::internal::Program, source: &str) -> String {
+pub fn format(program: &Program, source: &str) -> String {
     format_with_config(program, source, tsv_lang::PrintConfig::default())
 }
 
@@ -76,7 +76,7 @@ pub fn format(program: &ast::internal::Program, source: &str) -> String {
 /// This allows specifying print configuration like `base_indent_offset` for
 /// when TypeScript is embedded inside another format (e.g., Svelte `<script>` tags).
 pub fn format_with_config(
-    program: &ast::internal::Program,
+    program: &Program,
     source: &str,
     config: tsv_lang::PrintConfig,
 ) -> String {
@@ -105,7 +105,7 @@ pub fn format_with_config(
 /// let public_ast = tsv_ts::convert_ast(&ast, source);
 /// let json = serde_json::to_string_pretty(&public_ast)?;
 /// ```
-pub fn convert_ast(program: &ast::internal::Program, source: &str) -> ast::public::Program {
+pub fn convert_ast(program: &Program, source: &str) -> ast::public::Program {
     let tracker = tsv_lang::LocationTracker::new(source);
     ast::convert::convert_program(program, source, &tracker)
 }
@@ -128,7 +128,7 @@ pub fn parse_with_interner(
     source: &str,
     base_offset: usize,
     interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
-) -> Result<ast::internal::Program> {
+) -> Result<Program> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
     parser.parse().map_err(|e| e.with_context(source))
 }
@@ -151,7 +151,7 @@ pub fn parse_expression(
     source: &str,
     base_offset: usize,
     interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
-) -> Result<ast::internal::Expression> {
+) -> Result<Expression> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
     parser
         .parse_expression_public()
@@ -161,6 +161,6 @@ pub fn parse_expression(
 // Re-export key types for convenience
 pub use ast::internal::{
     ArrowFunctionBody, ArrowFunctionExpression, Expression, Identifier, Literal, LiteralValue,
-    ObjectProperty, Program, Property, SpreadElement, Statement, TSNumberKeyword, TSType,
-    TSTypeAnnotation, VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
+    ObjectProperty, Program, Property, SpreadElement, Statement, TSKeywordKind, TSKeywordType,
+    TSType, TSTypeAnnotation, VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
 };

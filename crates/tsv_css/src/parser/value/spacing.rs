@@ -11,7 +11,10 @@ pub fn should_add_space_between(prev: &str, curr: &str) -> bool {
         return false;
     }
 
+    // SAFETY: We just checked both strings are non-empty above
+    #[allow(clippy::unwrap_used)]
     let prev_last = prev.chars().last().unwrap();
+    #[allow(clippy::unwrap_used)]
     let curr_first = curr.chars().next().unwrap();
 
     // Never space around parens - they connect directly

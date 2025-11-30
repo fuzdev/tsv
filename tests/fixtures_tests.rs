@@ -12,10 +12,7 @@ use tsv_debug::fuz_client;
 
 /// Check if the fuz daemon is available
 async fn check_daemon_available() -> bool {
-    match fuz_client::parse_svelte("<div></div>").await {
-        Ok(_) => true,
-        Err(_) => false,
-    }
+    fuz_client::parse_svelte("<div></div>").await.is_ok()
 }
 
 #[tokio::test]
@@ -35,8 +32,8 @@ async fn test_all_fixtures() {
     }
 
     // Discover all fixtures
-    let fixture_list = fixtures::walk_fixtures(fixtures_dir)
-        .expect("Failed to walk fixtures directory");
+    let fixture_list =
+        fixtures::walk_fixtures(fixtures_dir).expect("Failed to walk fixtures directory");
 
     if fixture_list.is_empty() {
         panic!("No fixtures found in tests/fixtures");

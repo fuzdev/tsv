@@ -69,14 +69,14 @@ impl<'a> Printer<'a> {
     ///
     /// Returns true if the first character is whitespace.
     fn has_leading_whitespace(text: &str) -> bool {
-        text.chars().next().is_some_and(|c| c.is_whitespace())
+        text.chars().next().is_some_and(char::is_whitespace)
     }
 
     /// Check if text has trailing whitespace
     ///
     /// Returns true if the last character is whitespace.
     fn has_trailing_whitespace(text: &str) -> bool {
-        text.chars().last().is_some_and(|c| c.is_whitespace())
+        text.chars().last().is_some_and(char::is_whitespace)
     }
 
     /// Normalize whitespace in text content

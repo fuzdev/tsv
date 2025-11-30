@@ -52,7 +52,7 @@ impl Executable for FixturesUpdateExecutable {
         let status = match cmd.status() {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("Failed to run fixtures_update_parsed: {}", e);
+                eprintln!("Failed to run fixtures_update_parsed: {e}");
                 exit(1);
             }
         };
@@ -80,7 +80,7 @@ impl Executable for FixturesUpdateExecutable {
         let status = match cmd.status() {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("Failed to run fixtures_update_formatted: {}", e);
+                eprintln!("Failed to run fixtures_update_formatted: {e}");
                 exit(1);
             }
         };

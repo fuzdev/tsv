@@ -28,6 +28,12 @@ pub struct Parser<'a> {
     interner: Rc<RefCell<DefaultStringInterner>>,
     base_offset: usize,     // Offset in full source (for embedded expressions)
     comments: Vec<Comment>, // Collected comments during parsing
+    /// True if a line terminator occurred between the previous token and current token.
+    /// Used for ASI (Automatic Semicolon Insertion).
+    had_line_terminator: bool,
+    /// End position of the previous token (before current). Used for span calculation
+    /// when ASI inserts a semicolon.
+    prev_end: usize,
 }
 
 impl<'a> Parser<'a> {
@@ -81,26 +87,42 @@ impl<'a> Parser<'a> {
             interner,
             base_offset,
             comments,
+            had_line_terminator: false, // No line terminator before first token
+            prev_end: 0,
         })
     }
 
     pub(super) fn advance(&mut self) -> Result<(), ParseError> {
+        // Save previous token's end position for ASI span calculation
+        self.prev_end = self.current_end;
+
         // Get next token (from peek cache or lexer)
         if let Some(peek) = self.peek_cache.take() {
             self.current_kind = peek.kind;
             self.current_start = peek.start;
             self.current_end = peek.end;
             self.current_decoded = peek.decoded;
+            // Peek doesn't preserve line terminator info, so check lexer state
+            // Note: This is slightly imprecise for peek, but peek is rare
+            self.had_line_terminator = self.lexer.had_line_terminator();
         } else {
             let token = self.lexer.next_token()?;
             self.current_kind = token.kind;
             self.current_start = token.start;
             self.current_end = token.end;
             self.current_decoded = token.decoded;
+            self.had_line_terminator = self.lexer.had_line_terminator();
         }
 
         // Collect comment tokens into comments Vec
         while let TokenKind::Comment { content, is_block } = &self.current_kind {
+            // ECMAScript spec: if a MultiLineComment contains one or more line terminators,
+            // then it is replaced by a single line terminator for ASI purposes.
+            // So block comments with newlines should set had_line_terminator.
+            if *is_block && content.contains(['\n', '\r', '\u{2028}', '\u{2029}']) {
+                self.had_line_terminator = true;
+            }
+
             self.comments.push(Comment {
                 content: content.clone(),
                 is_block: *is_block,
@@ -114,6 +136,10 @@ impl<'a> Parser<'a> {
             self.current_start = token.start;
             self.current_end = token.end;
             self.current_decoded = token.decoded;
+            // Also check line terminator in whitespace after comment
+            if self.lexer.had_line_terminator() {
+                self.had_line_terminator = true;
+            }
         }
 
         Ok(())
@@ -129,11 +155,24 @@ impl<'a> Parser<'a> {
         self.current_kind.clone()
     }
 
+    /// Update current token state from a new token (for template continuation)
+    pub(super) fn update_current(&mut self, token: crate::lexer::Token) {
+        self.current_kind = token.kind;
+        self.current_start = token.start;
+        self.current_end = token.end;
+        self.current_decoded = token.decoded;
+    }
+
     pub(super) fn current_pos(&self) -> (usize, usize) {
         (
             self.current_start + self.base_offset,
             self.current_end + self.base_offset,
         )
+    }
+
+    /// Get the raw end position (without base_offset) for lexer operations
+    pub(super) fn current_raw_end(&self) -> usize {
+        self.current_end
     }
 
     pub(super) fn current_value(&self) -> &str {
@@ -173,13 +212,33 @@ impl<'a> Parser<'a> {
         }
         self.peek_cache
             .as_ref()
-            .map(|p| p.kind.clone())
-            .unwrap_or(TokenKind::Eof)
+            .map_or(TokenKind::Eof, |p| p.kind.clone())
     }
 
     #[expect(dead_code, reason = "Convenience wrapper for peek_kind() == kind")]
     pub(super) fn peek_check(&mut self, kind: &TokenKind) -> bool {
         &self.peek_kind() == kind
+    }
+
+    /// Check if peek token is an identifier (used for contextual keyword disambiguation)
+    pub(super) fn peek_is_identifier(&mut self) -> bool {
+        matches!(self.peek_kind(), TokenKind::Identifier)
+    }
+
+    /// Check if peek token could be a property name (identifier, keyword, string, or computed key)
+    ///
+    /// Used to detect getter/setter syntax where `get` and `set` are contextual keywords:
+    /// - `{ get x() {} }` - getter (peek is `x` = identifier)
+    /// - `{ get [expr]() {} }` - computed getter (peek is `[`)
+    /// - `{ get }` - shorthand property (peek is `}`, not a property name, so NOT a getter)
+    pub(super) fn peek_is_property_name(&mut self) -> bool {
+        matches!(
+            self.peek_kind(),
+            TokenKind::Identifier
+                | TokenKind::BracketOpen
+                | TokenKind::String
+                | TokenKind::Keyword(_)
+        )
     }
 
     pub(super) fn expect(&mut self, kind: &TokenKind) -> Result<(), ParseError> {
@@ -218,6 +277,43 @@ impl<'a> Parser<'a> {
         } else {
             false
         }
+    }
+
+    /// Check if a semicolon can be inserted at the current position (ASI).
+    ///
+    /// Returns true if:
+    /// - Current token is EOF, OR
+    /// - Current token is `}`, OR
+    /// - A line terminator occurred between the previous token and current token
+    ///
+    /// This is the core ASI detection per ECMAScript spec section 12.9.
+    pub(super) fn can_insert_semicolon(&self) -> bool {
+        matches!(self.current_kind, TokenKind::Eof | TokenKind::BraceClose)
+            || self.had_line_terminator
+    }
+
+    /// Consume a semicolon, or accept if ASI allows one.
+    ///
+    /// This is the main ASI entry point for statement termination.
+    /// Use this instead of `expect(&TokenKind::Semicolon)` for statement-ending semicolons.
+    ///
+    /// Returns Ok(()) if:
+    /// - A semicolon token was consumed, OR
+    /// - ASI conditions allow implicit semicolon insertion
+    ///
+    /// Returns Err if neither explicit semicolon nor ASI conditions are met.
+    pub(super) fn semicolon(&mut self) -> Result<(), ParseError> {
+        if self.eat(TokenKind::Semicolon) {
+            return Ok(());
+        }
+        if self.can_insert_semicolon() {
+            return Ok(());
+        }
+        Err(ParseError::InvalidSyntax {
+            message: "Expected ';'".to_string(),
+            position: self.current_pos().0,
+            context: None,
+        })
     }
 
     /// Handle list separator (comma) and terminator in list parsing
@@ -268,6 +364,45 @@ impl<'a> Parser<'a> {
                 context: None,
             })
         }
+    }
+
+    /// Parse a parenthesized parameter list: `(a, b, c)`
+    ///
+    /// Used by function declarations, method shorthand, and arrow functions.
+    /// Consumes both opening and closing parentheses.
+    pub(super) fn parse_parameter_list(&mut self) -> Result<Vec<Identifier>, ParseError> {
+        self.expect(&TokenKind::ParenOpen)?;
+
+        let mut params = Vec::new();
+        if !self.check(&TokenKind::ParenClose) {
+            loop {
+                // Parse parameter (identifier for now, no destructuring)
+                let (param_start, param_end) = self.current_pos();
+                if self.current_kind() != TokenKind::Identifier {
+                    return Err(ParseError::InvalidSyntax {
+                        message: format!("Expected parameter name, found {}", self.current_kind()),
+                        position: param_start,
+                        context: None,
+                    });
+                }
+                let symbol = self.intern(self.current_value());
+                self.advance()?;
+
+                params.push(Identifier {
+                    name: symbol,
+                    type_annotation: None,
+                    span: Span::new(param_start as u32, param_end as u32),
+                });
+
+                // Check for comma or closing paren
+                if !self.expect_list_separator(&TokenKind::Comma, &TokenKind::ParenClose)? {
+                    break;
+                }
+            }
+        }
+
+        self.expect(&TokenKind::ParenClose)?;
+        Ok(params)
     }
 
     pub fn parse(&mut self) -> Result<Program, ParseError> {

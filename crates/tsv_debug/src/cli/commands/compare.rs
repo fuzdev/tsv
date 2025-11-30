@@ -58,7 +58,7 @@ struct CompareExecutable {
 
 impl Executable for CompareExecutable {
     fn execute(&self) {
-        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        let rt = super::create_runtime();
         rt.block_on(run(&self.input, self.parser_type));
     }
 }
@@ -72,22 +72,22 @@ async fn run(input: &Input, parser_type: ParserType) {
     };
 
     println!("=== Input ===");
-    println!("{}", content);
+    println!("{content}");
     println!();
 
     // Run our formatter
     println!("=== Our Formatter ===");
     match run_our_formatter(content, parser_name) {
-        Ok(output) => println!("{}", output),
-        Err(err) => eprintln!("Error running our formatter: {}", err),
+        Ok(output) => println!("{output}"),
+        Err(err) => eprintln!("Error running our formatter: {err}"),
     }
     println!();
 
     // Run prettier
     println!("=== Prettier ===");
     match run_prettier(content, parser_name).await {
-        Ok(output) => println!("{}", output),
-        Err(err) => eprintln!("Error running prettier: {}", err),
+        Ok(output) => println!("{output}"),
+        Err(err) => eprintln!("Error running prettier: {err}"),
     }
 }
 
@@ -105,7 +105,7 @@ fn run_our_formatter(content: &str, parser: &str) -> Result<String, String> {
         .arg(content)
         .args(["--parser", parser])
         .output()
-        .map_err(|e| format!("Failed to execute cargo: {}", e))?;
+        .map_err(|e| format!("Failed to execute cargo: {e}"))?;
 
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())

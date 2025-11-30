@@ -44,7 +44,7 @@ struct FixturesUpdateParsedExecutable {
 
 impl Executable for FixturesUpdateParsedExecutable {
     fn execute(&self) {
-        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        let rt = super::create_runtime();
         rt.block_on(run(self.list_only, &self.filters));
     }
 }
@@ -60,7 +60,7 @@ async fn run(list_only: bool, filters: &[String]) {
     let all_fixtures = match fixtures::walk_fixtures(fixtures_dir) {
         Ok(f) => f,
         Err(e) => {
-            eprintln!("Error walking fixtures: {}", e);
+            eprintln!("Error walking fixtures: {e}");
             std::process::exit(1);
         }
     };
@@ -199,7 +199,7 @@ async fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult
     // Standard pattern: generate expected.json from Svelte's parser
     let json = match fuz_client::parse_svelte(&source).await {
         Ok(json) => ensure_trailing_newline(json),
-        Err(e) => return FixtureResult::Failed(format!("Svelte parse error: {}", e)),
+        Err(e) => return FixtureResult::Failed(format!("Svelte parse error: {e}")),
     };
 
     let expected_path = fixture.expected_path();
@@ -211,12 +211,12 @@ async fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult
         FixtureResult::Unchanged
     } else if existing.is_none() {
         match fixtures::write_file(&expected_path, &json) {
-            Ok(_) => FixtureResult::Created,
+            Ok(()) => FixtureResult::Created,
             Err(e) => FixtureResult::Failed(e),
         }
     } else {
         match fixtures::write_file(&expected_path, &json) {
-            Ok(_) => FixtureResult::Updated,
+            Ok(()) => FixtureResult::Updated,
             Err(e) => FixtureResult::Failed(e),
         }
     }
@@ -227,14 +227,14 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
     // Parse directly and serialize the struct (not via serde_json::Value) to preserve field order
     let ast = match tsv_svelte::parse(source) {
         Ok(ast) => ast,
-        Err(e) => return FixtureResult::Failed(format!("Our parser error: {:?}", e)),
+        Err(e) => return FixtureResult::Failed(format!("Our parser error: {e:?}")),
     };
     let public_ast = tsv_svelte::convert_ast(&ast, source);
 
     // Serialize with tab indentation (matching CLI and existing expected.json files)
     let our_json = match to_json_with_tabs(&public_ast) {
-        Ok(json) => format!("{}\n", json),
-        Err(e) => return FixtureResult::Failed(format!("Failed to serialize our AST: {}", e)),
+        Ok(json) => format!("{json}\n"),
+        Err(e) => return FixtureResult::Failed(format!("Failed to serialize our AST: {e}")),
     };
 
     // Generate expected_svelte.json from Svelte's parser (or error marker)
@@ -262,12 +262,12 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
 
     // Write expected_ours.json
     if !ours_unchanged && let Err(e) = fixtures::write_file(&expected_ours_path, &our_json) {
-        return FixtureResult::Failed(format!("Failed to write expected_ours.json: {}", e));
+        return FixtureResult::Failed(format!("Failed to write expected_ours.json: {e}"));
     }
 
     // Write expected_svelte.json
     if !svelte_unchanged && let Err(e) = fixtures::write_file(&expected_svelte_path, &svelte_json) {
-        return FixtureResult::Failed(format!("Failed to write expected_svelte.json: {}", e));
+        return FixtureResult::Failed(format!("Failed to write expected_svelte.json: {e}"));
     }
 
     // Determine result based on what existed before

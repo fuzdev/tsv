@@ -34,7 +34,7 @@ pub(crate) fn parse_attribute_selector(
         // Explicit no namespace: |attr
         parser.advance()?; // consume |
         parser.skip_whitespace()?;
-        Some("".to_string())
+        Some(String::new())
     } else if parser.check(&TokenKind::Identifier) {
         // Could be: ns|attr or just attr (or lang with |= operator)
         let maybe_namespace = parser

@@ -3,12 +3,6 @@
 //! Implements prettier's "parens for clarity" behavior where mixing operators
 //! at the same precedence level may require parentheses for readability.
 //!
-//! TODO: Future operator support (when parser implements them):
-//! - Bitshift operators: <<, >>, >>> (would be precedence level 10)
-//! - Exponentiation: ** (right-associative, precedence level 11)
-//! - Bitwise with comparison: special handling for clarity
-//!   e.g., `a < b & c < d` should become `(a < b) & (c < d)`
-//!
 //! Based on prettier's implementation:
 //! - ~/dev/prettier/src/language-js/utils/index.js (lines 792-813)
 //! - ~/dev/prettier/src/language-js/needs-parens.js
@@ -25,29 +19,44 @@ pub type PrecedenceLevel = u8;
 /// 2: || (logical OR)
 /// 3: && (logical AND)
 /// 4: | (bitwise OR)
-/// 5: & (bitwise AND)
-/// 6: ==, ===, !=, !== (equality)
-/// 7: <, >, <=, >= (relational)
-/// 8: +, - (additive)
-/// 9: *, /, % (multiplicative)
+/// 5: ^ (bitwise XOR)
+/// 6: & (bitwise AND)
+/// 7: ==, ===, !=, !== (equality)
+/// 8: <, >, <=, >=, in, instanceof (relational)
+/// 9: <<, >>, >>> (bitshift)
+/// 10: +, - (additive)
+/// 11: *, /, % (multiplicative)
+/// 12: ** (exponentiation) - right-associative!
 pub fn get_precedence(op: BinaryOperator) -> PrecedenceLevel {
     match op {
         BinaryOperator::QuestionQuestion => 1,
         BinaryOperator::PipePipe => 2,
         BinaryOperator::AmpersandAmpersand => 3,
         BinaryOperator::Pipe => 4,
-        BinaryOperator::Ampersand => 5,
+        BinaryOperator::Caret => 5,
+        BinaryOperator::Ampersand => 6,
         BinaryOperator::EqualsEquals
         | BinaryOperator::EqualsEqualsEquals
         | BinaryOperator::BangEquals
-        | BinaryOperator::BangEqualsEquals => 6,
+        | BinaryOperator::BangEqualsEquals => 7,
         BinaryOperator::LessThan
         | BinaryOperator::GreaterThan
         | BinaryOperator::LessThanEquals
-        | BinaryOperator::GreaterThanEquals => 7,
-        BinaryOperator::Plus | BinaryOperator::Minus => 8,
-        BinaryOperator::Star | BinaryOperator::Slash | BinaryOperator::Percent => 9,
+        | BinaryOperator::GreaterThanEquals
+        | BinaryOperator::Instanceof
+        | BinaryOperator::In => 8,
+        BinaryOperator::LeftShift
+        | BinaryOperator::RightShift
+        | BinaryOperator::UnsignedRightShift => 9,
+        BinaryOperator::Plus | BinaryOperator::Minus => 10,
+        BinaryOperator::Star | BinaryOperator::Slash | BinaryOperator::Percent => 11,
+        BinaryOperator::StarStar => 12,
     }
+}
+
+/// Returns true if the operator is right-associative
+pub fn is_right_associative(op: BinaryOperator) -> bool {
+    matches!(op, BinaryOperator::StarStar)
 }
 
 /// Check if operators can be written together without parens
@@ -97,16 +106,49 @@ pub fn should_flatten(parent_op: BinaryOperator, child_op: BinaryOperator) -> bo
         return false;
     }
 
-    // TODO: Chained modulo special case (future work)
-    // Prettier doesn't flatten chained modulo: `a % b % c` should become `(a % b) % c`
-    // even though it's the same operator. This would require:
-    //   if parent_op == BinaryOperator::Percent && child_op == BinaryOperator::Percent {
-    //       return false;
-    //   }
-    // See: TODO_LINE_WRAPPING.md for more details
+    // Step 5: Exponentiation is right-associative
+    // x ** y ** z → x ** (y ** z)
+    if parent_op == BinaryOperator::StarStar {
+        return false;
+    }
+
+    // Step 6: Bitshift operators don't flatten with each other
+    // x << y << z → (x << y) << z
+    if is_bitshift_operator(parent_op) && is_bitshift_operator(child_op) {
+        return false;
+    }
+
+    // Step 7: Chained modulo doesn't flatten
+    // x % y % z → (x % y) % z
+    // Prettier adds parens for clarity when chaining modulo with itself
+    if parent_op == BinaryOperator::Percent && child_op == BinaryOperator::Percent {
+        return false;
+    }
 
     // Default: can flatten (no parens needed)
     true
+}
+
+/// Check if operator is a bitwise operator (|, ^, &, <<, >>, >>>)
+/// Used by needs_parens_for_clarity to add parens for code understanding
+pub fn is_bitwise_operator(op: BinaryOperator) -> bool {
+    matches!(
+        op,
+        BinaryOperator::Pipe
+            | BinaryOperator::Caret
+            | BinaryOperator::Ampersand
+            | BinaryOperator::LeftShift
+            | BinaryOperator::RightShift
+            | BinaryOperator::UnsignedRightShift
+    )
+}
+
+/// Check if operator is a bitshift operator (<<, >>, >>>)
+fn is_bitshift_operator(op: BinaryOperator) -> bool {
+    matches!(
+        op,
+        BinaryOperator::LeftShift | BinaryOperator::RightShift | BinaryOperator::UnsignedRightShift
+    )
 }
 
 /// Check if operator is an equality operator (==, ===, !=, !==)
@@ -251,9 +293,9 @@ mod tests {
     }
 
     #[test]
-    fn test_same_modulo_flattens() {
-        // a % b % c → can flatten
-        assert!(should_flatten(
+    fn test_chained_modulo_doesnt_flatten() {
+        // a % b % c → (a % b) % c (needs parens for clarity)
+        assert!(!should_flatten(
             BinaryOperator::Percent,
             BinaryOperator::Percent
         ));
@@ -261,7 +303,7 @@ mod tests {
 
     #[test]
     fn test_precedence_levels() {
-        // Verify precedence ordering
+        // Verify precedence ordering (lower number = lower precedence)
         assert!(
             get_precedence(BinaryOperator::QuestionQuestion)
                 < get_precedence(BinaryOperator::PipePipe)
@@ -274,7 +316,8 @@ mod tests {
             get_precedence(BinaryOperator::AmpersandAmpersand)
                 < get_precedence(BinaryOperator::Pipe)
         );
-        assert!(get_precedence(BinaryOperator::Pipe) < get_precedence(BinaryOperator::Ampersand));
+        assert!(get_precedence(BinaryOperator::Pipe) < get_precedence(BinaryOperator::Caret));
+        assert!(get_precedence(BinaryOperator::Caret) < get_precedence(BinaryOperator::Ampersand));
         assert!(
             get_precedence(BinaryOperator::Ampersand)
                 < get_precedence(BinaryOperator::EqualsEquals)
@@ -282,8 +325,20 @@ mod tests {
         assert!(
             get_precedence(BinaryOperator::EqualsEquals) < get_precedence(BinaryOperator::LessThan)
         );
-        assert!(get_precedence(BinaryOperator::LessThan) < get_precedence(BinaryOperator::Plus));
+        assert!(
+            get_precedence(BinaryOperator::LessThan) < get_precedence(BinaryOperator::LeftShift)
+        );
+        assert!(get_precedence(BinaryOperator::LeftShift) < get_precedence(BinaryOperator::Plus));
         assert!(get_precedence(BinaryOperator::Plus) < get_precedence(BinaryOperator::Star));
+        assert!(get_precedence(BinaryOperator::Star) < get_precedence(BinaryOperator::StarStar));
+    }
+
+    #[test]
+    fn test_right_associative() {
+        // Only ** is right-associative
+        assert!(is_right_associative(BinaryOperator::StarStar));
+        assert!(!is_right_associative(BinaryOperator::Plus));
+        assert!(!is_right_associative(BinaryOperator::Star));
     }
 
     #[test]

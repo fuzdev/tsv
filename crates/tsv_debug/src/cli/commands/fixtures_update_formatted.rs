@@ -35,7 +35,7 @@ struct FixturesUpdateFormattedExecutable {
 
 impl Executable for FixturesUpdateFormattedExecutable {
     fn execute(&self) {
-        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        let rt = super::create_runtime();
         rt.block_on(run(&self.filters));
     }
 }
@@ -51,7 +51,7 @@ async fn run(filters: &[String]) {
     let all_fixtures = match fixtures::walk_fixtures(fixtures_dir) {
         Ok(f) => f,
         Err(e) => {
-            eprintln!("Error walking fixtures: {}", e);
+            eprintln!("Error walking fixtures: {e}");
             std::process::exit(1);
         }
     };
@@ -171,7 +171,7 @@ async fn update_formatted_file(fixture: &fixtures::Fixture) -> FormattedResult {
     // Run prettier
     let formatted = match fuz_client::run_prettier(&input, filepath).await {
         Ok(f) => f,
-        Err(e) => return FormattedResult::Failed(format!("Prettier error: {}", e)),
+        Err(e) => return FormattedResult::Failed(format!("Prettier error: {e}")),
     };
 
     let output_prettier_path = fixture.output_prettier_path();
@@ -180,7 +180,7 @@ async fn update_formatted_file(fixture: &fixtures::Fixture) -> FormattedResult {
     if formatted == input {
         if output_prettier_path.exists() {
             match fixtures::delete_file_if_exists(&output_prettier_path) {
-                Ok(_) => FormattedResult::Removed,
+                Ok(()) => FormattedResult::Removed,
                 Err(e) => FormattedResult::Failed(e),
             }
         } else {
@@ -194,12 +194,12 @@ async fn update_formatted_file(fixture: &fixtures::Fixture) -> FormattedResult {
             FormattedResult::Unchanged
         } else if existing.is_none() {
             match fixtures::write_file(&output_prettier_path, &formatted) {
-                Ok(_) => FormattedResult::Created,
+                Ok(()) => FormattedResult::Created,
                 Err(e) => FormattedResult::Failed(e),
             }
         } else {
             match fixtures::write_file(&output_prettier_path, &formatted) {
-                Ok(_) => FormattedResult::Updated,
+                Ok(()) => FormattedResult::Updated,
                 Err(e) => FormattedResult::Failed(e),
             }
         }

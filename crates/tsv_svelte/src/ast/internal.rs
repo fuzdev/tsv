@@ -146,10 +146,22 @@ pub struct Script {
 }
 
 /// Script context type
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum ScriptContext {
-    Default, // <script>
-    Module,  // <script context="module">
+    Default = 0, // <script>
+    Module = 1,  // <script context="module">
+}
+
+impl ScriptContext {
+    /// Returns the context string for JSON output
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            ScriptContext::Default => "default",
+            ScriptContext::Module => "module",
+        }
+    }
 }
 
 /// Svelte Style block - <style> tag contents

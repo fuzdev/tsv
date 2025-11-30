@@ -94,7 +94,11 @@ impl<'a> CssParser<'a> {
             let token = self.lexer.next_token()?;
             self.peek_cache = Some(PeekData::new(token.kind, token.start, token.end));
         }
-        Ok(&self.peek_cache.as_ref().unwrap().kind)
+        // peek_cache is guaranteed Some after the if block above
+        match &self.peek_cache {
+            Some(data) => Ok(&data.kind),
+            None => unreachable!("peek_cache was just populated"),
+        }
     }
 
     pub(crate) fn check(&self, kind: &TokenKind) -> bool {

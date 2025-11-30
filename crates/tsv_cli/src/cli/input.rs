@@ -29,7 +29,7 @@ impl Input {
     /// Read from file path
     pub fn from_file(path: &str) -> Result<Self, String> {
         let content = fs::read_to_string(path)
-            .map_err(|e| format!("Error reading file '{}': {}", path, e))?;
+            .map_err(|e| format!("Error reading file '{path}': {e}"))?;
         Ok(Input::File {
             path: path.to_string(),
             content,
@@ -41,7 +41,7 @@ impl Input {
         let mut buffer = String::new();
         io::stdin()
             .read_to_string(&mut buffer)
-            .map_err(|e| format!("Error reading from stdin: {}", e))?;
+            .map_err(|e| format!("Error reading from stdin: {e}"))?;
         Ok(Input::Stdin(buffer))
     }
 
@@ -80,8 +80,7 @@ impl FromStr for ParserType {
             "typescript" | "ts" => Ok(ParserType::TypeScript),
             "css" => Ok(ParserType::Css),
             _ => Err(format!(
-                "Unknown parser type: '{}'. Valid types: svelte, typescript, css",
-                s
+                "Unknown parser type: '{s}'. Valid types: svelte, typescript, css"
             )),
         }
     }

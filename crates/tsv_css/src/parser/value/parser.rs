@@ -195,7 +195,7 @@ impl<'a> ValueParser<'a> {
                 break;
             }
 
-            let (value_start, value_end_raw) = cursor.consume_until(|c| c.is_whitespace());
+            let (value_start, value_end_raw) = cursor.consume_until(char::is_whitespace);
             let value_end = self.trimmed_end(text, value_start, value_end_raw);
 
             if value_end > value_start {
@@ -223,7 +223,7 @@ impl<'a> ValueParser<'a> {
         let span = self.absolute_span();
 
         // Delegate to existing single-value parsers
-        super::parse_single_value(text, span).unwrap_or(CssValue::Identifier {
+        super::parse_single_value(text, span).unwrap_or_else(|| CssValue::Identifier {
             name: text.to_string(),
             span,
         })

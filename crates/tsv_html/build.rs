@@ -1,3 +1,7 @@
+// Build scripts should panic on failure - that's how they signal build errors.
+// Using expect/unwrap is appropriate here.
+#![allow(clippy::expect_used, clippy::unwrap_used)]
+
 //! Build script to generate HTML entity map from entities.json
 //!
 //! This script parses our simplified entities.json file (derived from the canonical
@@ -52,7 +56,7 @@ fn main() {
 
     for (entity_name, codepoint) in &entities {
         // Entity names already have '&' stripped in the JSON file
-        writeln!(f, "    \"{}\" => {},", entity_name, codepoint).unwrap();
+        writeln!(f, "    \"{entity_name}\" => {codepoint},").unwrap();
     }
 
     writeln!(f, "}};").unwrap();

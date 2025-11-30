@@ -1,6 +1,6 @@
 use super::{Command, Executable};
 use crate::cli::args::Args;
-use crate::cli::input::Input;
+use crate::cli::input::{Input, ParserType};
 use crate::json_utils::to_json_with_tabs;
 use std::process;
 
@@ -14,6 +14,7 @@ impl Command for ParseCommand {
 
     fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
         let pretty = args.flag("pretty");
+        let explicit_parser = args.option("parser").map(|s| s.parse()).transpose()?;
 
         let input = if let Some(content) = args.option("content") {
             // Parse from --content string argument
@@ -28,7 +29,11 @@ impl Command for ParseCommand {
             return Err("No input provided. Use a file path, --content, or --stdin".to_string());
         };
 
-        Ok(Box::new(ParseExecutable { input, pretty }))
+        Ok(Box::new(ParseExecutable {
+            input,
+            pretty,
+            explicit_parser,
+        }))
     }
 
     fn usage(&self) -> Vec<String> {
@@ -45,14 +50,15 @@ impl Command for ParseCommand {
 struct ParseExecutable {
     input: Input,
     pretty: bool,
+    explicit_parser: Option<ParserType>,
 }
 
 impl Executable for ParseExecutable {
     fn execute(&self) {
-        match parse_to_json(&self.input, self.pretty) {
-            Ok(json) => println!("{}", json),
+        match parse_to_json(&self.input, self.pretty, self.explicit_parser) {
+            Ok(json) => println!("{json}"),
             Err(e) => {
-                eprintln!("Parse error: {}", e);
+                eprintln!("Parse error: {e}");
                 process::exit(1);
             }
         }
@@ -61,24 +67,28 @@ impl Executable for ParseExecutable {
 
 /// Parse source code and convert to JSON
 ///
-/// Automatically detects whether input is Svelte, TypeScript, or CSS
-fn parse_to_json(input: &Input, pretty: bool) -> Result<String, String> {
-    use crate::cli::input::ParserType;
-
+/// Uses explicit parser type if provided, otherwise auto-detects from file extension or content
+fn parse_to_json(
+    input: &Input,
+    pretty: bool,
+    explicit_parser: Option<ParserType>,
+) -> Result<String, String> {
     let source = input.content();
 
-    // Try file extension first (most reliable), then fall back to content heuristics
-    let parser_type = input.parser_type().unwrap_or_else(|| {
-        // Content-based detection for stdin/content input
-        let trimmed = source.trim_start();
-        if trimmed.starts_with('<') {
-            ParserType::Svelte
-        } else if trimmed.ends_with('}') || (trimmed.contains('{') && trimmed.contains(':')) {
-            ParserType::Css
-        } else {
-            ParserType::TypeScript
-        }
-    });
+    // Priority: explicit --parser > file extension > content heuristics
+    let parser_type = explicit_parser
+        .or_else(|| input.parser_type())
+        .unwrap_or_else(|| {
+            // Content-based detection for stdin/content input
+            let trimmed = source.trim_start();
+            if trimmed.starts_with('<') {
+                ParserType::Svelte
+            } else if trimmed.ends_with('}') || (trimmed.contains('{') && trimmed.contains(':')) {
+                ParserType::Css
+            } else {
+                ParserType::TypeScript
+            }
+        });
 
     let json = match parser_type {
         ParserType::Svelte => {
@@ -119,5 +129,5 @@ fn parse_to_json(input: &Input, pretty: bool) -> Result<String, String> {
         }
     };
 
-    json.map_err(|e| format!("JSON serialization failed: {}", e))
+    json.map_err(|e| format!("JSON serialization failed: {e}"))
 }

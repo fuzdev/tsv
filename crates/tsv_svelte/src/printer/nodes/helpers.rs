@@ -77,7 +77,20 @@ impl<'a> Printer<'a> {
             }
             tsv_ts::Expression::UnaryExpression(unary) => {
                 self.write(unary.operator.as_str());
+                // Keyword operators need a space before the operand
+                if unary.operator.is_keyword_operator() {
+                    self.write(" ");
+                }
                 self.print_ts_expression(&unary.argument);
+            }
+            tsv_ts::Expression::UpdateExpression(update) => {
+                if update.prefix {
+                    self.write(update.operator.as_str());
+                    self.print_ts_expression(&update.argument);
+                } else {
+                    self.print_ts_expression(&update.argument);
+                    self.write(update.operator.as_str());
+                }
             }
             tsv_ts::Expression::BinaryExpression(binary) => {
                 self.print_ts_expression(&binary.left);
@@ -151,6 +164,76 @@ impl<'a> Printer<'a> {
                 self.write(" : ");
                 self.print_ts_expression(&cond.alternate);
             }
+            tsv_ts::Expression::TemplateLiteral(template) => {
+                self.write("`");
+                for (i, quasi) in template.quasis.iter().enumerate() {
+                    self.write(&quasi.raw);
+                    if i < template.expressions.len() {
+                        self.write("${");
+                        self.print_ts_expression(&template.expressions[i]);
+                        self.write("}");
+                    }
+                }
+                self.write("`");
+            }
+            tsv_ts::Expression::TaggedTemplateExpression(tagged) => {
+                self.print_ts_expression(&tagged.tag);
+                self.print_ts_expression(&tsv_ts::Expression::TemplateLiteral(
+                    tagged.quasi.clone(),
+                ));
+            }
+            tsv_ts::Expression::NewExpression(new_expr) => {
+                self.write("new ");
+                self.print_ts_expression(&new_expr.callee);
+                self.write("(");
+                for (i, arg) in new_expr.arguments.iter().enumerate() {
+                    if i > 0 {
+                        self.write(", ");
+                    }
+                    self.print_ts_expression(arg);
+                }
+                self.write(")");
+            }
+            tsv_ts::Expression::FunctionExpression(func) => {
+                // Print function expression: (params) { body }
+                self.write("(");
+                for (i, param) in func.params.iter().enumerate() {
+                    if i > 0 {
+                        self.write(", ");
+                    }
+                    let name = self.resolve_symbol(param.name);
+                    self.write(&name);
+                }
+                self.write(") ");
+                // Extract body from source (need to own the string to avoid borrow issues)
+                let body_start = func.body.span.start as usize;
+                let body_end = func.body.span.end as usize;
+                let body = self.source()[body_start..body_end].to_string();
+                self.write(&body);
+            }
+            tsv_ts::Expression::AwaitExpression(await_expr) => {
+                self.write("await ");
+                self.print_ts_expression(&await_expr.argument);
+            }
+            tsv_ts::Expression::SequenceExpression(seq) => {
+                self.write("(");
+                for (i, expr) in seq.expressions.iter().enumerate() {
+                    if i > 0 {
+                        self.write(", ");
+                    }
+                    self.print_ts_expression(expr);
+                }
+                self.write(")");
+            }
+            tsv_ts::Expression::RegexLiteral(regex) => {
+                self.write("/");
+                self.write(&regex.pattern);
+                self.write("/");
+                self.write(&regex.flags);
+            }
+            tsv_ts::Expression::Super(_) => {
+                self.write("super");
+            }
         }
     }
 
@@ -187,6 +270,9 @@ impl<'a> Printer<'a> {
             }
             tsv_ts::LiteralValue::Null => {
                 self.write("null");
+            }
+            tsv_ts::LiteralValue::Undefined => {
+                self.write("undefined");
             }
         }
     }

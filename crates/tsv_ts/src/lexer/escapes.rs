@@ -8,6 +8,10 @@
 // - readEscapedChar() - lines 6052-6112
 // - readCodePoint() - lines 5910-5923
 // - readHexChar() - lines 6116-6121
+//
+// Template literal escapes follow similar rules with additional:
+// - \` - escaped backtick (template delimiter)
+// - \$ - escaped dollar (to prevent interpolation)
 
 use tsv_lang::ParseError;
 
@@ -63,7 +67,7 @@ pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
                             result.push(ch);
                         } else {
                             return Err(ParseError::InvalidSyntax {
-                                message: format!("Invalid hex escape: \\x{}", hex),
+                                message: format!("Invalid hex escape: \\x{hex}"),
                                 position: 0,
                                 context: None,
                             });
@@ -77,18 +81,24 @@ pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
                         // Codepoint escape: \u{X...XXXXXX}
                         chars.next(); // consume '{'
                         let mut hex = String::new();
-                        while let Some(&ch) = chars.peek() {
-                            if ch == '}' {
-                                chars.next(); // consume '}'
-                                break;
-                            } else if ch.is_ascii_hexdigit() {
-                                hex.push(chars.next().unwrap());
-                            } else {
-                                return Err(ParseError::InvalidSyntax {
-                                    message: "Invalid unicode codepoint escape".to_string(),
-                                    position: 0,
-                                    context: None,
-                                });
+                        loop {
+                            match chars.peek() {
+                                Some(&'}') => {
+                                    chars.next(); // consume '}'
+                                    break;
+                                }
+                                Some(&ch) if ch.is_ascii_hexdigit() => {
+                                    chars.next();
+                                    hex.push(ch);
+                                }
+                                Some(_) => {
+                                    return Err(ParseError::InvalidSyntax {
+                                        message: "Invalid unicode codepoint escape".to_string(),
+                                        position: 0,
+                                        context: None,
+                                    });
+                                }
+                                None => break,
                             }
                         }
 
@@ -105,7 +115,7 @@ pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
                                 result.push(ch);
                             } else {
                                 return Err(ParseError::InvalidSyntax {
-                                    message: format!("Invalid unicode codepoint: U+{}", hex),
+                                    message: format!("Invalid unicode codepoint: U+{hex}"),
                                     position: 0,
                                     context: None,
                                 });
@@ -168,14 +178,12 @@ pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
                     let mut octal = String::from(ch);
                     // Read up to 2 more octal digits
                     for _ in 0..2 {
-                        if let Some(&next_ch) = chars.peek() {
-                            if ('0'..='7').contains(&next_ch) {
-                                octal.push(chars.next().unwrap());
-                            } else {
-                                break;
+                        match chars.peek() {
+                            Some(&next_ch) if ('0'..='7').contains(&next_ch) => {
+                                chars.next();
+                                octal.push(next_ch);
                             }
-                        } else {
-                            break;
+                            _ => break,
                         }
                     }
                     if let Ok(code) = u32::from_str_radix(&octal, 8)
@@ -218,7 +226,7 @@ where
             Some(ch) if ch.is_ascii_hexdigit() => result.push(ch),
             Some(ch) => {
                 return Err(ParseError::InvalidSyntax {
-                    message: format!("Expected hex digit, found '{}'", ch),
+                    message: format!("Expected hex digit, found '{ch}'"),
                     position: 0,
                     context: None,
                 });

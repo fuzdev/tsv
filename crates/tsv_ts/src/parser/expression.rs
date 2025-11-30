@@ -1,10 +1,12 @@
 // Expression parsing using Pratt parser for operator precedence
 
 use crate::ast::internal::{
-    ArrayExpression, ArrowFunctionBody, ArrowFunctionExpression, BinaryExpression, BinaryOperator,
-    CallExpression, ConditionalExpression, Expression, Identifier, Literal, LiteralValue,
-    MemberExpression, ObjectExpression, ObjectProperty, Property, SpreadElement, UnaryExpression,
-    UnaryOperator,
+    ArrayExpression, ArrowFunctionBody, ArrowFunctionExpression, AwaitExpression, BinaryExpression,
+    BinaryOperator, BlockStatement, CallExpression, ConditionalExpression, Expression,
+    FunctionExpression, Identifier, Literal, LiteralValue, MemberExpression, NewExpression,
+    ObjectExpression, ObjectProperty, Property, PropertyKind, RegexLiteral, SequenceExpression,
+    SpreadElement, Super, TaggedTemplateExpression, TemplateElement, TemplateLiteral,
+    UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
@@ -46,7 +48,8 @@ impl ParsedExpr {
 /// Uses standard JavaScript operator precedence
 fn infix_binding_power(kind: &TokenKind) -> Option<(u8, u8)> {
     // Binding power: higher = binds tighter
-    // (left_bp, right_bp): left_bp < right_bp for right-associative
+    // (left_bp, right_bp): left_bp < right_bp for left-associative
+    //                      left_bp > right_bp for right-associative
     match kind {
         // Nullish coalescing: lowest binary precedence
         TokenKind::QuestionQuestion => Some((5, 6)),
@@ -56,22 +59,32 @@ fn infix_binding_power(kind: &TokenKind) -> Option<(u8, u8)> {
         TokenKind::AmpersandAmpersand => Some((9, 10)),
         // Bitwise OR
         TokenKind::Pipe => Some((11, 12)),
+        // Bitwise XOR
+        TokenKind::Caret => Some((13, 14)),
         // Bitwise AND
-        TokenKind::Ampersand => Some((13, 14)),
+        TokenKind::Ampersand => Some((15, 16)),
         // Equality
         TokenKind::EqualsEquals
         | TokenKind::BangEquals
         | TokenKind::EqualsEqualsEquals
-        | TokenKind::BangEqualsEquals => Some((15, 16)),
-        // Relational
+        | TokenKind::BangEqualsEquals => Some((17, 18)),
+        // Relational (including in, instanceof)
         TokenKind::LessThan
         | TokenKind::GreaterThan
         | TokenKind::LessThanEquals
-        | TokenKind::GreaterThanEquals => Some((17, 18)),
+        | TokenKind::GreaterThanEquals
+        | TokenKind::Keyword(KeywordKind::Instanceof)
+        | TokenKind::Keyword(KeywordKind::In) => Some((19, 20)),
+        // Bitshift
+        TokenKind::LeftShift | TokenKind::RightShift | TokenKind::UnsignedRightShift => {
+            Some((21, 22))
+        }
         // Additive
-        TokenKind::Plus | TokenKind::Minus => Some((19, 20)),
+        TokenKind::Plus | TokenKind::Minus => Some((23, 24)),
         // Multiplicative
-        TokenKind::Star | TokenKind::Slash | TokenKind::Percent => Some((21, 22)),
+        TokenKind::Star | TokenKind::Slash | TokenKind::Percent => Some((25, 26)),
+        // Exponentiation (right-associative: left_bp > right_bp)
+        TokenKind::StarStar => Some((28, 27)),
         _ => None,
     }
 }
@@ -82,12 +95,16 @@ fn token_to_binary_operator(kind: &TokenKind) -> Option<BinaryOperator> {
         TokenKind::Plus => Some(BinaryOperator::Plus),
         TokenKind::Minus => Some(BinaryOperator::Minus),
         TokenKind::Star => Some(BinaryOperator::Star),
+        TokenKind::StarStar => Some(BinaryOperator::StarStar),
         TokenKind::Slash => Some(BinaryOperator::Slash),
         TokenKind::Percent => Some(BinaryOperator::Percent),
         TokenKind::LessThan => Some(BinaryOperator::LessThan),
         TokenKind::GreaterThan => Some(BinaryOperator::GreaterThan),
         TokenKind::LessThanEquals => Some(BinaryOperator::LessThanEquals),
         TokenKind::GreaterThanEquals => Some(BinaryOperator::GreaterThanEquals),
+        TokenKind::LeftShift => Some(BinaryOperator::LeftShift),
+        TokenKind::RightShift => Some(BinaryOperator::RightShift),
+        TokenKind::UnsignedRightShift => Some(BinaryOperator::UnsignedRightShift),
         TokenKind::EqualsEquals => Some(BinaryOperator::EqualsEquals),
         TokenKind::EqualsEqualsEquals => Some(BinaryOperator::EqualsEqualsEquals),
         TokenKind::BangEquals => Some(BinaryOperator::BangEquals),
@@ -97,14 +114,35 @@ fn token_to_binary_operator(kind: &TokenKind) -> Option<BinaryOperator> {
         TokenKind::QuestionQuestion => Some(BinaryOperator::QuestionQuestion),
         TokenKind::Ampersand => Some(BinaryOperator::Ampersand),
         TokenKind::Pipe => Some(BinaryOperator::Pipe),
+        TokenKind::Caret => Some(BinaryOperator::Caret),
+        TokenKind::Keyword(KeywordKind::Instanceof) => Some(BinaryOperator::Instanceof),
+        TokenKind::Keyword(KeywordKind::In) => Some(BinaryOperator::In),
         _ => None,
     }
 }
 
 impl<'a> Parser<'a> {
     /// Parse an expression using Pratt parsing for operator precedence
+    ///
+    /// This is the top-level entry point that handles ALL expression forms including
+    /// the comma operator (sequence expression). Use `parse_assignment_expression()`
+    /// for contexts where comma is a separator (function args, array elements, etc.)
     pub(super) fn parse_expression(&mut self) -> Result<Expression, ParseError> {
         Ok(self.parse_expression_bp(0)?.expr)
+    }
+
+    /// Parse an assignment expression (excludes comma operator)
+    ///
+    /// Use this for contexts where comma is a separator rather than an operator:
+    /// - Function call arguments: `foo(a, b)` - commas separate args
+    /// - Array elements: `[a, b, c]` - commas separate elements
+    /// - Object property values: `{x: a, y: b}` - commas separate properties
+    /// - Variable initializers: `const x = expr` - comma would be ambiguous with declarators
+    ///
+    /// To use the comma operator in these contexts, wrap in parens: `foo((a, b))`
+    pub(super) fn parse_assignment_expression(&mut self) -> Result<Expression, ParseError> {
+        // Use min_bp = 1 to skip comma handling (which only triggers at min_bp == 0)
+        Ok(self.parse_expression_bp(1)?.expr)
     }
 
     /// Pratt parser: parse expression with minimum binding power
@@ -134,6 +172,8 @@ impl<'a> Parser<'a> {
             }
 
             // Get operator
+            // SAFETY: We only reach this code for valid binary operator tokens
+            #[allow(clippy::unwrap_used)]
             let operator = token_to_binary_operator(&kind).unwrap();
             self.advance()?; // consume operator
 
@@ -155,19 +195,20 @@ impl<'a> Parser<'a> {
             };
         }
 
-        // Handle ternary operator (lowest precedence, above comma)
-        // Only handle at top level (min_bp == 0) to ensure proper precedence
-        if min_bp == 0 && self.check(&TokenKind::Question) {
+        // Handle ternary operator (lowest precedence among binary-like ops, above comma)
+        // Handle at min_bp <= 1 to include in assignment expressions but not in binary ops
+        if min_bp <= 1 && self.check(&TokenKind::Question) {
             self.advance()?; // consume '?'
 
-            // Parse consequent (then branch)
-            let consequent = self.parse_expression_bp(0)?;
+            // Parse consequent (then branch) - use bp=1 to exclude comma operator
+            // This ensures (a ? b : c, d) parses as ((a ? b : c), d) not (a ? b : (c, d))
+            let consequent = self.parse_expression_bp(1)?;
 
             // Expect ':'
             self.expect(&TokenKind::Colon)?;
 
-            // Parse alternate (else branch)
-            let alternate = self.parse_expression_bp(0)?;
+            // Parse alternate (else branch) - use bp=1 to exclude comma operator
+            let alternate = self.parse_expression_bp(1)?;
 
             let span = Span::new(expr_start as u32, alternate.actual_end as u32);
             left = ParsedExpr {
@@ -181,14 +222,52 @@ impl<'a> Parser<'a> {
             };
         }
 
+        // Handle comma operator (lowest precedence, after ternary)
+        // Only handle at top level (min_bp == 0) to avoid conflicts with comma in
+        // function calls, array literals, and object literals
+        if min_bp == 0 && self.check(&TokenKind::Comma) {
+            let mut expressions = vec![left.expr];
+            let mut last_end = left.actual_end;
+
+            while self.eat(TokenKind::Comma) {
+                // Parse next expression (ternary level, so min_bp = 0 is fine
+                // since we're handling comma at even lower level here)
+                let next = self.parse_expression_bp(1)?; // Use bp=1 to stop before next comma
+                expressions.push(next.expr);
+                last_end = next.actual_end;
+            }
+
+            let span = Span::new(expr_start as u32, last_end as u32);
+            left = ParsedExpr {
+                expr: Expression::SequenceExpression(SequenceExpression { expressions, span }),
+                actual_end: last_end,
+            };
+        }
+
         Ok(left)
     }
 
     /// Parse prefix expression returning ParsedExpr with actual end position
     fn parse_prefix_expression_with_end(&mut self) -> Result<ParsedExpr, ParseError> {
         let parsed = match self.current_kind() {
-            TokenKind::Minus | TokenKind::Plus | TokenKind::Bang => {
+            TokenKind::Minus | TokenKind::Plus | TokenKind::Bang | TokenKind::Tilde => {
                 let expr = self.parse_unary_expression()?;
+                ParsedExpr::from_expr(expr)
+            }
+            TokenKind::PlusPlus | TokenKind::MinusMinus => {
+                let expr = self.parse_prefix_update_expression()?;
+                ParsedExpr::from_expr(expr)
+            }
+            TokenKind::Keyword(KeywordKind::New) => {
+                let expr = self.parse_new_expression()?;
+                ParsedExpr::from_expr(expr)
+            }
+            TokenKind::Keyword(KeywordKind::Typeof | KeywordKind::Void | KeywordKind::Delete) => {
+                let expr = self.parse_unary_keyword_expression()?;
+                ParsedExpr::from_expr(expr)
+            }
+            TokenKind::Keyword(KeywordKind::Await) => {
+                let expr = self.parse_await_expression()?;
                 ParsedExpr::from_expr(expr)
             }
             _ => self.parse_primary_expression_with_end()?,
@@ -240,6 +319,101 @@ impl<'a> Parser<'a> {
                         prop_end,
                     );
                 }
+                TokenKind::QuestionDot => {
+                    // Optional chaining: obj?.prop, obj?.[expr], obj?.()
+                    self.advance()?; // consume '?.'
+
+                    match self.current_kind() {
+                        TokenKind::Identifier => {
+                            // obj?.prop - optional property access
+                            let (prop_start, prop_end) = self.current_pos();
+                            let name = self.intern(self.current_value());
+                            self.advance()?;
+
+                            let span = Span::new(left.expr.span().start, prop_end as u32);
+                            left = ParsedExpr::with_end(
+                                Expression::MemberExpression(MemberExpression {
+                                    object: Box::new(left.expr),
+                                    property: Box::new(Expression::Identifier(Identifier {
+                                        name,
+                                        type_annotation: None,
+                                        span: Span::new(prop_start as u32, prop_end as u32),
+                                    })),
+                                    computed: false,
+                                    optional: true,
+                                    span,
+                                }),
+                                prop_end,
+                            );
+                        }
+                        TokenKind::BracketOpen => {
+                            // obj?.[expr] - optional computed access
+                            self.advance()?; // consume '['
+
+                            let index = self.parse_expression()?;
+
+                            let (_, bracket_end) = self.current_pos();
+                            self.expect(&TokenKind::BracketClose)?; // consume ']'
+
+                            let span = Span::new(left.expr.span().start, bracket_end as u32);
+                            left = ParsedExpr::with_end(
+                                Expression::MemberExpression(MemberExpression {
+                                    object: Box::new(left.expr),
+                                    property: Box::new(index),
+                                    computed: true,
+                                    optional: true,
+                                    span,
+                                }),
+                                bracket_end,
+                            );
+                        }
+                        TokenKind::ParenOpen => {
+                            // obj?.() - optional call
+                            self.advance()?; // consume '('
+
+                            let mut arguments = Vec::new();
+
+                            // Parse arguments (use assignment_expression to avoid comma operator)
+                            if !self.check(&TokenKind::ParenClose) {
+                                loop {
+                                    let arg = self.parse_assignment_expression()?;
+                                    arguments.push(arg);
+
+                                    if !self.expect_list_separator(
+                                        &TokenKind::Comma,
+                                        &TokenKind::ParenClose,
+                                    )? {
+                                        break;
+                                    }
+                                }
+                            }
+
+                            let (_, paren_end) = self.current_pos();
+                            self.expect(&TokenKind::ParenClose)?; // consume ')'
+
+                            let span = Span::new(left.expr.span().start, paren_end as u32);
+                            left = ParsedExpr::with_end(
+                                Expression::CallExpression(CallExpression {
+                                    callee: Box::new(left.expr),
+                                    arguments,
+                                    optional: true,
+                                    span,
+                                }),
+                                paren_end,
+                            );
+                        }
+                        _ => {
+                            return Err(ParseError::InvalidSyntax {
+                                message: format!(
+                                    "Expected property name, '[', or '(' after '?.', found {}",
+                                    self.current_kind()
+                                ),
+                                position: self.current_pos().0,
+                                context: None,
+                            });
+                        }
+                    }
+                }
                 TokenKind::BracketOpen => {
                     // Computed member access: arr[0]
                     self.advance()?; // consume '['
@@ -267,10 +441,10 @@ impl<'a> Parser<'a> {
 
                     let mut arguments = Vec::new();
 
-                    // Parse arguments
+                    // Parse arguments (use assignment_expression to avoid comma operator)
                     if !self.check(&TokenKind::ParenClose) {
                         loop {
-                            let arg = self.parse_expression()?;
+                            let arg = self.parse_assignment_expression()?;
                             arguments.push(arg);
 
                             if !self
@@ -295,6 +469,49 @@ impl<'a> Parser<'a> {
                         paren_end,
                     );
                 }
+                TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
+                    // Tagged template expression: tag`content`
+                    let quasi = self.parse_template_literal()?;
+                    let quasi_span = quasi.span();
+                    if let Expression::TemplateLiteral(template) = quasi {
+                        let span = Span::new(left.expr.span().start, quasi_span.end);
+                        left = ParsedExpr::with_end(
+                            Expression::TaggedTemplateExpression(TaggedTemplateExpression {
+                                tag: Box::new(left.expr),
+                                quasi: template,
+                                span,
+                            }),
+                            quasi_span.end as usize,
+                        );
+                    }
+                }
+                kind @ TokenKind::PlusPlus | kind @ TokenKind::MinusMinus
+                    if !self.had_line_terminator =>
+                {
+                    // Postfix update expression: x++, x--
+                    // ASI Rule: If there's a line terminator before ++/--, ASI fires
+                    // and the ++/-- becomes a prefix operator on the next statement.
+                    // So we only parse postfix if NO line terminator preceded this token.
+                    let operator = if kind == TokenKind::PlusPlus {
+                        UpdateOperator::Increment
+                    } else {
+                        UpdateOperator::Decrement
+                    };
+
+                    let (_, op_end) = self.current_pos();
+                    self.advance()?;
+
+                    let span = Span::new(left.expr.span().start, op_end as u32);
+                    left = ParsedExpr::with_end(
+                        Expression::UpdateExpression(UpdateExpression {
+                            operator,
+                            argument: Box::new(left.expr),
+                            prefix: false,
+                            span,
+                        }),
+                        op_end,
+                    );
+                }
                 _ => break,
             }
         }
@@ -309,7 +526,7 @@ impl<'a> Parser<'a> {
                 let (start, end) = self.current_pos();
                 let raw = self.current_value().to_string();
                 let number = raw.parse().map_err(|_| ParseError::InvalidSyntax {
-                    message: format!("Invalid number: {}", raw),
+                    message: format!("Invalid number: {raw}"),
                     position: start,
                     context: None,
                 })?;
@@ -399,11 +616,72 @@ impl<'a> Parser<'a> {
                     end,
                 ))
             }
+            TokenKind::Keyword(KeywordKind::Undefined) => {
+                let (start, end) = self.current_pos();
+                self.advance()?;
+                Ok(ParsedExpr::with_end(
+                    Expression::Literal(Literal {
+                        value: LiteralValue::Undefined,
+                        span: Span::new(start as u32, end as u32),
+                    }),
+                    end,
+                ))
+            }
+            TokenKind::Keyword(KeywordKind::Super) => {
+                let (start, end) = self.current_pos();
+                self.advance()?;
+                Ok(ParsedExpr::with_end(
+                    Expression::Super(Super {
+                        span: Span::new(start as u32, end as u32),
+                    }),
+                    end,
+                ))
+            }
             TokenKind::ParenOpen => {
                 // Could be: arrow function `() => ...` or parenthesized expression `(expr)`
                 self.parse_paren_expression_with_end()
             }
             TokenKind::DotDotDot => Ok(ParsedExpr::from_expr(self.parse_spread_element()?)),
+            TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
+                Ok(ParsedExpr::from_expr(self.parse_template_literal()?))
+            }
+            TokenKind::Slash => {
+                // In expression context, `/` is a regex literal, not division
+                // Division is only possible after a value (identifier, number, closing bracket)
+                // but we're in parse_primary_expression which is called when expecting a value
+                //
+                // Use current_start directly (not current_pos) because the lexer expects positions
+                // relative to its source slice, not the full document offset.
+                let lexer_start = self.current_start;
+                let regex_token = self.lexer.read_regex_literal(lexer_start)?;
+                let lexer_end = regex_token.end;
+
+                // Calculate span with base_offset for the AST
+                let span_start = lexer_start + self.base_offset;
+                let span_end = lexer_end + self.base_offset;
+
+                // Extract pattern and flags from the decoded value (format: "pattern\0flags")
+                let decoded = regex_token.decoded.as_deref().unwrap_or("\0");
+                let (pattern, flags) = decoded.split_once('\0').unwrap_or((decoded, ""));
+
+                // Advance past the regex token by reading the next token
+                // We need to update parser state manually since lexer was resynced by read_regex_literal
+                let next_token = self.lexer.next_token()?;
+                self.current_kind = next_token.kind;
+                self.current_start = next_token.start;
+                self.current_end = next_token.end;
+                self.current_decoded = next_token.decoded;
+                // Note: had_line_terminator not updated here - regex doesn't affect ASI context
+
+                Ok(ParsedExpr::with_end(
+                    Expression::RegexLiteral(RegexLiteral {
+                        pattern: pattern.to_string(),
+                        flags: flags.to_string(),
+                        span: Span::new(span_start as u32, span_end as u32),
+                    }),
+                    span_end,
+                ))
+            }
             _ => Err(ParseError::InvalidExpression {
                 found: self.current_kind().to_string(),
                 position: self.current_pos().0,
@@ -531,7 +809,8 @@ impl<'a> Parser<'a> {
             // Check for spread: { ...obj }
             if self.check(&TokenKind::DotDotDot) {
                 self.advance()?; // consume '...'
-                let argument = self.parse_expression()?;
+                // Use assignment_expression because comma separates properties
+                let argument = self.parse_assignment_expression()?;
                 let prop_end = argument.span().end as usize;
                 properties.push(ObjectProperty::SpreadElement(SpreadElement {
                     argument: Box::new(argument),
@@ -545,19 +824,50 @@ impl<'a> Parser<'a> {
                 continue;
             }
 
+            // Check for getter/setter: `get x() {}` or `set x(v) {}`
+            // These are contextual keywords - only treated as get/set when followed by a property name
+            let accessor_kind = if self.current_kind() == TokenKind::Identifier {
+                let is_get = self.current_value() == "get";
+                let is_set = self.current_value() == "set";
+                if (is_get || is_set) && self.peek_is_property_name() {
+                    let kind = if is_get {
+                        PropertyKind::Get
+                    } else {
+                        PropertyKind::Set
+                    };
+                    self.advance()?; // consume 'get' or 'set'
+                    Some(kind)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
             // Parse property key
-            // Supports: identifiers, string literals
-            // TODO: Number literals, computed properties
-            let key = match self.current_kind() {
-                TokenKind::Identifier => {
+            // Supports: identifiers, keywords (as identifiers), string literals, computed keys
+            // TODO: Number literals
+            let (key, computed) = match self.current_kind() {
+                // Computed property: { [expr]: value }
+                TokenKind::BracketOpen => {
+                    self.advance()?; // consume '['
+                    let key_expr = self.parse_expression()?;
+                    self.expect(&TokenKind::BracketClose)?; // consume ']'
+                    (key_expr, true)
+                }
+                // Both identifiers and keywords can be property keys: { foo: 1, object: 2, in: 3 }
+                TokenKind::Identifier | TokenKind::Keyword(_) => {
                     let (key_start, key_end) = self.current_pos();
                     let symbol = self.intern(self.current_value());
                     self.advance()?;
-                    Expression::Identifier(Identifier {
-                        name: symbol,
-                        type_annotation: None,
-                        span: Span::new(key_start as u32, key_end as u32),
-                    })
+                    (
+                        Expression::Identifier(Identifier {
+                            name: symbol,
+                            type_annotation: None,
+                            span: Span::new(key_start as u32, key_end as u32),
+                        }),
+                        false,
+                    )
                 }
                 TokenKind::String => {
                     // String literal key: {"prop-name": value}
@@ -572,10 +882,13 @@ impl<'a> Parser<'a> {
                         String::new()
                     };
                     self.advance()?;
-                    Expression::Literal(Literal {
-                        value: LiteralValue::String { content, quote },
-                        span: Span::new(key_start as u32, key_end as u32),
-                    })
+                    (
+                        Expression::Literal(Literal {
+                            value: LiteralValue::String { content, quote },
+                            span: Span::new(key_start as u32, key_end as u32),
+                        }),
+                        false,
+                    )
                 }
                 _ => {
                     return Err(ParseError::InvalidSyntax {
@@ -586,12 +899,31 @@ impl<'a> Parser<'a> {
                 }
             };
 
-            // Check for shorthand property: `{ prop }` vs `{ prop: value }`
-            let (value, shorthand) = if self.eat(TokenKind::Colon) {
-                (self.parse_expression()?, false)
+            // Determine property kind, value, shorthand, and method flags
+            let (kind, value, shorthand, method) = if let Some(accessor) = accessor_kind {
+                // Getter/setter: `get x() {}` or `set x(v) {}`
+                let func_expr = self.parse_method_body(prop_start as u32)?;
+                (
+                    accessor,
+                    Expression::FunctionExpression(func_expr),
+                    false,
+                    false,
+                )
+            } else if self.check(&TokenKind::ParenOpen) {
+                // Method shorthand: `{ foo() { return 1; } }`
+                let func_expr = self.parse_method_body(key.span().start)?;
+                (
+                    PropertyKind::Init,
+                    Expression::FunctionExpression(func_expr),
+                    false,
+                    true,
+                )
+            } else if self.eat(TokenKind::Colon) {
+                // Use assignment_expression because comma separates properties
+                (PropertyKind::Init, self.parse_assignment_expression()?, false, false)
             } else {
                 // Shorthand: key is duplicated as value
-                (key.clone(), true)
+                (PropertyKind::Init, key.clone(), true, false)
             };
 
             // Property span should end at value's end, not including trailing comments
@@ -599,18 +931,10 @@ impl<'a> Parser<'a> {
             properties.push(ObjectProperty::Property(Property {
                 key,
                 value,
+                kind,
                 shorthand,
-                // TODO: Support computed property names: { [expr]: value }
-                // When TokenKind::BracketOpen is found at property key position,
-                // parse as computed property and set computed: true
-                // See: ECMAScript spec ComputedPropertyName
-                computed: false,
-                // TODO: Support method shorthand: { foo() {} }
-                // Detect when property value is a function and key matches method syntax
-                // Set method: true and adjust value to FunctionExpression
-                // Also needed: getter/setter syntax { get foo() {}, set foo(v) {} }
-                // See: ECMAScript spec MethodDefinition
-                method: false,
+                computed,
+                method,
                 span: Span::new(prop_start as u32, prop_end as u32),
             }));
 
@@ -657,8 +981,8 @@ impl<'a> Parser<'a> {
 
         // Parse elements
         loop {
-            // Parse element expression
-            let elem = self.parse_expression()?;
+            // Parse element expression (use assignment_expression because comma separates elements)
+            let elem = self.parse_assignment_expression()?;
             elements.push(Some(elem));
 
             // Check for comma or closing bracket (with trailing comma support)
@@ -676,10 +1000,10 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    /// Parse unary expression: `-x`, `+x`, `!x`
+    /// Parse unary expression: `-x`, `+x`, `!x`, `~x`
     ///
-    /// Unary operators have higher precedence than binary operators.
-    /// The binding power (25) is higher than multiplicative (21-22).
+    /// Unary operators have higher precedence than all binary operators.
+    /// The binding power (29) is higher than exponentiation (27-28).
     fn parse_unary_expression(&mut self) -> Result<Expression, ParseError> {
         let (start, _) = self.current_pos();
 
@@ -687,14 +1011,15 @@ impl<'a> Parser<'a> {
             TokenKind::Minus => UnaryOperator::Minus,
             TokenKind::Plus => UnaryOperator::Plus,
             TokenKind::Bang => UnaryOperator::Bang,
+            TokenKind::Tilde => UnaryOperator::Tilde,
             _ => unreachable!("parse_unary_expression called with non-unary operator"),
         };
         self.advance()?;
 
         // Parse the operand with high binding power (unary is right-associative)
-        // This allows chained unary: --x, -+x, !!x, etc.
+        // This allows chained unary: --x, -+x, !!x, ~~x etc.
         // and proper precedence: -a * b parses as (-a) * b
-        let parsed = self.parse_expression_bp(25)?;
+        let parsed = self.parse_expression_bp(29)?;
 
         // Use actual_end to include trailing parens in the span (matches Svelte's behavior)
         // For `!(a && b)`, the span should be from `!` to `)`, not just to `b`
@@ -704,6 +1029,178 @@ impl<'a> Parser<'a> {
             operator,
             argument: Box::new(parsed.expr),
             prefix: true,
+            span: Span::new(start as u32, end),
+        }))
+    }
+
+    /// Parse unary keyword expression: `typeof x`, `void 0`, `delete obj.x`
+    ///
+    /// These keyword operators have the same precedence as other unary operators.
+    fn parse_unary_keyword_expression(&mut self) -> Result<Expression, ParseError> {
+        let (start, _) = self.current_pos();
+
+        let operator = match self.current_kind() {
+            TokenKind::Keyword(KeywordKind::Typeof) => UnaryOperator::Typeof,
+            TokenKind::Keyword(KeywordKind::Void) => UnaryOperator::Void,
+            TokenKind::Keyword(KeywordKind::Delete) => UnaryOperator::Delete,
+            _ => unreachable!("parse_unary_keyword_expression called with non-keyword operator"),
+        };
+        self.advance()?;
+
+        // Parse the operand with high binding power (unary is right-associative)
+        let parsed = self.parse_expression_bp(29)?;
+        let end = parsed.actual_end as u32;
+
+        Ok(Expression::UnaryExpression(UnaryExpression {
+            operator,
+            argument: Box::new(parsed.expr),
+            prefix: true,
+            span: Span::new(start as u32, end),
+        }))
+    }
+
+    /// Parse await expression: `await promise`
+    ///
+    /// Await expressions have high precedence like unary operators.
+    fn parse_await_expression(&mut self) -> Result<Expression, ParseError> {
+        let (start, _) = self.current_pos();
+        self.advance()?; // consume 'await'
+
+        // Parse the operand with high binding power (same as unary)
+        let parsed = self.parse_expression_bp(29)?;
+        let end = parsed.actual_end as u32;
+
+        Ok(Expression::AwaitExpression(AwaitExpression {
+            argument: Box::new(parsed.expr),
+            span: Span::new(start as u32, end),
+        }))
+    }
+
+    /// Parse prefix update expression: `++x`, `--x`
+    ///
+    /// Prefix increment/decrement has the same precedence as unary operators.
+    fn parse_prefix_update_expression(&mut self) -> Result<Expression, ParseError> {
+        let (start, _) = self.current_pos();
+
+        let operator = match self.current_kind() {
+            TokenKind::PlusPlus => UpdateOperator::Increment,
+            TokenKind::MinusMinus => UpdateOperator::Decrement,
+            _ => unreachable!("parse_prefix_update_expression called with non-update operator"),
+        };
+        self.advance()?;
+
+        // Parse the operand - update expressions apply to member expressions or identifiers
+        // Use high binding power so ++x.y parses correctly
+        let parsed = self.parse_expression_bp(29)?;
+
+        let end = parsed.actual_end as u32;
+
+        Ok(Expression::UpdateExpression(UpdateExpression {
+            operator,
+            argument: Box::new(parsed.expr),
+            prefix: true,
+            span: Span::new(start as u32, end),
+        }))
+    }
+
+    /// Parse new expression: `new Date()`, `new Map()`, `new Foo.Bar()`
+    ///
+    /// The `new` keyword has the same precedence as unary operators.
+    /// It takes a callee (identifier or member expression) and optional arguments.
+    fn parse_new_expression(&mut self) -> Result<Expression, ParseError> {
+        let (start, _) = self.current_pos();
+        self.advance()?; // consume 'new'
+
+        // Parse the callee - this could be an identifier, member expression, or even nested `new`
+        // We use primary + postfix parsing but stop before call expressions
+        let callee_parsed = self.parse_primary_expression_with_end()?;
+
+        // Parse member access chains: new Foo.Bar.Baz()
+        let mut callee = callee_parsed;
+        loop {
+            match self.current_kind() {
+                TokenKind::Dot => {
+                    self.advance()?; // consume '.'
+                    if self.current_kind() != TokenKind::Identifier {
+                        return Err(ParseError::InvalidSyntax {
+                            message: format!(
+                                "Expected property name after '.', found {}",
+                                self.current_kind()
+                            ),
+                            position: self.current_pos().0,
+                            context: None,
+                        });
+                    }
+                    let (prop_start, prop_end) = self.current_pos();
+                    let name = self.intern(self.current_value());
+                    self.advance()?;
+
+                    let span = Span::new(callee.expr.span().start, prop_end as u32);
+                    callee = ParsedExpr::with_end(
+                        Expression::MemberExpression(MemberExpression {
+                            object: Box::new(callee.expr),
+                            property: Box::new(Expression::Identifier(Identifier {
+                                name,
+                                type_annotation: None,
+                                span: Span::new(prop_start as u32, prop_end as u32),
+                            })),
+                            computed: false,
+                            optional: false,
+                            span,
+                        }),
+                        prop_end,
+                    );
+                }
+                TokenKind::BracketOpen => {
+                    self.advance()?; // consume '['
+                    let index = self.parse_expression()?;
+                    let (_, bracket_end) = self.current_pos();
+                    self.expect(&TokenKind::BracketClose)?;
+
+                    let span = Span::new(callee.expr.span().start, bracket_end as u32);
+                    callee = ParsedExpr::with_end(
+                        Expression::MemberExpression(MemberExpression {
+                            object: Box::new(callee.expr),
+                            property: Box::new(index),
+                            computed: true,
+                            optional: false,
+                            span,
+                        }),
+                        bracket_end,
+                    );
+                }
+                _ => break,
+            }
+        }
+
+        // Parse optional arguments: new Date() vs new Date
+        let (arguments, end) = if self.check(&TokenKind::ParenOpen) {
+            self.advance()?; // consume '('
+            let mut args = Vec::new();
+
+            if !self.check(&TokenKind::ParenClose) {
+                loop {
+                    // Use assignment_expression because comma separates arguments
+                    let arg = self.parse_assignment_expression()?;
+                    args.push(arg);
+
+                    if !self.expect_list_separator(&TokenKind::Comma, &TokenKind::ParenClose)? {
+                        break;
+                    }
+                }
+            }
+
+            let (_, paren_end) = self.current_pos();
+            self.expect(&TokenKind::ParenClose)?;
+            (args, paren_end as u32)
+        } else {
+            // new Date without parens - valid JavaScript
+            (Vec::new(), callee.actual_end as u32)
+        };
+
+        Ok(Expression::NewExpression(NewExpression {
+            callee: Box::new(callee.expr),
+            arguments,
             span: Span::new(start as u32, end),
         }))
     }
@@ -792,7 +1289,8 @@ impl<'a> Parser<'a> {
             )
         } else {
             // Expression body: `() => expr`
-            let expr = self.parse_expression()?;
+            // Use assignment_expression so comma doesn't consume next object property
+            let expr = self.parse_assignment_expression()?;
             (ArrowFunctionBody::Expression(Box::new(expr)), true)
         };
 
@@ -808,17 +1306,247 @@ impl<'a> Parser<'a> {
         ))
     }
 
+    /// Parse method body for method shorthand: `foo() { return 1; }`
+    ///
+    /// This parses the parameter list and block body for a method definition.
+    /// The key has already been parsed by the caller.
+    fn parse_method_body(&mut self, start: u32) -> Result<FunctionExpression, ParseError> {
+        let params = self.parse_parameter_list()?;
+        let body = self.parse_block_statement()?;
+        let end = body.span.end;
+
+        Ok(FunctionExpression {
+            id: None, // Method shorthand has no function name
+            params,
+            body,
+            span: Span::new(start, end),
+        })
+    }
+
+    /// Parse a block statement: `{ stmt1; stmt2; }`
+    ///
+    /// Parses the statements inside a block body (used for function bodies).
+    pub(super) fn parse_block_statement(&mut self) -> Result<BlockStatement, ParseError> {
+        let (start, _) = self.current_pos();
+        self.expect(&TokenKind::BraceOpen)?; // consume '{'
+
+        let mut body = Vec::new();
+
+        // Parse statements until we hit '}'
+        while !self.check(&TokenKind::BraceClose) {
+            if self.check(&TokenKind::Eof) {
+                return Err(ParseError::InvalidSyntax {
+                    message: "Unexpected end of file in block".to_string(),
+                    position: self.current_pos().0,
+                    context: None,
+                });
+            }
+
+            let stmt = self.parse_statement()?;
+            body.push(stmt);
+        }
+
+        let (_, end) = self.current_pos();
+        self.expect(&TokenKind::BraceClose)?; // consume '}'
+
+        Ok(BlockStatement {
+            body,
+            span: Span::new(start as u32, end as u32),
+        })
+    }
+
     /// Parse spread element: `...expr`
     fn parse_spread_element(&mut self) -> Result<Expression, ParseError> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::DotDotDot)?; // consume '...'
 
-        let argument = self.parse_expression()?;
+        // Use assignment_expression because comma separates array elements/object properties
+        let argument = self.parse_assignment_expression()?;
         let end = argument.span().end;
 
         Ok(Expression::SpreadElement(SpreadElement {
             argument: Box::new(argument),
             span: Span::new(start as u32, end),
         }))
+    }
+
+    /// Parse template literal: `hello ${name}`
+    ///
+    /// Handles both simple templates (no interpolation) and templates with expressions.
+    /// See also `parse_template_literal_type()` in statement.rs for type context version.
+    pub(super) fn parse_template_literal(&mut self) -> Result<Expression, ParseError> {
+        let (start, _) = self.current_pos();
+        let mut quasis = Vec::new();
+        let mut expressions = Vec::new();
+
+        match self.current_kind() {
+            TokenKind::NoSubstitutionTemplate => {
+                // Simple template with no interpolation: `hello world`
+                let (elem_start, elem_end) = self.current_pos();
+                let raw = self.current_value().to_string();
+
+                // Extract content between backticks
+                let content = if raw.len() >= 2 {
+                    raw[1..raw.len() - 1].to_string()
+                } else {
+                    String::new()
+                };
+
+                // Decode escapes for cooked value
+                let cooked = if let Some(decoded) = self.current_decoded() {
+                    Some(decoded.to_string())
+                } else {
+                    Some(content.clone())
+                };
+
+                self.advance()?;
+
+                quasis.push(TemplateElement {
+                    raw: content,
+                    cooked,
+                    tail: true,
+                    span: Span::new(elem_start as u32, elem_end as u32),
+                });
+
+                Ok(Expression::TemplateLiteral(TemplateLiteral {
+                    quasis,
+                    expressions,
+                    span: Span::new(start as u32, elem_end as u32),
+                }))
+            }
+            TokenKind::TemplateHead => {
+                // Template with interpolation: `hello ${name}...`
+                let (elem_start, elem_end) = self.current_pos();
+                let raw = self.current_value().to_string();
+
+                // Extract content: remove leading ` and trailing ${
+                let content = if raw.len() >= 3 {
+                    raw[1..raw.len() - 2].to_string()
+                } else {
+                    String::new()
+                };
+
+                let cooked = if let Some(decoded) = self.current_decoded() {
+                    Some(decoded.to_string())
+                } else {
+                    Some(content.clone())
+                };
+
+                self.advance()?;
+
+                quasis.push(TemplateElement {
+                    raw: content,
+                    cooked,
+                    tail: false,
+                    span: Span::new(elem_start as u32, elem_end as u32),
+                });
+
+                // Parse expressions and remaining template parts
+                loop {
+                    // Parse the interpolated expression
+                    let expr = self.parse_expression()?;
+                    expressions.push(expr);
+
+                    // Expect closing } of the interpolation
+                    let (brace_start, _) = self.current_pos();
+                    if !self.check(&TokenKind::BraceClose) {
+                        return Err(ParseError::InvalidSyntax {
+                            message: format!(
+                                "Expected '}}' at end of template interpolation, found {}",
+                                self.current_kind()
+                            ),
+                            position: brace_start,
+                            context: None,
+                        });
+                    }
+
+                    // Get the raw end position (without base_offset) for the lexer
+                    let raw_brace_end = self.current_raw_end();
+
+                    // Skip the } in the lexer without getting next token normally
+                    // (calling advance() would try to lex ` as a new token)
+                    // Instead, tell the lexer to skip past the } and read template content
+                    let next_token = self.lexer.continue_template_from_brace(raw_brace_end)?;
+                    self.update_current(next_token);
+
+                    let (elem_start, elem_end) = self.current_pos();
+                    let raw = self.current_value().to_string();
+
+                    match self.current_kind().clone() {
+                        TokenKind::TemplateMiddle => {
+                            // More interpolations to come: }content${
+                            let content = if raw.len() >= 3 {
+                                raw[1..raw.len() - 2].to_string()
+                            } else {
+                                String::new()
+                            };
+
+                            let cooked = if let Some(decoded) = self.current_decoded() {
+                                Some(decoded.to_string())
+                            } else {
+                                Some(content.clone())
+                            };
+
+                            self.advance()?;
+
+                            quasis.push(TemplateElement {
+                                raw: content,
+                                cooked,
+                                tail: false,
+                                span: Span::new(elem_start as u32, elem_end as u32),
+                            });
+                        }
+                        TokenKind::TemplateTail => {
+                            // End of template: }content`
+                            let content = if raw.len() >= 2 {
+                                raw[1..raw.len() - 1].to_string()
+                            } else {
+                                String::new()
+                            };
+
+                            let cooked = if let Some(decoded) = self.current_decoded() {
+                                Some(decoded.to_string())
+                            } else {
+                                Some(content.clone())
+                            };
+
+                            self.advance()?;
+
+                            quasis.push(TemplateElement {
+                                raw: content,
+                                cooked,
+                                tail: true,
+                                span: Span::new(elem_start as u32, elem_end as u32),
+                            });
+
+                            break;
+                        }
+                        _ => {
+                            return Err(ParseError::InvalidSyntax {
+                                message: format!(
+                                    "Expected template middle or tail, found {}",
+                                    self.current_kind()
+                                ),
+                                position: elem_start,
+                                context: None,
+                            });
+                        }
+                    }
+                }
+
+                let end = quasis.last().map_or(start as u32, |q| q.span.end);
+
+                Ok(Expression::TemplateLiteral(TemplateLiteral {
+                    quasis,
+                    expressions,
+                    span: Span::new(start as u32, end),
+                }))
+            }
+            _ => Err(ParseError::InvalidSyntax {
+                message: format!("Expected template literal, found {}", self.current_kind()),
+                position: start,
+                context: None,
+            }),
+        }
     }
 }

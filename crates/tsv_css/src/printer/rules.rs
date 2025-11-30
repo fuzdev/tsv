@@ -349,7 +349,7 @@ impl<'a> Printer<'a> {
             CssValue::Identifier { name, .. } => doc::text(name.to_string()),
             CssValue::String { content, .. } => {
                 // Approximate string width (with quotes)
-                doc::text(format!("'{}'", content))
+                doc::text(format!("'{content}'"))
             }
             CssValue::Dimension { span, .. } => {
                 let raw = span.extract(self.source);

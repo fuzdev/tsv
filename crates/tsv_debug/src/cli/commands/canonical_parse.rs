@@ -57,13 +57,13 @@ struct CanonicalParseExecutable {
 
 impl Executable for CanonicalParseExecutable {
     fn execute(&self) {
-        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        let rt = super::create_runtime();
         let result = rt.block_on(run(&self.input, self.parser_type));
 
         match result {
-            Ok(json) => print!("{}", json),
+            Ok(json) => print!("{json}"),
             Err(err) => {
-                eprintln!("Error parsing: {}", err);
+                eprintln!("Error parsing: {err}");
                 std::process::exit(1);
             }
         }

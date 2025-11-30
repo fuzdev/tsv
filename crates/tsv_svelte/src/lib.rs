@@ -10,17 +10,17 @@ pub mod printer;
 pub use tsv_lang::{ParseError, Result};
 
 /// Parse Svelte source code into an internal AST
-pub fn parse(source: &str) -> Result<ast::Root> {
+pub fn parse(source: &str) -> Result<Root> {
     parser::parse_svelte(source).map_err(|e| e.with_context(source))
 }
 
 /// Format a Svelte AST back to source code
-pub fn format(root: &ast::Root, source: &str) -> String {
+pub fn format(root: &Root, source: &str) -> String {
     printer::format_svelte(root, source)
 }
 
 /// Convert internal AST to public JSON-compatible AST
-pub fn convert_ast(root: &ast::Root, source: &str) -> ast::public::Root {
+pub fn convert_ast(root: &Root, source: &str) -> ast::public::Root {
     ast::convert::convert_root(root, source)
 }
 

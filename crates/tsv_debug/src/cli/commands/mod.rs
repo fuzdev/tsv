@@ -7,3 +7,12 @@ pub mod fixtures_update_parsed;
 pub mod fixtures_validate;
 pub mod format_prettier;
 pub mod line_width;
+
+/// Create a tokio runtime for async operations.
+///
+/// Debug tools need async for Fuz daemon communication. Runtime creation
+/// failure is unrecoverable, so panicking is appropriate.
+#[allow(clippy::expect_used)]
+pub fn create_runtime() -> tokio::runtime::Runtime {
+    tokio::runtime::Runtime::new().expect("Failed to create tokio runtime")
+}

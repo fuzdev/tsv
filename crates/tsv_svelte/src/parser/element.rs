@@ -20,7 +20,7 @@ fn is_void(name: &str) -> bool {
 
 /// Check if a tag name is a component (first character uppercase)
 fn is_component(name: &str) -> bool {
-    name.chars().next().is_some_and(|c| c.is_uppercase())
+    name.chars().next().is_some_and(char::is_uppercase)
 }
 
 impl<'a> SvelteParser<'a> {
@@ -103,7 +103,7 @@ impl<'a> SvelteParser<'a> {
                 }
             } else if self.check(TokenKind::Eof) {
                 return Err(ParseError::InvalidSyntax {
-                    message: format!("Unclosed element: <{}>", tag_name),
+                    message: format!("Unclosed element: <{tag_name}>"),
                     position: start,
                     context: None,
                 });
@@ -136,8 +136,7 @@ impl<'a> SvelteParser<'a> {
         if closing_tag_name != tag_name {
             return Err(ParseError::InvalidSyntax {
                 message: format!(
-                    "Mismatched tags: expected closing tag for '{}' but found '{}'",
-                    tag_name, closing_tag_name
+                    "Mismatched tags: expected closing tag for '{tag_name}' but found '{closing_tag_name}'"
                 ),
                 position: self.current_start,
                 context: None,

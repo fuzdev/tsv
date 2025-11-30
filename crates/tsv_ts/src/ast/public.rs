@@ -32,6 +32,11 @@ pub struct Position {
 pub enum Statement {
     ExpressionStatement(ExpressionStatement),
     VariableDeclaration(VariableDeclaration),
+    TSTypeAliasDeclaration(TSTypeAliasDeclaration),
+    ReturnStatement(ReturnStatement),
+    BlockStatement(BlockStatement),
+    FunctionDeclaration(FunctionDeclaration),
+    ClassDeclaration(ClassDeclaration),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,12 +57,21 @@ pub enum Expression {
     ObjectExpression(ObjectExpression),
     ArrayExpression(ArrayExpression),
     UnaryExpression(UnaryExpression),
+    UpdateExpression(UpdateExpression),
     BinaryExpression(BinaryExpression),
     CallExpression(CallExpression),
+    NewExpression(NewExpression),
     MemberExpression(MemberExpression),
     ConditionalExpression(ConditionalExpression),
     ArrowFunctionExpression(ArrowFunctionExpression),
+    FunctionExpression(FunctionExpression),
     SpreadElement(SpreadElement),
+    TemplateLiteral(TemplateLiteral),
+    TaggedTemplateExpression(TaggedTemplateExpression),
+    AwaitExpression(AwaitExpression),
+    SequenceExpression(SequenceExpression),
+    RegexLiteral(RegexLiteral),
+    Super(Super),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,6 +138,19 @@ pub struct UnaryExpression {
     pub argument: Box<Expression>,
 }
 
+/// Update expression: `++x`, `x++`, `--x`, `x--`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub operator: String,
+    pub prefix: bool,
+    pub argument: Box<Expression>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BinaryExpression {
     #[serde(rename = "type")]
@@ -146,6 +173,18 @@ pub struct CallExpression {
     pub callee: Box<Expression>,
     pub arguments: Vec<Expression>,
     pub optional: bool,
+}
+
+/// New expression: `new Date()`, `new Map()`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub callee: Box<Expression>,
+    pub arguments: Vec<Expression>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -208,6 +247,92 @@ pub struct BlockStatement {
     pub body: Vec<Statement>,
 }
 
+/// Function declaration: `function foo(x) { return x + 1; }`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FunctionDeclaration {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub id: Identifier,
+    pub expression: bool,
+    pub generator: bool,
+    #[serde(rename = "async")]
+    pub is_async: bool,
+    pub params: Vec<Identifier>,
+    pub body: BlockStatement,
+}
+
+/// Class declaration: `class Foo { ... }`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClassDeclaration {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub id: Identifier,
+    #[serde(rename = "superClass")]
+    pub super_class: Option<Box<Expression>>,
+    pub body: ClassBody,
+}
+
+/// Class body: `{ constructor() {} method() {} }`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClassBody {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub body: Vec<MethodDefinition>,
+}
+
+/// Method definition in a class body
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MethodDefinition {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "static")]
+    pub is_static: bool,
+    pub computed: bool,
+    pub key: Box<Expression>,
+    pub kind: String,
+    pub value: FunctionExpression,
+}
+
+/// Function expression: `function() {}` or method shorthand `{ foo() {} }`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FunctionExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub id: Option<Identifier>,
+    pub expression: bool,
+    pub generator: bool,
+    #[serde(rename = "async")]
+    pub is_async: bool,
+    pub params: Vec<Identifier>,
+    pub body: BlockStatement,
+}
+
+/// Return statement: `return expr;` or `return;`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReturnStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub argument: Option<Box<Expression>>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpreadElement {
     #[serde(rename = "type")]
@@ -216,6 +341,107 @@ pub struct SpreadElement {
     pub end: u32,
     pub loc: SourceLocation,
     pub argument: Box<Expression>,
+}
+
+/// Template literal expression: `hello ${name}`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateLiteral {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub quasis: Vec<TemplateElement>,
+    pub expressions: Vec<Expression>,
+}
+
+/// Template element - a static string part of a template literal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateElement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub value: TemplateElementValue,
+    pub tail: bool,
+}
+
+/// Value field of a template element
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateElementValue {
+    pub raw: String,
+    /// Cooked value is null for invalid escape sequences in tagged templates
+    pub cooked: Option<String>,
+}
+
+/// Tagged template expression: tag`content ${expr}`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaggedTemplateExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub tag: Box<Expression>,
+    pub quasi: TemplateLiteral,
+}
+
+/// Await expression: `await promise`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AwaitExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub argument: Box<Expression>,
+}
+
+/// Sequence expression: `a, b, c`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SequenceExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub expressions: Vec<Expression>,
+}
+
+/// Regular expression literal.
+/// Serializes with type "Literal" to match acorn/Svelte AST.
+/// Example: `/hello/gi` becomes `{type: "Literal", value: {}, raw: "/hello/gi", regex: {pattern: "hello", flags: "gi"}}`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegexLiteral {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// Always serializes as empty object {} since regex can't be represented in JSON
+    pub value: serde_json::Value,
+    /// The full raw source text including slashes: /pattern/flags
+    pub raw: String,
+    /// Pattern and flags extracted for convenience
+    pub regex: RegexValue,
+}
+
+/// Regex pattern and flags for the AST.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegexValue {
+    pub pattern: String,
+    pub flags: String,
+}
+
+/// Super expression: `super`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Super {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -284,27 +510,27 @@ pub struct TSTypeAnnotation {
 
 /// TypeScript type expression
 ///
-/// Uses serde's `tag = "type"` to serialize enum variants with a `type` field.
-/// Each variant serializes to a flat object with its own fields plus `"type": "VariantName"`.
+/// Uses serde's untagged enum to serialize each variant based on its structure.
+/// Each variant serializes to a flat object with its own `type` field.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum TSType {
-    /// The `number` type keyword
     TSNumberKeyword(TSNumberKeyword),
-    // TODO: TSStringKeyword, TSBooleanKeyword, etc.
+    TSStringKeyword(TSStringKeyword),
+    TSBooleanKeyword(TSBooleanKeyword),
+    TSAnyKeyword(TSAnyKeyword),
+    TSVoidKeyword(TSVoidKeyword),
+    TSUndefinedKeyword(TSUndefinedKeyword),
+    TSNullKeyword(TSNullKeyword),
+    TSNeverKeyword(TSNeverKeyword),
+    TSUnknownKeyword(TSUnknownKeyword),
+    TSObjectKeyword(TSObjectKeyword),
+    TSSymbolKeyword(TSSymbolKeyword),
+    TSBigIntKeyword(TSBigIntKeyword),
+    TSLiteralType(TSLiteralType),
 }
 
 /// TypeScript `number` type keyword
-///
-/// Serializes to:
-/// ```json
-/// {
-///   "type": "TSNumberKeyword",
-///   "start": 9,
-///   "end": 15,
-///   "loc": { ... }
-/// }
-/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TSNumberKeyword {
     #[serde(rename = "type")]
@@ -312,6 +538,160 @@ pub struct TSNumberKeyword {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
+}
+
+/// TypeScript `string` type keyword
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSStringKeyword {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+}
+
+/// TypeScript `boolean` type keyword
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSBooleanKeyword {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+}
+
+/// TypeScript `any` type keyword
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSAnyKeyword {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+}
+
+/// TypeScript `void` type keyword
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSVoidKeyword {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+}
+
+/// TypeScript `undefined` type keyword
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSUndefinedKeyword {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+}
+
+/// TypeScript `null` type keyword
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSNullKeyword {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+}
+
+/// TypeScript `never` type keyword
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSNeverKeyword {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+}
+
+/// TypeScript `unknown` type keyword
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSUnknownKeyword {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+}
+
+/// TypeScript `object` type keyword
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSObjectKeyword {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+}
+
+/// TypeScript `symbol` type keyword
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSSymbolKeyword {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+}
+
+/// TypeScript `bigint` type keyword
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSBigIntKeyword {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+}
+
+/// TypeScript type alias declaration: `type X = T`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSTypeAliasDeclaration {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub id: Identifier,
+    #[serde(rename = "typeAnnotation")]
+    pub type_annotation: TSType,
+}
+
+/// TypeScript literal type: `type X = 'hello'` or `type X = \`template\``
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSLiteralType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub literal: TSLiteralTypeLiteral,
+}
+
+/// The literal value inside a TSLiteralType
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum TSLiteralTypeLiteral {
+    TemplateLiteral(TemplateLiteralType),
+    // TODO: Add String, Number, Boolean literal variants
+}
+
+/// Template literal used as a type (same structure as TemplateLiteral but expressions are TSType)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateLiteralType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub quasis: Vec<TemplateElement>,
+    pub expressions: Vec<TSType>,
 }
 
 // Serialize numbers as integers if they have no fractional part

@@ -7,6 +7,7 @@
 ///
 /// A thin wrapper around String that provides a consistent API for all printers.
 /// The compiler will inline these methods, making this zero-cost.
+#[derive(Debug)]
 pub struct OutputBuffer {
     buffer: String,
 }
@@ -79,7 +80,7 @@ impl OutputBuffer {
     pub fn current_column(&self, tab_width: usize) -> usize {
         // Find the last newline and count chars after it
         let last_newline = self.buffer.rfind('\n');
-        let line_start = last_newline.map(|pos| pos + 1).unwrap_or(0);
+        let line_start = last_newline.map_or(0, |pos| pos + 1);
         let line = &self.buffer[line_start..];
 
         // Count column width, treating tabs as tab_width

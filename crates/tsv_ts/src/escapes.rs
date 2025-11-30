@@ -152,7 +152,8 @@ pub fn decode_string_escape(source: &str, position: usize) -> Result<String, Par
                         offset += 2;
                     }
                     '\\' | '"' | '\'' => {
-                        result.push(chars.next().unwrap());
+                        chars.next();
+                        result.push(next_ch);
                         offset += 2;
                     }
 
@@ -167,8 +168,7 @@ pub fn decode_string_escape(source: &str, position: usize) -> Result<String, Par
                         {
                             return Err(ParseError::InvalidSyntax {
                                 message: format!(
-                                    "Octal escape sequences are not allowed in strict mode (found '\\0{}')",
-                                    digit_ch
+                                    "Octal escape sequences are not allowed in strict mode (found '\\0{digit_ch}')"
                                 ),
                                 position: position + offset - 2,
                                 context: None,
@@ -182,8 +182,7 @@ pub fn decode_string_escape(source: &str, position: usize) -> Result<String, Par
                     '1'..='7' => {
                         return Err(ParseError::InvalidSyntax {
                             message: format!(
-                                "Octal escape sequences are not allowed in strict mode (found '\\{}')",
-                                next_ch
+                                "Octal escape sequences are not allowed in strict mode (found '\\{next_ch}')"
                             ),
                             position: position + offset,
                             context: None,
@@ -197,15 +196,13 @@ pub fn decode_string_escape(source: &str, position: usize) -> Result<String, Par
 
                         let mut hex_digits = String::new();
                         for _ in 0..2 {
-                            if let Some(&digit) = chars.peek() {
-                                if digit.is_ascii_hexdigit() {
-                                    hex_digits.push(chars.next().unwrap());
+                            match chars.peek() {
+                                Some(&digit) if digit.is_ascii_hexdigit() => {
+                                    chars.next();
+                                    hex_digits.push(digit);
                                     offset += 1;
-                                } else {
-                                    break;
                                 }
-                            } else {
-                                break;
+                                _ => break,
                             }
                         }
 
@@ -221,7 +218,10 @@ pub fn decode_string_escape(source: &str, position: usize) -> Result<String, Par
                             });
                         }
 
-                        let code = u8::from_str_radix(&hex_digits, 16).unwrap(); // Safe: validated above
+                        // Validated exactly 2 hex digits above, so this cannot fail
+                        #[allow(clippy::expect_used)]
+                        let code = u8::from_str_radix(&hex_digits, 16)
+                            .expect("valid hex digits");
                         result.push(code as char);
                     }
 
@@ -240,27 +240,28 @@ pub fn decode_string_escape(source: &str, position: usize) -> Result<String, Par
 
                             // Read up to 6 hex digits
                             for _ in 0..6 {
-                                if let Some(&digit) = chars.peek() {
-                                    if digit == '}' {
+                                match chars.peek() {
+                                    Some(&'}') => {
                                         chars.next();
                                         offset += 1;
                                         found_close = true;
                                         break;
-                                    } else if digit.is_ascii_hexdigit() {
-                                        hex_digits.push(chars.next().unwrap());
+                                    }
+                                    Some(&digit) if digit.is_ascii_hexdigit() => {
+                                        chars.next();
+                                        hex_digits.push(digit);
                                         offset += 1;
-                                    } else {
+                                    }
+                                    Some(&digit) => {
                                         return Err(ParseError::InvalidSyntax {
                                             message: format!(
-                                                "Invalid character '{}' in unicode code point escape",
-                                                digit
+                                                "Invalid character '{digit}' in unicode code point escape"
                                             ),
                                             position: position + offset,
                                             context: None,
                                         });
                                     }
-                                } else {
-                                    break;
+                                    None => break,
                                 }
                             }
 
@@ -276,8 +277,7 @@ pub fn decode_string_escape(source: &str, position: usize) -> Result<String, Par
                             if !found_close {
                                 return Err(ParseError::InvalidSyntax {
                                     message: format!(
-                                        "Unterminated unicode code point escape sequence (\\u{{{})",
-                                        hex_digits
+                                        "Unterminated unicode code point escape sequence (\\u{{{hex_digits})"
                                     ),
                                     position: position + offset - hex_digits.len() - 3,
                                     context: None,
@@ -298,8 +298,7 @@ pub fn decode_string_escape(source: &str, position: usize) -> Result<String, Par
                                 u32::from_str_radix(&hex_digits, 16).map_err(|_| {
                                     ParseError::InvalidSyntax {
                                         message: format!(
-                                            "Invalid unicode code point (\\u{{{}}})",
-                                            hex_digits
+                                            "Invalid unicode code point (\\u{{{hex_digits}}})"
                                         ),
                                         position: position + offset - hex_digits.len() - 3,
                                         context: None,
@@ -309,8 +308,7 @@ pub fn decode_string_escape(source: &str, position: usize) -> Result<String, Par
                             if code_point > 0x10FFFF {
                                 return Err(ParseError::InvalidSyntax {
                                     message: format!(
-                                        "Unicode code point 0x{:X} out of bounds (max is 0x10FFFF)",
-                                        code_point
+                                        "Unicode code point 0x{code_point:X} out of bounds (max is 0x10FFFF)"
                                     ),
                                     position: position + offset - hex_digits.len() - 3,
                                     context: None,
@@ -322,8 +320,7 @@ pub fn decode_string_escape(source: &str, position: usize) -> Result<String, Par
                                 None => {
                                     return Err(ParseError::InvalidSyntax {
                                         message: format!(
-                                            "Invalid unicode code point: 0x{:X}",
-                                            code_point
+                                            "Invalid unicode code point: 0x{code_point:X}"
                                         ),
                                         position: position + offset - hex_digits.len() - 3,
                                         context: None,
@@ -334,15 +331,13 @@ pub fn decode_string_escape(source: &str, position: usize) -> Result<String, Par
                             // Standard \uXXXX format (exactly 4 hex digits)
                             let mut hex_digits = String::new();
                             for _ in 0..4 {
-                                if let Some(&digit) = chars.peek() {
-                                    if digit.is_ascii_hexdigit() {
-                                        hex_digits.push(chars.next().unwrap());
+                                match chars.peek() {
+                                    Some(&digit) if digit.is_ascii_hexdigit() => {
+                                        chars.next();
+                                        hex_digits.push(digit);
                                         offset += 1;
-                                    } else {
-                                        break;
                                     }
-                                } else {
-                                    break;
+                                    _ => break,
                                 }
                             }
 
@@ -358,7 +353,10 @@ pub fn decode_string_escape(source: &str, position: usize) -> Result<String, Par
                                 });
                             }
 
-                            let code_point = u16::from_str_radix(&hex_digits, 16).unwrap(); // Safe: validated above
+                            // Validated exactly 4 hex digits above, so this cannot fail
+                            #[allow(clippy::expect_used)]
+                            let code_point = u16::from_str_radix(&hex_digits, 16)
+                                .expect("valid hex digits");
 
                             // Handle UTF-16 surrogate pairs
                             // High surrogate: 0xD800-0xDBFF
@@ -449,7 +447,8 @@ pub fn decode_string_escape(source: &str, position: usize) -> Result<String, Par
 
                     // Unknown escape: keep the character (e.g., \q → q)
                     _ => {
-                        result.push(chars.next().unwrap());
+                        chars.next();
+                        result.push(next_ch);
                         offset += 2;
                     }
                 }
