@@ -317,6 +317,7 @@ impl AttributeMatcher {
 pub struct CssDeclaration {
     pub property: String,
     pub value: CssValue, // Semantic representation (normalized)
+    pub important: bool, // !important flag
     pub span: Span,
 }
 

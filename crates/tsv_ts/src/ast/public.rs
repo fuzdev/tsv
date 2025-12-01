@@ -72,6 +72,12 @@ pub enum Expression {
     SequenceExpression(SequenceExpression),
     RegexLiteral(RegexLiteral),
     Super(Super),
+    // Assignment and patterns
+    AssignmentExpression(AssignmentExpression),
+    ObjectPattern(ObjectPattern),
+    ArrayPattern(ArrayPattern),
+    AssignmentPattern(AssignmentPattern),
+    RestElement(RestElement),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -224,7 +230,8 @@ pub struct ArrowFunctionExpression {
     pub generator: bool,
     #[serde(rename = "async")]
     pub is_async: bool,
-    pub params: Vec<Identifier>,
+    /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
+    pub params: Vec<Expression>,
     pub body: ArrowFunctionBody,
 }
 
@@ -260,7 +267,8 @@ pub struct FunctionDeclaration {
     pub generator: bool,
     #[serde(rename = "async")]
     pub is_async: bool,
-    pub params: Vec<Identifier>,
+    /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
+    pub params: Vec<Expression>,
     pub body: BlockStatement,
 }
 
@@ -318,7 +326,8 @@ pub struct FunctionExpression {
     pub generator: bool,
     #[serde(rename = "async")]
     pub is_async: bool,
-    pub params: Vec<Identifier>,
+    /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
+    pub params: Vec<Expression>,
     pub body: BlockStatement,
 }
 
@@ -444,6 +453,72 @@ pub struct Super {
     pub loc: SourceLocation,
 }
 
+/// Assignment expression: `x = value`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssignmentExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub operator: String,
+    pub left: Box<Expression>,
+    pub right: Box<Expression>,
+}
+
+/// Object pattern for destructuring: `{a, b}`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObjectPattern {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub properties: Vec<ObjectPatternProperty>,
+}
+
+/// Object pattern property - either a regular property or a rest element
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ObjectPatternProperty {
+    Property(Property),
+    RestElement(RestElement),
+}
+
+/// Array pattern for destructuring: `[a, b]`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArrayPattern {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub elements: Vec<Option<Expression>>,
+}
+
+/// Assignment pattern for default values: `a = 1`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssignmentPattern {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub left: Box<Expression>,
+    pub right: Box<Expression>,
+}
+
+/// Rest element in destructuring: `...rest`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RestElement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub argument: Box<Expression>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Property {
     #[serde(rename = "type")]
@@ -477,7 +552,8 @@ pub struct VariableDeclarator {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    pub id: Identifier,
+    /// The binding pattern (Identifier, ArrayPattern, or ObjectPattern)
+    pub id: Expression,
     pub init: Option<Expression>,
 }
 

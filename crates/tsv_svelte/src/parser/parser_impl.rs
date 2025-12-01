@@ -126,10 +126,7 @@ impl<'a> SvelteParser<'a> {
             ));
         }
 
-        Ok(self
-            .peek_cache
-            .as_ref()
-            .is_some_and(|p| p.kind == kind))
+        Ok(self.peek_cache.as_ref().is_some_and(|p| p.kind == kind))
     }
 
     /// Parse a text node if there's a gap between the last position and current position.

@@ -27,7 +27,10 @@ pub mod printing;
 pub mod quotes;
 mod span;
 
-pub use comment::Comment;
+pub use comment::{
+    Comment, comments_in_range, find_first_comment_from, has_comments_in_range,
+    has_line_comments_in_range,
+};
 pub use config::PrintConfig;
 pub use error::{ErrorContext, ParseError, Result};
 pub use interner::{InfallibleResolve, SymbolResolver};

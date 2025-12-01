@@ -1,5 +1,7 @@
 // Expression tag parsing
 
+use std::rc::Rc;
+
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
@@ -105,7 +107,8 @@ impl<'a> SvelteParser<'a> {
         let expr_content = &self.source[expr_start..expr_end];
 
         // Parse expression using TypeScript parser
-        let expression = tsv_ts::parse_expression(expr_content, expr_start, self.interner.clone())?;
+        let expression =
+            tsv_ts::parse_expression(expr_content, expr_start, Rc::clone(&self.interner))?;
 
         // Recreate lexer starting from the closing brace position
         // TODO(refactor): This lexer reconstruction pattern works but is somewhat unusual.

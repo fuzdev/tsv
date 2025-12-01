@@ -77,7 +77,8 @@ impl<'a> SvelteParser<'a> {
         let content = &self.source[content_start..content_end];
 
         // Parse content with TypeScript parser (shared interner + base offset)
-        let program = tsv_ts::parse_with_interner(content, content_start, self.interner.clone())?;
+        let program =
+            tsv_ts::parse_with_interner(content, content_start, Rc::clone(&self.interner))?;
 
         // Recreate lexer starting from the closing tag position
         // (same pattern as expression tags)

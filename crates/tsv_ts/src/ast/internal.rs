@@ -65,6 +65,12 @@ pub enum Expression {
     SequenceExpression(SequenceExpression),
     RegexLiteral(RegexLiteral),
     Super(Super),
+    // Assignment and patterns
+    AssignmentExpression(AssignmentExpression),
+    ObjectPattern(ObjectPattern),
+    ArrayPattern(ArrayPattern),
+    AssignmentPattern(AssignmentPattern),
+    RestElement(RestElement),
 }
 
 impl Expression {
@@ -90,6 +96,11 @@ impl Expression {
             Expression::SequenceExpression(seq) => seq.span,
             Expression::RegexLiteral(regex) => regex.span,
             Expression::Super(s) => s.span,
+            Expression::AssignmentExpression(assign) => assign.span,
+            Expression::ObjectPattern(obj) => obj.span,
+            Expression::ArrayPattern(arr) => arr.span,
+            Expression::AssignmentPattern(assign) => assign.span,
+            Expression::RestElement(rest) => rest.span,
         }
     }
 }
@@ -380,7 +391,8 @@ pub struct ConditionalExpression {
 /// require additional parsing infrastructure.
 #[derive(Debug, Clone)]
 pub struct ArrowFunctionExpression {
-    pub params: Vec<Identifier>,
+    /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
+    pub params: Vec<Expression>,
     pub body: ArrowFunctionBody,
     pub expression: bool, // true for expression body, false for block body
     pub span: Span,
@@ -415,8 +427,8 @@ impl ArrowFunctionBody {
 pub struct FunctionExpression {
     /// Optional function name (for named function expressions)
     pub id: Option<Identifier>,
-    /// Function parameters
-    pub params: Vec<Identifier>,
+    /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
+    pub params: Vec<Expression>,
     /// Function body (block statement with statements)
     pub body: BlockStatement,
     pub span: Span,
@@ -442,8 +454,8 @@ pub struct BlockStatement {
 pub struct FunctionDeclaration {
     /// Function name (required for declarations)
     pub id: Identifier,
-    /// Function parameters
-    pub params: Vec<Identifier>,
+    /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
+    pub params: Vec<Expression>,
     /// Function body (block statement with statements)
     pub body: BlockStatement,
     /// Whether this is a generator function (`function*`)
@@ -669,6 +681,151 @@ pub struct Super {
     pub span: Span,
 }
 
+/// Assignment expression: `x = value`, `obj.prop = value`, `{a, b} = obj`
+///
+/// Represents assignment operations including:
+/// - Simple assignment: `x = 1`
+/// - Member assignment: `obj.x = 1`
+/// - Destructuring: `{a, b} = obj`, `[x, y] = arr`
+/// - Compound assignment: `x += 1` (uses AssignmentOperator)
+#[derive(Debug, Clone)]
+pub struct AssignmentExpression {
+    /// The assignment target (identifier, member expression, or pattern)
+    pub left: Box<Expression>,
+    /// The operator: "=" for simple, "+=", "-=", etc. for compound
+    pub operator: AssignmentOperator,
+    /// The value being assigned
+    pub right: Box<Expression>,
+    pub span: Span,
+}
+
+/// Assignment operator: `=`, `+=`, `-=`, etc.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum AssignmentOperator {
+    Assign = 0,                   // =
+    AddAssign = 1,                // +=
+    SubtractAssign = 2,           // -=
+    MultiplyAssign = 3,           // *=
+    DivideAssign = 4,             // /=
+    RemainderAssign = 5,          // %=
+    ExponentiateAssign = 6,       // **=
+    LeftShiftAssign = 7,          // <<=
+    RightShiftAssign = 8,         // >>=
+    UnsignedRightShiftAssign = 9, // >>>=
+    BitwiseOrAssign = 10,         // |=
+    BitwiseXorAssign = 11,        // ^=
+    BitwiseAndAssign = 12,        // &=
+    LogicalOrAssign = 13,         // ||=
+    LogicalAndAssign = 14,        // &&=
+    NullishAssign = 15,           // ??=
+}
+
+impl AssignmentOperator {
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            AssignmentOperator::Assign => "=",
+            AssignmentOperator::AddAssign => "+=",
+            AssignmentOperator::SubtractAssign => "-=",
+            AssignmentOperator::MultiplyAssign => "*=",
+            AssignmentOperator::DivideAssign => "/=",
+            AssignmentOperator::RemainderAssign => "%=",
+            AssignmentOperator::ExponentiateAssign => "**=",
+            AssignmentOperator::LeftShiftAssign => "<<=",
+            AssignmentOperator::RightShiftAssign => ">>=",
+            AssignmentOperator::UnsignedRightShiftAssign => ">>>=",
+            AssignmentOperator::BitwiseOrAssign => "|=",
+            AssignmentOperator::BitwiseXorAssign => "^=",
+            AssignmentOperator::BitwiseAndAssign => "&=",
+            AssignmentOperator::LogicalOrAssign => "||=",
+            AssignmentOperator::LogicalAndAssign => "&&=",
+            AssignmentOperator::NullishAssign => "??=",
+        }
+    }
+}
+
+/// Object pattern for destructuring: `{a, b}`, `{a: x, b: y}`, `{...rest}`
+///
+/// Used as the left-hand side in destructuring assignments and declarations:
+/// - `const {a, b} = obj`
+/// - `({a, b} = obj)`
+///
+/// Properties can include:
+/// - Shorthand: `{a}` (key equals value binding)
+/// - Renamed: `{a: x}` (bind obj.a to variable x)
+/// - Default values: `{a = 1}` (use 1 if obj.a is undefined)
+/// - Rest: `{...rest}` (collect remaining properties)
+#[derive(Debug, Clone)]
+pub struct ObjectPattern {
+    pub properties: Vec<ObjectPatternProperty>,
+    pub span: Span,
+}
+
+/// Object pattern property - either a regular property or a rest element
+#[derive(Debug, Clone)]
+pub enum ObjectPatternProperty {
+    Property(Property),
+    RestElement(RestElement),
+}
+
+impl ObjectPatternProperty {
+    pub fn span(&self) -> Span {
+        match self {
+            ObjectPatternProperty::Property(p) => p.span,
+            ObjectPatternProperty::RestElement(r) => r.span,
+        }
+    }
+}
+
+/// Array pattern for destructuring: `[a, b]`, `[a, , b]`, `[...rest]`
+///
+/// Used as the left-hand side in destructuring assignments and declarations:
+/// - `const [a, b] = arr`
+/// - `([a, b] = arr)`
+///
+/// Elements can include:
+/// - Identifiers: `[a, b]`
+/// - Nested patterns: `[{a}, [b]]`
+/// - Default values: `[a = 1]`
+/// - Rest: `[...rest]`
+/// - Holes: `[a, , b]` (skip element at index 1)
+#[derive(Debug, Clone)]
+pub struct ArrayPattern {
+    /// Elements are Option to support holes like `[a, , b]`
+    pub elements: Vec<Option<Expression>>,
+    pub span: Span,
+}
+
+/// Assignment pattern for default values in destructuring: `a = 1`
+///
+/// Used when a destructured variable has a default value:
+/// - `const {a = 1} = obj`
+/// - `const [a = 1] = arr`
+/// - `function foo({a = 1}) {}`
+///
+/// The left side is the binding pattern, the right side is the default value.
+#[derive(Debug, Clone)]
+pub struct AssignmentPattern {
+    /// The binding (identifier or nested pattern)
+    pub left: Box<Expression>,
+    /// The default value expression
+    pub right: Box<Expression>,
+    pub span: Span,
+}
+
+/// Rest element in destructuring: `...rest`
+///
+/// Collects remaining elements in array or object destructuring:
+/// - `const [a, ...rest] = arr` (rest gets remaining array elements)
+/// - `const {a, ...rest} = obj` (rest gets remaining properties)
+#[derive(Debug, Clone)]
+pub struct RestElement {
+    /// The binding for the rest (typically an identifier)
+    pub argument: Box<Expression>,
+    pub span: Span,
+}
+
 #[derive(Debug, Clone)]
 pub struct Literal {
     pub value: LiteralValue,
@@ -711,7 +868,8 @@ pub struct VariableDeclaration {
 
 #[derive(Debug, Clone)]
 pub struct VariableDeclarator {
-    pub id: Identifier,
+    /// The binding pattern (Identifier, ArrayPattern, or ObjectPattern)
+    pub id: Expression,
     pub init: Option<Expression>,
     pub span: Span,
 }

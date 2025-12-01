@@ -313,11 +313,10 @@ fn parse_pseudo_args(
                         found_of = true;
                         parser.advance()?; // consume "of"
                         break;
-                    } else {
-                        // Part of An+B (e.g., "odd", "even", "n")
-                        anb_end = parser.current_end;
-                        parser.advance()?;
                     }
+                    // Part of An+B (e.g., "odd", "even", "n")
+                    anb_end = parser.current_end;
+                    parser.advance()?;
                 } else {
                     // Other tokens (numbers, +, -, whitespace, etc.)
                     anb_end = parser.current_end;

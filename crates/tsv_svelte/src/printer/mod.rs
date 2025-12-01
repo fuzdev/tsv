@@ -112,14 +112,14 @@ impl<'a> Printer<'a> {
 
 /// Format a Svelte AST back to source code
 pub fn format_svelte(root: &internal::Root, source: &str) -> String {
-    let mut printer = Printer::new(source, root.interner.clone());
+    let mut printer = Printer::new(source, Rc::clone(&root.interner));
     printer.print_root(root);
     printer.into_string()
 }
 
 /// Format a Svelte AST back to source code
 pub fn print_svelte(root: &internal::Root, source: &str) -> String {
-    let mut printer = Printer::new(source, root.interner.clone());
+    let mut printer = Printer::new(source, Rc::clone(&root.interner));
     printer.print_root(root);
     printer.into_string()
 }
@@ -187,6 +187,8 @@ impl<'a> Printer<'a> {
     /// - Leading/trailing whitespace-only nodes are removed
     fn print_root_fragment(&mut self, fragment: &internal::Fragment) {
         let mut prev_was_block = false;
+        let mut prev_was_text = false;
+        let mut prev_was_comment = false;
         let mut has_output_content = false;
         let mut pending_ws = PendingWhitespace::None;
 
@@ -224,28 +226,10 @@ impl<'a> Printer<'a> {
                         prev_was_block = false;
                         // continue to next iteration for whitespace-only nodes
                     } else {
-                        // Text with content
-                        // Check if text itself has leading whitespace with newlines
-                        let text_has_leading_newline = {
-                            let trimmed = text.raw.trim_start();
-                            if trimmed.len() < text.raw.len() {
-                                let leading = &text.raw[..text.raw.len() - trimmed.len()];
-                                leading.contains('\n')
-                            } else {
-                                false
-                            }
-                        };
-
-                        // Check if text has trailing newline (determines if next element should be on new line)
-                        let text_has_trailing_newline = {
-                            let trimmed = text.raw.trim_end();
-                            if trimmed.len() < text.raw.len() {
-                                let trailing = &text.raw[trimmed.len()..];
-                                trailing.contains('\n')
-                            } else {
-                                false
-                            }
-                        };
+                        // Text with content - analyze whitespace using TextAnalysis trait
+                        let text_has_leading_newline = text.raw.has_leading_newline();
+                        let text_has_leading_space = text.raw.has_leading_space_only();
+                        let text_has_trailing_newline = text.raw.has_trailing_newline();
 
                         // Upgrade pending whitespace if text has leading newline
                         if text_has_leading_newline {
@@ -253,6 +237,9 @@ impl<'a> Printer<'a> {
                                 PendingWhitespace::BlankLine => PendingWhitespace::BlankLine,
                                 _ => PendingWhitespace::Newline,
                             };
+                        } else if text_has_leading_space && pending_ws == PendingWhitespace::None {
+                            // Text has leading space but no newline, upgrade None to Space
+                            pending_ws = PendingWhitespace::Space;
                         }
 
                         // Resolve pending whitespace before outputting text
@@ -272,16 +259,7 @@ impl<'a> Printer<'a> {
                         }
 
                         // Check if text has trailing space (not newline) - those are semantic
-                        let has_trailing_space = {
-                            let trimmed = text.raw.trim_end();
-                            if trimmed.len() < text.raw.len() {
-                                let trailing = &text.raw[trimmed.len()..];
-                                trailing.chars().any(|c| c == ' ' || c == '\t')
-                                    && !trailing.contains('\n')
-                            } else {
-                                false
-                            }
-                        };
+                        let has_trailing_space = text.raw.has_trailing_space_only();
 
                         // Root-level text normalization: always trim leading, preserve internal spaces,
                         // preserve trailing space only if it's not a newline
@@ -297,6 +275,8 @@ impl<'a> Printer<'a> {
                         // Update state
                         has_output_content = true;
                         prev_was_block = false;
+                        prev_was_text = true;
+                        prev_was_comment = false;
 
                         // Set pending whitespace for next node based on trailing whitespace
                         // If text has trailing space, space is already output - don't add newline before blocks
@@ -312,6 +292,8 @@ impl<'a> Printer<'a> {
                 }
                 FragmentNode::Element(el) => {
                     let is_block = self.is_block_element(el);
+                    let is_component = el.kind == internal::ElementKind::Component;
+                    let is_inline_html = !is_block && !is_component;
 
                     // Resolve pending whitespace before element
                     if has_output_content {
@@ -329,8 +311,11 @@ impl<'a> Printer<'a> {
                                 // Don't add any additional spacing
                             }
                             PendingWhitespace::Space => {
-                                // Space before block → newline, space before inline → preserve
-                                if is_block {
+                                // Space before block → newline
+                                // Space after comment before component → newline (prettier behavior)
+                                // Space after comment before inline HTML → preserve space
+                                // Otherwise → preserve space
+                                if is_block || (prev_was_comment && !is_inline_html) {
                                     self.write("\n");
                                 } else {
                                     self.write(" ");
@@ -346,6 +331,8 @@ impl<'a> Printer<'a> {
                     // Update state
                     has_output_content = true;
                     prev_was_block = is_block;
+                    prev_was_text = false;
+                    prev_was_comment = false;
                     pending_ws = PendingWhitespace::None;
                 }
                 FragmentNode::ExpressionTag(tag) => {
@@ -354,7 +341,14 @@ impl<'a> Printer<'a> {
                         match pending_ws {
                             PendingWhitespace::None => {}
                             PendingWhitespace::AlreadyHandled => {}
-                            PendingWhitespace::Space => self.write(" "), // Expressions are inline
+                            PendingWhitespace::Space => {
+                                // Space after comment before expression → newline (prettier behavior)
+                                if prev_was_comment {
+                                    self.write("\n");
+                                } else {
+                                    self.write(" ");
+                                }
+                            }
                             PendingWhitespace::Newline => self.write("\n"),
                             PendingWhitespace::BlankLine => self.write("\n\n"),
                         }
@@ -365,6 +359,85 @@ impl<'a> Printer<'a> {
                     // Update state
                     has_output_content = true;
                     prev_was_block = false; // Expressions are inline
+                    prev_was_text = false;
+                    prev_was_comment = false;
+                    pending_ws = PendingWhitespace::None;
+                }
+                FragmentNode::Comment(comment) => {
+                    // Resolve pending whitespace before comment (treat as inline)
+                    if has_output_content {
+                        match pending_ws {
+                            PendingWhitespace::None => {
+                                // If previous was block, need newline before comment
+                                if prev_was_block {
+                                    self.write("\n");
+                                }
+                            }
+                            PendingWhitespace::AlreadyHandled => {}
+                            PendingWhitespace::Space => {
+                                // Space before comment after non-text element → newline (prettier behavior)
+                                if !prev_was_text {
+                                    self.write("\n");
+                                } else {
+                                    self.write(" ");
+                                }
+                            }
+                            PendingWhitespace::Newline => self.write("\n"),
+                            PendingWhitespace::BlankLine => self.write("\n\n"),
+                        }
+                    }
+
+                    self.print_comment(comment);
+
+                    // Update state
+                    has_output_content = true;
+                    prev_was_block = false; // Comments are inline
+                    prev_was_text = false;
+                    prev_was_comment = true;
+                    pending_ws = PendingWhitespace::None;
+                }
+                FragmentNode::IfBlock(block) => {
+                    if has_output_content && pending_ws != PendingWhitespace::AlreadyHandled {
+                        self.write("\n");
+                    }
+                    self.print_if_block(block);
+                    has_output_content = true;
+                    prev_was_block = true;
+                    prev_was_text = false;
+                    prev_was_comment = false;
+                    pending_ws = PendingWhitespace::None;
+                }
+                FragmentNode::EachBlock(block) => {
+                    if has_output_content && pending_ws != PendingWhitespace::AlreadyHandled {
+                        self.write("\n");
+                    }
+                    self.print_each_block(block);
+                    has_output_content = true;
+                    prev_was_block = true;
+                    prev_was_text = false;
+                    prev_was_comment = false;
+                    pending_ws = PendingWhitespace::None;
+                }
+                FragmentNode::AwaitBlock(block) => {
+                    if has_output_content && pending_ws != PendingWhitespace::AlreadyHandled {
+                        self.write("\n");
+                    }
+                    self.print_await_block(block);
+                    has_output_content = true;
+                    prev_was_block = true;
+                    prev_was_text = false;
+                    prev_was_comment = false;
+                    pending_ws = PendingWhitespace::None;
+                }
+                FragmentNode::KeyBlock(block) => {
+                    if has_output_content && pending_ws != PendingWhitespace::AlreadyHandled {
+                        self.write("\n");
+                    }
+                    self.print_key_block(block);
+                    has_output_content = true;
+                    prev_was_block = true;
+                    prev_was_text = false;
+                    prev_was_comment = false;
                     pending_ws = PendingWhitespace::None;
                 }
             }
@@ -386,7 +459,364 @@ impl<'a> Printer<'a> {
             FragmentNode::Element(element) => self.print_element(element),
             FragmentNode::Text(text) => self.print_text(text, parent_is_block, parent_preserves_ws),
             FragmentNode::ExpressionTag(tag) => self.print_expression_tag(tag),
+            FragmentNode::Comment(comment) => self.print_comment(comment),
+            FragmentNode::IfBlock(block) => self.print_if_block(block),
+            FragmentNode::EachBlock(block) => self.print_each_block(block),
+            FragmentNode::AwaitBlock(block) => self.print_await_block(block),
+            FragmentNode::KeyBlock(block) => self.print_key_block(block),
         }
+    }
+
+    /// Format an HTML comment: <!-- content -->
+    fn print_comment(&mut self, comment: &internal::HtmlComment) {
+        self.write("<!--");
+        self.write(&comment.content);
+        self.write("-->");
+    }
+
+    /// Check if a fragment's content is inline (no newlines in source)
+    fn is_inline_fragment(&self, fragment: &internal::Fragment) -> bool {
+        let (Some(first), Some(last)) = (fragment.nodes.first(), fragment.nodes.last()) else {
+            return true;
+        };
+        let first_start = first.span().start as usize;
+        let last_end = last.span().end as usize;
+        let content = &self.source[first_start..last_end];
+        !content.contains('\n')
+    }
+
+    /// Format an if block: {#if test}...{:else}...{/if}
+    #[allow(clippy::literal_string_with_formatting_args)]
+    fn print_if_block(&mut self, block: &internal::IfBlock) {
+        self.write("{#if ");
+        self.write(&self.source[block.test.span().range()]);
+        self.write("}");
+
+        let is_inline = self.is_inline_fragment(&block.consequent);
+
+        if is_inline {
+            self.print_inline_children(&block.consequent);
+        } else {
+            self.print_block_children(&block.consequent);
+        }
+
+        if let Some(alt) = &block.alternate {
+            // Check if alternate is an else-if or plain else
+            if let Some(FragmentNode::IfBlock(else_if)) = alt.nodes.first() {
+                if else_if.elseif {
+                    if !is_inline {
+                        self.write("\n");
+                        self.write_indent();
+                    }
+                    self.write("{:else if ");
+                    self.write(&self.source[else_if.test.span().range()]);
+                    self.write("}");
+
+                    let else_if_inline = self.is_inline_fragment(&else_if.consequent);
+                    if else_if_inline {
+                        self.print_inline_children(&else_if.consequent);
+                    } else {
+                        self.print_block_children(&else_if.consequent);
+                    }
+
+                    if let Some(nested_alt) = &else_if.alternate {
+                        self.print_if_alternate(nested_alt, else_if_inline);
+                    }
+                } else {
+                    if !is_inline {
+                        self.write("\n");
+                        self.write_indent();
+                    }
+                    self.write("{:else}");
+                    let alt_inline = self.is_inline_fragment(alt);
+                    if alt_inline {
+                        self.print_inline_children(alt);
+                    } else {
+                        self.print_block_children(alt);
+                    }
+                }
+            } else {
+                if !is_inline {
+                    self.write("\n");
+                    self.write_indent();
+                }
+                self.write("{:else}");
+                let alt_inline = self.is_inline_fragment(alt);
+                if alt_inline {
+                    self.print_inline_children(alt);
+                } else {
+                    self.print_block_children(alt);
+                }
+            }
+        }
+
+        if is_inline {
+            self.write("{/if}");
+        } else {
+            self.write("\n");
+            self.write_indent();
+            self.write("{/if}");
+        }
+    }
+
+    /// Print the alternate branch of an if block (recursive helper)
+    #[allow(clippy::literal_string_with_formatting_args)]
+    fn print_if_alternate(&mut self, alt: &internal::Fragment, parent_is_inline: bool) {
+        if let Some(FragmentNode::IfBlock(else_if)) = alt.nodes.first() {
+            if else_if.elseif {
+                if !parent_is_inline {
+                    self.write("\n");
+                    self.write_indent();
+                }
+                self.write("{:else if ");
+                self.write(&self.source[else_if.test.span().range()]);
+                self.write("}");
+
+                let is_inline = self.is_inline_fragment(&else_if.consequent);
+                if is_inline {
+                    self.print_inline_children(&else_if.consequent);
+                } else {
+                    self.print_block_children(&else_if.consequent);
+                }
+
+                if let Some(nested_alt) = &else_if.alternate {
+                    self.print_if_alternate(nested_alt, is_inline);
+                }
+            } else {
+                if !parent_is_inline {
+                    self.write("\n");
+                    self.write_indent();
+                }
+                self.write("{:else}");
+                let is_inline = self.is_inline_fragment(alt);
+                if is_inline {
+                    self.print_inline_children(alt);
+                } else {
+                    self.print_block_children(alt);
+                }
+            }
+        } else {
+            if !parent_is_inline {
+                self.write("\n");
+                self.write_indent();
+            }
+            self.write("{:else}");
+            let is_inline = self.is_inline_fragment(alt);
+            if is_inline {
+                self.print_inline_children(alt);
+            } else {
+                self.print_block_children(alt);
+            }
+        }
+    }
+
+    /// Format an each block: {#each expr as item}...{/each}
+    #[allow(clippy::literal_string_with_formatting_args)]
+    fn print_each_block(&mut self, block: &internal::EachBlock) {
+        self.write("{#each ");
+        self.print_ts_expression(&block.expression);
+
+        if let Some(context) = &block.context {
+            // Has `as` clause: {#each expr as context, index (key)}
+            self.write(" as ");
+            self.print_ts_pattern(context);
+            if let Some(idx) = &block.index {
+                self.write(", ");
+                self.write(idx);
+            }
+            if let Some(key) = &block.key {
+                self.write(" (");
+                self.print_ts_expression(key);
+                self.write(")");
+            }
+        } else if let Some(idx) = &block.index {
+            // No `as` clause but has index: {#each expr, index}
+            self.write(", ");
+            self.write(idx);
+        }
+        // else: just {#each expr}
+
+        self.write("}");
+
+        let is_inline = self.is_inline_fragment(&block.body);
+        if is_inline {
+            self.print_inline_children(&block.body);
+        } else {
+            self.print_block_children(&block.body);
+        }
+
+        if let Some(fallback) = &block.fallback {
+            if !is_inline {
+                self.write("\n");
+                self.write_indent();
+            }
+            self.write("{:else}");
+            let fallback_inline = self.is_inline_fragment(fallback);
+            if fallback_inline {
+                self.print_inline_children(fallback);
+            } else {
+                self.print_block_children(fallback);
+            }
+        }
+
+        if is_inline {
+            self.write("{/each}");
+        } else {
+            self.write("\n");
+            self.write_indent();
+            self.write("{/each}");
+        }
+    }
+
+    /// Format an await block: {#await expr}...{:then}...{:catch}...{/await}
+    fn print_await_block(&mut self, block: &internal::AwaitBlock) {
+        // Check for shorthand syntax: {#await promise then value}
+        let is_shorthand = block.pending.is_none() && block.value.is_some();
+
+        self.write("{#await ");
+        self.write(&self.source[block.expression.span().range()]);
+
+        // Determine if content is inline based on the main content fragment
+        let main_fragment = if is_shorthand {
+            block.then.as_ref()
+        } else {
+            block.pending.as_ref()
+        };
+        let is_inline = main_fragment.is_none_or(|f| self.is_inline_fragment(f));
+
+        if is_shorthand {
+            if let Some(value) = &block.value {
+                self.write(" then ");
+                self.write(&self.source[value.span().range()]);
+            }
+            self.write("}");
+            if let Some(then_block) = &block.then {
+                if is_inline {
+                    self.print_inline_children(then_block);
+                } else {
+                    self.print_block_children(then_block);
+                }
+            }
+        } else {
+            self.write("}");
+            if let Some(pending) = &block.pending {
+                if is_inline {
+                    self.print_inline_children(pending);
+                } else {
+                    self.print_block_children(pending);
+                }
+            }
+            if let Some(then_block) = &block.then {
+                if !is_inline {
+                    self.write("\n");
+                    self.write_indent();
+                }
+                self.write("{:then");
+                if let Some(value) = &block.value {
+                    self.write(" ");
+                    self.write(&self.source[value.span().range()]);
+                }
+                self.write("}");
+                let then_inline = self.is_inline_fragment(then_block);
+                if then_inline {
+                    self.print_inline_children(then_block);
+                } else {
+                    self.print_block_children(then_block);
+                }
+            }
+            if let Some(catch_block) = &block.catch {
+                if !is_inline {
+                    self.write("\n");
+                    self.write_indent();
+                }
+                self.write("{:catch");
+                if let Some(error) = &block.error {
+                    self.write(" ");
+                    self.write(&self.source[error.span().range()]);
+                }
+                self.write("}");
+                let catch_inline = self.is_inline_fragment(catch_block);
+                if catch_inline {
+                    self.print_inline_children(catch_block);
+                } else {
+                    self.print_block_children(catch_block);
+                }
+            }
+        }
+
+        if is_inline {
+            self.write("{/await}");
+        } else {
+            self.write("\n");
+            self.write_indent();
+            self.write("{/await}");
+        }
+    }
+
+    /// Format a key block: {#key expr}...{/key}
+    fn print_key_block(&mut self, block: &internal::KeyBlock) {
+        self.write("{#key ");
+        self.write(&self.source[block.expression.span().range()]);
+        self.write("}");
+
+        let is_inline = self.is_inline_fragment(&block.fragment);
+        if is_inline {
+            self.print_inline_children(&block.fragment);
+        } else {
+            self.print_block_children(&block.fragment);
+        }
+
+        if is_inline {
+            self.write("{/key}");
+        } else {
+            self.write("\n");
+            self.write_indent();
+            self.write("{/key}");
+        }
+    }
+
+    /// Print children inline (no newlines added)
+    fn print_inline_children(&mut self, fragment: &internal::Fragment) {
+        for node in &fragment.nodes {
+            match node {
+                FragmentNode::Text(text) => {
+                    // For inline, preserve trimmed text
+                    let trimmed = text.raw.trim();
+                    if !trimmed.is_empty() {
+                        self.write(trimmed);
+                    }
+                }
+                _ => {
+                    self.print_fragment_node(node, false, false);
+                }
+            }
+        }
+    }
+
+    /// Helper to print children of a block with proper indentation
+    fn print_block_children(&mut self, fragment: &internal::Fragment) {
+        // For now, just print each child on a new line with indentation
+        if fragment.nodes.is_empty() {
+            return;
+        }
+        self.indent_level += 1;
+        for node in &fragment.nodes {
+            match node {
+                FragmentNode::Text(text) => {
+                    if !text.raw.trim().is_empty() {
+                        self.write("\n");
+                        self.write_indent();
+                        self.write(text.raw.trim());
+                    }
+                }
+                _ => {
+                    self.write("\n");
+                    self.write_indent();
+                    self.print_fragment_node(node, true, false);
+                }
+            }
+        }
+        self.indent_level -= 1;
     }
 }
 

@@ -51,14 +51,11 @@ impl CommandRegistry {
         }
 
         let command_name = &args[1];
-        let command = match self.find(command_name) {
-            Some(cmd) => cmd,
-            None => {
-                eprintln!("Unknown command: '{command_name}'");
-                eprintln!();
-                self.print_usage(&args[0]);
-                process::exit(1);
-            }
+        let Some(command) = self.find(command_name) else {
+            eprintln!("Unknown command: '{command_name}'");
+            eprintln!();
+            self.print_usage(&args[0]);
+            process::exit(1);
         };
 
         // Build Args from args[2..] (skip program name and command name)

@@ -1,11 +1,14 @@
 // Svelte parser - main entry point for parsing .svelte files
 
+use std::rc::Rc;
+
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, PeekData, Span};
 
 // Module declarations
 mod attribute;
+mod block;
 mod element;
 mod expression_tag;
 mod fragment;
@@ -92,12 +95,16 @@ impl<'a> SvelteParser<'a> {
                 }
                 css = Some(Box::new(style));
             } else {
-                // Regular markup: capture text and parse elements/expressions
+                // Regular markup: capture text and parse elements/expressions/comments
 
                 // Capture any leading text
                 self.capture_text_if_gap(last_end, &mut fragment_nodes)?;
 
-                if self.check(TokenKind::LeftAngle) {
+                if self.check(TokenKind::Comment) {
+                    let comment = self.parse_comment()?;
+                    last_end = comment.span.end as usize;
+                    fragment_nodes.push(FragmentNode::Comment(comment));
+                } else if self.check(TokenKind::LeftAngle) {
                     let element = self.parse_element()?;
                     last_end = element.span.end as usize;
                     fragment_nodes.push(FragmentNode::Element(element));
@@ -105,6 +112,10 @@ impl<'a> SvelteParser<'a> {
                     let expression_tag = self.parse_expression_tag()?;
                     last_end = expression_tag.span.end as usize;
                     fragment_nodes.push(FragmentNode::ExpressionTag(expression_tag));
+                } else if self.check(TokenKind::BlockOpen) {
+                    let block = self.parse_block()?;
+                    last_end = block.span().end as usize;
+                    fragment_nodes.push(block);
                 } else {
                     return Err(ParseError::InvalidSyntax {
                         message: format!("Unexpected token in markup: {}", self.current_kind),
@@ -138,7 +149,7 @@ impl<'a> SvelteParser<'a> {
         // root.span semantically covers meaningful content; full fidelity is in fragment.nodes.
         // This matches Svelte's parser exactly and aligns with JS AST conventions.
 
-        // root.start: First fragment node (whitespace-only → skip, content/element → include)
+        // root.start: First fragment node (whitespace-only text → skip, content/element/comment → include)
         if let Some(first_node) = fragment.nodes.first() {
             match first_node {
                 FragmentNode::Text(text) => {
@@ -150,13 +161,19 @@ impl<'a> SvelteParser<'a> {
                         root_start = Some(text.span.start as usize);
                     }
                 }
-                _ => {
+                FragmentNode::Element(_)
+                | FragmentNode::ExpressionTag(_)
+                | FragmentNode::Comment(_)
+                | FragmentNode::IfBlock(_)
+                | FragmentNode::EachBlock(_)
+                | FragmentNode::AwaitBlock(_)
+                | FragmentNode::KeyBlock(_) => {
                     root_start = Some(first_node.span().start as usize);
                 }
             }
         }
 
-        // root.end: Last fragment node (whitespace-only → exclude, content/element → include)
+        // root.end: Last fragment node (whitespace-only text → exclude, content/element/comment → include)
         let end = if let Some(last_node) = fragment.nodes.last() {
             match last_node {
                 FragmentNode::Text(text) => {
@@ -168,7 +185,13 @@ impl<'a> SvelteParser<'a> {
                         text.span.end
                     }
                 }
-                _ => last_node.span().end,
+                FragmentNode::Element(_)
+                | FragmentNode::ExpressionTag(_)
+                | FragmentNode::Comment(_)
+                | FragmentNode::IfBlock(_)
+                | FragmentNode::EachBlock(_)
+                | FragmentNode::AwaitBlock(_)
+                | FragmentNode::KeyBlock(_) => last_node.span().end,
             }
         } else {
             // No fragment nodes - use max of all top-level items
@@ -217,7 +240,7 @@ impl<'a> SvelteParser<'a> {
             css,
             comments,
             span: Span { start, end },
-            interner: self.interner.clone(),
+            interner: Rc::clone(&self.interner),
         })
     }
 }

@@ -28,8 +28,8 @@ impl Input {
 
     /// Read from file path
     pub fn from_file(path: &str) -> Result<Self, String> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| format!("Error reading file '{path}': {e}"))?;
+        let content =
+            fs::read_to_string(path).map_err(|e| format!("Error reading file '{path}': {e}"))?;
         Ok(Input::File {
             path: path.to_string(),
             content,

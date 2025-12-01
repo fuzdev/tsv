@@ -4,14 +4,18 @@ use tsv_lang::ParseError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
-    LeftAngle,  // <
-    RightAngle, // >
-    Slash,      // /
-    LeftBrace,  // {
-    RightBrace, // }
-    Equals,     // =
-    String,     // "..." attribute values
-    Identifier, // Tag names, attribute names
+    LeftAngle,     // <
+    RightAngle,    // >
+    Slash,         // /
+    LeftBrace,     // {
+    RightBrace,    // }
+    BlockOpen,     // {#
+    BlockClose,    // {/
+    BlockContinue, // {:
+    Equals,        // =
+    String,        // "..." attribute values
+    Identifier,    // Tag names, attribute names
+    Comment,       // <!-- ... -->
     Eof,
 }
 
@@ -23,9 +27,13 @@ impl fmt::Display for TokenKind {
             TokenKind::Slash => write!(f, "'/'"),
             TokenKind::LeftBrace => write!(f, "'{{'"),
             TokenKind::RightBrace => write!(f, "'}}'"),
+            TokenKind::BlockOpen => write!(f, "'{{#'"),
+            TokenKind::BlockClose => write!(f, "'{{/'"),
+            TokenKind::BlockContinue => write!(f, "'{{:'"),
             TokenKind::Equals => write!(f, "'='"),
             TokenKind::String => write!(f, "string"),
             TokenKind::Identifier => write!(f, "identifier"),
+            TokenKind::Comment => write!(f, "comment"),
             TokenKind::Eof => write!(f, "end of file"),
         }
     }
@@ -68,6 +76,12 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Peek at the next n characters without consuming them
+    fn peek_chars(&self, n: usize) -> &str {
+        let end = (self.position + n).min(self.source.len());
+        &self.source[self.position..end]
+    }
+
     fn skip_whitespace(&mut self) {
         while let Some(ch) = self.current {
             if ch.is_whitespace() {
@@ -108,6 +122,39 @@ impl<'a> Lexer<'a> {
                 value: "",
             }),
             Some('<') => {
+                // Check for HTML comment: <!--
+                if self.peek_chars(4) == "<!--" {
+                    // Consume "<!--"
+                    self.advance(); // <
+                    self.advance(); // !
+                    self.advance(); // -
+                    self.advance(); // -
+
+                    // Scan until "-->"
+                    while self.current.is_some() {
+                        if self.peek_chars(3) == "-->" {
+                            // Consume "-->"
+                            self.advance();
+                            self.advance();
+                            self.advance();
+                            return Ok(Token {
+                                kind: TokenKind::Comment,
+                                start,
+                                end: self.position,
+                                value: &self.source[start..self.position],
+                            });
+                        }
+                        self.advance();
+                    }
+
+                    // Unterminated comment
+                    return Err(ParseError::InvalidSyntax {
+                        message: "Unterminated HTML comment".to_string(),
+                        position: start,
+                        context: None,
+                    });
+                }
+
                 self.inside_tag = true; // Enter tag mode
                 self.advance();
                 Ok(Token {
@@ -138,12 +185,42 @@ impl<'a> Lexer<'a> {
             }
             Some('{') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::LeftBrace,
-                    start,
-                    end: self.position,
-                    value: &self.source[start..self.position],
-                })
+                // Check for block tokens: {#, {:, {/
+                match self.current {
+                    Some('#') => {
+                        self.advance();
+                        Ok(Token {
+                            kind: TokenKind::BlockOpen,
+                            start,
+                            end: self.position,
+                            value: &self.source[start..self.position],
+                        })
+                    }
+                    Some(':') => {
+                        self.advance();
+                        Ok(Token {
+                            kind: TokenKind::BlockContinue,
+                            start,
+                            end: self.position,
+                            value: &self.source[start..self.position],
+                        })
+                    }
+                    Some('/') => {
+                        self.advance();
+                        Ok(Token {
+                            kind: TokenKind::BlockClose,
+                            start,
+                            end: self.position,
+                            value: &self.source[start..self.position],
+                        })
+                    }
+                    _ => Ok(Token {
+                        kind: TokenKind::LeftBrace,
+                        start,
+                        end: self.position,
+                        value: &self.source[start..self.position],
+                    }),
+                }
             }
             Some('}') => {
                 self.advance();

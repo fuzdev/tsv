@@ -44,6 +44,21 @@ pub enum FragmentNode {
     RegularElement(Element),
     ExpressionTag(ExpressionTag),
     Text(Text),
+    Comment(Comment),
+    IfBlock(IfBlock),
+    EachBlock(EachBlock),
+    AwaitBlock(AwaitBlock),
+    KeyBlock(KeyBlock),
+}
+
+/// Svelte HTML Comment node: <!-- content -->
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Comment {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub data: String,
 }
 
 /// Svelte Element - HTML/component tag
@@ -111,4 +126,68 @@ pub struct Script {
     pub context: String,            // "default" or "module"
     pub content: serde_json::Value, // Program with leadingComments/trailingComments injected
     pub attributes: Vec<Attribute>,
+}
+
+/// Svelte IfBlock - conditional rendering
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IfBlock {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub elseif: bool,
+    pub test: Expression,
+    pub consequent: Fragment,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alternate: Option<Fragment>,
+}
+
+/// Svelte EachBlock - list iteration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EachBlock {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub expression: Expression,
+    /// None when no `as` clause: {#each expr} or {#each expr, index}
+    pub context: Option<Expression>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key: Option<Expression>,
+    pub body: Fragment,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fallback: Option<Fragment>,
+}
+
+/// Svelte AwaitBlock - promise handling
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AwaitBlock {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub expression: Expression,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<Expression>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<Expression>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pending: Option<Fragment>,
+    #[serde(rename = "then", skip_serializing_if = "Option::is_none")]
+    pub then_block: Option<Fragment>,
+    #[serde(rename = "catch", skip_serializing_if = "Option::is_none")]
+    pub catch_block: Option<Fragment>,
+}
+
+/// Svelte KeyBlock - keyed updates
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyBlock {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub expression: Expression,
+    pub fragment: Fragment,
 }

@@ -27,7 +27,10 @@ use crate::ast::internal;
 use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::DefaultStringInterner;
-use tsv_lang::{OutputBuffer, PrintConfig, SymbolResolver, printing};
+use tsv_lang::{
+    OutputBuffer, PrintConfig, SymbolResolver, comments_in_range, has_comments_in_range,
+    has_line_comments_in_range, printing,
+};
 
 /// Check if an expression is a pure property chain (member expressions without calls)
 ///
@@ -62,6 +65,28 @@ pub(crate) fn is_multiline_string_literal(expr: &internal::Expression, source: &
 }
 
 /// Check if an expression contains multiline string literals at any depth
+/// Check if an object pattern should expand (print across multiple lines).
+///
+/// Prettier expands object patterns when any property has a nested pattern
+/// (ObjectPattern or ArrayPattern) as its value. This is different from the
+/// multiline content rule used for object expressions.
+pub(crate) fn object_pattern_should_expand(obj: &internal::ObjectPattern) -> bool {
+    obj.properties.iter().any(|prop| match prop {
+        internal::ObjectPatternProperty::Property(p) => {
+            // Check if the value is a nested pattern
+            matches!(
+                p.value,
+                internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_)
+            ) ||
+            // Also check AssignmentPattern with nested pattern left side
+            matches!(&p.value, internal::Expression::AssignmentPattern(ap)
+                if matches!(ap.left.as_ref(),
+                    internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_)))
+        }
+        internal::ObjectPatternProperty::RestElement(_) => false,
+    })
+}
+
 ///
 /// Recursively traverses nested structures (arrays, objects, calls) to find
 /// multiline strings. Prettier expands ALL containing structures when a multiline
@@ -139,13 +164,36 @@ pub(crate) fn has_multiline_content(expr: &internal::Expression, source: &str) -
         internal::Expression::AwaitExpression(await_expr) => {
             has_multiline_content(&await_expr.argument, source)
         }
-        internal::Expression::SequenceExpression(seq) => {
-            seq.expressions.iter().any(|e| has_multiline_content(e, source))
-        }
+        internal::Expression::SequenceExpression(seq) => seq
+            .expressions
+            .iter()
+            .any(|e| has_multiline_content(e, source)),
         // Regex literals don't have multiline content
         internal::Expression::RegexLiteral(_) => false,
         // Super is just a keyword, no multiline content
         internal::Expression::Super(_) => false,
+        // Assignment expression: check both sides
+        internal::Expression::AssignmentExpression(assign) => {
+            has_multiline_content(&assign.left, source)
+                || has_multiline_content(&assign.right, source)
+        }
+        // Patterns: check their contents
+        internal::Expression::ObjectPattern(obj) => obj.properties.iter().any(|prop| match prop {
+            internal::ObjectPatternProperty::Property(p) => has_multiline_content(&p.value, source),
+            internal::ObjectPatternProperty::RestElement(r) => {
+                has_multiline_content(&r.argument, source)
+            }
+        }),
+        internal::Expression::ArrayPattern(arr) => arr
+            .elements
+            .iter()
+            .flatten()
+            .any(|elem| has_multiline_content(elem, source)),
+        internal::Expression::AssignmentPattern(pattern) => {
+            has_multiline_content(&pattern.left, source)
+                || has_multiline_content(&pattern.right, source)
+        }
+        internal::Expression::RestElement(rest) => has_multiline_content(&rest.argument, source),
     }
 }
 
@@ -210,6 +258,17 @@ impl<'a> Printer<'a> {
         self.buffer.current_column(self.config.tab_width)
     }
 
+    /// Check if a pattern expression should expand (print across multiple lines)
+    #[allow(clippy::only_used_in_recursion)]
+    pub(crate) fn pattern_should_expand(&self, expr: &internal::Expression) -> bool {
+        match expr {
+            internal::Expression::ObjectPattern(obj) => object_pattern_should_expand(obj),
+            internal::Expression::ArrayPattern(_) => false, // Array patterns don't expand based on nesting
+            internal::Expression::AssignmentPattern(ap) => self.pattern_should_expand(&ap.left),
+            _ => false,
+        }
+    }
+
     /// Print a TypeScript comment
     pub(crate) fn print_comment(&mut self, comment: &internal::Comment) {
         if comment.is_block {
@@ -253,6 +312,24 @@ impl<'a> Printer<'a> {
             // Always add newline between statements (separator)
             if i > 0 {
                 self.write("\n");
+
+                // Check for blank lines between statements (preserve from source)
+                // Only check if there are no comments between statements
+                // (comments handle their own blank line preservation)
+                let has_comments = self
+                    .comments
+                    .iter()
+                    .any(|c| c.span.start >= prev_end && c.span.end <= statement.span().start);
+
+                if !has_comments
+                    && printing::has_blank_line_between(
+                        self.source,
+                        prev_end,
+                        statement.span().start,
+                    )
+                {
+                    self.write("\n");
+                }
             }
 
             // Print leading comments before this statement
@@ -270,55 +347,48 @@ impl<'a> Printer<'a> {
 
     /// Print leading comments (comments between prev_end and curr_start)
     /// Returns true if any comments were printed
+    ///
+    /// Uses binary search to find starting point: O(log n + k)
     fn print_leading_comments(&mut self, prev_end: u32, curr_start: u32) -> bool {
-        // TODO: Optimize comment lookup with binary search or range queries
-        // Current: O(n) linear scan through all comments for each statement
-        // Better: Sort comments by position once, use binary search for range [prev_end, curr_start]
-        // Or: Build interval tree / segment tree for O(log n) range queries
-        // Impact: Significant for files with 100+ comments (e.g., heavily documented APIs)
-        // Note: Comments already collected during parsing, just need efficient retrieval
         let mut last_comment_end = prev_end;
         let mut printed_any = false;
 
-        for comment in self.comments.iter() {
-            // Check if comment is between prev and current position
-            if comment.span.start >= prev_end && comment.span.end <= curr_start {
-                // Skip comments that are on the same line as prev_end
-                // (those are trailing inline comments, already printed)
-                if printing::is_same_line(self.source, prev_end, comment.span.start) {
-                    continue;
-                }
+        for comment in comments_in_range(self.comments, prev_end, curr_start) {
+            // Skip comments that are on the same line as prev_end
+            // (those are trailing inline comments, already printed)
+            if printing::is_same_line(self.source, prev_end, comment.span.start) {
+                continue;
+            }
 
-                // Check if comment is on the same line as curr_start
-                // (those are same-line leading comments, print inline without newline)
-                if printing::is_same_line(self.source, comment.span.end, curr_start) {
-                    self.write_indent();
-                    self.print_comment(comment);
-                    self.write(" ");
-                    printed_any = true;
-                    last_comment_end = comment.span.end;
-                    continue;
-                }
-
-                // Check if we need a blank line before this comment
-                if comment.span.start > last_comment_end
-                    && printing::has_blank_line_between(
-                        self.source,
-                        last_comment_end,
-                        comment.span.start,
-                    )
-                {
-                    self.write("\n");
-                }
-
+            // Check if comment is on the same line as curr_start
+            // (those are same-line leading comments, print inline without newline)
+            if printing::is_same_line(self.source, comment.span.end, curr_start) {
                 self.write_indent();
                 self.print_comment(comment);
-                self.write("\n");
-
-                // Update last_comment_end for next iteration
-                last_comment_end = comment.span.end;
+                self.write(" ");
                 printed_any = true;
+                last_comment_end = comment.span.end;
+                continue;
             }
+
+            // Check if we need a blank line before this comment
+            if comment.span.start > last_comment_end
+                && printing::has_blank_line_between(
+                    self.source,
+                    last_comment_end,
+                    comment.span.start,
+                )
+            {
+                self.write("\n");
+            }
+
+            self.write_indent();
+            self.print_comment(comment);
+            self.write("\n");
+
+            // Update last_comment_end for next iteration
+            last_comment_end = comment.span.end;
+            printed_any = true;
         }
 
         // Check if there's a blank line after the last comment and before curr_start
@@ -336,21 +406,30 @@ impl<'a> Printer<'a> {
     ///
     /// Matches prettier's behavior: comments before semicolon are moved to after it.
     /// Example: `const x = 1 /* comment */;` → `const x = 1; /* comment */`
+    ///
+    /// Uses binary search to find starting point: O(log n + k)
     pub(crate) fn print_inline_comments_in_statement(&mut self, expr_end: u32, stmt_end: u32) {
-        // Collect all inline comments (before and after semicolon)
+        // Use binary search to skip comments before expr_end
+        let first_idx = tsv_lang::find_first_comment_from(self.comments, expr_end);
+
         let mut has_comments = false;
-        for comment in self.comments.iter() {
-            // Comments between expression end and statement end (before semicolon)
-            // OR comments after statement end on same line (after semicolon)
-            if (comment.span.start >= expr_end && comment.span.end <= stmt_end)
-                || (comment.span.start >= stmt_end
-                    && printing::is_same_line(self.source, stmt_end, comment.span.start))
-            {
+        for comment in &self.comments[first_idx..] {
+            // Print comments that are either:
+            // 1. Between expression end and statement end (before semicolon), OR
+            // 2. After statement end but on the same line (after semicolon)
+            let in_range = comment.span.start >= expr_end && comment.span.end <= stmt_end;
+            let same_line_after = comment.span.start >= stmt_end
+                && printing::is_same_line(self.source, stmt_end, comment.span.start);
+
+            if in_range || same_line_after {
                 if !has_comments {
                     self.write(" ");
                     has_comments = true;
                 }
                 self.print_comment(comment);
+            } else if comment.span.start > stmt_end {
+                // Stop once we're past stmt_end and no longer on same line
+                break;
             }
         }
     }
@@ -370,30 +449,30 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if there are comments between two positions (read-only check)
+    ///
+    /// Uses binary search: O(log n)
     pub(crate) fn has_comments_between(&self, start: u32, end: u32) -> bool {
-        self.comments
-            .iter()
-            .any(|c| c.span.start >= start && c.span.end <= end)
+        has_comments_in_range(self.comments, start, end)
     }
 
     /// Check if there are line comments (// style) between two positions
+    ///
+    /// Uses binary search: O(log n + k) where k is comments in range
     pub(crate) fn has_line_comments_between(&self, start: u32, end: u32) -> bool {
-        self.comments
-            .iter()
-            .any(|c| c.span.start >= start && c.span.end <= end && !c.is_block)
+        has_line_comments_in_range(self.comments, start, end)
     }
 
     /// Print inline comments between two positions (same-line comments only)
     /// Returns true if any comments were printed
     /// Note: Adds space before each comment, but NOT after (caller handles trailing space)
+    ///
+    /// Uses binary search to find starting point: O(log n + k)
     pub(crate) fn print_inline_comments_between(&mut self, start: u32, end: u32) -> bool {
         let mut printed_any = false;
-        for comment in self.comments.iter() {
-            if comment.span.start >= start && comment.span.end <= end {
-                self.write(" ");
-                self.print_comment(comment);
-                printed_any = true;
-            }
+        for comment in comments_in_range(self.comments, start, end) {
+            self.write(" ");
+            self.print_comment(comment);
+            printed_any = true;
         }
         printed_any
     }
@@ -401,13 +480,13 @@ impl<'a> Printer<'a> {
     /// Print leading comments for a variable declarator (no leading space)
     /// Returns true if any comments were printed
     /// Used for comments between declarators: `const a = 1, /* comment */ b = 2`
+    ///
+    /// Uses binary search to find starting point: O(log n + k)
     pub(crate) fn print_leading_comments_for_declarator(&mut self, start: u32, end: u32) -> bool {
         let mut printed_any = false;
-        for comment in self.comments.iter() {
-            if comment.span.start >= start && comment.span.end <= end {
-                self.print_comment(comment);
-                printed_any = true;
-            }
+        for comment in comments_in_range(self.comments, start, end) {
+            self.print_comment(comment);
+            printed_any = true;
         }
         printed_any
     }
@@ -423,6 +502,7 @@ impl<'a> Printer<'a> {
     ///
     /// Returns true if a same-line leading comment was printed (caller should skip its indent).
     /// For comments on their own line, prints with proper indentation and newline.
+    /// Uses binary search to find starting point: O(log n + k)
     pub(crate) fn print_object_leading_comments(
         &mut self,
         prev_end: u32,
@@ -432,48 +512,43 @@ impl<'a> Printer<'a> {
         let mut last_comment_end = prev_end;
         let mut printed_same_line = false;
 
-        for comment in self.comments.iter() {
-            // Check if comment is between prev and current position
-            if comment.span.start >= prev_end && comment.span.end <= curr_start {
-                // Skip comments on the same line as prev_end - those are trailing comments
-                // for the previous property (already printed by the trailing comment logic).
-                // EXCEPT for the first property: same-line comments after `{` are leading comments.
-                if !is_first_prop
-                    && printing::is_same_line(self.source, prev_end, comment.span.start)
-                {
-                    continue;
-                }
+        for comment in comments_in_range(self.comments, prev_end, curr_start) {
+            // Skip comments on the same line as prev_end - those are trailing comments
+            // for the previous property (already printed by the trailing comment logic).
+            // EXCEPT for the first property: same-line comments after `{` are leading comments.
+            if !is_first_prop && printing::is_same_line(self.source, prev_end, comment.span.start) {
+                continue;
+            }
 
-                // Check if comment is on the same line as curr_start
-                // (inline leading comment like `{/* comment */ a: 1}`)
-                if printing::is_same_line(self.source, comment.span.end, curr_start) {
-                    // Same-line comment: always print indent (we're at start of a new line),
-                    // then comment and space
-                    self.write_indent();
-                    self.print_comment(comment);
-                    self.write(" ");
-                    last_comment_end = comment.span.end;
-                    printed_same_line = true;
-                    continue;
-                }
-
-                // Comment on its own line: check for blank lines
-                if comment.span.start > last_comment_end
-                    && printing::has_blank_line_between(
-                        self.source,
-                        last_comment_end,
-                        comment.span.start,
-                    )
-                {
-                    self.write("\n");
-                }
-
+            // Check if comment is on the same line as curr_start
+            // (inline leading comment like `{/* comment */ a: 1}`)
+            if printing::is_same_line(self.source, comment.span.end, curr_start) {
+                // Same-line comment: always print indent (we're at start of a new line),
+                // then comment and space
                 self.write_indent();
                 self.print_comment(comment);
-                self.write("\n");
-
+                self.write(" ");
                 last_comment_end = comment.span.end;
+                printed_same_line = true;
+                continue;
             }
+
+            // Comment on its own line: check for blank lines
+            if comment.span.start > last_comment_end
+                && printing::has_blank_line_between(
+                    self.source,
+                    last_comment_end,
+                    comment.span.start,
+                )
+            {
+                self.write("\n");
+            }
+
+            self.write_indent();
+            self.print_comment(comment);
+            self.write("\n");
+
+            last_comment_end = comment.span.end;
         }
 
         // Check for blank line after the last comment before the property
@@ -485,6 +560,60 @@ impl<'a> Printer<'a> {
         }
 
         printed_same_line
+    }
+
+    /// Print leading comments before a statement in a block
+    ///
+    /// Similar to print_leading_comments but handles the first statement specially:
+    /// for the first statement, same-line comments after `{` are leading comments,
+    /// not trailing comments from a previous statement.
+    ///
+    /// - `prev_end`: Position after the previous statement (or opening brace for first statement)
+    /// - `curr_start`: Position of the current statement
+    /// - `is_first`: True if this is the first statement (prev_end is after opening brace)
+    ///
+    /// Uses binary search to find starting point: O(log n + k)
+    pub(crate) fn print_block_leading_comments(
+        &mut self,
+        prev_end: u32,
+        curr_start: u32,
+        is_first: bool,
+    ) {
+        let mut last_comment_end = prev_end;
+
+        for comment in comments_in_range(self.comments, prev_end, curr_start) {
+            // Skip comments on the same line as prev_end - those are trailing comments
+            // for the previous statement (already printed by the trailing comment logic).
+            // EXCEPT for the first statement: same-line comments after `{` are leading comments.
+            if !is_first && printing::is_same_line(self.source, prev_end, comment.span.start) {
+                continue;
+            }
+
+            // Check for blank lines before this comment
+            if comment.span.start > last_comment_end
+                && printing::has_blank_line_between(
+                    self.source,
+                    last_comment_end,
+                    comment.span.start,
+                )
+            {
+                self.write("\n");
+            }
+
+            self.write_indent();
+            self.print_comment(comment);
+            self.write("\n");
+
+            last_comment_end = comment.span.end;
+        }
+
+        // Check for blank line after the last comment before the statement
+        if last_comment_end > prev_end
+            && last_comment_end < curr_start
+            && printing::has_blank_line_between(self.source, last_comment_end, curr_start)
+        {
+            self.write("\n");
+        }
     }
 }
 

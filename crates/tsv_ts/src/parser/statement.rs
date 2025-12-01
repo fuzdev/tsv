@@ -114,36 +114,56 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_variable_declarator(&mut self) -> Result<VariableDeclarator, ParseError> {
-        // Parse identifier
-        if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected identifier in variable declaration".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
-        }
+        let id_start = self.current_pos().0;
 
-        let (id_start, id_end) = self.current_pos();
-        let symbol = self.intern(self.current_value());
-        self.advance()?;
+        // Parse binding pattern: identifier, array pattern [a, b], or object pattern {a, b}
+        let id = match self.current_kind() {
+            TokenKind::Identifier => {
+                // Simple identifier binding
+                let (start, end) = self.current_pos();
+                let symbol = self.intern(self.current_value());
+                self.advance()?;
 
-        // Check for type annotation
-        let type_annotation = if self.check(&TokenKind::Colon) {
-            Some(self.parse_type_annotation()?)
-        } else {
-            None
+                // Check for type annotation on identifier
+                let type_annotation = if self.check(&TokenKind::Colon) {
+                    Some(self.parse_type_annotation()?)
+                } else {
+                    None
+                };
+
+                let id_end = type_annotation
+                    .as_ref()
+                    .map_or(end, |ta| ta.span.end as usize);
+
+                Expression::Identifier(Identifier {
+                    name: symbol,
+                    type_annotation,
+                    span: Span::new(start as u32, id_end as u32),
+                })
+            }
+            TokenKind::BracketOpen => {
+                // Array destructuring pattern: [a, b] = arr
+                let expr = self.parse_array_expression()?;
+                self.to_assignable(expr)?
+            }
+            TokenKind::BraceOpen => {
+                // Object destructuring pattern: {a, b} = obj
+                let expr = self.parse_object_expression()?;
+                self.to_assignable(expr)?
+            }
+            _ => {
+                return Err(ParseError::InvalidSyntax {
+                    message: format!(
+                        "Expected identifier or destructuring pattern, found {}",
+                        self.current_kind()
+                    ),
+                    position: self.current_pos().0,
+                    context: None,
+                });
+            }
         };
 
-        // Calculate the end position of identifier (including type annotation if present)
-        let id_span_end = type_annotation
-            .as_ref()
-            .map_or(id_end, |ta| ta.span.end as usize);
-
-        let id = Identifier {
-            name: symbol,
-            type_annotation,
-            span: Span::new(id_start as u32, id_span_end as u32),
-        };
+        let id_end = id.span().end as usize;
 
         // Check for initializer
         // Use assignment_expression because comma separates declarators
@@ -153,9 +173,7 @@ impl<'a> Parser<'a> {
             None
         };
 
-        let end = init
-            .as_ref()
-            .map_or(id_span_end, |e| e.span().end as usize);
+        let end = init.as_ref().map_or(id_end, |e| e.span().end as usize);
 
         Ok(VariableDeclarator {
             id,
@@ -487,16 +505,18 @@ impl<'a> Parser<'a> {
         };
 
         // Parse optional `extends` clause
-        let super_class =
-            if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Extends)) {
-                self.advance()?; // consume 'extends'
+        let super_class = if matches!(
+            self.current_kind(),
+            TokenKind::Keyword(KeywordKind::Extends)
+        ) {
+            self.advance()?; // consume 'extends'
 
-                // Parse superclass expression (typically an identifier, but could be member expression)
-                let expr = self.parse_expression()?;
-                Some(Box::new(expr))
-            } else {
-                None
-            };
+            // Parse superclass expression (typically an identifier, but could be member expression)
+            let expr = self.parse_expression()?;
+            Some(Box::new(expr))
+        } else {
+            None
+        };
 
         // Parse class body
         let body = self.parse_class_body()?;

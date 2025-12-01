@@ -42,8 +42,8 @@ impl<'a> Printer<'a> {
                         parts.push(doc::hardline());
                         parts.push(doc::text(self.config.indent));
                     }
-                    let id_str = self.resolve_symbol(declarator.id.name);
-                    parts.push(doc::text(id_str));
+                    // id can be Identifier, ArrayPattern, or ObjectPattern
+                    parts.push(self.build_expression_doc(&declarator.id));
                     if let Some(init) = &declarator.init {
                         parts.push(doc::text(" = "));
                         parts.push(self.build_expression_doc(init));
@@ -84,7 +84,17 @@ impl<'a> Printer<'a> {
 
     /// Print an expression statement (expression followed by semicolon)
     fn print_expression_statement(&mut self, stmt: &internal::ExpressionStatement) {
+        // Object pattern assignments need parentheses to avoid ambiguity with block statements
+        // e.g., `({a, b} = obj);` not `{a, b} = obj;`
+        let needs_parens = self.expression_statement_needs_parens(&stmt.expression);
+
+        if needs_parens {
+            self.write("(");
+        }
         self.print_expression(&stmt.expression);
+        if needs_parens {
+            self.write(")");
+        }
         self.write(";");
 
         // Print inline comments - includes both:
@@ -94,6 +104,36 @@ impl<'a> Printer<'a> {
         self.print_inline_comments_in_statement(stmt.expression.span().end, stmt.span.end);
     }
 
+    /// Check if an expression statement needs parentheses
+    ///
+    /// Object pattern assignments need parens to avoid ambiguity with block statements.
+    /// Array pattern assignments don't need parens (no ambiguity with array literal).
+    fn expression_statement_needs_parens(&self, expr: &internal::Expression) -> bool {
+        expression_needs_parens_at_statement_level(expr)
+    }
+}
+
+/// Check if an expression needs parentheses at statement level
+///
+/// Separate function to avoid clippy warning about &self only used in recursion.
+fn expression_needs_parens_at_statement_level(expr: &internal::Expression) -> bool {
+    match expr {
+        internal::Expression::AssignmentExpression(assign) => {
+            matches!(assign.left.as_ref(), internal::Expression::ObjectPattern(_))
+        }
+        // Sequence expressions with object pattern assignment in first position also need parens
+        internal::Expression::SequenceExpression(seq) => {
+            if let Some(first) = seq.expressions.first() {
+                expression_needs_parens_at_statement_level(first)
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
+impl<'a> Printer<'a> {
     /// Print a variable declaration
     fn print_variable_declaration(&mut self, decl: &internal::VariableDeclaration) {
         // Write the keyword (const, let, var)
@@ -180,14 +220,14 @@ impl<'a> Printer<'a> {
     /// determines whether to break. Property chains use greedy line packing
     /// via `fill()` for long chains that need internal breaks.
     fn print_variable_declarator(&mut self, declarator: &internal::VariableDeclarator) {
-        // Check if we have an initializer - if not, just print the identifier
+        // Check if we have an initializer - if not, just print the binding pattern
         let Some(init) = &declarator.init else {
-            self.print_identifier(&declarator.id);
+            self.print_expression(&declarator.id);
             return;
         };
 
         // Handle comments around the equals sign
-        let id_end = declarator.id.span.end;
+        let id_end = declarator.id.span().end;
         let init_start = init.span().start;
         let equals_pos = self.find_equals_position(id_end, init_start);
         let has_comments_before_eq = self.has_comments_between(id_end, equals_pos);
@@ -195,7 +235,7 @@ impl<'a> Printer<'a> {
 
         // If there are comments, use direct printing (comment handling with doc IR is complex)
         if has_comments_before_eq || has_comments_after_eq {
-            self.print_identifier(&declarator.id);
+            self.print_expression(&declarator.id);
             let _ = self.print_inline_comments_between(id_end, equals_pos);
             if has_comments_after_eq {
                 self.write(" =");
@@ -217,11 +257,11 @@ impl<'a> Printer<'a> {
         if is_multiline_string {
             // Multiline strings: mandatory break after `=`
             // Structure: id + " =" + hardline + indent + value
-            let id_str = declarator.id.span.extract(self.source);
+            let id_doc = self.build_expression_doc(&declarator.id);
             let init_doc = self.build_expression_doc(init);
 
             let assignment_doc = doc::concat(vec![
-                doc::text(id_str),
+                id_doc,
                 doc::text(" ="),
                 doc::indent(doc::concat(vec![doc::hardline(), init_doc])),
             ]);
@@ -230,15 +270,17 @@ impl<'a> Printer<'a> {
             let current_col = self.current_column() + base_offset;
             let output = doc::print_doc_at_column(&assignment_doc, &self.config, current_col);
             self.write(&output);
-        } else if is_pure_property_chain(init) {
+        } else if is_pure_property_chain(init) && !self.pattern_should_expand(&declarator.id) {
             // Property chains: optional break based on width (fluid layout)
             // - If RHS fits after `= `, stay on one line: `id = value`
             // - If RHS doesn't fit, break after `=` and indent: `id =\n\tvalue`
             //
             // Structure: group(id + " =" + indent(line + rhs))
             // When the group decides to break, line() becomes newline + indent
-            let id_str = declarator.id.span.extract(self.source);
-            let id_doc = doc::text(id_str);
+            //
+            // Note: Skip this for expanded patterns - the group-based approach
+            // causes unwanted line breaks after `=` when the pattern is multiline.
+            let id_doc = self.build_expression_doc(&declarator.id);
             let init_doc = self.build_expression_doc(init);
 
             let assignment_doc = doc::group(doc::concat(vec![
@@ -253,7 +295,7 @@ impl<'a> Printer<'a> {
             self.write(&output);
         } else {
             // Direct printing for expressions that handle their own wrapping
-            self.print_identifier(&declarator.id);
+            self.print_expression(&declarator.id);
             self.write(" = ");
             self.print_expression(init);
         }
@@ -284,12 +326,12 @@ impl<'a> Printer<'a> {
         self.print_identifier(&decl.id);
         self.write("(");
 
-        // Print parameters
+        // Print parameters (can be Identifier, ArrayPattern, ObjectPattern, AssignmentPattern)
         for (i, param) in decl.params.iter().enumerate() {
             if i > 0 {
                 self.write(", ");
             }
-            self.print_identifier(param);
+            self.print_expression(param);
         }
 
         self.write(") ");
@@ -301,13 +343,12 @@ impl<'a> Printer<'a> {
         let id_str = self.resolve_symbol(decl.id.name);
         let mut parts = vec![doc::text("function "), doc::text(id_str), doc::text("(")];
 
-        // Build params
+        // Build params (can be Identifier, ArrayPattern, ObjectPattern, AssignmentPattern)
         for (i, param) in decl.params.iter().enumerate() {
             if i > 0 {
                 parts.push(doc::text(", "));
             }
-            let param_str = self.resolve_symbol(param.name);
-            parts.push(doc::text(param_str));
+            parts.push(self.build_expression_doc(param));
         }
 
         parts.push(doc::text(") "));
@@ -368,13 +409,13 @@ impl<'a> Printer<'a> {
             self.print_expression(&method.key);
         }
 
-        // Print parameters
+        // Print parameters (can be Identifier, ArrayPattern, ObjectPattern, AssignmentPattern)
         self.write("(");
         for (i, param) in method.value.params.iter().enumerate() {
             if i > 0 {
                 self.write(", ");
             }
-            self.print_identifier(param);
+            self.print_expression(param);
         }
         self.write(") ");
 
@@ -438,14 +479,13 @@ impl<'a> Printer<'a> {
             parts.push(self.build_expression_doc(&method.key));
         }
 
-        // Parameters
+        // Parameters (can be Identifier, ArrayPattern, ObjectPattern, AssignmentPattern)
         parts.push(doc::text("("));
         for (i, param) in method.value.params.iter().enumerate() {
             if i > 0 {
                 parts.push(doc::text(", "));
             }
-            let param_str = self.resolve_symbol(param.name);
-            parts.push(doc::text(param_str));
+            parts.push(self.build_expression_doc(param));
         }
         parts.push(doc::text(") "));
 

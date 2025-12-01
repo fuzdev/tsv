@@ -203,6 +203,7 @@ impl<'a> Printer<'a> {
         let has_inline_or_expr = fragment.nodes.iter().any(|node| match node {
             FragmentNode::Element(el) => self.is_inline_element(el),
             FragmentNode::ExpressionTag(_) => true,
+            FragmentNode::Comment(_) => true, // Comments are inline-like for spacing
             _ => false,
         });
 
@@ -216,33 +217,46 @@ impl<'a> Printer<'a> {
         let should_skip_ws_boundaries = is_block && has_inline_or_expr && !only_text;
 
         if should_skip_ws_boundaries {
-            // Find first non-whitespace node
-            let first_content_idx = fragment.nodes.iter().position(|node| {
-                if let FragmentNode::Text(text) = node {
-                    !text.raw.trim().is_empty()
-                } else {
-                    true // Non-text nodes count as content
-                }
-            });
+            // Find content boundaries (first/last non-whitespace-only nodes)
+            let (first_content_idx, last_content_idx) =
+                find_content_boundary_indices(&fragment.nodes);
 
-            // Find last non-whitespace node
-            let last_content_idx = fragment.nodes.iter().rposition(|node| {
-                if let FragmentNode::Text(text) = node {
-                    !text.raw.trim().is_empty()
-                } else {
-                    true // Non-text nodes count as content
-                }
-            });
+            // Print nodes within content boundaries, with special handling for boundary text
+            if let (Some(first), Some(last)) = (first_content_idx, last_content_idx) {
+                for (i, node) in fragment.nodes.iter().enumerate() {
+                    // Skip nodes outside content boundaries
+                    if i < first || i > last {
+                        continue;
+                    }
 
-            // Print nodes, skipping leading/trailing whitespace-only text
-            for (i, node) in fragment.nodes.iter().enumerate() {
-                // Skip if before first content or after last content
-                if let (Some(first), Some(last)) = (first_content_idx, last_content_idx)
-                    && (i < first || i > last)
-                {
-                    continue;
+                    // Special handling for boundary text nodes to trim leading/trailing whitespace
+                    if let FragmentNode::Text(text) = node {
+                        let is_first = i == first;
+                        let is_last = i == last;
+
+                        if is_first || is_last {
+                            // Normalize whitespace, then trim boundaries as needed
+                            let normalized = self.normalize_whitespace(&text.raw, false);
+                            let trimmed = normalized.trim();
+
+                            // Write with appropriate boundary handling
+                            if is_first && is_last {
+                                self.write(trimmed);
+                            } else if is_first {
+                                // Trim start, preserve trailing
+                                let trimmed_start = normalized.trim_start();
+                                self.write(trimmed_start);
+                            } else {
+                                // Preserve leading, trim end
+                                let trimmed_end = normalized.trim_end();
+                                self.write(trimmed_end);
+                            }
+                            continue;
+                        }
+                    }
+
+                    self.print_fragment_node(node, child_parent_is_block, preserves_ws);
                 }
-                self.print_fragment_node(node, child_parent_is_block, preserves_ws);
             }
         } else {
             // Normal mode: print all nodes
@@ -330,4 +344,25 @@ impl<'a> Printer<'a> {
         self.write("\n");
         self.write(">");
     }
+}
+
+/// Find the first and last indices of non-whitespace-only content nodes.
+///
+/// Returns (first_content_idx, last_content_idx) where:
+/// - Text nodes with only whitespace are skipped
+/// - Non-text nodes (elements, expressions, comments) always count as content
+/// - Text nodes with non-whitespace content count as content
+fn find_content_boundary_indices(nodes: &[FragmentNode]) -> (Option<usize>, Option<usize>) {
+    let is_content = |node: &FragmentNode| {
+        if let FragmentNode::Text(text) = node {
+            text.raw.has_content() // Uses TextAnalysis trait
+        } else {
+            true // Non-text nodes are always content
+        }
+    };
+
+    let first = nodes.iter().position(is_content);
+    let last = nodes.iter().rposition(is_content);
+
+    (first, last)
 }

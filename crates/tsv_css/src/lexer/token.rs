@@ -31,6 +31,7 @@ pub enum TokenKind {
     Dollar,           // $ (for attribute selectors: $=)
     Pipe,             // | (for attribute selectors: |=, namespace selectors)
     ColumnCombinator, // || (CSS Grid column combinator)
+    Bang,             // ! (for !important)
 
     // Values - composite tokens per CSS Syntax Level 3
     String {

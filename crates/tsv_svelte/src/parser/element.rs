@@ -80,11 +80,19 @@ impl<'a> SvelteParser<'a> {
         let mut last_end = opening_tag_end;
 
         // Parse children until we hit closing tag
+        #[allow(unused_assignments)] // last_end may be set before loop breaks
         loop {
             // Capture text/whitespace gaps between tokens
             self.capture_text_if_gap(last_end, &mut child_nodes)?;
+            // Update last_end to prevent double-capture if we break
+            last_end = self.current_start;
 
-            if self.check(TokenKind::LeftBrace) {
+            if self.check(TokenKind::Comment) {
+                // HTML comment: <!-- ... -->
+                let comment = self.parse_comment()?;
+                last_end = comment.span.end as usize;
+                child_nodes.push(FragmentNode::Comment(comment));
+            } else if self.check(TokenKind::LeftBrace) {
                 // Expression tag: {expr}
                 let expression_tag = self.parse_expression_tag()?;
                 last_end = expression_tag.span.end as usize;
@@ -95,12 +103,16 @@ impl<'a> SvelteParser<'a> {
                 if self.is_next_token(TokenKind::Slash)? {
                     // It's a closing tag - exit loop
                     break;
-                } else {
-                    // It's a child element - recursively parse
-                    let child = self.parse_element()?;
-                    last_end = child.span.end as usize;
-                    child_nodes.push(FragmentNode::Element(child));
                 }
+                // It's a child element - recursively parse
+                let child = self.parse_element()?;
+                last_end = child.span.end as usize;
+                child_nodes.push(FragmentNode::Element(child));
+            } else if self.check(TokenKind::BlockOpen) {
+                // Control flow block: {#if}, {#each}, etc.
+                let block = self.parse_block()?;
+                last_end = block.span().end as usize;
+                child_nodes.push(block);
             } else if self.check(TokenKind::Eof) {
                 return Err(ParseError::InvalidSyntax {
                     message: format!("Unclosed element: <{tag_name}>"),
@@ -111,7 +123,7 @@ impl<'a> SvelteParser<'a> {
                 // Unexpected token
                 return Err(ParseError::InvalidSyntax {
                     message: format!(
-                        "Expected element, expression tag, or closing tag, found {}",
+                        "Expected element, expression tag, comment, block, or closing tag, found {}",
                         self.current_kind
                     ),
                     position: self.current_start,

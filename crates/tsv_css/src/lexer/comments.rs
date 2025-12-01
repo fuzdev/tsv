@@ -28,10 +28,9 @@ pub(crate) fn read_comment(source: &str, pos: &mut usize) -> Result<Token, Parse
                     *pos += 1; // *
                     *pos += 1; // /
                     break;
-                } else {
-                    content.push('*');
-                    *pos += 1;
                 }
+                content.push('*');
+                *pos += 1;
             }
             Some(ch) => {
                 content.push(ch);

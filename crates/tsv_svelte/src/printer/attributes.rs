@@ -6,6 +6,8 @@
 // - Future: Directives (on:, bind:, use:, transition:, etc.)
 // - Future: Dynamic attributes ({...spread})
 
+use std::rc::Rc;
+
 use crate::ast::internal;
 use crate::printer::Printer;
 use tsv_lang::SymbolResolver;
@@ -90,7 +92,7 @@ impl<'a> Printer<'a> {
                 // TODO: For now, render the expression tag to a string
                 // In future full refactor, this would build a Doc tree for the expression
                 let mut temp_printer =
-                    Printer::with_config(self.source, self.interner.clone(), self.config);
+                    Printer::with_config(self.source, Rc::clone(&self.interner), self.config);
                 temp_printer.print_expression_tag(expr_tag);
                 doc::text(temp_printer.into_string())
             }

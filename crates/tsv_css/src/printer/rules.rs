@@ -406,12 +406,18 @@ impl<'a> Printer<'a> {
         // Write property name (normalized with spaces around comments)
         self.write(&property_normalized);
 
+        // Helper to write the declaration ending (!important if needed, then semicolon)
+        let important = decl.important;
+
         // Check if property needs multiline formatting (structure-based)
         if self.should_use_multiline(decl) {
             self.write(":\n");
             self.indent_level += 1;
             self.print_css_value_multiline(&decl.value);
             self.indent_level -= 1;
+            if important {
+                self.write(" !important");
+            }
             self.write(";\n");
         // Check if value needs width-based wrapping
         } else if let (true, is_comma) =
@@ -433,17 +439,26 @@ impl<'a> Printer<'a> {
                 self.print_space_list_wrapped(&decl.value, first_line_offset);
                 self.indent_level -= 1;
             }
+            if important {
+                self.write(" !important");
+            }
             self.write(";\n");
         } else if self.value_comments.contains_key(&decl.span.start) {
             // Value has comments - extract from source to preserve them
             if let Some(normalized) = source_fidelity::extract_value_with_comments(decl_source) {
                 self.write(": ");
                 self.write(&normalized);
+                if important {
+                    self.write(" !important");
+                }
                 self.write(";\n");
             } else {
                 // Fallback: shouldn't happen
                 self.write(": ");
                 self.write(decl_source);
+                if important {
+                    self.write(" !important");
+                }
                 self.write(";\n");
             }
         } else if let CssValue::String { quote, .. } = &decl.value {
@@ -451,12 +466,18 @@ impl<'a> Printer<'a> {
             if let Some(formatted) = source_fidelity::extract_string_value(decl_source, *quote) {
                 self.write(": ");
                 self.write(&formatted);
+                if important {
+                    self.write(" !important");
+                }
                 self.write(";\n");
             } else {
                 // Fallback: use semantic formatting
                 self.write(": ");
                 let formatted = source_fidelity::format_string_value("", *quote);
                 self.write(&formatted);
+                if important {
+                    self.write(" !important");
+                }
                 self.write(";\n");
             }
         } else {
@@ -469,6 +490,9 @@ impl<'a> Printer<'a> {
                 self.write(": ");
             }
             self.print_css_value(&decl.value);
+            if important {
+                self.write(" !important");
+            }
             self.write(";\n");
         }
     }
@@ -527,13 +551,10 @@ impl<'a> Printer<'a> {
     /// Uses pair-based lookahead (like prettier's fill algorithm) to pack multiple items per line.
     /// Pattern: property:\n\titem1, item2,\n\titem3;
     fn print_comma_list_wrapped(&mut self, value: &CssValue) {
-        let values = match value {
-            CssValue::CommaSeparated { values, .. } => values,
-            _ => {
-                // Fallback
-                self.print_nested_value(value);
-                return;
-            }
+        let CssValue::CommaSeparated { values, .. } = value else {
+            // Fallback
+            self.print_nested_value(value);
+            return;
         };
 
         // Calculate available width on continuation lines
@@ -644,13 +665,10 @@ impl<'a> Printer<'a> {
     ///
     /// `first_line_offset` is the width already consumed on the first line (property + ": ")
     fn print_space_list_wrapped(&mut self, value: &CssValue, first_line_offset: usize) {
-        let values = match value {
-            CssValue::List { values, .. } => values,
-            _ => {
-                // Fallback
-                self.print_nested_value(value);
-                return;
-            }
+        let CssValue::List { values, .. } = value else {
+            // Fallback
+            self.print_nested_value(value);
+            return;
         };
 
         // Calculate available width on continuation lines

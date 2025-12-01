@@ -452,9 +452,8 @@ fn validate_normalization_ours(result: &mut FixtureValidation, fixture: &Fixture
 
     for quirk_name in &prettier_quirk_variants {
         let quirk_path = fixture_dir.join(quirk_name);
-        let quirk_content = match read_file(&quirk_path) {
-            Ok(s) => s,
-            Err(_) => continue,
+        let Ok(quirk_content) = read_file(&quirk_path) else {
+            continue;
         };
 
         // Track for duplicate detection
@@ -497,9 +496,8 @@ fn validate_normalization_ours(result: &mut FixtureValidation, fixture: &Fixture
 
     for variant_name in &unformatted_variants {
         let variant_path = fixture_dir.join(variant_name);
-        let variant_content = match read_file(&variant_path) {
-            Ok(s) => s,
-            Err(_) => continue,
+        let Ok(variant_content) = read_file(&variant_path) else {
+            continue;
         };
 
         // Track for duplicate detection
@@ -555,9 +553,8 @@ fn validate_normalization_ours(result: &mut FixtureValidation, fixture: &Fixture
 
     for variant_name in unformatted_ours_variants {
         let variant_path = fixture_dir.join(&variant_name);
-        let variant_content = match read_file(&variant_path) {
-            Ok(s) => s,
-            Err(_) => continue,
+        let Ok(variant_content) = read_file(&variant_path) else {
+            continue;
         };
 
         match fixtures::format_with_our_formatter(&variant_content, "temp.svelte") {
@@ -702,9 +699,8 @@ async fn validate_normalization_prettier(
     let prettier_quirk_variants = discover_prettier_quirk_variants(fixture_dir);
     for quirk_name in &prettier_quirk_variants {
         let quirk_path = fixture_dir.join(quirk_name);
-        let quirk_content = match read_file(&quirk_path) {
-            Ok(s) => s,
-            Err(_) => continue,
+        let Ok(quirk_content) = read_file(&quirk_path) else {
+            continue;
         };
 
         match fuz_client::run_prettier(&quirk_content, "temp.svelte").await {
@@ -728,9 +724,8 @@ async fn validate_normalization_prettier(
     let unformatted_variants = discover_unformatted_variants(fixture_dir);
     for variant_name in &unformatted_variants {
         let variant_path = fixture_dir.join(variant_name);
-        let variant_content = match read_file(&variant_path) {
-            Ok(s) => s,
-            Err(_) => continue,
+        let Ok(variant_content) = read_file(&variant_path) else {
+            continue;
         };
 
         match fuz_client::run_prettier(&variant_content, "temp.svelte").await {

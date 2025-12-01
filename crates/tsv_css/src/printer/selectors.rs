@@ -32,12 +32,13 @@ impl<'a> Printer<'a> {
         // Check if source contains comments
         let source_text = list.span.extract(self.source);
         if source_text.contains("/*") {
-            // Extract from source and normalize whitespace around comments
+            // Extract from source and normalize spacing around comments
+            // Add missing spaces and reduce double spaces to single
             let normalized = source_text
-                .replace(",/*", ", /*")
-                .replace("*/.", "*/ .")
-                .replace(",  /*", ", /*")
-                .replace("*/  .", "*/ .");
+                .replace(",/*", ", /*") // Ensure space after comma before comment
+                .replace("*/.", "*/ .") // Ensure space after comment before class selector
+                .replace(",  /*", ", /*") // Reduce double space after comma
+                .replace("*/  .", "*/ ."); // Reduce double space after comment
             self.write(&normalized);
             return;
         }
@@ -86,16 +87,13 @@ impl<'a> Printer<'a> {
         let has_comments = source_text.contains("/*");
 
         if has_comments {
-            // Extract from source and normalize whitespace around comments
-            // Replace patterns like ",/*" with ", /*" and "*/" with "*/ "
-            // TODO: Refactor to use self.normalize_comment_spacing() for consistency
-            // Current implementation uses manual .replace() calls (6 lines of duplication)
-            // Would need testing against selector fixtures with comments to ensure identical output
+            // Extract from source and normalize spacing around comments
+            // Add missing spaces and reduce double spaces to single
             let normalized = source_text
-                .replace(",/*", ", /*")
-                .replace("*/.", "*/ .")
-                .replace(",  /*", ", /*") // Reduce multiple spaces after comma
-                .replace("*/  .", "*/ ."); // Reduce multiple spaces after comment
+                .replace(",/*", ", /*") // Ensure space after comma before comment
+                .replace("*/.", "*/ .") // Ensure space after comment before class selector
+                .replace(",  /*", ", /*") // Reduce double space after comma
+                .replace("*/  .", "*/ ."); // Reduce double space after comment
             self.write(&normalized);
         } else {
             self.print_selector_list_with_wrapping(list, nested);

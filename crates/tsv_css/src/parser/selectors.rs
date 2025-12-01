@@ -486,7 +486,10 @@ fn parse_relative_selector(
     combinator_span: Option<Span>,
 ) -> Result<RelativeSelector, ParseError> {
     // Start position is either the combinator start (if present) or the current selector start
-    let start = combinator_span.map_or_else(|| parser.base_offset() + parser.current_start(), |s| s.start as usize);
+    let start = combinator_span.map_or_else(
+        || parser.base_offset() + parser.current_start(),
+        |s| s.start as usize,
+    );
     let mut selectors = Vec::new();
 
     // Parse one or more simple selectors

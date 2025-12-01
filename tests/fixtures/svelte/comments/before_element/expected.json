@@ -1,0 +1,46 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 32,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 16,
+				"data": " comment "
+			},
+			{
+				"type": "Text",
+				"start": 16,
+				"end": 17,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 17,
+				"end": 32,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 22,
+							"end": 26,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

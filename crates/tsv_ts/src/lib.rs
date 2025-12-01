@@ -80,8 +80,12 @@ pub fn format_with_config(
     source: &str,
     config: tsv_lang::PrintConfig,
 ) -> String {
-    let mut printer =
-        printer::Printer::with_config(program.interner.clone(), source, &program.comments, config);
+    let mut printer = printer::Printer::with_config(
+        Rc::clone(&program.interner),
+        source,
+        &program.comments,
+        config,
+    );
     printer.print_program(program);
     printer.into_string()
 }
@@ -158,9 +162,42 @@ pub fn parse_expression(
         .map_err(|e| e.with_context(source))
 }
 
+/// Parse a partial expression, stopping at top-level commas.
+///
+/// This is used when parsing patterns in contexts where commas have other meanings,
+/// such as `{#each items as pattern, index}` where the comma separates the pattern
+/// from the index variable.
+///
+/// Unlike `parse_expression`, this uses assignment expression parsing which stops
+/// at top-level commas (but handles commas inside objects/arrays/calls correctly).
+///
+/// # Arguments
+///
+/// * `source` - The source code starting at the expression
+/// * `base_offset` - Offset in the full source file
+/// * `interner` - Shared string interner
+///
+/// # Returns
+///
+/// * `Ok((Expression, usize))` - The parsed expression and the absolute position
+///   where parsing stopped (start of next token)
+/// * `Err(ParseError)` - If parsing fails
+pub fn parse_expression_partial(
+    source: &str,
+    base_offset: usize,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+) -> Result<(Expression, usize)> {
+    let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
+    parser
+        .parse_assignment_expression_partial()
+        .map_err(|e| e.with_context(source))
+}
+
 // Re-export key types for convenience
 pub use ast::internal::{
-    ArrowFunctionBody, ArrowFunctionExpression, Expression, Identifier, Literal, LiteralValue,
-    ObjectProperty, Program, Property, SpreadElement, Statement, TSKeywordKind, TSKeywordType,
-    TSType, TSTypeAnnotation, VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
+    ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression, AssignmentExpression,
+    AssignmentOperator, AssignmentPattern, Expression, Identifier, Literal, LiteralValue,
+    ObjectPattern, ObjectPatternProperty, ObjectProperty, Program, Property, RestElement,
+    SpreadElement, Statement, TSKeywordKind, TSKeywordType, TSType, TSTypeAnnotation,
+    VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
 };

@@ -20,11 +20,59 @@ impl<'a> Printer<'a> {
         self.write("}");
     }
 
-    /// Format a TypeScript expression (helper for expression tags)
+    /// Format a TypeScript pattern (destructuring context)
+    ///
+    /// Patterns use spaces inside braces: `{ a, b }` instead of `{a, b}`.
+    /// Used for `{#each ... as pattern}` contexts.
+    pub fn print_ts_pattern(&mut self, expr: &tsv_ts::Expression) {
+        match expr {
+            tsv_ts::Expression::ObjectExpression(obj) => {
+                // Destructuring patterns use spaces inside braces (matches prettier)
+                self.write("{ ");
+                for (i, prop) in obj.properties.iter().enumerate() {
+                    match prop {
+                        tsv_ts::ObjectProperty::Property(p) => {
+                            self.print_ts_expression(&p.key);
+                            if !p.shorthand {
+                                self.write(": ");
+                                self.print_ts_pattern(&p.value);
+                            }
+                        }
+                        tsv_ts::ObjectProperty::SpreadElement(s) => {
+                            self.write("...");
+                            self.print_ts_pattern(&s.argument);
+                        }
+                    }
+                    if i < obj.properties.len() - 1 {
+                        self.write(", ");
+                    }
+                }
+                self.write(" }");
+            }
+            tsv_ts::Expression::ArrayExpression(arr) => {
+                // Array patterns also use spaces inside brackets
+                self.write("[");
+                for (i, elem) in arr.elements.iter().enumerate() {
+                    if let Some(e) = elem {
+                        self.print_ts_pattern(e);
+                    }
+                    if i < arr.elements.len() - 1 {
+                        self.write(", ");
+                    }
+                }
+                self.write("]");
+            }
+            // For other expression types, delegate to regular expression printing
+            _ => self.print_ts_expression(expr),
+        }
+    }
+
+    /// Format a TypeScript expression
     ///
     /// Delegates to TypeScript printer logic for string literals (quote conversion).
     /// Static HTML attributes always use double quotes per HTML spec.
-    fn print_ts_expression(&mut self, expr: &tsv_ts::Expression) {
+    /// Used for expression tags and block expressions.
+    pub fn print_ts_expression(&mut self, expr: &tsv_ts::Expression) {
         match expr {
             tsv_ts::Expression::Literal(lit) => {
                 self.print_ts_literal(lit);
@@ -34,31 +82,25 @@ impl<'a> Printer<'a> {
                 self.write(&name);
             }
             tsv_ts::Expression::ObjectExpression(obj) => {
-                // TODO: This is a simplified implementation that should be replaced
-                // with proper TypeScript printer delegation for complex formatting.
-                // For now, handle simple inline objects.
+                // Format object expressions without spaces inside braces (matches prettier)
                 self.write("{");
-                if !obj.properties.is_empty() {
-                    self.write(" ");
-                    for (i, prop) in obj.properties.iter().enumerate() {
-                        match prop {
-                            tsv_ts::ObjectProperty::Property(p) => {
-                                self.print_ts_expression(&p.key);
-                                if !p.shorthand {
-                                    self.write(": ");
-                                    self.print_ts_expression(&p.value);
-                                }
-                            }
-                            tsv_ts::ObjectProperty::SpreadElement(s) => {
-                                self.write("...");
-                                self.print_ts_expression(&s.argument);
+                for (i, prop) in obj.properties.iter().enumerate() {
+                    match prop {
+                        tsv_ts::ObjectProperty::Property(p) => {
+                            self.print_ts_expression(&p.key);
+                            if !p.shorthand {
+                                self.write(": ");
+                                self.print_ts_expression(&p.value);
                             }
                         }
-                        if i < obj.properties.len() - 1 {
-                            self.write(", ");
+                        tsv_ts::ObjectProperty::SpreadElement(s) => {
+                            self.write("...");
+                            self.print_ts_expression(&s.argument);
                         }
                     }
-                    self.write(" ");
+                    if i < obj.properties.len() - 1 {
+                        self.write(", ");
+                    }
                 }
                 self.write("}");
             }
@@ -101,13 +143,13 @@ impl<'a> Printer<'a> {
             }
             tsv_ts::Expression::ArrowFunctionExpression(arrow) => {
                 // Print arrow function: (params) => body
+                // params can be patterns, so use print_ts_expression
                 self.write("(");
                 for (i, param) in arrow.params.iter().enumerate() {
                     if i > 0 {
                         self.write(", ");
                     }
-                    let name = self.resolve_symbol(param.name);
-                    self.write(&name);
+                    self.print_ts_expression(param);
                 }
                 self.write(") => ");
                 match &arrow.body {
@@ -196,13 +238,13 @@ impl<'a> Printer<'a> {
             }
             tsv_ts::Expression::FunctionExpression(func) => {
                 // Print function expression: (params) { body }
+                // params can be patterns, so use print_ts_expression
                 self.write("(");
                 for (i, param) in func.params.iter().enumerate() {
                     if i > 0 {
                         self.write(", ");
                     }
-                    let name = self.resolve_symbol(param.name);
-                    self.write(&name);
+                    self.print_ts_expression(param);
                 }
                 self.write(") ");
                 // Extract body from source (need to own the string to avoid borrow issues)
@@ -233,6 +275,63 @@ impl<'a> Printer<'a> {
             }
             tsv_ts::Expression::Super(_) => {
                 self.write("super");
+            }
+            tsv_ts::Expression::AssignmentExpression(assign) => {
+                self.print_ts_expression(&assign.left);
+                self.write(" ");
+                self.write(assign.operator.as_str());
+                self.write(" ");
+                self.print_ts_expression(&assign.right);
+            }
+            tsv_ts::Expression::ObjectPattern(obj) => {
+                // ObjectPattern AST nodes (not used by Svelte parser for patterns)
+                // TODO: verify this is correct formatting if ObjectPattern is ever used
+                self.write("{");
+                for (i, prop) in obj.properties.iter().enumerate() {
+                    if i > 0 {
+                        self.write(", ");
+                    }
+                    match prop {
+                        tsv_ts::ObjectPatternProperty::Property(p) => {
+                            self.print_ts_expression(&p.key);
+                            if !p.shorthand {
+                                self.write(": ");
+                                self.print_ts_expression(&p.value);
+                            } else if let tsv_ts::Expression::AssignmentPattern(pattern) = &p.value
+                            {
+                                // Shorthand with default: {a = 1}
+                                self.write(" = ");
+                                self.print_ts_expression(&pattern.right);
+                            }
+                        }
+                        tsv_ts::ObjectPatternProperty::RestElement(r) => {
+                            self.write("...");
+                            self.print_ts_expression(&r.argument);
+                        }
+                    }
+                }
+                self.write("}");
+            }
+            tsv_ts::Expression::ArrayPattern(arr) => {
+                self.write("[");
+                for (i, elem) in arr.elements.iter().enumerate() {
+                    if i > 0 {
+                        self.write(", ");
+                    }
+                    if let Some(e) = elem {
+                        self.print_ts_expression(e);
+                    }
+                }
+                self.write("]");
+            }
+            tsv_ts::Expression::AssignmentPattern(pattern) => {
+                self.print_ts_expression(&pattern.left);
+                self.write(" = ");
+                self.print_ts_expression(&pattern.right);
+            }
+            tsv_ts::Expression::RestElement(rest) => {
+                self.write("...");
+                self.print_ts_expression(&rest.argument);
             }
         }
     }

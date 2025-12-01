@@ -53,6 +53,11 @@ impl<'a> Printer<'a> {
             Expression::SequenceExpression(seq) => self.print_sequence_expression(seq),
             Expression::RegexLiteral(regex) => self.print_regex_literal(regex),
             Expression::Super(_) => self.write("super"),
+            Expression::AssignmentExpression(assign) => self.print_assignment_expression(assign),
+            Expression::ObjectPattern(obj) => self.print_object_pattern(obj),
+            Expression::ArrayPattern(arr) => self.print_array_pattern(arr),
+            Expression::AssignmentPattern(pattern) => self.print_assignment_pattern(pattern),
+            Expression::RestElement(rest) => self.print_rest_element(rest),
         }
     }
 
@@ -132,6 +137,11 @@ impl<'a> Printer<'a> {
             Expression::SequenceExpression(seq) => self.build_sequence_doc(seq),
             Expression::RegexLiteral(regex) => self.build_regex_doc(regex),
             Expression::Super(_) => doc::text("super"),
+            Expression::AssignmentExpression(assign) => self.build_assignment_doc(assign),
+            Expression::ObjectPattern(obj) => self.build_object_pattern_doc(obj),
+            Expression::ArrayPattern(arr) => self.build_array_pattern_doc(arr),
+            Expression::AssignmentPattern(pattern) => self.build_assignment_pattern_doc(pattern),
+            Expression::RestElement(rest) => self.build_rest_element_doc(rest),
         }
     }
 
@@ -173,14 +183,13 @@ impl<'a> Printer<'a> {
 
     /// Print an arrow function expression
     fn print_arrow_function(&mut self, arrow: &internal::ArrowFunctionExpression) {
-        // Print parameters
+        // Print parameters (can be Identifier, ArrayPattern, ObjectPattern, AssignmentPattern)
         self.write("(");
         for (i, param) in arrow.params.iter().enumerate() {
             if i > 0 {
                 self.write(", ");
             }
-            let name = self.resolve_symbol(param.name);
-            self.write(&name);
+            self.print_expression(param);
         }
         self.write(") => ");
 
@@ -207,14 +216,13 @@ impl<'a> Printer<'a> {
     pub(super) fn build_arrow_doc(&self, arrow: &internal::ArrowFunctionExpression) -> Doc {
         let mut parts = Vec::new();
 
-        // Parameters
+        // Parameters (can be Identifier, ArrayPattern, ObjectPattern, AssignmentPattern)
         parts.push(doc::text("("));
         for (i, param) in arrow.params.iter().enumerate() {
             if i > 0 {
                 parts.push(doc::text(", "));
             }
-            let name = self.resolve_symbol(param.name);
-            parts.push(doc::text(name));
+            parts.push(self.build_expression_doc(param));
         }
         parts.push(doc::text(") => "));
 
@@ -305,14 +313,13 @@ impl<'a> Printer<'a> {
 
     /// Print a function expression (for method shorthand): `foo() { return 1; }`
     pub(super) fn print_function_expression(&mut self, func: &internal::FunctionExpression) {
-        // Print parameters
+        // Print parameters (can be Identifier, ArrayPattern, ObjectPattern, AssignmentPattern)
         self.write("(");
         for (i, param) in func.params.iter().enumerate() {
             if i > 0 {
                 self.write(", ");
             }
-            let name = self.resolve_symbol(param.name);
-            self.write(&name);
+            self.print_expression(param);
         }
         self.write(") ");
 
@@ -324,14 +331,13 @@ impl<'a> Printer<'a> {
     pub(super) fn build_function_doc(&self, func: &internal::FunctionExpression) -> Doc {
         let mut parts = Vec::new();
 
-        // Parameters
+        // Parameters (can be Identifier, ArrayPattern, ObjectPattern, AssignmentPattern)
         parts.push(doc::text("("));
         for (i, param) in func.params.iter().enumerate() {
             if i > 0 {
                 parts.push(doc::text(", "));
             }
-            let name = self.resolve_symbol(param.name);
-            parts.push(doc::text(name));
+            parts.push(self.build_expression_doc(param));
         }
         parts.push(doc::text(") "));
 
@@ -342,19 +348,65 @@ impl<'a> Printer<'a> {
     }
 
     /// Print a block statement: `{ stmt1; stmt2; }`
+    ///
+    /// Handles comments between statements similar to print_program.
     pub(super) fn print_block_statement(&mut self, block: &internal::BlockStatement) {
         if block.body.is_empty() {
-            self.write("{}");
+            // Check for comments inside empty block
+            // Block span starts after '{' and ends before '}'
+            let block_start = block.span.start + 1; // After '{'
+            let block_end = block.span.end - 1; // Before '}'
+            let has_inner_comments = self.has_comments_between(block_start, block_end);
+
+            if has_inner_comments {
+                self.write("{\n");
+                self.indent_level += 1;
+                self.print_leading_comments(block_start, block_end);
+                self.indent_level -= 1;
+                self.write_indent();
+                self.write("}");
+            } else {
+                self.write("{}");
+            }
             return;
         }
 
         self.write("{\n");
         self.indent_level += 1;
 
-        for stmt in &block.body {
+        // Track previous statement end for comment printing (similar to print_program)
+        let mut prev_end = block.span.start + 1; // Start after '{'
+
+        for (i, stmt) in block.body.iter().enumerate() {
+            let is_first = i == 0;
+
+            // Check for blank lines between statements (when no comments)
+            if !is_first {
+                let has_comments = self
+                    .comments
+                    .iter()
+                    .any(|c| c.span.start >= prev_end && c.span.end <= stmt.span().start);
+
+                if !has_comments
+                    && tsv_lang::printing::has_blank_line_between(
+                        self.source,
+                        prev_end,
+                        stmt.span().start,
+                    )
+                {
+                    self.write("\n");
+                }
+            }
+
+            // Print leading comments before this statement
+            // For the first statement, include same-line comments after '{'
+            self.print_block_leading_comments(prev_end, stmt.span().start, is_first);
+
             self.write_indent();
             self.print_statement(stmt);
             self.write("\n");
+
+            prev_end = stmt.span().end;
         }
 
         self.indent_level -= 1;
@@ -383,6 +435,309 @@ impl<'a> Printer<'a> {
             doc::indent(doc::concat(vec![doc::hardline(), doc::concat(body_parts)])),
             doc::hardline(),
             doc::text("}"),
+        ])
+    }
+
+    // =========================================================================
+    // Assignment and Pattern Expressions
+    // =========================================================================
+
+    /// Print an assignment expression with width-based wrapping
+    ///
+    /// When the assignment exceeds print_width, wraps after `=`:
+    /// ```javascript
+    /// [long, array, pattern] =
+    ///     value;
+    /// ```
+    ///
+    /// However, when the LHS pattern is already expanded (multiline), don't wrap:
+    /// ```javascript
+    /// ({
+    ///     a: {b},
+    /// } = obj);  // stays together
+    /// ```
+    fn print_assignment_expression(&mut self, assign: &internal::AssignmentExpression) {
+        // Object patterns: let the pattern handle its own width-based expansion
+        // The `} = rhs` should stay together on the closing line
+        if matches!(assign.left.as_ref(), Expression::ObjectPattern(_)) {
+            self.print_expression(&assign.left);
+            self.write(" ");
+            self.write(assign.operator.as_str());
+            self.write(" ");
+            self.print_expression(&assign.right);
+            return;
+        }
+
+        // Array patterns and regular assignments: use doc-builder for width-based wrapping
+        // When the line exceeds print width, wrap after `=`
+        let assignment_doc = self.build_assignment_doc(assign);
+        let base_offset = self.config.base_indent_offset * self.config.tab_width;
+        let current_col = self.current_column() + base_offset;
+        let output = doc::print_doc_at_column(&assignment_doc, &self.config, current_col);
+        self.write(&output);
+    }
+
+    /// Build a Doc for an assignment expression
+    fn build_assignment_doc(&self, assign: &internal::AssignmentExpression) -> Doc {
+        let left_doc = self.build_expression_doc(&assign.left);
+        let right_doc = self.build_expression_doc(&assign.right);
+
+        // Structure: group(left + " =" + indent(line + right))
+        doc::group(doc::concat(vec![
+            left_doc,
+            doc::text(" "),
+            doc::text(assign.operator.as_str()),
+            doc::indent(doc::concat(vec![doc::line(), right_doc])),
+        ]))
+    }
+
+    /// Print an object pattern: `{a, b}` or expanded `{\n\ta,\n\tb,\n}`
+    ///
+    /// Prettier expands object patterns when:
+    /// 1. Any property has a nested pattern value (always expand)
+    /// 2. The pattern exceeds print width (width-based expansion)
+    fn print_object_pattern(&mut self, obj: &internal::ObjectPattern) {
+        if obj.properties.is_empty() {
+            self.write("{}");
+            return;
+        }
+
+        let should_expand = super::object_pattern_should_expand(obj);
+
+        if should_expand {
+            // Nested patterns: always expand (imperative path for performance)
+            let last_is_rest = matches!(
+                obj.properties.last(),
+                Some(internal::ObjectPatternProperty::RestElement(_))
+            );
+
+            self.write("{\n");
+            self.indent_level += 1;
+            for (i, prop) in obj.properties.iter().enumerate() {
+                self.write_indent();
+                self.print_object_pattern_property(prop);
+                // Add trailing comma unless it's a rest element (syntax error)
+                let is_last = i == obj.properties.len() - 1;
+                if !is_last || !last_is_rest {
+                    self.write(",");
+                }
+                if !is_last {
+                    self.write("\n");
+                }
+            }
+            self.write("\n");
+            self.indent_level -= 1;
+            self.write_indent();
+            self.write("}");
+        } else {
+            // Use doc-builder for width-based expansion
+            let doc = self.build_object_pattern_doc(obj);
+            let base_offset = self.config.base_indent_offset * self.config.tab_width;
+            let current_col = self.current_column() + base_offset;
+            let output = doc::print_doc_at_column(&doc, &self.config, current_col);
+            self.write(&output);
+        }
+    }
+
+    /// Print an object pattern property
+    fn print_object_pattern_property(&mut self, prop: &internal::ObjectPatternProperty) {
+        match prop {
+            internal::ObjectPatternProperty::Property(p) => {
+                if p.shorthand {
+                    // For shorthand with default value, we need to print key = default
+                    if let Expression::AssignmentPattern(pattern) = &p.value {
+                        self.print_expression(&p.key);
+                        self.write(" = ");
+                        self.print_expression(&pattern.right);
+                    } else {
+                        self.print_expression(&p.key);
+                    }
+                } else {
+                    // Handle computed keys: {[key]: value}
+                    // For regular keys, use print_property_key to normalize string keys to identifiers
+                    if p.computed {
+                        self.write("[");
+                        self.print_expression(&p.key);
+                        self.write("]");
+                    } else {
+                        self.print_property_key(&p.key);
+                    }
+                    self.write(": ");
+                    self.print_expression(&p.value);
+                }
+            }
+            internal::ObjectPatternProperty::RestElement(r) => {
+                self.print_rest_element(r);
+            }
+        }
+    }
+
+    /// Build a Doc for an object pattern
+    ///
+    /// Prettier expands object patterns when:
+    /// 1. Any property has a nested pattern value (always expand)
+    /// 2. The pattern exceeds print width (width-based expansion)
+    fn build_object_pattern_doc(&self, obj: &internal::ObjectPattern) -> Doc {
+        if obj.properties.is_empty() {
+            return doc::text("{}");
+        }
+
+        let should_expand = super::object_pattern_should_expand(obj);
+
+        if should_expand {
+            // Nested patterns: always expand
+            let last_is_rest = matches!(
+                obj.properties.last(),
+                Some(internal::ObjectPatternProperty::RestElement(_))
+            );
+
+            let mut prop_parts = Vec::new();
+            for (i, prop) in obj.properties.iter().enumerate() {
+                prop_parts.push(self.build_object_pattern_property_doc(prop));
+                let is_last = i == obj.properties.len() - 1;
+                // Add trailing comma unless it's a rest element (syntax error)
+                if !is_last || !last_is_rest {
+                    prop_parts.push(doc::text(","));
+                }
+                if !is_last {
+                    prop_parts.push(doc::hardline());
+                }
+            }
+
+            // Structure: { + indent(hardline + props) + hardline + }
+            // The hardline INSIDE indent gets indented, the one before } does not
+            doc::concat(vec![
+                doc::text("{"),
+                doc::indent(doc::concat(vec![doc::hardline(), doc::concat(prop_parts)])),
+                doc::hardline(),
+                doc::text("}"),
+            ])
+        } else {
+            // Use group with line breaks for width-based expansion
+            let mut parts = Vec::new();
+            let last_is_rest = matches!(
+                obj.properties.last(),
+                Some(internal::ObjectPatternProperty::RestElement(_))
+            );
+
+            for (i, prop) in obj.properties.iter().enumerate() {
+                parts.push(self.build_object_pattern_property_doc(prop));
+                if i < obj.properties.len() - 1 {
+                    parts.push(doc::text(","));
+                    parts.push(doc::line());
+                } else if !last_is_rest {
+                    // Last property: trailing comma only when broken
+                    // (rest elements can't have trailing commas)
+                    parts.push(doc::if_break(doc::text(","), doc::text("")));
+                }
+            }
+
+            doc::group(doc::concat(vec![
+                doc::text("{"),
+                doc::indent(doc::concat(vec![doc::softline(), doc::concat(parts)])),
+                doc::softline(),
+                doc::text("}"),
+            ]))
+        }
+    }
+
+    /// Build a Doc for an object pattern property
+    ///
+    /// String keys that are valid identifiers are normalized to unquoted form:
+    /// `{"key": value}` → `{key: value}`
+    fn build_object_pattern_property_doc(&self, prop: &internal::ObjectPatternProperty) -> Doc {
+        match prop {
+            internal::ObjectPatternProperty::Property(p) => {
+                if p.shorthand {
+                    if let Expression::AssignmentPattern(pattern) = &p.value {
+                        doc::concat(vec![
+                            self.build_expression_doc(&p.key),
+                            doc::text(" = "),
+                            self.build_expression_doc(&pattern.right),
+                        ])
+                    } else {
+                        self.build_expression_doc(&p.key)
+                    }
+                } else {
+                    // Handle computed keys: {[key]: value}
+                    // For regular keys, use property_key_doc to normalize string keys to identifiers
+                    let key_doc = if p.computed {
+                        doc::concat(vec![
+                            doc::text("["),
+                            self.build_expression_doc(&p.key),
+                            doc::text("]"),
+                        ])
+                    } else {
+                        self.build_property_key_doc(&p.key)
+                    };
+                    doc::concat(vec![
+                        key_doc,
+                        doc::text(": "),
+                        self.build_expression_doc(&p.value),
+                    ])
+                }
+            }
+            internal::ObjectPatternProperty::RestElement(r) => self.build_rest_element_doc(r),
+        }
+    }
+
+    /// Print an array pattern: `[a, b]`
+    fn print_array_pattern(&mut self, arr: &internal::ArrayPattern) {
+        self.write("[");
+        for (i, elem) in arr.elements.iter().enumerate() {
+            if i > 0 {
+                self.write(", ");
+            }
+            if let Some(e) = elem {
+                self.print_expression(e);
+            }
+        }
+        self.write("]");
+    }
+
+    /// Build a Doc for an array pattern
+    fn build_array_pattern_doc(&self, arr: &internal::ArrayPattern) -> Doc {
+        let mut parts = Vec::new();
+        parts.push(doc::text("["));
+        for (i, elem) in arr.elements.iter().enumerate() {
+            if i > 0 {
+                parts.push(doc::text(", "));
+            }
+            if let Some(e) = elem {
+                parts.push(self.build_expression_doc(e));
+            }
+        }
+        parts.push(doc::text("]"));
+        doc::concat(parts)
+    }
+
+    /// Print an assignment pattern: `a = 1`
+    fn print_assignment_pattern(&mut self, pattern: &internal::AssignmentPattern) {
+        self.print_expression(&pattern.left);
+        self.write(" = ");
+        self.print_expression(&pattern.right);
+    }
+
+    /// Build a Doc for an assignment pattern
+    fn build_assignment_pattern_doc(&self, pattern: &internal::AssignmentPattern) -> Doc {
+        doc::concat(vec![
+            self.build_expression_doc(&pattern.left),
+            doc::text(" = "),
+            self.build_expression_doc(&pattern.right),
+        ])
+    }
+
+    /// Print a rest element: `...rest`
+    fn print_rest_element(&mut self, rest: &internal::RestElement) {
+        self.write("...");
+        self.print_expression(&rest.argument);
+    }
+
+    /// Build a Doc for a rest element
+    fn build_rest_element_doc(&self, rest: &internal::RestElement) -> Doc {
+        doc::concat(vec![
+            doc::text("..."),
+            self.build_expression_doc(&rest.argument),
         ])
     }
 }

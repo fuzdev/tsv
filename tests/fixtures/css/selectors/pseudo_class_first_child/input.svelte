@@ -18,4 +18,12 @@
 	p:last-of-type {
 		margin-bottom: 0;
 	}
+
+	div:empty {
+		display: none;
+	}
+
+	p:only-of-type {
+		margin: 0;
+	}
 </style>

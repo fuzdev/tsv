@@ -80,16 +80,13 @@ impl<'a> Lexer<'a> {
             });
         }
 
-        let ch = match self.current_char() {
-            Some(c) => c,
-            None => {
-                return Ok(Token {
-                    kind: TokenKind::Eof,
-                    start: self.pos,
-                    end: self.pos,
-                    decoded: None,
-                });
-            }
+        let Some(ch) = self.current_char() else {
+            return Ok(Token {
+                kind: TokenKind::Eof,
+                start: self.pos,
+                end: self.pos,
+                decoded: None,
+            });
         };
 
         // Helper macro for single-character tokens
@@ -165,6 +162,7 @@ impl<'a> Lexer<'a> {
             '%' => single_char_token!(TokenKind::Percent),
             '^' => single_char_token!(TokenKind::Caret),
             '$' => single_char_token!(TokenKind::Dollar),
+            '!' => single_char_token!(TokenKind::Bang),
             '|' => {
                 // Check for || (column combinator)
                 if self.peek_char(1) == Some('|') {

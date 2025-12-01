@@ -49,6 +49,13 @@ impl<'a> Printer<'a> {
             }
             FragmentNode::ExpressionTag(_) => true,
             FragmentNode::Text(_) => true,
+            // Comments are treated as inline (similar to text)
+            FragmentNode::Comment(_) => true,
+            // Control flow blocks are treated as block elements
+            FragmentNode::IfBlock(_)
+            | FragmentNode::EachBlock(_)
+            | FragmentNode::AwaitBlock(_)
+            | FragmentNode::KeyBlock(_) => false,
         }
     }
 

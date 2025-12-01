@@ -198,6 +198,9 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
     let mut value_parts = Vec::new();
     let mut value_comments = Vec::new(); // Collect comments found in the value
     let mut value_end = value_start;
+    // Track recent end positions for !important stripping (stores ends for last 2 tokens)
+    let mut prev_value_end = value_start;
+    let mut prev_prev_value_end = value_start;
     let mut paren_depth: i32 = 0; // Track nesting level of parentheses
     while !parser.check(&TokenKind::Eof)
         && !(paren_depth == 0
@@ -230,6 +233,8 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
                     },
                 });
                 // Update value_end to include the comment in the declaration span
+                prev_prev_value_end = prev_value_end;
+                prev_value_end = value_end;
                 value_end = parser.base_offset() + parser.current_end;
                 parser.advance()?;
                 continue;
@@ -242,6 +247,7 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
                 paren_depth = paren_depth.saturating_sub(1);
                 parser.current_value().to_string()
             }
+            TokenKind::Bang => "!".to_string(),
             _ => {
                 // Other tokens - include them as-is from source
                 parser.current_value().to_string()
@@ -249,9 +255,28 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
         };
 
         value_parts.push(value_str);
+        prev_prev_value_end = prev_value_end;
+        prev_value_end = value_end;
         value_end = parser.base_offset() + parser.current_end;
         parser.advance()?;
     }
+
+    // Check for !important at the end of value
+    let important = if value_parts.len() >= 2 {
+        let last = value_parts.last().map(String::as_str);
+        let second_last = value_parts.get(value_parts.len() - 2).map(String::as_str);
+        if second_last == Some("!") && last.is_some_and(|s| s.eq_ignore_ascii_case("important")) {
+            // Remove !important from value parts and adjust value_end
+            value_parts.pop();
+            value_parts.pop();
+            value_end = prev_prev_value_end;
+            true
+        } else {
+            false
+        }
+    } else {
+        false
+    };
 
     // Join value parts intelligently - only add spaces when needed
     // Most CSS values don't need spaces (translateX(0), not translateX ( 0 ))
@@ -326,6 +351,7 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
     Ok(CssDeclaration {
         property,
         value,
+        important,
         span: decl_span,
     })
 }

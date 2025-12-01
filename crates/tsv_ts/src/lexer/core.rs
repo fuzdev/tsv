@@ -732,10 +732,9 @@ impl<'a> Lexer<'a> {
                             end: self.position,
                             decoded,
                         });
-                    } else {
-                        // Regular $ character
-                        self.advance();
                     }
+                    // Regular $ character
+                    self.advance();
                 }
                 Some('\\') => {
                     // Escape sequence
@@ -829,8 +828,9 @@ impl<'a> Lexer<'a> {
         // Check for empty pattern (would be a comment)
         if pattern.is_empty() {
             return Err(ParseError::InvalidSyntax {
-                message: "Regular expression literal cannot be empty (use /(?:)/ for empty pattern)"
-                    .to_string(),
+                message:
+                    "Regular expression literal cannot be empty (use /(?:)/ for empty pattern)"
+                        .to_string(),
                 position: slash_start,
                 context: None,
             });
@@ -934,10 +934,9 @@ impl<'a> Lexer<'a> {
                             end: self.position,
                             decoded,
                         });
-                    } else {
-                        // Regular $ character
-                        self.advance();
                     }
+                    // Regular $ character
+                    self.advance();
                 }
                 Some('\\') => {
                     // Escape sequence

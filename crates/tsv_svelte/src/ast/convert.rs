@@ -3,9 +3,24 @@
 // Converts internal AST to public JSON-compatible representation.
 // Matches Svelte's official parser output format.
 
+use serde::Serialize;
+
 use crate::ast::{internal, public};
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker, printing};
+
+/// Serialize a value to JSON, panicking on failure.
+///
+/// Our AST types derive `Serialize` correctly, so serialization cannot fail.
+/// This helper centralizes the `#[allow]` annotation and safety justification.
+///
+/// # Panics
+///
+/// Panics if serialization fails (indicates a bug in our Serialize impl).
+#[allow(clippy::expect_used)]
+fn to_json_value<T: Serialize>(value: &T) -> serde_json::Value {
+    serde_json::to_value(value).expect("AST types derive Serialize correctly")
+}
 
 /// Context for comment attachment process
 ///
@@ -168,8 +183,14 @@ fn attach_comments_recursively(
         }
 
         // Extract start/end if present
-        let node_start = obj.get("start").and_then(serde_json::Value::as_u64).map(|v| v as u32);
-        let node_end = obj.get("end").and_then(serde_json::Value::as_u64).map(|v| v as u32);
+        let node_start = obj
+            .get("start")
+            .and_then(serde_json::Value::as_u64)
+            .map(|v| v as u32);
+        let node_end = obj
+            .get("end")
+            .and_then(serde_json::Value::as_u64)
+            .map(|v| v as u32);
 
         if let (Some(start), Some(end)) = (node_start, node_end) {
             // Attach comments to this node
@@ -217,10 +238,14 @@ fn attach_comments_recursively(
                         let positions: Vec<(Option<u32>, Option<u32>)> = arr
                             .iter()
                             .map(|item| {
-                                let start =
-                                    item.get("start").and_then(serde_json::Value::as_u64).map(|v| v as u32);
-                                let end =
-                                    item.get("end").and_then(serde_json::Value::as_u64).map(|v| v as u32);
+                                let start = item
+                                    .get("start")
+                                    .and_then(serde_json::Value::as_u64)
+                                    .map(|v| v as u32);
+                                let end = item
+                                    .get("end")
+                                    .and_then(serde_json::Value::as_u64)
+                                    .map(|v| v as u32);
                                 (start, end)
                             })
                             .collect();
@@ -484,6 +509,31 @@ fn convert_fragment_node(
             public::FragmentNode::ExpressionTag(convert_expression_tag(tag, source, loc, interner))
         }
         internal::FragmentNode::Text(text) => public::FragmentNode::Text(convert_text(text)),
+        internal::FragmentNode::Comment(comment) => {
+            public::FragmentNode::Comment(convert_comment(comment))
+        }
+        internal::FragmentNode::IfBlock(block) => {
+            public::FragmentNode::IfBlock(convert_if_block(block, source, loc, interner))
+        }
+        internal::FragmentNode::EachBlock(block) => {
+            public::FragmentNode::EachBlock(convert_each_block(block, source, loc, interner))
+        }
+        internal::FragmentNode::AwaitBlock(block) => {
+            public::FragmentNode::AwaitBlock(convert_await_block(block, source, loc, interner))
+        }
+        internal::FragmentNode::KeyBlock(block) => {
+            public::FragmentNode::KeyBlock(convert_key_block(block, source, loc, interner))
+        }
+    }
+}
+
+fn convert_comment(comment: &internal::HtmlComment) -> public::Comment {
+    // Note: internal uses `content`, public uses `data` (Svelte's naming)
+    public::Comment {
+        node_type: "Comment".to_string(),
+        start: comment.span.start,
+        end: comment.span.end,
+        data: comment.content.clone(),
     }
 }
 
@@ -560,28 +610,18 @@ fn convert_attribute(
                     .iter()
                     .map(|v| convert_attribute_value(v, source, loc, interner))
                     .collect();
-                // SAFETY: Our types derive Serialize correctly; serialization can't fail
-                #[allow(clippy::unwrap_used)]
-                Some(serde_json::to_value(converted).unwrap())
+                Some(to_json_value(&converted))
             } else if values.len() == 1 {
                 // Single expression only: serialize as object
-                // SAFETY: Our types derive Serialize correctly; serialization can't fail
-                #[allow(clippy::unwrap_used)]
-                Some(
-                    serde_json::to_value(convert_attribute_value(
-                        &values[0], source, loc, interner,
-                    ))
-                    .unwrap(),
-                )
+                let converted = convert_attribute_value(&values[0], source, loc, interner);
+                Some(to_json_value(&converted))
             } else {
                 // Multiple expressions: serialize as array
                 let converted: Vec<_> = values
                     .iter()
                     .map(|v| convert_attribute_value(v, source, loc, interner))
                     .collect();
-                // SAFETY: Our types derive Serialize correctly; serialization can't fail
-                #[allow(clippy::unwrap_used)]
-                Some(serde_json::to_value(converted).unwrap())
+                Some(to_json_value(&converted))
             }
         }
     };
@@ -644,9 +684,7 @@ fn convert_script(
     // because it keeps the internal TypeScript AST clean (zero Svelte-specific pollution).
     // The trade-off is we lose type safety on Script.content (now serde_json::Value),
     // but this is acceptable for the public API layer.
-    // SAFETY: Our Program type derives Serialize correctly; serialization can't fail
-    #[allow(clippy::expect_used)]
-    let mut program_json = serde_json::to_value(&program).expect("Failed to serialize Program");
+    let mut program_json = to_json_value(&program);
 
     // Track which comments have been attached to prevent duplicates
     let mut attached_indices = std::collections::HashSet::new();
@@ -725,9 +763,7 @@ fn convert_style(
             .iter()
             .map(|attr| {
                 let public_attr = convert_attribute(attr, source, &full_loc, interner);
-                // SAFETY: Our Attribute type derives Serialize correctly
-                #[allow(clippy::expect_used)]
-                serde_json::to_value(public_attr).expect("Failed to serialize attribute")
+                to_json_value(&public_attr)
             })
             .collect(),
         children,
@@ -737,5 +773,117 @@ fn convert_style(
             styles,
             comment: None,
         },
+    }
+}
+
+fn convert_if_block(
+    block: &internal::IfBlock,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+) -> public::IfBlock {
+    let ts_expr = tsv_ts::ast::convert::convert_expression(&block.test, source, loc, interner, 0);
+
+    public::IfBlock {
+        node_type: "IfBlock".to_string(),
+        start: block.span.start,
+        end: block.span.end,
+        elseif: block.elseif,
+        test: ts_expr,
+        consequent: convert_fragment(&block.consequent, source, loc, interner),
+        alternate: block
+            .alternate
+            .as_ref()
+            .map(|f| convert_fragment(f, source, loc, interner)),
+    }
+}
+
+fn convert_each_block(
+    block: &internal::EachBlock,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+) -> public::EachBlock {
+    let expression =
+        tsv_ts::ast::convert::convert_expression(&block.expression, source, loc, interner, 0);
+    let context = block
+        .context
+        .as_ref()
+        .map(|c| tsv_ts::ast::convert::convert_expression(c, source, loc, interner, 0));
+    let key = block
+        .key
+        .as_ref()
+        .map(|k| tsv_ts::ast::convert::convert_expression(k, source, loc, interner, 0));
+
+    public::EachBlock {
+        node_type: "EachBlock".to_string(),
+        start: block.span.start,
+        end: block.span.end,
+        expression,
+        context,
+        index: block.index.clone(),
+        key,
+        body: convert_fragment(&block.body, source, loc, interner),
+        fallback: block
+            .fallback
+            .as_ref()
+            .map(|f| convert_fragment(f, source, loc, interner)),
+    }
+}
+
+fn convert_await_block(
+    block: &internal::AwaitBlock,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+) -> public::AwaitBlock {
+    let expression =
+        tsv_ts::ast::convert::convert_expression(&block.expression, source, loc, interner, 0);
+    let value = block
+        .value
+        .as_ref()
+        .map(|v| tsv_ts::ast::convert::convert_expression(v, source, loc, interner, 0));
+    let error = block
+        .error
+        .as_ref()
+        .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
+
+    public::AwaitBlock {
+        node_type: "AwaitBlock".to_string(),
+        start: block.span.start,
+        end: block.span.end,
+        expression,
+        value,
+        error,
+        pending: block
+            .pending
+            .as_ref()
+            .map(|f| convert_fragment(f, source, loc, interner)),
+        then_block: block
+            .then
+            .as_ref()
+            .map(|f| convert_fragment(f, source, loc, interner)),
+        catch_block: block
+            .catch
+            .as_ref()
+            .map(|f| convert_fragment(f, source, loc, interner)),
+    }
+}
+
+fn convert_key_block(
+    block: &internal::KeyBlock,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+) -> public::KeyBlock {
+    let expression =
+        tsv_ts::ast::convert::convert_expression(&block.expression, source, loc, interner, 0);
+
+    public::KeyBlock {
+        node_type: "KeyBlock".to_string(),
+        start: block.span.start,
+        end: block.span.end,
+        expression,
+        fragment: convert_fragment(&block.fragment, source, loc, interner),
     }
 }

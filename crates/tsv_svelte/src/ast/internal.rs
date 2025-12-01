@@ -42,6 +42,78 @@ pub enum FragmentNode {
     Element(Element),
     ExpressionTag(ExpressionTag),
     Text(Text),
+    Comment(HtmlComment),
+    IfBlock(IfBlock),
+    EachBlock(EachBlock),
+    AwaitBlock(AwaitBlock),
+    KeyBlock(KeyBlock),
+}
+
+/// HTML comment node: <!-- content -->
+///
+/// Represents an HTML comment in the template. The `content` field contains
+/// the raw content between `<!--` and `-->`, with whitespace preserved exactly.
+///
+/// Note: This uses `content` internally for consistency with `tsv_lang::Comment`
+/// and `CssComment`. The public AST uses `data` (Svelte's naming) via conversion.
+#[derive(Debug, Clone)]
+pub struct HtmlComment {
+    pub content: String, // Content between <!-- and -->
+    pub span: Span,
+}
+
+/// Svelte IfBlock - conditional rendering
+///
+/// Represents {#if test}...{:else if test}...{:else}...{/if} blocks.
+/// The `elseif` field is true for {:else if} branches (nested in alternate).
+#[derive(Debug, Clone)]
+pub struct IfBlock {
+    pub elseif: bool,
+    pub test: Expression,
+    pub consequent: Fragment,
+    pub alternate: Option<Fragment>,
+    pub span: Span,
+}
+
+/// Svelte EachBlock - list iteration
+///
+/// Represents {#each expression as context, index (key)}...{:else}...{/each} blocks.
+/// Also supports {#each expression} and {#each expression, index} without `as`.
+#[derive(Debug, Clone)]
+pub struct EachBlock {
+    pub expression: Expression,
+    pub context: Option<Expression>, // Pattern (identifier or destructuring), None if no `as`
+    pub index: Option<String>,
+    pub key: Option<Expression>,
+    pub body: Fragment,
+    pub fallback: Option<Fragment>,
+    pub span: Span,
+}
+
+/// Svelte AwaitBlock - promise handling
+///
+/// Represents {#await expression}...{:then value}...{:catch error}...{/await} blocks.
+/// Also supports shorthand: {#await expression then value}...{/await}
+#[derive(Debug, Clone)]
+pub struct AwaitBlock {
+    pub expression: Expression,
+    pub value: Option<Expression>, // Pattern for :then binding
+    pub error: Option<Expression>, // Pattern for :catch binding
+    pub pending: Option<Fragment>,
+    pub then: Option<Fragment>,
+    pub catch: Option<Fragment>,
+    pub span: Span,
+}
+
+/// Svelte KeyBlock - keyed updates
+///
+/// Represents {#key expression}...{/key} blocks.
+/// Forces re-creation of contents when expression changes.
+#[derive(Debug, Clone)]
+pub struct KeyBlock {
+    pub expression: Expression,
+    pub fragment: Fragment,
+    pub span: Span,
 }
 
 impl FragmentNode {
@@ -50,6 +122,11 @@ impl FragmentNode {
             FragmentNode::Element(elem) => elem.span,
             FragmentNode::ExpressionTag(tag) => tag.span,
             FragmentNode::Text(text) => text.span,
+            FragmentNode::Comment(comment) => comment.span,
+            FragmentNode::IfBlock(block) => block.span,
+            FragmentNode::EachBlock(block) => block.span,
+            FragmentNode::AwaitBlock(block) => block.span,
+            FragmentNode::KeyBlock(block) => block.span,
         }
     }
 }

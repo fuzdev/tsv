@@ -1,12 +1,14 @@
 // Expression parsing using Pratt parser for operator precedence
 
 use crate::ast::internal::{
-    ArrayExpression, ArrowFunctionBody, ArrowFunctionExpression, AwaitExpression, BinaryExpression,
+    ArrayExpression, ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression,
+    AssignmentExpression, AssignmentOperator, AssignmentPattern, AwaitExpression, BinaryExpression,
     BinaryOperator, BlockStatement, CallExpression, ConditionalExpression, Expression,
     FunctionExpression, Identifier, Literal, LiteralValue, MemberExpression, NewExpression,
-    ObjectExpression, ObjectProperty, Property, PropertyKind, RegexLiteral, SequenceExpression,
-    SpreadElement, Super, TaggedTemplateExpression, TemplateElement, TemplateLiteral,
-    UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator,
+    ObjectExpression, ObjectPattern, ObjectPatternProperty, ObjectProperty, Property, PropertyKind,
+    RegexLiteral, RestElement, SequenceExpression, SpreadElement, Super, TaggedTemplateExpression,
+    TemplateElement, TemplateLiteral, UnaryExpression, UnaryOperator, UpdateExpression,
+    UpdateOperator,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
@@ -43,80 +45,54 @@ impl ParsedExpr {
     }
 }
 
-/// Get infix binding power for a token (left and right)
-/// Returns None if not an infix operator
-/// Uses standard JavaScript operator precedence
-fn infix_binding_power(kind: &TokenKind) -> Option<(u8, u8)> {
-    // Binding power: higher = binds tighter
-    // (left_bp, right_bp): left_bp < right_bp for left-associative
-    //                      left_bp > right_bp for right-associative
+/// Infix operator info: binding powers and the corresponding binary operator.
+///
+/// Returns `(left_bp, right_bp, operator)` if the token is a binary operator.
+/// - `left_bp < right_bp` for left-associative operators
+/// - `left_bp > right_bp` for right-associative operators (e.g., `**`)
+///
+/// Uses standard JavaScript operator precedence.
+fn infix_operator_info(kind: &TokenKind) -> Option<(u8, u8, BinaryOperator)> {
+    use BinaryOperator as Op;
+
     match kind {
         // Nullish coalescing: lowest binary precedence
-        TokenKind::QuestionQuestion => Some((5, 6)),
+        TokenKind::QuestionQuestion => Some((5, 6, Op::QuestionQuestion)),
         // Logical OR
-        TokenKind::PipePipe => Some((7, 8)),
+        TokenKind::PipePipe => Some((7, 8, Op::PipePipe)),
         // Logical AND
-        TokenKind::AmpersandAmpersand => Some((9, 10)),
+        TokenKind::AmpersandAmpersand => Some((9, 10, Op::AmpersandAmpersand)),
         // Bitwise OR
-        TokenKind::Pipe => Some((11, 12)),
+        TokenKind::Pipe => Some((11, 12, Op::Pipe)),
         // Bitwise XOR
-        TokenKind::Caret => Some((13, 14)),
+        TokenKind::Caret => Some((13, 14, Op::Caret)),
         // Bitwise AND
-        TokenKind::Ampersand => Some((15, 16)),
+        TokenKind::Ampersand => Some((15, 16, Op::Ampersand)),
         // Equality
-        TokenKind::EqualsEquals
-        | TokenKind::BangEquals
-        | TokenKind::EqualsEqualsEquals
-        | TokenKind::BangEqualsEquals => Some((17, 18)),
+        TokenKind::EqualsEquals => Some((17, 18, Op::EqualsEquals)),
+        TokenKind::BangEquals => Some((17, 18, Op::BangEquals)),
+        TokenKind::EqualsEqualsEquals => Some((17, 18, Op::EqualsEqualsEquals)),
+        TokenKind::BangEqualsEquals => Some((17, 18, Op::BangEqualsEquals)),
         // Relational (including in, instanceof)
-        TokenKind::LessThan
-        | TokenKind::GreaterThan
-        | TokenKind::LessThanEquals
-        | TokenKind::GreaterThanEquals
-        | TokenKind::Keyword(KeywordKind::Instanceof)
-        | TokenKind::Keyword(KeywordKind::In) => Some((19, 20)),
+        TokenKind::LessThan => Some((19, 20, Op::LessThan)),
+        TokenKind::GreaterThan => Some((19, 20, Op::GreaterThan)),
+        TokenKind::LessThanEquals => Some((19, 20, Op::LessThanEquals)),
+        TokenKind::GreaterThanEquals => Some((19, 20, Op::GreaterThanEquals)),
+        TokenKind::Keyword(KeywordKind::Instanceof) => Some((19, 20, Op::Instanceof)),
+        TokenKind::Keyword(KeywordKind::In) => Some((19, 20, Op::In)),
         // Bitshift
-        TokenKind::LeftShift | TokenKind::RightShift | TokenKind::UnsignedRightShift => {
-            Some((21, 22))
-        }
+        TokenKind::LeftShift => Some((21, 22, Op::LeftShift)),
+        TokenKind::RightShift => Some((21, 22, Op::RightShift)),
+        TokenKind::UnsignedRightShift => Some((21, 22, Op::UnsignedRightShift)),
         // Additive
-        TokenKind::Plus | TokenKind::Minus => Some((23, 24)),
+        TokenKind::Plus => Some((23, 24, Op::Plus)),
+        TokenKind::Minus => Some((23, 24, Op::Minus)),
         // Multiplicative
-        TokenKind::Star | TokenKind::Slash | TokenKind::Percent => Some((25, 26)),
+        TokenKind::Star => Some((25, 26, Op::Star)),
+        TokenKind::Slash => Some((25, 26, Op::Slash)),
+        TokenKind::Percent => Some((25, 26, Op::Percent)),
         // Exponentiation (right-associative: left_bp > right_bp)
-        TokenKind::StarStar => Some((28, 27)),
-        _ => None,
-    }
-}
-
-/// Convert token kind to binary operator
-fn token_to_binary_operator(kind: &TokenKind) -> Option<BinaryOperator> {
-    match kind {
-        TokenKind::Plus => Some(BinaryOperator::Plus),
-        TokenKind::Minus => Some(BinaryOperator::Minus),
-        TokenKind::Star => Some(BinaryOperator::Star),
-        TokenKind::StarStar => Some(BinaryOperator::StarStar),
-        TokenKind::Slash => Some(BinaryOperator::Slash),
-        TokenKind::Percent => Some(BinaryOperator::Percent),
-        TokenKind::LessThan => Some(BinaryOperator::LessThan),
-        TokenKind::GreaterThan => Some(BinaryOperator::GreaterThan),
-        TokenKind::LessThanEquals => Some(BinaryOperator::LessThanEquals),
-        TokenKind::GreaterThanEquals => Some(BinaryOperator::GreaterThanEquals),
-        TokenKind::LeftShift => Some(BinaryOperator::LeftShift),
-        TokenKind::RightShift => Some(BinaryOperator::RightShift),
-        TokenKind::UnsignedRightShift => Some(BinaryOperator::UnsignedRightShift),
-        TokenKind::EqualsEquals => Some(BinaryOperator::EqualsEquals),
-        TokenKind::EqualsEqualsEquals => Some(BinaryOperator::EqualsEqualsEquals),
-        TokenKind::BangEquals => Some(BinaryOperator::BangEquals),
-        TokenKind::BangEqualsEquals => Some(BinaryOperator::BangEqualsEquals),
-        TokenKind::AmpersandAmpersand => Some(BinaryOperator::AmpersandAmpersand),
-        TokenKind::PipePipe => Some(BinaryOperator::PipePipe),
-        TokenKind::QuestionQuestion => Some(BinaryOperator::QuestionQuestion),
-        TokenKind::Ampersand => Some(BinaryOperator::Ampersand),
-        TokenKind::Pipe => Some(BinaryOperator::Pipe),
-        TokenKind::Caret => Some(BinaryOperator::Caret),
-        TokenKind::Keyword(KeywordKind::Instanceof) => Some(BinaryOperator::Instanceof),
-        TokenKind::Keyword(KeywordKind::In) => Some(BinaryOperator::In),
+        TokenKind::StarStar => Some((28, 27, Op::StarStar)),
         _ => None,
     }
 }
@@ -162,7 +138,7 @@ impl<'a> Parser<'a> {
             let kind = self.current_kind().clone();
 
             // Check if this is an infix operator
-            let Some((left_bp, right_bp)) = infix_binding_power(&kind) else {
+            let Some((left_bp, right_bp, operator)) = infix_operator_info(&kind) else {
                 break;
             };
 
@@ -171,10 +147,6 @@ impl<'a> Parser<'a> {
                 break;
             }
 
-            // Get operator
-            // SAFETY: We only reach this code for valid binary operator tokens
-            #[allow(clippy::unwrap_used)]
-            let operator = token_to_binary_operator(&kind).unwrap();
             self.advance()?; // consume operator
 
             // Parse right-hand side with right binding power
@@ -188,6 +160,29 @@ impl<'a> Parser<'a> {
                 expr: Expression::BinaryExpression(BinaryExpression {
                     left: Box::new(left.expr),
                     operator,
+                    right: Box::new(right.expr),
+                    span,
+                }),
+                actual_end: right.actual_end,
+            };
+        }
+
+        // Handle assignment operator (after binary ops, before ternary)
+        // Assignment is right-associative and has low precedence
+        if min_bp <= 1 && self.check(&TokenKind::Equals) {
+            self.advance()?; // consume '='
+
+            // Parse right-hand side (assignment is right-associative, so same precedence)
+            let right = self.parse_expression_bp(1)?;
+
+            // Convert left side to pattern if needed (cover grammar)
+            let left_pattern = self.to_assignable(left.expr)?;
+
+            let span = Span::new(expr_start as u32, right.actual_end as u32);
+            left = ParsedExpr {
+                expr: Expression::AssignmentExpression(AssignmentExpression {
+                    left: Box::new(left_pattern),
+                    operator: AssignmentOperator::Assign,
                     right: Box::new(right.expr),
                     span,
                 }),
@@ -786,7 +781,7 @@ impl<'a> Parser<'a> {
     /// - Getter/setter: `{ get foo() {}, set foo(v) {} }`
     /// - Spread properties: `{ ...obj }`
     /// - String/number literal keys: `{ "key": value, 123: value }`
-    fn parse_object_expression(&mut self) -> Result<Expression, ParseError> {
+    pub(super) fn parse_object_expression(&mut self) -> Result<Expression, ParseError> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?; // consume '{'
 
@@ -845,8 +840,7 @@ impl<'a> Parser<'a> {
             };
 
             // Parse property key
-            // Supports: identifiers, keywords (as identifiers), string literals, computed keys
-            // TODO: Number literals
+            // Supports: identifiers, keywords (as identifiers), string literals, number literals, computed keys
             let (key, computed) = match self.current_kind() {
                 // Computed property: { [expr]: value }
                 TokenKind::BracketOpen => {
@@ -890,6 +884,19 @@ impl<'a> Parser<'a> {
                         false,
                     )
                 }
+                TokenKind::Number => {
+                    // Number literal key: {0: value, 1: value}
+                    let (key_start, key_end) = self.current_pos();
+                    let value = self.current_value().parse::<f64>().unwrap_or(f64::NAN);
+                    self.advance()?;
+                    (
+                        Expression::Literal(Literal {
+                            value: LiteralValue::Number(value),
+                            span: Span::new(key_start as u32, key_end as u32),
+                        }),
+                        false,
+                    )
+                }
                 _ => {
                     return Err(ParseError::InvalidSyntax {
                         message: format!("Expected property key, found {}", self.current_kind()),
@@ -920,7 +927,30 @@ impl<'a> Parser<'a> {
                 )
             } else if self.eat(TokenKind::Colon) {
                 // Use assignment_expression because comma separates properties
-                (PropertyKind::Init, self.parse_assignment_expression()?, false, false)
+                (
+                    PropertyKind::Init,
+                    self.parse_assignment_expression()?,
+                    false,
+                    false,
+                )
+            } else if self.check(&TokenKind::Equals) && !computed {
+                // Shorthand with default value: `{a = 1}` (only for simple identifiers)
+                // This parses as an AssignmentExpression, which gets converted to
+                // AssignmentPattern by to_assignable() when used in destructuring context
+                self.advance()?; // consume '='
+                let default_value = self.parse_assignment_expression()?;
+                let assign_end = default_value.span().end;
+                (
+                    PropertyKind::Init,
+                    Expression::AssignmentExpression(AssignmentExpression {
+                        left: Box::new(key.clone()),
+                        operator: AssignmentOperator::Assign,
+                        right: Box::new(default_value),
+                        span: Span::new(key.span().start, assign_end),
+                    }),
+                    true,
+                    false,
+                )
             } else {
                 // Shorthand: key is duplicated as value
                 (PropertyKind::Init, key.clone(), true, false)
@@ -963,7 +993,8 @@ impl<'a> Parser<'a> {
     /// TODO: Future enhancements:
     /// - Sparse arrays: `[1,,3]` (missing elements)
     /// - Spread elements: `[...arr]`
-    fn parse_array_expression(&mut self) -> Result<Expression, ParseError> {
+    /// - Elision (holes): `[, a]`, `[a, , b]`, `[, , a]`
+    pub(super) fn parse_array_expression(&mut self) -> Result<Expression, ParseError> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BracketOpen)?; // consume '['
 
@@ -979,15 +1010,43 @@ impl<'a> Parser<'a> {
             }));
         }
 
-        // Parse elements
+        // Parse elements (including elision/holes)
         loop {
+            // Check for elision (hole): leading comma means empty slot
+            if self.check(&TokenKind::Comma) {
+                elements.push(None); // hole
+                self.advance()?; // consume ','
+                // Check if we hit the closing bracket (trailing comma after hole)
+                if self.check(&TokenKind::BracketClose) {
+                    break;
+                }
+                continue;
+            }
+
+            // Check for closing bracket (end of array)
+            if self.check(&TokenKind::BracketClose) {
+                break;
+            }
+
             // Parse element expression (use assignment_expression because comma separates elements)
             let elem = self.parse_assignment_expression()?;
             elements.push(Some(elem));
 
-            // Check for comma or closing bracket (with trailing comma support)
-            if !self.expect_list_separator(&TokenKind::Comma, &TokenKind::BracketClose)? {
+            // Check for comma or closing bracket
+            if self.check(&TokenKind::Comma) {
+                self.advance()?; // consume ','
+                // Check for trailing comma
+                if self.check(&TokenKind::BracketClose) {
+                    break;
+                }
+            } else if self.check(&TokenKind::BracketClose) {
                 break;
+            } else {
+                return Err(ParseError::InvalidExpression {
+                    found: format!("'{}'", self.current_kind()),
+                    position: self.current_pos().0,
+                    context: None,
+                });
             }
         }
 
@@ -1211,45 +1270,18 @@ impl<'a> Parser<'a> {
     /// - No parameters: `() => expr`
     /// - Single parameter: `(x) => expr`
     /// - Multiple parameters: `(x, y) => expr`
+    /// - Destructuring parameters: `([a, b]) => ...`, `({x, y}) => ...`
+    /// - Default values: `(a = 1) => ...`
     /// - Expression body: `() => expr`
     /// - Block body: `() => { ... }` (body stored as span, not parsed)
     ///
     /// TODO: Support single parameter without parens: `x => expr`
     fn parse_arrow_function(&mut self) -> Result<Expression, ParseError> {
         let (start, _) = self.current_pos();
-        self.expect(&TokenKind::ParenOpen)?; // consume '('
 
-        // Parse parameter list
-        let mut params = Vec::new();
+        // Parse parameter list (reuse shared method)
+        let params = self.parse_parameter_list()?;
 
-        if !self.check(&TokenKind::ParenClose) {
-            loop {
-                // Parse parameter (identifier for now, no destructuring)
-                let (param_start, param_end) = self.current_pos();
-                if self.current_kind() != TokenKind::Identifier {
-                    return Err(ParseError::InvalidSyntax {
-                        message: format!("Expected parameter name, found {}", self.current_kind()),
-                        position: param_start,
-                        context: None,
-                    });
-                }
-                let symbol = self.intern(self.current_value());
-                self.advance()?;
-
-                params.push(Identifier {
-                    name: symbol,
-                    type_annotation: None,
-                    span: Span::new(param_start as u32, param_end as u32),
-                });
-
-                // Check for comma or closing paren
-                if !self.expect_list_separator(&TokenKind::Comma, &TokenKind::ParenClose)? {
-                    break;
-                }
-            }
-        }
-
-        self.expect(&TokenKind::ParenClose)?; // consume ')'
         self.expect(&TokenKind::Arrow)?; // consume '=>'
 
         // Parse body: expression or block
@@ -1547,6 +1579,124 @@ impl<'a> Parser<'a> {
                 position: start,
                 context: None,
             }),
+        }
+    }
+
+    // =========================================================================
+    // Pattern Conversion (Cover Grammar)
+    // =========================================================================
+
+    /// Convert an expression to an assignable pattern (cover grammar)
+    ///
+    /// This implements the ECMAScript "cover grammar" for assignment targets.
+    /// When we parse `{a, b} = obj`, we first parse `{a, b}` as an ObjectExpression,
+    /// then convert it to an ObjectPattern when we see the `=`.
+    ///
+    /// Conversions:
+    /// - ObjectExpression → ObjectPattern
+    /// - ArrayExpression → ArrayPattern
+    /// - SpreadElement → RestElement
+    /// - BinaryExpression with = (shorthand default) → AssignmentPattern
+    /// - Identifier, MemberExpression → unchanged (valid assignment targets)
+    pub(super) fn to_assignable(&self, expr: Expression) -> Result<Expression, ParseError> {
+        match expr {
+            // Identifier is already a valid assignment target
+            Expression::Identifier(_) => Ok(expr),
+
+            // Member expression is a valid assignment target
+            Expression::MemberExpression(_) => Ok(expr),
+
+            // Convert ObjectExpression to ObjectPattern
+            Expression::ObjectExpression(obj) => {
+                let properties = obj
+                    .properties
+                    .into_iter()
+                    .map(|prop| self.object_property_to_pattern(prop))
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                Ok(Expression::ObjectPattern(ObjectPattern {
+                    properties,
+                    span: obj.span,
+                }))
+            }
+
+            // Convert ArrayExpression to ArrayPattern
+            Expression::ArrayExpression(arr) => {
+                let elements = arr
+                    .elements
+                    .into_iter()
+                    .map(|elem| elem.map(|e| self.to_assignable(e)).transpose())
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                Ok(Expression::ArrayPattern(ArrayPattern {
+                    elements,
+                    span: arr.span,
+                }))
+            }
+
+            // Convert SpreadElement to RestElement
+            Expression::SpreadElement(spread) => {
+                let argument = self.to_assignable(*spread.argument)?;
+                Ok(Expression::RestElement(RestElement {
+                    argument: Box::new(argument),
+                    span: spread.span,
+                }))
+            }
+
+            // AssignmentExpression in pattern context becomes AssignmentPattern
+            // This handles default values like `{a = 1}` which was parsed as shorthand
+            Expression::AssignmentExpression(assign) => {
+                let left = self.to_assignable(*assign.left)?;
+                Ok(Expression::AssignmentPattern(AssignmentPattern {
+                    left: Box::new(left),
+                    right: assign.right,
+                    span: assign.span,
+                }))
+            }
+
+            // Already a pattern (can happen with nested patterns)
+            Expression::ObjectPattern(_)
+            | Expression::ArrayPattern(_)
+            | Expression::AssignmentPattern(_)
+            | Expression::RestElement(_) => Ok(expr),
+
+            // Invalid assignment target
+            _ => Err(ParseError::InvalidSyntax {
+                message: "Invalid assignment target".to_string(),
+                position: expr.span().start as usize,
+                context: None,
+            }),
+        }
+    }
+
+    /// Convert an object property to a pattern property
+    fn object_property_to_pattern(
+        &self,
+        prop: ObjectProperty,
+    ) -> Result<ObjectPatternProperty, ParseError> {
+        match prop {
+            ObjectProperty::Property(p) => {
+                // Convert the value to a pattern
+                let value = self.to_assignable(p.value)?;
+
+                Ok(ObjectPatternProperty::Property(Property {
+                    key: p.key,
+                    value,
+                    method: p.method,
+                    shorthand: p.shorthand,
+                    computed: p.computed,
+                    kind: p.kind,
+                    span: p.span,
+                }))
+            }
+            ObjectProperty::SpreadElement(spread) => {
+                // Convert spread to rest element
+                let argument = self.to_assignable(*spread.argument)?;
+                Ok(ObjectPatternProperty::RestElement(RestElement {
+                    argument: Box::new(argument),
+                    span: spread.span,
+                }))
+            }
         }
     }
 }

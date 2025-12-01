@@ -84,8 +84,8 @@ fn walk_fixtures_recursive(
     relative_base: &str,
     fixtures: &mut Vec<Fixture>,
 ) -> Result<(), String> {
-    let entries = fs::read_dir(current)
-        .map_err(|e| format!("Failed to read directory {current:?}: {e}"))?;
+    let entries =
+        fs::read_dir(current).map_err(|e| format!("Failed to read directory {current:?}: {e}"))?;
 
     for entry in entries {
         let entry = entry.map_err(|e| format!("Failed to read entry: {e}"))?;
@@ -630,13 +630,10 @@ pub fn delete_file_if_exists(path: &Path) -> Result<(), String> {
 /// Only supports .svelte files currently.
 pub fn format_with_our_formatter(content: &str, filepath: &str) -> Result<String, String> {
     if filepath.ends_with(".svelte") {
-        let ast =
-            tsv_svelte::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
+        let ast = tsv_svelte::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
         Ok(tsv_svelte::format(&ast, content))
     } else {
-        Err(format!(
-            "Unsupported file type for formatting: {filepath}"
-        ))
+        Err(format!("Unsupported file type for formatting: {filepath}"))
     }
 }
 

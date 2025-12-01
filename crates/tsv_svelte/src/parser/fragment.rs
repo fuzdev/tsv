@@ -35,4 +35,34 @@ impl<'a> SvelteParser<'a> {
             },
         })
     }
+
+    /// Parse an HTML comment: <!-- content -->
+    ///
+    /// The current token is TokenKind::Comment, which includes the full
+    /// <!-- ... --> delimiters. We extract just the content field.
+    pub(crate) fn parse_comment(&mut self) -> Result<HtmlComment, ParseError> {
+        let start = self.current_start;
+        let end = self.current_end;
+
+        // Token value is the full comment including <!-- and -->
+        let token_value = self.current_value();
+
+        // Extract content: text between <!-- and -->
+        let content = if token_value.len() >= 7 {
+            // Remove "<!--" (4 chars) from start and "-->" (3 chars) from end
+            token_value[4..token_value.len() - 3].to_string()
+        } else {
+            String::new()
+        };
+
+        self.advance()?;
+
+        Ok(HtmlComment {
+            content,
+            span: Span {
+                start: start as u32,
+                end: end as u32,
+            },
+        })
+    }
 }

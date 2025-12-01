@@ -14,7 +14,7 @@ members = [
 version = "0.1.0"
 edition = "2024"
 authors = ["tsv contributors"]
-license = "MIT OR Apache-2.0"
+license = "AGPL-3.0-only"
 
 [workspace.dependencies]
 # Foundation
@@ -57,15 +57,11 @@ too_many_lines = "allow"
 # Style preferences - explicit can be clearer
 use_self = "allow"
 doc_markdown = "allow"
-# TODO: Run `cargo clippy --fix` to inline format args, then enable this lint
-uninlined_format_args = "allow"
 unreadable_literal = "allow"
 option_if_let_else = "allow"
 if_not_else = "allow"
 match_same_arms = "allow"
 single_match_else = "allow"
-redundant_else = "allow"
-manual_let_else = "allow"
 # These are style choices that can go either way
 wildcard_imports = "allow"
 unused_self = "allow"
@@ -113,12 +109,12 @@ cargo_common_metadata = "allow"
 multiple_crate_versions = "allow"
 
 # Restriction lints (panic points need explicit #[allow] with justification)
+clone_on_ref_ptr = "warn"
 dbg_macro = "warn"
 expect_used = "warn"
 panic = "warn"
 unwrap_used = "warn"
 # Note: todo! macro allowed per project convention (see CLAUDE.md)
-# TODO: Audit the ~72 unwrap/expect usages and add explicit #[allow] with safety justification
 
 # Root package for integration tests
 [package]

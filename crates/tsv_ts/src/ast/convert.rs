@@ -157,14 +157,7 @@ fn convert_statement(
                 params: func_decl
                     .params
                     .iter()
-                    .map(|p| public::Identifier {
-                        node_type: "Identifier".to_string(),
-                        start: p.span.start,
-                        end: p.span.end,
-                        loc: create_location(p.span, loc, offset),
-                        name: interner.must_resolve(p.name).to_string(),
-                        type_annotation: None,
-                    })
+                    .map(|p| convert_expression(p, source, loc, interner, offset))
                     .collect(),
                 body: convert_block_statement(&func_decl.body, source, loc, interner, offset),
             })
@@ -241,14 +234,7 @@ fn convert_method_definition(
         params: func
             .params
             .iter()
-            .map(|p| public::Identifier {
-                node_type: "Identifier".to_string(),
-                start: p.span.start,
-                end: p.span.end,
-                loc: create_location(p.span, loc, offset),
-                name: interner.must_resolve(p.name).to_string(),
-                type_annotation: None,
-            })
+            .map(|p| convert_expression(p, source, loc, interner, offset))
             .collect(),
         body: convert_block_statement(&func.body, source, loc, interner, offset),
     };
@@ -304,18 +290,8 @@ fn convert_variable_declarator(
         start: declarator.span.start,
         end: declarator.span.end,
         loc: create_location(declarator.span, loc, offset),
-        id: public::Identifier {
-            node_type: "Identifier".to_string(),
-            start: declarator.id.span.start,
-            end: declarator.id.span.end,
-            loc: create_location(declarator.id.span, loc, offset),
-            name: interner.must_resolve(declarator.id.name).to_string(),
-            type_annotation: declarator
-                .id
-                .type_annotation
-                .as_ref()
-                .map(|ta| convert_type_annotation(ta, loc, offset)),
-        },
+        // id can be Identifier, ArrayPattern, or ObjectPattern
+        id: convert_expression(&declarator.id, source, loc, interner, offset),
         init: declarator
             .init
             .as_ref()
@@ -492,14 +468,7 @@ pub fn convert_expression(
                 params: arrow
                     .params
                     .iter()
-                    .map(|p| public::Identifier {
-                        node_type: "Identifier".to_string(),
-                        start: p.span.start,
-                        end: p.span.end,
-                        loc: create_location(p.span, loc, offset),
-                        name: interner.must_resolve(p.name).to_string(),
-                        type_annotation: None,
-                    })
+                    .map(|p| convert_expression(p, source, loc, interner, offset))
                     .collect(),
                 body,
             })
@@ -524,14 +493,7 @@ pub fn convert_expression(
                 params: func
                     .params
                     .iter()
-                    .map(|p| public::Identifier {
-                        node_type: "Identifier".to_string(),
-                        start: p.span.start,
-                        end: p.span.end,
-                        loc: create_location(p.span, loc, offset),
-                        name: interner.must_resolve(p.name).to_string(),
-                        type_annotation: None,
-                    })
+                    .map(|p| convert_expression(p, source, loc, interner, offset))
                     .collect(),
                 body: convert_block_statement(&func.body, source, loc, interner, offset),
             })
@@ -710,6 +672,95 @@ pub fn convert_expression(
             end: s.span.end,
             loc: create_location(s.span, loc, offset),
         }),
+        internal::Expression::AssignmentExpression(assign) => {
+            public::Expression::AssignmentExpression(public::AssignmentExpression {
+                node_type: "AssignmentExpression".to_string(),
+                start: assign.span.start,
+                end: assign.span.end,
+                loc: create_location(assign.span, loc, offset),
+                operator: assign.operator.as_str().to_string(),
+                left: Box::new(convert_expression(
+                    &assign.left,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+                right: Box::new(convert_expression(
+                    &assign.right,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
+        internal::Expression::ObjectPattern(obj) => {
+            public::Expression::ObjectPattern(public::ObjectPattern {
+                node_type: "ObjectPattern".to_string(),
+                start: obj.span.start,
+                end: obj.span.end,
+                loc: create_location(obj.span, loc, offset),
+                properties: obj
+                    .properties
+                    .iter()
+                    .map(|p| convert_object_pattern_property(p, source, loc, interner, offset))
+                    .collect(),
+            })
+        }
+        internal::Expression::ArrayPattern(arr) => {
+            public::Expression::ArrayPattern(public::ArrayPattern {
+                node_type: "ArrayPattern".to_string(),
+                start: arr.span.start,
+                end: arr.span.end,
+                loc: create_location(arr.span, loc, offset),
+                elements: arr
+                    .elements
+                    .iter()
+                    .map(|e| {
+                        e.as_ref()
+                            .map(|expr| convert_expression(expr, source, loc, interner, offset))
+                    })
+                    .collect(),
+            })
+        }
+        internal::Expression::AssignmentPattern(pattern) => {
+            public::Expression::AssignmentPattern(public::AssignmentPattern {
+                node_type: "AssignmentPattern".to_string(),
+                start: pattern.span.start,
+                end: pattern.span.end,
+                loc: create_location(pattern.span, loc, offset),
+                left: Box::new(convert_expression(
+                    &pattern.left,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+                right: Box::new(convert_expression(
+                    &pattern.right,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
+        internal::Expression::RestElement(rest) => {
+            public::Expression::RestElement(public::RestElement {
+                node_type: "RestElement".to_string(),
+                start: rest.span.start,
+                end: rest.span.end,
+                loc: create_location(rest.span, loc, offset),
+                argument: Box::new(convert_expression(
+                    &rest.argument,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
     }
 }
 
@@ -776,6 +827,35 @@ fn convert_object_property(
                 loc: create_location(s.span, loc, offset),
                 argument: Box::new(convert_expression(
                     &s.argument,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
+    }
+}
+
+fn convert_object_pattern_property(
+    prop: &internal::ObjectPatternProperty,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::ObjectPatternProperty {
+    match prop {
+        internal::ObjectPatternProperty::Property(p) => public::ObjectPatternProperty::Property(
+            convert_property(p, source, loc, interner, offset),
+        ),
+        internal::ObjectPatternProperty::RestElement(r) => {
+            public::ObjectPatternProperty::RestElement(public::RestElement {
+                node_type: "RestElement".to_string(),
+                start: r.span.start,
+                end: r.span.end,
+                loc: create_location(r.span, loc, offset),
+                argument: Box::new(convert_expression(
+                    &r.argument,
                     source,
                     loc,
                     interner,

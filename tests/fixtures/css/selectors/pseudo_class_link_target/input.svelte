@@ -1,5 +1,4 @@
 <style>
-	/* Link pseudo-classes */
 	a:any-link {
 		color: blue;
 	}
@@ -8,8 +7,11 @@
 		text-decoration: none;
 	}
 
-	/* Target container */
-	.container:target-within {
+	a:visited {
+		color: purple;
+	}
+
+	div:target {
 		background: yellow;
 	}
 </style>

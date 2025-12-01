@@ -4,6 +4,16 @@ use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 
+/// Check if an at-rule name is a keyframes rule (including vendor-prefixed versions)
+/// e.g., "keyframes", "-webkit-keyframes", "-moz-keyframes"
+fn is_keyframes_atrule(name: &str) -> bool {
+    name == "keyframes"
+        || name == "-webkit-keyframes"
+        || name == "-moz-keyframes"
+        || name == "-o-keyframes"
+        || name == "-ms-keyframes"
+}
+
 /// Check if current token is a CSS boolean operator keyword (and, or, not)
 fn is_boolean_operator(parser: &CssParser) -> bool {
     if let TokenKind::Identifier = &parser.current_kind {
@@ -232,7 +242,9 @@ fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span),
     } else {
         // SAFETY: We just checked is_empty() is false
         #[allow(clippy::unwrap_used)]
-        { values.last().unwrap().span().end }
+        {
+            values.last().unwrap().span().end
+        }
     };
 
     Ok((
@@ -687,17 +699,17 @@ fn parse_atrule_block(
 
     // Determine what content to expect based on at-rule type and nesting context
     // When nested inside a rule, at-rules that normally contain rules should contain declarations instead
-    let expect_rules = matches!(
+    let expect_rules = (matches!(
         atrule_name,
         "media"
             | "supports"
             | "layer"
-            | "keyframes"
             | "container"
             | "starting-style"
             | "scope"
             | "font-feature-values"
-    ) && !nested_in_rule;
+    ) || is_keyframes_atrule(atrule_name))
+        && !nested_in_rule;
     let expect_declarations = matches!(
         atrule_name,
         "font-face" | "page" | "property" | "counter-style" | "color-profile" | "position-try" | "font-palette-values"

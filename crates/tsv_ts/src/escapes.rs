@@ -220,8 +220,7 @@ pub fn decode_string_escape(source: &str, position: usize) -> Result<String, Par
 
                         // Validated exactly 2 hex digits above, so this cannot fail
                         #[allow(clippy::expect_used)]
-                        let code = u8::from_str_radix(&hex_digits, 16)
-                            .expect("valid hex digits");
+                        let code = u8::from_str_radix(&hex_digits, 16).expect("valid hex digits");
                         result.push(code as char);
                     }
 
@@ -355,8 +354,8 @@ pub fn decode_string_escape(source: &str, position: usize) -> Result<String, Par
 
                             // Validated exactly 4 hex digits above, so this cannot fail
                             #[allow(clippy::expect_used)]
-                            let code_point = u16::from_str_radix(&hex_digits, 16)
-                                .expect("valid hex digits");
+                            let code_point =
+                                u16::from_str_radix(&hex_digits, 16).expect("valid hex digits");
 
                             // Handle UTF-16 surrogate pairs
                             // High surrogate: 0xD800-0xDBFF

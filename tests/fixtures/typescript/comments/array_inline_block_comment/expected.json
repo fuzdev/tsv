@@ -1,0 +1,204 @@
+{
+	"css": null,
+	"js": [],
+	"start": null,
+	"end": null,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " comment1 ",
+			"start": 28,
+			"end": 42,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 19
+				},
+				"end": {
+					"line": 2,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment2 ",
+			"start": 49,
+			"end": 63,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 40
+				},
+				"end": {
+					"line": 2,
+					"column": 54
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 75,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 66,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 0
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 65,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 56
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 16,
+							"end": 64,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 2,
+									"column": 55
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 16,
+								"end": 22,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 13
+									}
+								},
+								"name": "value1"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 25,
+								"end": 64,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 16
+									},
+									"end": {
+										"line": 2,
+										"column": 55
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 26,
+										"end": 27,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 17
+											},
+											"end": {
+												"line": 2,
+												"column": 18
+											}
+										},
+										"value": 1,
+										"raw": "1",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " comment1 ",
+												"start": 28,
+												"end": 42
+											}
+										]
+									},
+									{
+										"type": "Literal",
+										"start": 44,
+										"end": 45,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 35
+											},
+											"end": {
+												"line": 2,
+												"column": 36
+											}
+										},
+										"value": 2,
+										"raw": "2"
+									},
+									{
+										"type": "Literal",
+										"start": 47,
+										"end": 48,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 38
+											},
+											"end": {
+												"line": 2,
+												"column": 39
+											}
+										},
+										"value": 3,
+										"raw": "3",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " comment2 ",
+												"start": 49,
+												"end": 63
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

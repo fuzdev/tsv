@@ -12,6 +12,7 @@ use std::fmt::Write;
 use super::Printer;
 use crate::ast::internal::{self, Expression, Literal, LiteralValue};
 use tsv_lang::SymbolResolver;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::{self, Doc};
 use tsv_lang::printing::{
     StringFormatOptions, format_string_literal, has_blank_line_between, has_newline_between,
@@ -75,9 +76,19 @@ impl<'a> Printer<'a> {
     /// - Blank lines between properties: preserved in multiline mode
     /// - Line comments: force multiline (can't be inline)
     /// - Block comments in inline source: stay inline if fits
+    /// - Empty objects with comments: expand to multiline
     pub(super) fn print_object_expression(&mut self, obj: &internal::ObjectExpression) {
         // Check if object contains line comments (force multiline)
         let has_line_comments = self.has_line_comments_between(obj.span.start, obj.span.end);
+
+        // Check if object has any comments
+        let has_comments = self.has_comments_between(obj.span.start, obj.span.end);
+
+        // Handle empty objects with comments specially
+        if obj.properties.is_empty() && has_comments {
+            self.print_empty_object_with_comments(obj);
+            return;
+        }
 
         // Check if source has newlines (preserve multiline)
         let has_source_newline = if !obj.properties.is_empty() {
@@ -86,9 +97,6 @@ impl<'a> Printer<'a> {
         } else {
             false
         };
-
-        // Check if object has any comments
-        let has_comments = self.has_comments_between(obj.span.start, obj.span.end);
 
         if has_line_comments || (has_source_newline && has_comments) {
             // Use multiline comment-aware path:
@@ -112,6 +120,33 @@ impl<'a> Printer<'a> {
             let output = doc::print_doc_at_column(&doc, &self.config, current_col);
             self.write(&output);
         }
+    }
+
+    /// Print an empty object that contains only comments
+    ///
+    /// Prettier always expands empty objects with comments to multiline:
+    /// `{/* comment */}` → `{\n\t/* comment */\n}`
+    fn print_empty_object_with_comments(&mut self, obj: &internal::ObjectExpression) {
+        self.write("{\n");
+        self.indent_level += 1 + self.declaration_indent_depth;
+
+        // Print all comments inside the object
+        // Unlike print_leading_comments, we print ALL comments here (including same-line ones)
+        // because there are no "statements" to attach trailing comments to
+        // Uses binary search: O(log n + k)
+        let inner_start = obj.span.start + 1; // After '{'
+        let inner_end = obj.span.end - 1; // Before '}'
+
+        for comment in comments_in_range(self.comments, inner_start, inner_end) {
+            self.write_indent();
+            self.print_comment(comment);
+            self.write("\n");
+        }
+
+        self.indent_level -= 1;
+        self.write_indent();
+        self.indent_level -= self.declaration_indent_depth;
+        self.write("}");
     }
 
     /// Build a Doc for an object expression
@@ -307,11 +342,9 @@ impl<'a> Printer<'a> {
             // Print leading comments (block only since we're inline)
             // Skip comments that were trailing comments for the previous property
             // (those are on the same line as prev_prop_end)
-            for comment in self.comments.iter() {
-                if comment.span.start >= prev_prop_end
-                    && comment.span.end <= prop.span().start
-                    && comment.is_block
-                {
+            // Uses binary search: O(log n + k)
+            for comment in comments_in_range(self.comments, prev_prop_end, prop.span().start) {
+                if comment.is_block {
                     // Skip if this is a trailing comment from previous property
                     // (on same line as prev_prop_end, unless it's the first property)
                     if !is_first_prop_check(i)
@@ -354,13 +387,13 @@ impl<'a> Printer<'a> {
                         parts.push(key_str);
                     } else {
                         // Check for comments between key and value (after colon)
+                        // Uses binary search: O(log n + k)
                         let colon_pos = self.find_colon_after(p.key.span().end);
                         let mut value_prefix = String::new();
-                        for comment in self.comments.iter() {
-                            if comment.span.start > colon_pos
-                                && comment.span.end <= p.value.span().start
-                                && comment.is_block
-                            {
+                        for comment in
+                            comments_in_range(self.comments, colon_pos + 1, p.value.span().start)
+                        {
+                            if comment.is_block {
                                 let _ = write!(value_prefix, "/*{}*/ ", comment.content);
                             }
                         }
@@ -375,13 +408,10 @@ impl<'a> Printer<'a> {
             }
 
             // Print trailing comments after value (block only)
+            // Uses binary search: O(log n + k)
             let prop_end = prop.value_end();
-            for comment in self.comments.iter() {
-                if comment.span.start >= prop_end
-                    && comment.span.end <= obj.span.end
-                    && is_same_line(self.source, prop_end, comment.span.start)
-                    && comment.is_block
-                {
+            for comment in comments_in_range(self.comments, prop_end, obj.span.end) {
+                if is_same_line(self.source, prop_end, comment.span.start) && comment.is_block {
                     parts.push(format!(" /*{}*/", comment.content));
                 }
             }
@@ -599,10 +629,11 @@ impl<'a> Printer<'a> {
             }
             Expression::FunctionExpression(func) => {
                 // Function expressions: () { return ...; }
+                // params can be patterns, so extract from source instead of resolving names
                 let params: Vec<String> = func
                     .params
                     .iter()
-                    .map(|p| self.resolve_symbol(p.name))
+                    .map(|p| self.expression_to_string(p))
                     .collect();
                 // For inline string, we just extract body from source
                 let body_start = func.body.span.start as usize;
@@ -626,6 +657,78 @@ impl<'a> Printer<'a> {
                 format!("/{}/{}", regex.pattern, regex.flags)
             }
             Expression::Super(_) => "super".to_string(),
+            Expression::AssignmentExpression(assign) => {
+                format!(
+                    "{} {} {}",
+                    self.expression_to_string(&assign.left),
+                    assign.operator.as_str(),
+                    self.expression_to_string(&assign.right)
+                )
+            }
+            Expression::ObjectPattern(obj) => {
+                let props: Vec<String> = obj
+                    .properties
+                    .iter()
+                    .map(|p| self.object_pattern_property_to_string(p))
+                    .collect();
+                format!("{{{}}}", props.join(", "))
+            }
+            Expression::ArrayPattern(arr) => {
+                let elems: Vec<String> = arr
+                    .elements
+                    .iter()
+                    .map(|e| match e {
+                        Some(expr) => self.expression_to_string(expr),
+                        None => String::new(),
+                    })
+                    .collect();
+                format!("[{}]", elems.join(", "))
+            }
+            Expression::AssignmentPattern(pattern) => {
+                format!(
+                    "{} = {}",
+                    self.expression_to_string(&pattern.left),
+                    self.expression_to_string(&pattern.right)
+                )
+            }
+            Expression::RestElement(rest) => {
+                format!("...{}", self.expression_to_string(&rest.argument))
+            }
+        }
+    }
+
+    /// Convert an object pattern property to a string
+    fn object_pattern_property_to_string(&self, prop: &internal::ObjectPatternProperty) -> String {
+        match prop {
+            internal::ObjectPatternProperty::Property(p) => {
+                if p.shorthand {
+                    // For shorthand with default value, the value is an AssignmentPattern
+                    // For shorthand without default, key and value are the same identifier
+                    match &p.value {
+                        Expression::AssignmentPattern(pattern) => {
+                            // {a = 1} - shorthand with default
+                            format!(
+                                "{} = {}",
+                                self.expression_to_string(&p.key),
+                                self.expression_to_string(&pattern.right)
+                            )
+                        }
+                        _ => self.expression_to_string(&p.key),
+                    }
+                } else {
+                    // {a: x} or {a: x = 1} or {[key]: x}
+                    // For regular keys, use property_key_to_string to normalize string keys to identifiers
+                    let key_str = if p.computed {
+                        format!("[{}]", self.expression_to_string(&p.key))
+                    } else {
+                        self.property_key_to_string(&p.key)
+                    };
+                    format!("{}: {}", key_str, self.expression_to_string(&p.value))
+                }
+            }
+            internal::ObjectPatternProperty::RestElement(r) => {
+                format!("...{}", self.expression_to_string(&r.argument))
+            }
         }
     }
 
@@ -757,12 +860,10 @@ impl<'a> Printer<'a> {
 
                 // Print trailing inline comments on same line as property
                 // Block comments go before comma, line comments go after comma (matches prettier)
+                // Uses binary search: O(log n + k)
                 let mut has_line_comment = false;
-                for comment in self.comments.iter() {
-                    if comment.span.start >= prop_end
-                        && comment.span.start < obj.span.end
-                        && is_same_line(self.source, prop_end, comment.span.start)
-                    {
+                for comment in comments_in_range(self.comments, prop_end, obj.span.end) {
+                    if is_same_line(self.source, prop_end, comment.span.start) {
                         if comment.is_block {
                             // Block comment: print before comma
                             self.write(" ");
@@ -778,10 +879,8 @@ impl<'a> Printer<'a> {
 
                 // Print line comments after comma
                 if has_line_comment {
-                    for comment in self.comments.iter() {
-                        if comment.span.start >= prop_end
-                            && comment.span.start < obj.span.end
-                            && is_same_line(self.source, prop_end, comment.span.start)
+                    for comment in comments_in_range(self.comments, prop_end, obj.span.end) {
+                        if is_same_line(self.source, prop_end, comment.span.start)
                             && !comment.is_block
                         {
                             self.write(" ");
@@ -814,13 +913,13 @@ impl<'a> Printer<'a> {
     ) -> String {
         let mut result = String::new();
 
-        // Parameters
+        // Parameters (can be patterns, so use expression_to_string)
         result.push('(');
         for (i, param) in arrow.params.iter().enumerate() {
             if i > 0 {
                 result.push_str(", ");
             }
-            result.push_str(&self.resolve_symbol(param.name));
+            result.push_str(&self.expression_to_string(param));
         }
         result.push_str(") => ");
 

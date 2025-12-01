@@ -10,6 +10,6 @@ pub mod public;
 
 // Re-export commonly used types
 pub use internal::{
-    Attribute, AttributeValue, Element, ExpressionTag, Fragment, FragmentNode, Root, Script,
-    ScriptContext, Style, Text,
+    Attribute, AttributeValue, AwaitBlock, EachBlock, Element, ExpressionTag, Fragment,
+    FragmentNode, IfBlock, KeyBlock, Root, Script, ScriptContext, Style, Text,
 };

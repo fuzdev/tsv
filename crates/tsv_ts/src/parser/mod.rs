@@ -370,29 +370,88 @@ impl<'a> Parser<'a> {
     ///
     /// Used by function declarations, method shorthand, and arrow functions.
     /// Consumes both opening and closing parentheses.
-    pub(super) fn parse_parameter_list(&mut self) -> Result<Vec<Identifier>, ParseError> {
+    pub(super) fn parse_parameter_list(&mut self) -> Result<Vec<Expression>, ParseError> {
         self.expect(&TokenKind::ParenOpen)?;
 
         let mut params = Vec::new();
         if !self.check(&TokenKind::ParenClose) {
             loop {
-                // Parse parameter (identifier for now, no destructuring)
-                let (param_start, param_end) = self.current_pos();
-                if self.current_kind() != TokenKind::Identifier {
-                    return Err(ParseError::InvalidSyntax {
-                        message: format!("Expected parameter name, found {}", self.current_kind()),
-                        position: param_start,
-                        context: None,
-                    });
-                }
-                let symbol = self.intern(self.current_value());
-                self.advance()?;
+                // Parse parameter: identifier, array pattern, or object pattern
+                let param = match self.current_kind() {
+                    TokenKind::Identifier => {
+                        // Simple identifier parameter
+                        let (param_start, param_end) = self.current_pos();
+                        let symbol = self.intern(self.current_value());
+                        self.advance()?;
+                        let mut param = Expression::Identifier(Identifier {
+                            name: symbol,
+                            type_annotation: None,
+                            span: Span::new(param_start as u32, param_end as u32),
+                        });
+                        // Check for default value: param = default
+                        if self.check(&TokenKind::Equals) {
+                            self.advance()?; // consume '='
+                            let default_value = self.parse_assignment_expression()?;
+                            let assign_end = default_value.span().end;
+                            param = Expression::AssignmentPattern(AssignmentPattern {
+                                left: Box::new(param),
+                                right: Box::new(default_value),
+                                span: Span::new(param_start as u32, assign_end),
+                            });
+                        }
+                        param
+                    }
+                    TokenKind::BracketOpen => {
+                        // Array destructuring pattern: [a, b]
+                        let expr = self.parse_array_expression()?;
+                        let pattern = self.to_assignable(expr)?;
+                        // Check for default value
+                        if self.check(&TokenKind::Equals) {
+                            let pattern_start = pattern.span().start;
+                            self.advance()?; // consume '='
+                            let default_value = self.parse_assignment_expression()?;
+                            let assign_end = default_value.span().end;
+                            Expression::AssignmentPattern(AssignmentPattern {
+                                left: Box::new(pattern),
+                                right: Box::new(default_value),
+                                span: Span::new(pattern_start, assign_end),
+                            })
+                        } else {
+                            pattern
+                        }
+                    }
+                    TokenKind::BraceOpen => {
+                        // Object destructuring pattern: {a, b}
+                        let expr = self.parse_object_expression()?;
+                        let pattern = self.to_assignable(expr)?;
+                        // Check for default value
+                        if self.check(&TokenKind::Equals) {
+                            let pattern_start = pattern.span().start;
+                            self.advance()?; // consume '='
+                            let default_value = self.parse_assignment_expression()?;
+                            let assign_end = default_value.span().end;
+                            Expression::AssignmentPattern(AssignmentPattern {
+                                left: Box::new(pattern),
+                                right: Box::new(default_value),
+                                span: Span::new(pattern_start, assign_end),
+                            })
+                        } else {
+                            pattern
+                        }
+                    }
+                    _ => {
+                        return Err(ParseError::InvalidSyntax {
+                            message: format!(
+                                "Expected parameter name or destructuring pattern, found {}",
+                                self.current_kind()
+                            ),
+                            position: self.current_pos().0,
+                            context: None,
+                        });
+                    }
+                };
 
-                params.push(Identifier {
-                    name: symbol,
-                    type_annotation: None,
-                    span: Span::new(param_start as u32, param_end as u32),
-                });
+                params.push(param);
 
                 // Check for comma or closing paren
                 if !self.expect_list_separator(&TokenKind::Comma, &TokenKind::ParenClose)? {
@@ -427,6 +486,21 @@ impl<'a> Parser<'a> {
     /// Parse a single expression (used by Svelte for expression tags)
     pub fn parse_expression_public(&mut self) -> Result<Expression, ParseError> {
         self.parse_expression()
+    }
+
+    /// Parse a single assignment expression and return position where parsing stopped.
+    ///
+    /// Unlike `parse_expression_public()`, this stops at top-level commas.
+    /// This is useful for parsing expressions embedded in contexts where commas
+    /// have other meanings (like `{#each items as pattern, index}`).
+    ///
+    /// Returns (expression, end_position) where end_position is where the next
+    /// unparsed content begins (in absolute source coordinates with base_offset).
+    pub fn parse_assignment_expression_partial(&mut self) -> Result<(Expression, usize), ParseError> {
+        let expr = self.parse_assignment_expression()?;
+        // Return the start of the current (unconsumed) token
+        let next_pos = self.current_start + self.base_offset;
+        Ok((expr, next_pos))
     }
 }
 
