@@ -162,6 +162,87 @@ pub fn parse_expression(
         .map_err(|e| e.with_context(source))
 }
 
+/// Format a single TypeScript expression back to source code
+///
+/// This formats an expression AST node that was parsed as part of a larger document
+/// (e.g., a Svelte template). The source must be the full document source that the
+/// expression's spans refer to.
+///
+/// # Arguments
+///
+/// * `expression` - The expression AST to format
+/// * `source` - The original full source code (the expression's spans index into this)
+/// * `interner` - Shared string interner (same one used during parsing)
+///
+/// # Returns
+///
+/// The formatted expression as a String
+pub fn format_expression(
+    expression: &Expression,
+    source: &str,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+) -> String {
+    format_expression_with_indent(expression, source, interner, 0)
+}
+
+/// Format a single TypeScript expression with a base indentation level
+///
+/// This is used when formatting expressions embedded in other content
+/// (e.g., Svelte templates) where the expression needs to respect the
+/// surrounding indentation context.
+pub fn format_expression_with_indent(
+    expression: &Expression,
+    source: &str,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+    indent_level: usize,
+) -> String {
+    let comments = Vec::new();
+    let mut printer = printer::Printer::with_config(
+        interner,
+        source,
+        &comments,
+        tsv_lang::PrintConfig::default(),
+    );
+    printer.set_indent_level(indent_level);
+    printer.print_expression(expression);
+    printer.into_string()
+}
+
+/// Parse an expression and convert it to a binding pattern.
+///
+/// This parses an expression and then converts it to a pattern:
+/// - ObjectExpression → ObjectPattern
+/// - ArrayExpression → ArrayPattern
+/// - SpreadElement → RestElement
+/// - AssignmentExpression → AssignmentPattern
+/// - Identifier → Identifier (unchanged)
+///
+/// Used for parsing destructuring patterns in contexts like `@const {a, b} = expr`.
+///
+/// # Arguments
+///
+/// * `source` - The source code of the pattern
+/// * `base_offset` - Offset in the full source file
+/// * `interner` - Shared string interner
+///
+/// # Returns
+///
+/// * `Ok(Expression)` - The parsed pattern (ObjectPattern, ArrayPattern, etc.)
+/// * `Err(ParseError)` - If parsing or conversion fails
+pub fn parse_pattern(
+    source: &str,
+    base_offset: usize,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+) -> Result<Expression> {
+    let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
+    let expr = parser
+        .parse_expression_public()
+        .map_err(|e| e.with_context(source))?;
+    parser
+        .expression_to_pattern(expr)
+        .map_err(|e| e.with_context(source))
+}
+
 /// Parse a partial expression, stopping at top-level commas.
 ///
 /// This is used when parsing patterns in contexts where commas have other meanings,
@@ -191,6 +272,25 @@ pub fn parse_expression_partial(
     parser
         .parse_assignment_expression_partial()
         .map_err(|e| e.with_context(source))
+}
+
+/// Build a Doc tree for a TypeScript expression
+///
+/// This returns a Doc that can be used in the doc-based formatting system
+/// for proper line wrapping decisions. Unlike `format_expression` which returns
+/// a formatted string, this preserves break points and wrapping information.
+///
+/// Used when embedding TS expressions in larger documents (e.g., Svelte attributes)
+/// where the surrounding context needs to participate in wrapping decisions.
+pub fn build_expression_doc(
+    expression: &Expression,
+    source: &str,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+    config: &tsv_lang::PrintConfig,
+) -> tsv_lang::doc::Doc {
+    let comments = Vec::new();
+    let printer = printer::Printer::with_config(interner, source, &comments, *config);
+    printer.build_expression_doc_public(expression)
 }
 
 // Re-export key types for convenience

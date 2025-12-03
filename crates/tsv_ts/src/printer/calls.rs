@@ -19,6 +19,18 @@ fn chain_has_calls(expr: &internal::Expression) -> bool {
     }
 }
 
+/// Check if an expression needs parentheses when used as a callee
+/// Ternary expressions like `(a ? b : c)()` need parens to call the result
+fn callee_needs_parens(expr: &internal::Expression) -> bool {
+    matches!(
+        expr,
+        internal::Expression::ConditionalExpression(_)
+            | internal::Expression::BinaryExpression(_)
+            | internal::Expression::AssignmentExpression(_)
+            | internal::Expression::SequenceExpression(_)
+    )
+}
+
 impl<'a> Printer<'a> {
     /// Print a call expression: `foo()`, `obj.method(arg1, arg2)`
     ///
@@ -59,7 +71,14 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a call expression with argument wrapping (not chain-aware)
     pub(super) fn build_call_doc_with_wrapping(&self, call: &internal::CallExpression) -> Doc {
-        let callee = self.build_expression_doc(&call.callee);
+        let callee_doc = self.build_expression_doc(&call.callee);
+
+        // Wrap callee in parens if needed (e.g., ternary: `(a ? b : c)()`)
+        let callee = if callee_needs_parens(&call.callee) {
+            doc::concat(vec![doc::text("("), callee_doc, doc::text(")")])
+        } else {
+            callee_doc
+        };
 
         // Handle optional chaining
         let callee = if call.optional {
@@ -234,42 +253,26 @@ impl<'a> Printer<'a> {
 
     /// Print a member expression: `obj.prop`, `arr[0]`
     ///
-    /// For property-only chains, keeps inline (relies on assignment-level wrapping).
-    /// For method chains (containing calls), wraps with leading `.`.
+    /// For method chains (containing calls), wraps with leading `.` before method calls.
+    /// For property-only chains, uses greedy line packing with `fill()`.
     pub(super) fn print_member_expression(&mut self, member: &internal::MemberExpression) {
         // Check if this chain contains any calls (method chain vs property chain)
         let has_calls = chain_has_calls(&internal::Expression::MemberExpression(member.clone()));
 
-        if has_calls {
+        let doc = if has_calls {
             // Method chain - use chain wrapping
-            let doc = self.build_chain_doc_with_wrapping(&internal::Expression::MemberExpression(
+            self.build_chain_doc_with_wrapping(&internal::Expression::MemberExpression(
                 member.clone(),
-            ));
-            let base_offset = self.config.base_indent_offset * self.config.tab_width;
-            let current_col = self.current_column() + base_offset + 1;
-            let output = doc::print_doc_at_column(&doc, &self.config, current_col);
-            self.write(&output);
+            ))
         } else {
-            // Property chain - keep inline, print directly
-            self.print_expression(&member.object);
+            // Property chain - use member doc with fill() for greedy wrapping
+            self.build_member_doc(member)
+        };
 
-            if member.computed {
-                if member.optional {
-                    self.write("?.[");
-                } else {
-                    self.write("[");
-                }
-                self.print_expression(&member.property);
-                self.write("]");
-            } else {
-                if member.optional {
-                    self.write("?.");
-                } else {
-                    self.write(".");
-                }
-                self.print_expression(&member.property);
-            }
-        }
+        let base_offset = self.config.base_indent_offset * self.config.tab_width;
+        let current_col = self.current_column() + base_offset + 1;
+        let output = doc::print_doc_at_column(&doc, &self.config, current_col);
+        self.write(&output);
     }
 
     /// Collect chain segments from a member/call expression chain
@@ -347,9 +350,17 @@ impl<'a> Printer<'a> {
                     segments.push(args_doc);
                 }
             }
-            // Base case: identifiers, literals, etc.
+            // Base case: identifiers, literals, await, etc.
             _ => {
-                segments.push(self.build_expression_doc(expr));
+                let doc = self.build_expression_doc(expr);
+                // Wrap await expressions in parens for correct precedence in chains
+                // `(await a).b` means member access on await result
+                // `await a.b` means await the member access
+                if matches!(expr, internal::Expression::AwaitExpression(_)) {
+                    segments.push(doc::concat(vec![doc::text("("), doc, doc::text(")")]));
+                } else {
+                    segments.push(doc);
+                }
             }
         }
     }
@@ -417,12 +428,11 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a member expression with optional breaking at dots
     ///
-    /// For long property chains, uses greedy line packing - fits as many segments
-    /// as possible on each line before breaking:
+    /// For long property chains, uses greedy fill to pack as many segments
+    /// as possible on each line:
     /// ```javascript
-    /// const long =
-    ///     obj.prop1.prop2.prop3.prop4.prop5.prop6.prop7.prop8.prop9.prop10.prop11.prop12.prop13.prop14
-    ///         .prop15.prop16;
+    /// obj.prop1.prop2.prop3.prop4.prop5.prop6.prop7.prop8.prop9.prop10.prop11.prop12.prop13
+    ///     .prop14.prop15.prop16
     /// ```
     pub(super) fn build_member_doc(&self, member: &internal::MemberExpression) -> Doc {
         // Collect all segments of the chain (root + each member access)
@@ -436,20 +446,22 @@ impl<'a> Printer<'a> {
             return segments.into_iter().next().unwrap_or_else(|| doc::text(""));
         }
 
+        // First segment stays at base level
+        let first = segments.remove(0);
+
         // Build fill parts: [segment, softline, segment, softline, ...]
         // Fill uses greedy packing - fits as many on each line as possible
         let mut fill_parts = Vec::new();
         for (i, segment) in segments.into_iter().enumerate() {
             if i > 0 {
-                // Separator before each segment (except first)
-                // softline: nothing in flat mode, newline+indent in break mode
                 fill_parts.push(doc::softline());
             }
             fill_parts.push(segment);
         }
 
-        // Wrap in group with indent so breaks get proper indentation
-        doc::group(doc::indent(doc::fill(fill_parts)))
+        // Structure: first + indent(fill([seg2, softline, seg3, ...]))
+        // The indent ensures continuations get +1 indent when broken
+        doc::concat(vec![first, doc::indent(doc::fill(fill_parts))])
     }
 
     /// Collect segments from a member expression chain
@@ -481,7 +493,15 @@ impl<'a> Printer<'a> {
             }
             // Base case: root of the chain
             _ => {
-                segments.push(self.build_expression_doc(expr));
+                let doc = self.build_expression_doc(expr);
+                // Wrap await expressions in parens for correct precedence in chains
+                // `(await a).b` means member access on await result
+                // `await a.b` means await the member access
+                if matches!(expr, internal::Expression::AwaitExpression(_)) {
+                    segments.push(doc::concat(vec![doc::text("("), doc, doc::text(")")]));
+                } else {
+                    segments.push(doc);
+                }
             }
         }
     }

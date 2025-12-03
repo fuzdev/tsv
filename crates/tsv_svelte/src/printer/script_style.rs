@@ -58,7 +58,7 @@ impl<'a> Printer<'a> {
         // Format attributes (includes "context" if this is a module script)
         for attr in &script.attributes {
             self.write(" ");
-            self.print_attribute(attr);
+            self.print_attribute_node(attr);
         }
 
         self.write(">\n");
@@ -120,7 +120,7 @@ impl<'a> Printer<'a> {
         // Format attributes
         for attr in &style.attributes {
             self.write(" ");
-            self.print_attribute(attr);
+            self.print_attribute_node(attr);
         }
 
         self.write(">");

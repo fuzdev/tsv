@@ -525,6 +525,116 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Format a Svelte special element
+    ///
+    /// Special elements include: `<svelte:head>`, `<svelte:window>`, `<slot>`, etc.
+    /// Similar to `print_element` but uses the kind's tag name.
+    pub fn print_special_element(&mut self, element: &internal::SpecialElement) {
+        use crate::ast::internal::{FragmentNode, SpecialElementKind};
+
+        let tag_name = element.kind.tag_name();
+
+        // Most special elements can have children, but some are empty by design
+        let is_typically_empty = matches!(
+            element.kind,
+            SpecialElementKind::SvelteWindow
+                | SpecialElementKind::SvelteBody
+                | SpecialElementKind::SvelteDocument
+                | SpecialElementKind::SvelteComponent
+                | SpecialElementKind::SvelteSelf
+        );
+
+        // Determine if this is an inline-content element (like slot, svelte:fragment)
+        let is_inline_element = matches!(
+            element.kind,
+            SpecialElementKind::SlotElement
+                | SpecialElementKind::SvelteFragment
+                | SpecialElementKind::SvelteSelf
+                | SpecialElementKind::SvelteComponent
+                | SpecialElementKind::SvelteElement
+                | SpecialElementKind::TitleElement
+        );
+
+        // svelte:boundary always formats inline (compacts newlines)
+        let is_always_inline = matches!(element.kind, SpecialElementKind::SvelteBoundary);
+
+        // Opening tag
+        self.write("<");
+        self.write(tag_name);
+
+        // Special handling for svelte:element's `this` attribute
+        if let Some(ref tag_expr) = element.tag {
+            self.write(" this={");
+            self.print_ts_expression(tag_expr);
+            self.write("}");
+        }
+
+        // Special handling for svelte:component's `this` attribute
+        if let Some(ref expr) = element.expression {
+            self.write(" this={");
+            self.print_ts_expression(expr);
+            self.write("}");
+        }
+
+        // Format other attributes
+        for attr in &element.attributes {
+            self.write(" ");
+            self.print_attribute_node(attr);
+        }
+
+        // Self-closing if empty
+        if element.fragment.nodes.is_empty() {
+            if is_typically_empty {
+                // These elements are typically self-closing
+                self.write(" />");
+            } else {
+                // Other elements with no children: use explicit closing tag
+                self.write("></");
+                self.write(tag_name);
+                self.write(">");
+            }
+            return;
+        }
+
+        self.write(">");
+
+        // Determine formatting mode based on content
+        let has_block_children = element.fragment.nodes.iter().any(|node| {
+            matches!(node, FragmentNode::Element(el) if self.is_block_element(el))
+                || matches!(node, FragmentNode::SpecialElement(se) if matches!(
+                    se.kind,
+                    SpecialElementKind::SvelteHead
+                ))
+        });
+
+        // Check if children are all simple text content (for compact formatting)
+        // svelte:boundary always uses compact formatting; others check has_block_children
+        let is_simple_inline_content = is_always_inline
+            || (!has_block_children
+                && (is_inline_element
+                    || element.fragment.nodes.iter().all(|node| match node {
+                        FragmentNode::Text(_) | FragmentNode::ExpressionTag(_) => true,
+                        FragmentNode::SpecialElement(se) => matches!(
+                            se.kind,
+                            SpecialElementKind::SlotElement | SpecialElementKind::SvelteFragment
+                        ),
+                        _ => false,
+                    })));
+
+        if is_simple_inline_content {
+            // Compact formatting for inline content
+            self.print_compact_children(&element.fragment, true, false);
+        } else {
+            // Block formatting for complex content
+            self.print_multiline_children(&element.fragment.nodes, false);
+        }
+
+        // Closing tag
+        self.write("</");
+        self.write(tag_name);
+        self.write(">");
+    }
+
     /// Format attributes with line wrapping support (hybrid doc-builder approach)
     ///
     /// Uses prettier's doc-builder pattern to decide whether to wrap attributes:
@@ -558,7 +668,7 @@ impl<'a> Printer<'a> {
         let mut attr_docs = Vec::new();
         for attr in &element.attributes {
             attr_docs.push(doc::line()); // Soft line before each attribute
-            attr_docs.push(self.build_attribute_doc(attr));
+            attr_docs.push(self.build_attribute_node_doc(attr));
         }
 
         // Add dedent(line()) at the end for proper spacing before closing tag
@@ -568,10 +678,19 @@ impl<'a> Printer<'a> {
 
         // For line length calculation, we need to include the tag name and closing
         // Build a complete doc to let the fits() algorithm make the right decision
-        let closing = if is_void || element.fragment.nodes.is_empty() {
-            "/>"
+        //
+        // Prettier's behavior (from prettier-plugin-svelte):
+        // - For empty elements: includes full `></tagname>` in fits calculation
+        // - For elements with content: only checks opening tag with `>`
+        // - For void/self-closing: uses `/>`
+        let closing: String = if is_void {
+            " />".to_string()
+        } else if element.fragment.nodes.is_empty() {
+            // Empty elements: include closing tag in calculation (matches prettier)
+            // e.g., `></div>` for <div></div>
+            format!("></{tag_name}>")
         } else {
-            ">"
+            ">".to_string()
         };
 
         // Build the complete doc structure matching prettier
@@ -580,7 +699,7 @@ impl<'a> Printer<'a> {
             doc::text("<"),
             doc::text(tag_name),
             doc::indent(doc::group(doc::concat(attr_docs))),
-            doc::text(closing),
+            doc::text(&closing),
         ]));
 
         // Check if the complete tag fits on one line
@@ -595,18 +714,18 @@ impl<'a> Printer<'a> {
             // Print inline: space before each attribute
             for attr in &element.attributes {
                 self.write(" ");
-                self.print_attribute(attr);
+                self.print_attribute_node(attr);
             }
             false // Not multiline
         } else {
             // Print multiline: each attribute on its own line
+            self.indent_level += 1;
             for attr in &element.attributes {
                 self.write("\n");
-                self.indent_level += 1;
                 self.write_indent();
-                self.indent_level -= 1;
-                self.print_attribute(attr);
+                self.print_attribute_node(attr);
             }
+            self.indent_level -= 1;
             // NOTE: Newline before closing tag is handled by caller
             // (different behavior for hug mode vs normal mode)
             true // Multiline

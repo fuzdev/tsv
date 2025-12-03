@@ -108,16 +108,12 @@ impl<'a> Printer<'a> {
             self.print_object_expression_inline_with_comments(obj);
         } else {
             // Use doc-builder for width-based wrapping
-            // Pass current column for accurate width calculation
-            // Account for base_indent_offset (e.g., Svelte wrapper indentation)
-            // NOTE: We add 1 to account for trailing punctuation (like `;`) that will be
-            // added after the object by the statement printer. This is a conservative
-            // approximation. The proper fix would be to build entire statements as docs.
-            // TODO: Build full statements as docs for precise width calculation
+            // Pass current column and indent level for accurate formatting
             let doc = self.build_object_doc(obj);
             let base_offset = self.config.base_indent_offset * self.config.tab_width;
             let current_col = self.current_column() + base_offset + 1; // +1 for trailing punctuation
-            let output = doc::print_doc_at_column(&doc, &self.config, current_col);
+            let output =
+                doc::print_doc_with_indent(&doc, &self.config, current_col, self.indent_level);
             self.write(&output);
         }
     }
@@ -286,17 +282,32 @@ impl<'a> Printer<'a> {
                 key_doc
             }
         } else if prop.method {
-            // Method shorthand: `foo() {}` - print key followed by params and body
+            // Method shorthand: `foo() {}` or `async foo() {}` - print key followed by params and body
             if let Expression::FunctionExpression(func) = &prop.value {
                 let func_doc = self.build_function_doc(func);
-                doc::concat(vec![key_doc, func_doc])
+                // Add async prefix if the function is async
+                if func.r#async {
+                    doc::concat(vec![doc::text("async "), key_doc, func_doc])
+                } else {
+                    doc::concat(vec![key_doc, func_doc])
+                }
             } else {
                 // Fallback for malformed AST
                 let value_doc = self.build_expression_doc(&prop.value);
                 doc::concat(vec![key_doc, doc::text(": "), value_doc])
             }
         } else if prop.shorthand {
-            key_doc
+            // Handle shorthand with default value: {a = 1}
+            // The value is an AssignmentExpression (or AssignmentPattern in proper patterns)
+            if let Expression::AssignmentExpression(assign) = &prop.value {
+                let default_doc = self.build_expression_doc(&assign.right);
+                doc::concat(vec![key_doc, doc::text(" = "), default_doc])
+            } else if let Expression::AssignmentPattern(pattern) = &prop.value {
+                let default_doc = self.build_expression_doc(&pattern.right);
+                doc::concat(vec![key_doc, doc::text(" = "), default_doc])
+            } else {
+                key_doc
+            }
         } else {
             let value_doc = self.build_expression_doc(&prop.value);
             doc::concat(vec![key_doc, doc::text(": "), value_doc])
@@ -380,11 +391,29 @@ impl<'a> Printer<'a> {
                         let value_str = self.expression_to_string(&p.value);
                         parts.push(format!("{key_str}{value_str}"));
                     } else if p.method {
-                        // Method shorthand: `foo() {}`
+                        // Method shorthand: `foo() {}` or `async foo() {}`
                         let value_str = self.expression_to_string(&p.value);
-                        parts.push(format!("{key_str}{value_str}"));
+                        // Add async prefix if the function is async
+                        if let Expression::FunctionExpression(func) = &p.value {
+                            if func.r#async {
+                                parts.push(format!("async {key_str}{value_str}"));
+                            } else {
+                                parts.push(format!("{key_str}{value_str}"));
+                            }
+                        } else {
+                            parts.push(format!("{key_str}{value_str}"));
+                        }
                     } else if p.shorthand {
-                        parts.push(key_str);
+                        // Handle shorthand with default value: {a = 1}
+                        if let Expression::AssignmentExpression(assign) = &p.value {
+                            let default_str = self.expression_to_string(&assign.right);
+                            parts.push(format!("{key_str} = {default_str}"));
+                        } else if let Expression::AssignmentPattern(pattern) = &p.value {
+                            let default_str = self.expression_to_string(&pattern.right);
+                            parts.push(format!("{key_str} = {default_str}"));
+                        } else {
+                            parts.push(key_str);
+                        }
                     } else {
                         // Check for comments between key and value (after colon)
                         // Uses binary search: O(log n + k)
@@ -435,7 +464,9 @@ impl<'a> Printer<'a> {
     pub(super) fn expression_to_string(&self, expr: &Expression) -> String {
         match expr {
             Expression::Literal(lit) => match &lit.value {
-                LiteralValue::Number(n) => n.to_string(),
+                LiteralValue::Number(_) => {
+                    super::expressions::normalize_number_literal(lit.span.extract(self.source))
+                }
                 LiteralValue::String { content: _, quote } => {
                     let start = lit.span.start as usize;
                     let end = lit.span.end as usize;
@@ -481,7 +512,16 @@ impl<'a> Printer<'a> {
                                 let value_str = self.expression_to_string(&p.value);
                                 parts.push(format!("{key_str}{value_str}"));
                             } else if p.shorthand {
-                                parts.push(key_str);
+                                // Handle shorthand with default value: {a = 1}
+                                if let Expression::AssignmentExpression(assign) = &p.value {
+                                    let default_str = self.expression_to_string(&assign.right);
+                                    parts.push(format!("{key_str} = {default_str}"));
+                                } else if let Expression::AssignmentPattern(pattern) = &p.value {
+                                    let default_str = self.expression_to_string(&pattern.right);
+                                    parts.push(format!("{key_str} = {default_str}"));
+                                } else {
+                                    parts.push(key_str);
+                                }
                             } else {
                                 let value_str = self.expression_to_string(&p.value);
                                 parts.push(format!("{key_str}: {value_str}"));
@@ -842,12 +882,22 @@ impl<'a> Printer<'a> {
                                 self.write(": ");
                                 self.print_expression(&p.value);
                             }
-                        } else if !p.shorthand {
+                        } else if p.shorthand {
+                            // Shorthand property: `{ prop }` - key is already printed
+                            // Handle shorthand with default value: {a = 1}
+                            if let Expression::AssignmentExpression(assign) = &p.value {
+                                self.write(" = ");
+                                self.print_expression(&assign.right);
+                            } else if let Expression::AssignmentPattern(pattern) = &p.value {
+                                self.write(" = ");
+                                self.print_expression(&pattern.right);
+                            }
+                            // For regular shorthand, nothing extra to print
+                        } else {
                             // Regular property: `key: value`
                             self.write(": ");
                             self.print_expression(&p.value);
                         }
-                        // Shorthand property: `{ prop }` - key is already printed
                     }
                     internal::ObjectProperty::SpreadElement(s) => {
                         self.write("...");
@@ -894,7 +944,7 @@ impl<'a> Printer<'a> {
             }
 
             // Print any final comments before closing brace
-            self.print_leading_comments(prev_end, obj.span.end);
+            self.print_leading_comments(prev_end, obj.span.end, false);
 
             // Restore indent: first go to closing brace level (with declaration_indent_depth)
             self.indent_level -= 1;
@@ -913,6 +963,11 @@ impl<'a> Printer<'a> {
     ) -> String {
         let mut result = String::new();
 
+        // Async keyword if present
+        if arrow.r#async {
+            result.push_str("async ");
+        }
+
         // Parameters (can be patterns, so use expression_to_string)
         result.push('(');
         for (i, param) in arrow.params.iter().enumerate() {
@@ -921,15 +976,23 @@ impl<'a> Printer<'a> {
             }
             result.push_str(&self.expression_to_string(param));
         }
-        result.push_str(") => ");
+        result.push(')');
+
+        // Return type annotation
+        if let Some(return_type) = &arrow.return_type {
+            result.push_str(&self.type_annotation_to_string(return_type));
+        }
+
+        result.push_str(" => ");
 
         // Body
         match &arrow.body {
             internal::ArrowFunctionBody::Expression(expr) => {
                 result.push_str(&self.expression_to_string(expr));
             }
-            internal::ArrowFunctionBody::BlockStatement { span } => {
-                let raw = span.extract(self.source);
+            internal::ArrowFunctionBody::BlockStatement(block) => {
+                // For inline formatting, extract raw block from source
+                let raw = block.span.extract(self.source);
                 result.push_str(raw);
             }
         }

@@ -26,6 +26,7 @@ impl<'a> Printer<'a> {
     /// Used for `{#each ... as pattern}` contexts.
     pub fn print_ts_pattern(&mut self, expr: &tsv_ts::Expression) {
         match expr {
+            // ObjectExpression may appear in legacy AST or from external sources
             tsv_ts::Expression::ObjectExpression(obj) => {
                 // Destructuring patterns use spaces inside braces (matches prettier)
                 self.write("{ ");
@@ -49,8 +50,44 @@ impl<'a> Printer<'a> {
                 }
                 self.write(" }");
             }
+            tsv_ts::Expression::ObjectPattern(obj) => {
+                // ObjectPattern - correct AST type for destructuring patterns
+                self.write("{ ");
+                for (i, prop) in obj.properties.iter().enumerate() {
+                    match prop {
+                        tsv_ts::ObjectPatternProperty::Property(p) => {
+                            self.print_ts_expression(&p.key);
+                            if !p.shorthand {
+                                self.write(": ");
+                                self.print_ts_pattern(&p.value);
+                            }
+                        }
+                        tsv_ts::ObjectPatternProperty::RestElement(r) => {
+                            self.write("...");
+                            self.print_ts_pattern(&r.argument);
+                        }
+                    }
+                    if i < obj.properties.len() - 1 {
+                        self.write(", ");
+                    }
+                }
+                self.write(" }");
+            }
             tsv_ts::Expression::ArrayExpression(arr) => {
                 // Array patterns also use spaces inside brackets
+                self.write("[");
+                for (i, elem) in arr.elements.iter().enumerate() {
+                    if let Some(e) = elem {
+                        self.print_ts_pattern(e);
+                    }
+                    if i < arr.elements.len() - 1 {
+                        self.write(", ");
+                    }
+                }
+                self.write("]");
+            }
+            tsv_ts::Expression::ArrayPattern(arr) => {
+                // ArrayPattern - correct AST type for array destructuring
                 self.write("[");
                 for (i, elem) in arr.elements.iter().enumerate() {
                     if let Some(e) = elem {
@@ -156,10 +193,8 @@ impl<'a> Printer<'a> {
                     tsv_ts::ArrowFunctionBody::Expression(expr) => {
                         self.print_ts_expression(expr);
                     }
-                    tsv_ts::ArrowFunctionBody::BlockStatement { span } => {
-                        // Extract raw block from source
-                        let raw = span.extract(self.source);
-                        self.write(raw);
+                    tsv_ts::ArrowFunctionBody::BlockStatement(block) => {
+                        self.print_ts_block_statement(block);
                     }
                 }
             }
@@ -284,8 +319,8 @@ impl<'a> Printer<'a> {
                 self.print_ts_expression(&assign.right);
             }
             tsv_ts::Expression::ObjectPattern(obj) => {
-                // ObjectPattern AST nodes (not used by Svelte parser for patterns)
-                // TODO: verify this is correct formatting if ObjectPattern is ever used
+                // ObjectPattern in expression context - no spaces inside braces
+                // (For pattern contexts like {#each ... as pattern}, use print_ts_pattern instead)
                 self.write("{");
                 for (i, prop) in obj.properties.iter().enumerate() {
                     if i > 0 {
@@ -374,6 +409,13 @@ impl<'a> Printer<'a> {
                 self.write("undefined");
             }
         }
+    }
+
+    /// Print a TypeScript block statement: `{ stmt1; stmt2; }`
+    fn print_ts_block_statement(&mut self, block: &tsv_ts::ast::internal::BlockStatement) {
+        // Use source extraction for the block (block is properly parsed, so statements are formatted)
+        let raw = block.span.extract(self.source()).to_string();
+        self.write(&raw);
     }
 
     /// Get the content span for a node, skipping layout whitespace for text nodes

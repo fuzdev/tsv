@@ -42,6 +42,7 @@ impl<'a> SvelteParser<'a> {
             "each" => self.parse_each_block(start),
             "await" => self.parse_await_block(start),
             "key" => self.parse_key_block(start),
+            "snippet" => self.parse_snippet_block(start),
             _ => Err(ParseError::InvalidSyntax {
                 message: format!("Unknown block type: {{#{keyword}}}"),
                 position: start,
@@ -151,7 +152,11 @@ impl<'a> SvelteParser<'a> {
 
         // Parse: "each expression as context, index (key)"
         // Strip "each " prefix
-        let each_prefix_len = if tag_content.starts_with("each ") { 5 } else { 0 };
+        let each_prefix_len = if tag_content.starts_with("each ") {
+            5
+        } else {
+            0
+        };
         let content = &tag_content[each_prefix_len..];
         let content_offset = tag_content_start + each_prefix_len;
 
@@ -240,7 +245,14 @@ impl<'a> SvelteParser<'a> {
         &self,
         binding: &str,
         binding_offset: usize,
-    ) -> Result<(tsv_ts::Expression, Option<String>, Option<tsv_ts::Expression>), ParseError> {
+    ) -> Result<
+        (
+            tsv_ts::Expression,
+            Option<String>,
+            Option<tsv_ts::Expression>,
+        ),
+        ParseError,
+    > {
         // Calculate leading whitespace and adjust offset accordingly
         let leading_ws = binding.len() - binding.trim_start().len();
         let trimmed = binding.trim();
@@ -275,11 +287,8 @@ impl<'a> SvelteParser<'a> {
             // Destructuring pattern - find matching bracket
             let end = self.find_matching_bracket(trimmed)?;
             let pattern_str = &trimmed[..end];
-            let expr = tsv_ts::parse_expression(
-                pattern_str,
-                adjusted,
-                Rc::clone(&self.interner),
-            )?;
+            // Use parse_pattern to get ObjectPattern/ArrayPattern instead of ObjectExpression/ArrayExpression
+            let expr = tsv_ts::parse_pattern(pattern_str, adjusted, Rc::clone(&self.interner))?;
             Ok((expr, adjusted + end))
         } else {
             // Simple identifier - read until non-identifier char
@@ -294,27 +303,22 @@ impl<'a> SvelteParser<'a> {
                 });
             }
             let ident_str = &trimmed[..end];
-            let expr = tsv_ts::parse_expression(
-                ident_str,
-                adjusted,
-                Rc::clone(&self.interner),
-            )?;
+            let expr = tsv_ts::parse_expression(ident_str, adjusted, Rc::clone(&self.interner))?;
             Ok((expr, adjusted + end))
         }
     }
 
     /// Find the matching closing bracket for a string starting with { or [
     fn find_matching_bracket(&self, input: &str) -> Result<usize, ParseError> {
-        let open = input.chars().next().unwrap();
-        let close = match open {
-            '{' => '}',
-            '[' => ']',
+        let (open, close) = match input.chars().next() {
+            Some('{') => ('{', '}'),
+            Some('[') => ('[', ']'),
             _ => {
                 return Err(ParseError::InvalidSyntax {
                     message: "Expected { or [".to_string(),
                     position: 0,
                     context: None,
-                })
+                });
             }
         };
 
@@ -411,7 +415,11 @@ impl<'a> SvelteParser<'a> {
 
         // Parse: "await expression" or "await expression then value"
         // Strip "await " prefix
-        let await_prefix_len = if tag_content.starts_with("await ") { 6 } else { 0 };
+        let await_prefix_len = if tag_content.starts_with("await ") {
+            6
+        } else {
+            0
+        };
         let content = &tag_content[await_prefix_len..];
         let content_offset = tag_content_start + await_prefix_len;
 
@@ -614,6 +622,434 @@ impl<'a> SvelteParser<'a> {
         }))
     }
 
+    /// Parse a snippet block: {#snippet name(params)}...{/snippet}
+    /// Also handles TypeScript generics: {#snippet name<T>(params)}
+    fn parse_snippet_block(&mut self, start: usize) -> Result<FragmentNode, ParseError> {
+        // Get the content start position (after {#)
+        let tag_content_start = self.current_end;
+
+        // Scan to find closing } and extract content
+        let (tag_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
+
+        // Parse: "snippet name(params)" or "snippet name<T>(params)"
+        let content = tag_content
+            .strip_prefix("snippet ")
+            .unwrap_or(tag_content)
+            .trim();
+
+        // Find the name (identifier before < or ()
+        // Need to handle: fn, fn<T>, fn<T, U>
+        let generic_pos = content.find('<');
+        let paren_pos = content.find('(').unwrap_or(content.len());
+
+        // Extract type parameters if present (like Svelte's parser)
+        let (name_end, type_parameters) = if let Some(gpos) = generic_pos {
+            if gpos < paren_pos {
+                // Found '<' before '(' - this is a generic type parameter
+                // Find the matching '>'
+                let close_pos = self.find_matching_angle_bracket(content, gpos)?;
+                let type_params = content[gpos + 1..close_pos].to_string();
+                (gpos, Some(type_params))
+            } else {
+                // '<' is after '(' - not a generic, probably a comparison in default value
+                (paren_pos, None)
+            }
+        } else {
+            (paren_pos, None)
+        };
+
+        let name_str = content[..name_end].trim();
+        let name_offset = tag_content_start + tag_content.find(name_str).unwrap_or(0);
+        let expression =
+            tsv_ts::parse_expression(name_str, name_offset, Rc::clone(&self.interner))?;
+
+        // Parse parameters (between parentheses)
+        let mut parameters = Vec::new();
+        let mut raw_parameters = None;
+        if paren_pos < content.len() {
+            let close_paren = content.rfind(')').unwrap_or(content.len());
+            let params_str = &content[paren_pos + 1..close_paren];
+            if !params_str.trim().is_empty() {
+                // Check if params contain TypeScript type annotations (: followed by type)
+                // If so, store raw string since our parser doesn't support type annotations yet
+                if params_str.contains(':') {
+                    raw_parameters = Some(params_str.trim().to_string());
+                } else {
+                    // Parse comma-separated parameters using pattern parsing
+                    let params_offset =
+                        tag_content_start + tag_content.find(params_str).unwrap_or(0);
+                    parameters = self.parse_snippet_parameters(params_str, params_offset)?;
+                }
+            }
+        }
+
+        // Parse body
+        let body = self.parse_block_children(&["snippet"], content_start)?;
+
+        // Expect closing {/snippet}
+        let end = if self.check(TokenKind::BlockClose) {
+            let close_tag_start = self.current_end;
+            let (_, after_close) = self.scan_block_tag_content(close_tag_start)?;
+            after_close
+        } else {
+            self.current_start
+        };
+
+        Ok(FragmentNode::SnippetBlock(SnippetBlock {
+            expression,
+            type_parameters,
+            parameters,
+            raw_parameters,
+            body,
+            span: Span {
+                start: start as u32,
+                end: end as u32,
+            },
+        }))
+    }
+
+    /// Parse snippet parameters (comma-separated patterns with optional defaults)
+    fn parse_snippet_parameters(
+        &self,
+        params: &str,
+        base_offset: usize,
+    ) -> Result<Vec<tsv_ts::Expression>, ParseError> {
+        let mut parameters = Vec::new();
+        let mut current_pos = 0;
+
+        // Work with original params string to keep positions correct
+        while current_pos < params.len() {
+            let remaining = &params[current_pos..];
+            let ws_len = remaining.len() - remaining.trim_start().len();
+            let offset = base_offset + current_pos + ws_len;
+            let remaining_trimmed = remaining.trim_start();
+
+            if remaining_trimmed.is_empty() {
+                break;
+            }
+
+            // Parse one parameter (pattern potentially with default value)
+            let (param, param_end) = self.parse_context_pattern(remaining_trimmed, offset)?;
+
+            // Check for default value: = expr
+            let after_param = &params[param_end - base_offset..];
+            let after_param_trimmed = after_param.trim_start();
+
+            if after_param_trimmed.starts_with('=') {
+                // Has default value - parse full parameter as a pattern
+                // (e.g., `{a, b} = defaultObj` becomes AssignmentPattern)
+                let next_comma = after_param_trimmed
+                    .find(',')
+                    .unwrap_or(after_param_trimmed.len());
+                let full_param = &params[current_pos
+                    ..param_end - base_offset + after_param.len() - after_param_trimmed.len()
+                        + next_comma];
+                let full_param_expr = tsv_ts::parse_pattern(
+                    full_param.trim(),
+                    base_offset + current_pos + ws_len,
+                    Rc::clone(&self.interner),
+                )?;
+                parameters.push(full_param_expr);
+                current_pos = param_end - base_offset + after_param.len()
+                    - after_param_trimmed.len()
+                    + next_comma;
+            } else {
+                parameters.push(param);
+                current_pos = param_end - base_offset;
+            }
+
+            // Skip comma if present
+            let after = &params[current_pos..];
+            let after_trimmed = after.trim_start();
+            if after_trimmed.starts_with(',') {
+                current_pos += after.len() - after_trimmed.len() + 1;
+            }
+        }
+
+        Ok(parameters)
+    }
+
+    /// Parse a template tag starting with {@
+    ///
+    /// Dispatches to specific tag parsers based on the keyword.
+    pub(crate) fn parse_template_tag(&mut self) -> Result<FragmentNode, ParseError> {
+        let start = self.current_start;
+
+        // We're at {@, consume it
+        if !self.check(TokenKind::TagOpen) {
+            return Err(ParseError::InvalidSyntax {
+                message: format!("Expected '{{@', found {}", self.current_kind),
+                position: self.current_start,
+                context: None,
+            });
+        }
+
+        // Look at the source to determine the tag type
+        let after_open = self.current_end;
+        let remaining = &self.source[after_open..];
+
+        // Find the keyword
+        let keyword_end = remaining
+            .find(|c: char| !c.is_alphabetic())
+            .unwrap_or(remaining.len());
+        let keyword = &remaining[..keyword_end];
+
+        match keyword {
+            "html" => self.parse_html_tag(start),
+            "const" => self.parse_const_tag(start),
+            "debug" => self.parse_debug_tag(start),
+            "render" => self.parse_render_tag(start),
+            _ => Err(ParseError::InvalidSyntax {
+                message: format!("Unknown template tag: {{@{keyword}}}"),
+                position: start,
+                context: None,
+            }),
+        }
+    }
+
+    /// Parse an html tag: {@html expression}
+    fn parse_html_tag(&mut self, start: usize) -> Result<FragmentNode, ParseError> {
+        let tag_content_start = self.current_end;
+        let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
+
+        // Parse: "html expression"
+        let expr_str = tag_content
+            .strip_prefix("html ")
+            .unwrap_or(tag_content)
+            .trim();
+
+        let expr_offset = tag_content_start + tag_content.find(expr_str).unwrap_or(0);
+        let expression =
+            tsv_ts::parse_expression(expr_str, expr_offset, Rc::clone(&self.interner))?;
+
+        // End is right after the closing }
+        let end = after_close;
+
+        Ok(FragmentNode::HtmlTag(HtmlTag {
+            expression,
+            span: Span {
+                start: start as u32,
+                end: end as u32,
+            },
+        }))
+    }
+
+    /// Parse a const tag: {@const name = expression}
+    fn parse_const_tag(&mut self, start: usize) -> Result<FragmentNode, ParseError> {
+        let tag_content_start = self.current_end;
+        let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
+
+        // Parse: "const name = expression"
+        let decl_str = tag_content
+            .strip_prefix("const ")
+            .unwrap_or(tag_content)
+            .trim();
+
+        let decl_offset = tag_content_start + tag_content.find(decl_str).unwrap_or(0);
+
+        // Find the = sign (accounting for destructuring patterns with nested =)
+        // We need to find the top-level = that separates id from init
+        let eq_pos = self.find_const_equals(decl_str)?;
+
+        let id_str = decl_str[..eq_pos].trim();
+        let init_str = decl_str[eq_pos + 1..].trim();
+
+        let id_offset = decl_offset + decl_str.find(id_str).unwrap_or(0);
+        let init_offset =
+            decl_offset + eq_pos + 1 + (decl_str[eq_pos + 1..].len() - init_str.len());
+
+        // Parse id as a pattern (identifier or destructuring)
+        // Use parse_pattern to convert ObjectExpression/ArrayExpression to patterns
+        let id = tsv_ts::parse_pattern(id_str, id_offset, Rc::clone(&self.interner))?;
+
+        // Parse init as an expression
+        let init = tsv_ts::parse_expression(init_str, init_offset, Rc::clone(&self.interner))?;
+
+        let end = after_close;
+
+        Ok(FragmentNode::ConstTag(ConstTag {
+            id,
+            init,
+            span: Span {
+                start: start as u32,
+                end: end as u32,
+            },
+        }))
+    }
+
+    /// Find the top-level = in a const declaration (not inside brackets/braces)
+    ///
+    /// NOTE: The escape handling is simplified - it doesn't correctly handle
+    /// escaped backslashes (e.g., `"test\\"` would be parsed incorrectly).
+    /// This is unlikely to occur in real @const declarations.
+    fn find_const_equals(&self, s: &str) -> Result<usize, ParseError> {
+        let mut depth = 0;
+        let mut in_string = false;
+        let mut string_char = '"';
+
+        for (i, c) in s.char_indices() {
+            if in_string {
+                if c == string_char && !s[..i].ends_with('\\') {
+                    in_string = false;
+                }
+            } else {
+                match c {
+                    '"' | '\'' | '`' => {
+                        in_string = true;
+                        string_char = c;
+                    }
+                    '{' | '[' | '(' => depth += 1,
+                    '}' | ']' | ')' => depth -= 1,
+                    '=' if depth == 0 => return Ok(i),
+                    _ => {}
+                }
+            }
+        }
+
+        Err(ParseError::InvalidSyntax {
+            message: "Expected '=' in const declaration".to_string(),
+            position: 0,
+            context: None,
+        })
+    }
+
+    /// Parse a debug tag: {@debug} or {@debug x, y, z}
+    ///
+    /// Unlike Prettier (which strips comments), we preserve TS comments in debug tags.
+    /// Comments are extracted and stored in Root.ts_comments for lookup by span.
+    fn parse_debug_tag(&mut self, start: usize) -> Result<FragmentNode, ParseError> {
+        let tag_content_start = self.current_end;
+        let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
+
+        // Parse: "debug" or "debug x, y, z"
+        // First get the part after "debug" keyword
+        let (idents_str, idents_offset) = if let Some(stripped) = tag_content.strip_prefix("debug ")
+        {
+            let offset = tag_content_start + "debug ".len();
+            (stripped, offset)
+        } else if let Some(stripped) = tag_content.strip_prefix("debug") {
+            let offset = tag_content_start + "debug".len();
+            (stripped, offset)
+        } else {
+            ("", tag_content_start)
+        };
+
+        // Extract TS comments from the identifiers portion (preserves in Root.ts_comments)
+        // Returns content with comments replaced by spaces (positions preserved)
+        let cleaned_idents = self.extract_ts_comments(idents_str, idents_offset);
+
+        let mut identifiers = Vec::new();
+        if !cleaned_idents.trim().is_empty() {
+            // Parse comma-separated identifiers from the cleaned content
+            // Since comments are replaced with equal-length spaces, positions are preserved
+            let mut pos = 0;
+            for chunk in cleaned_idents.split(',') {
+                let trimmed = chunk.trim();
+                if !trimmed.is_empty() {
+                    // Find where trimmed content starts within this chunk
+                    let trim_offset = chunk.find(trimmed).unwrap_or(0);
+                    let ident_offset = idents_offset + pos + trim_offset;
+                    let expr =
+                        tsv_ts::parse_expression(trimmed, ident_offset, Rc::clone(&self.interner))?;
+                    identifiers.push(expr);
+                }
+                pos += chunk.len() + 1; // +1 for the comma
+            }
+        }
+
+        let end = after_close;
+
+        Ok(FragmentNode::DebugTag(DebugTag {
+            identifiers,
+            span: Span {
+                start: start as u32,
+                end: end as u32,
+            },
+        }))
+    }
+
+    /// Parse a render tag: {@render fn()} or {@render fn?.()}
+    fn parse_render_tag(&mut self, start: usize) -> Result<FragmentNode, ParseError> {
+        let tag_content_start = self.current_end;
+        let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
+
+        // Parse: "render expression" where expression must be a call
+        let expr_str = tag_content
+            .strip_prefix("render ")
+            .unwrap_or(tag_content)
+            .trim();
+
+        let expr_offset = tag_content_start + tag_content.find(expr_str).unwrap_or(0);
+        let expression =
+            tsv_ts::parse_expression(expr_str, expr_offset, Rc::clone(&self.interner))?;
+
+        let end = after_close;
+
+        Ok(FragmentNode::RenderTag(RenderTag {
+            expression,
+            span: Span {
+                start: start as u32,
+                end: end as u32,
+            },
+        }))
+    }
+
+    /// Find the matching closing angle bracket for generics like `<T>`.
+    /// Used for TypeScript generics in snippet declarations.
+    /// Similar to Svelte's match_bracket utility.
+    fn find_matching_angle_bracket(
+        &self,
+        content: &str,
+        open_pos: usize,
+    ) -> Result<usize, ParseError> {
+        let bytes = content.as_bytes();
+        let mut depth = 1;
+        let mut i = open_pos + 1;
+        let mut in_string = false;
+        let mut string_char = 0u8;
+        let mut escape_next = false;
+
+        while i < bytes.len() && depth > 0 {
+            let ch = bytes[i];
+
+            if escape_next {
+                escape_next = false;
+                i += 1;
+                continue;
+            }
+
+            if in_string {
+                if ch == b'\\' {
+                    escape_next = true;
+                } else if ch == string_char {
+                    in_string = false;
+                }
+                i += 1;
+                continue;
+            }
+
+            match ch {
+                b'"' | b'\'' | b'`' => {
+                    in_string = true;
+                    string_char = ch;
+                }
+                b'<' => depth += 1,
+                b'>' => depth -= 1,
+                _ => {}
+            }
+            i += 1;
+        }
+
+        if depth == 0 {
+            Ok(i - 1) // Position of closing bracket
+        } else {
+            Err(ParseError::UnexpectedEof {
+                position: content.len(),
+                context: None,
+            })
+        }
+    }
+
     /// Scan source from a position until we find the closing } of a block tag
     /// Returns (content between start and }, position after })
     fn scan_block_tag_content(&mut self, start: usize) -> Result<(&'a str, usize), ParseError> {
@@ -740,9 +1176,17 @@ impl<'a> SvelteParser<'a> {
                 if self.is_next_token(TokenKind::Slash)? {
                     break;
                 }
-                let element = self.parse_element()?;
-                last_end = element.span.end as usize;
-                nodes.push(FragmentNode::Element(element));
+                use crate::parser::element::ParsedElement;
+                match self.parse_element_or_special(false)? {
+                    ParsedElement::Element(elem) => {
+                        last_end = elem.span.end as usize;
+                        nodes.push(FragmentNode::Element(elem));
+                    }
+                    ParsedElement::SpecialElement(elem) => {
+                        last_end = elem.span.end as usize;
+                        nodes.push(FragmentNode::SpecialElement(elem));
+                    }
+                }
             } else if self.check(TokenKind::LeftBrace) {
                 let expr = self.parse_expression_tag()?;
                 last_end = expr.span.end as usize;
@@ -751,6 +1195,10 @@ impl<'a> SvelteParser<'a> {
                 let block = self.parse_block()?;
                 last_end = block.span().end as usize;
                 nodes.push(block);
+            } else if self.check(TokenKind::TagOpen) {
+                let tag = self.parse_template_tag()?;
+                last_end = tag.span().end as usize;
+                nodes.push(tag);
             } else {
                 // Unknown token - might be text content that wasn't captured
                 break;

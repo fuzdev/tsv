@@ -48,6 +48,62 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Create a token with the current position as end
+    #[inline]
+    fn make_token(&self, kind: TokenKind, start: usize) -> Token {
+        Token {
+            kind,
+            start,
+            end: self.position,
+            decoded: None,
+        }
+    }
+
+    /// Scan digits matching a predicate, allowing numeric separators (_)
+    fn scan_digits(&mut self, is_valid_digit: impl Fn(char) -> bool) {
+        while let Some(ch) = self.current {
+            if is_valid_digit(ch) || ch == '_' {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+    }
+
+    /// Scan a decimal number (integer, float, or scientific notation)
+    /// Handles: 123, 1.5, 1e3, 1.5e-2, 1_000
+    fn scan_decimal_number(&mut self) {
+        // Integer part (with optional separators)
+        self.scan_digits(|c| c.is_ascii_digit());
+
+        // Decimal point and fractional part
+        if self.current == Some('.') {
+            // Peek ahead: if next char is a digit or if this is trailing decimal (5.)
+            let next_char = self.source[self.position + 1..].chars().next();
+            if next_char.is_some_and(|c| c.is_ascii_digit()) {
+                // Normal decimal: 3.14
+                self.advance(); // consume '.'
+                self.scan_digits(|c| c.is_ascii_digit());
+            } else if next_char.is_none()
+                || !next_char.is_some_and(|c| c.is_alphanumeric() || c == '_' || c == '.')
+            {
+                // Trailing decimal: 5. (followed by ; or space or end)
+                // But not: 5.toString() or 5..toString()
+                self.advance(); // consume '.'
+            }
+        }
+
+        // Exponent part: e+10, E-3, e10
+        if matches!(self.current, Some('e' | 'E')) {
+            self.advance(); // consume 'e' or 'E'
+            // Optional sign
+            if matches!(self.current, Some('+' | '-')) {
+                self.advance();
+            }
+            self.scan_digits(|c| c.is_ascii_digit());
+        }
+    }
+
     fn skip_whitespace(&mut self) {
         self.had_line_terminator = false;
         while let Some(ch) = self.current {
@@ -98,21 +154,11 @@ impl<'a> Lexer<'a> {
             }),
             Some(';') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::Semicolon,
-                    start,
-                    end: self.position,
-                    decoded: None,
-                })
+                Ok(self.make_token(TokenKind::Semicolon, start))
             }
             Some(':') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::Colon,
-                    start,
-                    end: self.position,
-                    decoded: None,
-                })
+                Ok(self.make_token(TokenKind::Colon, start))
             }
             Some('=') => {
                 self.advance();
@@ -120,80 +166,64 @@ impl<'a> Lexer<'a> {
                     Some('>') => {
                         // =>
                         self.advance();
-                        Ok(Token {
-                            kind: TokenKind::Arrow,
-                            start,
-                            end: self.position,
-                            decoded: None,
-                        })
+                        Ok(self.make_token(TokenKind::Arrow, start))
                     }
                     Some('=') => {
                         self.advance();
                         if self.current == Some('=') {
                             // ===
                             self.advance();
-                            Ok(Token {
-                                kind: TokenKind::EqualsEqualsEquals,
-                                start,
-                                end: self.position,
-                                decoded: None,
-                            })
+                            Ok(self.make_token(TokenKind::EqualsEqualsEquals, start))
                         } else {
                             // ==
-                            Ok(Token {
-                                kind: TokenKind::EqualsEquals,
-                                start,
-                                end: self.position,
-                                decoded: None,
-                            })
+                            Ok(self.make_token(TokenKind::EqualsEquals, start))
                         }
                     }
                     _ => {
                         // =
-                        Ok(Token {
-                            kind: TokenKind::Equals,
-                            start,
-                            end: self.position,
-                            decoded: None,
-                        })
+                        Ok(self.make_token(TokenKind::Equals, start))
                     }
                 }
             }
             Some(ch) if ch.is_ascii_digit() => {
-                // Parse integer part
-                while let Some(ch) = self.current {
-                    if ch.is_ascii_digit() {
-                        self.advance();
-                    } else {
-                        break;
-                    }
-                }
-
-                // Check for decimal point (float: 1.5)
-                if self.current == Some('.') {
-                    // Peek ahead to ensure it's not a method call like 1.toString()
-                    let next_char = self.source[self.position + 1..].chars().next();
-                    if next_char.is_some_and(|c| c.is_ascii_digit()) {
-                        self.advance(); // consume '.'
-                        while let Some(ch) = self.current {
-                            if ch.is_ascii_digit() {
-                                self.advance();
-                            } else {
-                                break;
-                            }
+                // Handle different number formats
+                if ch == '0' {
+                    let next = self.source[self.position + 1..].chars().next();
+                    match next {
+                        Some('x' | 'X') => {
+                            // Hex: 0xff, 0xFF
+                            self.advance(); // consume '0'
+                            self.advance(); // consume 'x'
+                            self.scan_digits(|c| c.is_ascii_hexdigit());
+                        }
+                        Some('b' | 'B') => {
+                            // Binary: 0b1010
+                            self.advance(); // consume '0'
+                            self.advance(); // consume 'b'
+                            self.scan_digits(|c| c == '0' || c == '1');
+                        }
+                        Some('o' | 'O') => {
+                            // Octal: 0o77
+                            self.advance(); // consume '0'
+                            self.advance(); // consume 'o'
+                            self.scan_digits(|c| ('0'..='7').contains(&c));
+                        }
+                        _ => {
+                            // Regular number or float starting with 0
+                            self.scan_decimal_number();
                         }
                     }
+                } else {
+                    // Regular decimal number
+                    self.scan_decimal_number();
                 }
 
-                // TODO: Support scientific notation (1e10, 1.5e-3)
-                // TODO: Support hex (0x10), binary (0b10), octal (0o10)
+                // Check for BigInt suffix: 123n, 0xffn
+                if self.current == Some('n') {
+                    self.advance();
+                }
 
-                Ok(Token {
-                    kind: TokenKind::Number,
-                    start,
-                    end: self.position,
-                    decoded: None,
-                })
+                Ok(self.make_token(TokenKind::Number, start))
             }
             Some(ch) if ch.is_alphabetic() || ch == '_' || ch == '$' => {
                 while let Some(ch) = self.current {
@@ -209,12 +239,7 @@ impl<'a> Lexer<'a> {
                 } else {
                     TokenKind::Identifier
                 };
-                Ok(Token {
-                    kind,
-                    start,
-                    end: self.position,
-                    decoded: None,
-                })
+                Ok(self.make_token(kind, start))
             }
             Some(quote @ '\'' | quote @ '"') => {
                 // String literal - single or double quoted
@@ -266,128 +291,82 @@ impl<'a> Lexer<'a> {
             }
             Some(',') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::Comma,
-                    start,
-                    end: self.position,
-                    decoded: None,
-                })
+                Ok(self.make_token(TokenKind::Comma, start))
             }
             Some('{') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::BraceOpen,
-                    start,
-                    end: self.position,
-                    decoded: None,
-                })
+                Ok(self.make_token(TokenKind::BraceOpen, start))
             }
             Some('}') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::BraceClose,
-                    start,
-                    end: self.position,
-                    decoded: None,
-                })
+                Ok(self.make_token(TokenKind::BraceClose, start))
             }
             Some('[') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::BracketOpen,
-                    start,
-                    end: self.position,
-                    decoded: None,
-                })
+                Ok(self.make_token(TokenKind::BracketOpen, start))
             }
             Some(']') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::BracketClose,
-                    start,
-                    end: self.position,
-                    decoded: None,
-                })
+                Ok(self.make_token(TokenKind::BracketClose, start))
             }
             Some('(') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::ParenOpen,
-                    start,
-                    end: self.position,
-                    decoded: None,
-                })
+                Ok(self.make_token(TokenKind::ParenOpen, start))
             }
             Some(')') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::ParenClose,
-                    start,
-                    end: self.position,
-                    decoded: None,
-                })
+                Ok(self.make_token(TokenKind::ParenClose, start))
             }
             Some('.') => {
-                // Could be: ... (spread) or . (member access - not yet implemented)
                 let peek1 = self.source[self.position + 1..].chars().next();
                 let peek2 = self.source[self.position + 2..].chars().next();
                 if peek1 == Some('.') && peek2 == Some('.') {
+                    // Spread operator: ...
                     self.advance(); // consume first .
                     self.advance(); // consume second .
                     self.advance(); // consume third .
-                    Ok(Token {
-                        kind: TokenKind::DotDotDot,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    Ok(self.make_token(TokenKind::DotDotDot, start))
+                } else if peek1.is_some_and(|c| c.is_ascii_digit()) {
+                    // Number starting with decimal: .5
+                    self.advance(); // consume '.'
+                    self.scan_digits(|c| c.is_ascii_digit());
+                    // Check for exponent
+                    if matches!(self.current, Some('e' | 'E')) {
+                        self.advance();
+                        if matches!(self.current, Some('+' | '-')) {
+                            self.advance();
+                        }
+                        self.scan_digits(|c| c.is_ascii_digit());
+                    }
+                    Ok(self.make_token(TokenKind::Number, start))
                 } else {
                     // Single dot: member access operator
                     self.advance();
-                    Ok(Token {
-                        kind: TokenKind::Dot,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    Ok(self.make_token(TokenKind::Dot, start))
                 }
             }
             Some('-') => {
                 self.advance();
                 if self.current == Some('-') {
                     self.advance();
-                    Ok(Token {
-                        kind: TokenKind::MinusMinus,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    Ok(self.make_token(TokenKind::MinusMinus, start))
+                } else if self.current == Some('=') {
+                    self.advance();
+                    Ok(self.make_token(TokenKind::MinusEquals, start))
                 } else {
-                    Ok(Token {
-                        kind: TokenKind::Minus,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    Ok(self.make_token(TokenKind::Minus, start))
                 }
             }
             Some('+') => {
                 self.advance();
                 if self.current == Some('+') {
                     self.advance();
-                    Ok(Token {
-                        kind: TokenKind::PlusPlus,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    Ok(self.make_token(TokenKind::PlusPlus, start))
+                } else if self.current == Some('=') {
+                    self.advance();
+                    Ok(self.make_token(TokenKind::PlusEquals, start))
                 } else {
-                    Ok(Token {
-                        kind: TokenKind::Plus,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    Ok(self.make_token(TokenKind::Plus, start))
                 }
             }
             Some('/') => {
@@ -415,15 +394,16 @@ impl<'a> Lexer<'a> {
                         self.current = self.chars.next();
                         Ok(token)
                     }
+                    Some('=') => {
+                        // Division assignment operator /=
+                        self.advance();
+                        self.advance();
+                        Ok(self.make_token(TokenKind::SlashEquals, start))
+                    }
                     _ => {
                         // Division operator /
                         self.advance();
-                        Ok(Token {
-                            kind: TokenKind::Slash,
-                            start,
-                            end: self.position,
-                            decoded: None,
-                        })
+                        Ok(self.make_token(TokenKind::Slash, start))
                     }
                 }
             }
@@ -431,112 +411,84 @@ impl<'a> Lexer<'a> {
                 self.advance();
                 if self.current == Some('*') {
                     self.advance();
-                    Ok(Token {
-                        kind: TokenKind::StarStar,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    if self.current == Some('=') {
+                        self.advance();
+                        Ok(self.make_token(TokenKind::StarStarEquals, start))
+                    } else {
+                        Ok(self.make_token(TokenKind::StarStar, start))
+                    }
+                } else if self.current == Some('=') {
+                    self.advance();
+                    Ok(self.make_token(TokenKind::StarEquals, start))
                 } else {
-                    Ok(Token {
-                        kind: TokenKind::Star,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    Ok(self.make_token(TokenKind::Star, start))
                 }
             }
             Some('%') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::Percent,
-                    start,
-                    end: self.position,
-                    decoded: None,
-                })
+                if self.current == Some('=') {
+                    self.advance();
+                    Ok(self.make_token(TokenKind::PercentEquals, start))
+                } else {
+                    Ok(self.make_token(TokenKind::Percent, start))
+                }
             }
             Some('^') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::Caret,
-                    start,
-                    end: self.position,
-                    decoded: None,
-                })
+                if self.current == Some('=') {
+                    self.advance();
+                    Ok(self.make_token(TokenKind::CaretEquals, start))
+                } else {
+                    Ok(self.make_token(TokenKind::Caret, start))
+                }
             }
             Some('~') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::Tilde,
-                    start,
-                    end: self.position,
-                    decoded: None,
-                })
+                Ok(self.make_token(TokenKind::Tilde, start))
             }
             Some('<') => {
                 self.advance();
                 if self.current == Some('=') {
                     self.advance();
-                    Ok(Token {
-                        kind: TokenKind::LessThanEquals,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    Ok(self.make_token(TokenKind::LessThanEquals, start))
                 } else if self.current == Some('<') {
                     self.advance();
-                    Ok(Token {
-                        kind: TokenKind::LeftShift,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    if self.current == Some('=') {
+                        self.advance();
+                        Ok(self.make_token(TokenKind::LeftShiftEquals, start))
+                    } else {
+                        Ok(self.make_token(TokenKind::LeftShift, start))
+                    }
                 } else {
-                    Ok(Token {
-                        kind: TokenKind::LessThan,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    Ok(self.make_token(TokenKind::LessThan, start))
                 }
             }
             Some('>') => {
                 self.advance();
                 if self.current == Some('=') {
                     self.advance();
-                    Ok(Token {
-                        kind: TokenKind::GreaterThanEquals,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    Ok(self.make_token(TokenKind::GreaterThanEquals, start))
                 } else if self.current == Some('>') {
                     self.advance();
                     if self.current == Some('>') {
-                        // >>>
+                        // >>> or >>>=
                         self.advance();
-                        Ok(Token {
-                            kind: TokenKind::UnsignedRightShift,
-                            start,
-                            end: self.position,
-                            decoded: None,
-                        })
+                        if self.current == Some('=') {
+                            self.advance();
+                            Ok(self.make_token(TokenKind::UnsignedRightShiftEquals, start))
+                        } else {
+                            Ok(self.make_token(TokenKind::UnsignedRightShift, start))
+                        }
+                    } else if self.current == Some('=') {
+                        // >>=
+                        self.advance();
+                        Ok(self.make_token(TokenKind::RightShiftEquals, start))
                     } else {
                         // >>
-                        Ok(Token {
-                            kind: TokenKind::RightShift,
-                            start,
-                            end: self.position,
-                            decoded: None,
-                        })
+                        Ok(self.make_token(TokenKind::RightShift, start))
                     }
                 } else {
-                    Ok(Token {
-                        kind: TokenKind::GreaterThan,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    Ok(self.make_token(TokenKind::GreaterThan, start))
                 }
             }
             Some('!') => {
@@ -545,105 +497,71 @@ impl<'a> Lexer<'a> {
                     self.advance();
                     if self.current == Some('=') {
                         self.advance();
-                        Ok(Token {
-                            kind: TokenKind::BangEqualsEquals,
-                            start,
-                            end: self.position,
-                            decoded: None,
-                        })
+                        Ok(self.make_token(TokenKind::BangEqualsEquals, start))
                     } else {
-                        Ok(Token {
-                            kind: TokenKind::BangEquals,
-                            start,
-                            end: self.position,
-                            decoded: None,
-                        })
+                        Ok(self.make_token(TokenKind::BangEquals, start))
                     }
                 } else {
-                    Ok(Token {
-                        kind: TokenKind::Bang,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    Ok(self.make_token(TokenKind::Bang, start))
                 }
             }
             Some('&') => {
                 self.advance();
                 if self.current == Some('&') {
                     self.advance();
-                    Ok(Token {
-                        kind: TokenKind::AmpersandAmpersand,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    if self.current == Some('=') {
+                        self.advance();
+                        Ok(self.make_token(TokenKind::AmpersandAmpersandEquals, start))
+                    } else {
+                        Ok(self.make_token(TokenKind::AmpersandAmpersand, start))
+                    }
+                } else if self.current == Some('=') {
+                    self.advance();
+                    Ok(self.make_token(TokenKind::AmpersandEquals, start))
                 } else {
-                    Ok(Token {
-                        kind: TokenKind::Ampersand,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    Ok(self.make_token(TokenKind::Ampersand, start))
                 }
             }
             Some('|') => {
                 self.advance();
                 if self.current == Some('|') {
                     self.advance();
-                    Ok(Token {
-                        kind: TokenKind::PipePipe,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    if self.current == Some('=') {
+                        self.advance();
+                        Ok(self.make_token(TokenKind::PipePipeEquals, start))
+                    } else {
+                        Ok(self.make_token(TokenKind::PipePipe, start))
+                    }
+                } else if self.current == Some('=') {
+                    self.advance();
+                    Ok(self.make_token(TokenKind::PipeEquals, start))
                 } else {
-                    Ok(Token {
-                        kind: TokenKind::Pipe,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    Ok(self.make_token(TokenKind::Pipe, start))
                 }
             }
             Some('?') => {
                 self.advance();
                 if self.current == Some('?') {
                     self.advance();
-                    Ok(Token {
-                        kind: TokenKind::QuestionQuestion,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    if self.current == Some('=') {
+                        self.advance();
+                        Ok(self.make_token(TokenKind::QuestionQuestionEquals, start))
+                    } else {
+                        Ok(self.make_token(TokenKind::QuestionQuestion, start))
+                    }
                 } else if self.current == Some('.') {
                     // Check for optional chaining `?.`
                     // Must not be followed by a digit (to avoid ambiguity with `?.0` which should be `?` `.0`)
                     let next = self.chars.clone().next();
                     if next.is_none_or(|ch| !ch.is_ascii_digit()) {
                         self.advance();
-                        Ok(Token {
-                            kind: TokenKind::QuestionDot,
-                            start,
-                            end: self.position,
-                            decoded: None,
-                        })
+                        Ok(self.make_token(TokenKind::QuestionDot, start))
                     } else {
                         // `?.0` should be `?` followed by `.0` (number)
-                        Ok(Token {
-                            kind: TokenKind::Question,
-                            start,
-                            end: self.position,
-                            decoded: None,
-                        })
+                        Ok(self.make_token(TokenKind::Question, start))
                     }
                 } else {
-                    Ok(Token {
-                        kind: TokenKind::Question,
-                        start,
-                        end: self.position,
-                        decoded: None,
-                    })
+                    Ok(self.make_token(TokenKind::Question, start))
                 }
             }
             Some('`') => {

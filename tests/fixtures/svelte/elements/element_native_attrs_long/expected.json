@@ -12,12 +12,36 @@
 				"start": 0,
 				"end": 123,
 				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 6,
 						"end": 27,
 						"name": "class",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 1,
+								"character": 6
+							},
+							"end": {
+								"line": 2,
+								"column": 6,
+								"character": 11
+							}
+						},
 						"value": [
 							{
 								"start": 13,
@@ -33,6 +57,18 @@
 						"start": 29,
 						"end": 37,
 						"name": "id",
+						"name_loc": {
+							"start": {
+								"line": 3,
+								"column": 1,
+								"character": 29
+							},
+							"end": {
+								"line": 3,
+								"column": 3,
+								"character": 31
+							}
+						},
 						"value": [
 							{
 								"start": 33,
@@ -48,6 +84,18 @@
 						"start": 39,
 						"end": 58,
 						"name": "data-attr1",
+						"name_loc": {
+							"start": {
+								"line": 4,
+								"column": 1,
+								"character": 39
+							},
+							"end": {
+								"line": 4,
+								"column": 11,
+								"character": 49
+							}
+						},
 						"value": [
 							{
 								"start": 51,
@@ -63,6 +111,18 @@
 						"start": 60,
 						"end": 79,
 						"name": "data-attr2",
+						"name_loc": {
+							"start": {
+								"line": 5,
+								"column": 1,
+								"character": 60
+							},
+							"end": {
+								"line": 5,
+								"column": 11,
+								"character": 70
+							}
+						},
 						"value": [
 							{
 								"start": 72,
@@ -78,6 +138,18 @@
 						"start": 81,
 						"end": 100,
 						"name": "aria-label",
+						"name_loc": {
+							"start": {
+								"line": 6,
+								"column": 1,
+								"character": 81
+							},
+							"end": {
+								"line": 6,
+								"column": 11,
+								"character": 91
+							}
+						},
 						"value": [
 							{
 								"start": 93,
@@ -93,6 +165,18 @@
 						"start": 102,
 						"end": 115,
 						"name": "role",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 1,
+								"character": 102
+							},
+							"end": {
+								"line": 7,
+								"column": 5,
+								"character": 106
+							}
+						},
 						"value": [
 							{
 								"start": 108,

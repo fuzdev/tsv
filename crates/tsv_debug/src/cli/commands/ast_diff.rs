@@ -1,5 +1,5 @@
+use crate::error::DebugError;
 use crate::fixtures;
-use anyhow::Result;
 use std::process::Command as ProcessCommand;
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
@@ -111,7 +111,7 @@ async fn compare_two_inputs(
     input1: &Input,
     input2: &Input,
     parser_type: ParserType,
-) -> Result<bool> {
+) -> crate::error::Result<bool> {
     let content1 = input1.content();
     let content2 = input2.content();
 
@@ -122,7 +122,7 @@ async fn compare_two_inputs(
 }
 
 /// Compare round-trip: parse → format → parse → compare
-async fn compare_round_trip(input: &Input, parser_type: ParserType) -> Result<bool> {
+async fn compare_round_trip(input: &Input, parser_type: ParserType) -> crate::error::Result<bool> {
     let content = input.content();
 
     // Parse original
@@ -138,10 +138,10 @@ async fn compare_round_trip(input: &Input, parser_type: ParserType) -> Result<bo
 }
 
 /// Parse content to JSON AST string
-async fn parse_to_json(content: &str, parser_type: ParserType) -> Result<String> {
+async fn parse_to_json(content: &str, parser_type: ParserType) -> crate::error::Result<String> {
     match parser_type {
-        ParserType::Svelte => fuz_client::parse_svelte(content).await,
-        ParserType::TypeScript => fuz_client::parse_typescript(content).await,
+        ParserType::Svelte => Ok(fuz_client::parse_svelte(content).await?),
+        ParserType::TypeScript => Ok(fuz_client::parse_typescript(content).await?),
         ParserType::Css => {
             // Use our Rust parser for CSS
             let output = ProcessCommand::new("cargo")
@@ -161,14 +161,16 @@ async fn parse_to_json(content: &str, parser_type: ParserType) -> Result<String>
             if output.status.success() {
                 Ok(String::from_utf8_lossy(&output.stdout).to_string())
             } else {
-                anyhow::bail!("{}", String::from_utf8_lossy(&output.stderr))
+                Err(DebugError::Command(
+                    String::from_utf8_lossy(&output.stderr).into_owned(),
+                ))
             }
         }
     }
 }
 
 /// Format content using our Rust printer
-fn format_content(content: &str, parser_type: ParserType) -> Result<String> {
+fn format_content(content: &str, parser_type: ParserType) -> crate::error::Result<String> {
     let parser_name = match parser_type {
         ParserType::Svelte => "svelte",
         ParserType::TypeScript => "typescript",
@@ -192,12 +194,14 @@ fn format_content(content: &str, parser_type: ParserType) -> Result<String> {
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        anyhow::bail!("{}", String::from_utf8_lossy(&output.stderr))
+        Err(DebugError::Command(
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        ))
     }
 }
 
 /// Compare two AST JSON strings (ignoring spans/locations)
-fn compare_asts(json1: &str, json2: &str) -> Result<bool> {
+fn compare_asts(json1: &str, json2: &str) -> crate::error::Result<bool> {
     let ast1: serde_json::Value = serde_json::from_str(json1)?;
     let ast2: serde_json::Value = serde_json::from_str(json2)?;
 

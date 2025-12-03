@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::DebugError;
 use std::process::Command as ProcessCommand;
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
@@ -70,12 +70,12 @@ impl Executable for CanonicalParseExecutable {
     }
 }
 
-async fn run(input: &Input, parser_type: ParserType) -> Result<String> {
+async fn run(input: &Input, parser_type: ParserType) -> crate::error::Result<String> {
     let content = input.content();
 
     match parser_type {
-        ParserType::Svelte => fuz_client::parse_svelte(content).await,
-        ParserType::TypeScript => fuz_client::parse_typescript(content).await,
+        ParserType::Svelte => Ok(fuz_client::parse_svelte(content).await?),
+        ParserType::TypeScript => Ok(fuz_client::parse_typescript(content).await?),
         ParserType::Css => {
             // CSS uses our Rust parser (no external canonical parser available)
             parse_css_with_rust(content)
@@ -84,7 +84,7 @@ async fn run(input: &Input, parser_type: ParserType) -> Result<String> {
 }
 
 /// Parse CSS using our Rust parser (no external canonical parser available)
-fn parse_css_with_rust(content: &str) -> Result<String> {
+fn parse_css_with_rust(content: &str) -> crate::error::Result<String> {
     let output = ProcessCommand::new("cargo")
         .args([
             "run",
@@ -101,6 +101,8 @@ fn parse_css_with_rust(content: &str) -> Result<String> {
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        anyhow::bail!("{}", String::from_utf8_lossy(&output.stderr))
+        Err(DebugError::Command(
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        ))
     }
 }

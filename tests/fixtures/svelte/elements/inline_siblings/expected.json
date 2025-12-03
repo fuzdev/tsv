@@ -12,6 +12,18 @@
 				"start": 0,
 				"end": 18,
 				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 5,
+						"character": 5
+					}
+				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -31,6 +43,18 @@
 				"start": 18,
 				"end": 36,
 				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 19,
+						"character": 19
+					},
+					"end": {
+						"line": 1,
+						"column": 23,
+						"character": 23
+					}
+				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",

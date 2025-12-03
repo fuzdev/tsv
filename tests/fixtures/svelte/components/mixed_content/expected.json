@@ -12,6 +12,18 @@
 				"start": 0,
 				"end": 77,
 				"name": "Outer",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 6,
+						"character": 6
+					}
+				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -28,6 +40,18 @@
 							"start": 9,
 							"end": 27,
 							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 10
+								},
+								"end": {
+									"line": 2,
+									"column": 3,
+									"character": 11
+								}
+							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -54,12 +78,36 @@
 							"start": 29,
 							"end": 60,
 							"name": "Inner",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 30
+								},
+								"end": {
+									"line": 3,
+									"column": 7,
+									"character": 35
+								}
+							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 36,
 									"end": 40,
 									"name": "prop",
+									"name_loc": {
+										"start": {
+											"line": 3,
+											"column": 8,
+											"character": 36
+										},
+										"end": {
+											"line": 3,
+											"column": 12,
+											"character": 40
+										}
+									},
 									"value": true
 								}
 							],

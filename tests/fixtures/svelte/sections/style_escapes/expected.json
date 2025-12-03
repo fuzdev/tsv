@@ -260,6 +260,18 @@
 				"start": 0,
 				"end": 252,
 				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -276,12 +288,36 @@
 							"start": 26,
 							"end": 67,
 							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 27
+								},
+								"end": {
+									"line": 3,
+									"column": 6,
+									"character": 31
+								}
+							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 32,
 									"end": 52,
 									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 3,
+											"column": 7,
+											"character": 32
+										},
+										"end": {
+											"line": 3,
+											"column": 12,
+											"character": 37
+										}
+									},
 									"value": [
 										{
 											"start": 39,
@@ -318,12 +354,36 @@
 							"start": 69,
 							"end": 109,
 							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 2,
+									"character": 70
+								},
+								"end": {
+									"line": 4,
+									"column": 6,
+									"character": 74
+								}
+							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 75,
 									"end": 94,
 									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 4,
+											"column": 7,
+											"character": 75
+										},
+										"end": {
+											"line": 4,
+											"column": 12,
+											"character": 80
+										}
+									},
 									"value": [
 										{
 											"start": 82,
@@ -360,12 +420,36 @@
 							"start": 111,
 							"end": 153,
 							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 2,
+									"character": 112
+								},
+								"end": {
+									"line": 5,
+									"column": 6,
+									"character": 116
+								}
+							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 117,
 									"end": 140,
 									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 5,
+											"column": 7,
+											"character": 117
+										},
+										"end": {
+											"line": 5,
+											"column": 12,
+											"character": 122
+										}
+									},
 									"value": [
 										{
 											"start": 124,
@@ -402,12 +486,36 @@
 							"start": 155,
 							"end": 200,
 							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 6,
+									"column": 2,
+									"character": 156
+								},
+								"end": {
+									"line": 6,
+									"column": 6,
+									"character": 160
+								}
+							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 161,
 									"end": 183,
 									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 6,
+											"column": 7,
+											"character": 161
+										},
+										"end": {
+											"line": 6,
+											"column": 12,
+											"character": 166
+										}
+									},
 									"value": [
 										{
 											"start": 168,
@@ -444,12 +552,36 @@
 							"start": 202,
 							"end": 245,
 							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 7,
+									"column": 2,
+									"character": 203
+								},
+								"end": {
+									"line": 7,
+									"column": 6,
+									"character": 207
+								}
+							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 208,
 									"end": 229,
 									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 7,
+											"column": 7,
+											"character": 208
+										},
+										"end": {
+											"line": 7,
+											"column": 12,
+											"character": 213
+										}
+									},
 									"value": [
 										{
 											"start": 215,

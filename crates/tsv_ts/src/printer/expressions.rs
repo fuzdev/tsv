@@ -17,9 +17,69 @@ use tsv_lang::SymbolResolver;
 use tsv_lang::doc::{self, Doc};
 use tsv_lang::printing::{StringFormatOptions, format_string_literal};
 
+/// Normalize a number literal to match Prettier's output format.
+///
+/// Transformations:
+/// - Hex to lowercase: `0xFF` → `0xff`
+/// - Scientific notation to lowercase without `+`: `2E+10` → `2e10`
+/// - Leading decimal gets zero: `.5` → `0.5`
+/// - Trailing decimal removed: `5.` → `5`
+/// - BigInt hex to lowercase: `0xFFn` → `0xffn`
+/// - Numeric separators preserved
+pub fn normalize_number_literal(raw: &str) -> String {
+    let mut result = String::with_capacity(raw.len());
+    let chars: Vec<char> = raw.chars().collect();
+    let len = chars.len();
+
+    // Handle leading decimal: .5 → 0.5
+    if chars.first() == Some(&'.') {
+        result.push('0');
+        result.push_str(raw);
+        return result;
+    }
+
+    // Check for BigInt suffix
+    let is_bigint = chars.last() == Some(&'n');
+    let num_end = if is_bigint { len - 1 } else { len };
+
+    // Check for trailing decimal: 5. → 5
+    if num_end > 0 && chars[num_end - 1] == '.' {
+        // Copy everything except the trailing decimal
+        for &c in &chars[..num_end - 1] {
+            result.push(c.to_ascii_lowercase());
+        }
+        if is_bigint {
+            result.push('n');
+        }
+        return result;
+    }
+
+    // Process the number, lowercasing hex digits and 'e'/'E', removing '+' after 'e'
+    let mut i = 0;
+    while i < num_end {
+        let c = chars[i];
+        if c == 'E' {
+            result.push('e');
+            // Skip '+' after e/E if present
+            if i + 1 < num_end && chars[i + 1] == '+' {
+                i += 1;
+            }
+        } else {
+            result.push(c.to_ascii_lowercase());
+        }
+        i += 1;
+    }
+
+    if is_bigint {
+        result.push('n');
+    }
+
+    result
+}
+
 impl<'a> Printer<'a> {
     /// Print an expression
-    pub(crate) fn print_expression(&mut self, expression: &Expression) {
+    pub fn print_expression(&mut self, expression: &Expression) {
         // TODO: Add comment support for additional expression types as they're implemented
         // Future expressions that will need comment handling:
         //   - ArrayExpression: Comments before/after elements, trailing comma
@@ -62,13 +122,13 @@ impl<'a> Printer<'a> {
     }
 
     /// Print a literal value
-    fn print_literal(&mut self, literal: &internal::Literal) {
+    pub(super) fn print_literal(&mut self, literal: &internal::Literal) {
         match &literal.value {
-            LiteralValue::Number(n) => {
-                // Format the number value
-                // Note: This normalizes the format (hex/binary become decimal)
-                // Future: preserve original format if needed
-                self.write(&n.to_string());
+            LiteralValue::Number(_) => {
+                // Extract raw literal and normalize it
+                let raw = literal.span.extract(self.source);
+                let normalized = normalize_number_literal(raw);
+                self.write(&normalized);
             }
             LiteralValue::String { content: _, quote } => {
                 // Extract raw literal from source (preserves escape sequences)
@@ -103,6 +163,11 @@ impl<'a> Printer<'a> {
         let name = self.resolve_symbol(identifier.name);
         self.write(&name);
 
+        // Handle optional marker (e.g., `a?` in `function fn(a?: number) {}`)
+        if identifier.optional {
+            self.write("?");
+        }
+
         // Handle type annotations
         if let Some(type_annotation) = &identifier.type_annotation {
             self.print_type_annotation(type_annotation);
@@ -115,7 +180,26 @@ impl<'a> Printer<'a> {
             Expression::Literal(lit) => self.build_literal_doc(lit),
             Expression::Identifier(id) => {
                 let name = self.resolve_symbol(id.name);
-                doc::text(name)
+                let name_doc = doc::text(name);
+
+                // Fast path: no optional marker or type annotation
+                if !id.optional && id.type_annotation.is_none() {
+                    name_doc
+                } else {
+                    let mut parts = vec![name_doc];
+
+                    // Handle optional marker (e.g., `a?` in `function fn(a?: number) {}`)
+                    if id.optional {
+                        parts.push(doc::text("?"));
+                    }
+
+                    // Handle type annotations
+                    if let Some(type_annotation) = &id.type_annotation {
+                        parts.push(self.build_type_annotation_doc(type_annotation));
+                    }
+
+                    doc::concat(parts)
+                }
             }
             Expression::ObjectExpression(obj) => self.build_object_doc(obj),
             Expression::ArrayExpression(arr) => self.build_array_doc(arr),
@@ -146,9 +230,13 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a literal
-    fn build_literal_doc(&self, literal: &internal::Literal) -> Doc {
+    pub(super) fn build_literal_doc(&self, literal: &internal::Literal) -> Doc {
         match &literal.value {
-            LiteralValue::Number(n) => doc::text(n.to_string()),
+            LiteralValue::Number(_) => {
+                // Extract raw literal and normalize it
+                let raw = literal.span.extract(self.source);
+                doc::text(normalize_number_literal(raw))
+            }
             LiteralValue::String { content: _, quote } => {
                 let start = literal.span.start as usize;
                 let end = literal.span.end as usize;
@@ -183,6 +271,11 @@ impl<'a> Printer<'a> {
 
     /// Print an arrow function expression
     fn print_arrow_function(&mut self, arrow: &internal::ArrowFunctionExpression) {
+        // Print async keyword if present
+        if arrow.r#async {
+            self.write("async ");
+        }
+
         // Print parameters (can be Identifier, ArrayPattern, ObjectPattern, AssignmentPattern)
         self.write("(");
         for (i, param) in arrow.params.iter().enumerate() {
@@ -191,17 +284,22 @@ impl<'a> Printer<'a> {
             }
             self.print_expression(param);
         }
-        self.write(") => ");
+        self.write(")");
+
+        // Print return type annotation if present
+        if let Some(return_type) = &arrow.return_type {
+            self.print_type_annotation(return_type);
+        }
+
+        self.write(" => ");
 
         // Print body
         match &arrow.body {
             internal::ArrowFunctionBody::Expression(expr) => {
                 self.print_expression(expr);
             }
-            internal::ArrowFunctionBody::BlockStatement { span } => {
-                // Extract raw block from source
-                let raw = span.extract(self.source);
-                self.write(raw);
+            internal::ArrowFunctionBody::BlockStatement(block) => {
+                self.print_block_statement(block);
             }
         }
     }
@@ -216,6 +314,11 @@ impl<'a> Printer<'a> {
     pub(super) fn build_arrow_doc(&self, arrow: &internal::ArrowFunctionExpression) -> Doc {
         let mut parts = Vec::new();
 
+        // Async keyword if present
+        if arrow.r#async {
+            parts.push(doc::text("async "));
+        }
+
         // Parameters (can be Identifier, ArrayPattern, ObjectPattern, AssignmentPattern)
         parts.push(doc::text("("));
         for (i, param) in arrow.params.iter().enumerate() {
@@ -224,17 +327,22 @@ impl<'a> Printer<'a> {
             }
             parts.push(self.build_expression_doc(param));
         }
-        parts.push(doc::text(") => "));
+        parts.push(doc::text(")"));
+
+        // Return type annotation
+        if let Some(return_type) = &arrow.return_type {
+            parts.push(self.build_type_annotation_doc(return_type));
+        }
+
+        parts.push(doc::text(" => "));
 
         // Body
         match &arrow.body {
             internal::ArrowFunctionBody::Expression(expr) => {
                 parts.push(self.build_expression_doc(expr));
             }
-            internal::ArrowFunctionBody::BlockStatement { span } => {
-                // Extract raw block from source
-                let raw = span.extract(self.source);
-                parts.push(doc::text(raw));
+            internal::ArrowFunctionBody::BlockStatement(block) => {
+                parts.push(self.build_block_statement_doc(block));
             }
         }
 
@@ -339,7 +447,14 @@ impl<'a> Printer<'a> {
             }
             parts.push(self.build_expression_doc(param));
         }
-        parts.push(doc::text(") "));
+        parts.push(doc::text(")"));
+
+        // Return type annotation (e.g., `: number`)
+        if let Some(return_type) = &func.return_type {
+            parts.push(self.build_type_annotation_doc(return_type));
+        }
+
+        parts.push(doc::text(" "));
 
         // Body
         parts.push(self.build_block_statement_doc(&func.body));
@@ -361,7 +476,7 @@ impl<'a> Printer<'a> {
             if has_inner_comments {
                 self.write("{\n");
                 self.indent_level += 1;
-                self.print_leading_comments(block_start, block_end);
+                self.print_leading_comments(block_start, block_end, false);
                 self.indent_level -= 1;
                 self.write_indent();
                 self.write("}");
@@ -545,10 +660,16 @@ impl<'a> Printer<'a> {
             internal::ObjectPatternProperty::Property(p) => {
                 if p.shorthand {
                     // For shorthand with default value, we need to print key = default
+                    // Handle both AssignmentPattern and AssignmentExpression
+                    // (parser may produce AssignmentExpression in some contexts)
                     if let Expression::AssignmentPattern(pattern) = &p.value {
                         self.print_expression(&p.key);
                         self.write(" = ");
                         self.print_expression(&pattern.right);
+                    } else if let Expression::AssignmentExpression(assign) = &p.value {
+                        self.print_expression(&p.key);
+                        self.write(" = ");
+                        self.print_expression(&assign.right);
                     } else {
                         self.print_expression(&p.key);
                     }
@@ -649,11 +770,19 @@ impl<'a> Printer<'a> {
         match prop {
             internal::ObjectPatternProperty::Property(p) => {
                 if p.shorthand {
+                    // Handle both AssignmentPattern and AssignmentExpression
+                    // (parser may produce AssignmentExpression in some contexts)
                     if let Expression::AssignmentPattern(pattern) = &p.value {
                         doc::concat(vec![
                             self.build_expression_doc(&p.key),
                             doc::text(" = "),
                             self.build_expression_doc(&pattern.right),
+                        ])
+                    } else if let Expression::AssignmentExpression(assign) = &p.value {
+                        doc::concat(vec![
+                            self.build_expression_doc(&p.key),
+                            doc::text(" = "),
+                            self.build_expression_doc(&assign.right),
                         ])
                     } else {
                         self.build_expression_doc(&p.key)

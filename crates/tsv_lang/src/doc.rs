@@ -492,9 +492,22 @@ pub fn print_doc(doc: &Doc, config: &PrintConfig) -> String {
 /// Use this when the doc is being inserted into a line that already has content.
 /// The `start_column` affects the width calculation for breaking decisions.
 pub fn print_doc_at_column(doc: &Doc, config: &PrintConfig, start_column: usize) -> String {
+    print_doc_with_indent(doc, config, start_column, 0)
+}
+
+/// Convert a Doc tree to a formatted string with both column and indent level specified
+///
+/// Use this when the doc is being inserted into content that already has both
+/// column position and indentation context (e.g., Svelte template expressions).
+pub fn print_doc_with_indent(
+    doc: &Doc,
+    config: &PrintConfig,
+    start_column: usize,
+    start_indent_level: usize,
+) -> String {
     let mut output = String::new();
-    let mut indent_level: usize = 0;
-    let mut pos: usize = start_column; // Start at specified column
+    let mut indent_level: usize = start_indent_level;
+    let mut pos: usize = start_column;
 
     render_doc(
         doc,

@@ -5,7 +5,7 @@ use crate::lexer::{Lexer, TokenKind};
 use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
-use tsv_lang::ParseError;
+use tsv_lang::{Comment, ParseError, Span};
 
 use super::PeekData;
 
@@ -18,6 +18,8 @@ pub(crate) struct SvelteParser<'a> {
     pub(crate) peek_cache: Option<PeekData<TokenKind>>,
     pub(crate) interner: Rc<RefCell<DefaultStringInterner>>,
     pub(crate) base_offset: usize, // Offset of lexer's source in full source
+    /// TS comments collected from template expressions (e.g., {@debug /* comment */ a})
+    pub(crate) expression_comments: Vec<Comment>,
 }
 
 impl<'a> SvelteParser<'a> {
@@ -38,6 +40,7 @@ impl<'a> SvelteParser<'a> {
             peek_cache: None,
             interner,
             base_offset: 0,
+            expression_comments: Vec::new(),
         })
     }
 
@@ -141,5 +144,115 @@ impl<'a> SvelteParser<'a> {
             nodes.push(FragmentNode::Text(text));
         }
         Ok(())
+    }
+
+    /// Advance the lexer to a specific position in the source.
+    /// Used when we've manually scanned ahead (e.g., for {@attach} parsing).
+    /// Preserves the current `inside_tag` state for correct tokenization.
+    pub(crate) fn advance_to_position(&mut self, pos: usize) -> Result<(), ParseError> {
+        // Save the inside_tag state before creating new lexer
+        let was_inside_tag = self.lexer.inside_tag;
+
+        // Reset the lexer to start from the new position
+        self.lexer = Lexer::new_at(&self.source[pos..], pos);
+        self.base_offset = pos;
+        self.peek_cache = None;
+
+        // Restore inside_tag state
+        self.lexer.inside_tag = was_inside_tag;
+
+        // Get the next token at the new position
+        let token = self.lexer.next_token()?;
+        self.current_kind = token.kind;
+        self.current_start = self.base_offset + token.start;
+        self.current_end = self.base_offset + token.end;
+
+        Ok(())
+    }
+
+    /// Extract TS comments from content and add them to expression_comments.
+    ///
+    /// Scans for `/* ... */` block comments and `// ...` line comments.
+    /// Returns content with comments replaced by spaces (preserving positions).
+    ///
+    /// # Arguments
+    /// * `content` - The content to scan for comments
+    /// * `base_offset` - Offset in the full source where this content starts
+    ///
+    /// # Returns
+    /// Content with comments replaced by equivalent whitespace
+    pub(crate) fn extract_ts_comments(&mut self, content: &str, base_offset: usize) -> String {
+        let mut result = content.to_string();
+        let bytes = content.as_bytes();
+        let mut i = 0;
+
+        while i < bytes.len() {
+            if i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'*' {
+                // Block comment: /* ... */
+                let start = i;
+                i += 2;
+                while i + 1 < bytes.len() && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
+                    i += 1;
+                }
+                if i + 1 < bytes.len() {
+                    i += 2; // Skip */
+                }
+                let end = i;
+
+                // Extract comment content (without /* */)
+                let comment_content = &content[start + 2..end.saturating_sub(2)];
+                self.expression_comments.push(Comment {
+                    content: comment_content.to_string(),
+                    is_block: true,
+                    span: Span {
+                        start: (base_offset + start) as u32,
+                        end: (base_offset + end) as u32,
+                    },
+                });
+
+                // Replace comment with spaces in result
+                result.replace_range(start..end, &" ".repeat(end - start));
+            } else if i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'/' {
+                // Line comment: // ...
+                let start = i;
+                i += 2;
+                while i < bytes.len() && bytes[i] != b'\n' {
+                    i += 1;
+                }
+                let end = i;
+
+                // Extract comment content (without //)
+                let comment_content = &content[start + 2..end];
+                self.expression_comments.push(Comment {
+                    content: comment_content.to_string(),
+                    is_block: false,
+                    span: Span {
+                        start: (base_offset + start) as u32,
+                        end: (base_offset + end) as u32,
+                    },
+                });
+
+                // Replace comment with spaces in result
+                result.replace_range(start..end, &" ".repeat(end - start));
+            } else if bytes[i] == b'"' || bytes[i] == b'\'' || bytes[i] == b'`' {
+                // Skip strings to avoid matching // or /* inside them
+                let quote = bytes[i];
+                i += 1;
+                while i < bytes.len() && bytes[i] != quote {
+                    if bytes[i] == b'\\' && i + 1 < bytes.len() {
+                        i += 2; // Skip escaped char
+                    } else {
+                        i += 1;
+                    }
+                }
+                if i < bytes.len() {
+                    i += 1; // Skip closing quote
+                }
+            } else {
+                i += 1;
+            }
+        }
+
+        result
     }
 }

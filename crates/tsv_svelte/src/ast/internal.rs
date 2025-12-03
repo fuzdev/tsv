@@ -20,7 +20,11 @@ pub struct Root {
     pub instance: Option<Box<Script>>,
     pub module: Option<Box<Script>>,
     pub css: Option<Box<Style>>,
-    pub comments: Vec<Comment>,
+    /// `<svelte:options>` configuration (not part of fragment)
+    pub options: Option<SvelteOptions>,
+    /// All TypeScript comments from scripts and template expressions.
+    /// Use `comments_in_range(span)` to find comments for a specific node.
+    pub ts_comments: Vec<Comment>,
     pub span: Span,
     pub interner: Rc<RefCell<DefaultStringInterner>>,
 }
@@ -40,6 +44,7 @@ pub struct Fragment {
 #[derive(Debug, Clone)]
 pub enum FragmentNode {
     Element(Element),
+    SpecialElement(SpecialElement),
     ExpressionTag(ExpressionTag),
     Text(Text),
     Comment(HtmlComment),
@@ -47,6 +52,11 @@ pub enum FragmentNode {
     EachBlock(EachBlock),
     AwaitBlock(AwaitBlock),
     KeyBlock(KeyBlock),
+    SnippetBlock(SnippetBlock),
+    HtmlTag(HtmlTag),
+    ConstTag(ConstTag),
+    DebugTag(DebugTag),
+    RenderTag(RenderTag),
 }
 
 /// HTML comment node: <!-- content -->
@@ -116,10 +126,318 @@ pub struct KeyBlock {
     pub span: Span,
 }
 
+/// Svelte SnippetBlock - reusable template snippets
+///
+/// Represents {#snippet name(params)}...{/snippet} blocks.
+/// Defines a reusable chunk of markup that can be rendered with {@render}.
+#[derive(Debug, Clone)]
+pub struct SnippetBlock {
+    pub expression: Expression,          // Snippet name (Identifier)
+    pub type_parameters: Option<String>, // Generic type params, e.g., "T" for <T>
+    pub parameters: Vec<Expression>, // Function parameters (patterns) - may be empty if raw_parameters is set
+    pub raw_parameters: Option<String>, // Raw parameter string for TypeScript (when type annotations present)
+    pub body: Fragment,
+    pub span: Span,
+}
+
+/// Svelte HtmlTag - raw HTML injection
+///
+/// Represents {@html expression} tags.
+/// Injects raw HTML content without escaping.
+#[derive(Debug, Clone)]
+pub struct HtmlTag {
+    pub expression: Expression,
+    pub span: Span,
+}
+
+/// Svelte ConstTag - local constant declaration
+///
+/// Represents {@const name = expression} tags.
+/// Declares a local constant within a block scope.
+/// The `id` is the pattern (identifier or destructuring) and `init` is the value.
+#[derive(Debug, Clone)]
+pub struct ConstTag {
+    pub id: Expression,   // Pattern (identifier or destructuring)
+    pub init: Expression, // Initializer expression
+    pub span: Span,
+}
+
+/// Svelte DebugTag - debugging helper
+///
+/// Represents {@debug} or {@debug x, y, z} tags.
+/// Triggers debugger when any listed variable changes.
+/// Empty identifiers array means "debug all state".
+///
+/// Note: Unlike Prettier (which strips comments), we preserve TS comments
+/// within debug tags. Comments are stored in `Root.ts_comments` and looked
+/// up by span during formatting. This is an intentional divergence.
+#[derive(Debug, Clone)]
+pub struct DebugTag {
+    pub identifiers: Vec<Expression>, // List of identifiers to debug
+    pub span: Span,
+}
+
+/// Svelte RenderTag - snippet rendering
+///
+/// Represents {@render fn()} or {@render fn?.()} tags.
+/// Renders a snippet, optionally with arguments.
+#[derive(Debug, Clone)]
+pub struct RenderTag {
+    pub expression: Expression, // CallExpression or ChainExpression
+    pub span: Span,
+}
+
+/// Svelte AttachTag - element attachment
+///
+/// Represents {@attach expr} inside element opening tags.
+/// Attaches reactive functions to elements (Svelte 5.29+).
+#[derive(Debug, Clone)]
+pub struct AttachTag {
+    pub expression: Expression,
+    pub span: Span,
+}
+
+// =============================================================================
+// Directives
+// =============================================================================
+
+/// OnDirective - event handler (`on:click={handler}`)
+///
+/// Event handlers can have modifiers like `preventDefault`, `stopPropagation`, etc.
+/// When no expression is provided (rare), expression is null.
+#[derive(Debug, Clone)]
+pub struct OnDirective {
+    pub name: String,                   // Event name: "click", "keydown", etc.
+    pub expression: Option<Expression>, // Handler function
+    pub modifiers: Vec<String>,         // "preventDefault", "stopPropagation", etc.
+    pub span: Span,
+}
+
+/// BindDirective - two-way binding (`bind:value={name}`)
+///
+/// Bindings connect a property to a variable. When shorthand (`bind:value`),
+/// an identifier with the same name is auto-generated as the expression.
+#[derive(Debug, Clone)]
+pub struct BindDirective {
+    pub name: String,           // Property name: "value", "checked", "this", etc.
+    pub expression: Expression, // Binding target (always present - auto-generated for shorthand)
+    pub modifiers: Vec<String>, // Currently empty for bindings
+    pub span: Span,
+}
+
+/// ClassDirective - conditional class (`class:active={isActive}`)
+///
+/// Applies a class conditionally based on an expression.
+/// When shorthand (`class:active`), an identifier with the same name is auto-generated.
+#[derive(Debug, Clone)]
+pub struct ClassDirective {
+    pub name: String,           // Class name: "active", "visible", etc.
+    pub expression: Expression, // Condition (always present - auto-generated for shorthand)
+    pub modifiers: Vec<String>, // Currently empty for class directives
+    pub span: Span,
+}
+
+/// StyleDirective - inline style (`style:color={value}`)
+///
+/// Sets a CSS property value. Unlike other directives, uses `value` instead of `expression`
+/// because it can be a string value, not just an expression.
+/// When shorthand (`style:color`), value is `true` (boolean).
+#[derive(Debug, Clone)]
+pub struct StyleDirective {
+    pub name: String,               // CSS property: "color", "--custom", etc.
+    pub value: StyleDirectiveValue, // true, ExpressionTag, or mixed text/expressions
+    pub modifiers: Vec<String>,     // "important"
+    pub span: Span,
+}
+
+/// Value of a style directive
+#[derive(Debug, Clone)]
+pub enum StyleDirectiveValue {
+    /// Shorthand: `style:color` (uses variable with same name)
+    True,
+    /// Pure expression: `style:color={value}`
+    ExpressionTag(ExpressionTag),
+    /// Mixed value (string with possible expressions): `style:color="red"`
+    Parts(Vec<AttributeValue>),
+}
+
+/// UseDirective - action (`use:action={params}`)
+///
+/// Actions are functions that run when an element is mounted.
+#[derive(Debug, Clone)]
+pub struct UseDirective {
+    pub name: String,                   // Action name: "action", "tooltip", etc.
+    pub expression: Option<Expression>, // Parameters passed to the action
+    pub modifiers: Vec<String>,         // Currently unused
+    pub span: Span,
+}
+
+/// TransitionDirective - transition (`transition:fade`, `in:fly`, `out:slide`)
+///
+/// Controls enter/exit animations. Can be bidirectional (transition:) or unidirectional (in:/out:).
+#[derive(Debug, Clone)]
+pub struct TransitionDirective {
+    pub name: String,                   // Transition name: "fade", "fly", "slide", etc.
+    pub expression: Option<Expression>, // Transition parameters
+    pub modifiers: Vec<String>,         // "local", "global"
+    pub intro: bool,                    // true for transition: and in:
+    pub outro: bool,                    // true for transition: and out:
+    pub span: Span,
+}
+
+/// AnimateDirective - animation (`animate:flip={params}`)
+///
+/// FLIP animations for list items.
+#[derive(Debug, Clone)]
+pub struct AnimateDirective {
+    pub name: String,                   // Animation name: "flip", etc.
+    pub expression: Option<Expression>, // Animation parameters
+    pub modifiers: Vec<String>,         // Currently unused
+    pub span: Span,
+}
+
+/// LetDirective - slot prop (`let:item={localItem}`)
+///
+/// Receives values from a slot. The expression is the local binding pattern.
+#[derive(Debug, Clone)]
+pub struct LetDirective {
+    pub name: String,                   // Slot prop name: "item", "index", etc.
+    pub expression: Option<Expression>, // Local binding pattern (Identifier, ArrayPattern, ObjectPattern)
+    pub modifiers: Vec<String>,         // Currently unused
+    pub span: Span,
+}
+
+// =============================================================================
+// Special Elements
+// =============================================================================
+
+/// Kind of Svelte special element
+///
+/// These are elements with special behavior in Svelte:
+/// - Document injection: `<svelte:head>`, `<svelte:window>`, `<svelte:body>`, `<svelte:document>`
+/// - Dynamic elements: `<svelte:element>`, `<svelte:component>`, `<svelte:self>`
+/// - Content slots: `<slot>`, `<svelte:fragment>`
+/// - Error handling: `<svelte:boundary>`
+/// - Semantic HTML: `<title>` (inside svelte:head)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpecialElementKind {
+    /// `<svelte:head>` - inject content into document head
+    SvelteHead,
+    /// `<svelte:window>` - bind to window events/properties
+    SvelteWindow,
+    /// `<svelte:body>` - bind to body events
+    SvelteBody,
+    /// `<svelte:document>` - bind to document events
+    SvelteDocument,
+    /// `<svelte:element this={tag}>` - dynamic element tag
+    SvelteElement,
+    /// `<svelte:component this={Component}>` - dynamic component (legacy)
+    SvelteComponent,
+    /// `<svelte:self>` - recursive self-reference
+    SvelteSelf,
+    /// `<slot>` - content slot
+    SlotElement,
+    /// `<svelte:fragment>` - wrapper for slot content
+    SvelteFragment,
+    /// `<svelte:boundary>` - error boundary (Svelte 5)
+    SvelteBoundary,
+    /// `<title>` - semantic title element (inside svelte:head)
+    TitleElement,
+}
+
+impl SpecialElementKind {
+    /// Returns the tag name as it appears in source code
+    #[inline]
+    pub const fn tag_name(self) -> &'static str {
+        match self {
+            SpecialElementKind::SvelteHead => "svelte:head",
+            SpecialElementKind::SvelteWindow => "svelte:window",
+            SpecialElementKind::SvelteBody => "svelte:body",
+            SpecialElementKind::SvelteDocument => "svelte:document",
+            SpecialElementKind::SvelteElement => "svelte:element",
+            SpecialElementKind::SvelteComponent => "svelte:component",
+            SpecialElementKind::SvelteSelf => "svelte:self",
+            SpecialElementKind::SlotElement => "slot",
+            SpecialElementKind::SvelteFragment => "svelte:fragment",
+            SpecialElementKind::SvelteBoundary => "svelte:boundary",
+            SpecialElementKind::TitleElement => "title",
+        }
+    }
+
+    /// Returns the AST node type name for JSON output
+    #[inline]
+    pub const fn node_type(self) -> &'static str {
+        match self {
+            SpecialElementKind::SvelteHead => "SvelteHead",
+            SpecialElementKind::SvelteWindow => "SvelteWindow",
+            SpecialElementKind::SvelteBody => "SvelteBody",
+            SpecialElementKind::SvelteDocument => "SvelteDocument",
+            SpecialElementKind::SvelteElement => "SvelteElement",
+            SpecialElementKind::SvelteComponent => "SvelteComponent",
+            SpecialElementKind::SvelteSelf => "SvelteSelf",
+            SpecialElementKind::SlotElement => "SlotElement",
+            SpecialElementKind::SvelteFragment => "SvelteFragment",
+            SpecialElementKind::SvelteBoundary => "SvelteBoundary",
+            SpecialElementKind::TitleElement => "TitleElement",
+        }
+    }
+
+    /// Try to parse a tag name into a special element kind
+    ///
+    /// Note: `title` is only TitleElement when inside `<svelte:head>`,
+    /// which must be checked by the caller.
+    pub fn from_tag_name(name: &str, in_svelte_head: bool) -> Option<Self> {
+        match name {
+            "svelte:head" => Some(SpecialElementKind::SvelteHead),
+            "svelte:window" => Some(SpecialElementKind::SvelteWindow),
+            "svelte:body" => Some(SpecialElementKind::SvelteBody),
+            "svelte:document" => Some(SpecialElementKind::SvelteDocument),
+            "svelte:element" => Some(SpecialElementKind::SvelteElement),
+            "svelte:component" => Some(SpecialElementKind::SvelteComponent),
+            "svelte:self" => Some(SpecialElementKind::SvelteSelf),
+            "slot" => Some(SpecialElementKind::SlotElement),
+            "svelte:fragment" => Some(SpecialElementKind::SvelteFragment),
+            "svelte:boundary" => Some(SpecialElementKind::SvelteBoundary),
+            "title" if in_svelte_head => Some(SpecialElementKind::TitleElement),
+            _ => None,
+        }
+    }
+}
+
+/// Svelte Special Element
+///
+/// Represents special Svelte elements that have unique behavior:
+/// - `<svelte:head>`, `<svelte:window>`, `<svelte:body>`, `<svelte:document>`
+/// - `<svelte:element>` (dynamic tag), `<svelte:component>` (dynamic component)
+/// - `<svelte:self>`, `<slot>`, `<svelte:fragment>`, `<svelte:boundary>`
+/// - `<title>` (when inside `<svelte:head>`)
+#[derive(Debug, Clone)]
+pub struct SpecialElement {
+    pub kind: SpecialElementKind,
+    pub attributes: Vec<AttributeNode>,
+    pub fragment: Fragment,
+    /// Dynamic tag expression for `<svelte:element this={tag}>`
+    pub tag: Option<Expression>,
+    /// Component expression for `<svelte:component this={Component}>`
+    pub expression: Option<Expression>,
+    pub span: Span,
+}
+
+/// Svelte Options
+///
+/// Represents `<svelte:options>` which configures component behavior.
+/// Stored separately from the fragment in `Root.options`.
+#[derive(Debug, Clone)]
+pub struct SvelteOptions {
+    pub attributes: Vec<AttributeNode>,
+    pub span: Span,
+}
+
 impl FragmentNode {
     pub fn span(&self) -> Span {
         match self {
             FragmentNode::Element(elem) => elem.span,
+            FragmentNode::SpecialElement(elem) => elem.span,
             FragmentNode::ExpressionTag(tag) => tag.span,
             FragmentNode::Text(text) => text.span,
             FragmentNode::Comment(comment) => comment.span,
@@ -127,6 +445,11 @@ impl FragmentNode {
             FragmentNode::EachBlock(block) => block.span,
             FragmentNode::AwaitBlock(block) => block.span,
             FragmentNode::KeyBlock(block) => block.span,
+            FragmentNode::SnippetBlock(block) => block.span,
+            FragmentNode::HtmlTag(tag) => tag.span,
+            FragmentNode::ConstTag(tag) => tag.span,
+            FragmentNode::DebugTag(tag) => tag.span,
+            FragmentNode::RenderTag(tag) => tag.span,
         }
     }
 }
@@ -150,7 +473,7 @@ pub enum ElementKind {
 pub struct Element {
     pub name: DefaultSymbol,
     pub kind: ElementKind,
-    pub attributes: Vec<Attribute>,
+    pub attributes: Vec<AttributeNode>,
     pub fragment: Fragment,
     pub span: Span,
 }
@@ -159,11 +482,48 @@ pub struct Element {
 ///
 /// Represents an attribute on an element, e.g., `class="foo"` or `disabled`.
 /// The value is optional (for boolean attributes) and can contain text or expressions.
+///
+/// Shorthand attributes like `{a}` (equivalent to `a={a}`) are represented as
+/// Attribute with name="a" and value containing an ExpressionTag with Identifier "a".
+/// Detection is implicit: check if name matches expression identifier.
 #[derive(Debug, Clone)]
 pub struct Attribute {
     pub name: DefaultSymbol,
     pub value: Option<Vec<AttributeValue>>,
     pub span: Span,
+}
+
+/// Svelte SpreadAttribute - spread object as attributes
+///
+/// Represents `{...obj}` syntax that spreads an object's properties as attributes.
+/// The expression can be any valid expression: identifier, call, member access, etc.
+#[derive(Debug, Clone)]
+pub struct SpreadAttribute {
+    pub expression: Expression,
+    pub span: Span,
+}
+
+/// Svelte attribute-like node
+///
+/// Elements can have various attribute-like constructs:
+/// - `Attribute`: Standard `name="value"` or `name={expr}` attributes (including shorthand `{a}`)
+/// - `SpreadAttribute`: `{...obj}` spreads object properties as attributes
+/// - `AttachTag`: `{@attach expr}` attachments (Svelte 5.29+)
+/// - Directives: `on:`, `bind:`, `class:`, `style:`, `use:`, `transition:`, `in:`, `out:`, `animate:`, `let:`
+#[derive(Debug, Clone)]
+pub enum AttributeNode {
+    Attribute(Attribute),
+    SpreadAttribute(SpreadAttribute),
+    AttachTag(AttachTag),
+    // Directives
+    OnDirective(OnDirective),
+    BindDirective(BindDirective),
+    ClassDirective(ClassDirective),
+    StyleDirective(StyleDirective),
+    UseDirective(UseDirective),
+    TransitionDirective(TransitionDirective),
+    AnimateDirective(AnimateDirective),
+    LetDirective(LetDirective),
 }
 
 /// Svelte Attribute value part
@@ -217,7 +577,7 @@ pub struct ExpressionTag {
 #[derive(Debug, Clone)]
 pub struct Script {
     pub content: Program,
-    pub attributes: Vec<Attribute>,
+    pub attributes: Vec<AttributeNode>,
     pub context: ScriptContext,
     pub span: Span,
 }
@@ -249,6 +609,6 @@ impl ScriptContext {
 pub struct Style {
     pub span: Span,         // Full <style>...</style> span
     pub content_span: Span, // Just the CSS text inside the tags
-    pub attributes: Vec<Attribute>,
+    pub attributes: Vec<AttributeNode>,
     pub css_stylesheet: CssStyleSheet, // Parsed CSS stylesheet (nodes + value comments)
 }

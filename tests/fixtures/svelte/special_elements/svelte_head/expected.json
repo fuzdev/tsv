@@ -1,0 +1,83 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 49,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SvelteHead",
+				"start": 0,
+				"end": 49,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 13,
+							"end": 15,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "TitleElement",
+							"start": 15,
+							"end": 34,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 16
+								},
+								"end": {
+									"line": 2,
+									"column": 7,
+									"character": 21
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 22,
+										"end": 26,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 34,
+							"end": 35,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

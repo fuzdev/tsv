@@ -10,21 +10,20 @@ use std::path::Path;
 use tsv_debug::fixtures::{self, validation};
 use tsv_debug::fuz_client;
 
-/// Check if the fuz daemon is available
-async fn check_daemon_available() -> bool {
-    fuz_client::parse_svelte("<div></div>").await.is_ok()
-}
-
 #[tokio::test]
 async fn test_all_fixtures() {
     // Fail fast if daemon is not available
-    if !check_daemon_available().await {
-        panic!(
-            "Fuz daemon is not available at 127.0.0.1:3620.\n\
+    match fuz_client::check_daemon().await {
+        Ok(info) => {
+            eprintln!("Using fuz daemon on port {} (pid {})", info.port, info.pid);
+        }
+        Err(e) => panic!(
+            "Fuz daemon not available: {e}\n\
             The fixture tests require the daemon for full validation.\n\
-            Please start the daemon with: fuz_daemon"
-        );
-    }
+            Hint: {}",
+            e.hint()
+        ),
+    };
 
     let fixtures_dir = Path::new("tests/fixtures");
     if !fixtures_dir.exists() {
@@ -45,7 +44,7 @@ async fn test_all_fixtures() {
 
     // Validate each fixture
     for fixture in &fixture_list {
-        let result = validation::validate_fixture(fixture, &mut context).await;
+        let result = validation::validate_fixture(fixture, &mut context, false).await;
         summary.add(result);
     }
 

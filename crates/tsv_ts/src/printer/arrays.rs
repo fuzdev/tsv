@@ -168,7 +168,7 @@ impl<'a> Printer<'a> {
             }
 
             // Print any final comments before closing bracket
-            self.print_leading_comments(prev_end, arr.span.end);
+            self.print_leading_comments(prev_end, arr.span.end, false);
 
             self.indent_level -= 1;
             self.write_indent();

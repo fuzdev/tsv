@@ -15,7 +15,7 @@ use tsv_lang::{ParseError, PeekData, Span};
 
 // Import parsing implementations
 mod expression;
-mod statement;
+mod statement; // Statement parsing (refactored into submodules)
 
 pub struct Parser<'a> {
     source: &'a str,
@@ -197,6 +197,34 @@ impl<'a> Parser<'a> {
         &self.current_kind == kind
     }
 
+    /// Check if current token is an assignment operator and return it.
+    ///
+    /// Returns `Some(operator)` for: `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `**=`,
+    /// `<<=`, `>>=`, `>>>=`, `&=`, `|=`, `^=`, `&&=`, `||=`, `??=`
+    pub(super) fn try_assignment_operator(&self) -> Option<AssignmentOperator> {
+        match &self.current_kind {
+            TokenKind::Equals => Some(AssignmentOperator::Assign),
+            TokenKind::PlusEquals => Some(AssignmentOperator::AddAssign),
+            TokenKind::MinusEquals => Some(AssignmentOperator::SubtractAssign),
+            TokenKind::StarEquals => Some(AssignmentOperator::MultiplyAssign),
+            TokenKind::SlashEquals => Some(AssignmentOperator::DivideAssign),
+            TokenKind::PercentEquals => Some(AssignmentOperator::RemainderAssign),
+            TokenKind::StarStarEquals => Some(AssignmentOperator::ExponentiateAssign),
+            TokenKind::LeftShiftEquals => Some(AssignmentOperator::LeftShiftAssign),
+            TokenKind::RightShiftEquals => Some(AssignmentOperator::RightShiftAssign),
+            TokenKind::UnsignedRightShiftEquals => {
+                Some(AssignmentOperator::UnsignedRightShiftAssign)
+            }
+            TokenKind::AmpersandEquals => Some(AssignmentOperator::BitwiseAndAssign),
+            TokenKind::PipeEquals => Some(AssignmentOperator::BitwiseOrAssign),
+            TokenKind::CaretEquals => Some(AssignmentOperator::BitwiseXorAssign),
+            TokenKind::AmpersandAmpersandEquals => Some(AssignmentOperator::LogicalAndAssign),
+            TokenKind::PipePipeEquals => Some(AssignmentOperator::LogicalOrAssign),
+            TokenKind::QuestionQuestionEquals => Some(AssignmentOperator::NullishAssign),
+            _ => None,
+        }
+    }
+
     // Peek helpers for lookahead (needed for type annotations, operators, etc.)
     // Lazily computes peek token on first access
     pub(super) fn peek_kind(&mut self) -> TokenKind {
@@ -273,6 +301,17 @@ impl<'a> Parser<'a> {
     /// ```
     pub(super) fn eat(&mut self, kind: TokenKind) -> bool {
         if self.check(&kind) {
+            self.advance().is_ok()
+        } else {
+            false
+        }
+    }
+
+    /// Consume a contextual keyword if present (identifier with specific value).
+    /// Returns true if consumed, false otherwise.
+    #[inline]
+    pub(super) fn eat_contextual_keyword(&mut self, keyword: &str) -> bool {
+        if matches!(self.current_kind(), TokenKind::Identifier) && self.current_value() == keyword {
             self.advance().is_ok()
         } else {
             false
@@ -383,11 +422,26 @@ impl<'a> Parser<'a> {
                         let (param_start, param_end) = self.current_pos();
                         let symbol = self.intern(self.current_value());
                         self.advance()?;
+
+                        // Check for optional marker: param?
+                        let optional = self.eat(TokenKind::Question);
+
+                        // Check for type annotation: param: type
+                        let (type_annotation, id_end) = if self.check(&TokenKind::Colon) {
+                            let ta = self.parse_type_annotation()?;
+                            let end = ta.span.end;
+                            (Some(ta), end as usize)
+                        } else {
+                            (None, param_end)
+                        };
+
                         let mut param = Expression::Identifier(Identifier {
                             name: symbol,
-                            type_annotation: None,
-                            span: Span::new(param_start as u32, param_end as u32),
+                            optional,
+                            type_annotation,
+                            span: Span::new(param_start as u32, id_end as u32),
                         });
+
                         // Check for default value: param = default
                         if self.check(&TokenKind::Equals) {
                             self.advance()?; // consume '='
@@ -438,6 +492,37 @@ impl<'a> Parser<'a> {
                         } else {
                             pattern
                         }
+                    }
+                    TokenKind::DotDotDot => {
+                        // Rest parameter: ...args or ...args: type
+                        let rest_start = self.current_pos().0;
+                        self.advance()?; // consume '...'
+
+                        // Parse the identifier
+                        let (id_start, id_end) = self.current_pos();
+                        let symbol = self.intern(self.current_value());
+                        self.expect(&TokenKind::Identifier)?;
+
+                        // Check for type annotation: ...args: type
+                        let (type_annotation, arg_end) = if self.check(&TokenKind::Colon) {
+                            let ta = self.parse_type_annotation()?;
+                            let end = ta.span.end;
+                            (Some(ta), end as usize)
+                        } else {
+                            (None, id_end)
+                        };
+
+                        let argument = Expression::Identifier(Identifier {
+                            name: symbol,
+                            optional: false,
+                            type_annotation,
+                            span: Span::new(id_start as u32, arg_end as u32),
+                        });
+
+                        Expression::RestElement(RestElement {
+                            argument: Box::new(argument),
+                            span: Span::new(rest_start as u32, arg_end as u32),
+                        })
                     }
                     _ => {
                         return Err(ParseError::InvalidSyntax {
@@ -496,11 +581,57 @@ impl<'a> Parser<'a> {
     ///
     /// Returns (expression, end_position) where end_position is where the next
     /// unparsed content begins (in absolute source coordinates with base_offset).
-    pub fn parse_assignment_expression_partial(&mut self) -> Result<(Expression, usize), ParseError> {
+    pub fn parse_assignment_expression_partial(
+        &mut self,
+    ) -> Result<(Expression, usize), ParseError> {
         let expr = self.parse_assignment_expression()?;
         // Return the start of the current (unconsumed) token
         let next_pos = self.current_start + self.base_offset;
         Ok((expr, next_pos))
+    }
+
+    /// Convert an expression to a binding pattern.
+    ///
+    /// This converts ObjectExpression to ObjectPattern, ArrayExpression to ArrayPattern,
+    /// etc. Used when parsing destructuring patterns in variable declarations and
+    /// similar contexts.
+    ///
+    /// # Arguments
+    ///
+    /// * `expr` - The expression to convert (typically an ObjectExpression or ArrayExpression)
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Expression)` - The converted pattern (ObjectPattern, ArrayPattern, etc.)
+    /// * `Err(ParseError)` - If the expression cannot be converted to a valid pattern
+    pub fn expression_to_pattern(&self, expr: Expression) -> Result<Expression, ParseError> {
+        self.to_assignable(expr)
+    }
+
+    /// Parse a string literal into a Literal node.
+    ///
+    /// Expects the current token to be a String token.
+    pub(super) fn parse_string_literal(&mut self) -> Result<Literal, ParseError> {
+        debug_assert!(matches!(self.current_kind(), TokenKind::String));
+
+        let (start, end) = self.current_pos();
+        let raw = self.current_value().to_string();
+        let quote = raw.chars().next().unwrap_or('"');
+
+        let content = if let Some(decoded) = self.current_decoded() {
+            decoded.to_string()
+        } else if raw.len() >= 2 {
+            raw[1..raw.len() - 1].to_string()
+        } else {
+            String::new()
+        };
+
+        self.advance()?;
+
+        Ok(Literal {
+            value: LiteralValue::String { content, quote },
+            span: Span::new(start as u32, end as u32),
+        })
     }
 }
 

@@ -43,6 +43,18 @@
 							"start": 9,
 							"end": 25,
 							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 10
+								},
+								"end": {
+									"line": 2,
+									"column": 5,
+									"character": 13
+								}
+							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -81,6 +93,18 @@
 							"start": 35,
 							"end": 51,
 							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 2,
+									"character": 36
+								},
+								"end": {
+									"line": 4,
+									"column": 5,
+									"character": 39
+								}
+							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

@@ -29,7 +29,7 @@ use crate::ast::internal::{self, FragmentNode};
 use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::DefaultStringInterner;
-use tsv_lang::{OutputBuffer, PrintConfig, SymbolResolver};
+use tsv_lang::{Comment, OutputBuffer, PrintConfig, SymbolResolver, comments_in_range};
 
 /// Pending whitespace state - buffers whitespace decisions until next node is known
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,18 +64,25 @@ pub struct Printer<'a> {
     pub(crate) source: &'a str,
     /// Shared string interner for resolving symbols
     interner: Rc<RefCell<DefaultStringInterner>>,
+    /// TypeScript comments from scripts and template expressions
+    ts_comments: &'a [Comment],
 }
 
 impl<'a> Printer<'a> {
-    /// Create a new printer with the given source, interner, and default config
-    pub fn new(source: &'a str, interner: Rc<RefCell<DefaultStringInterner>>) -> Self {
-        Self::with_config(source, interner, PrintConfig::default())
+    /// Create a new printer with the given source, interner, comments, and default config
+    pub fn new(
+        source: &'a str,
+        interner: Rc<RefCell<DefaultStringInterner>>,
+        ts_comments: &'a [Comment],
+    ) -> Self {
+        Self::with_config(source, interner, ts_comments, PrintConfig::default())
     }
 
-    /// Create a new printer with the given source, interner, and config
+    /// Create a new printer with the given source, interner, comments, and config
     pub fn with_config(
         source: &'a str,
         interner: Rc<RefCell<DefaultStringInterner>>,
+        ts_comments: &'a [Comment],
         config: PrintConfig,
     ) -> Self {
         Self {
@@ -84,6 +91,7 @@ impl<'a> Printer<'a> {
             config,
             source,
             interner,
+            ts_comments,
         }
     }
 
@@ -112,14 +120,14 @@ impl<'a> Printer<'a> {
 
 /// Format a Svelte AST back to source code
 pub fn format_svelte(root: &internal::Root, source: &str) -> String {
-    let mut printer = Printer::new(source, Rc::clone(&root.interner));
+    let mut printer = Printer::new(source, Rc::clone(&root.interner), &root.ts_comments);
     printer.print_root(root);
     printer.into_string()
 }
 
 /// Format a Svelte AST back to source code
 pub fn print_svelte(root: &internal::Root, source: &str) -> String {
-    let mut printer = Printer::new(source, Rc::clone(&root.interner));
+    let mut printer = Printer::new(source, Rc::clone(&root.interner), &root.ts_comments);
     printer.print_root(root);
     printer.into_string()
 }
@@ -137,8 +145,17 @@ impl<'a> Printer<'a> {
     pub fn print_root(&mut self, root: &internal::Root) {
         let mut has_previous_section = false;
 
+        // Format svelte:options (if present) - always first
+        if let Some(options) = &root.options {
+            self.print_svelte_options(options);
+            has_previous_section = true;
+        }
+
         // Format module script (if present)
         if let Some(script) = &root.module {
+            if has_previous_section {
+                self.write("\n"); // Blank line between sections
+            }
             self.print_script(script);
             has_previous_section = true;
         }
@@ -175,6 +192,21 @@ impl<'a> Printer<'a> {
             }
             self.print_style(style);
         }
+    }
+
+    /// Format `<svelte:options ... />` tag
+    ///
+    /// Always outputs self-closing form with attributes.
+    fn print_svelte_options(&mut self, options: &internal::SvelteOptions) {
+        self.write("<svelte:options");
+
+        // Format attributes
+        for attr in &options.attributes {
+            self.write(" ");
+            self.print_attribute_node(attr);
+        }
+
+        self.write(" />\n");
     }
 
     /// Format a Fragment with blank lines between root-level block elements
@@ -397,8 +429,15 @@ impl<'a> Printer<'a> {
                     pending_ws = PendingWhitespace::None;
                 }
                 FragmentNode::IfBlock(block) => {
-                    if has_output_content && pending_ws != PendingWhitespace::AlreadyHandled {
-                        self.write("\n");
+                    // Control blocks at root level: preserve blank lines
+                    if has_output_content {
+                        match pending_ws {
+                            PendingWhitespace::BlankLine => self.write("\n\n"),
+                            PendingWhitespace::Newline => self.write("\n"),
+                            PendingWhitespace::Space => self.write("\n"),
+                            PendingWhitespace::None => self.write("\n"),
+                            PendingWhitespace::AlreadyHandled => {}
+                        }
                     }
                     self.print_if_block(block);
                     has_output_content = true;
@@ -408,8 +447,15 @@ impl<'a> Printer<'a> {
                     pending_ws = PendingWhitespace::None;
                 }
                 FragmentNode::EachBlock(block) => {
-                    if has_output_content && pending_ws != PendingWhitespace::AlreadyHandled {
-                        self.write("\n");
+                    // Control blocks at root level: preserve blank lines
+                    if has_output_content {
+                        match pending_ws {
+                            PendingWhitespace::BlankLine => self.write("\n\n"),
+                            PendingWhitespace::Newline => self.write("\n"),
+                            PendingWhitespace::Space => self.write("\n"),
+                            PendingWhitespace::None => self.write("\n"),
+                            PendingWhitespace::AlreadyHandled => {}
+                        }
                     }
                     self.print_each_block(block);
                     has_output_content = true;
@@ -419,8 +465,15 @@ impl<'a> Printer<'a> {
                     pending_ws = PendingWhitespace::None;
                 }
                 FragmentNode::AwaitBlock(block) => {
-                    if has_output_content && pending_ws != PendingWhitespace::AlreadyHandled {
-                        self.write("\n");
+                    // Control blocks at root level: preserve blank lines
+                    if has_output_content {
+                        match pending_ws {
+                            PendingWhitespace::BlankLine => self.write("\n\n"),
+                            PendingWhitespace::Newline => self.write("\n"),
+                            PendingWhitespace::Space => self.write("\n"),
+                            PendingWhitespace::None => self.write("\n"),
+                            PendingWhitespace::AlreadyHandled => {}
+                        }
                     }
                     self.print_await_block(block);
                     has_output_content = true;
@@ -430,10 +483,125 @@ impl<'a> Printer<'a> {
                     pending_ws = PendingWhitespace::None;
                 }
                 FragmentNode::KeyBlock(block) => {
-                    if has_output_content && pending_ws != PendingWhitespace::AlreadyHandled {
-                        self.write("\n");
+                    // Control blocks at root level: preserve blank lines
+                    if has_output_content {
+                        match pending_ws {
+                            PendingWhitespace::BlankLine => self.write("\n\n"),
+                            PendingWhitespace::Newline => self.write("\n"),
+                            PendingWhitespace::Space => self.write("\n"),
+                            PendingWhitespace::None => self.write("\n"),
+                            PendingWhitespace::AlreadyHandled => {}
+                        }
                     }
                     self.print_key_block(block);
+                    has_output_content = true;
+                    prev_was_block = true;
+                    prev_was_text = false;
+                    prev_was_comment = false;
+                    pending_ws = PendingWhitespace::None;
+                }
+                FragmentNode::SnippetBlock(block) => {
+                    // Snippet blocks at root level: preserve blank lines
+                    if has_output_content {
+                        match pending_ws {
+                            PendingWhitespace::BlankLine => self.write("\n\n"),
+                            PendingWhitespace::Newline => self.write("\n"),
+                            PendingWhitespace::Space => self.write("\n"),
+                            PendingWhitespace::None => self.write("\n"),
+                            PendingWhitespace::AlreadyHandled => {}
+                        }
+                    }
+                    self.print_snippet_block(block);
+                    has_output_content = true;
+                    prev_was_block = true;
+                    prev_was_text = false;
+                    prev_was_comment = false;
+                    pending_ws = PendingWhitespace::None;
+                }
+                FragmentNode::HtmlTag(tag) => {
+                    // Template tags at root level: preserve blank lines
+                    if has_output_content {
+                        match pending_ws {
+                            PendingWhitespace::BlankLine => self.write("\n\n"),
+                            PendingWhitespace::Newline => self.write("\n"),
+                            PendingWhitespace::Space => self.write("\n"),
+                            PendingWhitespace::None => self.write("\n"),
+                            PendingWhitespace::AlreadyHandled => {}
+                        }
+                    }
+                    self.print_html_tag(tag);
+                    has_output_content = true;
+                    prev_was_block = true;
+                    prev_was_text = false;
+                    prev_was_comment = false;
+                    pending_ws = PendingWhitespace::None;
+                }
+                FragmentNode::ConstTag(tag) => {
+                    // Template tags at root level: preserve blank lines
+                    if has_output_content {
+                        match pending_ws {
+                            PendingWhitespace::BlankLine => self.write("\n\n"),
+                            PendingWhitespace::Newline => self.write("\n"),
+                            PendingWhitespace::Space => self.write("\n"),
+                            PendingWhitespace::None => self.write("\n"),
+                            PendingWhitespace::AlreadyHandled => {}
+                        }
+                    }
+                    self.print_const_tag(tag);
+                    has_output_content = true;
+                    prev_was_block = true;
+                    prev_was_text = false;
+                    prev_was_comment = false;
+                    pending_ws = PendingWhitespace::None;
+                }
+                FragmentNode::DebugTag(tag) => {
+                    // Template tags at root level: preserve blank lines
+                    if has_output_content {
+                        match pending_ws {
+                            PendingWhitespace::BlankLine => self.write("\n\n"),
+                            PendingWhitespace::Newline => self.write("\n"),
+                            PendingWhitespace::Space => self.write("\n"),
+                            PendingWhitespace::None => self.write("\n"),
+                            PendingWhitespace::AlreadyHandled => {}
+                        }
+                    }
+                    self.print_debug_tag(tag);
+                    has_output_content = true;
+                    prev_was_block = true;
+                    prev_was_text = false;
+                    prev_was_comment = false;
+                    pending_ws = PendingWhitespace::None;
+                }
+                FragmentNode::RenderTag(tag) => {
+                    // Template tags at root level: preserve blank lines
+                    if has_output_content {
+                        match pending_ws {
+                            PendingWhitespace::BlankLine => self.write("\n\n"),
+                            PendingWhitespace::Newline => self.write("\n"),
+                            PendingWhitespace::Space => self.write("\n"),
+                            PendingWhitespace::None => self.write("\n"),
+                            PendingWhitespace::AlreadyHandled => {}
+                        }
+                    }
+                    self.print_render_tag(tag);
+                    has_output_content = true;
+                    prev_was_block = true;
+                    prev_was_text = false;
+                    prev_was_comment = false;
+                    pending_ws = PendingWhitespace::None;
+                }
+                FragmentNode::SpecialElement(elem) => {
+                    // Special elements at root level: treat like block elements
+                    if has_output_content {
+                        match pending_ws {
+                            PendingWhitespace::BlankLine => self.write("\n\n"),
+                            PendingWhitespace::Newline => self.write("\n"),
+                            PendingWhitespace::Space => self.write("\n"),
+                            PendingWhitespace::None => self.write("\n"),
+                            PendingWhitespace::AlreadyHandled => {}
+                        }
+                    }
+                    self.print_special_element(elem);
                     has_output_content = true;
                     prev_was_block = true;
                     prev_was_text = false;
@@ -464,6 +632,12 @@ impl<'a> Printer<'a> {
             FragmentNode::EachBlock(block) => self.print_each_block(block),
             FragmentNode::AwaitBlock(block) => self.print_await_block(block),
             FragmentNode::KeyBlock(block) => self.print_key_block(block),
+            FragmentNode::SnippetBlock(block) => self.print_snippet_block(block),
+            FragmentNode::HtmlTag(tag) => self.print_html_tag(tag),
+            FragmentNode::ConstTag(tag) => self.print_const_tag(tag),
+            FragmentNode::DebugTag(tag) => self.print_debug_tag(tag),
+            FragmentNode::RenderTag(tag) => self.print_render_tag(tag),
+            FragmentNode::SpecialElement(elem) => self.print_special_element(elem),
         }
     }
 
@@ -489,7 +663,9 @@ impl<'a> Printer<'a> {
     #[allow(clippy::literal_string_with_formatting_args)]
     fn print_if_block(&mut self, block: &internal::IfBlock) {
         self.write("{#if ");
-        self.write(&self.source[block.test.span().range()]);
+        let formatted =
+            tsv_ts::format_expression(&block.test, self.source, Rc::clone(&self.interner));
+        self.write(&formatted);
         self.write("}");
 
         let is_inline = self.is_inline_fragment(&block.consequent);
@@ -509,7 +685,12 @@ impl<'a> Printer<'a> {
                         self.write_indent();
                     }
                     self.write("{:else if ");
-                    self.write(&self.source[else_if.test.span().range()]);
+                    let formatted = tsv_ts::format_expression(
+                        &else_if.test,
+                        self.source,
+                        Rc::clone(&self.interner),
+                    );
+                    self.write(&formatted);
                     self.write("}");
 
                     let else_if_inline = self.is_inline_fragment(&else_if.consequent);
@@ -569,7 +750,12 @@ impl<'a> Printer<'a> {
                     self.write_indent();
                 }
                 self.write("{:else if ");
-                self.write(&self.source[else_if.test.span().range()]);
+                let formatted = tsv_ts::format_expression(
+                    &else_if.test,
+                    self.source,
+                    Rc::clone(&self.interner),
+                );
+                self.write(&formatted);
                 self.write("}");
 
                 let is_inline = self.is_inline_fragment(&else_if.consequent);
@@ -773,6 +959,160 @@ impl<'a> Printer<'a> {
             self.write_indent();
             self.write("{/key}");
         }
+    }
+
+    /// Format a snippet block: {#snippet name(params)}...{/snippet}
+    fn print_snippet_block(&mut self, block: &internal::SnippetBlock) {
+        self.write("{#snippet ");
+        self.write(&self.source[block.expression.span().range()]);
+        // Emit type parameters if present (e.g., <T> for generics)
+        if let Some(ref type_params) = block.type_parameters {
+            self.write("<");
+            self.write(type_params);
+            self.write(">");
+        }
+        self.write("(");
+        // Use raw_parameters if present (TypeScript with type annotations)
+        // Otherwise format parsed parameters
+        if let Some(ref raw_params) = block.raw_parameters {
+            self.write(raw_params);
+        } else {
+            for (i, param) in block.parameters.iter().enumerate() {
+                if i > 0 {
+                    self.write(", ");
+                }
+                // Format parameter expressions (handles defaults and destructuring)
+                let formatted =
+                    tsv_ts::format_expression(param, self.source, Rc::clone(&self.interner));
+                self.write(&formatted);
+            }
+        }
+        self.write(")}");
+
+        let is_inline = self.is_inline_fragment(&block.body);
+        if is_inline {
+            self.print_inline_children(&block.body);
+        } else {
+            self.print_block_children(&block.body);
+        }
+
+        if is_inline {
+            self.write("{/snippet}");
+        } else {
+            self.write("\n");
+            self.write_indent();
+            self.write("{/snippet}");
+        }
+    }
+
+    /// Format an html tag: {@html expr}
+    fn print_html_tag(&mut self, tag: &internal::HtmlTag) {
+        self.write("{@html ");
+        let formatted =
+            tsv_ts::format_expression(&tag.expression, self.source, Rc::clone(&self.interner));
+        self.write(&formatted);
+        self.write("}");
+    }
+
+    /// Format a const tag: {@const name = expr}
+    fn print_const_tag(&mut self, tag: &internal::ConstTag) {
+        self.write("{@const ");
+        // Format the id (pattern) with current indent level for multiline patterns
+        let formatted_id = tsv_ts::format_expression_with_indent(
+            &tag.id,
+            self.source,
+            Rc::clone(&self.interner),
+            self.indent_level,
+        );
+        self.write(&formatted_id);
+        self.write(" = ");
+        // Format the init expression
+        let formatted_init = tsv_ts::format_expression_with_indent(
+            &tag.init,
+            self.source,
+            Rc::clone(&self.interner),
+            self.indent_level,
+        );
+        self.write(&formatted_init);
+        self.write("}");
+    }
+
+    /// Format a debug tag: {@debug} or {@debug x, y, z}
+    ///
+    /// Unlike Prettier (which strips comments), we preserve TS comments.
+    /// Comments are looked up from Root.ts_comments by span position.
+    fn print_debug_tag(&mut self, tag: &internal::DebugTag) {
+        self.write("{@debug");
+
+        // Get comments within the tag's content (after "{@debug" and before "}")
+        // The tag span includes the full `{@debug ... }`, so we look inside
+        let tag_comments: Vec<_> =
+            comments_in_range(self.ts_comments, tag.span.start, tag.span.end).collect();
+
+        if tag.identifiers.is_empty() && tag_comments.is_empty() {
+            // Just {@debug} with no identifiers or comments
+            self.write("}");
+            return;
+        }
+
+        self.write(" ");
+
+        // Track position as we emit content
+        // Start after "{@debug " (7 characters from tag start)
+        let mut last_end = tag.span.start + 7; // "{@debug" = 7 chars
+
+        for (i, id) in tag.identifiers.iter().enumerate() {
+            if i > 0 {
+                self.write(", ");
+                last_end += 2; // ", "
+            }
+
+            // Emit any comments that appear before this identifier
+            for comment in &tag_comments {
+                if comment.span.start >= last_end && comment.span.end <= id.span().start {
+                    if comment.is_block {
+                        self.write("/*");
+                        self.write(&comment.content);
+                        self.write("*/ ");
+                    } else {
+                        self.write("//");
+                        self.write(&comment.content);
+                        self.write("\n");
+                    }
+                    last_end = comment.span.end;
+                }
+            }
+
+            let formatted = tsv_ts::format_expression(id, self.source, Rc::clone(&self.interner));
+            self.write(&formatted);
+            last_end = id.span().end;
+        }
+
+        // Emit any trailing comments (after last identifier)
+        for comment in &tag_comments {
+            if comment.span.start >= last_end {
+                self.write(" ");
+                if comment.is_block {
+                    self.write("/*");
+                    self.write(&comment.content);
+                    self.write("*/");
+                } else {
+                    self.write("//");
+                    self.write(&comment.content);
+                }
+            }
+        }
+
+        self.write("}");
+    }
+
+    /// Format a render tag: {@render fn()} or {@render fn?.()}
+    fn print_render_tag(&mut self, tag: &internal::RenderTag) {
+        self.write("{@render ");
+        let formatted =
+            tsv_ts::format_expression(&tag.expression, self.source, Rc::clone(&self.interner));
+        self.write(&formatted);
+        self.write("}");
     }
 
     /// Print children inline (no newlines added)

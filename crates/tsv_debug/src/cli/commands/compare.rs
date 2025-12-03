@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::DebugError;
 use std::process::Command as ProcessCommand;
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
@@ -91,7 +91,7 @@ async fn run(input: &Input, parser_type: ParserType) {
     }
 }
 
-fn run_our_formatter(content: &str, parser: &str) -> Result<String, String> {
+fn run_our_formatter(content: &str, parser: &str) -> crate::error::Result<String> {
     let output = ProcessCommand::new("cargo")
         .args([
             "run",
@@ -104,22 +104,23 @@ fn run_our_formatter(content: &str, parser: &str) -> Result<String, String> {
         ])
         .arg(content)
         .args(["--parser", parser])
-        .output()
-        .map_err(|e| format!("Failed to execute cargo: {e}"))?;
+        .output()?;
 
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        Err(DebugError::Command(
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        ))
     }
 }
 
-async fn run_prettier(content: &str, parser: &str) -> Result<String> {
+async fn run_prettier(content: &str, parser: &str) -> crate::error::Result<String> {
     let filepath = match parser {
         "svelte" => "temp.svelte",
         "css" => "temp.css",
         _ => "temp.ts",
     };
 
-    fuz_client::run_prettier(content, filepath).await
+    Ok(fuz_client::run_prettier(content, filepath).await?)
 }

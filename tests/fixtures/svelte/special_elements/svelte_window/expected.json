@@ -1,0 +1,73 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 38,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SvelteWindow",
+				"start": 0,
+				"end": 38,
+				"name": "svelte:window",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 14,
+						"character": 14
+					}
+				},
+				"attributes": [
+					{
+						"start": 15,
+						"end": 35,
+						"type": "OnDirective",
+						"name": "keydown",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 15,
+								"character": 15
+							},
+							"end": {
+								"line": 1,
+								"column": 25,
+								"character": 25
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 27,
+							"end": 34,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 27
+								},
+								"end": {
+									"line": 1,
+									"column": 34
+								}
+							},
+							"name": "handler"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

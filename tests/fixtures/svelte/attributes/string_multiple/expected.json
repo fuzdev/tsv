@@ -12,12 +12,36 @@
 				"start": 0,
 				"end": 49,
 				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 6,
+						"character": 6
+					}
+				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 7,
 						"end": 26,
 						"name": "data-attr1",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 7,
+								"character": 7
+							},
+							"end": {
+								"line": 1,
+								"column": 17,
+								"character": 17
+							}
+						},
 						"value": [
 							{
 								"start": 19,
@@ -33,6 +57,18 @@
 						"start": 27,
 						"end": 46,
 						"name": "data-attr2",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 27,
+								"character": 27
+							},
+							"end": {
+								"line": 1,
+								"column": 37,
+								"character": 37
+							}
+						},
 						"value": [
 							{
 								"start": 39,

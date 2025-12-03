@@ -13,6 +13,7 @@ impl Command for FixturesValidateCommand {
     fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
         let list_only = args.flag("list");
         let verbose = args.flag("verbose") || args.flag("v");
+        let prettier_only = args.flag("prettier-only");
 
         // Collect remaining args as filters
         let mut filters = Vec::new();
@@ -23,6 +24,7 @@ impl Command for FixturesValidateCommand {
         Ok(Box::new(FixturesValidateExecutable {
             list_only,
             verbose,
+            prettier_only,
             filters,
         }))
     }
@@ -33,6 +35,8 @@ impl Command for FixturesValidateCommand {
                 .to_string(),
             "fixtures_validate --list                    List all fixtures".to_string(),
             "fixtures_validate --verbose                 Show successful checks too".to_string(),
+            "fixtures_validate --prettier-only           Skip our parser/formatter (for fixture authoring)"
+                .to_string(),
             "fixtures_validate <filter>...               Validate matching fixtures".to_string(),
         ]
     }
@@ -41,6 +45,7 @@ impl Command for FixturesValidateCommand {
 struct FixturesValidateExecutable {
     list_only: bool,
     verbose: bool,
+    prettier_only: bool,
     filters: Vec<String>,
 }
 
@@ -108,7 +113,8 @@ impl FixturesValidateExecutable {
 
         // Validate each fixture
         for fixture in &fixture_list {
-            let result = validation::validate_fixture(fixture, &mut context).await;
+            let result =
+                validation::validate_fixture(fixture, &mut context, self.prettier_only).await;
             summary.add(result);
         }
 

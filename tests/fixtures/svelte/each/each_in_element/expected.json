@@ -12,6 +12,18 @@
 				"start": 0,
 				"end": 60,
 				"name": "ul",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 3,
+						"character": 3
+					}
+				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -58,6 +70,18 @@
 										"start": 30,
 										"end": 45,
 										"name": "li",
+										"name_loc": {
+											"start": {
+												"line": 3,
+												"column": 3,
+												"character": 31
+											},
+											"end": {
+												"line": 3,
+												"column": 5,
+												"character": 33
+											}
+										},
 										"attributes": [],
 										"fragment": {
 											"type": "Fragment",
@@ -99,6 +123,7 @@
 								"type": "Identifier",
 								"name": "item",
 								"start": 22,
+								"end": 26,
 								"loc": {
 									"start": {
 										"line": 2,
@@ -110,8 +135,7 @@
 										"column": 21,
 										"character": 26
 									}
-								},
-								"end": 26
+								}
 							}
 						},
 						{

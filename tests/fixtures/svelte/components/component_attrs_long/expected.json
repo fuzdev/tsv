@@ -12,12 +12,36 @@
 				"start": 0,
 				"end": 107,
 				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 5,
+						"character": 5
+					}
+				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 7,
 						"end": 104,
 						"name": "very-long-attribute-name",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 1,
+								"character": 7
+							},
+							"end": {
+								"line": 2,
+								"column": 25,
+								"character": 31
+							}
+						},
 						"value": [
 							{
 								"start": 33,

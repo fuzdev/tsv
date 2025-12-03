@@ -11,6 +11,7 @@ use crate::fixtures::{
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use thiserror::Error;
 
 /// Validation error with self-describing names
 ///
@@ -18,59 +19,92 @@ use std::hash::{Hash, Hasher};
 /// but currently unused. Structure validation errors are wrapped in `StructureValidationFailed`
 /// which preserves detailed messages from `validate_fixture_structure()`. The specific variants
 /// document the intended type structure for future refactoring.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[allow(dead_code)]
 pub enum ValidationError {
     // Structure - Missing/Invalid
+    #[error("Missing input.svelte")]
     StructureMissingInput,
+    #[error("Missing expected.json")]
     StructureMissingExpected,
+    #[error("expected.json cannot coexist with expected_ours.json")]
     StructureExpectedJsonWithDivergenceFiles,
 
     // Structure - Svelte divergence
+    #[error("Directory needs _svelte_divergence suffix")]
     StructureSvelteDivergenceMissingSuffix,
+    #[error("_svelte_divergence dir missing expected_ours/svelte.json")]
     StructureSvelteDivergenceSuffixWithoutFiles,
+    #[error("Missing expected_ours.json in _svelte_divergence dir")]
     StructureSvelteDivergenceMissingExpectedOurs,
+    #[error("Missing expected_svelte.json in _svelte_divergence dir")]
     StructureSvelteDivergenceMissingExpectedSvelte,
+    #[error("expected_ours.json requires _svelte_divergence suffix")]
     StructureExpectedOursWithoutSvelteDivergenceSuffix,
+    #[error("expected_svelte.json requires _svelte_divergence suffix")]
     StructureExpectedSvelteWithoutSvelteDivergenceSuffix,
 
     // Structure - Prettier divergence
+    #[error("Directory needs _prettier_divergence suffix")]
     StructurePrettierDivergenceMissingSuffix,
+    #[error("_prettier_divergence dir missing divergence files")]
     StructurePrettierDivergenceSuffixWithoutFiles,
+    #[error("_prettier_divergence dir has unformatted_*.svelte: {}", .0.join(", "))]
     StructurePrettierDivergenceHasUnformatted(Vec<String>),
+    #[error("{0} requires _prettier_divergence suffix")]
     StructurePrettierQuirkWithoutPrettierDivergenceSuffix(String),
+    #[error("{0} requires _prettier_divergence suffix")]
     StructureUnformattedOursWithoutPrettierDivergenceSuffix(String),
 
     // Structure - Content validation
+    #[error("{0} is identical to input.svelte")]
     StructureVariantIdenticalToInput(String),
+    #[error("README.md required for divergence")]
     StructureMissingReadme,
 
     /// Generic structure validation failure with detailed message
     /// Used when validate_fixture_structure() returns an error string
+    #[error("{0}")]
     StructureValidationFailed(String),
 
     // Parser
+    #[error("expected.json is outdated")]
     ParserExpectedJsonOutdated,
+    #[error("expected_ours.json is outdated")]
     ParserExpectedOursOutdated,
+    #[error("expected_svelte.json is outdated")]
     ParserExpectedSvelteOutdated,
+    #[error("Parser error: {0}")]
     ParserError(String),
 
     // Formatter
+    #[error("input.svelte doesn't format to itself")]
     FormatterInputNotIdempotent,
+    #[error("output_prettier.svelte is outdated")]
     FormatterOutputPrettierOutdated,
+    #[error("input.svelte differs from prettier output")]
     FormatterInputDiffersFromPrettier,
+    #[error("Formatter error: {0}")]
     FormatterError(String),
 
     // Normalization
+    #[error("{0} not preserved by prettier")]
     NormalizationPrettierQuirkNotPreserved(String),
+    #[error("{0} doesn't normalize to input.svelte")]
     NormalizationPrettierQuirkNotNormalized(String),
+    #[error("{0} doesn't normalize to input.svelte (prettier)")]
     NormalizationUnformattedPrettierMismatch(String),
+    #[error("{0} doesn't normalize to input.svelte")]
     NormalizationUnformattedNotNormalized(String),
+    #[error("{0} doesn't normalize to input.svelte")]
     NormalizationUnformattedOursNotNormalized(String),
 
     // Duplicates (within fixture)
+    #[error("Duplicate unformatted files: {}", .0.join(", "))]
     DuplicateUnformattedWithinFixture(Vec<String>),
+    #[error("Duplicate prettier_quirk files: {}", .0.join(", "))]
     DuplicatePrettierQuirkWithinFixture(Vec<String>),
+    #[error("{0} is redundant (identical to {1})")]
     RedundantUnformattedMatchesQuirk(String, String),
 }
 
@@ -125,101 +159,6 @@ impl ValidationError {
             Self::DuplicateUnformattedWithinFixture(_)
             | Self::DuplicatePrettierQuirkWithinFixture(_) => "Remove duplicate files",
             Self::RedundantUnformattedMatchesQuirk(_, _) => "Remove redundant unformatted file",
-        }
-    }
-}
-
-impl fmt::Display for ValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::StructureMissingInput => write!(f, "Missing input.svelte"),
-            Self::StructureMissingExpected => write!(f, "Missing expected.json"),
-            Self::StructureExpectedJsonWithDivergenceFiles => {
-                write!(f, "expected.json cannot coexist with expected_ours.json")
-            }
-            Self::StructureSvelteDivergenceMissingSuffix => {
-                write!(f, "Directory needs _svelte_divergence suffix")
-            }
-            Self::StructureSvelteDivergenceSuffixWithoutFiles => {
-                write!(
-                    f,
-                    "_svelte_divergence dir missing expected_ours/svelte.json"
-                )
-            }
-            Self::StructureSvelteDivergenceMissingExpectedOurs => {
-                write!(f, "Missing expected_ours.json in _svelte_divergence dir")
-            }
-            Self::StructureSvelteDivergenceMissingExpectedSvelte => {
-                write!(f, "Missing expected_svelte.json in _svelte_divergence dir")
-            }
-            Self::StructureExpectedOursWithoutSvelteDivergenceSuffix => {
-                write!(f, "expected_ours.json requires _svelte_divergence suffix")
-            }
-            Self::StructureExpectedSvelteWithoutSvelteDivergenceSuffix => {
-                write!(f, "expected_svelte.json requires _svelte_divergence suffix")
-            }
-            Self::StructurePrettierDivergenceMissingSuffix => {
-                write!(f, "Directory needs _prettier_divergence suffix")
-            }
-            Self::StructurePrettierDivergenceSuffixWithoutFiles => {
-                write!(f, "_prettier_divergence dir missing divergence files")
-            }
-            Self::StructurePrettierDivergenceHasUnformatted(files) => {
-                write!(
-                    f,
-                    "_prettier_divergence dir has unformatted_*.svelte: {}",
-                    files.join(", ")
-                )
-            }
-            Self::StructurePrettierQuirkWithoutPrettierDivergenceSuffix(file) => {
-                write!(f, "{file} requires _prettier_divergence suffix")
-            }
-            Self::StructureUnformattedOursWithoutPrettierDivergenceSuffix(file) => {
-                write!(f, "{file} requires _prettier_divergence suffix")
-            }
-            Self::StructureVariantIdenticalToInput(file) => {
-                write!(f, "{file} is identical to input.svelte")
-            }
-            Self::StructureMissingReadme => write!(f, "README.md required for divergence"),
-            Self::StructureValidationFailed(msg) => write!(f, "{msg}"),
-            Self::ParserExpectedJsonOutdated => write!(f, "expected.json is outdated"),
-            Self::ParserExpectedOursOutdated => write!(f, "expected_ours.json is outdated"),
-            Self::ParserExpectedSvelteOutdated => write!(f, "expected_svelte.json is outdated"),
-            Self::ParserError(msg) => write!(f, "Parser error: {msg}"),
-            Self::FormatterInputNotIdempotent => {
-                write!(f, "input.svelte doesn't format to itself")
-            }
-            Self::FormatterOutputPrettierOutdated => {
-                write!(f, "output_prettier.svelte is outdated")
-            }
-            Self::FormatterInputDiffersFromPrettier => {
-                write!(f, "input.svelte differs from prettier output")
-            }
-            Self::FormatterError(msg) => write!(f, "Formatter error: {msg}"),
-            Self::NormalizationPrettierQuirkNotPreserved(file) => {
-                write!(f, "{file} not preserved by prettier")
-            }
-            Self::NormalizationPrettierQuirkNotNormalized(file) => {
-                write!(f, "{file} doesn't normalize to input.svelte")
-            }
-            Self::NormalizationUnformattedPrettierMismatch(file) => {
-                write!(f, "{file} doesn't normalize to input.svelte (prettier)")
-            }
-            Self::NormalizationUnformattedNotNormalized(file) => {
-                write!(f, "{file} doesn't normalize to input.svelte")
-            }
-            Self::NormalizationUnformattedOursNotNormalized(file) => {
-                write!(f, "{file} doesn't normalize to input.svelte")
-            }
-            Self::DuplicateUnformattedWithinFixture(files) => {
-                write!(f, "Duplicate unformatted files: {}", files.join(", "))
-            }
-            Self::DuplicatePrettierQuirkWithinFixture(files) => {
-                write!(f, "Duplicate prettier_quirk files: {}", files.join(", "))
-            }
-            Self::RedundantUnformattedMatchesQuirk(file, quirk) => {
-                write!(f, "{file} is redundant (identical to {quirk})")
-            }
         }
     }
 }
@@ -328,9 +267,13 @@ impl ValidationContext {
 }
 
 /// Validate a single fixture, collecting all errors
+///
+/// When `prettier_only` is true, skips our parser/formatter validation.
+/// This is useful for validating fixture design before implementing features.
 pub async fn validate_fixture(
     fixture: &Fixture,
     context: &mut ValidationContext,
+    prettier_only: bool,
 ) -> FixtureValidation {
     let mut result = FixtureValidation::new(fixture.relative_path.clone());
 
@@ -364,17 +307,20 @@ pub async fn validate_fixture(
     let is_svelte_divergence_dir = has_svelte_divergence_suffix(dir_name);
     let is_prettier_divergence_dir = has_prettier_divergence_suffix(dir_name);
 
-    // Phase 2: Our Parser validation - P2 (no daemon)
-    validate_parser_ours(&mut result, fixture, &input);
+    // Phases 2-4: Our parser/formatter validation (skip in prettier_only mode)
+    if !prettier_only {
+        // Phase 2: Our Parser validation - P2 (no daemon)
+        validate_parser_ours(&mut result, fixture, &input);
 
-    // Phase 3: Our Formatter validation - F1 (no daemon)
-    let format_ok = validate_formatter_idempotent(&mut result, &input);
+        // Phase 3: Our Formatter validation - F1 (no daemon)
+        let format_ok = validate_formatter_idempotent(&mut result, &input);
 
-    // Phase 4: Our Normalization (skip if F1 failed)
-    if format_ok {
-        validate_normalization_ours(&mut result, fixture, &input);
-    } else {
-        result.add_success(ValidationSuccess::NormalizationSkipped);
+        // Phase 4: Our Normalization (skip if F1 failed)
+        if format_ok {
+            validate_normalization_ours(&mut result, fixture, &input);
+        } else {
+            result.add_success(ValidationSuccess::NormalizationSkipped);
+        }
     }
 
     // Phase 5: Daemon validations (prettier + Svelte parser)
@@ -722,6 +668,10 @@ async fn validate_normalization_prettier(
     }
 
     let unformatted_variants = discover_unformatted_variants(fixture_dir);
+    // Update count for reporting (may not be set if validate_normalization_ours was skipped)
+    if result.unformatted_count == 0 {
+        result.unformatted_count = unformatted_variants.len();
+    }
     for variant_name in &unformatted_variants {
         let variant_path = fixture_dir.join(variant_name);
         let Ok(variant_content) = read_file(&variant_path) else {

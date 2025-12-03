@@ -88,13 +88,14 @@ pub(crate) fn parse_attribute_selector(
                 parser.advance()?;
                 parser.skip_whitespace()?;
 
-                // Parse attribute flags (i, s) - optional
+                // Parse attribute flags (i/I=case-insensitive, s/S=case-sensitive) - optional
                 let flags = if parser.check(&TokenKind::Identifier) {
                     let flag = parser.current_value().to_string();
-                    if flag == "i" || flag == "s" {
+                    let flag_lower = flag.to_lowercase();
+                    if flag_lower == "i" || flag_lower == "s" {
                         parser.advance()?;
                         parser.skip_whitespace()?;
-                        Some(flag)
+                        Some(flag) // Preserve original case
                     } else {
                         None
                     }
@@ -156,14 +157,15 @@ pub(crate) fn parse_attribute_selector(
                 (Some(matcher), value)
             };
 
-            // Parse attribute flags (i, s) - optional
+            // Parse attribute flags (i/I=case-insensitive, s/S=case-sensitive) - optional
             let flags = if parser.check(&TokenKind::Identifier) {
                 let flag = parser.current_value().to_string();
-                // Only accept 'i' (case-insensitive) or 's' (case-sensitive) as flags
-                if flag == "i" || flag == "s" {
+                let flag_lower = flag.to_lowercase();
+                // Accept both lowercase and uppercase flag letters
+                if flag_lower == "i" || flag_lower == "s" {
                     parser.advance()?;
                     parser.skip_whitespace()?;
-                    Some(flag)
+                    Some(flag) // Preserve original case
                 } else {
                     None
                 }
@@ -246,14 +248,15 @@ pub(crate) fn parse_attribute_selector(
         (Some(matcher), value)
     };
 
-    // Parse attribute flags (i, s) - optional
+    // Parse attribute flags (i/I=case-insensitive, s/S=case-sensitive) - optional
     let flags = if parser.check(&TokenKind::Identifier) {
         let flag = parser.current_value().to_string();
-        // Only accept 'i' (case-insensitive) or 's' (case-sensitive) as flags
-        if flag == "i" || flag == "s" {
+        let flag_lower = flag.to_lowercase();
+        // Accept both lowercase and uppercase flag letters
+        if flag_lower == "i" || flag_lower == "s" {
             parser.advance()?;
             parser.skip_whitespace()?;
-            Some(flag)
+            Some(flag) // Preserve original case
         } else {
             None
         }

@@ -2,11 +2,11 @@
 node_modules
 
 # Output
+/target
 /.svelte-kit
 /build
 /dist
 /dist_*
-/target
 /.gro
 /.zzz
 

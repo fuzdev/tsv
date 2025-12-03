@@ -7,6 +7,7 @@ description = "Language-agnostic foundation primitives for TSV"
 [dependencies]
 smallvec.workspace = true
 string-interner.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true

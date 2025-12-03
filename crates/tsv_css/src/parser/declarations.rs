@@ -324,7 +324,22 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
         start: value_span.start - base,
         end: value_span.end - base,
     };
-    let value = super::value::parse_value_from_source(parser.source(), source_relative_span, base);
+
+    // Custom properties (--*) with unusual values (e.g., leading comma) preserve raw value
+    // Normal custom property values are still parsed for proper formatting
+    let raw_value =
+        &parser.source()[source_relative_span.start as usize..source_relative_span.end as usize];
+    let trimmed_value = raw_value.trim();
+
+    let value = if property.starts_with("--") && trimmed_value.starts_with(',') {
+        // Leading comma is unusual syntax - preserve as raw identifier
+        CssValue::Identifier {
+            name: trimmed_value.to_string(),
+            span: value_span,
+        }
+    } else {
+        super::value::parse_value_from_source(parser.source(), source_relative_span, base)
+    };
 
     // Declaration ends after the value, NOT including the semicolon
     let end = value_end;

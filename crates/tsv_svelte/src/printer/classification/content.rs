@@ -51,11 +51,28 @@ impl<'a> Printer<'a> {
             FragmentNode::Text(_) => true,
             // Comments are treated as inline (similar to text)
             FragmentNode::Comment(_) => true,
+            // Template tags are inline (like expression tags)
+            FragmentNode::HtmlTag(_)
+            | FragmentNode::ConstTag(_)
+            | FragmentNode::DebugTag(_)
+            | FragmentNode::RenderTag(_) => true,
             // Control flow blocks are treated as block elements
             FragmentNode::IfBlock(_)
             | FragmentNode::EachBlock(_)
             | FragmentNode::AwaitBlock(_)
-            | FragmentNode::KeyBlock(_) => false,
+            | FragmentNode::KeyBlock(_)
+            | FragmentNode::SnippetBlock(_) => false,
+            // Special elements: most are block-level, a few are inline
+            FragmentNode::SpecialElement(el) => {
+                use crate::ast::internal::SpecialElementKind;
+                matches!(
+                    el.kind,
+                    SpecialElementKind::SlotElement
+                        | SpecialElementKind::SvelteFragment
+                        | SpecialElementKind::SvelteComponent
+                        | SpecialElementKind::SvelteSelf
+                )
+            }
         }
     }
 

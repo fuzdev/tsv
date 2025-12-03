@@ -31,6 +31,7 @@
 					"type": "Identifier",
 					"name": "value1",
 					"start": 22,
+					"end": 28,
 					"loc": {
 						"start": {
 							"line": 1,
@@ -42,8 +43,7 @@
 							"column": 28,
 							"character": 28
 						}
-					},
-					"end": 28
+					}
 				},
 				"error": null,
 				"pending": null,
@@ -81,6 +81,7 @@
 								"type": "Identifier",
 								"name": "value2",
 								"start": 53,
+								"end": 59,
 								"loc": {
 									"start": {
 										"line": 2,
@@ -92,8 +93,7 @@
 										"column": 29,
 										"character": 59
 									}
-								},
-								"end": 59
+								}
 							},
 							"error": null,
 							"pending": null,
@@ -112,6 +112,18 @@
 										"start": 63,
 										"end": 91,
 										"name": "div",
+										"name_loc": {
+											"start": {
+												"line": 3,
+												"column": 3,
+												"character": 64
+											},
+											"end": {
+												"line": 3,
+												"column": 6,
+												"character": 67
+											}
+										},
 										"attributes": [],
 										"fragment": {
 											"type": "Fragment",

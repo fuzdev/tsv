@@ -31,6 +31,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 smallvec = "1.11"
 string-interner = "0.19"
+thiserror = "2"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

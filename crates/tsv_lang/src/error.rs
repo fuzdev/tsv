@@ -1,6 +1,6 @@
 // Error types for parsing
 
-use std::fmt;
+use thiserror::Error;
 
 /// Rich error context with source snippet and position
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,7 +49,7 @@ impl ErrorContext {
     }
 
     /// Format error context with caret pointer
-    fn format_with_caret(&self, message: &str) -> String {
+    pub fn format_with_caret(&self, message: &str) -> String {
         let indent = " ".repeat(format!("{}:", self.line_number).len() + self.column + 1);
         format!(
             "{}\n{}:{} {}\n{}^ here",
@@ -62,32 +62,43 @@ impl ErrorContext {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Format error message with context (caret pointer) or position fallback
+fn format_error(base_msg: &str, position: usize, context: Option<&ErrorContext>) -> String {
+    if let Some(ctx) = context {
+        ctx.format_with_caret(base_msg)
+    } else {
+        format!("{base_msg} at position {position}")
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ParseError {
+    #[error("{}", format_error(&format!("Expected {expected}, found {found}"), *position, context.as_ref()))]
     UnexpectedToken {
         expected: String,
         found: String,
         position: usize,
         context: Option<ErrorContext>,
     },
+    #[error("{}", format_error("Unexpected end of file", *position, context.as_ref()))]
     UnexpectedEof {
         position: usize,
         context: Option<ErrorContext>,
     },
+    #[error("{}", format_error(message, *position, context.as_ref()))]
     InvalidSyntax {
         message: String,
         position: usize,
         context: Option<ErrorContext>,
     },
+    #[error("{}", format_error(&format!("Expected expression, found {found}"), *position, context.as_ref()))]
     InvalidExpression {
         found: String,
         position: usize,
         context: Option<ErrorContext>,
     },
-    FileTooLarge {
-        size: usize,
-        max: usize,
-    },
+    #[error("File too large: {size} bytes (maximum: {max} bytes / 4GB)")]
+    FileTooLarge { size: usize, max: usize },
 }
 
 /// Result type alias for parsing operations
@@ -144,65 +155,6 @@ impl ParseError {
         }
     }
 }
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ParseError::UnexpectedToken {
-                expected,
-                found,
-                position,
-                context,
-            } => {
-                let base_msg = format!("Expected {expected}, found {found}");
-                if let Some(ctx) = context {
-                    write!(f, "{}", ctx.format_with_caret(&base_msg))
-                } else {
-                    write!(f, "{base_msg} at position {position}")
-                }
-            }
-            ParseError::UnexpectedEof { position, context } => {
-                let base_msg = "Unexpected end of file";
-                if let Some(ctx) = context {
-                    write!(f, "{}", ctx.format_with_caret(base_msg))
-                } else {
-                    write!(f, "{base_msg} at position {position}")
-                }
-            }
-            ParseError::InvalidSyntax {
-                message,
-                position,
-                context,
-            } => {
-                if let Some(ctx) = context {
-                    write!(f, "{}", ctx.format_with_caret(message))
-                } else {
-                    write!(f, "{message} at position {position}")
-                }
-            }
-            ParseError::InvalidExpression {
-                found,
-                position,
-                context,
-            } => {
-                let base_msg = format!("Expected expression, found {found}");
-                if let Some(ctx) = context {
-                    write!(f, "{}", ctx.format_with_caret(&base_msg))
-                } else {
-                    write!(f, "{base_msg} at position {position}")
-                }
-            }
-            ParseError::FileTooLarge { size, max } => {
-                write!(
-                    f,
-                    "File too large: {size} bytes (maximum: {max} bytes / 4GB)"
-                )
-            }
-        }
-    }
-}
-
-impl std::error::Error for ParseError {}
 
 #[cfg(test)]
 mod tests {

@@ -1,0 +1,165 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 143,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "HtmlTag",
+				"start": 0,
+				"end": 143,
+				"expression": {
+					"type": "CallExpression",
+					"start": 7,
+					"end": 142,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 7
+						},
+						"end": {
+							"line": 9,
+							"column": 1
+						}
+					},
+					"callee": {
+						"type": "Identifier",
+						"start": 7,
+						"end": 35,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 7
+							},
+							"end": {
+								"line": 1,
+								"column": 35
+							}
+						},
+						"name": "generateSuperLongHtmlContent"
+					},
+					"arguments": [
+						{
+							"type": "Identifier",
+							"start": 38,
+							"end": 49,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 1
+								},
+								"end": {
+									"line": 2,
+									"column": 12
+								}
+							},
+							"name": "argumentOne"
+						},
+						{
+							"type": "Identifier",
+							"start": 52,
+							"end": 63,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 12
+								}
+							},
+							"name": "argumentTwo"
+						},
+						{
+							"type": "Identifier",
+							"start": 66,
+							"end": 79,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 14
+								}
+							},
+							"name": "argumentThree"
+						},
+						{
+							"type": "Identifier",
+							"start": 82,
+							"end": 94,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 1
+								},
+								"end": {
+									"line": 5,
+									"column": 13
+								}
+							},
+							"name": "argumentFour"
+						},
+						{
+							"type": "Identifier",
+							"start": 97,
+							"end": 109,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 1
+								},
+								"end": {
+									"line": 6,
+									"column": 13
+								}
+							},
+							"name": "argumentFive"
+						},
+						{
+							"type": "Identifier",
+							"start": 112,
+							"end": 123,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 1
+								},
+								"end": {
+									"line": 7,
+									"column": 12
+								}
+							},
+							"name": "argumentSix"
+						},
+						{
+							"type": "Identifier",
+							"start": 126,
+							"end": 139,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 1
+								},
+								"end": {
+									"line": 8,
+									"column": 14
+								}
+							},
+							"name": "argumentSeven"
+						}
+					],
+					"optional": false
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

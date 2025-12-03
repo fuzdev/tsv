@@ -37,6 +37,169 @@ pub enum Statement {
     BlockStatement(BlockStatement),
     FunctionDeclaration(FunctionDeclaration),
     ClassDeclaration(ClassDeclaration),
+    ExportNamedDeclaration(ExportNamedDeclaration),
+    ExportDefaultDeclaration(ExportDefaultDeclaration),
+    ExportAllDeclaration(ExportAllDeclaration),
+    ImportDeclaration(ImportDeclaration),
+    // Control flow statements
+    IfStatement(IfStatement),
+    ForStatement(ForStatement),
+    ForInStatement(ForInStatement),
+    ForOfStatement(ForOfStatement),
+    WhileStatement(WhileStatement),
+    DoWhileStatement(DoWhileStatement),
+    SwitchStatement(SwitchStatement),
+    TryStatement(TryStatement),
+    ThrowStatement(ThrowStatement),
+    BreakStatement(BreakStatement),
+    ContinueStatement(ContinueStatement),
+    LabeledStatement(LabeledStatement),
+    EmptyStatement(EmptyStatement),
+}
+
+/// Export named declaration: `export const x = 1;`, `export { x }`, `export { x } from "y"`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportNamedDeclaration {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "exportKind")]
+    pub export_kind: String,
+    /// Declaration being exported (for `export const x = 1`), or null for specifiers
+    pub declaration: Option<Box<Statement>>,
+    /// Export specifiers: `export { a, b as c }`
+    pub specifiers: Vec<ExportSpecifier>,
+    /// Re-export source: `export { x } from "y"` or null for local exports
+    pub source: Option<Literal>,
+}
+
+/// Export default declaration: `export default x`, `export default function() {}`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportDefaultDeclaration {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "exportKind")]
+    pub export_kind: String,
+    /// The expression or declaration being exported as default
+    pub declaration: ExportDefaultValue,
+}
+
+/// Value of export default - can be expression or declaration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ExportDefaultValue {
+    Expression(Expression),
+    FunctionDeclaration(FunctionDeclaration),
+    ClassDeclaration(ClassDeclaration),
+}
+
+/// Export all declaration: `export * from "y"` or `export * as ns from "y"`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportAllDeclaration {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "exportKind")]
+    pub export_kind: String,
+    /// For `export * as ns from "y"`, the namespace binding name, or null
+    pub exported: Option<Identifier>,
+    /// Module source
+    pub source: Literal,
+}
+
+/// Export specifier: `export { x }` or `export { x as y }`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportSpecifier {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// Local name (what's exported from this module)
+    pub local: Identifier,
+    /// Exported name (what it's called externally)
+    pub exported: Identifier,
+    #[serde(rename = "exportKind")]
+    pub export_kind: String,
+}
+
+/// Import declaration: `import x from "y"`, `import { a, b } from "y"`, etc.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportDeclaration {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "importKind")]
+    pub import_kind: String,
+    pub specifiers: Vec<ImportSpecifier>,
+    pub source: Literal,
+    pub attributes: Vec<ImportAttribute>,
+}
+
+/// Import specifier: default, named, or namespace
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ImportSpecifier {
+    Default(ImportDefaultSpecifier),
+    Named(ImportNamedSpecifier),
+    Namespace(ImportNamespaceSpecifier),
+}
+
+/// Default import: `import x from "y"`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportDefaultSpecifier {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub local: Identifier,
+}
+
+/// Named import: `import { a } from "y"` or `import { a as b } from "y"`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportNamedSpecifier {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub imported: Identifier,
+    pub local: Identifier,
+    #[serde(rename = "importKind")]
+    pub import_kind: String,
+}
+
+/// Namespace import: `import * as ns from "y"`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportNamespaceSpecifier {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub local: Identifier,
+}
+
+/// Import attribute: `{ type: "json" }`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportAttribute {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub key: Identifier,
+    pub value: Literal,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -100,6 +263,9 @@ pub struct Identifier {
     pub end: u32,
     pub loc: SourceLocation,
     pub name: String,
+    /// Whether this is an optional parameter
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub optional: bool,
     #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
     pub type_annotation: Option<TSTypeAnnotation>,
 }
@@ -233,6 +399,8 @@ pub struct ArrowFunctionExpression {
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Vec<Expression>,
     pub body: ArrowFunctionBody,
+    #[serde(rename = "returnType", skip_serializing_if = "Option::is_none")]
+    pub return_type: Option<TSTypeAnnotation>,
 }
 
 /// Arrow function body - either expression or block statement
@@ -255,6 +423,7 @@ pub struct BlockStatement {
 }
 
 /// Function declaration: `function foo(x) { return x + 1; }`
+/// For `export default function() {}`, id is null.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionDeclaration {
     #[serde(rename = "type")]
@@ -262,17 +431,22 @@ pub struct FunctionDeclaration {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    pub id: Identifier,
+    /// Function name (None for anonymous export default functions)
+    pub id: Option<Identifier>,
     pub expression: bool,
     pub generator: bool,
     #[serde(rename = "async")]
     pub is_async: bool,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Vec<Expression>,
+    /// Return type annotation (e.g., `: number`)
+    #[serde(rename = "returnType", skip_serializing_if = "Option::is_none")]
+    pub return_type: Option<TSTypeAnnotation>,
     pub body: BlockStatement,
 }
 
 /// Class declaration: `class Foo { ... }`
+/// For `export default class {}`, id is null.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClassDeclaration {
     #[serde(rename = "type")]
@@ -280,13 +454,14 @@ pub struct ClassDeclaration {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    pub id: Identifier,
+    /// Class name (None for anonymous export default classes)
+    pub id: Option<Identifier>,
     #[serde(rename = "superClass")]
     pub super_class: Option<Box<Expression>>,
     pub body: ClassBody,
 }
 
-/// Class body: `{ constructor() {} method() {} }`
+/// Class body: `{ constructor() {} method() {} prop = value; }`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClassBody {
     #[serde(rename = "type")]
@@ -294,7 +469,15 @@ pub struct ClassBody {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    pub body: Vec<MethodDefinition>,
+    pub body: Vec<ClassMember>,
+}
+
+/// Class member - either method definition or property definition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ClassMember {
+    MethodDefinition(MethodDefinition),
+    PropertyDefinition(PropertyDefinition),
 }
 
 /// Method definition in a class body
@@ -313,6 +496,24 @@ pub struct MethodDefinition {
     pub value: FunctionExpression,
 }
 
+/// Property definition in a class body: `name = value;`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PropertyDefinition {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "static")]
+    pub is_static: bool,
+    pub computed: bool,
+    pub key: Box<Expression>,
+    /// Type annotation (e.g., `: number`)
+    #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
+    pub type_annotation: Option<TSTypeAnnotation>,
+    pub value: Option<Box<Expression>>,
+}
+
 /// Function expression: `function() {}` or method shorthand `{ foo() {} }`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionExpression {
@@ -328,6 +529,9 @@ pub struct FunctionExpression {
     pub is_async: bool,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Vec<Expression>,
+    /// Return type annotation (e.g., `: number`)
+    #[serde(rename = "returnType", skip_serializing_if = "Option::is_none")]
+    pub return_type: Option<TSTypeAnnotation>,
     pub body: BlockStatement,
 }
 
@@ -341,6 +545,221 @@ pub struct ReturnStatement {
     pub loc: SourceLocation,
     pub argument: Option<Box<Expression>>,
 }
+
+// ============================================================================
+// Control Flow Statements
+// ============================================================================
+
+/// If statement: `if (test) consequent` or `if (test) consequent else alternate`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IfStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub test: Box<Expression>,
+    pub consequent: Box<Statement>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alternate: Option<Box<Statement>>,
+}
+
+/// For statement: `for (init; test; update) body`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ForStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub init: Option<ForInit>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub test: Option<Box<Expression>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub update: Option<Box<Expression>>,
+    pub body: Box<Statement>,
+}
+
+/// For statement initialization
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ForInit {
+    VariableDeclaration(VariableDeclaration),
+    Expression(Box<Expression>),
+}
+
+/// For-in statement: `for (left in right) body`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ForInStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub left: ForInOfLeft,
+    pub right: Box<Expression>,
+    pub body: Box<Statement>,
+}
+
+/// For-of statement: `for (left of right) body`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ForOfStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub left: ForInOfLeft,
+    pub right: Box<Expression>,
+    #[serde(rename = "await")]
+    pub r#await: bool,
+    pub body: Box<Statement>,
+}
+
+/// Left side of for-in/for-of
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ForInOfLeft {
+    VariableDeclaration(VariableDeclaration),
+    Pattern(Box<Expression>),
+}
+
+/// While statement: `while (test) body`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhileStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub test: Box<Expression>,
+    pub body: Box<Statement>,
+}
+
+/// Do-while statement: `do body while (test)`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DoWhileStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub body: Box<Statement>,
+    pub test: Box<Expression>,
+}
+
+/// Switch statement: `switch (discriminant) { cases }`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SwitchStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub discriminant: Box<Expression>,
+    pub cases: Vec<SwitchCase>,
+}
+
+/// Switch case: `case test: consequent` or `default: consequent`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SwitchCase {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub test: Option<Box<Expression>>,
+    pub consequent: Vec<Statement>,
+}
+
+/// Try statement: `try { block } catch { handler } finally { finalizer }`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TryStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub block: BlockStatement,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub handler: Option<CatchClause>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finalizer: Option<BlockStatement>,
+}
+
+/// Catch clause: `catch (param) { body }`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CatchClause {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub param: Option<Box<Expression>>,
+    pub body: BlockStatement,
+}
+
+/// Throw statement: `throw argument`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThrowStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub argument: Box<Expression>,
+}
+
+/// Break statement: `break` or `break label`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BreakStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<Identifier>,
+}
+
+/// Continue statement: `continue` or `continue label`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContinueStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<Identifier>,
+}
+
+/// Labeled statement: `label: statement`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LabeledStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub label: Identifier,
+    pub body: Box<Statement>,
+}
+
+/// Empty statement: `;`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmptyStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+}
+
+// ============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpreadElement {
@@ -604,6 +1023,19 @@ pub enum TSType {
     TSSymbolKeyword(TSSymbolKeyword),
     TSBigIntKeyword(TSBigIntKeyword),
     TSLiteralType(TSLiteralType),
+    TSArrayType(TSArrayType),
+}
+
+/// TypeScript array type: `number[]`, `string[]`, etc.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSArrayType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "elementType")]
+    pub element_type: Box<TSType>,
 }
 
 /// TypeScript `number` type keyword

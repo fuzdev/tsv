@@ -12,6 +12,7 @@ pub enum TokenKind {
     BlockOpen,     // {#
     BlockClose,    // {/
     BlockContinue, // {:
+    TagOpen,       // {@
     Equals,        // =
     String,        // "..." attribute values
     Identifier,    // Tag names, attribute names
@@ -30,6 +31,7 @@ impl fmt::Display for TokenKind {
             TokenKind::BlockOpen => write!(f, "'{{#'"),
             TokenKind::BlockClose => write!(f, "'{{/'"),
             TokenKind::BlockContinue => write!(f, "'{{:'"),
+            TokenKind::TagOpen => write!(f, "'{{@'"),
             TokenKind::Equals => write!(f, "'='"),
             TokenKind::String => write!(f, "string"),
             TokenKind::Identifier => write!(f, "identifier"),
@@ -69,10 +71,30 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Create a new lexer starting at a given position.
+    /// The source slice starts from the given position, but positions
+    /// are reported relative to the start of the slice (i.e., starting from 0).
+    pub fn new_at(source: &'a str, _start_offset: usize) -> Self {
+        // Note: _start_offset is informational only - the caller handles
+        // adding the base offset to positions. We just lexer the provided slice.
+        Self::new(source)
+    }
+
     fn advance(&mut self) {
         if let Some(ch) = self.current {
             self.position += ch.len_utf8();
             self.current = self.chars.next();
+        }
+    }
+
+    /// Create a token with the current position as end and value extracted from source
+    #[inline]
+    fn make_token(&self, kind: TokenKind, start: usize) -> Token<'a> {
+        Token {
+            kind,
+            start,
+            end: self.position,
+            value: &self.source[start..self.position],
         }
     }
 
@@ -137,12 +159,7 @@ impl<'a> Lexer<'a> {
                             self.advance();
                             self.advance();
                             self.advance();
-                            return Ok(Token {
-                                kind: TokenKind::Comment,
-                                start,
-                                end: self.position,
-                                value: &self.source[start..self.position],
-                            });
+                            return Ok(self.make_token(TokenKind::Comment, start));
                         }
                         self.advance();
                     }
@@ -157,31 +174,16 @@ impl<'a> Lexer<'a> {
 
                 self.inside_tag = true; // Enter tag mode
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::LeftAngle,
-                    start,
-                    end: self.position,
-                    value: &self.source[start..self.position],
-                })
+                Ok(self.make_token(TokenKind::LeftAngle, start))
             }
             Some('>') => {
                 self.inside_tag = false; // Exit tag mode, back to template mode
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::RightAngle,
-                    start,
-                    end: self.position,
-                    value: &self.source[start..self.position],
-                })
+                Ok(self.make_token(TokenKind::RightAngle, start))
             }
             Some('/') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::Slash,
-                    start,
-                    end: self.position,
-                    value: &self.source[start..self.position],
-                })
+                Ok(self.make_token(TokenKind::Slash, start))
             }
             Some('{') => {
                 self.advance();
@@ -189,56 +191,30 @@ impl<'a> Lexer<'a> {
                 match self.current {
                     Some('#') => {
                         self.advance();
-                        Ok(Token {
-                            kind: TokenKind::BlockOpen,
-                            start,
-                            end: self.position,
-                            value: &self.source[start..self.position],
-                        })
+                        Ok(self.make_token(TokenKind::BlockOpen, start))
                     }
                     Some(':') => {
                         self.advance();
-                        Ok(Token {
-                            kind: TokenKind::BlockContinue,
-                            start,
-                            end: self.position,
-                            value: &self.source[start..self.position],
-                        })
+                        Ok(self.make_token(TokenKind::BlockContinue, start))
                     }
                     Some('/') => {
                         self.advance();
-                        Ok(Token {
-                            kind: TokenKind::BlockClose,
-                            start,
-                            end: self.position,
-                            value: &self.source[start..self.position],
-                        })
+                        Ok(self.make_token(TokenKind::BlockClose, start))
                     }
-                    _ => Ok(Token {
-                        kind: TokenKind::LeftBrace,
-                        start,
-                        end: self.position,
-                        value: &self.source[start..self.position],
-                    }),
+                    Some('@') => {
+                        self.advance();
+                        Ok(self.make_token(TokenKind::TagOpen, start))
+                    }
+                    _ => Ok(self.make_token(TokenKind::LeftBrace, start)),
                 }
             }
             Some('}') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::RightBrace,
-                    start,
-                    end: self.position,
-                    value: &self.source[start..self.position],
-                })
+                Ok(self.make_token(TokenKind::RightBrace, start))
             }
             Some('=') => {
                 self.advance();
-                Ok(Token {
-                    kind: TokenKind::Equals,
-                    start,
-                    end: self.position,
-                    value: &self.source[start..self.position],
-                })
+                Ok(self.make_token(TokenKind::Equals, start))
             }
             Some(quote @ '\'' | quote @ '"') => {
                 // String literal for attribute values
@@ -249,12 +225,7 @@ impl<'a> Lexer<'a> {
                 while let Some(ch) = self.current {
                     if ch == quote {
                         self.advance(); // consume closing quote
-                        return Ok(Token {
-                            kind: TokenKind::String,
-                            start,
-                            end: self.position,
-                            value: &self.source[start..self.position],
-                        });
+                        return Ok(self.make_token(TokenKind::String, start));
                     }
                     self.advance();
                 }
@@ -267,20 +238,22 @@ impl<'a> Lexer<'a> {
             }
             Some(ch) if ch.is_alphabetic() || ch == '_' || ch == '$' => {
                 // Tag names and identifiers
+                // Also include : and | for directive syntax (on:click|preventDefault)
+                // and -- for CSS custom properties (style:--custom)
                 while let Some(ch) = self.current {
-                    if ch.is_alphanumeric() || ch == '_' || ch == '$' || ch == '-' {
+                    if ch.is_alphanumeric()
+                        || ch == '_'
+                        || ch == '$'
+                        || ch == '-'
+                        || ch == ':'
+                        || ch == '|'
+                    {
                         self.advance();
                     } else {
                         break;
                     }
                 }
-                let value = &self.source[start..self.position];
-                Ok(Token {
-                    kind: TokenKind::Identifier,
-                    start,
-                    end: self.position,
-                    value,
-                })
+                Ok(self.make_token(TokenKind::Identifier, start))
             }
             Some(ch) => Err(ParseError::InvalidSyntax {
                 message: format!("Unexpected character in template: '{ch}'"),

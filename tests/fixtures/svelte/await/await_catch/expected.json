@@ -32,6 +32,7 @@
 					"type": "Identifier",
 					"name": "error",
 					"start": 43,
+					"end": 48,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -43,8 +44,7 @@
 							"column": 13,
 							"character": 48
 						}
-					},
-					"end": 48
+					}
 				},
 				"pending": {
 					"type": "Fragment",
@@ -61,6 +61,18 @@
 							"start": 18,
 							"end": 34,
 							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 19
+								},
+								"end": {
+									"line": 2,
+									"column": 5,
+									"character": 22
+								}
+							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -100,6 +112,18 @@
 							"start": 51,
 							"end": 69,
 							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 2,
+									"character": 52
+								},
+								"end": {
+									"line": 4,
+									"column": 5,
+									"character": 55
+								}
+							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

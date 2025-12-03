@@ -44,6 +44,18 @@
 							"start": 18,
 							"end": 33,
 							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 19
+								},
+								"end": {
+									"line": 2,
+									"column": 5,
+									"character": 22
+								}
+							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

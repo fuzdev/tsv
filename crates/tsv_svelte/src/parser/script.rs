@@ -148,13 +148,28 @@ impl<'a> SvelteParser<'a> {
 
     /// Detect whether a script is a module script based on its attributes
     fn detect_script_context(
-        attributes: &[Attribute],
+        attributes: &[AttributeNode],
         _source: &str,
         interner: &Rc<RefCell<DefaultStringInterner>>,
     ) -> ScriptContext {
-        for attr in attributes {
+        for attr_node in attributes {
+            // Only process Attribute nodes (not AttachTag or directives)
+            let attr = match attr_node {
+                AttributeNode::Attribute(attr) => attr,
+                AttributeNode::SpreadAttribute(_)
+                | AttributeNode::AttachTag(_)
+                | AttributeNode::OnDirective(_)
+                | AttributeNode::BindDirective(_)
+                | AttributeNode::ClassDirective(_)
+                | AttributeNode::StyleDirective(_)
+                | AttributeNode::UseDirective(_)
+                | AttributeNode::TransitionDirective(_)
+                | AttributeNode::AnimateDirective(_)
+                | AttributeNode::LetDirective(_) => continue,
+            };
+
             // Resolve attribute name to string
-            let name = interner.borrow().must_resolve(attr.name).to_string();
+            let name = interner.borrow().resolve_infallible(attr.name).to_string();
 
             // Check for boolean module attribute: <script module>
             if name == "module" && attr.value.is_none() {

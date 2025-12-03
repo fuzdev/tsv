@@ -15,33 +15,92 @@ use tsv_lang::{ParseError, Span};
 
 use super::Parser;
 
+/// Parse a JavaScript number literal (hex, binary, octal, scientific, BigInt)
+/// Returns f64 (BigInt suffix 'n' is ignored for value, preserved in raw)
+///
+/// Note: Precision loss for large integers (>2^52) matches JavaScript behavior.
+#[allow(clippy::cast_precision_loss)]
+fn parse_number_literal(raw: &str) -> Result<f64, std::num::ParseFloatError> {
+    // Remove numeric separators
+    let clean: String = raw.chars().filter(|&c| c != '_').collect();
+
+    // Strip BigInt suffix
+    let clean = clean.strip_suffix('n').unwrap_or(&clean);
+
+    if clean.len() >= 2 {
+        let prefix = &clean[..2];
+        let digits = &clean[2..];
+        match prefix {
+            "0x" | "0X" => {
+                // Hex: 0xff
+                return Ok(i64::from_str_radix(digits, 16).unwrap_or(0) as f64);
+            }
+            "0b" | "0B" => {
+                // Binary: 0b1010
+                return Ok(i64::from_str_radix(digits, 2).unwrap_or(0) as f64);
+            }
+            "0o" | "0O" => {
+                // Octal: 0o77
+                return Ok(i64::from_str_radix(digits, 8).unwrap_or(0) as f64);
+            }
+            _ => {}
+        }
+    }
+
+    // Regular decimal (including scientific notation)
+    clean.parse::<f64>()
+}
+
 /// Parsed expression with actual end position tracking
 ///
-/// Used during parsing to track where expressions truly end after consuming
-/// parentheses. This allows binary expressions to correctly include opening/closing
+/// Used during parsing to track where expressions truly start and end after consuming
+/// parentheses. This allows binary/call expressions to correctly include opening/closing
 /// parens in their spans while keeping inner expression spans semantic.
 ///
 /// Example: `(a && b) || c`
 /// - Inner `&&` expression: span = `a && b` (semantic, excludes parens)
 /// - Outer `||` expression: span starts at `(`, uses `actual_end` from left operand
+///
+/// Example: `(a ? b : c)()`
+/// - Inner ternary: span = `a ? b : c` (semantic, excludes parens)
+/// - CallExpression: span starts at `actual_start` (the `(`), not ternary's start
 #[derive(Debug)]
 struct ParsedExpr {
     /// The parsed expression with semantic span (may exclude surrounding parens)
     expr: Expression,
+    /// Actual start position before any opening parentheses
+    actual_start: usize,
     /// Actual end position after consuming any closing parentheses
     actual_end: usize,
 }
 
 impl ParsedExpr {
-    /// Create a ParsedExpr where actual_end matches the expression's semantic span
+    /// Create a ParsedExpr where actual_start/end match the expression's semantic span
     fn from_expr(expr: Expression) -> Self {
-        let actual_end = expr.span().end as usize;
-        Self { expr, actual_end }
+        let span = expr.span();
+        Self {
+            actual_start: span.start as usize,
+            actual_end: span.end as usize,
+            expr,
+        }
     }
 
     /// Create a ParsedExpr with explicit actual_end (for parenthesized expressions)
     fn with_end(expr: Expression, actual_end: usize) -> Self {
-        Self { expr, actual_end }
+        Self {
+            actual_start: expr.span().start as usize,
+            actual_end,
+            expr,
+        }
+    }
+
+    /// Create a ParsedExpr with explicit actual_start and actual_end (for parenthesized expressions)
+    fn with_bounds(expr: Expression, actual_start: usize, actual_end: usize) -> Self {
+        Self {
+            expr,
+            actual_start,
+            actual_end,
+        }
     }
 }
 
@@ -153,7 +212,7 @@ impl<'a> Parser<'a> {
             let right = self.parse_expression_bp(right_bp)?;
 
             // Create binary expression
-            // Use expr_start (which includes any opening paren) instead of left.expr.span().start
+            // Use expr_start (which includes any opening paren) instead of left.actual_start as u32
             // Use right.actual_end (position after parsing) to include closing parens
             let span = Span::new(expr_start as u32, right.actual_end as u32);
             left = ParsedExpr {
@@ -163,14 +222,18 @@ impl<'a> Parser<'a> {
                     right: Box::new(right.expr),
                     span,
                 }),
+                actual_start: expr_start,
                 actual_end: right.actual_end,
             };
         }
 
         // Handle assignment operator (after binary ops, before ternary)
         // Assignment is right-associative and has low precedence
-        if min_bp <= 1 && self.check(&TokenKind::Equals) {
-            self.advance()?; // consume '='
+        // Check for simple `=` and compound assignment operators (+=, -=, etc.)
+        if min_bp <= 1
+            && let Some(operator) = self.try_assignment_operator()
+        {
+            self.advance()?; // consume assignment operator
 
             // Parse right-hand side (assignment is right-associative, so same precedence)
             let right = self.parse_expression_bp(1)?;
@@ -182,10 +245,11 @@ impl<'a> Parser<'a> {
             left = ParsedExpr {
                 expr: Expression::AssignmentExpression(AssignmentExpression {
                     left: Box::new(left_pattern),
-                    operator: AssignmentOperator::Assign,
+                    operator,
                     right: Box::new(right.expr),
                     span,
                 }),
+                actual_start: expr_start,
                 actual_end: right.actual_end,
             };
         }
@@ -213,6 +277,7 @@ impl<'a> Parser<'a> {
                     alternate: Box::new(alternate.expr),
                     span,
                 }),
+                actual_start: expr_start,
                 actual_end: alternate.actual_end,
             };
         }
@@ -235,6 +300,7 @@ impl<'a> Parser<'a> {
             let span = Span::new(expr_start as u32, last_end as u32);
             left = ParsedExpr {
                 expr: Expression::SequenceExpression(SequenceExpression { expressions, span }),
+                actual_start: expr_start,
                 actual_end: last_end,
             };
         }
@@ -263,6 +329,11 @@ impl<'a> Parser<'a> {
             }
             TokenKind::Keyword(KeywordKind::Await) => {
                 let expr = self.parse_await_expression()?;
+                ParsedExpr::from_expr(expr)
+            }
+            TokenKind::Keyword(KeywordKind::Async) => {
+                // Async arrow function: `async () => ...` or `async x => ...`
+                let expr = self.parse_async_arrow_function()?;
                 ParsedExpr::from_expr(expr)
             }
             _ => self.parse_primary_expression_with_end()?,
@@ -298,12 +369,13 @@ impl<'a> Parser<'a> {
                     let name = self.intern(self.current_value());
                     self.advance()?;
 
-                    let span = Span::new(left.expr.span().start, prop_end as u32);
+                    let span = Span::new(left.actual_start as u32, prop_end as u32);
                     left = ParsedExpr::with_end(
                         Expression::MemberExpression(MemberExpression {
                             object: Box::new(left.expr),
                             property: Box::new(Expression::Identifier(Identifier {
                                 name,
+                                optional: false,
                                 type_annotation: None,
                                 span: Span::new(prop_start as u32, prop_end as u32),
                             })),
@@ -325,12 +397,13 @@ impl<'a> Parser<'a> {
                             let name = self.intern(self.current_value());
                             self.advance()?;
 
-                            let span = Span::new(left.expr.span().start, prop_end as u32);
+                            let span = Span::new(left.actual_start as u32, prop_end as u32);
                             left = ParsedExpr::with_end(
                                 Expression::MemberExpression(MemberExpression {
                                     object: Box::new(left.expr),
                                     property: Box::new(Expression::Identifier(Identifier {
                                         name,
+                                        optional: false,
                                         type_annotation: None,
                                         span: Span::new(prop_start as u32, prop_end as u32),
                                     })),
@@ -350,7 +423,7 @@ impl<'a> Parser<'a> {
                             let (_, bracket_end) = self.current_pos();
                             self.expect(&TokenKind::BracketClose)?; // consume ']'
 
-                            let span = Span::new(left.expr.span().start, bracket_end as u32);
+                            let span = Span::new(left.actual_start as u32, bracket_end as u32);
                             left = ParsedExpr::with_end(
                                 Expression::MemberExpression(MemberExpression {
                                     object: Box::new(left.expr),
@@ -386,7 +459,7 @@ impl<'a> Parser<'a> {
                             let (_, paren_end) = self.current_pos();
                             self.expect(&TokenKind::ParenClose)?; // consume ')'
 
-                            let span = Span::new(left.expr.span().start, paren_end as u32);
+                            let span = Span::new(left.actual_start as u32, paren_end as u32);
                             left = ParsedExpr::with_end(
                                 Expression::CallExpression(CallExpression {
                                     callee: Box::new(left.expr),
@@ -418,7 +491,7 @@ impl<'a> Parser<'a> {
                     let (_, bracket_end) = self.current_pos();
                     self.expect(&TokenKind::BracketClose)?; // consume ']'
 
-                    let span = Span::new(left.expr.span().start, bracket_end as u32);
+                    let span = Span::new(left.actual_start as u32, bracket_end as u32);
                     left = ParsedExpr::with_end(
                         Expression::MemberExpression(MemberExpression {
                             object: Box::new(left.expr),
@@ -453,7 +526,7 @@ impl<'a> Parser<'a> {
                     let (_, paren_end) = self.current_pos();
                     self.expect(&TokenKind::ParenClose)?; // consume ')'
 
-                    let span = Span::new(left.expr.span().start, paren_end as u32);
+                    let span = Span::new(left.actual_start as u32, paren_end as u32);
                     left = ParsedExpr::with_end(
                         Expression::CallExpression(CallExpression {
                             callee: Box::new(left.expr),
@@ -469,7 +542,7 @@ impl<'a> Parser<'a> {
                     let quasi = self.parse_template_literal()?;
                     let quasi_span = quasi.span();
                     if let Expression::TemplateLiteral(template) = quasi {
-                        let span = Span::new(left.expr.span().start, quasi_span.end);
+                        let span = Span::new(left.actual_start as u32, quasi_span.end);
                         left = ParsedExpr::with_end(
                             Expression::TaggedTemplateExpression(TaggedTemplateExpression {
                                 tag: Box::new(left.expr),
@@ -496,7 +569,7 @@ impl<'a> Parser<'a> {
                     let (_, op_end) = self.current_pos();
                     self.advance()?;
 
-                    let span = Span::new(left.expr.span().start, op_end as u32);
+                    let span = Span::new(left.actual_start as u32, op_end as u32);
                     left = ParsedExpr::with_end(
                         Expression::UpdateExpression(UpdateExpression {
                             operator,
@@ -519,8 +592,8 @@ impl<'a> Parser<'a> {
         match self.current_kind() {
             TokenKind::Number => {
                 let (start, end) = self.current_pos();
-                let raw = self.current_value().to_string();
-                let number = raw.parse().map_err(|_| ParseError::InvalidSyntax {
+                let raw = self.current_value();
+                let number = parse_number_literal(raw).map_err(|_| ParseError::InvalidSyntax {
                     message: format!("Invalid number: {raw}"),
                     position: start,
                     context: None,
@@ -570,6 +643,7 @@ impl<'a> Parser<'a> {
                 Ok(ParsedExpr::with_end(
                     Expression::Identifier(Identifier {
                         name: symbol,
+                        optional: false,
                         type_annotation: None,
                         span: Span::new(start as u32, end as u32),
                     }),
@@ -699,7 +773,10 @@ impl<'a> Parser<'a> {
         }
 
         // Parse as grouped expression: (expr)
-        // This is the key case: we need to return the position AFTER the closing ')'
+        // Track actual_start BEFORE '(' and actual_end AFTER ')' for correct spans
+        // when this expression is used as a callee: (a ? b : c)() should have
+        // CallExpression span starting at '(', not at 'a'
+        let (paren_start, _) = self.current_pos();
         self.expect(&TokenKind::ParenOpen)?; // consume '('
 
         let parsed = self.parse_expression_bp(0)?;
@@ -708,8 +785,9 @@ impl<'a> Parser<'a> {
         let (_, paren_end) = self.current_pos();
         self.expect(&TokenKind::ParenClose)?; // consume ')'
 
-        // Return expression with its original span (excluding parens), but with actual end after ')'
-        Ok(ParsedExpr::with_end(parsed.expr, paren_end))
+        // Return expression with its original span (excluding parens), but with
+        // actual_start before '(' and actual_end after ')' for containing expressions
+        Ok(ParsedExpr::with_bounds(parsed.expr, paren_start, paren_end))
     }
 
     /// Check if current position starts an arrow function
@@ -732,7 +810,7 @@ impl<'a> Parser<'a> {
                 b')' => {
                     depth -= 1;
                     if depth == 0 {
-                        // Found closing paren, check for =>
+                        // Found closing paren, check for => (possibly with type annotation)
                         pos += 1;
                         // Skip whitespace
                         while pos < bytes.len()
@@ -743,10 +821,37 @@ impl<'a> Parser<'a> {
                         {
                             pos += 1;
                         }
-                        // Check for =>
-                        return pos + 1 < bytes.len()
-                            && bytes[pos] == b'='
-                            && bytes[pos + 1] == b'>';
+                        // Check for => directly
+                        if pos + 1 < bytes.len() && bytes[pos] == b'=' && bytes[pos + 1] == b'>' {
+                            return true;
+                        }
+                        // Check for type annotation: ): type =>
+                        if pos < bytes.len() && bytes[pos] == b':' {
+                            // Skip type annotation until we find =>
+                            while pos + 1 < bytes.len() {
+                                // Skip whitespace
+                                while pos < bytes.len()
+                                    && (bytes[pos] == b' '
+                                        || bytes[pos] == b'\t'
+                                        || bytes[pos] == b'\n'
+                                        || bytes[pos] == b'\r')
+                                {
+                                    pos += 1;
+                                }
+                                // Check for =>
+                                if pos + 1 < bytes.len()
+                                    && bytes[pos] == b'='
+                                    && bytes[pos + 1] == b'>'
+                                {
+                                    return true;
+                                }
+                                // Move past current character
+                                if pos < bytes.len() {
+                                    pos += 1;
+                                }
+                            }
+                        }
+                        return false;
                     }
                 }
                 b'"' | b'\'' => {
@@ -819,9 +924,23 @@ impl<'a> Parser<'a> {
                 continue;
             }
 
+            // Check for async method: `async foo() {}`
+            // async is tokenized as a keyword, and is treated as method when followed by property name
+            let is_async_method =
+                if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Async))
+                    && self.peek_is_property_name()
+                {
+                    self.advance()?; // consume 'async'
+                    true
+                } else {
+                    false
+                };
+
             // Check for getter/setter: `get x() {}` or `set x(v) {}`
             // These are contextual keywords - only treated as get/set when followed by a property name
-            let accessor_kind = if self.current_kind() == TokenKind::Identifier {
+            // Note: async getters/setters are not valid in JavaScript
+            let accessor_kind = if !is_async_method && self.current_kind() == TokenKind::Identifier
+            {
                 let is_get = self.current_value() == "get";
                 let is_set = self.current_value() == "set";
                 if (is_get || is_set) && self.peek_is_property_name() {
@@ -857,6 +976,7 @@ impl<'a> Parser<'a> {
                     (
                         Expression::Identifier(Identifier {
                             name: symbol,
+                            optional: false,
                             type_annotation: None,
                             span: Span::new(key_start as u32, key_end as u32),
                         }),
@@ -909,16 +1029,17 @@ impl<'a> Parser<'a> {
             // Determine property kind, value, shorthand, and method flags
             let (kind, value, shorthand, method) = if let Some(accessor) = accessor_kind {
                 // Getter/setter: `get x() {}` or `set x(v) {}`
-                let func_expr = self.parse_method_body(prop_start as u32)?;
+                // Note: getters/setters cannot be async
+                let func_expr = self.parse_method_body(prop_start as u32, false, false)?;
                 (
                     accessor,
                     Expression::FunctionExpression(func_expr),
                     false,
                     false,
                 )
-            } else if self.check(&TokenKind::ParenOpen) {
-                // Method shorthand: `{ foo() { return 1; } }`
-                let func_expr = self.parse_method_body(key.span().start)?;
+            } else if self.check(&TokenKind::ParenOpen) || is_async_method {
+                // Method shorthand: `{ foo() {} }` or `{ async foo() {} }`
+                let func_expr = self.parse_method_body(key.span().start, is_async_method, false)?;
                 (
                     PropertyKind::Init,
                     Expression::FunctionExpression(func_expr),
@@ -1200,6 +1321,7 @@ impl<'a> Parser<'a> {
                             object: Box::new(callee.expr),
                             property: Box::new(Expression::Identifier(Identifier {
                                 name,
+                                optional: false,
                                 type_annotation: None,
                                 span: Span::new(prop_start as u32, prop_end as u32),
                             })),
@@ -1282,43 +1404,20 @@ impl<'a> Parser<'a> {
         // Parse parameter list (reuse shared method)
         let params = self.parse_parameter_list()?;
 
+        // Check for return type annotation: (): type => ...
+        let return_type = if self.check(&TokenKind::Colon) {
+            Some(self.parse_type_annotation()?)
+        } else {
+            None
+        };
+
         self.expect(&TokenKind::Arrow)?; // consume '=>'
 
         // Parse body: expression or block
         let (body, expression) = if self.check(&TokenKind::BraceOpen) {
             // Block body: `() => { ... }`
-            let (block_start, _) = self.current_pos();
-            self.advance()?; // consume '{'
-
-            // Skip block contents (simplified: just find matching brace)
-            let mut brace_depth = 1;
-            while brace_depth > 0 {
-                match self.current_kind() {
-                    TokenKind::BraceOpen => brace_depth += 1,
-                    TokenKind::BraceClose => brace_depth -= 1,
-                    TokenKind::Eof => {
-                        return Err(ParseError::InvalidSyntax {
-                            message: "Unexpected end of file in arrow function body".to_string(),
-                            position: self.current_pos().0,
-                            context: None,
-                        });
-                    }
-                    _ => {}
-                }
-                if brace_depth > 0 {
-                    self.advance()?;
-                }
-            }
-
-            let (_, block_end) = self.current_pos();
-            self.advance()?; // consume final '}'
-
-            (
-                ArrowFunctionBody::BlockStatement {
-                    span: Span::new(block_start as u32, block_end as u32),
-                },
-                false,
-            )
+            let block = self.parse_block_statement()?;
+            (ArrowFunctionBody::BlockStatement(block), false)
         } else {
             // Expression body: `() => expr`
             // Use assignment_expression so comma doesn't consume next object property
@@ -1333,6 +1432,74 @@ impl<'a> Parser<'a> {
                 params,
                 body,
                 expression,
+                return_type,
+                r#async: false, // Non-async arrow function; async ones are parsed via parse_async_arrow_function
+                span: Span::new(start as u32, end),
+            },
+        ))
+    }
+
+    /// Parse async arrow function: `async () => ...` or `async x => ...`
+    fn parse_async_arrow_function(&mut self) -> Result<Expression, ParseError> {
+        let (start, _) = self.current_pos();
+
+        // Consume 'async' keyword
+        debug_assert!(matches!(
+            self.current_kind(),
+            TokenKind::Keyword(KeywordKind::Async)
+        ));
+        self.advance()?;
+
+        // Parse parameter list or single parameter
+        let params = if self.check(&TokenKind::ParenOpen) {
+            self.parse_parameter_list()?
+        } else if matches!(self.current_kind(), TokenKind::Identifier) {
+            // Single parameter without parens: `async x => ...`
+            let (id_start, id_end) = self.current_pos();
+            let symbol = self.intern(self.current_value());
+            self.advance()?;
+            vec![Expression::Identifier(Identifier {
+                name: symbol,
+                optional: false,
+                type_annotation: None,
+                span: Span::new(id_start as u32, id_end as u32),
+            })]
+        } else {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected '(' or identifier after 'async'".to_string(),
+                position: self.current_pos().0,
+                context: None,
+            });
+        };
+
+        // Check for return type annotation
+        let return_type = if self.check(&TokenKind::Colon) {
+            Some(self.parse_type_annotation()?)
+        } else {
+            None
+        };
+
+        self.expect(&TokenKind::Arrow)?; // consume '=>'
+
+        // Parse body: expression or block
+        let (body, expression) = if self.check(&TokenKind::BraceOpen) {
+            // Block body: `async () => { ... }`
+            let block = self.parse_block_statement()?;
+            (ArrowFunctionBody::BlockStatement(block), false)
+        } else {
+            let expr = self.parse_assignment_expression()?;
+            (ArrowFunctionBody::Expression(Box::new(expr)), true)
+        };
+
+        let end = body.span().end;
+
+        Ok(Expression::ArrowFunctionExpression(
+            ArrowFunctionExpression {
+                params,
+                body,
+                expression,
+                return_type,
+                r#async: true,
                 span: Span::new(start as u32, end),
             },
         ))
@@ -1342,15 +1509,31 @@ impl<'a> Parser<'a> {
     ///
     /// This parses the parameter list and block body for a method definition.
     /// The key has already been parsed by the caller.
-    fn parse_method_body(&mut self, start: u32) -> Result<FunctionExpression, ParseError> {
+    fn parse_method_body(
+        &mut self,
+        start: u32,
+        is_async: bool,
+        is_generator: bool,
+    ) -> Result<FunctionExpression, ParseError> {
         let params = self.parse_parameter_list()?;
+
+        // Check for return type annotation: (): type
+        let return_type = if self.check(&TokenKind::Colon) {
+            Some(self.parse_type_annotation()?)
+        } else {
+            None
+        };
+
         let body = self.parse_block_statement()?;
         let end = body.span.end;
 
         Ok(FunctionExpression {
             id: None, // Method shorthand has no function name
             params,
+            return_type,
             body,
+            generator: is_generator,
+            r#async: is_async,
             span: Span::new(start, end),
         })
     }

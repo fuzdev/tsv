@@ -34,14 +34,32 @@ impl<'a> SvelteParser<'a> {
         let mut instance = None;
         let mut module = None;
         let mut css = None;
+        let mut options = None;
         let mut fragment_nodes = Vec::new();
         let mut last_end = 0;
         let mut root_start = None;
 
         // Parse the entire file linearly
         while !self.check(TokenKind::Eof) {
+            // Check for svelte:options tag (must come first, before other special handling)
+            if self.check(TokenKind::LeftAngle) && self.is_next_tag("svelte:options")? {
+                // Capture any text before the options tag
+                self.capture_text_if_gap(last_end, &mut fragment_nodes)?;
+
+                // Parse svelte:options tag
+                let svelte_options = self.parse_svelte_options()?;
+                last_end = svelte_options.span.end as usize;
+
+                if options.is_some() {
+                    return Err(ParseError::InvalidSyntax {
+                        message: "Duplicate <svelte:options> found".to_string(),
+                        position: self.current_start,
+                        context: None,
+                    });
+                }
+                options = Some(svelte_options);
             // Check for script or style tags
-            if self.check(TokenKind::LeftAngle) && self.is_next_tag("script")? {
+            } else if self.check(TokenKind::LeftAngle) && self.is_next_tag("script")? {
                 // Capture any text before the script tag
                 self.capture_text_if_gap(last_end, &mut fragment_nodes)?;
 
@@ -105,9 +123,17 @@ impl<'a> SvelteParser<'a> {
                     last_end = comment.span.end as usize;
                     fragment_nodes.push(FragmentNode::Comment(comment));
                 } else if self.check(TokenKind::LeftAngle) {
-                    let element = self.parse_element()?;
-                    last_end = element.span.end as usize;
-                    fragment_nodes.push(FragmentNode::Element(element));
+                    use crate::parser::element::ParsedElement;
+                    match self.parse_element_or_special(false)? {
+                        ParsedElement::Element(elem) => {
+                            last_end = elem.span.end as usize;
+                            fragment_nodes.push(FragmentNode::Element(elem));
+                        }
+                        ParsedElement::SpecialElement(elem) => {
+                            last_end = elem.span.end as usize;
+                            fragment_nodes.push(FragmentNode::SpecialElement(elem));
+                        }
+                    }
                 } else if self.check(TokenKind::LeftBrace) {
                     let expression_tag = self.parse_expression_tag()?;
                     last_end = expression_tag.span.end as usize;
@@ -116,6 +142,10 @@ impl<'a> SvelteParser<'a> {
                     let block = self.parse_block()?;
                     last_end = block.span().end as usize;
                     fragment_nodes.push(block);
+                } else if self.check(TokenKind::TagOpen) {
+                    let tag = self.parse_template_tag()?;
+                    last_end = tag.span().end as usize;
+                    fragment_nodes.push(tag);
                 } else {
                     return Err(ParseError::InvalidSyntax {
                         message: format!("Unexpected token in markup: {}", self.current_kind),
@@ -162,12 +192,18 @@ impl<'a> SvelteParser<'a> {
                     }
                 }
                 FragmentNode::Element(_)
+                | FragmentNode::SpecialElement(_)
                 | FragmentNode::ExpressionTag(_)
                 | FragmentNode::Comment(_)
                 | FragmentNode::IfBlock(_)
                 | FragmentNode::EachBlock(_)
                 | FragmentNode::AwaitBlock(_)
-                | FragmentNode::KeyBlock(_) => {
+                | FragmentNode::KeyBlock(_)
+                | FragmentNode::SnippetBlock(_)
+                | FragmentNode::HtmlTag(_)
+                | FragmentNode::ConstTag(_)
+                | FragmentNode::DebugTag(_)
+                | FragmentNode::RenderTag(_) => {
                     root_start = Some(first_node.span().start as usize);
                 }
             }
@@ -186,12 +222,18 @@ impl<'a> SvelteParser<'a> {
                     }
                 }
                 FragmentNode::Element(_)
+                | FragmentNode::SpecialElement(_)
                 | FragmentNode::ExpressionTag(_)
                 | FragmentNode::Comment(_)
                 | FragmentNode::IfBlock(_)
                 | FragmentNode::EachBlock(_)
                 | FragmentNode::AwaitBlock(_)
-                | FragmentNode::KeyBlock(_) => last_node.span().end,
+                | FragmentNode::KeyBlock(_)
+                | FragmentNode::SnippetBlock(_)
+                | FragmentNode::HtmlTag(_)
+                | FragmentNode::ConstTag(_)
+                | FragmentNode::DebugTag(_)
+                | FragmentNode::RenderTag(_) => last_node.span().end,
             }
         } else {
             // No fragment nodes - use max of all top-level items
@@ -211,11 +253,11 @@ impl<'a> SvelteParser<'a> {
         // Use calculated root_start (from first fragment node), or 0 if no fragments
         let start = root_start.unwrap_or(0) as u32;
 
-        // Extract comments from TypeScript instance/module scripts
-        let mut comments = Vec::new();
+        // Collect all TypeScript comments from scripts and template expressions
+        let mut ts_comments = Vec::new();
         if let Some(ref script) = instance {
             for ts_comment in &script.content.comments {
-                comments.push(Comment {
+                ts_comments.push(Comment {
                     content: ts_comment.content.clone(),
                     is_block: ts_comment.is_block,
                     span: ts_comment.span,
@@ -224,23 +266,77 @@ impl<'a> SvelteParser<'a> {
         }
         if let Some(ref script) = module {
             for ts_comment in &script.content.comments {
-                comments.push(Comment {
+                ts_comments.push(Comment {
                     content: ts_comment.content.clone(),
                     is_block: ts_comment.is_block,
                     span: ts_comment.span,
                 });
             }
         }
-        // TODO: Extract from CSS and collect HTML comments
+        // Add expression comments collected during template parsing
+        // Currently extracted from: {@debug} tags (intentional divergence from prettier)
+        // Future: could extend to other template tags if needed
+        ts_comments.append(&mut self.expression_comments);
+        // Sort by position for consistent lookup via comments_in_range()
+        ts_comments.sort_by_key(|c| c.span.start);
+        // TODO: Consider extracting CSS comments if needed for public AST
 
         Ok(Root {
             fragment,
             instance,
             module,
             css,
-            comments,
+            options,
+            ts_comments,
             span: Span { start, end },
             interner: Rc::clone(&self.interner),
+        })
+    }
+
+    /// Parse `<svelte:options ... />` tag
+    ///
+    /// svelte:options is always self-closing and has no children.
+    /// It configures component behavior via attributes like `runes`, `customElement`, etc.
+    fn parse_svelte_options(&mut self) -> Result<SvelteOptions, ParseError> {
+        let start = self.current_start;
+
+        // Parse opening: <svelte:options
+        self.expect(TokenKind::LeftAngle)?;
+        self.expect(TokenKind::Identifier)?; // "svelte:options"
+
+        // Parse attributes
+        let attributes = self.parse_attributes()?;
+
+        // Check for self-closing: />
+        let self_closing = self.check(TokenKind::Slash);
+        if self_closing {
+            self.advance()?; // consume /
+        }
+
+        let end = self.current_end as u32;
+        self.expect(TokenKind::RightAngle)?;
+
+        // If not self-closing, expect closing tag
+        if !self_closing {
+            self.expect(TokenKind::LeftAngle)?;
+            self.expect(TokenKind::Slash)?;
+            if !self.check(TokenKind::Identifier) || self.current_value() != "svelte:options" {
+                return Err(ParseError::InvalidSyntax {
+                    message: "Expected </svelte:options>".to_string(),
+                    position: self.current_start,
+                    context: None,
+                });
+            }
+            self.advance()?;
+            self.expect(TokenKind::RightAngle)?;
+        }
+
+        Ok(SvelteOptions {
+            attributes,
+            span: Span {
+                start: start as u32,
+                end,
+            },
         })
     }
 }

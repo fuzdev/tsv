@@ -42,12 +42,36 @@
 							"start": 10,
 							"end": 31,
 							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 11
+								},
+								"end": {
+									"line": 2,
+									"column": 6,
+									"character": 15
+								}
+							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 16,
 									"end": 28,
 									"name": "prop",
+									"name_loc": {
+										"start": {
+											"line": 2,
+											"column": 7,
+											"character": 16
+										},
+										"end": {
+											"line": 2,
+											"column": 11,
+											"character": 20
+										}
+									},
 									"value": [
 										{
 											"start": 22,

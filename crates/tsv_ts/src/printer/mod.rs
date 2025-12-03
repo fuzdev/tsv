@@ -135,7 +135,7 @@ pub(crate) fn has_multiline_content(expr: &internal::Expression, source: &str) -
         }
         internal::Expression::ArrowFunctionExpression(arrow) => match &arrow.body {
             internal::ArrowFunctionBody::Expression(expr) => has_multiline_content(expr, source),
-            internal::ArrowFunctionBody::BlockStatement { .. } => false,
+            internal::ArrowFunctionBody::BlockStatement(_) => false,
         },
         internal::Expression::SpreadElement(spread) => {
             has_multiline_content(&spread.argument, source)
@@ -253,9 +253,22 @@ impl<'a> Printer<'a> {
         self.buffer.into_string()
     }
 
+    /// Set the indent level (for formatting expressions in nested contexts)
+    pub fn set_indent_level(&mut self, level: usize) {
+        self.indent_level = level;
+    }
+
     /// Get the current column position (for doc-builder width calculations)
     pub(crate) fn current_column(&self) -> usize {
         self.buffer.current_column(self.config.tab_width)
+    }
+
+    /// Build a Doc for an expression (public wrapper for doc-based formatting)
+    ///
+    /// This returns a Doc tree that can be used for line wrapping decisions
+    /// when embedding TS expressions in larger documents (e.g., Svelte attributes).
+    pub fn build_expression_doc_public(&self, expr: &internal::Expression) -> tsv_lang::doc::Doc {
+        self.build_expression_doc(expr)
     }
 
     /// Check if a pattern expression should expand (print across multiple lines)
@@ -334,7 +347,9 @@ impl<'a> Printer<'a> {
 
             // Print leading comments before this statement
             // (blank line preservation handled inside print_leading_comments)
-            self.print_leading_comments(prev_end, statement.span().start);
+            // For the first statement, include same-line comments (no previous statement to be trailing from)
+            let is_first = i == 0;
+            self.print_leading_comments(prev_end, statement.span().start, is_first);
 
             self.print_statement(statement);
 
@@ -348,15 +363,20 @@ impl<'a> Printer<'a> {
     /// Print leading comments (comments between prev_end and curr_start)
     /// Returns true if any comments were printed
     ///
+    /// - `prev_end`: Position after the previous statement (or 0 for first statement)
+    /// - `curr_start`: Position of the current statement
+    /// - `is_first`: True if this is the first statement (prev_end is start of file)
+    ///
     /// Uses binary search to find starting point: O(log n + k)
-    fn print_leading_comments(&mut self, prev_end: u32, curr_start: u32) -> bool {
+    fn print_leading_comments(&mut self, prev_end: u32, curr_start: u32, is_first: bool) -> bool {
         let mut last_comment_end = prev_end;
         let mut printed_any = false;
 
         for comment in comments_in_range(self.comments, prev_end, curr_start) {
             // Skip comments that are on the same line as prev_end
             // (those are trailing inline comments, already printed)
-            if printing::is_same_line(self.source, prev_end, comment.span.start) {
+            // EXCEPT for the first statement: same-line comments at start of file are leading comments
+            if !is_first && printing::is_same_line(self.source, prev_end, comment.span.start) {
                 continue;
             }
 

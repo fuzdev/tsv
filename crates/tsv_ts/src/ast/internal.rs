@@ -21,6 +21,24 @@ pub enum Statement {
     BlockStatement(BlockStatement),
     FunctionDeclaration(FunctionDeclaration),
     ClassDeclaration(ClassDeclaration),
+    ExportNamedDeclaration(ExportNamedDeclaration),
+    ExportDefaultDeclaration(ExportDefaultDeclaration),
+    ExportAllDeclaration(ExportAllDeclaration),
+    ImportDeclaration(ImportDeclaration),
+    // Control flow statements
+    IfStatement(IfStatement),
+    ForStatement(ForStatement),
+    ForInStatement(ForInStatement),
+    ForOfStatement(ForOfStatement),
+    WhileStatement(WhileStatement),
+    DoWhileStatement(DoWhileStatement),
+    SwitchStatement(SwitchStatement),
+    TryStatement(TryStatement),
+    ThrowStatement(ThrowStatement),
+    BreakStatement(BreakStatement),
+    ContinueStatement(ContinueStatement),
+    LabeledStatement(LabeledStatement),
+    EmptyStatement(EmptyStatement),
 }
 
 impl Statement {
@@ -33,8 +51,144 @@ impl Statement {
             Statement::BlockStatement(block) => block.span,
             Statement::FunctionDeclaration(decl) => decl.span,
             Statement::ClassDeclaration(decl) => decl.span,
+            Statement::ExportNamedDeclaration(decl) => decl.span,
+            Statement::ExportDefaultDeclaration(decl) => decl.span,
+            Statement::ExportAllDeclaration(decl) => decl.span,
+            Statement::ImportDeclaration(decl) => decl.span,
+            // Control flow statements
+            Statement::IfStatement(stmt) => stmt.span,
+            Statement::ForStatement(stmt) => stmt.span,
+            Statement::ForInStatement(stmt) => stmt.span,
+            Statement::ForOfStatement(stmt) => stmt.span,
+            Statement::WhileStatement(stmt) => stmt.span,
+            Statement::DoWhileStatement(stmt) => stmt.span,
+            Statement::SwitchStatement(stmt) => stmt.span,
+            Statement::TryStatement(stmt) => stmt.span,
+            Statement::ThrowStatement(stmt) => stmt.span,
+            Statement::BreakStatement(stmt) => stmt.span,
+            Statement::ContinueStatement(stmt) => stmt.span,
+            Statement::LabeledStatement(stmt) => stmt.span,
+            Statement::EmptyStatement(stmt) => stmt.span,
         }
     }
+}
+
+/// Export named declaration: `export const x = 1;`, `export { x }`, `export { x } from "y"`
+#[derive(Debug, Clone)]
+pub struct ExportNamedDeclaration {
+    /// The declaration being exported (VariableDeclaration, FunctionDeclaration, ClassDeclaration)
+    /// None when using specifiers
+    pub declaration: Option<Box<Statement>>,
+    /// Export specifiers: `export { a, b as c }`
+    pub specifiers: Vec<ExportSpecifier>,
+    /// Re-export source: `export { x } from "y"` or None for local exports
+    pub source: Option<Literal>,
+    pub span: Span,
+}
+
+/// Export default declaration: `export default x`, `export default function() {}`
+#[derive(Debug, Clone)]
+pub struct ExportDefaultDeclaration {
+    /// The expression or declaration being exported as default
+    pub declaration: ExportDefaultValue,
+    pub span: Span,
+}
+
+/// Value of export default - can be expression or declaration
+#[derive(Debug, Clone)]
+pub enum ExportDefaultValue {
+    Expression(Expression),
+    FunctionDeclaration(Box<FunctionDeclaration>),
+    ClassDeclaration(Box<ClassDeclaration>),
+}
+
+/// Export all declaration: `export * from "y"` or `export * as ns from "y"`
+#[derive(Debug, Clone)]
+pub struct ExportAllDeclaration {
+    /// For `export * as ns from "y"`, the namespace binding name
+    pub exported: Option<Identifier>,
+    /// Module source
+    pub source: Literal,
+    pub span: Span,
+}
+
+/// Export specifier: `export { x }` or `export { x as y }`
+#[derive(Debug, Clone)]
+pub struct ExportSpecifier {
+    /// Local name (what's exported from this module)
+    pub local: Identifier,
+    /// Exported name (what it's called externally, may be same as local)
+    pub exported: Identifier,
+    pub span: Span,
+}
+
+/// Import kind: value import or type-only import
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ImportKind {
+    #[default]
+    Value,
+    Type,
+}
+
+/// Import declaration: `import x from "y"`, `import { a, b } from "y"`, etc.
+#[derive(Debug, Clone)]
+pub struct ImportDeclaration {
+    /// Import specifiers (default, named, or namespace)
+    pub specifiers: Vec<ImportSpecifier>,
+    /// Module source (string literal)
+    pub source: Literal,
+    /// Import attributes: `import x from "y" with { type: "json" }`
+    pub attributes: Vec<ImportAttribute>,
+    /// Import kind: "value" or "type" (for `import type { ... }`)
+    pub import_kind: ImportKind,
+    pub span: Span,
+}
+
+/// Import specifier variants
+#[derive(Debug, Clone)]
+pub enum ImportSpecifier {
+    /// Default import: `import x from "y"`
+    Default(ImportDefaultSpecifier),
+    /// Named import: `import { a, b as c } from "y"`
+    Named(ImportNamedSpecifier),
+    /// Namespace import: `import * as ns from "y"`
+    Namespace(ImportNamespaceSpecifier),
+}
+
+/// Default import specifier: `import x from "y"`
+#[derive(Debug, Clone)]
+pub struct ImportDefaultSpecifier {
+    /// Local binding name
+    pub local: Identifier,
+    pub span: Span,
+}
+
+/// Named import specifier: `import { a } from "y"` or `import { a as b } from "y"`
+#[derive(Debug, Clone)]
+pub struct ImportNamedSpecifier {
+    /// Imported name (the name in the module)
+    pub imported: Identifier,
+    /// Local binding name (may be same as imported, or different for `as` renames)
+    pub local: Identifier,
+    /// Import kind for inline type modifier: `import { type A, B } from "y"`
+    pub import_kind: ImportKind,
+    pub span: Span,
+}
+
+/// Namespace import specifier: `import * as ns from "y"`
+#[derive(Debug, Clone)]
+pub struct ImportNamespaceSpecifier {
+    /// Local binding name
+    pub local: Identifier,
+    pub span: Span,
+}
+
+/// Import attribute: `{ type: "json" }`
+#[derive(Debug, Clone)]
+pub struct ImportAttribute {
+    pub key: Identifier,
+    pub value: Literal,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -395,6 +549,10 @@ pub struct ArrowFunctionExpression {
     pub params: Vec<Expression>,
     pub body: ArrowFunctionBody,
     pub expression: bool, // true for expression body, false for block body
+    /// Return type annotation (TypeScript): (): number => ...
+    pub return_type: Option<TSTypeAnnotation>,
+    /// Whether this is an async arrow function: `async () => ...`
+    pub r#async: bool,
     pub span: Span,
 }
 
@@ -403,16 +561,15 @@ pub struct ArrowFunctionExpression {
 pub enum ArrowFunctionBody {
     /// Expression body: `() => expr`
     Expression(Box<Expression>),
-    /// Block body: `() => { stmts }` - stores raw source for now
-    /// TODO: Parse block statements properly
-    BlockStatement { span: Span },
+    /// Block body: `() => { stmts }`
+    BlockStatement(BlockStatement),
 }
 
 impl ArrowFunctionBody {
     pub fn span(&self) -> Span {
         match self {
             ArrowFunctionBody::Expression(expr) => expr.span(),
-            ArrowFunctionBody::BlockStatement { span } => *span,
+            ArrowFunctionBody::BlockStatement(block) => block.span,
         }
     }
 }
@@ -429,8 +586,14 @@ pub struct FunctionExpression {
     pub id: Option<Identifier>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Vec<Expression>,
+    /// Return type annotation (e.g., `: number` in `function fn(): number {}`)
+    pub return_type: Option<TSTypeAnnotation>,
     /// Function body (block statement with statements)
     pub body: BlockStatement,
+    /// Whether this is a generator function (`function*`)
+    pub generator: bool,
+    /// Whether this is an async function (`async function`)
+    pub r#async: bool,
     pub span: Span,
 }
 
@@ -448,14 +611,17 @@ pub struct BlockStatement {
 
 /// Function declaration: `function foo(x) { return x + 1; }`
 ///
-/// Unlike FunctionExpression, the id (function name) is required.
+/// For regular declarations, the id (function name) is required.
+/// For `export default function() {}`, the name is optional.
 /// Declarations are hoisted and can be called before they appear in source.
 #[derive(Debug, Clone)]
 pub struct FunctionDeclaration {
-    /// Function name (required for declarations)
-    pub id: Identifier,
+    /// Function name (required for declarations, optional for export default)
+    pub id: Option<Identifier>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Vec<Expression>,
+    /// Return type annotation (e.g., `: number` in `function fn(): number {}`)
+    pub return_type: Option<TSTypeAnnotation>,
     /// Function body (block statement with statements)
     pub body: BlockStatement,
     /// Whether this is a generator function (`function*`)
@@ -474,13 +640,164 @@ pub struct ReturnStatement {
     pub span: Span,
 }
 
+// ============================================================================
+// Control Flow Statements
+// ============================================================================
+
+/// If statement: `if (test) consequent` or `if (test) consequent else alternate`
+#[derive(Debug, Clone)]
+pub struct IfStatement {
+    pub test: Expression,
+    pub consequent: Box<Statement>,
+    pub alternate: Option<Box<Statement>>,
+    pub span: Span,
+}
+
+/// For statement: `for (init; test; update) body`
+#[derive(Debug, Clone)]
+pub struct ForStatement {
+    /// Initialization: variable declaration or expression (or None)
+    pub init: Option<ForInit>,
+    /// Test condition (or None for infinite loop)
+    pub test: Option<Expression>,
+    /// Update expression (or None)
+    pub update: Option<Expression>,
+    pub body: Box<Statement>,
+    pub span: Span,
+}
+
+/// For statement initialization - either a variable declaration or expression
+#[derive(Debug, Clone)]
+pub enum ForInit {
+    VariableDeclaration(VariableDeclaration),
+    Expression(Expression),
+}
+
+/// For-in statement: `for (left in right) body`
+#[derive(Debug, Clone)]
+pub struct ForInStatement {
+    /// Left side: variable declaration or expression pattern
+    pub left: ForInOfLeft,
+    pub right: Expression,
+    pub body: Box<Statement>,
+    pub span: Span,
+}
+
+/// For-of statement: `for (left of right) body`
+#[derive(Debug, Clone)]
+pub struct ForOfStatement {
+    /// Left side: variable declaration or expression pattern
+    pub left: ForInOfLeft,
+    pub right: Expression,
+    /// Whether this is `for await (... of ...)`
+    pub r#await: bool,
+    pub body: Box<Statement>,
+    pub span: Span,
+}
+
+/// Left side of for-in/for-of: either a variable declaration or expression pattern
+#[derive(Debug, Clone)]
+pub enum ForInOfLeft {
+    VariableDeclaration(VariableDeclaration),
+    Pattern(Expression),
+}
+
+/// While statement: `while (test) body`
+#[derive(Debug, Clone)]
+pub struct WhileStatement {
+    pub test: Expression,
+    pub body: Box<Statement>,
+    pub span: Span,
+}
+
+/// Do-while statement: `do body while (test)`
+#[derive(Debug, Clone)]
+pub struct DoWhileStatement {
+    pub body: Box<Statement>,
+    pub test: Expression,
+    pub span: Span,
+}
+
+/// Switch statement: `switch (discriminant) { cases }`
+#[derive(Debug, Clone)]
+pub struct SwitchStatement {
+    pub discriminant: Expression,
+    pub cases: Vec<SwitchCase>,
+    pub span: Span,
+}
+
+/// Switch case: `case test: consequent` or `default: consequent`
+#[derive(Debug, Clone)]
+pub struct SwitchCase {
+    /// Test expression, or None for `default:`
+    pub test: Option<Expression>,
+    pub consequent: Vec<Statement>,
+    pub span: Span,
+}
+
+/// Try statement: `try { block } catch (param) { handler } finally { finalizer }`
+#[derive(Debug, Clone)]
+pub struct TryStatement {
+    pub block: BlockStatement,
+    pub handler: Option<CatchClause>,
+    pub finalizer: Option<BlockStatement>,
+    pub span: Span,
+}
+
+/// Catch clause: `catch (param) { body }`
+#[derive(Debug, Clone)]
+pub struct CatchClause {
+    /// Catch parameter, or None for `catch { }` (optional catch binding)
+    pub param: Option<Expression>,
+    pub body: BlockStatement,
+    pub span: Span,
+}
+
+/// Throw statement: `throw argument`
+#[derive(Debug, Clone)]
+pub struct ThrowStatement {
+    pub argument: Expression,
+    pub span: Span,
+}
+
+/// Break statement: `break` or `break label`
+#[derive(Debug, Clone)]
+pub struct BreakStatement {
+    pub label: Option<Identifier>,
+    pub span: Span,
+}
+
+/// Continue statement: `continue` or `continue label`
+#[derive(Debug, Clone)]
+pub struct ContinueStatement {
+    pub label: Option<Identifier>,
+    pub span: Span,
+}
+
+/// Labeled statement: `label: statement`
+#[derive(Debug, Clone)]
+pub struct LabeledStatement {
+    pub label: Identifier,
+    pub body: Box<Statement>,
+    pub span: Span,
+}
+
+/// Empty statement: `;`
+#[derive(Debug, Clone)]
+pub struct EmptyStatement {
+    pub span: Span,
+}
+
+// ============================================================================
+
 /// Class declaration: `class Foo { ... }` or `class Foo extends Bar { ... }`
 ///
 /// Represents a class declaration with optional superclass.
+/// For `export default class {}`, the name is optional.
 #[derive(Debug, Clone)]
 pub struct ClassDeclaration {
-    /// Class name (required for declarations)
-    pub id: Identifier,
+    /// Class name (required for declarations, optional for export default)
+    pub id: Option<Identifier>,
     /// Optional superclass expression (for `extends`)
     pub super_class: Option<Box<Expression>>,
     /// Class body containing methods and properties
@@ -488,13 +805,29 @@ pub struct ClassDeclaration {
     pub span: Span,
 }
 
-/// Class body: `{ constructor() {} method() {} }`
+/// Class body: `{ constructor() {} method() {} prop = value; }`
 ///
 /// Contains the methods and properties of a class.
 #[derive(Debug, Clone)]
 pub struct ClassBody {
-    pub body: Vec<MethodDefinition>,
+    pub body: Vec<ClassMember>,
     pub span: Span,
+}
+
+/// Class member - either a method definition or property definition
+#[derive(Debug, Clone)]
+pub enum ClassMember {
+    MethodDefinition(MethodDefinition),
+    PropertyDefinition(PropertyDefinition),
+}
+
+impl ClassMember {
+    pub fn span(&self) -> Span {
+        match self {
+            ClassMember::MethodDefinition(m) => m.span,
+            ClassMember::PropertyDefinition(p) => p.span,
+        }
+    }
 }
 
 /// Method definition kind
@@ -531,6 +864,24 @@ pub struct MethodDefinition {
     /// Whether this is a static method
     pub is_static: bool,
     /// Whether the key is computed (`[expr]()`)
+    pub computed: bool,
+    pub span: Span,
+}
+
+/// Property definition in a class body: `name = value;` or `name;`
+///
+/// Unlike methods, properties use `=` for initialization.
+#[derive(Debug, Clone)]
+pub struct PropertyDefinition {
+    /// Property name (key)
+    pub key: Expression,
+    /// Type annotation (e.g., `: number` in `a: number = 0;`)
+    pub type_annotation: Option<TSTypeAnnotation>,
+    /// Optional initial value
+    pub value: Option<Expression>,
+    /// Whether this is a static property
+    pub is_static: bool,
+    /// Whether the key is computed (`[expr] = value`)
     pub computed: bool,
     pub span: Span,
 }
@@ -835,6 +1186,8 @@ pub struct Literal {
 #[derive(Debug, Clone)]
 pub struct Identifier {
     pub name: DefaultSymbol,
+    /// Whether this is an optional parameter (e.g., `a?` in `function fn(a?: number) {}`)
+    pub optional: bool,
     pub type_annotation: Option<TSTypeAnnotation>,
     pub span: Span,
 }
@@ -901,7 +1254,9 @@ pub enum TSType {
     Keyword(TSKeywordType),
     /// Literal types (template literals, string literals, number literals, etc.)
     Literal(TSLiteralType),
-    // TODO: Union, Intersection, Array, Tuple, Function, Object literal, etc.
+    /// Array types (number[], string[], etc.)
+    Array(TSArrayType),
+    // TODO: Union, Intersection, Tuple, Function, Object literal, etc.
 }
 
 impl TSType {
@@ -910,8 +1265,17 @@ impl TSType {
         match self {
             TSType::Keyword(kw) => kw.span,
             TSType::Literal(lit) => lit.span(),
+            TSType::Array(arr) => arr.span,
         }
     }
+}
+
+/// TypeScript array type: `number[]`, `string[]`, etc.
+#[derive(Debug, Clone)]
+pub struct TSArrayType {
+    /// The element type of the array
+    pub element_type: Box<TSType>,
+    pub span: Span,
 }
 
 /// TypeScript primitive type keyword
@@ -1025,7 +1389,27 @@ impl TSKeywordKind {
             | KeywordKind::Async
             | KeywordKind::Await
             | KeywordKind::Super
-            | KeywordKind::Extends => None,
+            | KeywordKind::Extends
+            | KeywordKind::Export
+            // Control flow keywords
+            | KeywordKind::If
+            | KeywordKind::Else
+            | KeywordKind::For
+            | KeywordKind::While
+            | KeywordKind::Do
+            | KeywordKind::Switch
+            | KeywordKind::Case
+            | KeywordKind::Default
+            | KeywordKind::Break
+            | KeywordKind::Continue
+            | KeywordKind::Try
+            | KeywordKind::Catch
+            | KeywordKind::Finally
+            | KeywordKind::Throw
+            // Module keywords
+            | KeywordKind::Import
+            | KeywordKind::From
+            | KeywordKind::As => None,
         }
     }
 }

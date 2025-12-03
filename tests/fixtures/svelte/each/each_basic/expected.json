@@ -35,6 +35,18 @@
 							"start": 21,
 							"end": 38,
 							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 1,
+									"column": 22,
+									"character": 22
+								},
+								"end": {
+									"line": 1,
+									"column": 25,
+									"character": 25
+								}
+							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -69,6 +81,7 @@
 					"type": "Identifier",
 					"name": "item",
 					"start": 16,
+					"end": 20,
 					"loc": {
 						"start": {
 							"line": 1,
@@ -80,8 +93,7 @@
 							"column": 20,
 							"character": 20
 						}
-					},
-					"end": 20
+					}
 				}
 			}
 		]

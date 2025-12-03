@@ -33,6 +33,20 @@ pub enum KeywordKind {
     In = 19,
     // Control flow keywords
     Return = 20,
+    If = 30,
+    Else = 31,
+    For = 32,
+    While = 33,
+    Do = 34,
+    Switch = 35,
+    Case = 36,
+    Default = 37,
+    Break = 38,
+    Continue = 39,
+    Try = 40,
+    Catch = 41,
+    Finally = 42,
+    Throw = 43,
     // Declaration keywords (continued)
     Function = 21,
     Class = 22,
@@ -45,6 +59,11 @@ pub enum KeywordKind {
     // Class keywords
     Super = 27,
     Extends = 28,
+    // Module keywords
+    Export = 29,
+    Import = 44,
+    From = 45,
+    As = 46,
 }
 
 impl KeywordKind {
@@ -73,6 +92,20 @@ impl KeywordKind {
             KeywordKind::Instanceof => "instanceof",
             KeywordKind::In => "in",
             KeywordKind::Return => "return",
+            KeywordKind::If => "if",
+            KeywordKind::Else => "else",
+            KeywordKind::For => "for",
+            KeywordKind::While => "while",
+            KeywordKind::Do => "do",
+            KeywordKind::Switch => "switch",
+            KeywordKind::Case => "case",
+            KeywordKind::Default => "default",
+            KeywordKind::Break => "break",
+            KeywordKind::Continue => "continue",
+            KeywordKind::Try => "try",
+            KeywordKind::Catch => "catch",
+            KeywordKind::Finally => "finally",
+            KeywordKind::Throw => "throw",
             KeywordKind::Function => "function",
             KeywordKind::Class => "class",
             KeywordKind::Typeof => "typeof",
@@ -81,6 +114,10 @@ impl KeywordKind {
             KeywordKind::Await => "await",
             KeywordKind::Super => "super",
             KeywordKind::Extends => "extends",
+            KeywordKind::Export => "export",
+            KeywordKind::Import => "import",
+            KeywordKind::From => "from",
+            KeywordKind::As => "as",
         }
     }
 
@@ -177,6 +214,22 @@ pub enum TokenKind {
     QuestionDot,        // ?. (optional chaining)
     Bang,               // !
     Question,           // ?
+    // Compound assignment operators
+    PlusEquals,               // +=
+    MinusEquals,              // -=
+    StarEquals,               // *=
+    SlashEquals,              // /=
+    PercentEquals,            // %=
+    StarStarEquals,           // **=
+    LeftShiftEquals,          // <<=
+    RightShiftEquals,         // >>=
+    UnsignedRightShiftEquals, // >>>=
+    AmpersandEquals,          // &=
+    PipeEquals,               // |=
+    CaretEquals,              // ^=
+    AmpersandAmpersandEquals, // &&=
+    PipePipeEquals,           // ||=
+    QuestionQuestionEquals,   // ??=
     Comment { content: String, is_block: bool },
     // Template literal tokens
     // NoSubstitutionTemplate: `content` (no ${} interpolation)
@@ -251,6 +304,21 @@ impl fmt::Display for TokenKind {
             TokenKind::QuestionDot => write!(f, "'?.'"),
             TokenKind::Bang => write!(f, "'!'"),
             TokenKind::Question => write!(f, "'?'"),
+            TokenKind::PlusEquals => write!(f, "'+='"),
+            TokenKind::MinusEquals => write!(f, "'-='"),
+            TokenKind::StarEquals => write!(f, "'*='"),
+            TokenKind::SlashEquals => write!(f, "'/='"),
+            TokenKind::PercentEquals => write!(f, "'%='"),
+            TokenKind::StarStarEquals => write!(f, "'**='"),
+            TokenKind::LeftShiftEquals => write!(f, "'<<='"),
+            TokenKind::RightShiftEquals => write!(f, "'>>='"),
+            TokenKind::UnsignedRightShiftEquals => write!(f, "'>>>='"),
+            TokenKind::AmpersandEquals => write!(f, "'&='"),
+            TokenKind::PipeEquals => write!(f, "'|='"),
+            TokenKind::CaretEquals => write!(f, "'^='"),
+            TokenKind::AmpersandAmpersandEquals => write!(f, "'&&='"),
+            TokenKind::PipePipeEquals => write!(f, "'||='"),
+            TokenKind::QuestionQuestionEquals => write!(f, "'??='"),
             TokenKind::Comment { is_block, .. } => {
                 if *is_block {
                     write!(f, "block comment")
@@ -336,6 +404,20 @@ static KEYWORDS: phf::Map<&'static str, KeywordKind> = phf_map! {
     "in" => KeywordKind::In,
     // Control flow keywords
     "return" => KeywordKind::Return,
+    "if" => KeywordKind::If,
+    "else" => KeywordKind::Else,
+    "for" => KeywordKind::For,
+    "while" => KeywordKind::While,
+    "do" => KeywordKind::Do,
+    "switch" => KeywordKind::Switch,
+    "case" => KeywordKind::Case,
+    "default" => KeywordKind::Default,
+    "break" => KeywordKind::Break,
+    "continue" => KeywordKind::Continue,
+    "try" => KeywordKind::Try,
+    "catch" => KeywordKind::Catch,
+    "finally" => KeywordKind::Finally,
+    "throw" => KeywordKind::Throw,
     // Declaration keywords (continued)
     "function" => KeywordKind::Function,
     "class" => KeywordKind::Class,
@@ -348,10 +430,13 @@ static KEYWORDS: phf::Map<&'static str, KeywordKind> = phf_map! {
     // Class keywords
     "super" => KeywordKind::Super,
     "extends" => KeywordKind::Extends,
+    // Module keywords
+    "export" => KeywordKind::Export,
+    "import" => KeywordKind::Import,
+    "from" => KeywordKind::From,
+    "as" => KeywordKind::As,
     // TODO: Expand keyword list for:
     // - Type keywords: interface, type, enum, namespace, etc.
-    // - Control flow: if, else, while, for, switch, case, break, continue
-    // - Other: import, export, async, await, etc.
 };
 
 /// O(1) keyword lookup using perfect hash function
