@@ -436,7 +436,7 @@ impl<'a> SvelteParser<'a> {
         let after_expr = &content[expr_consumed..];
 
         // Check for shorthand: {#await promise then value}
-        let shorthand_value = if let Some(rest) = after_expr.strip_prefix(" then ") {
+        let shorthand_then = if let Some(rest) = after_expr.strip_prefix(" then ") {
             Some(rest)
         } else if let Some(rest) = after_expr.trim_start().strip_prefix("then ") {
             Some(rest)
@@ -446,10 +446,21 @@ impl<'a> SvelteParser<'a> {
             None
         };
 
+        // Check for shorthand: {#await promise catch error}
+        let shorthand_catch = if let Some(rest) = after_expr.strip_prefix(" catch ") {
+            Some(rest)
+        } else if let Some(rest) = after_expr.trim_start().strip_prefix("catch ") {
+            Some(rest)
+        } else if after_expr.trim() == "catch" || after_expr.trim_start().starts_with("catch}") {
+            Some("")
+        } else {
+            None
+        };
+
         let (pending, then_fragment, catch_fragment, value, error, end) = if let Some(value_str) =
-            shorthand_value
+            shorthand_then
         {
-            // Shorthand syntax: no pending block
+            // Shorthand then syntax: {#await promise then value}...{/await}
             let value = if !value_str.is_empty() {
                 // Calculate offset: we know value_str comes after "expression then "
                 let then_keyword_end = expr_end_pos + (after_expr.len() - value_str.len());
@@ -476,6 +487,34 @@ impl<'a> SvelteParser<'a> {
             };
 
             (None, Some(then_content), None, value, None, block_end)
+        } else if let Some(error_str) = shorthand_catch {
+            // Shorthand catch syntax: {#await promise catch error}...{/await}
+            let error = if !error_str.is_empty() {
+                // Calculate offset: we know error_str comes after "expression catch "
+                let catch_keyword_end = expr_end_pos + (after_expr.len() - error_str.len());
+                let error_trimmed = error_str.trim_start();
+                let error_offset = catch_keyword_end + (error_str.len() - error_trimmed.len());
+                Some(tsv_ts::parse_expression(
+                    error_trimmed,
+                    error_offset,
+                    Rc::clone(&self.interner),
+                )?)
+            } else {
+                None
+            };
+
+            let catch_content = self.parse_block_children(&["await"], content_start)?;
+
+            // Expect closing {/await}
+            let block_end = if self.check(TokenKind::BlockClose) {
+                let close_tag_start = self.current_end;
+                let (_, after_close) = self.scan_block_tag_content(close_tag_start)?;
+                after_close
+            } else {
+                self.current_start
+            };
+
+            (None, None, Some(catch_content), None, error, block_end)
         } else {
             // Full syntax with pending block
             let pending_content =

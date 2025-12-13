@@ -11,8 +11,8 @@ use string_interner::DefaultStringInterner;
 use tsv_lang::LocationTracker;
 
 use super::{
-    attach_comments_recursively, convert_attribute_node, convert_fragment,
-    to_json_value, CommentAttachmentContext,
+    CommentAttachmentContext, attach_comments_recursively, convert_attribute_node,
+    convert_fragment, to_json_value,
 };
 
 pub(super) fn convert_script(
@@ -187,14 +187,15 @@ pub(super) fn convert_special_element(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::SpecialElement {
+    // Extract tag and expression from the kind enum
     let tag = elem
-        .tag
-        .as_ref()
+        .kind
+        .tag()
         .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
 
     let expression = elem
-        .expression
-        .as_ref()
+        .kind
+        .expression()
         .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
 
     public::SpecialElement {

@@ -1,0 +1,579 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 518,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Short template - doesn't wrap",
+			"start": 20,
+			"end": 52,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Long static template - tests wrapping behavior",
+			"start": 85,
+			"end": 134,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Long with interpolation",
+			"start": 244,
+			"end": 270,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Long tagged template",
+			"start": 381,
+			"end": 404,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 24
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 517,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 508,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 0
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 54,
+					"end": 82,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 29
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 60,
+							"end": 81,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 28
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 60,
+								"end": 65,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 12
+									}
+								},
+								"name": "short"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 68,
+								"end": 81,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 15
+									},
+									"end": {
+										"line": 3,
+										"column": 28
+									}
+								},
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 69,
+										"end": 80,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 16
+											},
+											"end": {
+												"line": 3,
+												"column": 27
+											}
+										},
+										"value": {
+											"raw": "text1 text2",
+											"cooked": "text1 text2"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Short template - doesn't wrap",
+							"start": 20,
+							"end": 52
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 136,
+					"end": 241,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 106
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 142,
+							"end": 240,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 105
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 142,
+								"end": 147,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 12
+									}
+								},
+								"name": "long1"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 150,
+								"end": 240,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 15
+									},
+									"end": {
+										"line": 6,
+										"column": 105
+									}
+								},
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 151,
+										"end": 239,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 16
+											},
+											"end": {
+												"line": 6,
+												"column": 104
+											}
+										},
+										"value": {
+											"raw": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14",
+											"cooked": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Long static template - tests wrapping behavior",
+							"start": 85,
+							"end": 134
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 272,
+					"end": 378,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 107
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 278,
+							"end": 377,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 106
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 278,
+								"end": 283,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 12
+									}
+								},
+								"name": "long2"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 286,
+								"end": 377,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 15
+									},
+									"end": {
+										"line": 9,
+										"column": 106
+									}
+								},
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 337,
+										"end": 341,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 66
+											},
+											"end": {
+												"line": 9,
+												"column": 70
+											}
+										},
+										"name": "expr"
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 287,
+										"end": 335,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 16
+											},
+											"end": {
+												"line": 9,
+												"column": 64
+											}
+										},
+										"value": {
+											"raw": "text1 text2 text3 text4 text5 text6 text7 text8 ",
+											"cooked": "text1 text2 text3 text4 text5 text6 text7 text8 "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 342,
+										"end": 376,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 71
+											},
+											"end": {
+												"line": 9,
+												"column": 105
+											}
+										},
+										"value": {
+											"raw": " text9 text10 text11 text12 text13",
+											"cooked": " text9 text10 text11 text12 text13"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Long with interpolation",
+							"start": 244,
+							"end": 270
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 406,
+					"end": 507,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 102
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 412,
+							"end": 506,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 101
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 412,
+								"end": 417,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 12
+									}
+								},
+								"name": "long3"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 420,
+								"end": 506,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 15
+									},
+									"end": {
+										"line": 12,
+										"column": 101
+									}
+								},
+								"tag": {
+									"type": "Identifier",
+									"start": 420,
+									"end": 423,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 15
+										},
+										"end": {
+											"line": 12,
+											"column": 18
+										}
+									},
+									"name": "tag"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 423,
+									"end": 506,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 18
+										},
+										"end": {
+											"line": 12,
+											"column": 101
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 424,
+											"end": 505,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 19
+												},
+												"end": {
+													"line": 12,
+													"column": 100
+												}
+											},
+											"value": {
+												"raw": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13",
+												"cooked": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Long tagged template",
+							"start": 381,
+							"end": 404
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

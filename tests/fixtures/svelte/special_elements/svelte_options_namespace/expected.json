@@ -1,0 +1,46 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 35,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": {
+		"start": 0,
+		"end": 34,
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 16,
+				"end": 31,
+				"name": "namespace",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 16,
+						"character": 16
+					},
+					"end": {
+						"line": 1,
+						"column": 25,
+						"character": 25
+					}
+				},
+				"value": [
+					{
+						"start": 27,
+						"end": 30,
+						"type": "Text",
+						"raw": "svg",
+						"data": "svg"
+					}
+				]
+			}
+		],
+		"namespace": "svg"
+	},
+	"comments": []
+}

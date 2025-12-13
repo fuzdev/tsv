@@ -19,6 +19,44 @@
 use super::internal;
 use crate::escapes;
 
+/// Split a declaration source into property and value, matching Svelte's quirky behavior.
+///
+/// SVELTE QUIRK: When there's a CSS comment between the property name and the colon,
+/// Svelte puts the comment AND the colon into the value instead of the property.
+///
+/// Example: `color /* comment */ : red`
+/// - Normal split: property=`color /* comment */ `, value=`red`
+/// - Svelte quirk: property=`color`, value=`/* comment */ : red`
+///
+/// This is a tokenization bug in Svelte's CSS parser, but we replicate it for compatibility.
+/// Our internal AST remains semantically correct; this quirk is only applied in conversion.
+fn split_declaration_svelte_compat(decl_source: &str) -> (&str, &str) {
+    let Some(colon_pos) = decl_source.find(':') else {
+        return (decl_source, "");
+    };
+
+    let before_colon = &decl_source[..colon_pos];
+
+    // Look for /* that appears after some property text
+    if let Some(comment_idx) = before_colon.find("/*") {
+        // Only apply quirk if there's actual property content before the comment
+        let before_comment = &before_colon[..comment_idx];
+        if !before_comment.trim().is_empty() {
+            // SVELTE QUIRK: Comment between property and colon
+            // Property = just the text before the comment (trimmed)
+            // Value = comment + colon + actual value (everything from comment onward)
+            let property = before_comment.trim();
+            let value = &decl_source[comment_idx..];
+            return (property, value);
+        }
+    }
+
+    // Normal case: split at colon
+    let property = &decl_source[..colon_pos];
+    let value = decl_source[colon_pos + 1..].trim_start();
+    (property, value)
+}
+
 /// Convert PseudoClassArgs to Svelte's expected JSON structure
 ///
 /// Generates the wrapper structure: SelectorList → ComplexSelector → RelativeSelector → Nth
@@ -194,16 +232,9 @@ fn convert_css_rule(rule: &internal::CssRule, source: &str) -> serde_json::Value
                     // Example: `\00e9motion` stays as `\00e9motion`, not `émotion`
                     let decl_source = decl.span.extract(source);
 
-                    // Find the colon separator between property and value
+                    // Split using Svelte-compatible logic (handles comment-before-colon quirk)
                     let (property_source, value_source) =
-                        if let Some(colon_pos) = decl_source.find(':') {
-                            let prop = &decl_source[..colon_pos];
-                            let val = decl_source[colon_pos + 1..].trim_start();
-                            (prop, val)
-                        } else {
-                            // Shouldn't happen, but fallback
-                            (decl_source, "")
-                        };
+                        split_declaration_svelte_compat(decl_source);
 
                     // Apply Svelte quirks to value (backslash doubling, unicode duplication)
                     let value_with_quirks = escapes::apply_svelte_quirks(value_source);
@@ -347,15 +378,8 @@ fn convert_atrule_block_child(child: &internal::CssBlockChild, source: &str) -> 
             // SVELTE QUIRK: Extract property and value from source to preserve raw escapes
             let decl_source = &source[decl.span.start as usize..decl.span.end as usize];
 
-            // Find the colon separator between property and value
-            let (property_source, value_source) = if let Some(colon_pos) = decl_source.find(':') {
-                let prop = &decl_source[..colon_pos];
-                let val = decl_source[colon_pos + 1..].trim_start();
-                (prop, val)
-            } else {
-                // Shouldn't happen, but fallback
-                (decl_source, "")
-            };
+            // Split using Svelte-compatible logic (handles comment-before-colon quirk)
+            let (property_source, value_source) = split_declaration_svelte_compat(decl_source);
 
             // Apply Svelte quirks to value (backslash doubling, unicode duplication)
             let value_with_quirks = escapes::apply_svelte_quirks(value_source);
@@ -626,22 +650,21 @@ pub fn convert_css_nodes(nodes: &[internal::CssNode], source: &str) -> serde_jso
         .collect();
 
     // Calculate content span from all nodes (including comments for accurate bounds)
-    let (content_start, content_end) = if let Some(first) = nodes.first() {
-        let start = match first {
-            internal::CssNode::Rule(rule) => rule.span.start,
-            internal::CssNode::Comment(comment) => comment.span.start,
-            internal::CssNode::Atrule(atrule) => atrule.span.start,
-        };
-        // SAFETY: We're inside `if let Some(first) = nodes.first()`, so slice is non-empty
-        #[allow(clippy::unwrap_used)]
-        let end = match nodes.last().unwrap() {
-            internal::CssNode::Rule(rule) => rule.span.end,
-            internal::CssNode::Comment(comment) => comment.span.end,
-            internal::CssNode::Atrule(atrule) => atrule.span.end,
-        };
-        (start, end)
-    } else {
-        (0, 0)
+    let (content_start, content_end) = match (nodes.first(), nodes.last()) {
+        (Some(first), Some(last)) => {
+            let start = match first {
+                internal::CssNode::Rule(rule) => rule.span.start,
+                internal::CssNode::Comment(comment) => comment.span.start,
+                internal::CssNode::Atrule(atrule) => atrule.span.start,
+            };
+            let end = match last {
+                internal::CssNode::Rule(rule) => rule.span.end,
+                internal::CssNode::Comment(comment) => comment.span.end,
+                internal::CssNode::Atrule(atrule) => atrule.span.end,
+            };
+            (start, end)
+        }
+        _ => (0, 0),
     };
 
     serde_json::json!({

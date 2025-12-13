@@ -2,7 +2,32 @@
 
 use super::super::Printer;
 use crate::ast::internal::{self, Statement};
-use tsv_lang::{SymbolResolver, doc};
+use string_interner::Symbol;
+use tsv_lang::doc;
+
+/// Check if a statement can be printed inline after `if (cond)` without a newline.
+///
+/// Block, expression, break, continue, return, throw, and empty statements stay inline.
+/// Other statements (if, for, while, etc.) go on a new line with indent.
+fn is_inline_consequent(stmt: &Statement) -> bool {
+    matches!(
+        stmt,
+        Statement::BlockStatement(_)
+            | Statement::ExpressionStatement(_)
+            | Statement::BreakStatement(_)
+            | Statement::ContinueStatement(_)
+            | Statement::ReturnStatement(_)
+            | Statement::ThrowStatement(_)
+            | Statement::EmptyStatement(_)
+    )
+}
+
+/// Check if a statement can be printed inline after `else` without a newline.
+///
+/// Same as `is_inline_consequent` but also allows IfStatement for else-if chains.
+fn is_inline_alternate(stmt: &Statement) -> bool {
+    is_inline_consequent(stmt) || matches!(stmt, Statement::IfStatement(_))
+}
 
 impl<'a> Printer<'a> {
     // ========================================================================
@@ -10,25 +35,29 @@ impl<'a> Printer<'a> {
     // ========================================================================
 
     pub(super) fn print_if_statement(&mut self, stmt: &internal::IfStatement) {
-        self.write("if (");
-        self.print_expression(&stmt.test);
-        self.write(")");
+        // Check if condition has line comments that require multi-line expansion
+        if self.condition_has_line_comments(&stmt.test) {
+            // Use doc-based printing for proper multi-line handling
+            let test_doc = self.build_expression_doc(&stmt.test);
+            let condition_doc = doc::group(doc::concat(vec![
+                doc::text("if ("),
+                doc::indent_softline(test_doc),
+                doc::softline(),
+                doc::text(")"),
+            ]));
+            self.write_doc_with_margin(&condition_doc);
+        } else {
+            self.write("if (");
+            self.print_expression(&stmt.test);
+            self.write(")");
+        }
 
-        // Print consequent - determine if it needs newline+indent
-        // Block, expression, break, continue, return, throw stay inline
-        // Other statements (if, for, while, etc.) go on new line: `if (cond)\n\tstmt`
-        let consequent_inline = matches!(
-            stmt.consequent.as_ref(),
-            Statement::BlockStatement(_)
-                | Statement::ExpressionStatement(_)
-                | Statement::BreakStatement(_)
-                | Statement::ContinueStatement(_)
-                | Statement::ReturnStatement(_)
-                | Statement::ThrowStatement(_)
-        );
-
-        if consequent_inline {
-            self.write(" ");
+        // Print consequent - inline or newline+indent based on statement type
+        if is_inline_consequent(&stmt.consequent) {
+            // No space before empty statement: `if (true);` not `if (true) ;`
+            if !matches!(stmt.consequent.as_ref(), Statement::EmptyStatement(_)) {
+                self.write(" ");
+            }
             self.print_statement(&stmt.consequent);
         } else {
             self.write("\n");
@@ -39,30 +68,28 @@ impl<'a> Printer<'a> {
         }
 
         if let Some(alternate) = &stmt.alternate {
+            // Check for comments between consequent and alternate
+            // These are comments like: `} // comment\nelse {`
+            let consequent_end = stmt.consequent.span().end;
+            let alternate_start = alternate.span().start;
+            let has_comments_between = self.has_comments_between(consequent_end, alternate_start);
+
             // If consequent is a block, else goes on same line
             // If consequent is not a block (e.g., single statement), else goes on new line
             if matches!(stmt.consequent.as_ref(), Statement::BlockStatement(_)) {
-                self.write(" else ");
+                if has_comments_between {
+                    // Print inline comments between } and else
+                    self.print_if_else_comments(consequent_end, alternate_start);
+                } else {
+                    self.write(" else ");
+                }
             } else {
                 self.write("\n");
                 self.write_indent();
                 self.write("else ");
             }
-            // Print alternate - determine if it needs newline+indent
-            // Block, expression, break, continue, return, throw, and if statements stay inline
-            // Other statements go on new line with indent
-            let alternate_inline = matches!(
-                alternate.as_ref(),
-                Statement::BlockStatement(_)
-                    | Statement::ExpressionStatement(_)
-                    | Statement::BreakStatement(_)
-                    | Statement::ContinueStatement(_)
-                    | Statement::ReturnStatement(_)
-                    | Statement::ThrowStatement(_)
-                    | Statement::IfStatement(_)
-            );
-
-            if alternate_inline {
+            // Print alternate - inline or newline+indent based on statement type
+            if is_inline_alternate(alternate) {
                 self.print_statement(alternate);
             } else {
                 self.write("\n");
@@ -74,67 +101,172 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Print comments between `}` of consequent and `else` keyword.
+    ///
+    /// Handles patterns like: `} // comment for else\nelse {`
+    /// - Prints inline comments after `}`
+    /// - Puts `else` on a new line if there are comments
+    fn print_if_else_comments(&mut self, consequent_end: u32, alternate_start: u32) {
+        let first_idx = tsv_lang::find_first_comment_from(self.comments, consequent_end);
+
+        for comment in &self.comments[first_idx..] {
+            if comment.span.start >= alternate_start {
+                break;
+            }
+            // Print comment on same line as `}`
+            self.write(" ");
+            self.print_comment(comment);
+        }
+        // Put else on new line
+        self.write("\n");
+        self.write_indent();
+        self.write("else ");
+    }
+
     pub(super) fn print_for_statement(&mut self, stmt: &internal::ForStatement) {
-        self.write("for (");
-        if let Some(init) = &stmt.init {
-            self.print_for_init(init);
-        }
-        self.write(";");
-        // Add space after semicolon if there's a test or if test is missing but update is present
-        if stmt.test.is_some() || (stmt.test.is_none() && stmt.update.is_some()) {
+        // Build the for header as a doc for proper line wrapping
+        let doc = self.build_for_header_doc(stmt);
+        self.write_doc_with_margin(&doc);
+
+        // Check for comments between ) and body (Prettier 3.7 #18108)
+        // e.g., `for (...) /* comment */ ;`
+        let header_end = self.get_for_header_end(stmt);
+        let body_start = stmt.body.span().start;
+        let has_comments = self.has_comments_between(header_end, body_start);
+
+        if has_comments {
+            self.print_inline_comments_between(header_end, body_start);
+            // Prettier adds space after comment before empty statement: `/* comment */ ;`
+            self.write(" ");
+        } else if !matches!(stmt.body.as_ref(), Statement::EmptyStatement(_)) {
+            // Don't add space before empty statement: `for (...);` not `for (...) ;`
             self.write(" ");
         }
-        if let Some(test) = &stmt.test {
-            self.print_expression(test);
-        }
-        self.write(";");
-        // Add space after second semicolon if there's an update OR if there was a test
-        // (prettier adds trailing space when update is None but test was present)
-        if stmt.update.is_some() || stmt.test.is_some() {
-            self.write(" ");
-        }
-        if let Some(update) = &stmt.update {
-            // For update position, sequence expressions don't need parens
-            self.print_for_update(update);
-        }
-        self.write(") ");
         self.print_statement(&stmt.body);
     }
 
-    /// Print a for loop update expression
-    /// Sequence expressions in this position don't need parentheses
-    fn print_for_update(&mut self, expr: &internal::Expression) {
-        if let internal::Expression::SequenceExpression(seq) = expr {
-            for (i, e) in seq.expressions.iter().enumerate() {
-                if i > 0 {
-                    self.write(", ");
-                }
-                self.print_expression(e);
-            }
-        } else {
-            self.print_expression(expr);
-        }
+    /// Get the end position of a for loop header (position after the last non-body element)
+    fn get_for_header_end(&self, stmt: &internal::ForStatement) -> u32 {
+        // The header ends at the update, test, init, or span start (whichever is last)
+        stmt.update
+            .as_ref()
+            .map(|u| u.span().end)
+            .or_else(|| stmt.test.as_ref().map(|t| t.span().end))
+            .or_else(|| stmt.init.as_ref().map(|i| self.get_for_init_span_end(i)))
+            .unwrap_or(stmt.span.start + 4) // fallback: after "for ("
     }
 
-    fn print_for_init(&mut self, init: &internal::ForInit) {
-        match init {
-            internal::ForInit::VariableDeclaration(decl) => {
-                self.write(decl.kind.as_str());
-                self.write(" ");
-                for (i, declarator) in decl.declarations.iter().enumerate() {
-                    if i > 0 {
-                        self.write(", ");
-                    }
-                    self.print_expression(&declarator.id);
-                    if let Some(init) = &declarator.init {
-                        self.write(" = ");
-                        self.print_expression(init);
-                    }
+    /// Build a Doc for the for loop header with wrapping support
+    ///
+    /// Handles comments between parts (Prettier 3.7 #18099):
+    /// `for (let i = 0; // comment\n i < n; i++)` expands to multi-line
+    fn build_for_header_doc(&self, stmt: &internal::ForStatement) -> doc::Doc {
+        // Build init, test, update parts
+        let init_doc = stmt.init.as_ref().map(|init| self.build_for_init_doc(init));
+        let test_doc = stmt
+            .test
+            .as_ref()
+            .map(|test| self.build_expression_doc(test));
+        let update_doc = stmt
+            .update
+            .as_ref()
+            .map(|update| self.build_for_update_doc(update));
+
+        // Prettier's for loop spacing rules:
+        // - `for (;;)` - no content, no spaces
+        // - `for (init;;)` - init only
+        // - `for (;test;)` - test only
+        // - `for (;;update)` - update only
+        // - `for (init; test; update)` - spaces between parts
+        // - `for (; cond; )` - space after last ; when update is None but test exists
+
+        let has_any = init_doc.is_some() || test_doc.is_some() || update_doc.is_some();
+
+        if !has_any {
+            // Empty for (;;) - no wrapping needed
+            return doc::text("for (;;)");
+        }
+
+        // Check for comments between parts that force expansion
+        let has_comment_between_parts = self.for_header_has_comments(stmt);
+
+        // Build the content between parens
+        let mut inner_parts = Vec::new();
+
+        let has_test = test_doc.is_some();
+        let has_update = update_doc.is_some();
+
+        // Init part
+        if let Some(init) = init_doc {
+            inner_parts.push(init);
+        }
+        inner_parts.push(doc::text(";"));
+
+        // Check for comment between init and test
+        if let Some(init) = &stmt.init {
+            let init_end = self.get_for_init_span_end(init);
+            let test_start = if let Some(t) = &stmt.test {
+                t.span().start
+            } else if let Some(u) = &stmt.update {
+                u.span().start
+            } else {
+                stmt.span.end
+            };
+            if self.has_line_comments_between(init_end, test_start) {
+                let comment_on_own_line = self.has_newline_before_comment(init_end, test_start);
+                if comment_on_own_line {
+                    inner_parts.push(doc::hardline());
+                    inner_parts.push(
+                        self.build_inline_comments_between_doc_no_leading_space(
+                            init_end, test_start,
+                        ),
+                    );
+                    inner_parts.push(doc::hardline());
+                } else {
+                    inner_parts.push(self.build_inline_comments_between_doc(init_end, test_start));
+                    inner_parts.push(doc::hardline());
                 }
+            } else if has_test || has_update {
+                inner_parts.push(doc::line());
             }
-            internal::ForInit::Expression(expr) => {
-                self.print_expression(expr);
-            }
+        } else if has_test || has_update {
+            // Test part - add space/line before if test or update exists
+            inner_parts.push(doc::line());
+        }
+
+        if let Some(test) = test_doc {
+            inner_parts.push(test);
+        }
+        inner_parts.push(doc::text(";"));
+
+        // Update part
+        if let Some(update) = update_doc {
+            inner_parts.push(doc::line());
+            inner_parts.push(update);
+        } else if has_test && !has_comment_between_parts {
+            // Prettier adds trailing space when update is None but test exists
+            inner_parts.push(doc::if_break(doc::text(""), doc::text(" ")));
+        }
+
+        doc::group(doc::concat(vec![
+            doc::text("for ("),
+            doc::indent_softline(doc::concat(inner_parts)),
+            doc::softline(),
+            doc::text(")"),
+        ]))
+    }
+
+    /// Build a Doc for a for loop update expression
+    fn build_for_update_doc(&self, expr: &internal::Expression) -> doc::Doc {
+        if let internal::Expression::SequenceExpression(seq) = expr {
+            let expr_docs: Vec<_> = seq
+                .expressions
+                .iter()
+                .map(|e| self.build_expression_doc(e))
+                .collect();
+            doc::join(expr_docs, ", ")
+        } else {
+            self.build_expression_doc(expr)
         }
     }
 
@@ -278,7 +410,12 @@ impl<'a> Printer<'a> {
 
     pub(super) fn print_labeled_statement(&mut self, stmt: &internal::LabeledStatement) {
         self.print_identifier(&stmt.label);
-        self.write(": ");
+        // No space before empty statement: `label:;` not `label: ;`
+        if matches!(stmt.body.as_ref(), Statement::EmptyStatement(_)) {
+            self.write(":");
+        } else {
+            self.write(": ");
+        }
         self.print_statement(&stmt.body);
     }
 
@@ -287,10 +424,17 @@ impl<'a> Printer<'a> {
     // ========================================================================
 
     pub(super) fn build_if_statement_doc(&self, stmt: &internal::IfStatement) -> doc::Doc {
+        // No space before empty statement: `if (true);` not `if (true) ;`
+        let consequent_prefix = if matches!(stmt.consequent.as_ref(), Statement::EmptyStatement(_))
+        {
+            ")"
+        } else {
+            ") "
+        };
         let mut parts = vec![
             doc::text("if ("),
             self.build_expression_doc(&stmt.test),
-            doc::text(") "),
+            doc::text(consequent_prefix),
             self.build_statement_doc(&stmt.consequent),
         ];
         if let Some(alternate) = &stmt.alternate {
@@ -478,7 +622,7 @@ impl<'a> Printer<'a> {
         if let Some(label) = &stmt.label {
             doc::concat(vec![
                 doc::text("break "),
-                doc::text(self.resolve_symbol(label.name)),
+                doc::symbol(label.name.to_usize() as u32),
                 doc::text(";"),
             ])
         } else {
@@ -493,7 +637,7 @@ impl<'a> Printer<'a> {
         if let Some(label) = &stmt.label {
             doc::concat(vec![
                 doc::text("continue "),
-                doc::text(self.resolve_symbol(label.name)),
+                doc::symbol(label.name.to_usize() as u32),
                 doc::text(";"),
             ])
         } else {
@@ -505,10 +649,76 @@ impl<'a> Printer<'a> {
         &self,
         stmt: &internal::LabeledStatement,
     ) -> doc::Doc {
+        // No space before empty statement: `label:;` not `label: ;`
+        let separator = if matches!(stmt.body.as_ref(), Statement::EmptyStatement(_)) {
+            ":"
+        } else {
+            ": "
+        };
         doc::concat(vec![
-            doc::text(self.resolve_symbol(stmt.label.name)),
-            doc::text(": "),
+            doc::symbol(stmt.label.name.to_usize() as u32),
+            doc::text(separator),
             self.build_statement_doc(&stmt.body),
         ])
+    }
+
+    /// Check if a condition expression has line comments that require multi-line expansion
+    ///
+    /// Returns true if the expression or any of its binary sub-expressions contain
+    /// line comments between operands.
+    fn condition_has_line_comments(&self, expr: &internal::Expression) -> bool {
+        match expr {
+            internal::Expression::BinaryExpression(binary) => {
+                // Check for line comments between left and right operands
+                let left_end = binary.left.span().end;
+                let right_start = binary.right.span().start;
+                if self.has_line_comments_between(left_end, right_start) {
+                    return true;
+                }
+                // Recursively check sub-expressions
+                self.condition_has_line_comments(&binary.left)
+                    || self.condition_has_line_comments(&binary.right)
+            }
+            // For other expression types, no line comments to check
+            _ => false,
+        }
+    }
+
+    /// Check if a for statement header has line comments between parts
+    fn for_header_has_comments(&self, stmt: &internal::ForStatement) -> bool {
+        // Check between init and test
+        if let Some(init) = &stmt.init {
+            let init_end = self.get_for_init_span_end(init);
+            let test_start = if let Some(t) = &stmt.test {
+                t.span().start
+            } else if let Some(u) = &stmt.update {
+                u.span().start
+            } else {
+                stmt.span.end
+            };
+            if self.has_line_comments_between(init_end, test_start) {
+                return true;
+            }
+        }
+        // Check between test and update
+        if let Some(test) = &stmt.test {
+            let test_end = test.span().end;
+            let update_start = stmt
+                .update
+                .as_ref()
+                .map_or(stmt.span.end, |u| u.span().start);
+            if self.has_line_comments_between(test_end, update_start) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Get the end position of a ForInit
+    fn get_for_init_span_end(&self, init: &internal::ForInit) -> u32 {
+        match init {
+            internal::ForInit::VariableDeclaration(decl) => decl.span.end,
+            internal::ForInit::Expression(expr) => expr.span().end,
+        }
     }
 }

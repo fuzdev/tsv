@@ -101,6 +101,24 @@ impl<'a> CssParser<'a> {
         }
     }
 
+    /// Peek past whitespace and comments to find the next significant token.
+    /// This creates a temporary lexer to look ahead without modifying parser state.
+    /// Used for disambiguating declarations vs nested rules.
+    pub(crate) fn peek_past_whitespace(&self) -> Result<TokenKind, ParseError> {
+        // Create a temporary lexer from current position
+        let remaining = &self.source()[self.current_end..];
+        let mut temp_lexer = Lexer::new(remaining);
+
+        // Skip whitespace and comments
+        loop {
+            let token = temp_lexer.next_token()?;
+            match &token.kind {
+                TokenKind::Whitespace | TokenKind::Comment(_) => continue,
+                _ => return Ok(token.kind),
+            }
+        }
+    }
+
     pub(crate) fn check(&self, kind: &TokenKind) -> bool {
         &self.current_kind == kind
     }

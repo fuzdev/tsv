@@ -1,0 +1,3 @@
+{@debug veryLongVariableNameOne,veryLongVariableNameTwo,veryLongVariableNameThree,veryLongVariableNameFour}
+
+{@debug veryLongVariableNameOne,veryLongVariableNameTwo,veryLongVariableNameThree,veryLongVariableNameFour,veryLongVariableNameFive,veryLongVariableNameSix}

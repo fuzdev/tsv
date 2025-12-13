@@ -6,45 +6,7 @@
 
 use crate::ast::internal;
 use crate::printer::Printer;
-
-/// Check if we're inside a template literal after processing this line.
-///
-/// Template literals span multiple lines when they contain actual newlines.
-/// Lines that are inside a template literal should not be re-indented
-/// because the whitespace is part of the template content.
-///
-/// This function counts unescaped backticks to track template literal state.
-/// It also ignores backticks inside string literals (single/double quoted).
-fn is_inside_template_literal(line: &str, was_inside: bool) -> bool {
-    let mut in_template = was_inside;
-    let mut in_string: Option<char> = None;
-    let mut chars = line.chars();
-
-    while let Some(c) = chars.next() {
-        // Handle escape sequences
-        if c == '\\' {
-            chars.next(); // Skip the escaped character
-            continue;
-        }
-
-        // Handle string literals
-        if in_string.is_none() && (c == '"' || c == '\'') {
-            in_string = Some(c);
-            continue;
-        }
-        if Some(c) == in_string {
-            in_string = None;
-            continue;
-        }
-
-        // Track template literals (only when not in a string)
-        if in_string.is_none() && c == '`' {
-            in_template = !in_template;
-        }
-    }
-
-    in_template
-}
+use crate::printer::helpers::is_inside_template_literal;
 
 impl<'a> Printer<'a> {
     /// Format a Script tag
@@ -78,17 +40,43 @@ impl<'a> Printer<'a> {
         // IMPORTANT: Don't add indentation to:
         // 1. String continuation lines (backslash + newline)
         // 2. Lines inside template literals (they're part of the template content)
+        // 3. Multi-line block comment continuation lines (prettier preserves original spacing)
         // These must be preserved exactly as they are.
         let content_trimmed = formatted_content.trim_end_matches('\n');
         self.indent_level += 1;
         let mut is_continuation_line = false;
         let mut in_template_literal = false;
+        let mut in_multiline_comment = false;
         for line in content_trimmed.lines() {
+            let trimmed = line.trim_start();
+
+            // Check if this is a comment line that should NOT be indented:
+            // - We're inside a multi-line comment
+            // - The line starts at column 0 (no leading whitespace)
+            // - This includes closing `*/` lines that start at column 0
+            // This preserves prettier's behavior where comment lines at column 0 stay at column 0
+            // NOTE: Check this BEFORE updating in_multiline_comment state
+            let is_unindented_comment_line = in_multiline_comment && line == trimmed;
+
+            // Track if we're inside a multi-line comment
+            // A multi-line comment starts when we see /* without a matching */ on the same line
+            // Note: This is a simplified check that doesn't handle nested comments
+            // or comments inside strings/templates, but works for typical cases
+            if !in_template_literal && trimmed.contains("/*") && !trimmed.contains("*/") {
+                in_multiline_comment = true;
+            } else if in_multiline_comment && trimmed.contains("*/") {
+                in_multiline_comment = false;
+            }
+
             // Don't indent:
             // - Blank lines
             // - Continuation lines inside strings
             // - Lines that are inside template literals (actual newlines in template content)
-            let should_indent = !line.is_empty() && !is_continuation_line && !in_template_literal;
+            // - Multi-line block comment lines that start at column 0 (no leading whitespace)
+            let should_indent = !line.is_empty()
+                && !is_continuation_line
+                && !in_template_literal
+                && !is_unindented_comment_line;
             if should_indent {
                 self.write_indent();
             }

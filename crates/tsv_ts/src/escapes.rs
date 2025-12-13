@@ -1,11 +1,11 @@
-//! TypeScript/JavaScript escape sequence handling utilities
+//! TypeScript/JS escape sequence handling utilities
 //!
-//! This module provides escape handling for JavaScript/TypeScript string literals,
+//! This module provides escape handling for JS/TypeScript string literals,
 //! implementing the full ES6+ escape sequence specification.
 //!
 //! # Escape Sequence Types
 //!
-//! JavaScript supports multiple escape sequence formats:
+//! JS supports multiple escape sequence formats:
 //!
 //! 1. **Simple single-character escapes**:
 //!    - `\n` → newline (U+000A)
@@ -64,7 +64,7 @@
 
 use tsv_lang::ParseError;
 
-/// Decode JavaScript/TypeScript escape sequences in a string.
+/// Decode JS/TypeScript escape sequences in a string.
 ///
 /// Converts JS escape sequences to their actual character values.
 /// This function implements the full ECMAScript escape sequence specification.

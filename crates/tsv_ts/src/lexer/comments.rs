@@ -45,7 +45,7 @@ pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, 
 
 /// Read a TypeScript block comment: /* ... */
 /// Returns the comment content WITHOUT the /* */ delimiters
-/// Note: Unlike CSS, JavaScript/TypeScript does NOT support nested block comments
+/// Note: Unlike CSS, JS/TypeScript does NOT support nested block comments
 ///
 /// NOTE: Content is preserved exactly as written. Indentation stripping for multi-line
 /// comments happens in the conversion layer (matching Svelte's behavior).

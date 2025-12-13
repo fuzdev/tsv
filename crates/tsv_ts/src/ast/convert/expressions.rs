@@ -3,9 +3,10 @@
 use super::super::{internal, public};
 use super::{
     convert_arrow_function_expression, convert_await_expression, convert_call_expression,
-    convert_conditional_expression, convert_function_expression, convert_member_expression,
-    convert_new_expression, convert_object_pattern, convert_property, convert_template_literal,
-    convert_type_annotation, create_location,
+    convert_class_expression, convert_conditional_expression, convert_function_expression,
+    convert_member_expression, convert_new_expression, convert_object_pattern, convert_property,
+    convert_template_literal, convert_type, convert_type_annotation,
+    convert_type_parameter_instantiation, convert_yield_expression, create_location,
 };
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
@@ -31,7 +32,16 @@ pub fn convert_expression(
                 type_annotation: id
                     .type_annotation
                     .as_ref()
-                    .map(|ta| convert_type_annotation(ta, loc, offset)),
+                    .map(|ta| convert_type_annotation(ta, source, loc, interner, offset)),
+            })
+        }
+        internal::Expression::PrivateIdentifier(pid) => {
+            public::Expression::PrivateIdentifier(public::PrivateIdentifier {
+                node_type: "PrivateIdentifier".to_string(),
+                start: pid.span.start,
+                end: pid.span.end,
+                loc: create_location(pid.span, loc, offset),
+                name: interner.resolve_infallible(pid.name).to_string(),
             })
         }
         internal::Expression::ObjectExpression(obj) => {
@@ -136,6 +146,9 @@ pub fn convert_expression(
         internal::Expression::FunctionExpression(func) => public::Expression::FunctionExpression(
             convert_function_expression(func, source, loc, interner, offset),
         ),
+        internal::Expression::ClassExpression(class_expr) => public::Expression::ClassExpression(
+            convert_class_expression(class_expr, source, loc, interner, offset),
+        ),
         internal::Expression::SpreadElement(spread) => {
             public::Expression::SpreadElement(public::SpreadElement {
                 node_type: "SpreadElement".to_string(),
@@ -186,6 +199,9 @@ pub fn convert_expression(
         }
         internal::Expression::AwaitExpression(await_expr) => public::Expression::AwaitExpression(
             convert_await_expression(await_expr, source, loc, interner, offset),
+        ),
+        internal::Expression::YieldExpression(yield_expr) => public::Expression::YieldExpression(
+            convert_yield_expression(yield_expr, source, loc, interner, offset),
         ),
         internal::Expression::SequenceExpression(seq) => {
             public::Expression::SequenceExpression(public::SequenceExpression {
@@ -262,6 +278,10 @@ pub fn convert_expression(
                             .map(|expr| convert_expression(expr, source, loc, interner, offset))
                     })
                     .collect(),
+                type_annotation: arr
+                    .type_annotation
+                    .as_ref()
+                    .map(|ta| convert_type_annotation(ta, source, loc, interner, offset)),
             })
         }
         internal::Expression::AssignmentPattern(pattern) => {
@@ -301,6 +321,167 @@ pub fn convert_expression(
                 )),
             })
         }
+        internal::Expression::TSTypeAssertion(type_assert) => {
+            public::Expression::TSTypeAssertion(public::TSTypeAssertion {
+                node_type: "TSTypeAssertion".to_string(),
+                start: type_assert.span.start,
+                end: type_assert.span.end,
+                loc: create_location(type_assert.span, loc, offset),
+                type_annotation: Box::new(convert_type(
+                    &type_assert.type_annotation,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+                expression: Box::new(convert_expression(
+                    &type_assert.expression,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
+        internal::Expression::TSAsExpression(as_expr) => {
+            public::Expression::TSAsExpression(public::TSAsExpression {
+                node_type: "TSAsExpression".to_string(),
+                start: as_expr.span.start,
+                end: as_expr.span.end,
+                loc: create_location(as_expr.span, loc, offset),
+                expression: Box::new(convert_expression(
+                    &as_expr.expression,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+                type_annotation: Box::new(convert_type(
+                    &as_expr.type_annotation,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
+        internal::Expression::TSSatisfiesExpression(sat_expr) => {
+            public::Expression::TSSatisfiesExpression(public::TSSatisfiesExpression {
+                node_type: "TSSatisfiesExpression".to_string(),
+                start: sat_expr.span.start,
+                end: sat_expr.span.end,
+                loc: create_location(sat_expr.span, loc, offset),
+                expression: Box::new(convert_expression(
+                    &sat_expr.expression,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+                type_annotation: Box::new(convert_type(
+                    &sat_expr.type_annotation,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
+        internal::Expression::TSInstantiationExpression(inst_expr) => {
+            public::Expression::TSInstantiationExpression(public::TSInstantiationExpression {
+                node_type: "TSInstantiationExpression".to_string(),
+                start: inst_expr.span.start,
+                end: inst_expr.span.end,
+                loc: create_location(inst_expr.span, loc, offset),
+                expression: Box::new(convert_expression(
+                    &inst_expr.expression,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+                type_arguments: convert_type_parameter_instantiation(
+                    &inst_expr.type_arguments,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                ),
+            })
+        }
+        internal::Expression::TSNonNullExpression(non_null_expr) => {
+            public::Expression::TSNonNullExpression(public::TSNonNullExpression {
+                node_type: "TSNonNullExpression".to_string(),
+                start: non_null_expr.span.start,
+                end: non_null_expr.span.end,
+                loc: create_location(non_null_expr.span, loc, offset),
+                expression: Box::new(convert_expression(
+                    &non_null_expr.expression,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
+        internal::Expression::ImportExpression(import_expr) => {
+            public::Expression::ImportExpression(public::ImportExpression {
+                node_type: "ImportExpression".to_string(),
+                start: import_expr.span.start,
+                end: import_expr.span.end,
+                loc: create_location(import_expr.span, loc, offset),
+                source: Box::new(convert_expression(
+                    &import_expr.source,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
+        internal::Expression::MetaProperty(meta) => {
+            public::Expression::MetaProperty(public::MetaProperty {
+                node_type: "MetaProperty".to_string(),
+                start: meta.span.start,
+                end: meta.span.end,
+                loc: create_location(meta.span, loc, offset),
+                meta: public::Identifier {
+                    node_type: "Identifier".to_string(),
+                    start: meta.meta.span.start,
+                    end: meta.meta.span.end,
+                    loc: create_location(meta.meta.span, loc, offset),
+                    name: interner.resolve_infallible(meta.meta.name).to_string(),
+                    optional: false,
+                    type_annotation: None,
+                },
+                property: public::Identifier {
+                    node_type: "Identifier".to_string(),
+                    start: meta.property.span.start,
+                    end: meta.property.span.end,
+                    loc: create_location(meta.property.span, loc, offset),
+                    name: interner.resolve_infallible(meta.property.name).to_string(),
+                    optional: false,
+                    type_annotation: None,
+                },
+            })
+        }
+        internal::Expression::TSParameterProperty(param_prop) => {
+            public::Expression::TSParameterProperty(public::TSParameterProperty {
+                node_type: "TSParameterProperty".to_string(),
+                start: param_prop.span.start,
+                end: param_prop.span.end,
+                loc: create_location(param_prop.span, loc, offset),
+                accessibility: param_prop.accessibility.map(|a| a.as_str().to_string()),
+                readonly: param_prop.readonly,
+                parameter: Box::new(convert_expression(
+                    &param_prop.parameter,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
     }
 }
 
@@ -310,18 +491,25 @@ fn convert_literal_expression(
     loc: &LocationTracker,
     offset: usize,
 ) -> public::Expression {
-    let value = match &lit.value {
-        internal::LiteralValue::Number(n) => serde_json::Value::Number(
-            serde_json::Number::from_f64(*n).unwrap_or_else(|| serde_json::Number::from(0)),
+    let (value, bigint) = match &lit.value {
+        internal::LiteralValue::Number(n) => (
+            serde_json::Value::Number(
+                serde_json::Number::from_f64(*n).unwrap_or_else(|| serde_json::Number::from(0)),
+            ),
+            None,
         ),
         internal::LiteralValue::String { content, .. } => {
-            serde_json::Value::String(content.clone())
+            (serde_json::Value::String(content.clone()), None)
         }
-        internal::LiteralValue::Boolean(b) => serde_json::Value::Bool(*b),
-        internal::LiteralValue::Null => serde_json::Value::Null,
+        internal::LiteralValue::BigInt(val) => {
+            // BigInt: value is the string, bigint field stores the same value
+            (serde_json::Value::String(val.clone()), Some(val.clone()))
+        }
+        internal::LiteralValue::Boolean(b) => (serde_json::Value::Bool(*b), None),
+        internal::LiteralValue::Null => (serde_json::Value::Null, None),
         // undefined is represented as a special identifier in most ASTs
         // but as a literal in ours - serialize as null for JSON compatibility
-        internal::LiteralValue::Undefined => serde_json::Value::Null,
+        internal::LiteralValue::Undefined => (serde_json::Value::Null, None),
     };
     // Extract raw from source using span
     let raw = lit.span.extract(source);
@@ -332,6 +520,7 @@ fn convert_literal_expression(
         loc: create_location(lit.span, loc, offset),
         value,
         raw: raw.to_string(),
+        bigint,
     })
 }
 

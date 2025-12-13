@@ -35,10 +35,7 @@ impl<'a> Printer<'a> {
         } else {
             // Build doc for width-based wrapping (handles block comments inline)
             let doc = self.build_array_doc_with_wrapping(arr);
-            let base_offset = self.config.base_indent_offset * self.config.tab_width;
-            let current_col = self.current_column() + base_offset + 1; // +1 for trailing punctuation
-            let output = doc::print_doc_at_column(&doc, &self.config, current_col);
-            self.write(&output);
+            self.write_doc_with_margin(&doc);
         }
     }
 
@@ -46,24 +43,8 @@ impl<'a> Printer<'a> {
     ///
     /// Uses binary search to find comments: O(log n + k)
     fn print_empty_array_with_comments(&mut self, arr: &internal::ArrayExpression) {
-        self.write("[\n");
-        self.indent_level += 1 + self.declaration_indent_depth;
-
-        // Print all comments inside the array
-        // Unlike print_leading_comments, we print ALL comments here (including same-line ones)
-        let inner_start = arr.span.start + 1;
-        let inner_end = arr.span.end - 1;
-
-        for comment in comments_in_range(self.comments, inner_start, inner_end) {
-            self.write_indent();
-            self.print_comment(comment);
-            self.write("\n");
-        }
-
-        self.indent_level -= 1;
-        self.write_indent();
-        self.indent_level -= self.declaration_indent_depth;
-        self.write("]");
+        let (content_start, content_end) = super::content_bounds(arr.span);
+        self.print_empty_container_with_comments("[", "]", content_start, content_end);
     }
 
     /// Print an array expression with comments
@@ -74,7 +55,7 @@ impl<'a> Printer<'a> {
 
         if !arr.elements.is_empty() {
             self.write("\n");
-            self.indent_level += 1 + self.declaration_indent_depth;
+            self.indent_level += self.container_indent_increment();
 
             let mut prev_end = arr.span.start + 1; // After opening bracket
 
@@ -170,9 +151,7 @@ impl<'a> Printer<'a> {
             // Print any final comments before closing bracket
             self.print_leading_comments(prev_end, arr.span.end, false);
 
-            self.indent_level -= 1;
-            self.write_indent();
-            self.indent_level -= self.declaration_indent_depth;
+            self.write_container_closing_indent();
         }
 
         self.write("]");
@@ -295,6 +274,18 @@ impl<'a> Printer<'a> {
         let mut parts = Vec::new();
 
         for (i, elem) in arr.elements.iter().enumerate() {
+            // For the first element, check for leading comments after `[`
+            if i == 0 {
+                let first_elem_start = elem.as_ref().map_or(arr.span.end - 1, |e| e.span().start);
+                for comment in
+                    comments_in_range(self.comments, arr.span.start + 1, first_elem_start)
+                {
+                    if comment.is_block {
+                        parts.push(doc::text_owned(format!("/*{}*/ ", comment.content)));
+                    }
+                }
+            }
+
             let elem_end = elem.as_ref().map_or(arr.span.start + 1, |e| e.span().end);
 
             if let Some(expr) = elem {
@@ -312,30 +303,28 @@ impl<'a> Printer<'a> {
 
             for comment in comments_in_range(self.comments, elem_end, next_boundary) {
                 if comment.is_block {
-                    parts.push(doc::text(format!(" /*{}*/", comment.content)));
+                    parts.push(doc::text_owned(format!(" /*{}*/", comment.content)));
                 }
             }
 
             if i < arr.elements.len() - 1 {
-                // Separator: comma + line (becomes space in flat mode, newline in break)
-                parts.push(doc::concat(vec![doc::text(","), doc::line()]));
+                parts.push(doc::comma_line());
             }
         }
 
-        // In multi-declarator context, apply extra indentation
+        // Reserve 1 char for closing `]` to prevent greedy-fill boundary overflow
+        let fill_with_reserve = doc::with_context(
+            doc::fill(parts),
+            doc::DocContext {
+                trailing_reserve: 1,
+            },
+        );
         let inner = doc::concat(vec![
             doc::softline(),
-            doc::fill(parts),
-            doc::if_break(doc::text(","), doc::text("")),
+            fill_with_reserve,
+            doc::trailing_comma(),
         ]);
-        let (indented_content, closing_line) = if self.declaration_indent_depth > 0 {
-            (
-                doc::indent(doc::indent(inner)),
-                doc::indent(doc::softline()),
-            )
-        } else {
-            (doc::indent(inner), doc::softline())
-        };
+        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, doc::softline());
 
         doc::group(doc::concat(vec![
             doc::text("["),
@@ -352,10 +341,25 @@ impl<'a> Printer<'a> {
     fn build_array_group_doc(&self, arr: &internal::ArrayExpression) -> Doc {
         let mut parts = Vec::new();
 
+        // Check if last element is an elision (requires mandatory trailing comma)
+        let has_trailing_elision = arr.elements.last().is_some_and(Option::is_none);
+
         for (i, elem) in arr.elements.iter().enumerate() {
+            // For the first element, check for leading comments after `[`
+            if i == 0 {
+                let first_elem_start = elem.as_ref().map_or(arr.span.end - 1, |e| e.span().start);
+                for comment in
+                    comments_in_range(self.comments, arr.span.start + 1, first_elem_start)
+                {
+                    if comment.is_block {
+                        parts.push(doc::text_owned(format!("/*{}*/ ", comment.content)));
+                    }
+                }
+            }
+
             let elem_end = elem.as_ref().map_or(arr.span.start + 1, |e| e.span().end);
 
-            // Add element
+            // Add element (elisions output nothing - the comma represents them)
             if let Some(expr) = elem {
                 parts.push(self.build_expression_doc(expr));
             }
@@ -372,30 +376,31 @@ impl<'a> Printer<'a> {
 
             for comment in comments_in_range(self.comments, elem_end, next_boundary) {
                 if comment.is_block {
-                    parts.push(doc::text(format!(" /*{}*/", comment.content)));
+                    parts.push(doc::text_owned(format!(" /*{}*/", comment.content)));
                 }
             }
 
-            if i < arr.elements.len() - 1 {
+            let is_last = i == arr.elements.len() - 1;
+            if !is_last {
+                // Separator comma between elements
                 parts.push(doc::text(","));
                 parts.push(doc::line());
+            } else if has_trailing_elision {
+                // Trailing comma for elision - MUST be preserved (semantically significant)
+                parts.push(doc::text(","));
             }
         }
 
-        // In multi-declarator context, apply extra indentation
-        let inner = doc::concat(vec![
-            doc::softline(),
-            doc::concat(parts),
-            doc::if_break(doc::text(","), doc::text("")),
-        ]);
-        let (indented_content, closing_line) = if self.declaration_indent_depth > 0 {
-            (
-                doc::indent(doc::indent(inner)),
-                doc::indent(doc::softline()),
-            )
+        // Use trailing_comma() only if last element is NOT an elision
+        // (elision trailing comma was already added unconditionally above)
+        let trailing = if has_trailing_elision {
+            doc::text("")
         } else {
-            (doc::indent(inner), doc::softline())
+            doc::trailing_comma()
         };
+
+        let inner = doc::concat(vec![doc::softline(), doc::concat(parts), trailing]);
+        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, doc::softline());
 
         doc::group(doc::concat(vec![
             doc::text("["),
@@ -420,16 +425,8 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // In multi-declarator context, apply extra indentation
         let inner = doc::concat(vec![doc::hardline(), doc::concat(parts), doc::text(",")]);
-        let (indented_content, closing_line) = if self.declaration_indent_depth > 0 {
-            (
-                doc::indent(doc::indent(inner)),
-                doc::indent(doc::hardline()),
-            )
-        } else {
-            (doc::indent(inner), doc::hardline())
-        };
+        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, doc::hardline());
 
         doc::concat(vec![
             doc::text("["),

@@ -17,7 +17,7 @@ mod variable;
 
 use super::Printer;
 use crate::ast::internal::{self, Statement};
-use tsv_lang::{SymbolResolver, doc};
+use tsv_lang::doc;
 
 impl<'a> Printer<'a> {
     /// Print a statement
@@ -35,7 +35,11 @@ impl<'a> Printer<'a> {
                 self.print_export_default_declaration(decl);
             }
             Statement::ExportAllDeclaration(decl) => self.print_export_all_declaration(decl),
+            Statement::TSExportAssignment(decl) => self.print_export_assignment(decl),
             Statement::ImportDeclaration(decl) => self.print_import_declaration(decl),
+            Statement::TSImportEqualsDeclaration(decl) => {
+                self.print_import_equals_declaration(decl);
+            }
             // Control flow statements
             Statement::IfStatement(stmt) => self.print_if_statement(stmt),
             Statement::ForStatement(stmt) => self.print_for_statement(stmt),
@@ -50,6 +54,10 @@ impl<'a> Printer<'a> {
             Statement::ContinueStatement(stmt) => self.print_continue_statement(stmt),
             Statement::LabeledStatement(stmt) => self.print_labeled_statement(stmt),
             Statement::EmptyStatement(_) => self.write(";"),
+            Statement::TSInterfaceDeclaration(decl) => self.print_interface_declaration(decl),
+            Statement::TSDeclareFunction(decl) => self.print_declare_function(decl),
+            Statement::TSEnumDeclaration(decl) => self.print_enum_declaration(decl),
+            Statement::TSModuleDeclaration(decl) => self.print_module_declaration(decl),
         }
     }
 
@@ -82,20 +90,7 @@ impl<'a> Printer<'a> {
                 parts.push(doc::text(";"));
                 doc::concat(parts)
             }
-            Statement::TSTypeAliasDeclaration(decl) => {
-                let id_str = self.resolve_symbol(decl.id.name);
-                // For type alias, extract from source for now (type printing is complex)
-                let type_start = decl.type_annotation.span().start as usize;
-                let type_end = decl.type_annotation.span().end as usize;
-                let type_str = &self.source[type_start..type_end];
-                doc::concat(vec![
-                    doc::text("type "),
-                    doc::text(id_str),
-                    doc::text(" = "),
-                    doc::text(type_str),
-                    doc::text(";"),
-                ])
-            }
+            Statement::TSTypeAliasDeclaration(decl) => self.build_type_alias_declaration_doc(decl),
             Statement::ReturnStatement(ret) => {
                 let mut parts = vec![doc::text("return")];
                 if let Some(arg) = &ret.argument {
@@ -115,7 +110,11 @@ impl<'a> Printer<'a> {
                 self.build_export_default_declaration_doc(decl)
             }
             Statement::ExportAllDeclaration(decl) => self.build_export_all_declaration_doc(decl),
+            Statement::TSExportAssignment(decl) => self.build_export_assignment_doc(decl),
             Statement::ImportDeclaration(decl) => self.build_import_declaration_doc(decl),
+            Statement::TSImportEqualsDeclaration(decl) => {
+                self.build_import_equals_declaration_doc(decl)
+            }
             // Control flow statements - use simple doc building
             Statement::IfStatement(stmt) => self.build_if_statement_doc(stmt),
             Statement::ForStatement(stmt) => self.build_for_statement_doc(stmt),
@@ -130,6 +129,10 @@ impl<'a> Printer<'a> {
             Statement::ContinueStatement(stmt) => self.build_continue_statement_doc(stmt),
             Statement::LabeledStatement(stmt) => self.build_labeled_statement_doc(stmt),
             Statement::EmptyStatement(_) => doc::text(";"),
+            Statement::TSInterfaceDeclaration(decl) => self.build_interface_declaration_doc(decl),
+            Statement::TSDeclareFunction(decl) => self.build_declare_function_doc(decl),
+            Statement::TSEnumDeclaration(decl) => self.build_enum_declaration_doc(decl),
+            Statement::TSModuleDeclaration(decl) => self.build_module_declaration_doc(decl),
         }
     }
 
@@ -146,13 +149,35 @@ impl<'a> Printer<'a> {
         if needs_parens {
             self.write(")");
         }
+
+        // For expression statements, prettier keeps comments BEFORE the semicolon.
+        // This differs from variable declarations which move comments after the semicolon.
+        // Example: `1 as const /* comment */;` stays as `1 as const /* comment */;`
+        let expr_end = stmt.expression.span().end;
+        // Find where the semicolon is (it's the last character of the statement)
+        // Comments between expression end and statement end (excluding semicolon) go before
+        let semicolon_pos = stmt.span.end.saturating_sub(1);
+        if self.has_comments_between(expr_end, semicolon_pos) {
+            self.print_inline_comments_between(expr_end, semicolon_pos);
+        }
+
         self.write(";");
 
-        // Print inline comments - includes both:
-        // 1. Comments after semicolon (stmt.span.end)
-        // 2. Comments before semicolon (between expression.end and stmt.span.end)
-        // Prettier moves comments from before semicolon to after it
-        self.print_inline_comments_in_statement(stmt.expression.span().end, stmt.span.end);
+        // Print trailing comments after the semicolon (on same line only)
+        self.print_trailing_same_line_comments(stmt.span.end);
+    }
+
+    /// Print trailing comments on the same line after a position
+    fn print_trailing_same_line_comments(&mut self, after_pos: u32) {
+        let first_idx = tsv_lang::find_first_comment_from(self.comments, after_pos);
+        for comment in &self.comments[first_idx..] {
+            if tsv_lang::printing::is_same_line(self.source, after_pos, comment.span.start) {
+                self.write(" ");
+                self.print_comment(comment);
+            } else {
+                break;
+            }
+        }
     }
 
     /// Check if an expression statement needs parentheses

@@ -37,11 +37,10 @@ impl Command for FormatCommand {
 
     fn usage(&self) -> Vec<String> {
         vec![
-            "format <file>                               Format file and output formatted code"
+            "format <file>                              Format file, output formatted code"
                 .to_string(),
-            "format --content <string> --parser <type>   Format string (preferred)".to_string(),
-            "format --stdin --parser <type>              Format stdin (not preferred for agents)"
-                .to_string(),
+            "format --content <string> --parser <type>  Format string (preferred)".to_string(),
+            "format --stdin --parser <type>             Format stdin (not preferred)".to_string(),
         ]
     }
 }
@@ -78,7 +77,13 @@ impl Executable for FormatExecutable {
             },
             ParserType::TypeScript => match tsv_ts::parse(source) {
                 Ok(ast) => {
-                    let formatted = tsv_ts::format(&ast, source);
+                    // For standalone TypeScript files, don't add trailing comma for arrow type params
+                    // (no Svelte template syntax disambiguation needed)
+                    let config = tsv_lang::PrintConfig {
+                        arrow_type_param_trailing_comma: false,
+                        ..Default::default()
+                    };
+                    let formatted = tsv_ts::format_with_config(&ast, source, config);
                     print!("{formatted}");
                 }
                 Err(e) => {

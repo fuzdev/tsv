@@ -1,7 +1,7 @@
 // Object, array, template, and pattern conversions
 
 use super::super::{internal, public};
-use super::{convert_expression, create_location};
+use super::{convert_expression, convert_type_annotation, create_location};
 use string_interner::DefaultStringInterner;
 use tsv_lang::LocationTracker;
 
@@ -66,6 +66,10 @@ pub(in crate::ast) fn convert_object_pattern(
             .iter()
             .map(|p| convert_object_pattern_property(p, source, loc, interner, offset))
             .collect(),
+        type_annotation: obj
+            .type_annotation
+            .as_ref()
+            .map(|ta| convert_type_annotation(ta, source, loc, interner, offset)),
     }
 }
 

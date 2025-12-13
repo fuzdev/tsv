@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 554,
+		"end": 750,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 545,
+					"end": 741,
 					"children": [
 						{
 							"type": "Declaration",
@@ -84,69 +84,118 @@
 						},
 						{
 							"type": "Declaration",
-							"start": 338,
-							"end": 367,
+							"start": 337,
+							"end": 354,
+							"property": "--abs",
+							"value": "abs(-10px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 358,
+							"end": 374,
+							"property": "--sign",
+							"value": "sign(-5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 425,
+							"end": 454,
 							"property": "transform",
 							"value": "rotate(sin(45deg))"
 						},
 						{
 							"type": "Declaration",
-							"start": 371,
-							"end": 390,
+							"start": 458,
+							"end": 477,
 							"property": "--angle",
 							"value": "cos(30deg)"
 						},
 						{
 							"type": "Declaration",
-							"start": 394,
-							"end": 415,
+							"start": 481,
+							"end": 502,
 							"property": "--tangent",
 							"value": "tan(60deg)"
 						},
 						{
 							"type": "Declaration",
-							"start": 464,
-							"end": 484,
+							"start": 506,
+							"end": 523,
+							"property": "--asin",
+							"value": "asin(0.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 527,
+							"end": 544,
+							"property": "--acos",
+							"value": "acos(0.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 548,
+							"end": 563,
+							"property": "--atan",
+							"value": "atan(1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 567,
+							"end": 587,
+							"property": "--atan2",
+							"value": "atan2(1, 1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 636,
+							"end": 656,
 							"property": "opacity",
 							"value": "pow(0.5, 2)"
 						},
 						{
 							"type": "Declaration",
-							"start": 488,
-							"end": 505,
+							"start": 660,
+							"end": 677,
 							"property": "--sqrt",
 							"value": "sqrt(144)"
 						},
 						{
 							"type": "Declaration",
-							"start": 509,
-							"end": 522,
+							"start": 681,
+							"end": 701,
+							"property": "--hypot",
+							"value": "hypot(3, 4)"
+						},
+						{
+							"type": "Declaration",
+							"start": 705,
+							"end": 718,
 							"property": "--exp",
 							"value": "exp(2)"
 						},
 						{
 							"type": "Declaration",
-							"start": 526,
-							"end": 541,
+							"start": 722,
+							"end": 737,
 							"property": "--log",
 							"value": "log(100)"
 						}
 					]
 				},
 				"start": 9,
-				"end": 545
+				"end": 741
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 546,
-			"styles": "\n\tdiv {\n\t\t/* Comparison functions (CSS Values 4) */\n\t\twidth: min(100px, 50vw, 80%);\n\t\theight: max(200px, 30vh);\n\t\tfont-size: clamp(12px, 2vw, 24px);\n\t\t/* Stepped value functions (CSS Values 4) */\n\t\t--steps: round(10.7px);\n\t\t--remainder: mod(18px, 5px);\n\t\t--rem-val: rem(18px, 5px);\n\t\t/* Trigonometric functions (CSS Values 4) */\n\t\ttransform: rotate(sin(45deg));\n\t\t--angle: cos(30deg);\n\t\t--tangent: tan(60deg);\n\t\t/* Exponential functions (CSS Values 5) */\n\t\topacity: pow(0.5, 2);\n\t\t--sqrt: sqrt(144);\n\t\t--exp: exp(2);\n\t\t--log: log(100);\n\t}\n",
+			"end": 742,
+			"styles": "\n\tdiv {\n\t\t/* Comparison functions (CSS Values 4) */\n\t\twidth: min(100px, 50vw, 80%);\n\t\theight: max(200px, 30vh);\n\t\tfont-size: clamp(12px, 2vw, 24px);\n\t\t/* Stepped value functions (CSS Values 4) */\n\t\t--steps: round(10.7px);\n\t\t--remainder: mod(18px, 5px);\n\t\t--rem-val: rem(18px, 5px);\n\t\t/* Sign-related functions (CSS Values 4) */\n\t\t--abs: abs(-10px);\n\t\t--sign: sign(-5);\n\t\t/* Trigonometric functions (CSS Values 4) */\n\t\ttransform: rotate(sin(45deg));\n\t\t--angle: cos(30deg);\n\t\t--tangent: tan(60deg);\n\t\t--asin: asin(0.5);\n\t\t--acos: acos(0.5);\n\t\t--atan: atan(1);\n\t\t--atan2: atan2(1, 1);\n\t\t/* Exponential functions (CSS Values 5) */\n\t\topacity: pow(0.5, 2);\n\t\t--sqrt: sqrt(144);\n\t\t--hypot: hypot(3, 4);\n\t\t--exp: exp(2);\n\t\t--log: log(100);\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
-	"start": null,
-	"end": null,
+	"start": 0,
+	"end": 751,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

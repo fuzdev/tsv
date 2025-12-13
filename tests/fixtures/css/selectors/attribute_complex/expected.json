@@ -402,8 +402,8 @@
 		}
 	},
 	"js": [],
-	"start": null,
-	"end": null,
+	"start": 0,
+	"end": 518,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod input_parser;
 
 use commands::{
     ast_diff::AstDiffCommand, canonical_parse::CanonicalParseCommand, compare::CompareCommand,

@@ -272,6 +272,52 @@ pub struct UseDirective {
     pub span: Span,
 }
 
+/// Direction of a transition directive
+///
+/// Encodes the three valid states instead of two booleans:
+/// - `Both`: bidirectional transition (`transition:fade`)
+/// - `In`: intro only (`in:fly`)
+/// - `Out`: outro only (`out:slide`)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransitionDirection {
+    /// Bidirectional: `transition:name` - runs on both enter and exit
+    Both,
+    /// Intro only: `in:name` - runs only on enter
+    In,
+    /// Outro only: `out:name` - runs only on exit
+    Out,
+}
+
+impl TransitionDirection {
+    /// Returns the directive prefix for this direction
+    pub const fn prefix(self) -> &'static str {
+        match self {
+            Self::Both => "transition",
+            Self::In => "in",
+            Self::Out => "out",
+        }
+    }
+
+    /// Returns the directive prefix with colon (e.g., "transition:")
+    pub const fn prefix_with_colon(self) -> &'static str {
+        match self {
+            Self::Both => "transition:",
+            Self::In => "in:",
+            Self::Out => "out:",
+        }
+    }
+
+    /// Returns true if this includes intro (enter) animation
+    pub const fn has_intro(self) -> bool {
+        matches!(self, Self::Both | Self::In)
+    }
+
+    /// Returns true if this includes outro (exit) animation
+    pub const fn has_outro(self) -> bool {
+        matches!(self, Self::Both | Self::Out)
+    }
+}
+
 /// TransitionDirective - transition (`transition:fade`, `in:fly`, `out:slide`)
 ///
 /// Controls enter/exit animations. Can be bidirectional (transition:) or unidirectional (in:/out:).
@@ -280,8 +326,7 @@ pub struct TransitionDirective {
     pub name: String,                   // Transition name: "fade", "fly", "slide", etc.
     pub expression: Option<Expression>, // Transition parameters
     pub modifiers: Vec<String>,         // "local", "global"
-    pub intro: bool,                    // true for transition: and in:
-    pub outro: bool,                    // true for transition: and out:
+    pub direction: TransitionDirection, // Which animations to run
     pub span: Span,
 }
 
@@ -311,6 +356,67 @@ pub struct LetDirective {
 // Special Elements
 // =============================================================================
 
+/// Tag identifier for special elements (used during parsing before data is available)
+///
+/// This is a simple Copy enum used to identify the kind of special element
+/// before we've parsed the `this` attribute. After parsing, use `SpecialElementKind`
+/// which includes the associated data.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpecialElementTag {
+    SvelteHead,
+    SvelteWindow,
+    SvelteBody,
+    SvelteDocument,
+    SvelteElement,
+    SvelteComponent,
+    SvelteSelf,
+    SlotElement,
+    SvelteFragment,
+    SvelteBoundary,
+    TitleElement,
+}
+
+impl SpecialElementTag {
+    /// Try to parse a tag name into a special element tag
+    ///
+    /// Note: `title` is only TitleElement when inside `<svelte:head>`,
+    /// which must be checked by the caller.
+    pub fn from_tag_name(name: &str, in_svelte_head: bool) -> Option<Self> {
+        match name {
+            "svelte:head" => Some(Self::SvelteHead),
+            "svelte:window" => Some(Self::SvelteWindow),
+            "svelte:body" => Some(Self::SvelteBody),
+            "svelte:document" => Some(Self::SvelteDocument),
+            "svelte:element" => Some(Self::SvelteElement),
+            "svelte:component" => Some(Self::SvelteComponent),
+            "svelte:self" => Some(Self::SvelteSelf),
+            "slot" => Some(Self::SlotElement),
+            "svelte:fragment" => Some(Self::SvelteFragment),
+            "svelte:boundary" => Some(Self::SvelteBoundary),
+            "title" if in_svelte_head => Some(Self::TitleElement),
+            _ => None,
+        }
+    }
+
+    /// Returns the tag name as it appears in source code
+    #[inline]
+    pub const fn tag_name(self) -> &'static str {
+        match self {
+            Self::SvelteHead => "svelte:head",
+            Self::SvelteWindow => "svelte:window",
+            Self::SvelteBody => "svelte:body",
+            Self::SvelteDocument => "svelte:document",
+            Self::SvelteElement => "svelte:element",
+            Self::SvelteComponent => "svelte:component",
+            Self::SvelteSelf => "svelte:self",
+            Self::SlotElement => "slot",
+            Self::SvelteFragment => "svelte:fragment",
+            Self::SvelteBoundary => "svelte:boundary",
+            Self::TitleElement => "title",
+        }
+    }
+}
+
 /// Kind of Svelte special element
 ///
 /// These are elements with special behavior in Svelte:
@@ -319,7 +425,10 @@ pub struct LetDirective {
 /// - Content slots: `<slot>`, `<svelte:fragment>`
 /// - Error handling: `<svelte:boundary>`
 /// - Semantic HTML: `<title>` (inside svelte:head)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Variants that require additional data (SvelteElement, SvelteComponent) carry it
+/// directly, eliminating the need for Option fields on the parent struct.
+#[derive(Debug, Clone)]
 pub enum SpecialElementKind {
     /// `<svelte:head>` - inject content into document head
     SvelteHead,
@@ -330,9 +439,9 @@ pub enum SpecialElementKind {
     /// `<svelte:document>` - bind to document events
     SvelteDocument,
     /// `<svelte:element this={tag}>` - dynamic element tag
-    SvelteElement,
+    SvelteElement { tag: Expression },
     /// `<svelte:component this={Component}>` - dynamic component (legacy)
-    SvelteComponent,
+    SvelteComponent { expression: Expression },
     /// `<svelte:self>` - recursive self-reference
     SvelteSelf,
     /// `<slot>` - content slot
@@ -348,57 +457,52 @@ pub enum SpecialElementKind {
 impl SpecialElementKind {
     /// Returns the tag name as it appears in source code
     #[inline]
-    pub const fn tag_name(self) -> &'static str {
+    pub fn tag_name(&self) -> &'static str {
         match self {
-            SpecialElementKind::SvelteHead => "svelte:head",
-            SpecialElementKind::SvelteWindow => "svelte:window",
-            SpecialElementKind::SvelteBody => "svelte:body",
-            SpecialElementKind::SvelteDocument => "svelte:document",
-            SpecialElementKind::SvelteElement => "svelte:element",
-            SpecialElementKind::SvelteComponent => "svelte:component",
-            SpecialElementKind::SvelteSelf => "svelte:self",
-            SpecialElementKind::SlotElement => "slot",
-            SpecialElementKind::SvelteFragment => "svelte:fragment",
-            SpecialElementKind::SvelteBoundary => "svelte:boundary",
-            SpecialElementKind::TitleElement => "title",
+            Self::SvelteHead => "svelte:head",
+            Self::SvelteWindow => "svelte:window",
+            Self::SvelteBody => "svelte:body",
+            Self::SvelteDocument => "svelte:document",
+            Self::SvelteElement { .. } => "svelte:element",
+            Self::SvelteComponent { .. } => "svelte:component",
+            Self::SvelteSelf => "svelte:self",
+            Self::SlotElement => "slot",
+            Self::SvelteFragment => "svelte:fragment",
+            Self::SvelteBoundary => "svelte:boundary",
+            Self::TitleElement => "title",
         }
     }
 
     /// Returns the AST node type name for JSON output
     #[inline]
-    pub const fn node_type(self) -> &'static str {
+    pub fn node_type(&self) -> &'static str {
         match self {
-            SpecialElementKind::SvelteHead => "SvelteHead",
-            SpecialElementKind::SvelteWindow => "SvelteWindow",
-            SpecialElementKind::SvelteBody => "SvelteBody",
-            SpecialElementKind::SvelteDocument => "SvelteDocument",
-            SpecialElementKind::SvelteElement => "SvelteElement",
-            SpecialElementKind::SvelteComponent => "SvelteComponent",
-            SpecialElementKind::SvelteSelf => "SvelteSelf",
-            SpecialElementKind::SlotElement => "SlotElement",
-            SpecialElementKind::SvelteFragment => "SvelteFragment",
-            SpecialElementKind::SvelteBoundary => "SvelteBoundary",
-            SpecialElementKind::TitleElement => "TitleElement",
+            Self::SvelteHead => "SvelteHead",
+            Self::SvelteWindow => "SvelteWindow",
+            Self::SvelteBody => "SvelteBody",
+            Self::SvelteDocument => "SvelteDocument",
+            Self::SvelteElement { .. } => "SvelteElement",
+            Self::SvelteComponent { .. } => "SvelteComponent",
+            Self::SvelteSelf => "SvelteSelf",
+            Self::SlotElement => "SlotElement",
+            Self::SvelteFragment => "SvelteFragment",
+            Self::SvelteBoundary => "SvelteBoundary",
+            Self::TitleElement => "TitleElement",
         }
     }
 
-    /// Try to parse a tag name into a special element kind
-    ///
-    /// Note: `title` is only TitleElement when inside `<svelte:head>`,
-    /// which must be checked by the caller.
-    pub fn from_tag_name(name: &str, in_svelte_head: bool) -> Option<Self> {
-        match name {
-            "svelte:head" => Some(SpecialElementKind::SvelteHead),
-            "svelte:window" => Some(SpecialElementKind::SvelteWindow),
-            "svelte:body" => Some(SpecialElementKind::SvelteBody),
-            "svelte:document" => Some(SpecialElementKind::SvelteDocument),
-            "svelte:element" => Some(SpecialElementKind::SvelteElement),
-            "svelte:component" => Some(SpecialElementKind::SvelteComponent),
-            "svelte:self" => Some(SpecialElementKind::SvelteSelf),
-            "slot" => Some(SpecialElementKind::SlotElement),
-            "svelte:fragment" => Some(SpecialElementKind::SvelteFragment),
-            "svelte:boundary" => Some(SpecialElementKind::SvelteBoundary),
-            "title" if in_svelte_head => Some(SpecialElementKind::TitleElement),
+    /// Get the tag expression for SvelteElement
+    pub fn tag(&self) -> Option<&Expression> {
+        match self {
+            Self::SvelteElement { tag } => Some(tag),
+            _ => None,
+        }
+    }
+
+    /// Get the component expression for SvelteComponent
+    pub fn expression(&self) -> Option<&Expression> {
+        match self {
+            Self::SvelteComponent { expression } => Some(expression),
             _ => None,
         }
     }
@@ -411,15 +515,14 @@ impl SpecialElementKind {
 /// - `<svelte:element>` (dynamic tag), `<svelte:component>` (dynamic component)
 /// - `<svelte:self>`, `<slot>`, `<svelte:fragment>`, `<svelte:boundary>`
 /// - `<title>` (when inside `<svelte:head>`)
+///
+/// Variant-specific data (tag for SvelteElement, expression for SvelteComponent)
+/// is stored in the `SpecialElementKind` enum, not as Option fields here.
 #[derive(Debug, Clone)]
 pub struct SpecialElement {
     pub kind: SpecialElementKind,
     pub attributes: Vec<AttributeNode>,
     pub fragment: Fragment,
-    /// Dynamic tag expression for `<svelte:element this={tag}>`
-    pub tag: Option<Expression>,
-    /// Component expression for `<svelte:component this={Component}>`
-    pub expression: Option<Expression>,
     pub span: Span,
 }
 

@@ -34,6 +34,16 @@ pub struct Parser<'a> {
     /// End position of the previous token (before current). Used for span calculation
     /// when ASI inserts a semicolon.
     prev_end: usize,
+    /// Whether to parse TypeScript `as`/`satisfies` operators.
+    /// Disabled in partial expression parsing for Svelte template contexts
+    /// where `as` has different meaning (e.g., `{#each items as pattern}`).
+    allow_ts_type_assertions: bool,
+    /// True when parsing inside `declare namespace` or `declare module`.
+    /// Functions inside ambient contexts don't have bodies (end with `;`).
+    in_ambient_context: bool,
+    /// Stored lexer error from peek_kind(). Returned on next advance() call.
+    /// This ensures lexer errors propagate even when peek swallows them.
+    lexer_error: Option<ParseError>,
 }
 
 impl<'a> Parser<'a> {
@@ -89,10 +99,22 @@ impl<'a> Parser<'a> {
             comments,
             had_line_terminator: false, // No line terminator before first token
             prev_end: 0,
+            allow_ts_type_assertions: true, // Enable by default (TypeScript context)
+            in_ambient_context: false,      // Not in declare namespace/module
+            lexer_error: None,              // No stored lexer error
         })
     }
 
     pub(super) fn advance(&mut self) -> Result<(), ParseError> {
+        // Check for stored lexer error from peek_kind() - propagate it now
+        if let Some(err) = self.lexer_error.take() {
+            return Err(err);
+        }
+        self.advance_inner()
+    }
+
+    /// Advance without checking stored error first. Used by try_advance().
+    fn advance_inner(&mut self) -> Result<(), ParseError> {
         // Save previous token's end position for ASI span calculation
         self.prev_end = self.current_end;
 
@@ -145,6 +167,19 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    /// Try to advance, storing any error for later instead of returning it.
+    /// Returns true on success, false on error (with error stored in lexer_error).
+    /// Used by eat() and eat_contextual_keyword() which return bool.
+    fn try_advance(&mut self) -> bool {
+        match self.advance_inner() {
+            Ok(()) => true,
+            Err(err) => {
+                self.lexer_error = Some(err);
+                false
+            }
+        }
+    }
+
     pub(super) fn intern(&self, s: &str) -> DefaultSymbol {
         self.interner.borrow_mut().get_or_intern(s)
     }
@@ -170,6 +205,14 @@ impl<'a> Parser<'a> {
         )
     }
 
+    /// Get the end position of the previously consumed token (with base_offset).
+    ///
+    /// Useful for determining where statements end after consuming optional tokens
+    /// like semicolons (via ASI or explicit).
+    pub(super) fn prev_token_end(&self) -> usize {
+        self.prev_end + self.base_offset
+    }
+
     /// Get the raw end position (without base_offset) for lexer operations
     pub(super) fn current_raw_end(&self) -> usize {
         self.current_end
@@ -181,16 +224,37 @@ impl<'a> Parser<'a> {
 
     /// Get the decoded string value for the current token (for strings with escapes)
     ///
-    /// Currently unused (printer preserves escapes as-is instead of decoding).
-    /// This will be needed in the future for:
+    /// Used for:
+    /// - Identifiers with unicode escapes (\u0066oo → "foo")
     /// - Expression evaluation (computing const values)
     /// - Type analysis (analyzing string literal types)
     /// - Linting (analyzing string content for patterns)
-    ///
-    /// Keep this method for future tooling that needs runtime string values.
-    #[allow(dead_code)]
     pub(super) fn current_decoded(&self) -> Option<&str> {
         self.current_decoded.as_deref()
+    }
+
+    /// Get the identifier name from the current token.
+    ///
+    /// For identifiers with unicode escapes, returns the decoded name.
+    /// For regular identifiers, returns the raw source text.
+    ///
+    /// Example: `\u0066oo` returns "foo", `bar` returns "bar"
+    pub(super) fn current_identifier_name(&self) -> &str {
+        self.current_decoded
+            .as_deref()
+            .unwrap_or_else(|| self.current_value())
+    }
+
+    /// Intern the current identifier, using decoded name if available.
+    ///
+    /// This is the canonical way to intern identifiers. For identifiers with
+    /// unicode escapes (e.g., `\u0066oo`), returns the decoded symbol (`foo`).
+    /// For regular identifiers, returns the raw source text.
+    ///
+    /// Use this instead of `self.intern(self.current_value())` for all identifier
+    /// interning to ensure escaped identifiers are handled correctly.
+    pub(super) fn intern_identifier(&self) -> DefaultSymbol {
+        self.intern(self.current_identifier_name())
     }
 
     pub(super) fn check(&self, kind: &TokenKind) -> bool {
@@ -226,17 +290,24 @@ impl<'a> Parser<'a> {
     }
 
     // Peek helpers for lookahead (needed for type annotations, operators, etc.)
-    // Lazily computes peek token on first access
+    // Lazily computes peek token on first access.
+    // Stores lexer errors to be returned on next advance() call.
     pub(super) fn peek_kind(&mut self) -> TokenKind {
-        if self.peek_cache.is_none()
-            && let Ok(token) = self.lexer.next_token()
-        {
-            self.peek_cache = Some(PeekData::with_decoded(
-                token.kind,
-                token.start,
-                token.end,
-                token.decoded,
-            ));
+        if self.peek_cache.is_none() && self.lexer_error.is_none() {
+            match self.lexer.next_token() {
+                Ok(token) => {
+                    self.peek_cache = Some(PeekData::with_decoded(
+                        token.kind,
+                        token.start,
+                        token.end,
+                        token.decoded,
+                    ));
+                }
+                Err(err) => {
+                    // Store error to be returned on next advance()
+                    self.lexer_error = Some(err);
+                }
+            }
         }
         self.peek_cache
             .as_ref()
@@ -248,9 +319,21 @@ impl<'a> Parser<'a> {
         &self.peek_kind() == kind
     }
 
+    /// Get the value of the peek token as a string slice
+    pub(super) fn peek_value(&self) -> &str {
+        self.peek_cache
+            .as_ref()
+            .map_or("", |p| &self.source[p.start..p.end])
+    }
+
     /// Check if peek token is an identifier (used for contextual keyword disambiguation)
     pub(super) fn peek_is_identifier(&mut self) -> bool {
         matches!(self.peek_kind(), TokenKind::Identifier)
+    }
+
+    /// Check if peek token is a specific kind
+    pub(super) fn peek_is(&mut self, kind: &TokenKind) -> bool {
+        self.peek_kind() == *kind
     }
 
     /// Check if peek token could be a property name (identifier, keyword, string, or computed key)
@@ -269,6 +352,88 @@ impl<'a> Parser<'a> {
         )
     }
 
+    /// Check if current token is an identifier or keyword.
+    ///
+    /// In JS/TypeScript, reserved words (keywords) can be used as property names
+    /// in member expressions: `obj.class`, `obj.if`, `obj.default()`.
+    ///
+    /// This is distinct from `peek_is_property_name` which also allows `[` and strings.
+    /// After `.` or `?.`, we expect just an identifier or keyword (not computed/string).
+    pub(super) fn current_is_identifier_or_keyword(&self) -> bool {
+        matches!(
+            self.current_kind,
+            TokenKind::Identifier | TokenKind::Keyword(_)
+        )
+    }
+
+    /// Get the property name string from current token (identifier or keyword).
+    ///
+    /// Returns the string representation for property name contexts where both
+    /// identifiers and keywords are valid (e.g., after `.` in member access).
+    ///
+    /// # Precondition
+    /// Current token must be an identifier or keyword. Call `current_is_identifier_or_keyword()`
+    /// to verify before calling this method.
+    pub(super) fn current_property_name(&self) -> &str {
+        match &self.current_kind {
+            TokenKind::Identifier => self.current_value(),
+            TokenKind::Keyword(kw) => kw.as_str(),
+            _ => {
+                debug_assert!(
+                    false,
+                    "current_property_name called on non-identifier/keyword token"
+                );
+                // Return empty string as fallback in release builds
+                ""
+            }
+        }
+    }
+
+    /// Check if peek token could be a class member name (identifier, keyword, computed key, or private identifier)
+    ///
+    /// Used to detect accessor syntax in class bodies:
+    /// - `get x() {}` - getter (peek is `x` = identifier)
+    /// - `get #x() {}` - private getter (peek is `#`)
+    /// - `get [expr]() {}` - computed getter (peek is `[`)
+    pub(super) fn peek_is_class_member_name(&mut self) -> bool {
+        matches!(
+            self.peek_kind(),
+            TokenKind::Identifier
+                | TokenKind::BracketOpen
+                | TokenKind::String
+                | TokenKind::Keyword(_)
+                | TokenKind::Hash
+        )
+    }
+
+    /// Parse a private identifier: `#name`
+    ///
+    /// Current token must be `#`, followed by an identifier.
+    /// Returns the PrivateIdentifier with span including the `#`.
+    pub(super) fn parse_private_identifier(&mut self) -> Result<PrivateIdentifier, ParseError> {
+        debug_assert!(matches!(self.current_kind(), TokenKind::Hash));
+        let start = self.current_pos().0;
+        self.advance()?; // consume '#'
+
+        // Must be followed by an identifier
+        if !matches!(self.current_kind(), TokenKind::Identifier) {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected identifier after '#'".to_string(),
+                position: self.current_pos().0,
+                context: None,
+            });
+        }
+
+        let (_, end) = self.current_pos();
+        let name = self.intern_identifier();
+        self.advance()?;
+
+        Ok(PrivateIdentifier {
+            name,
+            span: Span::new(start as u32, end as u32),
+        })
+    }
+
     pub(super) fn expect(&mut self, kind: &TokenKind) -> Result<(), ParseError> {
         if self.check(kind) {
             self.advance()
@@ -280,6 +445,79 @@ impl<'a> Parser<'a> {
                 context: None,
             })
         }
+    }
+
+    /// Expect `>` in type context, handling compound token splitting
+    ///
+    /// In TypeScript, compound tokens starting with `>` can appear in type contexts where
+    /// they need to be split (e.g., `Array<Map<K, V>>`, `const k: <T>() => T = ...`).
+    ///
+    /// This method:
+    /// - Consumes `>` normally if current token is `>`
+    /// - Splits `>>` into `>` + `>`, consuming the first
+    /// - Splits `>>>` into `>` + `>>`, consuming the first
+    /// - Splits `>=` into `>` + re-lex (may become `=>`)
+    /// - Splits `>>=` into `>` + re-lex (may become `>=` or `>` + `=`)
+    /// - Splits `>>>=` into `>` + re-lex (may become `>>=`)
+    pub(super) fn expect_greater_than_in_type(&mut self) -> Result<(), ParseError> {
+        match self.current_kind {
+            TokenKind::GreaterThan => {
+                // Normal case: single `>`
+                self.advance()
+            }
+            TokenKind::RightShift => {
+                // `>>` - split into `>` + `>`
+                // Consume first `>` by advancing start position
+                self.current_start += 1;
+                self.current_kind = TokenKind::GreaterThan;
+                // Clear peek cache since token boundaries changed
+                self.peek_cache = None;
+                Ok(())
+            }
+            TokenKind::UnsignedRightShift => {
+                // `>>>` - split into `>` + `>>`
+                // Consume first `>` by advancing start position
+                self.current_start += 1;
+                self.current_kind = TokenKind::RightShift;
+                // Clear peek cache since token boundaries changed
+                self.peek_cache = None;
+                Ok(())
+            }
+            TokenKind::GreaterThanEquals
+            | TokenKind::RightShiftEquals
+            | TokenKind::UnsignedRightShiftEquals => {
+                // `>=`, `>>=`, `>>>=` - consume `>`, re-lex from next position
+                // The remainder might combine with subsequent chars (e.g., `>=` -> `=>`)
+                let new_start = self.current_start + 1;
+                let token = self.lexer.seek_and_next_token(new_start)?;
+                self.current_kind = token.kind;
+                self.current_start = token.start;
+                self.current_end = token.end;
+                self.current_decoded = token.decoded;
+                // Clear peek cache since token changed
+                self.peek_cache = None;
+                Ok(())
+            }
+            _ => Err(ParseError::UnexpectedToken {
+                expected: "'>'".to_string(),
+                found: format!("'{}'", self.current_kind),
+                position: self.current_start,
+                context: None,
+            }),
+        }
+    }
+
+    /// Check if current token is `>` or can be split to produce `>` (for type contexts)
+    pub(super) fn check_greater_than_in_type(&self) -> bool {
+        matches!(
+            self.current_kind,
+            TokenKind::GreaterThan
+                | TokenKind::RightShift
+                | TokenKind::UnsignedRightShift
+                | TokenKind::GreaterThanEquals
+                | TokenKind::RightShiftEquals
+                | TokenKind::UnsignedRightShiftEquals
+        )
     }
 
     /// Consume a token if it matches the given kind (optional token consumption)
@@ -300,22 +538,23 @@ impl<'a> Parser<'a> {
     /// };
     /// ```
     pub(super) fn eat(&mut self, kind: TokenKind) -> bool {
-        if self.check(&kind) {
-            self.advance().is_ok()
-        } else {
-            false
-        }
+        self.check(&kind) && self.try_advance()
     }
 
     /// Consume a contextual keyword if present (identifier with specific value).
     /// Returns true if consumed, false otherwise.
     #[inline]
     pub(super) fn eat_contextual_keyword(&mut self, keyword: &str) -> bool {
-        if matches!(self.current_kind(), TokenKind::Identifier) && self.current_value() == keyword {
-            self.advance().is_ok()
-        } else {
-            false
-        }
+        matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() == keyword
+            && self.try_advance()
+    }
+
+    /// Check if the next (peek) token is a contextual keyword.
+    /// Does not consume any tokens (only peeks).
+    #[inline]
+    pub(super) fn peek_is_contextual_keyword(&mut self, keyword: &str) -> bool {
+        matches!(self.peek_kind(), TokenKind::Identifier) && self.peek_value() == keyword
     }
 
     /// Check if a semicolon can be inserted at the current position (ASI).
@@ -342,8 +581,16 @@ impl<'a> Parser<'a> {
     ///
     /// Returns Err if neither explicit semicolon nor ASI conditions are met.
     pub(super) fn semicolon(&mut self) -> Result<(), ParseError> {
+        // Check for stored lexer error first (from failed eat/peek operations)
+        if let Some(err) = self.lexer_error.take() {
+            return Err(err);
+        }
         if self.eat(TokenKind::Semicolon) {
             return Ok(());
+        }
+        // Check again after eat() in case it stored an error
+        if let Some(err) = self.lexer_error.take() {
+            return Err(err);
         }
         if self.can_insert_semicolon() {
             return Ok(());
@@ -418,42 +665,117 @@ impl<'a> Parser<'a> {
                 // Parse parameter: identifier, array pattern, or object pattern
                 let param = match self.current_kind() {
                     TokenKind::Identifier => {
-                        // Simple identifier parameter
-                        let (param_start, param_end) = self.current_pos();
-                        let symbol = self.intern(self.current_value());
-                        self.advance()?;
+                        let param_start = self.current_pos().0;
 
-                        // Check for optional marker: param?
-                        let optional = self.eat(TokenKind::Question);
-
-                        // Check for type annotation: param: type
-                        let (type_annotation, id_end) = if self.check(&TokenKind::Colon) {
-                            let ta = self.parse_type_annotation()?;
-                            let end = ta.span.end;
-                            (Some(ta), end as usize)
+                        // Check for parameter property modifiers: public, private, protected, readonly
+                        let accessibility = if self.eat_contextual_keyword("public") {
+                            Some(Accessibility::Public)
+                        } else if self.eat_contextual_keyword("private") {
+                            Some(Accessibility::Private)
+                        } else if self.eat_contextual_keyword("protected") {
+                            Some(Accessibility::Protected)
                         } else {
-                            (None, param_end)
+                            None
                         };
 
-                        let mut param = Expression::Identifier(Identifier {
-                            name: symbol,
-                            optional,
-                            type_annotation,
-                            span: Span::new(param_start as u32, id_end as u32),
-                        });
+                        // Check for readonly modifier (can appear alone or after accessibility)
+                        let readonly = self.eat_contextual_keyword("readonly");
 
-                        // Check for default value: param = default
-                        if self.check(&TokenKind::Equals) {
-                            self.advance()?; // consume '='
-                            let default_value = self.parse_assignment_expression()?;
-                            let assign_end = default_value.span().end;
-                            param = Expression::AssignmentPattern(AssignmentPattern {
-                                left: Box::new(param),
-                                right: Box::new(default_value),
-                                span: Span::new(param_start as u32, assign_end),
+                        // If we have modifiers, this is a parameter property
+                        if accessibility.is_some() || readonly {
+                            // Parse the parameter name
+                            let (id_start, id_end) = self.current_pos();
+                            if !matches!(self.current_kind(), TokenKind::Identifier) {
+                                return Err(ParseError::InvalidSyntax {
+                                    message: "Expected parameter name after modifier".to_string(),
+                                    position: id_start,
+                                    context: None,
+                                });
+                            }
+                            let symbol = self.intern_identifier();
+                            self.advance()?;
+
+                            // Check for optional marker: param?
+                            let optional = self.eat(TokenKind::Question);
+
+                            // Check for type annotation: param: type
+                            let (type_annotation, end_pos) = if self.check(&TokenKind::Colon) {
+                                let ta = self.parse_type_annotation()?;
+                                let end = ta.span.end;
+                                (Some(ta), end as usize)
+                            } else {
+                                (None, id_end)
+                            };
+
+                            let identifier = Identifier {
+                                name: symbol,
+                                optional,
+                                type_annotation,
+                                span: Span::new(id_start as u32, end_pos as u32),
+                            };
+
+                            // Check for default value: param = default
+                            let (parameter, param_end): (Expression, u32) =
+                                if self.check(&TokenKind::Equals) {
+                                    self.advance()?;
+                                    let default_value = self.parse_assignment_expression()?;
+                                    let assign_end = default_value.span().end;
+                                    (
+                                        Expression::AssignmentPattern(AssignmentPattern {
+                                            left: Box::new(Expression::Identifier(identifier)),
+                                            right: Box::new(default_value),
+                                            span: Span::new(id_start as u32, assign_end),
+                                        }),
+                                        assign_end,
+                                    )
+                                } else {
+                                    (Expression::Identifier(identifier), end_pos as u32)
+                                };
+
+                            Expression::TSParameterProperty(TSParameterProperty {
+                                accessibility,
+                                readonly,
+                                parameter: Box::new(parameter),
+                                span: Span::new(param_start as u32, param_end),
+                            })
+                        } else {
+                            // Simple identifier parameter (no modifiers)
+                            let (param_start, param_end) = self.current_pos();
+                            let symbol = self.intern_identifier();
+                            self.advance()?;
+
+                            // Check for optional marker: param?
+                            let optional = self.eat(TokenKind::Question);
+
+                            // Check for type annotation: param: type
+                            let (type_annotation, id_end) = if self.check(&TokenKind::Colon) {
+                                let ta = self.parse_type_annotation()?;
+                                let end = ta.span.end;
+                                (Some(ta), end as usize)
+                            } else {
+                                (None, param_end)
+                            };
+
+                            let mut param = Expression::Identifier(Identifier {
+                                name: symbol,
+                                optional,
+                                type_annotation,
+                                span: Span::new(param_start as u32, id_end as u32),
                             });
+
+                            // Check for default value: param = default
+                            if self.check(&TokenKind::Equals) {
+                                self.advance()?; // consume '='
+                                let default_value = self.parse_assignment_expression()?;
+                                let assign_end = default_value.span().end;
+                                param = Expression::AssignmentPattern(AssignmentPattern {
+                                    left: Box::new(param),
+                                    right: Box::new(default_value),
+                                    span: Span::new(param_start as u32, assign_end),
+                                });
+                            }
+                            param
                         }
-                        param
                     }
                     TokenKind::BracketOpen => {
                         // Array destructuring pattern: [a, b]
@@ -500,7 +822,7 @@ impl<'a> Parser<'a> {
 
                         // Parse the identifier
                         let (id_start, id_end) = self.current_pos();
-                        let symbol = self.intern(self.current_value());
+                        let symbol = self.intern_identifier();
                         self.expect(&TokenKind::Identifier)?;
 
                         // Check for type annotation: ...args: type
@@ -579,12 +901,22 @@ impl<'a> Parser<'a> {
     /// This is useful for parsing expressions embedded in contexts where commas
     /// have other meanings (like `{#each items as pattern, index}`).
     ///
+    /// TypeScript `as`/`satisfies` parsing is disabled in this mode because `as`
+    /// has special meaning in Svelte template contexts (e.g., `{#each items as pattern}`).
+    ///
     /// Returns (expression, end_position) where end_position is where the next
     /// unparsed content begins (in absolute source coordinates with base_offset).
     pub fn parse_assignment_expression_partial(
         &mut self,
     ) -> Result<(Expression, usize), ParseError> {
-        let expr = self.parse_assignment_expression()?;
+        // Disable TypeScript type assertion parsing in partial mode
+        // to avoid consuming `as` which has different meaning in Svelte templates
+        let saved = self.allow_ts_type_assertions;
+        self.allow_ts_type_assertions = false;
+        let result = self.parse_assignment_expression();
+        self.allow_ts_type_assertions = saved;
+
+        let expr = result?;
         // Return the start of the current (unconsumed) token
         let next_pos = self.current_start + self.base_offset;
         Ok((expr, next_pos))

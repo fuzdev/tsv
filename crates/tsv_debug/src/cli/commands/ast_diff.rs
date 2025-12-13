@@ -1,6 +1,8 @@
-use crate::error::DebugError;
+use crate::cli::input_parser;
+use crate::diff::{diff_to_string, ColorChoice, DiffOptions};
+use crate::error;
 use crate::fixtures;
-use std::process::Command as ProcessCommand;
+use crate::{deno, subprocess};
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
 use tsv_cli::cli::input::{Input, ParserType};
@@ -14,44 +16,11 @@ impl Command for AstDiffCommand {
     }
 
     fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        // Two modes:
-        // 1. Single input: parse → format → parse → compare
-        // 2. Two inputs: parse both → compare
-        let content1 = args.option("content");
-        let use_stdin = args.flag("stdin");
-        let file1 = args.positional();
-        let file2 = args.positional();
+        // Parse first input
+        let (input1, parser_type) = input_parser::parse_input_and_parser_type(args)?;
 
-        let (input1, input2, parser_type) = if let Some(content) = content1 {
-            // Single content mode: parse → format → parse
-            let parser = args
-                .option("parser")
-                .ok_or("Error: --parser required when using --content")?
-                .parse()?;
-            (Input::from_content(content), None, parser)
-        } else if use_stdin {
-            // Single stdin mode: parse → format → parse
-            let parser = args
-                .option("parser")
-                .ok_or("Error: --parser required when using --stdin")?
-                .parse()?;
-            (Input::from_stdin()?, None, parser)
-        } else if let Some(path1) = file1 {
-            let parser = ParserType::from_extension(&path1);
-            if let Some(path2) = file2 {
-                // Two file mode: compare both
-                (
-                    Input::from_file(&path1)?,
-                    Some(Input::from_file(&path2)?),
-                    parser,
-                )
-            } else {
-                // Single file mode: parse → format → parse
-                (Input::from_file(&path1)?, None, parser)
-            }
-        } else {
-            return Err("No input provided. Use file path(s), --content, or --stdin".to_string());
-        };
+        // Parse optional second input (for two-file comparison mode)
+        let input2 = input_parser::parse_optional_second_input(args, parser_type)?;
 
         Ok(Box::new(AstDiffExecutable {
             input1,
@@ -111,7 +80,7 @@ async fn compare_two_inputs(
     input1: &Input,
     input2: &Input,
     parser_type: ParserType,
-) -> crate::error::Result<bool> {
+) -> error::Result<bool> {
     let content1 = input1.content();
     let content2 = input2.content();
 
@@ -122,7 +91,7 @@ async fn compare_two_inputs(
 }
 
 /// Compare round-trip: parse → format → parse → compare
-async fn compare_round_trip(input: &Input, parser_type: ParserType) -> crate::error::Result<bool> {
+async fn compare_round_trip(input: &Input, parser_type: ParserType) -> error::Result<bool> {
     let content = input.content();
 
     // Parse original
@@ -138,70 +107,30 @@ async fn compare_round_trip(input: &Input, parser_type: ParserType) -> crate::er
 }
 
 /// Parse content to JSON AST string
-async fn parse_to_json(content: &str, parser_type: ParserType) -> crate::error::Result<String> {
+async fn parse_to_json(content: &str, parser_type: ParserType) -> error::Result<String> {
     match parser_type {
-        ParserType::Svelte => Ok(fuz_client::parse_svelte(content).await?),
-        ParserType::TypeScript => Ok(fuz_client::parse_typescript(content).await?),
+        ParserType::Svelte => Ok(deno::parse_svelte(content).await?),
+        ParserType::TypeScript => Ok(deno::parse_typescript(content).await?),
         ParserType::Css => {
             // Use our Rust parser for CSS
-            let output = ProcessCommand::new("cargo")
-                .args([
-                    "run",
-                    "-p",
-                    "tsv_cli",
-                    "--quiet",
-                    "--",
-                    "parse",
-                    "--content",
-                ])
-                .arg(content)
-                .args(["--pretty"])
-                .output()?;
-
-            if output.status.success() {
-                Ok(String::from_utf8_lossy(&output.stdout).to_string())
-            } else {
-                Err(DebugError::Command(
-                    String::from_utf8_lossy(&output.stderr).into_owned(),
-                ))
-            }
+            subprocess::run_tsv_parse(content, true)
         }
     }
 }
 
 /// Format content using our Rust printer
-fn format_content(content: &str, parser_type: ParserType) -> crate::error::Result<String> {
+fn format_content(content: &str, parser_type: ParserType) -> error::Result<String> {
     let parser_name = match parser_type {
         ParserType::Svelte => "svelte",
         ParserType::TypeScript => "typescript",
         ParserType::Css => "css",
     };
 
-    let output = ProcessCommand::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "tsv_cli",
-            "--quiet",
-            "--",
-            "format",
-            "--content",
-        ])
-        .arg(content)
-        .args(["--parser", parser_name])
-        .output()?;
-
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    } else {
-        Err(DebugError::Command(
-            String::from_utf8_lossy(&output.stderr).into_owned(),
-        ))
-    }
+    subprocess::run_tsv_format(content, parser_name)
 }
 
 /// Compare two AST JSON strings (ignoring spans/locations)
-fn compare_asts(json1: &str, json2: &str) -> crate::error::Result<bool> {
+fn compare_asts(json1: &str, json2: &str) -> error::Result<bool> {
     let ast1: serde_json::Value = serde_json::from_str(json1)?;
     let ast2: serde_json::Value = serde_json::from_str(json2)?;
 
@@ -209,5 +138,29 @@ fn compare_asts(json1: &str, json2: &str) -> crate::error::Result<bool> {
     let ast1_clean = fixtures::remove_locations(ast1);
     let ast2_clean = fixtures::remove_locations(ast2);
 
-    Ok(ast1_clean == ast2_clean)
+    if ast1_clean == ast2_clean {
+        return Ok(true);
+    }
+
+    // Show diff when they don't match
+    let pretty1 = serde_json::to_string_pretty(&ast1_clean)?;
+    let pretty2 = serde_json::to_string_pretty(&ast2_clean)?;
+
+    println!("\n=== AST Diff ===");
+    let options =
+        DiffOptions::default().with_color_choice(ColorChoice::Auto);
+    let options = DiffOptions {
+        context_lines: None,
+        show_summary: true,
+        show_header: false,
+        inline_diff: true,
+        show_json_paths: true,
+        ..options
+    };
+    print!(
+        "{}",
+        diff_to_string(&pretty1, &pretty2, &options)
+    );
+
+    Ok(false)
 }

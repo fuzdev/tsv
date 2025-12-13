@@ -129,20 +129,6 @@ pub fn should_flatten(parent_op: BinaryOperator, child_op: BinaryOperator) -> bo
     true
 }
 
-/// Check if operator is a bitwise operator (|, ^, &, <<, >>, >>>)
-/// Used by needs_parens_for_clarity to add parens for code understanding
-pub fn is_bitwise_operator(op: BinaryOperator) -> bool {
-    matches!(
-        op,
-        BinaryOperator::Pipe
-            | BinaryOperator::Caret
-            | BinaryOperator::Ampersand
-            | BinaryOperator::LeftShift
-            | BinaryOperator::RightShift
-            | BinaryOperator::UnsignedRightShift
-    )
-}
-
 /// Check if operator is a bitshift operator (<<, >>, >>>)
 fn is_bitshift_operator(op: BinaryOperator) -> bool {
     matches!(

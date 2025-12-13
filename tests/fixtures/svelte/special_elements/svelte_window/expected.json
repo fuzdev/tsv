@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 38,
+	"end": 88,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,7 +10,7 @@
 			{
 				"type": "SvelteWindow",
 				"start": 0,
-				"end": 38,
+				"end": 87,
 				"name": "svelte:window",
 				"name_loc": {
 					"start": {
@@ -57,6 +57,101 @@
 								}
 							},
 							"name": "handler"
+						},
+						"modifiers": []
+					},
+					{
+						"start": 36,
+						"end": 55,
+						"type": "BindDirective",
+						"name": "innerWidth",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 36,
+								"character": 36
+							},
+							"end": {
+								"line": 1,
+								"column": 51,
+								"character": 51
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 53,
+							"end": 54,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 53
+								},
+								"end": {
+									"line": 1,
+									"column": 54
+								}
+							},
+							"name": "w"
+						},
+						"modifiers": []
+					},
+					{
+						"start": 56,
+						"end": 72,
+						"type": "BindDirective",
+						"name": "scrollY",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 56,
+								"character": 56
+							},
+							"end": {
+								"line": 1,
+								"column": 68,
+								"character": 68
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 70,
+							"end": 71,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 70
+								},
+								"end": {
+									"line": 1,
+									"column": 71
+								}
+							},
+							"name": "y"
+						},
+						"modifiers": []
+					},
+					{
+						"start": 73,
+						"end": 84,
+						"type": "BindDirective",
+						"name": "online",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 73,
+								"character": 73
+							},
+							"end": {
+								"line": 1,
+								"column": 84,
+								"character": 84
+							}
+						},
+						"expression": {
+							"start": 78,
+							"end": 84,
+							"type": "Identifier",
+							"name": "online"
 						},
 						"modifiers": []
 					}

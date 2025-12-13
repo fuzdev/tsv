@@ -1,0 +1,222 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 128,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 17,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 17,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "marker",
+											"start": 9,
+											"end": 17
+										}
+									],
+									"start": 9,
+									"end": 17
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 18,
+					"end": 36,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 22,
+							"end": 32,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 9,
+				"end": 36
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 39,
+					"end": 49,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 39,
+							"end": 49,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "li",
+											"start": 39,
+											"end": 41
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "marker",
+											"start": 41,
+											"end": 49
+										}
+									],
+									"start": 39,
+									"end": 49
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 50,
+					"end": 73,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 54,
+							"end": 69,
+							"property": "font-size",
+							"value": "1rem"
+						}
+					]
+				},
+				"start": 39,
+				"end": 73
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 76,
+					"end": 99,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 76,
+							"end": 99,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "is",
+											"args": {
+												"type": "SelectorList",
+												"start": 80,
+												"end": 98,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 80,
+														"end": 88,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "PseudoElementSelector",
+																		"name": "marker",
+																		"start": 80,
+																		"end": 88
+																	}
+																],
+																"start": 80,
+																"end": 88
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 90,
+														"end": 98,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "PseudoElementSelector",
+																		"name": "before",
+																		"start": 90,
+																		"end": 98
+																	}
+																],
+																"start": 90,
+																"end": 98
+															}
+														]
+													}
+												]
+											},
+											"start": 76,
+											"end": 99
+										}
+									],
+									"start": 76,
+									"end": 99
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 100,
+					"end": 119,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 104,
+							"end": 115,
+							"property": "content",
+							"value": "''"
+						}
+					]
+				},
+				"start": 76,
+				"end": 119
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 120,
+			"styles": "\n\t::marker {\n\t\tcolor: red;\n\t}\n\n\tli::marker {\n\t\tfont-size: 1rem;\n\t}\n\n\t:is(::marker, ::before) {\n\t\tcontent: '';\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 129,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

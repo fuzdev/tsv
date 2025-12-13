@@ -1,1 +1,1 @@
-<input data-attr="value" />
+<div data-attr="value"></div>

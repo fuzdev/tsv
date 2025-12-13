@@ -53,7 +53,7 @@ pub(in crate::ast) fn convert_statement(
         }
         internal::Statement::TSTypeAliasDeclaration(type_alias) => {
             public::Statement::TSTypeAliasDeclaration(convert_type_alias_declaration(
-                type_alias, loc, interner, offset,
+                type_alias, source, loc, interner, offset,
             ))
         }
         internal::Statement::ReturnStatement(ret) => {
@@ -85,8 +85,10 @@ pub(in crate::ast) fn convert_statement(
                 start: export_decl.span.start,
                 end: export_decl.span.end,
                 loc: create_location(export_decl.span, loc, offset),
-                // TODO: Support "type" for TypeScript `export type { T }`
-                export_kind: "value".to_string(),
+                export_kind: match export_decl.export_kind {
+                    internal::ExportKind::Value => "value".to_string(),
+                    internal::ExportKind::Type => "type".to_string(),
+                },
                 declaration: export_decl
                     .declaration
                     .as_ref()
@@ -126,12 +128,30 @@ pub(in crate::ast) fn convert_statement(
                 start: export_decl.span.start,
                 end: export_decl.span.end,
                 loc: create_location(export_decl.span, loc, offset),
-                export_kind: "value".to_string(),
+                export_kind: match export_decl.export_kind {
+                    internal::ExportKind::Value => "value".to_string(),
+                    internal::ExportKind::Type => "type".to_string(),
+                },
                 exported: export_decl
                     .exported
                     .as_ref()
                     .map(|id| convert_identifier(id, loc, interner, offset)),
                 source: convert_literal(&export_decl.source, source, loc, offset),
+            })
+        }
+        internal::Statement::TSExportAssignment(export_assign) => {
+            public::Statement::TSExportAssignment(public::TSExportAssignment {
+                node_type: "TSExportAssignment".to_string(),
+                start: export_assign.span.start,
+                end: export_assign.span.end,
+                loc: create_location(export_assign.span, loc, offset),
+                expression: convert_expression(
+                    &export_assign.expression,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                ),
             })
         }
         internal::Statement::ImportDeclaration(import_decl) => {
@@ -156,6 +176,11 @@ pub(in crate::ast) fn convert_statement(
                     .map(|a| convert_import_attribute(a, source, loc, interner, offset))
                     .collect(),
             })
+        }
+        internal::Statement::TSImportEqualsDeclaration(import_eq) => {
+            public::Statement::TSImportEqualsDeclaration(convert_import_equals_declaration(
+                import_eq, source, loc, interner, offset,
+            ))
         }
         // Control flow statements
         internal::Statement::IfStatement(if_stmt) => public::Statement::IfStatement(
@@ -207,6 +232,110 @@ pub(in crate::ast) fn convert_statement(
                 loc: create_location(empty.span, loc, offset),
             })
         }
+        internal::Statement::TSInterfaceDeclaration(iface) => {
+            public::Statement::TSInterfaceDeclaration(super::convert_interface_declaration(
+                iface, source, loc, interner, offset,
+            ))
+        }
+        internal::Statement::TSDeclareFunction(func) => public::Statement::TSDeclareFunction(
+            super::convert_declare_function(func, source, loc, interner, offset),
+        ),
+        internal::Statement::TSEnumDeclaration(enum_decl) => public::Statement::TSEnumDeclaration(
+            super::convert_enum_declaration(enum_decl, source, loc, interner, offset),
+        ),
+        internal::Statement::TSModuleDeclaration(module_decl) => {
+            public::Statement::TSModuleDeclaration(convert_module_declaration(
+                module_decl,
+                source,
+                loc,
+                interner,
+                offset,
+            ))
+        }
+    }
+}
+
+/// Convert TypeScript module/namespace declaration
+pub(in crate::ast) fn convert_module_declaration(
+    decl: &internal::TSModuleDeclaration,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::TSModuleDeclaration {
+    public::TSModuleDeclaration {
+        node_type: "TSModuleDeclaration".to_string(),
+        start: decl.span.start,
+        end: decl.span.end,
+        loc: create_location(decl.span, loc, offset),
+        id: convert_module_name(&decl.id, source, loc, interner, offset),
+        body: decl
+            .body
+            .as_ref()
+            .map(|b| convert_module_declaration_body(b, source, loc, interner, offset)),
+        declare: decl.declare,
+        global: decl.global,
+    }
+}
+
+/// Convert module/namespace name (identifier or string literal)
+fn convert_module_name(
+    name: &internal::TSModuleName,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::TSModuleName {
+    match name {
+        internal::TSModuleName::Identifier(id) => {
+            public::TSModuleName::Identifier(convert_identifier(id, loc, interner, offset))
+        }
+        internal::TSModuleName::Literal(lit) => {
+            public::TSModuleName::Literal(convert_literal(lit, source, loc, offset))
+        }
+    }
+}
+
+/// Convert module declaration body
+fn convert_module_declaration_body(
+    body: &internal::TSModuleDeclarationBody,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::TSModuleDeclarationBody {
+    match body {
+        internal::TSModuleDeclarationBody::TSModuleBlock(block) => {
+            public::TSModuleDeclarationBody::TSModuleBlock(convert_module_block(
+                block, source, loc, interner, offset,
+            ))
+        }
+        internal::TSModuleDeclarationBody::TSModuleDeclaration(nested) => {
+            public::TSModuleDeclarationBody::TSModuleDeclaration(Box::new(
+                convert_module_declaration(nested, source, loc, interner, offset),
+            ))
+        }
+    }
+}
+
+/// Convert module block
+fn convert_module_block(
+    block: &internal::TSModuleBlock,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::TSModuleBlock {
+    public::TSModuleBlock {
+        node_type: "TSModuleBlock".to_string(),
+        start: block.span.start,
+        end: block.span.end,
+        loc: create_location(block.span, loc, offset),
+        body: block
+            .body
+            .iter()
+            .map(|s| convert_statement(s, source, loc, interner, offset))
+            .collect(),
     }
 }
 
@@ -267,5 +396,102 @@ pub(in crate::ast) fn convert_identifier(
         name: interner.resolve_infallible(id.name).to_string(),
         optional: false,
         type_annotation: None,
+    }
+}
+
+fn convert_import_equals_declaration(
+    decl: &internal::TSImportEqualsDeclaration,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::TSImportEqualsDeclaration {
+    public::TSImportEqualsDeclaration {
+        node_type: "TSImportEqualsDeclaration".to_string(),
+        start: decl.span.start,
+        end: decl.span.end,
+        loc: create_location(decl.span, loc, offset),
+        import_kind: match decl.import_kind {
+            internal::ImportKind::Value => "value".to_string(),
+            internal::ImportKind::Type => "type".to_string(),
+        },
+        is_export: decl.is_export,
+        id: convert_identifier(&decl.id, loc, interner, offset),
+        module_reference: convert_module_reference(
+            &decl.module_reference,
+            source,
+            loc,
+            interner,
+            offset,
+        ),
+    }
+}
+
+fn convert_module_reference(
+    module_ref: &internal::TSModuleReference,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::TSModuleReference {
+    match module_ref {
+        internal::TSModuleReference::ExternalModuleReference(ext_ref) => {
+            public::TSModuleReference::ExternalModuleReference(public::TSExternalModuleReference {
+                node_type: "TSExternalModuleReference".to_string(),
+                start: ext_ref.span.start,
+                end: ext_ref.span.end,
+                loc: create_location(ext_ref.span, loc, offset),
+                expression: convert_literal(&ext_ref.expression, source, loc, offset),
+            })
+        }
+        internal::TSModuleReference::EntityName(entity_name) => {
+            public::TSModuleReference::EntityName(convert_entity_name(
+                entity_name,
+                loc,
+                interner,
+                offset,
+            ))
+        }
+    }
+}
+
+fn convert_entity_name(
+    name: &internal::TSEntityName,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::TSEntityName {
+    use tsv_lang::InfallibleResolve;
+
+    match name {
+        internal::TSEntityName::Identifier(id) => {
+            public::TSEntityName::Identifier(public::Identifier {
+                node_type: "Identifier".to_string(),
+                start: id.span.start,
+                end: id.span.end,
+                loc: create_location(id.span, loc, offset),
+                name: interner.resolve_infallible(id.name).to_string(),
+                optional: false,
+                type_annotation: None,
+            })
+        }
+        internal::TSEntityName::QualifiedName(qn) => {
+            public::TSEntityName::QualifiedName(public::TSQualifiedName {
+                node_type: "TSQualifiedName".to_string(),
+                start: qn.span.start,
+                end: qn.span.end,
+                loc: create_location(qn.span, loc, offset),
+                left: Box::new(convert_entity_name(&qn.left, loc, interner, offset)),
+                right: public::Identifier {
+                    node_type: "Identifier".to_string(),
+                    start: qn.right.span.start,
+                    end: qn.right.span.end,
+                    loc: create_location(qn.right.span, loc, offset),
+                    name: interner.resolve_infallible(qn.right.name).to_string(),
+                    optional: false,
+                    type_annotation: None,
+                },
+            })
+        }
     }
 }

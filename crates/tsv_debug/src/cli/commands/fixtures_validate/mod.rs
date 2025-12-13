@@ -1,4 +1,5 @@
 use crate::fixtures::{self, validation};
+use futures_util::stream::{self, StreamExt};
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
 
@@ -107,20 +108,30 @@ impl FixturesValidateExecutable {
             return;
         }
 
-        // Create validation context for cross-fixture duplicate detection
-        let mut context = validation::ValidationContext::new();
-        let mut summary = validation::ValidationSummary::new();
+        // Validate fixtures concurrently using tokio streams
+        let concurrency = std::thread::available_parallelism()
+            .map(std::num::NonZero::get)
+            .unwrap_or(4);
+        let prettier_only = self.prettier_only;
 
-        // Validate each fixture
-        for fixture in &fixture_list {
-            let result =
-                validation::validate_fixture(fixture, &mut context, self.prettier_only).await;
+        let results: Vec<_> =
+            stream::iter(fixture_list)
+                .map(|fixture| async move {
+                    validation::validate_fixture(&fixture, prettier_only).await
+                })
+                .buffer_unordered(concurrency)
+                .collect()
+                .await;
+
+        // Aggregate results
+        let mut summary = validation::ValidationSummary::new();
+        for result in results {
             summary.add(result);
         }
 
         // Check for cross-fixture duplicates (only when not filtering)
         if self.filters.is_empty() {
-            summary.cross_fixture_duplicates = context.find_duplicates();
+            summary.detect_cross_fixture_duplicates();
         }
 
         // Print results with verbose mode

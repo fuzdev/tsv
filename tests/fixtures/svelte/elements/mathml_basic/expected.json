@@ -1,0 +1,197 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 71,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 70,
+				"name": "math",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 5,
+						"character": 5
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 6,
+							"end": 8,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 8,
+							"end": 62,
+							"name": "mrow",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 9
+								},
+								"end": {
+									"line": 2,
+									"column": 6,
+									"character": 13
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 14,
+										"end": 17,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 17,
+										"end": 27,
+										"name": "mi",
+										"name_loc": {
+											"start": {
+												"line": 3,
+												"column": 3,
+												"character": 18
+											},
+											"end": {
+												"line": 3,
+												"column": 5,
+												"character": 20
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 21,
+													"end": 22,
+													"raw": "x",
+													"data": "x"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 27,
+										"end": 30,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 30,
+										"end": 40,
+										"name": "mo",
+										"name_loc": {
+											"start": {
+												"line": 4,
+												"column": 3,
+												"character": 31
+											},
+											"end": {
+												"line": 4,
+												"column": 5,
+												"character": 33
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 34,
+													"end": 35,
+													"raw": "+",
+													"data": "+"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 40,
+										"end": 43,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 43,
+										"end": 53,
+										"name": "mi",
+										"name_loc": {
+											"start": {
+												"line": 5,
+												"column": 3,
+												"character": 44
+											},
+											"end": {
+												"line": 5,
+												"column": 5,
+												"character": 46
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 47,
+													"end": 48,
+													"raw": "y",
+													"data": "y"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 53,
+										"end": 55,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 62,
+							"end": 63,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

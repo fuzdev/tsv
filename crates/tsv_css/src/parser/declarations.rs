@@ -28,18 +28,16 @@ pub(crate) fn is_nested_rule_start(parser: &mut CssParser) -> Result<bool, Parse
         // Ambiguous: identifier could be type selector (nested rule) or property name (declaration)
         // Look ahead to check if next non-whitespace/comment token is `:` (declaration) or not (nested rule)
         TokenKind::Identifier => {
-            // Peek ahead to see what comes after the identifier
-            // Note: We only peek one token, so if there's a comment between property and colon,
-            // we need to handle that case. Comments in property values are stored in the side table.
-            let next_kind = parser.peek()?;
+            // Peek past whitespace and comments to find the significant next token
+            let next_kind = parser.peek_past_whitespace()?;
             match next_kind {
-                // Colon right after identifier = declaration
+                // Colon after identifier (possibly with whitespace/comments) = declaration
                 TokenKind::Colon => Ok(false),
-                // Comment or whitespace could be followed by colon (declaration) or selector token (nested rule)
-                // For safety, assume declaration if we see comment/whitespace after identifier
-                // (nested rules typically don't have comments/whitespace before the next selector token)
-                TokenKind::Whitespace | TokenKind::Comment(_) => Ok(false),
-                // Anything else after identifier = nested rule
+                // Left brace after identifier = nested rule (e.g., "div {")
+                TokenKind::LeftBrace => Ok(true),
+                // Selector tokens after identifier = nested rule
+                TokenKind::Dot | TokenKind::Hash | TokenKind::LeftBracket => Ok(true),
+                // Other tokens - likely nested rule
                 _ => Ok(true),
             }
         }

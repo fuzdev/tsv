@@ -420,7 +420,8 @@ pub fn format_color_from_source(
                     format!("hsl({hue_str} {sat_str} {light_str})")
                 }
             }
-            _ => unreachable!(),
+            // Fallback for any other color types (future-proofing)
+            _ => format_color_value(color),
         }
     } else {
         // Fallback to basic formatting

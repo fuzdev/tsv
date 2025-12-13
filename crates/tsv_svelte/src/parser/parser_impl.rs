@@ -44,6 +44,12 @@ impl<'a> SvelteParser<'a> {
         })
     }
 
+    /// Returns the lexer's initial position (after BOM skip).
+    /// Used by parser to initialize gap tracking.
+    pub(crate) fn initial_position(&self) -> usize {
+        self.lexer.initial_position()
+    }
+
     pub(crate) fn advance(&mut self) -> Result<(), ParseError> {
         if let Some(peek) = self.peek_cache.take() {
             self.current_kind = peek.kind;

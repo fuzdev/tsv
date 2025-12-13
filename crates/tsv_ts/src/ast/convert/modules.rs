@@ -1,6 +1,7 @@
 // Import and export specifier conversions
 
 use super::super::{internal, public};
+use super::types::convert_declare_function;
 use super::{convert_expression, convert_identifier, create_location};
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
@@ -160,6 +161,11 @@ pub(in crate::ast) fn convert_export_default_value(
                 func, source, loc, interner, offset,
             ))
         }
+        internal::ExportDefaultValue::TSDeclareFunction(func) => {
+            public::ExportDefaultValue::TSDeclareFunction(convert_declare_function(
+                func, source, loc, interner, offset,
+            ))
+        }
         internal::ExportDefaultValue::ClassDeclaration(class) => {
             public::ExportDefaultValue::ClassDeclaration(convert_class_declaration(
                 class, source, loc, interner, offset,
@@ -175,16 +181,22 @@ pub(in crate::ast) fn convert_literal(
     loc: &LocationTracker,
     offset: usize,
 ) -> public::Literal {
-    let value = match &lit.value {
-        internal::LiteralValue::Number(n) => serde_json::Value::Number(
-            serde_json::Number::from_f64(*n).unwrap_or_else(|| serde_json::Number::from(0)),
+    let (value, bigint) = match &lit.value {
+        internal::LiteralValue::Number(n) => (
+            serde_json::Value::Number(
+                serde_json::Number::from_f64(*n).unwrap_or_else(|| serde_json::Number::from(0)),
+            ),
+            None,
         ),
         internal::LiteralValue::String { content, .. } => {
-            serde_json::Value::String(content.clone())
+            (serde_json::Value::String(content.clone()), None)
         }
-        internal::LiteralValue::Boolean(b) => serde_json::Value::Bool(*b),
-        internal::LiteralValue::Null => serde_json::Value::Null,
-        internal::LiteralValue::Undefined => serde_json::Value::Null,
+        internal::LiteralValue::BigInt(val) => {
+            (serde_json::Value::String(val.clone()), Some(val.clone()))
+        }
+        internal::LiteralValue::Boolean(b) => (serde_json::Value::Bool(*b), None),
+        internal::LiteralValue::Null => (serde_json::Value::Null, None),
+        internal::LiteralValue::Undefined => (serde_json::Value::Null, None),
     };
     let raw = lit.span.extract(source);
     public::Literal {
@@ -194,6 +206,7 @@ pub(in crate::ast) fn convert_literal(
         loc: create_location(lit.span, loc, offset),
         value,
         raw: raw.to_string(),
+        bigint,
     }
 }
 
@@ -205,7 +218,9 @@ fn convert_function_to_public(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::FunctionDeclaration {
-    use super::{convert_block_statement, convert_type_annotation};
+    use super::{
+        convert_block_statement, convert_type_annotation, convert_type_parameter_declaration,
+    };
 
     public::FunctionDeclaration {
         node_type: "FunctionDeclaration".to_string(),
@@ -219,6 +234,10 @@ fn convert_function_to_public(
         expression: false,
         generator: func.generator,
         is_async: func.r#async,
+        type_parameters: func
+            .type_parameters
+            .as_ref()
+            .map(|tp| convert_type_parameter_declaration(tp, source, loc, interner, offset)),
         params: func
             .params
             .iter()
@@ -227,7 +246,7 @@ fn convert_function_to_public(
         return_type: func
             .return_type
             .as_ref()
-            .map(|rt| convert_type_annotation(rt, loc, offset)),
+            .map(|rt| convert_type_annotation(rt, source, loc, interner, offset)),
         body: convert_block_statement(&func.body, source, loc, interner, offset),
     }
 }
@@ -240,21 +259,8 @@ fn convert_class_declaration(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::ClassDeclaration {
-    use super::convert_class_body;
+    use super::convert_class_declaration;
 
-    public::ClassDeclaration {
-        node_type: "ClassDeclaration".to_string(),
-        start: class.span.start,
-        end: class.span.end,
-        loc: create_location(class.span, loc, offset),
-        id: class
-            .id
-            .as_ref()
-            .map(|id| convert_identifier(id, loc, interner, offset)),
-        super_class: class
-            .super_class
-            .as_ref()
-            .map(|e| Box::new(convert_expression(e, source, loc, interner, offset))),
-        body: convert_class_body(&class.body, source, loc, interner, offset),
-    }
+    // Delegate to the main converter in declarations.rs
+    convert_class_declaration(class, source, loc, interner, offset)
 }

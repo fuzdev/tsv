@@ -36,7 +36,8 @@ impl<'a> SvelteParser<'a> {
         let mut css = None;
         let mut options = None;
         let mut fragment_nodes = Vec::new();
-        let mut last_end = 0;
+        // Start gap tracking at lexer's initial position (accounts for BOM skip)
+        let mut last_end = self.initial_position();
         let mut root_start = None;
 
         // Parse the entire file linearly

@@ -1,0 +1,80 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 66,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 26,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 26,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "target-within",
+											"args": null,
+											"start": 12,
+											"end": 26
+										}
+									],
+									"start": 9,
+									"end": 26
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 27,
+					"end": 57,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 31,
+							"end": 53,
+							"property": "outline",
+							"value": "2px solid red"
+						}
+					]
+				},
+				"start": 9,
+				"end": 57
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 58,
+			"styles": "\n\tdiv:target-within {\n\t\toutline: 2px solid red;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 67,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

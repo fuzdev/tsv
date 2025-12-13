@@ -1,0 +1,139 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 52,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 24,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 6,
+						"character": 6
+					}
+				},
+				"attributes": [
+					{
+						"start": 7,
+						"end": 21,
+						"type": "BindDirective",
+						"name": "this",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 7,
+								"character": 7
+							},
+							"end": {
+								"line": 1,
+								"column": 16,
+								"character": 16
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 18,
+							"end": 20,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 18
+								},
+								"end": {
+									"line": 1,
+									"column": 20
+								}
+							},
+							"name": "el"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 24,
+				"end": 25,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 25,
+				"end": 51,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 26
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 29
+					}
+				},
+				"attributes": [
+					{
+						"start": 30,
+						"end": 44,
+						"type": "BindDirective",
+						"name": "this",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 5,
+								"character": 30
+							},
+							"end": {
+								"line": 2,
+								"column": 14,
+								"character": 39
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 41,
+							"end": 43,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 16
+								},
+								"end": {
+									"line": 2,
+									"column": 18
+								}
+							},
+							"name": "el"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

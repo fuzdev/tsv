@@ -2,7 +2,7 @@ use crate::fixtures;
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
 
-/// fixtures-update-formatted command - regenerate output_prettier.svelte files
+/// fixtures-update-formatted command - regenerate output_prettier.* files
 pub struct FixturesUpdateFormattedCommand;
 
 impl Command for FixturesUpdateFormattedCommand {
@@ -22,7 +22,7 @@ impl Command for FixturesUpdateFormattedCommand {
 
     fn usage(&self) -> Vec<String> {
         vec![
-            "fixtures_update_formatted                   Regenerate all output_prettier.svelte files"
+            "fixtures_update_formatted                   Regenerate all output_prettier.* files"
                 .to_string(),
             "fixtures_update_formatted <filter>...       Regenerate matching fixtures".to_string(),
         ]
@@ -80,33 +80,34 @@ async fn run(filters: &[String]) {
     let mut failed = 0;
 
     for fixture in &fixture_list {
+        let output_filename = fixture.output_prettier_filename();
         match update_formatted_file(fixture).await {
             FormattedResult::Created => {
-                println!("✓ Created {}/output_prettier.svelte", fixture.relative_path);
+                println!("✓ Created {}/{}", fixture.relative_path, output_filename);
                 created += 1;
             }
             FormattedResult::Updated => {
-                println!("✓ Updated {}/output_prettier.svelte", fixture.relative_path);
+                println!("✓ Updated {}/{}", fixture.relative_path, output_filename);
                 updated += 1;
             }
             FormattedResult::Removed => {
                 println!(
-                    "✓ Removed {}/output_prettier.svelte (identical to input)",
-                    fixture.relative_path
+                    "✓ Removed {}/{} (identical to input)",
+                    fixture.relative_path, output_filename
                 );
                 removed += 1;
             }
             FormattedResult::Unchanged => {
                 println!(
-                    "- {}/output_prettier.svelte is up to date",
-                    fixture.relative_path
+                    "- {}/{} is up to date",
+                    fixture.relative_path, output_filename
                 );
                 unchanged += 1;
             }
             FormattedResult::NotNeeded => {
                 println!(
-                    "- {}/output_prettier.svelte not needed (input already formatted)",
-                    fixture.relative_path
+                    "- {}/{} not needed (input already formatted)",
+                    fixture.relative_path, output_filename
                 );
                 unchanged += 1;
             }
@@ -141,7 +142,7 @@ async fn run(filters: &[String]) {
     }
 
     if created > 0 || updated > 0 || removed > 0 {
-        println!("⚠️  Updated source of truth files (output_prettier.svelte)");
+        println!("⚠️  Updated source of truth files (output_prettier.*)");
     }
 
     if failed > 0 {
@@ -165,18 +166,16 @@ async fn update_formatted_file(fixture: &fixtures::Fixture) -> FormattedResult {
         Err(e) => return FormattedResult::Failed(e),
     };
 
-    // Determine filepath for prettier (always temp.svelte)
-    let filepath = "temp.svelte";
-
     // Run prettier
-    let formatted = match fuz_client::run_prettier(&input, filepath).await {
-        Ok(f) => f,
-        Err(e) => return FormattedResult::Failed(format!("Prettier error: {e}")),
-    };
+    let formatted =
+        match crate::deno::run_prettier(&input, fixture.input_type().prettier_parser()).await {
+            Ok(f) => f,
+            Err(e) => return FormattedResult::Failed(format!("Prettier error: {e}")),
+        };
 
     let output_prettier_path = fixture.output_prettier_path();
 
-    // If formatted output is identical to input, remove output_prettier.svelte file
+    // If formatted output is identical to input, remove output_prettier file
     if formatted == input {
         if output_prettier_path.exists() {
             match fixtures::delete_file_if_exists(&output_prettier_path) {
@@ -187,7 +186,7 @@ async fn update_formatted_file(fixture: &fixtures::Fixture) -> FormattedResult {
             FormattedResult::NotNeeded
         }
     } else {
-        // Formatted output differs from input, write/update output_prettier.svelte file
+        // Formatted output differs from input, write/update output_prettier file
         let existing = fixtures::read_file(&output_prettier_path).ok();
 
         if Some(&formatted) == existing.as_ref() {

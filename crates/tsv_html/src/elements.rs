@@ -28,6 +28,9 @@ static BLOCK_ELEMENTS: phf::Set<&'static str> = phf_set! {
     "center",
     "dialog",
     "div",
+    "dl",
+    "dd",
+    "dt",
     "figure",
     "figcaption",
     "footer",
@@ -47,6 +50,7 @@ static BLOCK_ELEMENTS: phf::Set<&'static str> = phf_set! {
     "p",
     "pre",
     "section",
+    "select",
     "table",
     "tbody",
     "td",
@@ -55,11 +59,37 @@ static BLOCK_ELEMENTS: phf::Set<&'static str> = phf_set! {
     "thead",
     "tr",
     "ul",
+    "svg",
+    "math",
 };
 
 static VOID_ELEMENTS: phf::Set<&'static str> = phf_set! {
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param",
     "source", "track", "wbr",
+};
+
+// SVG elements - synced with Svelte's utils.js SVG_ELEMENTS
+static SVG_ELEMENTS: phf::Set<&'static str> = phf_set! {
+    "altGlyph", "altGlyphDef", "altGlyphItem", "animate", "animateColor", "animateMotion",
+    "animateTransform", "circle", "clipPath", "color-profile", "cursor", "defs", "desc", "discard",
+    "ellipse", "feBlend", "feColorMatrix", "feComponentTransfer", "feComposite", "feConvolveMatrix",
+    "feDiffuseLighting", "feDisplacementMap", "feDistantLight", "feDropShadow", "feFlood",
+    "feFuncA", "feFuncB", "feFuncG", "feFuncR", "feGaussianBlur", "feImage", "feMerge",
+    "feMergeNode", "feMorphology", "feOffset", "fePointLight", "feSpecularLighting", "feSpotLight",
+    "feTile", "feTurbulence", "filter", "font", "font-face", "font-face-format", "font-face-name",
+    "font-face-src", "font-face-uri", "foreignObject", "g", "glyph", "glyphRef", "hatch",
+    "hatchpath", "hkern", "image", "line", "linearGradient", "marker", "mask", "mesh",
+    "meshgradient", "meshpatch", "meshrow", "metadata", "missing-glyph", "mpath", "path", "pattern",
+    "polygon", "polyline", "radialGradient", "rect", "set", "solidcolor", "stop", "svg", "switch",
+    "symbol", "text", "textPath", "title", "tref", "tspan", "unknown", "use", "view", "vkern",
+};
+
+// MathML elements - synced with Svelte's utils.js (MathML Core)
+static MATHML_ELEMENTS: phf::Set<&'static str> = phf_set! {
+    "annotation", "annotation-xml", "maction", "math", "merror", "mfrac", "mi", "mmultiscripts",
+    "mn", "mo", "mover", "mpadded", "mphantom", "mprescripts", "mroot", "mrow", "ms", "mspace",
+    "msqrt", "mstyle", "msub", "msubsup", "msup", "mtable", "mtd", "mtext", "mtr", "munder",
+    "munderover", "semantics",
 };
 
 /// Check if an HTML element is inline (phrasing content)
@@ -87,4 +117,22 @@ pub fn is_block_element(tag_name: &str) -> bool {
 #[inline]
 pub fn is_void_element(tag_name: &str) -> bool {
     VOID_ELEMENTS.contains(tag_name)
+}
+
+/// Check if an element is an SVG element
+#[inline]
+pub fn is_svg_element(tag_name: &str) -> bool {
+    SVG_ELEMENTS.contains(tag_name)
+}
+
+/// Check if an element is a MathML element
+#[inline]
+pub fn is_mathml_element(tag_name: &str) -> bool {
+    MATHML_ELEMENTS.contains(tag_name)
+}
+
+/// Check if an element is foreign content (SVG or MathML)
+#[inline]
+pub fn is_foreign_element(tag_name: &str) -> bool {
+    SVG_ELEMENTS.contains(tag_name) || MATHML_ELEMENTS.contains(tag_name)
 }

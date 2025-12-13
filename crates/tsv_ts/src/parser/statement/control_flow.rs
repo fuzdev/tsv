@@ -84,6 +84,60 @@ impl<'a> Parser<'a> {
             TokenKind::Keyword(KeywordKind::Const | KeywordKind::Let | KeywordKind::Var)
         );
 
+        // Check for `using` contextual keyword (ES2024 Explicit Resource Management)
+        // `for (using resource of resources) { ... }`
+        let is_using = self.current_kind() == TokenKind::Identifier
+            && self.current_value() == "using"
+            && self.peek_is_identifier();
+
+        // Check for `await using` in for-of
+        // `for await (await using resource of resources) { ... }`
+        let is_await_using = self.current_kind() == TokenKind::Keyword(KeywordKind::Await)
+            && self.peek_is_identifier()
+            && self.peek_value() == "using";
+
+        if is_await_using {
+            // Parse `await using` declaration for for-of
+            let var_decl = self.parse_for_await_using_declaration()?;
+
+            // `await using` only valid with `of`, not `in` or standard for
+            if self.current_value() == "of" {
+                self.advance()?;
+                return self.parse_for_of(
+                    start,
+                    ForInOfLeft::VariableDeclaration(var_decl),
+                    is_await,
+                );
+            }
+
+            return Err(ParseError::InvalidSyntax {
+                message: "'await using' can only be used in for-of loops".to_string(),
+                position: self.current_pos().0,
+                context: None,
+            });
+        }
+
+        if is_using {
+            // Parse `using` declaration for for-of
+            let var_decl = self.parse_for_using_declaration()?;
+
+            // `using` only valid with `of`, not `in` or standard for
+            if self.current_value() == "of" {
+                self.advance()?;
+                return self.parse_for_of(
+                    start,
+                    ForInOfLeft::VariableDeclaration(var_decl),
+                    is_await,
+                );
+            }
+
+            return Err(ParseError::InvalidSyntax {
+                message: "'using' can only be used in for-of loops".to_string(),
+                position: self.current_pos().0,
+                context: None,
+            });
+        }
+
         if is_var_decl {
             // Parse variable declaration (without semicolon)
             let var_decl = self.parse_for_variable_declaration()?;
@@ -478,7 +532,7 @@ impl<'a> Parser<'a> {
             && matches!(self.current_kind(), TokenKind::Identifier)
         {
             let (label_start, label_end) = self.current_pos();
-            let symbol = self.intern(self.current_value());
+            let symbol = self.intern_identifier();
             self.advance()?;
             (
                 Some(Identifier {
@@ -518,7 +572,7 @@ impl<'a> Parser<'a> {
             && matches!(self.current_kind(), TokenKind::Identifier)
         {
             let (label_start, label_end) = self.current_pos();
-            let symbol = self.intern(self.current_value());
+            let symbol = self.intern_identifier();
             self.advance()?;
             (
                 Some(Identifier {
@@ -547,7 +601,7 @@ impl<'a> Parser<'a> {
 
         // Parse label identifier
         debug_assert!(matches!(self.current_kind(), TokenKind::Identifier));
-        let symbol = self.intern(self.current_value());
+        let symbol = self.intern_identifier();
         self.advance()?;
 
         let label = Identifier {

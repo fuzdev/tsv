@@ -1,0 +1,195 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 274,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "DebugTag",
+				"start": 0,
+				"end": 110,
+				"identifiers": [
+					{
+						"type": "Identifier",
+						"start": 8,
+						"end": 31,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 8
+							},
+							"end": {
+								"line": 1,
+								"column": 31
+							}
+						},
+						"name": "veryLongVariableNameOne"
+					},
+					{
+						"type": "Identifier",
+						"start": 33,
+						"end": 56,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 33
+							},
+							"end": {
+								"line": 1,
+								"column": 56
+							}
+						},
+						"name": "veryLongVariableNameTwo"
+					},
+					{
+						"type": "Identifier",
+						"start": 58,
+						"end": 83,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 58
+							},
+							"end": {
+								"line": 1,
+								"column": 83
+							}
+						},
+						"name": "veryLongVariableNameThree"
+					},
+					{
+						"type": "Identifier",
+						"start": 85,
+						"end": 109,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 85
+							},
+							"end": {
+								"line": 1,
+								"column": 109
+							}
+						},
+						"name": "veryLongVariableNameFour"
+					}
+				]
+			},
+			{
+				"type": "Text",
+				"start": 110,
+				"end": 112,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "DebugTag",
+				"start": 112,
+				"end": 273,
+				"identifiers": [
+					{
+						"type": "Identifier",
+						"start": 120,
+						"end": 143,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 8
+							},
+							"end": {
+								"line": 3,
+								"column": 31
+							}
+						},
+						"name": "veryLongVariableNameOne"
+					},
+					{
+						"type": "Identifier",
+						"start": 145,
+						"end": 168,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 33
+							},
+							"end": {
+								"line": 3,
+								"column": 56
+							}
+						},
+						"name": "veryLongVariableNameTwo"
+					},
+					{
+						"type": "Identifier",
+						"start": 170,
+						"end": 195,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 58
+							},
+							"end": {
+								"line": 3,
+								"column": 83
+							}
+						},
+						"name": "veryLongVariableNameThree"
+					},
+					{
+						"type": "Identifier",
+						"start": 197,
+						"end": 221,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 85
+							},
+							"end": {
+								"line": 3,
+								"column": 109
+							}
+						},
+						"name": "veryLongVariableNameFour"
+					},
+					{
+						"type": "Identifier",
+						"start": 223,
+						"end": 247,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 111
+							},
+							"end": {
+								"line": 3,
+								"column": 135
+							}
+						},
+						"name": "veryLongVariableNameFive"
+					},
+					{
+						"type": "Identifier",
+						"start": 249,
+						"end": 272,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 137
+							},
+							"end": {
+								"line": 3,
+								"column": 160
+							}
+						},
+						"name": "veryLongVariableNameSix"
+					}
+				]
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

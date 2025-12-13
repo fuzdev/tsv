@@ -53,8 +53,8 @@
 		}
 	},
 	"js": [],
-	"start": null,
-	"end": null,
+	"start": 0,
+	"end": 77,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

@@ -14,17 +14,23 @@ impl Command for ParseCommand {
 
     fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
         let pretty = args.flag("pretty");
-        let explicit_parser = args.option("parser").map(|s| s.parse()).transpose()?;
+        let explicit_parser: Option<ParserType> =
+            args.option("parser").map(|s| s.parse()).transpose()?;
 
-        let input = if let Some(content) = args.option("content") {
-            // Parse from --content string argument
-            Input::from_content(content)
+        let (input, parser_type) = if let Some(content) = args.option("content") {
+            // Parse from --content string argument (requires --parser)
+            let parser_type =
+                explicit_parser.ok_or("--content requires --parser <svelte|typescript|css>")?;
+            (Input::from_content(content), parser_type)
         } else if args.flag("stdin") {
-            // Read from stdin (discouraged for agent usage)
-            Input::from_stdin()?
+            // Read from stdin (requires --parser)
+            let parser_type =
+                explicit_parser.ok_or("--stdin requires --parser <svelte|typescript|css>")?;
+            (Input::from_stdin()?, parser_type)
         } else if let Some(path) = args.positional() {
-            // Read from file
-            Input::from_file(&path)?
+            // Read from file (auto-detects from extension, --parser overrides)
+            let parser_type = explicit_parser.unwrap_or_else(|| ParserType::from_extension(&path));
+            (Input::from_file(&path)?, parser_type)
         } else {
             return Err("No input provided. Use a file path, --content, or --stdin".to_string());
         };
@@ -32,15 +38,17 @@ impl Command for ParseCommand {
         Ok(Box::new(ParseExecutable {
             input,
             pretty,
-            explicit_parser,
+            parser_type,
         }))
     }
 
     fn usage(&self) -> Vec<String> {
         vec![
-            "parse <file> [--pretty]              Parse file and output AST as JSON".to_string(),
-            "parse --content <string> [--pretty]  Parse string and output AST as JSON".to_string(),
-            "parse --stdin [--pretty]             Parse stdin (not preferred for agents)"
+            "parse <file> [--pretty]                             Parse file, output AST as JSON"
+                .to_string(),
+            "parse --content <string> --parser <type> [--pretty]  Parse string (preferred)"
+                .to_string(),
+            "parse --stdin --parser <type> [--pretty]             Parse stdin (not preferred)"
                 .to_string(),
         ]
     }
@@ -50,12 +58,12 @@ impl Command for ParseCommand {
 struct ParseExecutable {
     input: Input,
     pretty: bool,
-    explicit_parser: Option<ParserType>,
+    parser_type: ParserType,
 }
 
 impl Executable for ParseExecutable {
     fn execute(&self) {
-        match parse_to_json(&self.input, self.pretty, self.explicit_parser) {
+        match parse_to_json(&self.input, self.pretty, self.parser_type) {
             Ok(json) => println!("{json}"),
             Err(e) => {
                 eprintln!("Parse error: {e}");
@@ -66,29 +74,8 @@ impl Executable for ParseExecutable {
 }
 
 /// Parse source code and convert to JSON
-///
-/// Uses explicit parser type if provided, otherwise auto-detects from file extension or content
-fn parse_to_json(
-    input: &Input,
-    pretty: bool,
-    explicit_parser: Option<ParserType>,
-) -> Result<String, String> {
+fn parse_to_json(input: &Input, pretty: bool, parser_type: ParserType) -> Result<String, String> {
     let source = input.content();
-
-    // Priority: explicit --parser > file extension > content heuristics
-    let parser_type = explicit_parser
-        .or_else(|| input.parser_type())
-        .unwrap_or_else(|| {
-            // Content-based detection for stdin/content input
-            let trimmed = source.trim_start();
-            if trimmed.starts_with('<') {
-                ParserType::Svelte
-            } else if trimmed.ends_with('}') || (trimmed.contains('{') && trimmed.contains(':')) {
-                ParserType::Css
-            } else {
-                ParserType::TypeScript
-            }
-        });
 
     let json = match parser_type {
         ParserType::Svelte => {

@@ -6,7 +6,9 @@
 //
 // - **mod.rs** (this file): Orchestration - coordinates printing of CSS nodes, core Printer
 // - **selectors.rs**: Selector printing (reusable across rules and at-rules)
-// - **rules.rs**: Rule and declaration printing (uses selectors module)
+// - **rules.rs**: CSS rule printing (selector + block structure)
+// - **declarations.rs**: Declaration printing + wrapping logic
+// - **values.rs**: CSS value printing (all value types)
 // - **atrules.rs**: At-rule printing (@media, @keyframes, etc., uses selectors and rules)
 //
 // ## Design Principles
@@ -15,15 +17,18 @@
 // 2. **Preserve Semantics**: Never change CSS rendering semantics
 // 3. **Modularity**: Each module has single responsibility for future maintainability
 // 4. **Reusability**: Shared printing logic (selectors) used by multiple modules
+// 5. **Hierarchy-Following**: Module structure mirrors CSS spec (rules → declarations → values)
 
 mod atrules;
+mod declarations;
 mod rules;
 mod selectors;
 pub mod source_fidelity;
+mod values;
 
-use crate::ast::internal::{CssComment, CssNode, CssStyleSheet};
+use crate::ast::internal::{CssBlockChild, CssComment, CssNode, CssStyleSheet};
 use std::collections::HashMap;
-use tsv_lang::{OutputBuffer, PrintConfig, printing};
+use tsv_lang::{OutputBuffer, PrintConfig, doc, printing};
 
 /// Printer state for building output
 pub struct Printer<'a> {
@@ -75,6 +80,31 @@ impl<'a> Printer<'a> {
     /// Remove trailing newline from buffer (for inline comment handling)
     pub(crate) fn buffer_remove_trailing_newline(&mut self) {
         self.buffer.pop_if_ends_with('\n');
+    }
+
+    /// Get the current column position (for doc-builder width calculations)
+    ///
+    /// Includes base_indent_offset to account for Svelte wrapper indentation
+    /// that will be added to each line during final formatting.
+    pub(crate) fn current_column(&self) -> usize {
+        let col = self.buffer.current_column(self.config.tab_width);
+        // Add wrapper indent width so fill calculations account for final indentation
+        col + (self.config.base_indent_offset * self.config.tab_width)
+    }
+
+    /// Write a Doc to the buffer, accounting for current column and indent level
+    ///
+    /// This handles the common pattern of:
+    /// 1. Get current column position (which already includes base_indent_offset after newlines)
+    /// 2. Print doc with indent-aware width calculations
+    /// 3. Write the result to the buffer
+    ///
+    /// Note: base_indent_offset is already accounted for in position tracking after newlines
+    /// (see doc::render_single_doc line breaks). We should NOT add it again here.
+    pub(crate) fn write_doc(&mut self, doc: &doc::Doc) {
+        let current_col = self.current_column();
+        let output = doc::print_doc_with_indent(doc, &self.config, current_col, self.indent_level);
+        self.write(&output);
     }
 
     /// Get the formatted output
@@ -250,11 +280,103 @@ impl<'a> Printer<'a> {
     }
 
     /// Print a CSS comment
-    fn print_css_comment(&mut self, comment: &CssComment) {
+    pub(crate) fn print_css_comment(&mut self, comment: &CssComment) {
         // Write comment with delimiters - content is preserved exactly as written
         self.write("/*");
         self.write(&comment.content);
         self.write("*/");
+    }
+
+    /// Try to print inline comments after the current item
+    ///
+    /// Checks if the next item is a comment on the same line as `prev_end`.
+    /// If so, prints it inline and returns the number of comments consumed.
+    ///
+    /// This consolidates the repeated pattern across rules.rs and atrules.rs.
+    pub(crate) fn try_print_inline_comments(
+        &mut self,
+        children: &[CssBlockChild],
+        current_idx: usize,
+        prev_end: u32,
+    ) -> usize {
+        let mut consumed = 0;
+        let mut last_end = prev_end;
+
+        while let Some(CssBlockChild::Comment(next_comment)) =
+            children.get(current_idx + 1 + consumed)
+            && printing::is_same_line(self.source, last_end, next_comment.span.start)
+        {
+            self.write(" /*");
+            self.write(&next_comment.content);
+            self.write("*/");
+            last_end = next_comment.span.end;
+            consumed += 1;
+        }
+
+        consumed
+    }
+
+    /// Try to print inline comments after a declaration
+    ///
+    /// Similar to `try_print_inline_comments` but handles the declaration-specific
+    /// case where we need to remove the trailing newline before the first comment.
+    pub(crate) fn try_print_inline_comments_after_decl(
+        &mut self,
+        children: &[CssBlockChild],
+        current_idx: usize,
+        prev_end: u32,
+    ) -> usize {
+        let mut consumed = 0;
+        let mut last_end = prev_end;
+
+        while let Some(CssBlockChild::Comment(next_comment)) =
+            children.get(current_idx + 1 + consumed)
+            && printing::is_same_line(self.source, last_end, next_comment.span.start)
+        {
+            if consumed == 0 {
+                // First inline comment - remove the trailing newline from declaration
+                self.buffer_remove_trailing_newline();
+            }
+            self.write(" /*");
+            self.write(&next_comment.content);
+            self.write("*/");
+            last_end = next_comment.span.end;
+            consumed += 1;
+        }
+
+        if consumed > 0 {
+            self.write("\n");
+        }
+
+        consumed
+    }
+
+    /// Check if there's a blank line between two spans in the source
+    pub(crate) fn has_blank_line_between_spans(&self, prev_end: u32, curr_start: u32) -> bool {
+        printing::has_blank_line_between(self.source, prev_end, curr_start)
+    }
+
+    /// Check if previous sibling is a comment
+    pub(crate) fn prev_is_comment(children: &[CssBlockChild], index: usize) -> bool {
+        index > 0 && matches!(children.get(index - 1), Some(CssBlockChild::Comment(_)))
+    }
+
+    /// Check if previous sibling is a nested rule
+    pub(crate) fn prev_is_rule(children: &[CssBlockChild], index: usize) -> bool {
+        index > 0 && matches!(children.get(index - 1), Some(CssBlockChild::Rule(_)))
+    }
+
+    /// Get the end span of the previous sibling
+    pub(crate) fn prev_span_end(children: &[CssBlockChild], index: usize) -> Option<u32> {
+        if index == 0 {
+            return None;
+        }
+        children.get(index - 1).map(|child| match child {
+            CssBlockChild::Declaration(d) => d.span.end,
+            CssBlockChild::Comment(c) => c.span.end,
+            CssBlockChild::Rule(r) => r.span.end,
+            CssBlockChild::Atrule(a) => a.span.end,
+        })
     }
 }
 

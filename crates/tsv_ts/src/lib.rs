@@ -208,6 +208,27 @@ pub fn format_expression_with_indent(
     printer.into_string()
 }
 
+/// Format a single TypeScript expression in an isolated context.
+///
+/// Similar to `format_expression`, but handles sequence expressions specially:
+/// they are NOT wrapped in parentheses since the surrounding context (like
+/// Svelte's `={...}`) already provides the necessary grouping.
+pub fn format_expression_isolated(
+    expression: &Expression,
+    source: &str,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+) -> String {
+    let comments = Vec::new();
+    let mut printer = printer::Printer::with_config(
+        interner,
+        source,
+        &comments,
+        tsv_lang::PrintConfig::default(),
+    );
+    printer.print_expression_isolated(expression);
+    printer.into_string()
+}
+
 /// Parse an expression and convert it to a binding pattern.
 ///
 /// This parses an expression and then converts it to a pattern:
@@ -291,6 +312,25 @@ pub fn build_expression_doc(
     let comments = Vec::new();
     let printer = printer::Printer::with_config(interner, source, &comments, *config);
     printer.build_expression_doc_public(expression)
+}
+
+/// Build a Doc tree for a TypeScript expression in an isolated context.
+///
+/// Similar to `build_expression_doc`, but handles sequence expressions specially:
+/// they are NOT wrapped in parentheses since the surrounding context (like
+/// Svelte's `={...}`) already provides the necessary grouping.
+///
+/// Use this when the expression is inside braces or other grouping syntax
+/// where the outer delimiter already disambiguates the comma operator.
+pub fn build_expression_doc_isolated(
+    expression: &Expression,
+    source: &str,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+    config: &tsv_lang::PrintConfig,
+) -> tsv_lang::doc::Doc {
+    let comments = Vec::new();
+    let printer = printer::Printer::with_config(interner, source, &comments, *config);
+    printer.build_expression_doc_isolated_public(expression)
 }
 
 // Re-export key types for convenience

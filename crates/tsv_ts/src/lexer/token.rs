@@ -1,4 +1,4 @@
-// Token types for TypeScript/JavaScript lexer
+// Token types for TypeScript/JS lexer
 
 use phf::phf_map;
 use std::fmt;
@@ -50,6 +50,7 @@ pub enum KeywordKind {
     // Declaration keywords (continued)
     Function = 21,
     Class = 22,
+    Enum = 49,
     // Unary keyword operators
     Typeof = 23,
     Delete = 24,
@@ -64,6 +65,9 @@ pub enum KeywordKind {
     Import = 44,
     From = 45,
     As = 46,
+    Satisfies = 47,
+    // Generator keywords
+    Yield = 48,
 }
 
 impl KeywordKind {
@@ -108,6 +112,7 @@ impl KeywordKind {
             KeywordKind::Throw => "throw",
             KeywordKind::Function => "function",
             KeywordKind::Class => "class",
+            KeywordKind::Enum => "enum",
             KeywordKind::Typeof => "typeof",
             KeywordKind::Delete => "delete",
             KeywordKind::Async => "async",
@@ -118,6 +123,8 @@ impl KeywordKind {
             KeywordKind::Import => "import",
             KeywordKind::From => "from",
             KeywordKind::As => "as",
+            KeywordKind::Satisfies => "satisfies",
+            KeywordKind::Yield => "yield",
         }
     }
 
@@ -156,6 +163,42 @@ impl KeywordKind {
                 | KeywordKind::Bigint
                 | KeywordKind::Null
                 | KeywordKind::Undefined
+        )
+    }
+
+    /// Returns true if this keyword can be used as an identifier in certain contexts.
+    ///
+    /// These are "contextual keywords" that only have keyword semantics in specific
+    /// syntactic positions. In other positions (like variable names), they're valid identifiers.
+    ///
+    /// Examples:
+    /// - `let async = 1;` - `async` is an identifier
+    /// - `async function f() {}` - `async` is a keyword
+    /// - `let from = 'x';` - `from` is an identifier
+    /// - `import x from 'y';` - `from` is a keyword
+    #[inline]
+    pub const fn can_be_identifier(self) -> bool {
+        matches!(
+            self,
+            // Contextual keywords that can be identifiers
+            KeywordKind::Async
+                | KeywordKind::Await
+                | KeywordKind::From
+                | KeywordKind::As
+                | KeywordKind::Satisfies
+                | KeywordKind::Let
+                | KeywordKind::Yield
+                // Type keywords are also valid identifiers in value positions
+                | KeywordKind::Number
+                | KeywordKind::String
+                | KeywordKind::Boolean
+                | KeywordKind::Any
+                | KeywordKind::Void
+                | KeywordKind::Never
+                | KeywordKind::Unknown
+                | KeywordKind::Object
+                | KeywordKind::Symbol
+                | KeywordKind::Bigint
         )
     }
 }
@@ -243,12 +286,14 @@ pub enum TokenKind {
     // Regular expression literal: /pattern/flags
     // Pattern and flags are stored in token.decoded as "pattern\0flags" (null-separated)
     RegexLiteral,
+    At,   // @ for decorators
+    Hash, // # for private identifiers
     Eof,
 }
 
 // TODO: Consider refining Display implementation for better error messages
 // Current approach: Quoted tokens like '=', lowercase for others
-// Alternative: Could match TypeScript/JavaScript terminology more closely
+// Alternative: Could match TypeScript/JS terminology more closely
 // Examples:
 // - "identifier token" instead of "identifier"
 // - "number literal" instead of "number"
@@ -331,6 +376,8 @@ impl fmt::Display for TokenKind {
             TokenKind::TemplateMiddle => write!(f, "template middle"),
             TokenKind::TemplateTail => write!(f, "template tail"),
             TokenKind::RegexLiteral => write!(f, "regular expression"),
+            TokenKind::At => write!(f, "'@'"),
+            TokenKind::Hash => write!(f, "'#'"),
             TokenKind::Eof => write!(f, "end of file"),
         }
     }
@@ -340,7 +387,7 @@ impl fmt::Display for TokenKind {
 // - `decoded`: owned string for escape-processed values (only allocated when needed)
 // - Raw text: extracted via source[start..end] on demand (zero duplication)
 //
-// This follows the "single source of truth" principle from ARCHITECTURE.md:
+// This follows the "single source of truth" principle from docs/architecture.md:
 // "Raw strings are NEVER duplicated in the AST" - applies to tokens too (pre-AST).
 #[derive(Debug, Clone)]
 pub struct Token {
@@ -421,6 +468,7 @@ static KEYWORDS: phf::Map<&'static str, KeywordKind> = phf_map! {
     // Declaration keywords (continued)
     "function" => KeywordKind::Function,
     "class" => KeywordKind::Class,
+    "enum" => KeywordKind::Enum,
     // Unary keyword operators
     "typeof" => KeywordKind::Typeof,
     "delete" => KeywordKind::Delete,
@@ -435,8 +483,11 @@ static KEYWORDS: phf::Map<&'static str, KeywordKind> = phf_map! {
     "import" => KeywordKind::Import,
     "from" => KeywordKind::From,
     "as" => KeywordKind::As,
+    "satisfies" => KeywordKind::Satisfies,
+    // Generator keywords
+    "yield" => KeywordKind::Yield,
     // TODO: Expand keyword list for:
-    // - Type keywords: interface, type, enum, namespace, etc.
+    // - Type keywords: interface, type, namespace, etc.
 };
 
 /// O(1) keyword lookup using perfect hash function

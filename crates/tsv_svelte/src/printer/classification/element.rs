@@ -36,6 +36,10 @@ impl<'a> Printer<'a> {
     /// language-level classification function.
     ///
     /// Components are treated as inline, not block elements.
+    ///
+    /// Note: `<script>` and `<style>` elements with content are treated as block
+    /// elements for formatting purposes, since their content will be formatted
+    /// on separate lines. Empty `<script>`/`<style>` remain inline.
     pub(crate) fn is_block_element(&self, element: &internal::Element) -> bool {
         // Components are treated as inline, not block
         use crate::ast::internal::ElementKind;
@@ -44,6 +48,13 @@ impl<'a> Printer<'a> {
         }
 
         let tag_name = self.resolve_symbol(element.name);
+
+        // <script> and <style> with content are treated as block elements
+        // because their content will be formatted on separate lines
+        if (tag_name == "script" || tag_name == "style") && !element.fragment.nodes.is_empty() {
+            return true;
+        }
+
         html::is_block_element(&tag_name)
     }
 }

@@ -1,5 +1,7 @@
-use crate::error::DebugError;
-use std::process::Command as ProcessCommand;
+use crate::cli::input_parser;
+use crate::diff::{ColorChoice, DiffOptions};
+use crate::error;
+use crate::{deno, subprocess};
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
 use tsv_cli::cli::input::{Input, ParserType};
@@ -13,29 +15,25 @@ impl Command for CompareCommand {
     }
 
     fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        // Parse input and detect parser type
-        let (input, parser_type) = if let Some(content) = args.option("content") {
-            // --content requires --parser
-            let parser = args
-                .option("parser")
-                .ok_or("Error: --parser required when using --content")?
-                .parse()?;
-            (Input::from_content(content), parser)
-        } else if args.flag("stdin") {
-            // --stdin requires --parser
-            let parser = args
-                .option("parser")
-                .ok_or("Error: --parser required when using --stdin")?
-                .parse()?;
-            (Input::from_stdin()?, parser)
-        } else if let Some(path) = args.positional() {
-            let parser = ParserType::from_extension(&path);
-            (Input::from_file(&path)?, parser)
+        // Parse flags
+        let quiet = args.flag("quiet");
+        let json_output = args.flag("json");
+        let color_choice = if let Some(color_str) = args.option("color") {
+            Some(color_str.parse()?)
         } else {
-            return Err("No input provided. Use a file path, --content, or --stdin".to_string());
+            None
         };
 
-        Ok(Box::new(CompareExecutable { input, parser_type }))
+        // Parse input and detect parser type
+        let (input, parser_type) = input_parser::parse_input_and_parser_type(args)?;
+
+        Ok(Box::new(CompareExecutable {
+            input,
+            parser_type,
+            quiet,
+            json_output,
+            color_choice,
+        }))
     }
 
     fn usage(&self) -> Vec<String> {
@@ -46,6 +44,12 @@ impl Command for CompareCommand {
                 .to_string(),
             "compare --stdin --parser <type>                 Compare formatter output from stdin (requires --parser)"
                 .to_string(),
+            "compare --quiet <file>                          Only show diff if outputs differ (exit 0 if match, 1 if differ)"
+                .to_string(),
+            "compare --color <auto|always|never>             Control color output (default: auto)"
+                .to_string(),
+            "compare --json <file>                           Output machine-readable JSON"
+                .to_string(),
         ]
     }
 }
@@ -54,16 +58,35 @@ impl Command for CompareCommand {
 struct CompareExecutable {
     input: Input,
     parser_type: ParserType,
+    quiet: bool,
+    json_output: bool,
+    color_choice: Option<ColorChoice>,
 }
 
 impl Executable for CompareExecutable {
     fn execute(&self) {
         let rt = super::create_runtime();
-        rt.block_on(run(&self.input, self.parser_type));
+        let exit_code = rt.block_on(run(
+            &self.input,
+            self.parser_type,
+            self.quiet,
+            self.json_output,
+            self.color_choice,
+        ));
+        if exit_code != 0 {
+            std::process::exit(exit_code);
+        }
     }
 }
 
-async fn run(input: &Input, parser_type: ParserType) {
+#[allow(clippy::expect_used)] // JSON serialization of simple types cannot fail
+async fn run(
+    input: &Input,
+    parser_type: ParserType,
+    quiet: bool,
+    json_output: bool,
+    color_choice: Option<ColorChoice>,
+) -> i32 {
     let content = input.content();
     let parser_name = match parser_type {
         ParserType::Svelte => "svelte",
@@ -71,56 +94,140 @@ async fn run(input: &Input, parser_type: ParserType) {
         ParserType::Css => "css",
     };
 
-    println!("=== Input ===");
-    println!("{content}");
-    println!();
+    if !quiet {
+        println!("=== Input ===");
+        println!("{content}");
+        println!();
+    }
 
     // Run our formatter
-    println!("=== Our Formatter ===");
-    match run_our_formatter(content, parser_name) {
-        Ok(output) => println!("{output}"),
-        Err(err) => eprintln!("Error running our formatter: {err}"),
-    }
-    println!();
-
-    // Run prettier
-    println!("=== Prettier ===");
-    match run_prettier(content, parser_name).await {
-        Ok(output) => println!("{output}"),
-        Err(err) => eprintln!("Error running prettier: {err}"),
-    }
-}
-
-fn run_our_formatter(content: &str, parser: &str) -> crate::error::Result<String> {
-    let output = ProcessCommand::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "tsv_cli",
-            "--quiet",
-            "--",
-            "format",
-            "--content",
-        ])
-        .arg(content)
-        .args(["--parser", parser])
-        .output()?;
-
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    } else {
-        Err(DebugError::Command(
-            String::from_utf8_lossy(&output.stderr).into_owned(),
-        ))
-    }
-}
-
-async fn run_prettier(content: &str, parser: &str) -> crate::error::Result<String> {
-    let filepath = match parser {
-        "svelte" => "temp.svelte",
-        "css" => "temp.css",
-        _ => "temp.ts",
+    let our_output = match run_our_formatter(content, parser_name) {
+        Ok(output) => {
+            if !quiet {
+                println!("=== Our Formatter ===");
+                println!("{output}");
+                println!();
+            }
+            Some(output)
+        }
+        Err(err) => {
+            if !quiet {
+                eprintln!("=== Our Formatter ===");
+            }
+            eprintln!("Error running our formatter: {err}");
+            if !quiet {
+                println!();
+            }
+            return 1;
+        }
     };
 
-    Ok(fuz_client::run_prettier(content, filepath).await?)
+    // Run prettier
+    let prettier_output = match run_prettier(content, parser_name).await {
+        Ok(output) => {
+            if !quiet {
+                println!("=== Prettier ===");
+                println!("{output}");
+                println!();
+            }
+            Some(output)
+        }
+        Err(err) => {
+            if !quiet {
+                eprintln!("=== Prettier ===");
+            }
+            eprintln!("Error running prettier: {err}");
+            let hint = err.hint();
+            if !hint.is_empty() {
+                eprintln!("hint: {hint}");
+            }
+            if !quiet {
+                println!();
+            }
+            return 1;
+        }
+    };
+
+    // Show diff if both succeeded
+    if let (Some(our), Some(prettier)) = (our_output, prettier_output) {
+        let outputs_match = our == prettier;
+
+        if json_output {
+            // JSON output mode
+            let result = serde_json::json!({
+                "match": outputs_match,
+                "our_output": our,
+                "prettier_output": prettier,
+            });
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&result).expect("JSON serialization failed")
+            );
+            return if outputs_match { 0 } else { 1 };
+        }
+
+        if quiet {
+            // In quiet mode, only show output if there's a difference
+            if !outputs_match {
+                let mut options = DiffOptions::compare();
+                if let Some(choice) = color_choice {
+                    options = options.with_color_choice(choice);
+                }
+                print_comparison_with_options(
+                    "=== Diff: Ours vs Prettier ===",
+                    &our,
+                    &prettier,
+                    &options,
+                );
+                return 1;
+            }
+            return 0;
+        }
+
+        // In normal mode, always show the comparison
+        let mut options = DiffOptions::compare();
+        if let Some(choice) = color_choice {
+            options = options.with_color_choice(choice);
+        }
+        print_comparison_with_options("=== Diff: Ours vs Prettier ===", &our, &prettier, &options);
+        return if outputs_match { 0 } else { 1 };
+    }
+
+    1
+}
+
+/// Print comparison with custom options (variant of diff::print_comparison)
+fn print_comparison_with_options(
+    label: &str,
+    our_output: &str,
+    prettier_output: &str,
+    options: &DiffOptions,
+) {
+    use crate::diff::{Color, diff_to_string};
+
+    let cyan = Color::Cyan.code();
+    let reset = Color::reset();
+
+    if our_output == prettier_output {
+        if options.color {
+            println!("{cyan}{label} ✓ Outputs match{reset}");
+        } else {
+            println!("{label} ✓ Outputs match");
+        }
+    } else {
+        if options.color {
+            println!("{cyan}{label} ✗ Outputs differ{reset}");
+        } else {
+            println!("{label} ✗ Outputs differ");
+        }
+        print!("{}", diff_to_string(our_output, prettier_output, options));
+    }
+}
+
+fn run_our_formatter(content: &str, parser: &str) -> error::Result<String> {
+    subprocess::run_tsv_format(content, parser)
+}
+
+async fn run_prettier(content: &str, parser: &str) -> error::Result<String> {
+    Ok(deno::run_prettier(content, deno::PrettierParser::Parser(parser)).await?)
 }

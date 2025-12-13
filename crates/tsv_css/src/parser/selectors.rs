@@ -21,19 +21,18 @@ pub(crate) fn parse_complex_selector_list(
     let mut selectors = Vec::new();
 
     // Parse first complex selector
-    selectors.push(parse_complex_selector(parser)?);
+    let first = parse_complex_selector(parser)?;
+    let mut end = first.span.end;
+    selectors.push(first);
 
     // Parse additional selectors separated by commas
     while parser.check(&TokenKind::Comma) {
         parser.advance()?; // consume comma
         parser.skip_whitespace_and_comments()?; // Skip whitespace and comments
-        selectors.push(parse_complex_selector(parser)?);
+        let sel = parse_complex_selector(parser)?;
+        end = sel.span.end;
+        selectors.push(sel);
     }
-
-    // End position should be the end of the last selector, not the next token
-    // SAFETY: We pushed the first selector unconditionally above
-    #[allow(clippy::unwrap_used)]
-    let end = selectors.last().unwrap().span.end;
 
     Ok(SelectorList {
         selectors,
@@ -215,19 +214,18 @@ pub(crate) fn parse_relative_selector_list(
     let mut selectors = Vec::new();
 
     // Parse first relative complex selector
-    selectors.push(parse_relative_complex_selector(parser)?);
+    let first = parse_relative_complex_selector(parser)?;
+    let mut end = first.span.end;
+    selectors.push(first);
 
     // Parse additional selectors separated by commas
     while parser.check(&TokenKind::Comma) {
         parser.advance()?; // consume comma
         parser.skip_whitespace_and_comments()?; // Skip whitespace and comments
-        selectors.push(parse_relative_complex_selector(parser)?);
+        let sel = parse_relative_complex_selector(parser)?;
+        end = sel.span.end;
+        selectors.push(sel);
     }
-
-    // End position should be the end of the last selector, not the next token
-    // SAFETY: We pushed the first selector unconditionally above
-    #[allow(clippy::unwrap_used)]
-    let end = selectors.last().unwrap().span.end;
 
     Ok(SelectorList {
         selectors,
@@ -261,17 +259,15 @@ fn parse_relative_complex_selector(parser: &mut CssParser) -> Result<ComplexSele
     // not an implicit Descendant combinator.
     let first_combinator_info = parse_explicit_combinator(parser)?;
 
-    if let Some((combinator, combinator_span)) = first_combinator_info {
+    let first = if let Some((combinator, combinator_span)) = first_combinator_info {
         // Starts with explicit combinator: :has(> img)
-        children.push(parse_relative_selector(
-            parser,
-            Some(combinator),
-            Some(combinator_span),
-        )?);
+        parse_relative_selector(parser, Some(combinator), Some(combinator_span))?
     } else {
         // No leading combinator: :has(img) - combinator field will be null
-        children.push(parse_relative_selector(parser, None, None)?);
-    }
+        parse_relative_selector(parser, None, None)?
+    };
+    let mut end = first.span.end;
+    children.push(first);
 
     // Parse additional relative selectors with combinators
     loop {
@@ -286,25 +282,14 @@ fn parse_relative_complex_selector(parser: &mut CssParser) -> Result<ComplexSele
         }
 
         // Check for combinator
-        let combinator_info = parse_combinator(parser)?;
-        if combinator_info.is_none() {
+        let Some((combinator, combinator_span)) = parse_combinator(parser)? else {
             break; // No more combinators, we're done
-        }
+        };
 
-        // SAFETY: We just checked is_none() above
-        #[allow(clippy::unwrap_used)]
-        let (combinator, combinator_span) = combinator_info.unwrap();
-        children.push(parse_relative_selector(
-            parser,
-            Some(combinator),
-            Some(combinator_span),
-        )?);
+        let child = parse_relative_selector(parser, Some(combinator), Some(combinator_span))?;
+        end = child.span.end;
+        children.push(child);
     }
-
-    // End position should be the end of the last child, not the next token
-    // SAFETY: We pushed at least one child unconditionally above (if/else at start)
-    #[allow(clippy::unwrap_used)]
-    let end = children.last().unwrap().span.end;
 
     Ok(ComplexSelector {
         children,
@@ -323,7 +308,9 @@ pub(crate) fn parse_complex_selector(
     let mut children = Vec::new();
 
     // First relative selector has no combinator
-    children.push(parse_relative_selector(parser, None, None)?);
+    let first = parse_relative_selector(parser, None, None)?;
+    let mut end = first.span.end;
+    children.push(first);
 
     // Parse additional relative selectors with combinators
     loop {
@@ -340,25 +327,14 @@ pub(crate) fn parse_complex_selector(
         }
 
         // Check for combinator (this will skip whitespace internally)
-        let combinator_info = parse_combinator(parser)?;
-        if combinator_info.is_none() {
+        let Some((combinator, combinator_span)) = parse_combinator(parser)? else {
             break; // No more combinators, we're done
-        }
+        };
 
-        // SAFETY: We just checked is_none() above
-        #[allow(clippy::unwrap_used)]
-        let (combinator, combinator_span) = combinator_info.unwrap();
-        children.push(parse_relative_selector(
-            parser,
-            Some(combinator),
-            Some(combinator_span),
-        )?);
+        let child = parse_relative_selector(parser, Some(combinator), Some(combinator_span))?;
+        end = child.span.end;
+        children.push(child);
     }
-
-    // End position should be the end of the last child, not the next token
-    // SAFETY: We pushed the first child unconditionally on line 326
-    #[allow(clippy::unwrap_used)]
-    let end = children.last().unwrap().span.end;
 
     Ok(ComplexSelector {
         children,
@@ -739,6 +715,53 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
                     end: end as u32,
                 },
             })
+        }
+        TokenKind::Pipe => {
+            // Explicit no-namespace selector: |div
+            // This selects elements with no namespace (in contrast to *|div for any namespace)
+            parser.advance()?; // consume pipe
+
+            // Must be followed by an identifier (element name) or asterisk (universal)
+            if parser.check(&TokenKind::Identifier) {
+                let element_name = parser
+                    .current_identifier()
+                    .ok_or_else(|| ParseError::InvalidSyntax {
+                        message: "Expected identifier".to_string(),
+                        position: parser.base_offset() + parser.current_start(),
+                        context: None,
+                    })?
+                    .to_string();
+                let end = parser.base_offset() + parser.current_end;
+                parser.advance()?;
+
+                Ok(SimpleSelector::Type {
+                    namespace: Some(String::new()), // Empty string = explicit no namespace
+                    name: element_name,
+                    span: Span {
+                        start: start as u32,
+                        end: end as u32,
+                    },
+                })
+            } else if parser.check(&TokenKind::Asterisk) {
+                // |* - universal selector with explicit no namespace
+                let end = parser.base_offset() + parser.current_end;
+                parser.advance()?;
+
+                Ok(SimpleSelector::Universal {
+                    namespace: Some(String::new()), // Empty string = explicit no namespace
+                    span: Span {
+                        start: start as u32,
+                        end: end as u32,
+                    },
+                })
+            } else {
+                Err(ParseError::InvalidSyntax {
+                    message: "Expected element name or '*' after no-namespace prefix '|'"
+                        .to_string(),
+                    position: parser.base_offset() + parser.current_start(),
+                    context: None,
+                })
+            }
         }
         _ => Err(ParseError::InvalidSyntax {
             message: format!("Unexpected token in selector: {:?}", parser.current_kind),

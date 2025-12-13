@@ -55,20 +55,38 @@ pub struct Lexer<'a> {
     chars: Chars<'a>,
     position: usize,
     current: Option<char>,
-    pub inside_tag: bool, // Track if we're inside <...>
+    pub inside_tag: bool,    // Track if we're inside <...>
+    initial_position: usize, // Position after BOM skip (0 or 3)
 }
 
 impl<'a> Lexer<'a> {
     pub fn new(source: &'a str) -> Self {
         let mut chars = source.chars();
-        let current = chars.next();
+        let mut current = chars.next();
+        let mut position = 0;
+
+        // Skip UTF-8 BOM (U+FEFF) at start of file if present.
+        // BOM is a legacy artifact; we strip it (like deno fmt, VS Code).
+        // Position starts after BOM so token spans reflect actual file bytes.
+        if current == Some('\u{feff}') {
+            position = '\u{feff}'.len_utf8();
+            current = chars.next();
+        }
+
         Self {
             source,
             chars,
-            position: 0,
+            position,
             current,
             inside_tag: false,
+            initial_position: position,
         }
+    }
+
+    /// Returns the initial position after BOM skip (0 if no BOM, 3 if BOM was skipped).
+    /// Used by parser to initialize gap tracking.
+    pub fn initial_position(&self) -> usize {
+        self.initial_position
     }
 
     /// Create a new lexer starting at a given position.
@@ -240,6 +258,7 @@ impl<'a> Lexer<'a> {
                 // Tag names and identifiers
                 // Also include : and | for directive syntax (on:click|preventDefault)
                 // and -- for CSS custom properties (style:--custom)
+                // and . for dot notation components (ns.Comp)
                 while let Some(ch) = self.current {
                     if ch.is_alphanumeric()
                         || ch == '_'
@@ -247,7 +266,20 @@ impl<'a> Lexer<'a> {
                         || ch == '-'
                         || ch == ':'
                         || ch == '|'
+                        || ch == '.'
                     {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                Ok(self.make_token(TokenKind::Identifier, start))
+            }
+            Some(ch) if ch.is_ascii_digit() => {
+                // Unquoted numeric attribute values (e.g., data-count=123)
+                // HTML allows unquoted values that are alphanumeric
+                while let Some(ch) = self.current {
+                    if ch.is_alphanumeric() || ch == '_' || ch == '-' {
                         self.advance();
                     } else {
                         break;

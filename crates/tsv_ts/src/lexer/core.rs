@@ -5,6 +5,55 @@ use super::escapes;
 use super::token::{Token, TokenKind, keyword_kind};
 use std::str::Chars;
 use tsv_lang::ParseError;
+use unicode_ident::{is_xid_continue, is_xid_start};
+
+/// Try to decode a unicode escape sequence at the given position.
+/// Returns Some((decoded_char, bytes_consumed)) if valid, None otherwise.
+///
+/// Handles both `\uXXXX` (4-digit) and `\u{X...}` (braced) formats.
+fn try_decode_unicode_escape(source: &str, start: usize) -> Option<(char, usize)> {
+    let bytes = source.as_bytes();
+
+    // Need at least \u
+    if start + 2 > bytes.len() || bytes[start] != b'\\' || bytes[start + 1] != b'u' {
+        return None;
+    }
+
+    let after_u = start + 2;
+
+    if after_u < bytes.len() && bytes[after_u] == b'{' {
+        // Braced format: \u{XXXX}
+        let content_start = after_u + 1;
+        let mut end = content_start;
+        while end < bytes.len() && bytes[end] != b'}' {
+            if !bytes[end].is_ascii_hexdigit() {
+                return None;
+            }
+            end += 1;
+        }
+        if end >= bytes.len() || end == content_start || end - content_start > 6 {
+            return None;
+        }
+        let hex = &source[content_start..end];
+        let code = u32::from_str_radix(hex, 16).ok()?;
+        let ch = char::from_u32(code)?;
+        Some((ch, end + 1 - start)) // +1 for closing brace
+    } else {
+        // 4-digit format: \uXXXX
+        if after_u + 4 > bytes.len() {
+            return None;
+        }
+        for i in 0..4 {
+            if !bytes[after_u + i].is_ascii_hexdigit() {
+                return None;
+            }
+        }
+        let hex = &source[after_u..after_u + 4];
+        let code = u16::from_str_radix(hex, 16).ok()?;
+        let ch = char::from_u32(code as u32)?;
+        Some((ch, 6)) // \uXXXX is 6 bytes
+    }
+}
 
 pub struct Lexer<'a> {
     source: &'a str,
@@ -24,11 +73,21 @@ pub struct Lexer<'a> {
 impl<'a> Lexer<'a> {
     pub fn new(source: &'a str) -> Self {
         let mut chars = source.chars();
-        let current = chars.next();
+        let mut current = chars.next();
+        let mut position = 0;
+
+        // Skip UTF-8 BOM (U+FEFF) at start of file if present.
+        // BOM is a legacy artifact; we strip it (like deno fmt, VS Code).
+        // Position starts after BOM so token spans reflect actual file bytes.
+        if current == Some('\u{feff}') {
+            position = '\u{feff}'.len_utf8();
+            current = chars.next();
+        }
+
         Self {
             source,
             chars,
-            position: 0,
+            position,
             current,
             template_depth: 0,
             had_line_terminator: false,
@@ -39,6 +98,15 @@ impl<'a> Lexer<'a> {
     /// Used for ASI (Automatic Semicolon Insertion).
     pub fn had_line_terminator(&self) -> bool {
         self.had_line_terminator
+    }
+
+    /// Seek to a specific position and re-lex from there.
+    /// Used when splitting compound tokens like `>=` into `>` + `=`.
+    pub fn seek_and_next_token(&mut self, position: usize) -> Result<Token, ParseError> {
+        self.position = position;
+        self.chars = self.source[position..].chars();
+        self.current = self.chars.next();
+        self.next_token()
     }
 
     fn advance(&mut self) {
@@ -57,6 +125,99 @@ impl<'a> Lexer<'a> {
             end: self.position,
             decoded: None,
         }
+    }
+
+    /// Scan an identifier that may contain unicode escapes.
+    ///
+    /// ECMAScript allows unicode escapes in identifiers:
+    /// - `\u0066oo` → identifier `foo`
+    /// - `\u{41}` → identifier `A`
+    /// - `b\u0061r` → identifier `bar`
+    ///
+    /// The decoded name is returned in the token's `decoded` field when escapes are present.
+    /// Prettier normalizes these to their decoded form.
+    fn scan_identifier_with_escapes(&mut self, first_char: char) -> Result<Token, ParseError> {
+        let start = self.position;
+        let mut decoded = String::new();
+        let mut has_escapes = false;
+
+        // Handle first character (already validated as valid identifier start)
+        if first_char == '\\' {
+            // First char is a unicode escape
+            has_escapes = true;
+            if let Some((ch, len)) = try_decode_unicode_escape(self.source, self.position) {
+                if !is_xid_start(ch) && ch != '_' && ch != '$' {
+                    return Err(ParseError::InvalidSyntax {
+                        message: format!(
+                            "Invalid identifier start character from unicode escape: '{ch}'"
+                        ),
+                        position: start,
+                        context: None,
+                    });
+                }
+                decoded.push(ch);
+                // Advance by the escape sequence length
+                for _ in 0..len {
+                    self.advance();
+                }
+            } else {
+                return Err(ParseError::InvalidSyntax {
+                    message: "Invalid unicode escape in identifier".to_string(),
+                    position: start,
+                    context: None,
+                });
+            }
+        } else {
+            decoded.push(first_char);
+            self.advance();
+        }
+
+        // Continue scanning identifier characters (including escapes)
+        loop {
+            match self.current {
+                Some(ch) if is_xid_continue(ch) || ch == '$' => {
+                    decoded.push(ch);
+                    self.advance();
+                }
+                Some('\\') => {
+                    // Potential unicode escape in identifier
+                    if let Some((ch, len)) = try_decode_unicode_escape(self.source, self.position) {
+                        if !is_xid_continue(ch) && ch != '$' {
+                            // Not a valid identifier continue char, stop here
+                            break;
+                        }
+                        has_escapes = true;
+                        decoded.push(ch);
+                        for _ in 0..len {
+                            self.advance();
+                        }
+                    } else {
+                        // Not a valid escape, stop identifier scanning
+                        break;
+                    }
+                }
+                _ => break,
+            }
+        }
+
+        // Check if it's a keyword (only if no escapes - escaped keywords are identifiers)
+        let kind = if !has_escapes {
+            if let Some(kw) = keyword_kind(&decoded) {
+                TokenKind::Keyword(kw)
+            } else {
+                TokenKind::Identifier
+            }
+        } else {
+            // Escaped identifiers are never keywords: `\u0063lass` is identifier "class", not keyword
+            TokenKind::Identifier
+        };
+
+        Ok(Token {
+            kind,
+            start,
+            end: self.position,
+            decoded: if has_escapes { Some(decoded) } else { None },
+        })
     }
 
     /// Scan digits matching a predicate, allowing numeric separators (_)
@@ -85,7 +246,7 @@ impl<'a> Lexer<'a> {
                 self.advance(); // consume '.'
                 self.scan_digits(|c| c.is_ascii_digit());
             } else if next_char.is_none()
-                || !next_char.is_some_and(|c| c.is_alphanumeric() || c == '_' || c == '.')
+                || !next_char.is_some_and(|c| is_xid_start(c) || c == '_' || c == '$' || c == '.')
             {
                 // Trailing decimal: 5. (followed by ; or space or end)
                 // But not: 5.toString() or 5..toString()
@@ -208,8 +369,18 @@ impl<'a> Lexer<'a> {
                             self.advance(); // consume 'o'
                             self.scan_digits(|c| ('0'..='7').contains(&c));
                         }
+                        Some('0'..='7') => {
+                            // Legacy octal (0777) - reject in strict mode (ES modules)
+                            // ES modules are always strict, so this is always an error
+                            return Err(ParseError::InvalidSyntax {
+                                message: "Octal literals are not allowed in strict mode. Use the syntax '0o' instead.".to_string(),
+                                position: start,
+                                context: None,
+                            });
+                        }
                         _ => {
-                            // Regular number or float starting with 0
+                            // Regular number or float starting with 0 (e.g., 0.5, 08, 09)
+                            // Note: 08 and 09 are valid decimal literals (non-octal digits)
                             self.scan_decimal_number();
                         }
                     }
@@ -225,21 +396,26 @@ impl<'a> Lexer<'a> {
 
                 Ok(self.make_token(TokenKind::Number, start))
             }
-            Some(ch) if ch.is_alphabetic() || ch == '_' || ch == '$' => {
-                while let Some(ch) = self.current {
-                    if ch.is_alphanumeric() || ch == '_' || ch == '$' {
-                        self.advance();
-                    } else {
-                        break;
-                    }
+            // ECMAScript identifiers: start with XID_Start, _, or $; continue with XID_Continue or $
+            // Note: _ is in XID_Continue but not XID_Start, so we check it explicitly for start
+            // Identifiers may contain unicode escapes: \u0066oo → foo, b\u0061r → bar
+            Some(ch) if is_xid_start(ch) || ch == '_' || ch == '$' => {
+                self.scan_identifier_with_escapes(ch)
+            }
+            // Unicode escape at start of identifier: \u0066oo → foo
+            Some('\\') => {
+                // Check if this is a valid unicode escape that decodes to an identifier start
+                if let Some((ch, _)) = try_decode_unicode_escape(self.source, self.position)
+                    && (is_xid_start(ch) || ch == '_' || ch == '$')
+                {
+                    return self.scan_identifier_with_escapes('\\');
                 }
-                let raw = &self.source[start..self.position];
-                let kind = if let Some(kw) = keyword_kind(raw) {
-                    TokenKind::Keyword(kw)
-                } else {
-                    TokenKind::Identifier
-                };
-                Ok(self.make_token(kind, start))
+                // Not a valid identifier start - fall through to error at end of match
+                Err(ParseError::InvalidSyntax {
+                    message: "Unexpected character: '\\'".to_string(),
+                    position: start,
+                    context: None,
+                })
             }
             Some(quote @ '\'' | quote @ '"') => {
                 // String literal - single or double quoted
@@ -568,6 +744,24 @@ impl<'a> Lexer<'a> {
                 // Template literal starting with backtick
                 self.read_template_content(start)
             }
+            Some('@') => {
+                // @ for decorators
+                self.advance();
+                Ok(self.make_token(TokenKind::At, start))
+            }
+            Some('#') => {
+                // Check for hashbang at start of file: #!/usr/bin/env node
+                if start == 0 {
+                    let next = self.source.get(1..2);
+                    if next == Some("!") {
+                        // Hashbang comment - read until end of line
+                        return self.read_hashbang_comment(start);
+                    }
+                }
+                // # for private identifiers
+                self.advance();
+                Ok(self.make_token(TokenKind::Hash, start))
+            }
             Some(ch) => Err(ParseError::InvalidSyntax {
                 message: format!("Unexpected character: '{ch}'"),
                 position: start,
@@ -756,13 +950,13 @@ impl<'a> Lexer<'a> {
 
         self.advance(); // Consume closing /
 
-        // Read flags (identifier characters)
+        // Read flags (IdentifierPartChar = XID_Continue, plus $ for ECMAScript)
         // TODO: Validate flags are only valid regex flags (d, g, i, m, s, u, v, y)
         // TODO: Reject duplicate flags (e.g., /test/gg)
         // TODO: Support Unicode escape sequences in flags (e.g., /test/\u0067 for 'g')
         let flags_start = self.position;
         while let Some(ch) = self.current {
-            if ch.is_alphanumeric() || ch == '_' || ch == '$' {
+            if is_xid_continue(ch) || ch == '$' {
                 self.advance();
             } else {
                 break;
@@ -876,5 +1070,42 @@ impl<'a> Lexer<'a> {
                 }
             }
         }
+    }
+
+    /// Read a hashbang comment: #!...
+    /// Only valid at the start of the file (position 0).
+    /// Reads until end of line or end of file.
+    /// Returns as a Comment token with is_block: false.
+    fn read_hashbang_comment(&mut self, start: usize) -> Result<Token, ParseError> {
+        // Skip #!
+        self.advance(); // #
+        self.advance(); // !
+
+        let mut content = String::from("#!");
+
+        // Read until newline or EOF
+        loop {
+            match self.current {
+                None | Some('\n') | Some('\r') => {
+                    // End of hashbang comment
+                    // Don't consume the newline - it's whitespace for the next token
+                    break;
+                }
+                Some(ch) => {
+                    content.push(ch);
+                    self.advance();
+                }
+            }
+        }
+
+        Ok(Token {
+            kind: TokenKind::Comment {
+                content,
+                is_block: false,
+            },
+            start,
+            end: self.position,
+            decoded: None,
+        })
     }
 }

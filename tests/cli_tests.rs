@@ -13,6 +13,8 @@ fn test_parse_command_with_content() {
             "parse",
             "--content",
             "const x = 42;",
+            "--parser",
+            "typescript",
         ])
         .output()
         .expect("Failed to execute command");
@@ -37,6 +39,8 @@ fn test_parse_command_with_pretty() {
             "parse",
             "--content",
             "const x = 42;",
+            "--parser",
+            "typescript",
             "--pretty",
         ])
         .output()
@@ -148,6 +152,8 @@ fn test_parse_invalid_syntax() {
             "parse",
             "--content",
             "const x = ",
+            "--parser",
+            "typescript",
         ])
         .output()
         .expect("Failed to execute command");
@@ -157,6 +163,32 @@ fn test_parse_invalid_syntax() {
     assert!(
         stderr.contains("Parse error") || stderr.contains("error"),
         "Should report parse error"
+    );
+}
+
+#[test]
+fn test_parse_missing_parser() {
+    let output = Command::new("cargo")
+        .args(&[
+            "run",
+            "-p",
+            "tsv_cli",
+            "-q",
+            "parse",
+            "--content",
+            "<div>test</div>",
+        ])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(
+        !output.status.success(),
+        "Parse without --parser should fail"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--parser") || stderr.contains("Error"),
+        "Should report missing parser option"
     );
 }
 

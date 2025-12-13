@@ -7,15 +7,12 @@
 /// - ")" + "format" = space (end of function, start of identifier)
 /// - "100%" + "-" = space (operators need spaces in calc())
 pub fn should_add_space_between(prev: &str, curr: &str) -> bool {
-    if prev.is_empty() || curr.is_empty() {
+    let Some(prev_last) = prev.chars().last() else {
         return false;
-    }
-
-    // SAFETY: We just checked both strings are non-empty above
-    #[allow(clippy::unwrap_used)]
-    let prev_last = prev.chars().last().unwrap();
-    #[allow(clippy::unwrap_used)]
-    let curr_first = curr.chars().next().unwrap();
+    };
+    let Some(curr_first) = curr.chars().next() else {
+        return false;
+    };
 
     // Never space around parens - they connect directly
     if curr_first == '(' || curr_first == ')' || prev_last == '(' {

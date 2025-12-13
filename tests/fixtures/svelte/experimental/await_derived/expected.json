@@ -1,0 +1,306 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 126,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 110,
+				"end": 112,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 112,
+				"end": 125,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 113
+					},
+					"end": {
+						"line": 9,
+						"column": 2,
+						"character": 114
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 115,
+							"end": 121,
+							"expression": {
+								"type": "Identifier",
+								"start": 116,
+								"end": 120,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 4
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"name": "data"
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 110,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 0
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 10,
+					"end": 58,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 25,
+						"end": 34,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 16
+							},
+							"end": {
+								"line": 2,
+								"column": 25
+							}
+						},
+						"name": "fetchData"
+					},
+					"expression": false,
+					"generator": false,
+					"async": true,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 37,
+						"end": 58,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 28
+							},
+							"end": {
+								"line": 4,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 41,
+								"end": 55,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 3,
+										"column": 16
+									}
+								},
+								"argument": {
+									"type": "Literal",
+									"start": 48,
+									"end": 54,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 9
+										},
+										"end": {
+											"line": 3,
+											"column": 15
+										}
+									},
+									"value": "data",
+									"raw": "'data'"
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 61,
+					"end": 100,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 40
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 65,
+							"end": 99,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 5
+								},
+								"end": {
+									"line": 6,
+									"column": 39
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 65,
+								"end": 69,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 5
+									},
+									"end": {
+										"line": 6,
+										"column": 9
+									}
+								},
+								"name": "data"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 72,
+								"end": 99,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 12
+									},
+									"end": {
+										"line": 6,
+										"column": 39
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 72,
+									"end": 80,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 12
+										},
+										"end": {
+											"line": 6,
+											"column": 20
+										}
+									},
+									"name": "$derived"
+								},
+								"arguments": [
+									{
+										"type": "AwaitExpression",
+										"start": 81,
+										"end": 98,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 21
+											},
+											"end": {
+												"line": 6,
+												"column": 38
+											}
+										},
+										"argument": {
+											"type": "CallExpression",
+											"start": 87,
+											"end": 98,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 27
+												},
+												"end": {
+													"line": 6,
+													"column": 38
+												}
+											},
+											"callee": {
+												"type": "Identifier",
+												"start": 87,
+												"end": 96,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 27
+													},
+													"end": {
+														"line": 6,
+														"column": 36
+													}
+												},
+												"name": "fetchData"
+											},
+											"arguments": [],
+											"optional": false
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

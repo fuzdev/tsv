@@ -1,0 +1,61 @@
+{
+	"type": "StyleSheet",
+	"start": 0,
+	"end": 19,
+	"attributes": [],
+	"children": [
+		{
+			"type": "Rule",
+			"prelude": {
+				"type": "SelectorList",
+				"start": 0,
+				"end": 2,
+				"children": [
+					{
+						"type": "ComplexSelector",
+						"start": 0,
+						"end": 2,
+						"children": [
+							{
+								"type": "RelativeSelector",
+								"combinator": null,
+								"start": 0,
+								"end": 2,
+								"selectors": [
+									{
+										"type": "ClassSelector",
+										"name": "a",
+										"start": 0,
+										"end": 2
+									}
+								]
+							}
+						]
+					}
+				]
+			},
+			"block": {
+				"type": "Block",
+				"start": 3,
+				"end": 19,
+				"children": [
+					{
+						"type": "Declaration",
+						"start": 6,
+						"end": 16,
+						"property": "color",
+						"value": "red"
+					}
+				]
+			},
+			"start": 0,
+			"end": 19
+		}
+	],
+	"content": {
+		"start": 0,
+		"end": 19,
+		"styles": ".a {\n\tcolor: red;\n}",
+		"comment": null
+	}
+}

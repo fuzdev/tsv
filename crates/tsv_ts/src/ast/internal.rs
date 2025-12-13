@@ -17,6 +17,10 @@ pub enum Statement {
     ExpressionStatement(ExpressionStatement),
     VariableDeclaration(VariableDeclaration),
     TSTypeAliasDeclaration(TSTypeAliasDeclaration),
+    TSInterfaceDeclaration(TSInterfaceDeclaration),
+    TSDeclareFunction(TSDeclareFunction),
+    TSEnumDeclaration(TSEnumDeclaration),
+    TSModuleDeclaration(TSModuleDeclaration),
     ReturnStatement(ReturnStatement),
     BlockStatement(BlockStatement),
     FunctionDeclaration(FunctionDeclaration),
@@ -24,7 +28,9 @@ pub enum Statement {
     ExportNamedDeclaration(ExportNamedDeclaration),
     ExportDefaultDeclaration(ExportDefaultDeclaration),
     ExportAllDeclaration(ExportAllDeclaration),
+    TSExportAssignment(TSExportAssignment),
     ImportDeclaration(ImportDeclaration),
+    TSImportEqualsDeclaration(TSImportEqualsDeclaration),
     // Control flow statements
     IfStatement(IfStatement),
     ForStatement(ForStatement),
@@ -47,6 +53,10 @@ impl Statement {
             Statement::ExpressionStatement(stmt) => stmt.span,
             Statement::VariableDeclaration(decl) => decl.span,
             Statement::TSTypeAliasDeclaration(decl) => decl.span,
+            Statement::TSInterfaceDeclaration(decl) => decl.span,
+            Statement::TSDeclareFunction(decl) => decl.span,
+            Statement::TSEnumDeclaration(decl) => decl.span,
+            Statement::TSModuleDeclaration(decl) => decl.span,
             Statement::ReturnStatement(stmt) => stmt.span,
             Statement::BlockStatement(block) => block.span,
             Statement::FunctionDeclaration(decl) => decl.span,
@@ -54,7 +64,9 @@ impl Statement {
             Statement::ExportNamedDeclaration(decl) => decl.span,
             Statement::ExportDefaultDeclaration(decl) => decl.span,
             Statement::ExportAllDeclaration(decl) => decl.span,
+            Statement::TSExportAssignment(decl) => decl.span,
             Statement::ImportDeclaration(decl) => decl.span,
+            Statement::TSImportEqualsDeclaration(decl) => decl.span,
             // Control flow statements
             Statement::IfStatement(stmt) => stmt.span,
             Statement::ForStatement(stmt) => stmt.span,
@@ -73,6 +85,17 @@ impl Statement {
     }
 }
 
+/// Decorator: `@expression` applied to classes and class members
+///
+/// The expression can be an identifier (`@foo`), call expression (`@foo()`),
+/// or member expression (`@foo.bar`).
+#[derive(Debug, Clone)]
+pub struct Decorator {
+    /// The decorator expression (identifier, call, or member expression)
+    pub expression: Expression,
+    pub span: Span,
+}
+
 /// Export named declaration: `export const x = 1;`, `export { x }`, `export { x } from "y"`
 #[derive(Debug, Clone)]
 pub struct ExportNamedDeclaration {
@@ -83,7 +106,18 @@ pub struct ExportNamedDeclaration {
     pub specifiers: Vec<ExportSpecifier>,
     /// Re-export source: `export { x } from "y"` or None for local exports
     pub source: Option<Literal>,
+    /// Export kind: "value" for regular exports, "type" for type-only exports
+    pub export_kind: ExportKind,
     pub span: Span,
+}
+
+/// Export kind for TypeScript type-only exports
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportKind {
+    /// Regular value export: `export { x }`
+    Value,
+    /// Type-only export: `export type { X }`
+    Type,
 }
 
 /// Export default declaration: `export default x`, `export default function() {}`
@@ -94,21 +128,44 @@ pub struct ExportDefaultDeclaration {
     pub span: Span,
 }
 
+/// Function declaration that may be ambient (TSDeclareFunction) or regular (FunctionDeclaration)
+///
+/// Used when parsing export function declarations which can be either
+/// in ambient context (declare module) or regular context.
+#[derive(Debug, Clone)]
+pub enum ExportFunctionDeclaration {
+    Declaration(FunctionDeclaration),
+    Declare(TSDeclareFunction),
+}
+
 /// Value of export default - can be expression or declaration
 #[derive(Debug, Clone)]
 pub enum ExportDefaultValue {
     Expression(Expression),
     FunctionDeclaration(Box<FunctionDeclaration>),
+    /// For ambient function declarations (no body)
+    TSDeclareFunction(Box<TSDeclareFunction>),
     ClassDeclaration(Box<ClassDeclaration>),
 }
 
 /// Export all declaration: `export * from "y"` or `export * as ns from "y"`
+/// Also handles type-only: `export type * from "y"`
 #[derive(Debug, Clone)]
 pub struct ExportAllDeclaration {
     /// For `export * as ns from "y"`, the namespace binding name
     pub exported: Option<Identifier>,
     /// Module source
     pub source: Literal,
+    /// Export kind: "value" or "type" (for `export type * from`)
+    pub export_kind: ExportKind,
+    pub span: Span,
+}
+
+/// TypeScript export assignment: `export = value;`
+/// CommonJS-style export for TypeScript modules
+#[derive(Debug, Clone)]
+pub struct TSExportAssignment {
+    pub expression: Expression,
     pub span: Span,
 }
 
@@ -191,6 +248,37 @@ pub struct ImportAttribute {
     pub span: Span,
 }
 
+/// TypeScript import equals declaration: `import x = require("y")` or `import x = A.B`
+#[derive(Debug, Clone)]
+pub struct TSImportEqualsDeclaration {
+    /// The local binding name
+    pub id: Identifier,
+    /// The module reference (either external module or entity name)
+    pub module_reference: TSModuleReference,
+    /// Import kind: "value" or "type"
+    pub import_kind: ImportKind,
+    /// Whether this is an export: `export import x = require("y")`
+    pub is_export: bool,
+    pub span: Span,
+}
+
+/// Module reference: either external module reference or entity name
+#[derive(Debug, Clone)]
+pub enum TSModuleReference {
+    /// `require("module")`
+    ExternalModuleReference(TSExternalModuleReference),
+    /// `A.B.C` (entity name)
+    EntityName(TSEntityName),
+}
+
+/// External module reference: `require("module")`
+#[derive(Debug, Clone)]
+pub struct TSExternalModuleReference {
+    /// The module specifier (string literal)
+    pub expression: Literal,
+    pub span: Span,
+}
+
 #[derive(Debug, Clone)]
 pub struct ExpressionStatement {
     pub expression: Expression,
@@ -201,6 +289,7 @@ pub struct ExpressionStatement {
 pub enum Expression {
     Literal(Literal),
     Identifier(Identifier),
+    PrivateIdentifier(PrivateIdentifier),
     ObjectExpression(ObjectExpression),
     ArrayExpression(ArrayExpression),
     UnaryExpression(UnaryExpression),
@@ -212,10 +301,12 @@ pub enum Expression {
     ConditionalExpression(ConditionalExpression),
     ArrowFunctionExpression(ArrowFunctionExpression),
     FunctionExpression(FunctionExpression),
+    ClassExpression(ClassExpression),
     SpreadElement(SpreadElement),
     TemplateLiteral(TemplateLiteral),
     TaggedTemplateExpression(TaggedTemplateExpression),
     AwaitExpression(AwaitExpression),
+    YieldExpression(YieldExpression),
     SequenceExpression(SequenceExpression),
     RegexLiteral(RegexLiteral),
     Super(Super),
@@ -225,6 +316,20 @@ pub enum Expression {
     ArrayPattern(ArrayPattern),
     AssignmentPattern(AssignmentPattern),
     RestElement(RestElement),
+    // TypeScript type assertions
+    TSTypeAssertion(TSTypeAssertion),
+    TSAsExpression(TSAsExpression),
+    TSSatisfiesExpression(TSSatisfiesExpression),
+    // TypeScript instantiation expression: f<T>
+    TSInstantiationExpression(TSInstantiationExpression),
+    // TypeScript non-null assertion: expr!
+    TSNonNullExpression(TSNonNullExpression),
+    // TypeScript parameter property: constructor(public x)
+    TSParameterProperty(TSParameterProperty),
+    // Dynamic import: import('...')
+    ImportExpression(ImportExpression),
+    // Meta property: import.meta, new.target
+    MetaProperty(MetaProperty),
 }
 
 impl Expression {
@@ -232,6 +337,7 @@ impl Expression {
         match self {
             Expression::Literal(lit) => lit.span,
             Expression::Identifier(id) => id.span,
+            Expression::PrivateIdentifier(pid) => pid.span,
             Expression::ObjectExpression(obj) => obj.span,
             Expression::ArrayExpression(arr) => arr.span,
             Expression::UnaryExpression(unary) => unary.span,
@@ -243,10 +349,12 @@ impl Expression {
             Expression::ConditionalExpression(cond) => cond.span,
             Expression::ArrowFunctionExpression(arrow) => arrow.span,
             Expression::FunctionExpression(func) => func.span,
+            Expression::ClassExpression(class_expr) => class_expr.span,
             Expression::SpreadElement(spread) => spread.span,
             Expression::TemplateLiteral(template) => template.span,
             Expression::TaggedTemplateExpression(tagged) => tagged.span,
             Expression::AwaitExpression(await_expr) => await_expr.span,
+            Expression::YieldExpression(yield_expr) => yield_expr.span,
             Expression::SequenceExpression(seq) => seq.span,
             Expression::RegexLiteral(regex) => regex.span,
             Expression::Super(s) => s.span,
@@ -255,6 +363,14 @@ impl Expression {
             Expression::ArrayPattern(arr) => arr.span,
             Expression::AssignmentPattern(assign) => assign.span,
             Expression::RestElement(rest) => rest.span,
+            Expression::TSTypeAssertion(type_assert) => type_assert.span,
+            Expression::TSAsExpression(as_expr) => as_expr.span,
+            Expression::TSSatisfiesExpression(sat_expr) => sat_expr.span,
+            Expression::TSInstantiationExpression(inst) => inst.span,
+            Expression::TSNonNullExpression(non_null) => non_null.span,
+            Expression::TSParameterProperty(param_prop) => param_prop.span,
+            Expression::ImportExpression(import) => import.span,
+            Expression::MetaProperty(meta) => meta.span,
         }
     }
 }
@@ -485,6 +601,31 @@ impl BinaryOperator {
     pub fn can_flatten_with(&self, other: BinaryOperator) -> bool {
         crate::ast::precedence::should_flatten(*self, other)
     }
+
+    /// Check if this is a logical operator (&&, ||, ??)
+    #[inline]
+    pub const fn is_logical(self) -> bool {
+        matches!(
+            self,
+            BinaryOperator::AmpersandAmpersand
+                | BinaryOperator::PipePipe
+                | BinaryOperator::QuestionQuestion
+        )
+    }
+
+    /// Check if this is a bitwise operator (|, ^, &, <<, >>, >>>)
+    #[inline]
+    pub const fn is_bitwise(self) -> bool {
+        matches!(
+            self,
+            BinaryOperator::Pipe
+                | BinaryOperator::Caret
+                | BinaryOperator::Ampersand
+                | BinaryOperator::LeftShift
+                | BinaryOperator::RightShift
+                | BinaryOperator::UnsignedRightShift
+        )
+    }
 }
 
 /// Binary expression: `a + b`, `x && y`, etc.
@@ -496,10 +637,11 @@ pub struct BinaryExpression {
     pub span: Span,
 }
 
-/// Call expression: `foo()`, `obj.method(arg1, arg2)`
+/// Call expression: `foo()`, `obj.method(arg1, arg2)`, `fn<T>()`
 #[derive(Debug, Clone)]
 pub struct CallExpression {
     pub callee: Box<Expression>,
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
     pub arguments: Vec<Expression>,
     pub optional: bool, // true for `foo?.()` (optional chaining)
     pub span: Span,
@@ -509,10 +651,29 @@ pub struct CallExpression {
 ///
 /// Constructor call with the `new` keyword. The callee is typically an
 /// identifier or member expression, and arguments are optional.
+/// Type arguments like `new Map<K, V>()` are stored in `type_arguments`.
 #[derive(Debug, Clone)]
 pub struct NewExpression {
     pub callee: Box<Expression>,
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
     pub arguments: Vec<Expression>,
+    pub span: Span,
+}
+
+/// Dynamic import expression: `import('module')`
+#[derive(Debug, Clone)]
+pub struct ImportExpression {
+    pub source: Box<Expression>,
+    pub span: Span,
+}
+
+/// Meta property: `import.meta`, `new.target`
+#[derive(Debug, Clone)]
+pub struct MetaProperty {
+    /// The keyword: "import" or "new"
+    pub meta: Identifier,
+    /// The property: "meta" or "target"
+    pub property: Identifier,
     pub span: Span,
 }
 
@@ -545,14 +706,18 @@ pub struct ConditionalExpression {
 /// require additional parsing infrastructure.
 #[derive(Debug, Clone)]
 pub struct ArrowFunctionExpression {
+    /// Type parameters (TypeScript generics): `<T>() => ...`
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Vec<Expression>,
     pub body: ArrowFunctionBody,
-    pub expression: bool, // true for expression body, false for block body
     /// Return type annotation (TypeScript): (): number => ...
     pub return_type: Option<TSTypeAnnotation>,
     /// Whether this is an async arrow function: `async () => ...`
     pub r#async: bool,
+    /// Position of opening paren for params, if parenthesized.
+    /// `Some(pos)` for `(x) => x` or `() => x`, `None` for `x => x`
+    pub params_start: Option<u32>,
     pub span: Span,
 }
 
@@ -572,6 +737,11 @@ impl ArrowFunctionBody {
             ArrowFunctionBody::BlockStatement(block) => block.span,
         }
     }
+
+    /// Returns true if this is an expression body (not a block)
+    pub fn is_expression(&self) -> bool {
+        matches!(self, ArrowFunctionBody::Expression(_))
+    }
 }
 
 /// Function expression: `function() {}` or method shorthand `{ foo() {} }`
@@ -584,6 +754,8 @@ impl ArrowFunctionBody {
 pub struct FunctionExpression {
     /// Optional function name (for named function expressions)
     pub id: Option<Identifier>,
+    /// Type parameters (TypeScript generics): `function<T>() {}`
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Vec<Expression>,
     /// Return type annotation (e.g., `: number` in `function fn(): number {}`)
@@ -618,6 +790,8 @@ pub struct BlockStatement {
 pub struct FunctionDeclaration {
     /// Function name (required for declarations, optional for export default)
     pub id: Option<Identifier>,
+    /// Type parameters (TypeScript generics): `function fn<T>() {}`
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Vec<Expression>,
     /// Return type annotation (e.g., `: number` in `function fn(): number {}`)
@@ -796,12 +970,49 @@ pub struct EmptyStatement {
 /// For `export default class {}`, the name is optional.
 #[derive(Debug, Clone)]
 pub struct ClassDeclaration {
+    /// Decorators applied to this class
+    pub decorators: Vec<Decorator>,
     /// Class name (required for declarations, optional for export default)
     pub id: Option<Identifier>,
     /// Optional superclass expression (for `extends`)
     pub super_class: Option<Box<Expression>>,
+    /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
+    pub super_type_parameters: Option<TSTypeParameterInstantiation>,
+    /// Implements clause for declare class: `implements Foo, Bar`
+    pub implements: Vec<TSInterfaceHeritage>,
     /// Class body containing methods and properties
     pub body: ClassBody,
+    /// Whether this is a declare class (ambient declaration)
+    pub declare: bool,
+    /// Whether this is an abstract class
+    pub r#abstract: bool,
+    /// Type parameters (e.g., `<T>` in `class Foo<T>`)
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub span: Span,
+}
+
+/// Class expression: `class { }` or `class Foo<T> extends Bar { }`
+///
+/// Same as ClassDeclaration but used in expression position.
+/// The name is always optional.
+#[derive(Debug, Clone)]
+pub struct ClassExpression {
+    /// Decorators applied to this class
+    pub decorators: Vec<Decorator>,
+    /// Class name (always optional for expressions)
+    pub id: Option<Identifier>,
+    /// Optional superclass expression (for `extends`)
+    pub super_class: Option<Box<Expression>>,
+    /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
+    pub super_type_parameters: Option<TSTypeParameterInstantiation>,
+    /// Implements clause: `implements Foo, Bar`
+    pub implements: Vec<TSInterfaceHeritage>,
+    /// Class body containing methods and properties
+    pub body: ClassBody,
+    /// Whether this is an abstract class
+    pub r#abstract: bool,
+    /// Type parameters (e.g., `<T>` in `class Foo<T>`)
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub span: Span,
 }
 
@@ -814,11 +1025,12 @@ pub struct ClassBody {
     pub span: Span,
 }
 
-/// Class member - either a method definition or property definition
+/// Class member - method definition, property definition, or static block
 #[derive(Debug, Clone)]
 pub enum ClassMember {
     MethodDefinition(MethodDefinition),
     PropertyDefinition(PropertyDefinition),
+    StaticBlock(StaticBlock),
 }
 
 impl ClassMember {
@@ -826,8 +1038,16 @@ impl ClassMember {
         match self {
             ClassMember::MethodDefinition(m) => m.span,
             ClassMember::PropertyDefinition(p) => p.span,
+            ClassMember::StaticBlock(s) => s.span,
         }
     }
+}
+
+/// Static initialization block in a class: `static { ... }` (ES2022)
+#[derive(Debug, Clone)]
+pub struct StaticBlock {
+    pub body: Vec<Statement>,
+    pub span: Span,
 }
 
 /// Method definition kind
@@ -852,37 +1072,103 @@ impl MethodKind {
     }
 }
 
+/// Accessibility modifier for class members: public, private, protected
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Accessibility {
+    Public,
+    Private,
+    Protected,
+}
+
+impl Accessibility {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Accessibility::Public => "public",
+            Accessibility::Private => "private",
+            Accessibility::Protected => "protected",
+        }
+    }
+}
+
+/// TypeScript parameter property in constructor: `constructor(public x: number)`
+#[derive(Debug, Clone)]
+pub struct TSParameterProperty {
+    /// Accessibility modifier: public, private, protected
+    pub accessibility: Option<Accessibility>,
+    /// Whether the parameter is readonly
+    pub readonly: bool,
+    /// The actual parameter - can be Identifier or AssignmentPattern (with default value)
+    pub parameter: Box<Expression>,
+    pub span: Span,
+}
+
 /// Method definition in a class body: `method() { ... }` or `get x() { ... }`
 #[derive(Debug, Clone)]
 pub struct MethodDefinition {
+    /// Decorators applied to this method
+    pub decorators: Vec<Decorator>,
     /// Method name (key)
     pub key: Expression,
     /// Method implementation (value)
     pub value: FunctionExpression,
     /// Method kind (constructor, method, get, set)
     pub kind: MethodKind,
+    /// Accessibility modifier (public, private, protected)
+    pub accessibility: Option<Accessibility>,
     /// Whether this is a static method
     pub is_static: bool,
+    /// Whether this method overrides a base class method
+    pub r#override: bool,
+    /// Whether this is an abstract method (no body)
+    pub r#abstract: bool,
     /// Whether the key is computed (`[expr]()`)
     pub computed: bool,
     pub span: Span,
 }
 
+/// Modifier for class property optionality/definiteness.
+///
+/// These are mutually exclusive syntactically - they occupy the same position
+/// after the property name (`a?: T` vs `a!: T`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PropertyModifier {
+    /// No modifier (regular property)
+    #[default]
+    None,
+    /// Optional property (`a?: string`)
+    Optional,
+    /// Definite assignment assertion (`a!: string`)
+    Definite,
+}
+
 /// Property definition in a class body: `name = value;` or `name;`
 ///
 /// Unlike methods, properties use `=` for initialization.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
 pub struct PropertyDefinition {
+    /// Decorators applied to this property
+    pub decorators: Vec<Decorator>,
     /// Property name (key)
     pub key: Expression,
     /// Type annotation (e.g., `: number` in `a: number = 0;`)
     pub type_annotation: Option<TSTypeAnnotation>,
     /// Optional initial value
     pub value: Option<Expression>,
+    /// Accessibility modifier (public, private, protected)
+    pub accessibility: Option<Accessibility>,
     /// Whether this is a static property
     pub is_static: bool,
+    /// Whether this is an abstract property
+    pub r#abstract: bool,
+    /// Whether this is a readonly property
+    pub readonly: bool,
     /// Whether the key is computed (`[expr] = value`)
     pub computed: bool,
+    /// Whether this property uses the accessor keyword (ES decorator proposal)
+    pub accessor: bool,
+    /// Optional/definite modifier (`?` or `!` after property name)
+    pub modifier: PropertyModifier,
     pub span: Span,
 }
 
@@ -935,6 +1221,9 @@ pub enum LiteralValue {
         content: String, // string content without quotes (decoded)
         quote: char,     // original quote character (' or ")
     },
+    /// BigInt literal: `1n`, `100n`, `0xffn`
+    /// Value stored as string since BigInt can exceed f64 precision
+    BigInt(String),
     Boolean(bool),
     Null,
     Undefined,
@@ -994,6 +1283,21 @@ pub struct AwaitExpression {
     pub span: Span,
 }
 
+/// Yield expression: `yield value` or `yield* iterable`
+///
+/// Used in generator functions to produce values.
+/// - `yield` with no argument yields undefined
+/// - `yield value` yields the given value
+/// - `yield* iterable` delegates to another generator/iterable
+#[derive(Debug, Clone)]
+pub struct YieldExpression {
+    /// The value to yield (None for `yield` with no argument)
+    pub argument: Option<Box<Expression>>,
+    /// Whether this is a delegating yield: `yield*`
+    pub delegate: bool,
+    pub span: Span,
+}
+
 /// Sequence expression: `a, b, c`
 ///
 /// Evaluates all expressions left to right, returns the last value.
@@ -1029,6 +1333,81 @@ pub struct RegexLiteral {
 /// - `super[expr]` computed property access on parent
 #[derive(Debug, Clone)]
 pub struct Super {
+    pub span: Span,
+}
+
+/// TypeScript angle-bracket type assertion: `<Type>expr`
+///
+/// Old-style type assertion syntax. Equivalent to `expr as Type` but
+/// incompatible with JSX (looks like a JSX element).
+///
+/// Example: `<string>someValue`, `<T>a`
+#[derive(Debug, Clone)]
+pub struct TSTypeAssertion {
+    /// The target type
+    pub type_annotation: Box<TSType>,
+    /// The expression being type-asserted
+    pub expression: Box<Expression>,
+    pub span: Span,
+}
+
+/// TypeScript `as` type assertion: `expr as Type` or `expr as const`
+///
+/// Type assertion that tells the compiler to treat an expression as a specific type.
+/// Unlike angle-bracket syntax (`<Type>expr`), this works in JSX/TSX.
+///
+/// Note: `as const` is represented as a type reference with name "const".
+#[derive(Debug, Clone)]
+pub struct TSAsExpression {
+    /// The expression being type-asserted
+    pub expression: Box<Expression>,
+    /// The target type
+    pub type_annotation: Box<TSType>,
+    pub span: Span,
+}
+
+/// TypeScript `satisfies` expression: `expr satisfies Type`
+///
+/// Checks that an expression conforms to a type while preserving its inferred type.
+/// Unlike `as`, this doesn't widen the type - the expression keeps its specific type.
+///
+/// Example: `{ a: 1 } satisfies Record<string, number>` keeps type `{ a: number }`
+/// but verifies it's compatible with `Record<string, number>`.
+#[derive(Debug, Clone)]
+pub struct TSSatisfiesExpression {
+    /// The expression being checked
+    pub expression: Box<Expression>,
+    /// The type to satisfy
+    pub type_annotation: Box<TSType>,
+    pub span: Span,
+}
+
+/// TypeScript instantiation expression: `f<T>`, `SomeClass<number>`
+///
+/// Instantiates a generic value with specific type arguments without calling it.
+/// This is different from CallExpression with type arguments (`f<T>()`) - this
+/// just provides type arguments to a generic function/class reference.
+///
+/// Example: `const boundF = f<number>;` gives `f` with type parameter bound to `number`.
+#[derive(Debug, Clone)]
+pub struct TSInstantiationExpression {
+    /// The expression being instantiated
+    pub expression: Box<Expression>,
+    /// The type arguments: <T, U>
+    pub type_arguments: TSTypeParameterInstantiation,
+    pub span: Span,
+}
+
+/// TypeScript non-null assertion expression: `expr!`
+///
+/// Asserts that an expression is not null or undefined.
+/// This is a compile-time assertion that has no runtime effect.
+///
+/// Example: `document.getElementById("app")!`
+#[derive(Debug, Clone)]
+pub struct TSNonNullExpression {
+    /// The expression being asserted non-null
+    pub expression: Box<Expression>,
     pub span: Span,
 }
 
@@ -1110,6 +1489,7 @@ impl AssignmentOperator {
 #[derive(Debug, Clone)]
 pub struct ObjectPattern {
     pub properties: Vec<ObjectPatternProperty>,
+    pub type_annotation: Option<TSTypeAnnotation>,
     pub span: Span,
 }
 
@@ -1145,6 +1525,7 @@ impl ObjectPatternProperty {
 pub struct ArrayPattern {
     /// Elements are Option to support holes like `[a, , b]`
     pub elements: Vec<Option<Expression>>,
+    pub type_annotation: Option<TSTypeAnnotation>,
     pub span: Span,
 }
 
@@ -1192,12 +1573,28 @@ pub struct Identifier {
     pub span: Span,
 }
 
+/// Private identifier: `#foo` in class fields and methods
+///
+/// Used for truly private class members (ES2022 private class fields).
+/// The name does NOT include the `#` prefix - it's stored separately.
+/// The span DOES include the `#` character.
+#[derive(Debug, Clone)]
+pub struct PrivateIdentifier {
+    /// The name without the `#` prefix (e.g., "foo" for `#foo`)
+    pub name: DefaultSymbol,
+    pub span: Span,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum VariableDeclarationKind {
     Const = 0,
     Let = 1,
     Var = 2,
+    /// ES2024 Explicit Resource Management: `using resource = getResource();`
+    Using = 3,
+    /// ES2024 Explicit Resource Management: `await using resource = getAsyncResource();`
+    AwaitUsing = 4,
 }
 
 impl VariableDeclarationKind {
@@ -1208,6 +1605,8 @@ impl VariableDeclarationKind {
             Self::Const => "const",
             Self::Let => "let",
             Self::Var => "var",
+            Self::Using => "using",
+            Self::AwaitUsing => "await using",
         }
     }
 }
@@ -1216,6 +1615,8 @@ impl VariableDeclarationKind {
 pub struct VariableDeclaration {
     pub kind: VariableDeclarationKind,
     pub declarations: Vec<VariableDeclarator>,
+    /// Whether this is an ambient declaration (`declare const x: T;`)
+    pub declare: bool,
     pub span: Span,
 }
 
@@ -1256,7 +1657,42 @@ pub enum TSType {
     Literal(TSLiteralType),
     /// Array types (number[], string[], etc.)
     Array(TSArrayType),
-    // TODO: Union, Intersection, Tuple, Function, Object literal, etc.
+    /// Union types: `A | B | C`
+    Union(TSUnionType),
+    /// Intersection types: `A & B & C`
+    Intersection(TSIntersectionType),
+    /// Type references: `SomeType`, `Array<T>`
+    TypeReference(TSTypeReference),
+    /// Object/type literal: `{ prop: T }`
+    TypeLiteral(TSTypeLiteral),
+    /// Function types: `(x: T) => U`
+    Function(TSFunctionType),
+    /// Tuple types: `[T, U]`
+    Tuple(TSTupleType),
+    /// Parenthesized types: `(T)`
+    Parenthesized(TSParenthesizedType),
+    /// Type predicates: `x is T` or `asserts x is T`
+    TypePredicate(TSTypePredicate),
+    /// Conditional types: `T extends U ? V : W`
+    Conditional(TSConditionalType),
+    /// Mapped types: `{ [K in keyof T]: V }`
+    Mapped(TSMappedType),
+    /// Type operators: `keyof T`, `unique symbol`, `readonly T`
+    TypeOperator(TSTypeOperator),
+    /// Import types: `import('module')` or `import('module').Foo<T>`
+    Import(TSImportType),
+    /// Type query: `typeof x`, `typeof Foo.bar`, `typeof import("module")`
+    TypeQuery(TSTypeQuery),
+    /// Indexed access types: `T[K]`, `Obj["key"]`, `T[keyof T]`
+    IndexedAccess(TSIndexedAccessType),
+    /// Rest type in tuples: `...T`
+    Rest(TSRestType),
+    /// Optional type in tuples: `T?`
+    Optional(TSOptionalType),
+    /// Named tuple member: `label: T` or `label?: T`
+    NamedTupleMember(TSNamedTupleMember),
+    /// Infer type: `infer U` (in conditional types)
+    Infer(TSInferType),
 }
 
 impl TSType {
@@ -1266,6 +1702,24 @@ impl TSType {
             TSType::Keyword(kw) => kw.span,
             TSType::Literal(lit) => lit.span(),
             TSType::Array(arr) => arr.span,
+            TSType::Union(u) => u.span,
+            TSType::Intersection(i) => i.span,
+            TSType::TypeReference(r) => r.span,
+            TSType::TypeLiteral(t) => t.span,
+            TSType::Function(f) => f.span,
+            TSType::Tuple(t) => t.span,
+            TSType::Parenthesized(p) => p.span,
+            TSType::TypePredicate(p) => p.span,
+            TSType::Conditional(c) => c.span,
+            TSType::Mapped(m) => m.span,
+            TSType::TypeOperator(o) => o.span,
+            TSType::Import(i) => i.span,
+            TSType::TypeQuery(q) => q.span,
+            TSType::IndexedAccess(i) => i.span,
+            TSType::Rest(r) => r.span,
+            TSType::Optional(o) => o.span,
+            TSType::NamedTupleMember(n) => n.span,
+            TSType::Infer(i) => i.span,
         }
     }
 }
@@ -1275,6 +1729,16 @@ impl TSType {
 pub struct TSArrayType {
     /// The element type of the array
     pub element_type: Box<TSType>,
+    pub span: Span,
+}
+
+/// TypeScript indexed access type: `T[K]`, `Obj["key"]`, `T[keyof T]`
+#[derive(Debug, Clone)]
+pub struct TSIndexedAccessType {
+    /// The object type being indexed
+    pub object_type: Box<TSType>,
+    /// The index type
+    pub index_type: Box<TSType>,
     pub span: Span,
 }
 
@@ -1313,6 +1777,8 @@ pub enum TSKeywordKind {
     Object = 9,
     Symbol = 10,
     BigInt = 11,
+    True = 12,
+    False = 13,
 }
 
 impl TSKeywordKind {
@@ -1332,6 +1798,8 @@ impl TSKeywordKind {
             TSKeywordKind::Object => "object",
             TSKeywordKind::Symbol => "symbol",
             TSKeywordKind::BigInt => "bigint",
+            TSKeywordKind::True => "true",
+            TSKeywordKind::False => "false",
         }
     }
 
@@ -1351,11 +1819,13 @@ impl TSKeywordKind {
             TSKeywordKind::Object => "TSObjectKeyword",
             TSKeywordKind::Symbol => "TSSymbolKeyword",
             TSKeywordKind::BigInt => "TSBigIntKeyword",
+            TSKeywordKind::True => "TSLiteralType",
+            TSKeywordKind::False => "TSLiteralType",
         }
     }
 
     /// Convert from lexer KeywordKind to AST TSKeywordKind
-    /// Returns None for non-type keywords (const, let, var, true, false)
+    /// Returns None for non-type keywords (const, let, var, etc.)
     #[inline]
     pub fn from_lexer_keyword(kw: crate::lexer::KeywordKind) -> Option<Self> {
         use crate::lexer::KeywordKind;
@@ -1372,12 +1842,12 @@ impl TSKeywordKind {
             KeywordKind::Object => Some(TSKeywordKind::Object),
             KeywordKind::Symbol => Some(TSKeywordKind::Symbol),
             KeywordKind::Bigint => Some(TSKeywordKind::BigInt),
+            KeywordKind::True => Some(TSKeywordKind::True),
+            KeywordKind::False => Some(TSKeywordKind::False),
             // Non-type keywords
             KeywordKind::Const
             | KeywordKind::Let
             | KeywordKind::Var
-            | KeywordKind::True
-            | KeywordKind::False
             | KeywordKind::New
             | KeywordKind::Instanceof
             | KeywordKind::In
@@ -1409,7 +1879,12 @@ impl TSKeywordKind {
             // Module keywords
             | KeywordKind::Import
             | KeywordKind::From
-            | KeywordKind::As => None,
+            | KeywordKind::As
+            | KeywordKind::Satisfies
+            // Generator keywords
+            | KeywordKind::Yield
+            // Declaration keywords (not type keywords)
+            | KeywordKind::Enum => None,
         }
     }
 }
@@ -1421,8 +1896,8 @@ impl TSKeywordKind {
 #[derive(Debug, Clone)]
 pub struct TSTypeAliasDeclaration {
     pub id: Identifier,
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub type_annotation: TSType,
-    // TODO: Add type_parameters for generic type aliases: `type X<T> = T[]`
     pub span: Span,
 }
 
@@ -1433,7 +1908,14 @@ pub struct TSTypeAliasDeclaration {
 #[derive(Debug, Clone)]
 pub enum TSLiteralType {
     TemplateLiteral(TemplateLiteralType),
-    // TODO: Add String, Number, Boolean, Null, Undefined for other literal types
+    /// String literal type: `"hello"`, `'world'`
+    String(Literal),
+    /// Number literal type: `1`, `42.5`
+    Number(Literal),
+    /// BigInt literal type: `1n`, `100n`
+    BigInt(Literal),
+    /// Unary expression for negative numbers: `-1`, `-42n`
+    UnaryExpression(UnaryExpression),
 }
 
 impl TSLiteralType {
@@ -1441,6 +1923,10 @@ impl TSLiteralType {
     pub fn span(&self) -> Span {
         match self {
             TSLiteralType::TemplateLiteral(t) => t.span,
+            TSLiteralType::String(lit) => lit.span,
+            TSLiteralType::Number(lit) => lit.span,
+            TSLiteralType::BigInt(lit) => lit.span,
+            TSLiteralType::UnaryExpression(unary) => unary.span,
         }
     }
 }
@@ -1453,5 +1939,496 @@ impl TSLiteralType {
 pub struct TemplateLiteralType {
     pub quasis: Vec<TemplateElement>,
     pub types: Vec<TSType>,
+    pub span: Span,
+}
+
+// ============================================================================
+// TypeScript Type Nodes
+// ============================================================================
+
+/// Union type: `A | B | C`
+#[derive(Debug, Clone)]
+pub struct TSUnionType {
+    pub types: Vec<TSType>,
+    pub span: Span,
+}
+
+/// Intersection type: `A & B & C`
+#[derive(Debug, Clone)]
+pub struct TSIntersectionType {
+    pub types: Vec<TSType>,
+    pub span: Span,
+}
+
+/// Type reference: `SomeType` or `Array<T>`
+#[derive(Debug, Clone)]
+pub struct TSTypeReference {
+    pub type_name: TSEntityName,
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
+    pub span: Span,
+}
+
+/// Entity name: `Foo` or `Foo.Bar.Baz`
+#[derive(Debug, Clone)]
+pub enum TSEntityName {
+    Identifier(Identifier),
+    QualifiedName(Box<TSQualifiedName>),
+}
+
+impl TSEntityName {
+    pub fn span(&self) -> Span {
+        match self {
+            TSEntityName::Identifier(id) => id.span,
+            TSEntityName::QualifiedName(qn) => qn.span,
+        }
+    }
+}
+
+/// Qualified name: `Foo.Bar`
+#[derive(Debug, Clone)]
+pub struct TSQualifiedName {
+    pub left: TSEntityName,
+    pub right: Identifier,
+    pub span: Span,
+}
+
+/// Type parameter instantiation: `<T, U>` (for type arguments)
+#[derive(Debug, Clone)]
+pub struct TSTypeParameterInstantiation {
+    pub params: Vec<TSType>,
+    pub span: Span,
+}
+
+/// Type parameter declaration: `<T, U>` (for declaring type parameters)
+#[derive(Debug, Clone)]
+pub struct TSTypeParameterDeclaration {
+    pub params: Vec<TSTypeParameter>,
+    pub span: Span,
+}
+
+/// Single type parameter: `T`, `T extends U`, or `T extends U = V`
+/// With optional modifiers: `const T`, `in T`, `out T`, `in out T`
+#[derive(Debug, Clone)]
+pub struct TSTypeParameter {
+    pub name: Identifier,
+    pub constraint: Option<Box<TSType>>,
+    pub default: Option<Box<TSType>>,
+    /// `const` modifier (TS 5.0): `<const T>`
+    pub is_const: bool,
+    /// `in` variance modifier (TS 4.7): `<in T>`
+    pub is_in: bool,
+    /// `out` variance modifier (TS 4.7): `<out T>`
+    pub is_out: bool,
+    pub span: Span,
+}
+
+/// Type literal (object type): `{ prop: T; method(): U }`
+#[derive(Debug, Clone)]
+pub struct TSTypeLiteral {
+    pub members: Vec<TSTypeElement>,
+    pub span: Span,
+}
+
+/// Type element - member of a type literal or interface
+#[derive(Debug, Clone)]
+pub enum TSTypeElement {
+    PropertySignature(TSPropertySignature),
+    MethodSignature(TSMethodSignature),
+    CallSignature(TSCallSignatureDeclaration),
+    ConstructSignature(TSConstructSignatureDeclaration),
+    IndexSignature(TSIndexSignature),
+}
+
+impl TSTypeElement {
+    pub fn span(&self) -> Span {
+        match self {
+            TSTypeElement::PropertySignature(p) => p.span,
+            TSTypeElement::MethodSignature(m) => m.span,
+            TSTypeElement::CallSignature(c) => c.span,
+            TSTypeElement::ConstructSignature(c) => c.span,
+            TSTypeElement::IndexSignature(i) => i.span,
+        }
+    }
+}
+
+/// Property signature: `prop: T` or `prop?: T` or `readonly prop: T`
+#[derive(Debug, Clone)]
+pub struct TSPropertySignature {
+    pub key: Expression,
+    pub computed: bool,
+    pub optional: bool,
+    pub readonly: bool,
+    pub type_annotation: Option<TSTypeAnnotation>,
+    pub span: Span,
+}
+
+/// Method signature: `method(): T` or `method<T>(x: T): T`
+#[derive(Debug, Clone)]
+pub struct TSMethodSignature {
+    pub key: Expression,
+    pub computed: bool,
+    pub optional: bool,
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub params: Vec<Expression>,
+    pub return_type: Option<TSTypeAnnotation>,
+    pub span: Span,
+}
+
+/// Call signature: `(): T` or `<T>(): T` or `(x: A): T`
+#[derive(Debug, Clone)]
+pub struct TSCallSignatureDeclaration {
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub params: Vec<Expression>,
+    pub return_type: Option<TSTypeAnnotation>,
+    pub span: Span,
+}
+
+/// Construct signature: `new (): T` or `new <T>(): T` or `new (x: A): T`
+#[derive(Debug, Clone)]
+pub struct TSConstructSignatureDeclaration {
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub params: Vec<Expression>,
+    pub return_type: Option<TSTypeAnnotation>,
+    pub span: Span,
+}
+
+/// Index signature: `[key: string]: T`
+#[derive(Debug, Clone)]
+pub struct TSIndexSignature {
+    pub parameters: Vec<Identifier>,
+    pub type_annotation: TSTypeAnnotation,
+    pub readonly: bool,
+    pub span: Span,
+}
+
+/// Function type: `(x: T) => U` or `<T>(x: T) => U`
+#[derive(Debug, Clone)]
+pub struct TSFunctionType {
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub params: Vec<Expression>,
+    pub return_type: Box<TSTypeAnnotation>,
+    pub span: Span,
+}
+
+/// Tuple type: `[T, U, V]`
+#[derive(Debug, Clone)]
+pub struct TSTupleType {
+    pub element_types: Vec<TSType>,
+    pub span: Span,
+}
+
+/// Rest type in tuples: `...T`
+#[derive(Debug, Clone)]
+pub struct TSRestType {
+    /// The type being spread
+    pub type_annotation: Box<TSType>,
+    pub span: Span,
+}
+
+/// Optional type in tuples: `T?`
+#[derive(Debug, Clone)]
+pub struct TSOptionalType {
+    /// The type that is optional
+    pub type_annotation: Box<TSType>,
+    pub span: Span,
+}
+
+/// Named tuple member: `label: T` or `label?: T`
+#[derive(Debug, Clone)]
+pub struct TSNamedTupleMember {
+    /// The label identifier
+    pub label: Identifier,
+    /// The element type
+    pub element_type: Box<TSType>,
+    /// Whether this element is optional (label?: T)
+    pub optional: bool,
+    pub span: Span,
+}
+
+/// Infer type: `infer U` (in conditional types)
+///
+/// Used in the extends clause of conditional types to introduce a type variable
+/// that can be inferred from the matched type.
+#[derive(Debug, Clone)]
+pub struct TSInferType {
+    /// The type parameter being inferred
+    pub type_parameter: TSTypeParameter,
+    pub span: Span,
+}
+
+/// Parenthesized type: `(T)`
+#[derive(Debug, Clone)]
+pub struct TSParenthesizedType {
+    pub type_annotation: Box<TSType>,
+    pub span: Span,
+}
+
+/// Conditional type: `T extends U ? V : W`
+#[derive(Debug, Clone)]
+pub struct TSConditionalType {
+    pub check_type: Box<TSType>,
+    pub extends_type: Box<TSType>,
+    pub true_type: Box<TSType>,
+    pub false_type: Box<TSType>,
+    pub span: Span,
+}
+
+/// Type predicate: `x is T` or `asserts x is T`
+///
+/// Used for type guards and assertion functions.
+#[derive(Debug, Clone)]
+pub struct TSTypePredicate {
+    /// The parameter name being checked (e.g., `x` in `x is string`)
+    pub parameter_name: Identifier,
+    /// The type being asserted (e.g., `string` in `x is string`)
+    /// None for `asserts x` without `is T`
+    pub type_annotation: Option<Box<TSType>>,
+    /// Whether this is an assertion predicate (`asserts x is T`)
+    pub asserts: bool,
+    pub span: Span,
+}
+
+/// Mapped type: `{ [K in keyof T]: V }`
+///
+/// Transforms properties from one type to another.
+#[derive(Debug, Clone)]
+pub struct TSMappedType {
+    /// The type parameter with constraint: `K in keyof T`
+    pub type_parameter: TSMappedTypeParameter,
+    /// Optional key remapping: `as NewK`
+    pub name_type: Option<Box<TSType>>,
+    /// The value type
+    pub type_annotation: Option<Box<TSType>>,
+    /// Readonly modifier: None, Some(true) for `readonly`, Some(false) for `-readonly`
+    pub readonly: Option<bool>,
+    /// Optional modifier: None, Some(true) for `?`, Some(false) for `-?`
+    pub optional: Option<bool>,
+    pub span: Span,
+}
+
+/// Type parameter in a mapped type: `K in keyof T`
+#[derive(Debug, Clone)]
+pub struct TSMappedTypeParameter {
+    /// The parameter name (just the string, not an Identifier)
+    pub name: String,
+    /// The constraint type (e.g., `keyof T`)
+    pub constraint: Box<TSType>,
+    pub span: Span,
+}
+
+/// Type operator: `keyof T`, `unique symbol`, `readonly T`
+#[derive(Debug, Clone)]
+pub struct TSTypeOperator {
+    /// The operator: "keyof", "unique", "readonly"
+    pub operator: TSTypeOperatorKind,
+    /// The type being operated on
+    pub type_annotation: Box<TSType>,
+    pub span: Span,
+}
+
+/// Type operator kind
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TSTypeOperatorKind {
+    Keyof,
+    Unique,
+    Readonly,
+}
+
+impl TSTypeOperatorKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TSTypeOperatorKind::Keyof => "keyof",
+            TSTypeOperatorKind::Unique => "unique",
+            TSTypeOperatorKind::Readonly => "readonly",
+        }
+    }
+}
+
+/// Import type: `import('module')` or `import('module', {with: {...}}).Qualifier<T>`
+#[derive(Debug, Clone)]
+pub struct TSImportType {
+    /// The module specifier (string literal)
+    pub argument: Literal,
+    /// Optional options object: `{with: {type: 'json'}}`
+    pub options: Option<Box<Expression>>,
+    /// Optional qualifier: `.Foo` or `.Foo.Bar` after the import
+    pub qualifier: Option<TSEntityName>,
+    /// Optional type arguments: `<T, U>`
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
+    pub span: Span,
+}
+
+/// Type query expression name: Identifier, QualifiedName, or ImportType
+///
+/// The `exprName` field of `TSTypeQuery` can be:
+/// - `Identifier` for `typeof x`
+/// - `TSQualifiedName` for `typeof Foo.bar`
+/// - `TSImportType` for `typeof import("module")`
+#[derive(Debug, Clone)]
+pub enum TSTypeQueryExprName {
+    /// Entity name (Identifier or QualifiedName): `typeof x`, `typeof Foo.bar`
+    EntityName(TSEntityName),
+    /// Import type: `typeof import("module")`
+    Import(Box<TSImportType>),
+}
+
+impl TSTypeQueryExprName {
+    pub fn span(&self) -> Span {
+        match self {
+            TSTypeQueryExprName::EntityName(e) => e.span(),
+            TSTypeQueryExprName::Import(i) => i.span,
+        }
+    }
+}
+
+/// Type query: `typeof x`, `typeof Foo.bar`, `typeof import("module")`, `typeof Array<T>`
+///
+/// Gets the type of a value expression.
+#[derive(Debug, Clone)]
+pub struct TSTypeQuery {
+    /// The expression whose type is being queried
+    pub expr_name: TSTypeQueryExprName,
+    /// Optional type arguments: `<T, U>` (e.g., `typeof Array<string>`)
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
+    pub span: Span,
+}
+
+// ============================================================================
+// TypeScript Declaration Nodes
+// ============================================================================
+
+/// Interface declaration: `interface Foo { ... }` or `interface Foo extends Bar { ... }`
+#[derive(Debug, Clone)]
+pub struct TSInterfaceDeclaration {
+    pub id: Identifier,
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub extends: Vec<TSInterfaceHeritage>,
+    pub body: TSInterfaceBody,
+    pub span: Span,
+}
+
+/// Interface heritage: `extends Foo, Bar`
+#[derive(Debug, Clone)]
+pub struct TSInterfaceHeritage {
+    pub expression: TSEntityName,
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
+    pub span: Span,
+}
+
+/// Interface body: `{ members }`
+#[derive(Debug, Clone)]
+pub struct TSInterfaceBody {
+    pub body: Vec<TSTypeElement>,
+    pub span: Span,
+}
+
+/// Declare function: `declare function foo(): void`
+///
+/// Also used for functions inside `declare namespace` where `declare` is implicit.
+#[derive(Debug, Clone)]
+pub struct TSDeclareFunction {
+    pub id: Identifier,
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub params: Vec<Expression>,
+    pub return_type: Option<TSTypeAnnotation>,
+    /// Whether to print the `declare` keyword.
+    /// True for top-level `declare function`, false inside `declare namespace`.
+    pub declare: bool,
+    pub span: Span,
+}
+
+/// TypeScript enum declaration: `enum Foo { A, B }`, `const enum Foo { A = 1 }`
+///
+/// Represents an enum declaration. Enums can be:
+/// - Regular: `enum Foo { A, B }`
+/// - Const: `const enum Foo { A, B }` (inlined at compile time)
+/// - Declare: `declare enum Foo { A, B }` (ambient declaration)
+/// - Declare const: `declare const enum Foo { A, B }`
+#[derive(Debug, Clone)]
+pub struct TSEnumDeclaration {
+    /// Enum name
+    pub id: Identifier,
+    /// Enum members
+    pub members: Vec<TSEnumMember>,
+    /// Whether this is a const enum
+    pub r#const: bool,
+    /// Whether this is an ambient declaration (declare enum)
+    pub declare: bool,
+    pub span: Span,
+}
+
+/// TypeScript enum member: `A`, `A = 1`, `A = "value"`
+///
+/// Represents a single member in an enum declaration.
+#[derive(Debug, Clone)]
+pub struct TSEnumMember {
+    /// Member name (identifier or computed)
+    pub id: TSEnumMemberId,
+    /// Optional initializer expression
+    pub initializer: Option<Expression>,
+    pub span: Span,
+}
+
+/// Enum member id: can be an identifier or a string literal (for computed names)
+#[derive(Debug, Clone)]
+pub enum TSEnumMemberId {
+    Identifier(Identifier),
+    /// String literal for computed names like `"hello"` in `enum { "hello" = 1 }`
+    String(Literal),
+}
+
+/// TypeScript module/namespace declaration: `namespace Utils { ... }` or `module Utils { ... }`
+///
+/// The `module` keyword is the older syntax, while `namespace` is the modern syntax.
+/// Both produce the same AST structure. For nested namespaces like `namespace Outer.Inner`,
+/// the parser creates nested TSModuleDeclaration nodes.
+#[derive(Debug, Clone)]
+pub struct TSModuleDeclaration {
+    /// Module/namespace name - identifier for regular namespaces, string literal for ambient modules
+    pub id: TSModuleName,
+    /// Module body - either a block or nested module declaration (for `A.B.C`)
+    /// `None` for shorthand ambient modules: `declare module 'name';`
+    pub body: Option<TSModuleDeclarationBody>,
+    /// Whether this is an ambient declaration (`declare namespace/module`)
+    pub declare: bool,
+    /// The keyword used: `namespace` or `module`
+    pub kind: TSModuleDeclarationKind,
+    /// For `declare global {}` - uses module kind but has special semantics
+    pub global: bool,
+    pub span: Span,
+}
+
+/// Module/namespace name - can be an identifier or a string literal
+#[derive(Debug, Clone)]
+pub enum TSModuleName {
+    /// Regular identifier: `namespace Foo { }`
+    Identifier(Identifier),
+    /// String literal for ambient modules: `declare module 'name' { }`
+    Literal(Literal),
+}
+
+/// The keyword used in a module/namespace declaration
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TSModuleDeclarationKind {
+    /// `namespace` keyword
+    Namespace,
+    /// `module` keyword (legacy syntax, same semantics as `namespace`)
+    Module,
+}
+
+/// Body of a TypeScript module declaration
+#[derive(Debug, Clone)]
+pub enum TSModuleDeclarationBody {
+    /// Block body with statements: `namespace A { ... }`
+    TSModuleBlock(TSModuleBlock),
+    /// Nested module declaration: `namespace A.B { ... }` - the B part
+    TSModuleDeclaration(Box<TSModuleDeclaration>),
+}
+
+/// TypeScript module block: the `{ ... }` part of a namespace/module declaration
+#[derive(Debug, Clone)]
+pub struct TSModuleBlock {
+    /// Statements inside the module block
+    pub body: Vec<Statement>,
     pub span: Span,
 }

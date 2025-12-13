@@ -10,6 +10,7 @@ serde.workspace = true
 serde_json.workspace = true
 string-interner.workspace = true
 phf = { version = "0.11", features = ["macros"] }
+unicode-ident.workspace = true
 
 [lints]
 workspace = true

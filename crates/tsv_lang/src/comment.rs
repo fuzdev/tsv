@@ -55,3 +55,13 @@ pub fn has_comments_in_range(comments: &[Comment], start: u32, end: u32) -> bool
 pub fn has_line_comments_in_range(comments: &[Comment], start: u32, end: u32) -> bool {
     comments_in_range(comments, start, end).any(|c| !c.is_block)
 }
+
+/// Iterate over comments after a position (span.start >= pos)
+///
+/// Returns an iterator over all comments starting at or after the given position.
+/// Uses binary search to find the starting point: O(log n + k) where k is result count.
+#[inline]
+pub fn comments_after(comments: &[Comment], pos: u32) -> impl Iterator<Item = &Comment> {
+    let first_idx = find_first_comment_from(comments, pos);
+    comments[first_idx..].iter()
+}

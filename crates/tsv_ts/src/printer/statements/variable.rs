@@ -2,14 +2,27 @@
 
 use super::super::Printer;
 use crate::ast::internal;
-use crate::printer::{is_multiline_string_literal, is_pure_property_chain};
+use crate::printer::{
+    is_module_path_fluid_call, is_multiline_string_literal, is_pure_property_chain,
+    needs_doc_based_wrapping,
+};
 use tsv_lang::doc;
 
 impl<'a> Printer<'a> {
     /// Print a variable declaration
     pub(super) fn print_variable_declaration(&mut self, decl: &internal::VariableDeclaration) {
+        // Print declare modifier if present
+        if decl.declare {
+            self.write("declare ");
+        }
+
         // Write the keyword (const, let, var)
-        let keyword_start = decl.span.start;
+        let keyword_start = if decl.declare {
+            // Skip "declare " (8 chars) to find actual keyword start
+            decl.span.start + 8
+        } else {
+            decl.span.start
+        };
         let keyword = decl.kind.as_str();
         self.write(keyword);
         let keyword_len = keyword.len() as u32;
@@ -138,33 +151,111 @@ impl<'a> Printer<'a> {
                 doc::indent(doc::concat(vec![doc::hardline(), init_doc])),
             ]);
 
-            let base_offset = self.config.base_indent_offset * self.config.tab_width;
-            let current_col = self.current_column() + base_offset;
-            let output = doc::print_doc_at_column(&assignment_doc, &self.config, current_col);
-            self.write(&output);
-        } else if is_pure_property_chain(init) && !self.pattern_should_expand(&declarator.id) {
-            // Property chains: optional break based on width (fluid layout)
+            self.write_doc(&assignment_doc);
+        } else if (is_pure_property_chain(init)
+            || is_module_path_fluid_call(init, &self.interner.borrow())
+            || matches!(init, internal::Expression::BinaryExpression(_)))
+            && !self.pattern_should_expand(&declarator.id)
+            && !self.id_has_multiline_type(&declarator.id)
+        {
+            // Property chains, module path calls, and binary expressions: optional break based on width
             // - If RHS fits after `= `, stay on one line: `id = value`
             // - If RHS doesn't fit, break after `=` and indent: `id =\n\tvalue`
             //
             // Structure: group(id + " =" + indent(line + rhs))
             // When the group decides to break, line() becomes newline + indent
             //
-            // Note: Skip this for expanded patterns - the group-based approach
-            // causes unwanted line breaks after `=` when the pattern is multiline.
+            // Binary expressions have internal groups with line() elements that allow
+            // operand-level breaking when the expression is too long.
+            //
+            // Note: Skip this for expanded patterns and multiline type annotations -
+            // the group-based approach causes unwanted line breaks after `=`.
             let id_doc = self.build_expression_doc(&declarator.id);
             let init_doc = self.build_expression_doc(init);
 
             let assignment_doc = doc::group(doc::concat(vec![
                 id_doc,
                 doc::text(" ="),
-                doc::indent(doc::concat(vec![doc::line(), init_doc])),
+                doc::indent_line(init_doc),
             ]));
+
+            self.write_doc(&assignment_doc);
+        } else if needs_doc_based_wrapping(init) {
+            // Expressions with internal groups that need width-based evaluation
+            // e.g., `!!(a || b || c)`, `new (a || b || c)()`
+            //
+            // These expressions have doc groups inside them that decide whether
+            // to break based on line width. We need to use the doc system to
+            // evaluate those groups.
+            let id_doc = self.build_expression_doc(&declarator.id);
+            let init_doc = self.build_expression_doc(init);
+
+            let assignment_doc = doc::concat(vec![id_doc, doc::text(" = "), init_doc]);
+
+            self.write_doc(&assignment_doc);
+        } else if matches!(
+            declarator.id,
+            internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_)
+        ) {
+            // Destructuring patterns with groups that need width-based evaluation
+            // e.g., `let {a, b}: {a: number; b: string} = obj`
+            //
+            // ObjectPattern and ArrayPattern contain groups for width-based expansion.
+            // We need to check if the FULL statement would exceed print width, not just
+            // the pattern, because the group makes its break decision in isolation.
+            //
+            // Pre-calculate if expanding is needed by measuring flat width of full statement.
+            let id_doc = self.build_expression_doc(&declarator.id);
+            let init_doc = self.build_expression_doc(init);
+
+            let assignment_doc = doc::concat(vec![id_doc, doc::text(" = "), init_doc]);
 
             let base_offset = self.config.base_indent_offset * self.config.tab_width;
             let current_col = self.current_column() + base_offset;
-            let output = doc::print_doc_at_column(&assignment_doc, &self.config, current_col);
-            self.write(&output);
+
+            // Check if the flat representation would fit
+            let remaining = self.config.print_width.saturating_sub(current_col);
+            let would_fit = {
+                let interner = self.interner.borrow();
+                doc::fits_resolved(
+                    &assignment_doc,
+                    remaining,
+                    doc::Mode::Flat,
+                    &self.config,
+                    &*interner,
+                )
+            };
+
+            if !would_fit {
+                // "break-lhs" pattern: LHS breaks independently (has hardlines),
+                // but " = value" stays together on one line
+                // Don't wrap in group - hardlines in LHS would force group to break
+                let id_doc = self.build_expression_doc_forced_expand(&declarator.id);
+                let init_doc = self.build_expression_doc(init);
+                let forced_doc = doc::concat(vec![id_doc, doc::text(" = "), init_doc]);
+                let output = {
+                    let interner = self.interner.borrow();
+                    doc::print_doc_at_column_resolved(
+                        &forced_doc,
+                        &self.config,
+                        current_col,
+                        &*interner,
+                    )
+                };
+                self.write(&output);
+            } else {
+                // Use doc-based printing for width-based decisions
+                let output = {
+                    let interner = self.interner.borrow();
+                    doc::print_doc_at_column_resolved(
+                        &assignment_doc,
+                        &self.config,
+                        current_col,
+                        &*interner,
+                    )
+                };
+                self.write(&output);
+            }
         } else {
             // Direct printing for expressions that handle their own wrapping
             self.print_expression(&declarator.id);

@@ -1,5 +1,6 @@
-use crate::error::DebugError;
-use std::process::Command as ProcessCommand;
+use crate::cli::input_parser;
+use crate::error;
+use crate::{deno, subprocess};
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
 use tsv_cli::cli::input::{Input, ParserType};
@@ -14,27 +15,7 @@ impl Command for CanonicalParseCommand {
     }
 
     fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        let (input, parser_type) = if let Some(content) = args.option("content") {
-            // --content requires --parser
-            let parser = args
-                .option("parser")
-                .ok_or("Error: --parser required when using --content")?
-                .parse()?;
-            (Input::from_content(content), parser)
-        } else if args.flag("stdin") {
-            // --stdin requires --parser
-            let parser = args
-                .option("parser")
-                .ok_or("Error: --parser required when using --stdin")?
-                .parse()?;
-            (Input::from_stdin()?, parser)
-        } else if let Some(path) = args.positional() {
-            let parser = ParserType::from_extension(&path);
-            (Input::from_file(&path)?, parser)
-        } else {
-            return Err("No input provided. Use a file path, --content, or --stdin".to_string());
-        };
-
+        let (input, parser_type) = input_parser::parse_input_and_parser_type(args)?;
         Ok(Box::new(CanonicalParseExecutable { input, parser_type }))
     }
 
@@ -70,12 +51,12 @@ impl Executable for CanonicalParseExecutable {
     }
 }
 
-async fn run(input: &Input, parser_type: ParserType) -> crate::error::Result<String> {
+async fn run(input: &Input, parser_type: ParserType) -> error::Result<String> {
     let content = input.content();
 
     match parser_type {
-        ParserType::Svelte => Ok(fuz_client::parse_svelte(content).await?),
-        ParserType::TypeScript => Ok(fuz_client::parse_typescript(content).await?),
+        ParserType::Svelte => Ok(deno::parse_svelte(content).await?),
+        ParserType::TypeScript => Ok(deno::parse_typescript(content).await?),
         ParserType::Css => {
             // CSS uses our Rust parser (no external canonical parser available)
             parse_css_with_rust(content)
@@ -84,25 +65,6 @@ async fn run(input: &Input, parser_type: ParserType) -> crate::error::Result<Str
 }
 
 /// Parse CSS using our Rust parser (no external canonical parser available)
-fn parse_css_with_rust(content: &str) -> crate::error::Result<String> {
-    let output = ProcessCommand::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "tsv_cli",
-            "--quiet",
-            "--",
-            "parse",
-            "--content",
-        ])
-        .arg(content)
-        .output()?;
-
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    } else {
-        Err(DebugError::Command(
-            String::from_utf8_lossy(&output.stderr).into_owned(),
-        ))
-    }
+fn parse_css_with_rust(content: &str) -> error::Result<String> {
+    subprocess::run_tsv_parse(content, false)
 }

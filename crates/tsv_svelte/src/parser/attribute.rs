@@ -25,7 +25,6 @@ enum DirectiveType {
 }
 
 impl DirectiveType {
-    /// Try to parse a directive type from a prefix
     fn from_prefix(prefix: &str) -> Option<Self> {
         match prefix {
             "on" => Some(Self::On),
@@ -143,6 +142,11 @@ impl<'a> SvelteParser<'a> {
 
         self.advance()?; // consume the identifier
 
+        // Style directives accept expression OR string values, handle separately
+        if directive_type == DirectiveType::Style {
+            return self.parse_style_directive(directive_name, modifiers, start, name_end);
+        }
+
         // Check for = (directive with value)
         let expression = if self.check(TokenKind::Equals) {
             self.advance()?; // consume =
@@ -163,7 +167,7 @@ impl<'a> SvelteParser<'a> {
             end: end as u32,
         };
 
-        // Create appropriate directive type
+        // Create the directive
         match directive_type {
             DirectiveType::On => Ok(AttributeNode::OnDirective(OnDirective {
                 name: directive_name,
@@ -195,22 +199,7 @@ impl<'a> SvelteParser<'a> {
                     span,
                 }))
             }
-            DirectiveType::Style => {
-                // Style directive has a value that can be true, expression, or string
-                let value = match expression {
-                    Some(e) => StyleDirectiveValue::ExpressionTag(ExpressionTag {
-                        expression: e,
-                        span, // TODO: track actual expression tag span
-                    }),
-                    None => StyleDirectiveValue::True,
-                };
-                Ok(AttributeNode::StyleDirective(StyleDirective {
-                    name: directive_name,
-                    value,
-                    modifiers,
-                    span,
-                }))
-            }
+            DirectiveType::Style => unreachable!("handled above"),
             DirectiveType::Use => Ok(AttributeNode::UseDirective(UseDirective {
                 name: directive_name,
                 expression,
@@ -222,8 +211,7 @@ impl<'a> SvelteParser<'a> {
                     name: directive_name,
                     expression,
                     modifiers,
-                    intro: true,
-                    outro: true,
+                    direction: TransitionDirection::Both,
                     span,
                 }))
             }
@@ -231,16 +219,14 @@ impl<'a> SvelteParser<'a> {
                 name: directive_name,
                 expression,
                 modifiers,
-                intro: true,
-                outro: false,
+                direction: TransitionDirection::In,
                 span,
             })),
             DirectiveType::Out => Ok(AttributeNode::TransitionDirective(TransitionDirective {
                 name: directive_name,
                 expression,
                 modifiers,
-                intro: false,
-                outro: true,
+                direction: TransitionDirection::Out,
                 span,
             })),
             DirectiveType::Animate => Ok(AttributeNode::AnimateDirective(AnimateDirective {
@@ -286,6 +272,63 @@ impl<'a> SvelteParser<'a> {
                 end: end as u32,
             },
         })
+    }
+
+    /// Parse a style directive (style:property={value} or style:property="value")
+    /// Style directives can have expression values OR string values
+    fn parse_style_directive(
+        &mut self,
+        directive_name: String,
+        modifiers: Vec<String>,
+        start: usize,
+        name_end: usize,
+    ) -> Result<AttributeNode, ParseError> {
+        // Check for = (directive with value)
+        let value = if self.check(TokenKind::Equals) {
+            self.advance()?; // consume =
+
+            // Style directive can have either expression {value} or string "value"
+            if self.check(TokenKind::LeftBrace) {
+                let expr_tag = self.parse_expression_tag()?;
+                StyleDirectiveValue::ExpressionTag(expr_tag)
+            } else if self.check(TokenKind::String) {
+                // Parse string value like "red"
+                let parts = self.parse_attribute_value()?;
+                StyleDirectiveValue::Parts(parts)
+            } else {
+                return Err(ParseError::InvalidSyntax {
+                    message: "Style directive value must be an expression or quoted string"
+                        .to_string(),
+                    position: self.current_start,
+                    context: None,
+                });
+            }
+        } else {
+            // Shorthand: style:color (no value, uses variable with same name)
+            StyleDirectiveValue::True
+        };
+
+        // Calculate end position
+        let end = match &value {
+            StyleDirectiveValue::ExpressionTag(et) => et.span.end as usize,
+            StyleDirectiveValue::Parts(parts) => parts.last().map_or(name_end, |p| match p {
+                AttributeValue::Text(t) => t.span.end as usize,
+                AttributeValue::ExpressionTag(et) => et.span.end as usize,
+            }),
+            StyleDirectiveValue::True => name_end,
+        };
+
+        let span = Span {
+            start: start as u32,
+            end: end as u32,
+        };
+
+        Ok(AttributeNode::StyleDirective(StyleDirective {
+            name: directive_name,
+            value,
+            modifiers,
+            span,
+        }))
     }
 
     /// Parse an {@attach expr} tag inside element attributes
@@ -621,7 +664,7 @@ impl<'a> SvelteParser<'a> {
         }
     }
 
-    /// Parse attribute value (e.g., `"ts"` or `{expr}`)
+    /// Parse attribute value (e.g., `"ts"`, `{expr}`, or unquoted `value`)
     /// Returns a Vec<AttributeValue> to support mixed text/expressions
     pub(crate) fn parse_attribute_value(&mut self) -> Result<Vec<AttributeValue>, ParseError> {
         let mut parts = Vec::new();
@@ -630,6 +673,26 @@ impl<'a> SvelteParser<'a> {
         if self.check(TokenKind::LeftBrace) {
             let expr_tag = self.parse_expression_tag()?;
             parts.push(AttributeValue::ExpressionTag(expr_tag));
+            return Ok(parts);
+        }
+
+        // Check for unquoted attribute value (identifier)
+        // HTML allows unquoted attribute values that don't contain whitespace or special chars
+        if self.check(TokenKind::Identifier) {
+            let (token_start, token_end) = self.current_pos();
+            let text_content = self.source[token_start..token_end].to_string();
+
+            let text = Text {
+                raw: text_content.clone(),
+                data: text_content,
+                span: Span {
+                    start: token_start as u32,
+                    end: token_end as u32,
+                },
+            };
+
+            self.advance()?;
+            parts.push(AttributeValue::Text(text));
             return Ok(parts);
         }
 

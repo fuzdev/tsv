@@ -1,0 +1,117 @@
+{
+	"type": "Program",
+	"start": 0,
+	"end": 36,
+	"loc": {
+		"start": {
+			"line": 1,
+			"column": 0
+		},
+		"end": {
+			"line": 3,
+			"column": 0
+		}
+	},
+	"body": [
+		{
+			"type": "ExpressionStatement",
+			"start": 20,
+			"end": 35,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 0
+				},
+				"end": {
+					"line": 2,
+					"column": 15
+				}
+			},
+			"expression": {
+				"type": "CallExpression",
+				"start": 20,
+				"end": 34,
+				"loc": {
+					"start": {
+						"line": 2,
+						"column": 0
+					},
+					"end": {
+						"line": 2,
+						"column": 14
+					}
+				},
+				"callee": {
+					"type": "MemberExpression",
+					"start": 20,
+					"end": 31,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 0
+						},
+						"end": {
+							"line": 2,
+							"column": 11
+						}
+					},
+					"object": {
+						"type": "Identifier",
+						"start": 20,
+						"end": 27,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 0
+							},
+							"end": {
+								"line": 2,
+								"column": 7
+							}
+						},
+						"name": "console"
+					},
+					"property": {
+						"type": "Identifier",
+						"start": 28,
+						"end": 31,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 8
+							},
+							"end": {
+								"line": 2,
+								"column": 11
+							}
+						},
+						"name": "log"
+					},
+					"computed": false,
+					"optional": false
+				},
+				"arguments": [
+					{
+						"type": "Literal",
+						"start": 32,
+						"end": 33,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 12
+							},
+							"end": {
+								"line": 2,
+								"column": 13
+							}
+						},
+						"value": 1,
+						"raw": "1"
+					}
+				],
+				"optional": false
+			}
+		}
+	],
+	"sourceType": "module"
+}

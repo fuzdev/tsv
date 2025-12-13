@@ -1,4 +1,4 @@
-// TypeScript/JavaScript lexer
+// TypeScript/JS lexer
 //
 // Tokenizes TypeScript source code into a stream of tokens.
 // Supports TypeScript-specific syntax like type annotations.

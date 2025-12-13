@@ -2,7 +2,8 @@
 
 use super::super::{internal, public};
 use super::{
-    convert_block_statement, convert_expression, convert_type_annotation, create_location,
+    convert_block_statement, convert_expression, convert_type_annotation,
+    convert_type_parameter_declaration, convert_type_parameter_instantiation, create_location,
 };
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
@@ -30,7 +31,7 @@ pub(in crate::ast) fn convert_arrow_function_expression(
         end: arrow.span.end,
         loc: create_location(arrow.span, loc, offset),
         id: None,
-        expression: arrow.expression,
+        expression: arrow.body.is_expression(),
         generator: false,
         is_async: arrow.r#async,
         params: arrow
@@ -39,10 +40,14 @@ pub(in crate::ast) fn convert_arrow_function_expression(
             .map(|p| convert_expression(p, source, loc, interner, offset))
             .collect(),
         body,
+        type_parameters: arrow
+            .type_parameters
+            .as_ref()
+            .map(|tp| convert_type_parameter_declaration(tp, source, loc, interner, offset)),
         return_type: arrow
             .return_type
             .as_ref()
-            .map(|rt| convert_type_annotation(rt, loc, offset)),
+            .map(|rt| convert_type_annotation(rt, source, loc, interner, offset)),
     }
 }
 
@@ -70,6 +75,10 @@ pub(in crate::ast) fn convert_function_expression(
         expression: false,
         generator: func.generator,
         is_async: func.r#async,
+        type_parameters: func
+            .type_parameters
+            .as_ref()
+            .map(|tp| convert_type_parameter_declaration(tp, source, loc, interner, offset)),
         params: func
             .params
             .iter()
@@ -78,7 +87,7 @@ pub(in crate::ast) fn convert_function_expression(
         return_type: func
             .return_type
             .as_ref()
-            .map(|rt| convert_type_annotation(rt, loc, offset)),
+            .map(|rt| convert_type_annotation(rt, source, loc, interner, offset)),
         body: convert_block_statement(&func.body, source, loc, interner, offset),
     }
 }
@@ -102,6 +111,10 @@ pub(in crate::ast) fn convert_call_expression(
             interner,
             offset,
         )),
+        type_arguments: call
+            .type_arguments
+            .as_ref()
+            .map(|ta| convert_type_parameter_instantiation(ta, source, loc, interner, offset)),
         arguments: call
             .arguments
             .iter()
@@ -130,6 +143,10 @@ pub(in crate::ast) fn convert_new_expression(
             interner,
             offset,
         )),
+        type_arguments: new_expr
+            .type_arguments
+            .as_ref()
+            .map(|ta| convert_type_parameter_instantiation(ta, source, loc, interner, offset)),
         arguments: new_expr
             .arguments
             .iter()
@@ -220,5 +237,25 @@ pub(in crate::ast) fn convert_await_expression(
             interner,
             offset,
         )),
+    }
+}
+
+pub(in crate::ast) fn convert_yield_expression(
+    yield_expr: &internal::YieldExpression,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::YieldExpression {
+    public::YieldExpression {
+        node_type: "YieldExpression".to_string(),
+        start: yield_expr.span.start,
+        end: yield_expr.span.end,
+        loc: create_location(yield_expr.span, loc, offset),
+        argument: yield_expr
+            .argument
+            .as_ref()
+            .map(|arg| Box::new(convert_expression(arg, source, loc, interner, offset))),
+        delegate: yield_expr.delegate,
     }
 }

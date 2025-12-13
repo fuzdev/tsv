@@ -1,3 +1,5 @@
+use crate::cli::input_parser;
+use crate::deno::{run_prettier, PrettierParser};
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
 use tsv_cli::cli::input::{Input, ParserType};
@@ -11,27 +13,7 @@ impl Command for FormatPrettierCommand {
     }
 
     fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        let (input, parser_type) = if let Some(content) = args.option("content") {
-            // --content requires --parser
-            let parser = args
-                .option("parser")
-                .ok_or("Error: --parser required when using --content")?
-                .parse()?;
-            (Input::from_content(content), parser)
-        } else if args.flag("stdin") {
-            // --stdin requires --parser
-            let parser = args
-                .option("parser")
-                .ok_or("Error: --parser required when using --stdin")?
-                .parse()?;
-            (Input::from_stdin()?, parser)
-        } else if let Some(path) = args.positional() {
-            let parser = ParserType::from_extension(&path);
-            (Input::from_file(&path)?, parser)
-        } else {
-            return Err("No input provided. Use a file path, --content, or --stdin".to_string());
-        };
-
+        let (input, parser_type) = input_parser::parse_input_and_parser_type(args)?;
         Ok(Box::new(FormatPrettierExecutable { input, parser_type }))
     }
 
@@ -61,13 +43,13 @@ impl Executable for FormatPrettierExecutable {
 
 async fn run(input: &Input, parser_type: ParserType) {
     let content = input.content();
-    let filepath = match parser_type {
-        ParserType::Svelte => "temp.svelte",
-        ParserType::TypeScript => "temp.ts",
-        ParserType::Css => "temp.css",
+    let parser = match parser_type {
+        ParserType::Svelte => PrettierParser::Parser("svelte"),
+        ParserType::TypeScript => PrettierParser::Parser("typescript"),
+        ParserType::Css => PrettierParser::Parser("css"),
     };
 
-    match fuz_client::run_prettier(content, filepath).await {
+    match run_prettier(content, parser).await {
         Ok(formatted) => print!("{formatted}"),
         Err(err) => {
             eprintln!("Error formatting with prettier: {err}");

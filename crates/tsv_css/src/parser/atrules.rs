@@ -237,15 +237,7 @@ fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span),
         }
     }
 
-    let end = if values.is_empty() {
-        start as u32
-    } else {
-        // SAFETY: We just checked is_empty() is false
-        #[allow(clippy::unwrap_used)]
-        {
-            values.last().unwrap().span().end
-        }
-    };
+    let end = values.last().map_or(start as u32, |v| v.span().end);
 
     Ok((
         values,

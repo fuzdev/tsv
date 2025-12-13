@@ -3,8 +3,13 @@ use phf::phf_set;
 
 /// Parse a color value: hex, named, rgb(), hsl(), etc.
 pub fn parse_color(s: &str) -> Option<Color> {
-    // Hex color: #RGB or #RRGGBB
-    if s.starts_with('#') && (s.len() == 4 || s.len() == 7) {
+    // Hex color: #RGB, #RGBA, #RRGGBB, or #RRGGBBAA
+    // Length includes the # prefix:
+    // - 4: #RGB (3-digit)
+    // - 5: #RGBA (4-digit with alpha)
+    // - 7: #RRGGBB (6-digit)
+    // - 9: #RRGGBBAA (8-digit with alpha)
+    if s.starts_with('#') && matches!(s.len(), 4 | 5 | 7 | 9) {
         return Some(Color::Hex(s.to_string()));
     }
 

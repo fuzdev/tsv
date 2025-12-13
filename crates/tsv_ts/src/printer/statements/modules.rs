@@ -2,6 +2,7 @@
 
 use super::super::Printer;
 use crate::ast::internal;
+use string_interner::Symbol;
 use tsv_lang::{SymbolResolver, doc};
 
 impl<'a> Printer<'a> {
@@ -12,18 +13,35 @@ impl<'a> Printer<'a> {
         &mut self,
         decl: &internal::ExportNamedDeclaration,
     ) {
+        let export_keyword = match decl.export_kind {
+            internal::ExportKind::Value => "export ",
+            internal::ExportKind::Type => "export type ",
+        };
         if let Some(declaration) = &decl.declaration {
+            // For decorated classes, print decorators before export keyword
+            if let internal::Statement::ClassDeclaration(class_decl) = declaration.as_ref()
+                && !class_decl.decorators.is_empty()
+            {
+                for decorator in &class_decl.decorators {
+                    self.print_decorator(decorator);
+                    self.write("\n");
+                    self.write_indent();
+                }
+                // Print export keyword and class without decorators (already printed above)
+                self.write(export_keyword);
+                let mut class_without_decorators = class_decl.clone();
+                class_without_decorators.decorators = Vec::new();
+                self.print_class_declaration(&class_without_decorators);
+                return;
+            }
+
             // export const x = 1; - use direct printing for declarations
-            self.write("export ");
+            self.write(export_keyword);
             self.print_statement(declaration);
         } else {
             // export { x, y as z } or export { x } from "y" - use doc builder
             let doc = self.build_export_named_declaration_doc(decl);
-            let base_offset = self.config.base_indent_offset * self.config.tab_width;
-            let current_col = self.current_column() + base_offset;
-            let output =
-                doc::print_doc_with_indent(&doc, &self.config, current_col, self.indent_level);
-            self.write(&output);
+            self.write_doc(&doc);
         }
     }
 
@@ -32,6 +50,23 @@ impl<'a> Printer<'a> {
         &mut self,
         decl: &internal::ExportDefaultDeclaration,
     ) {
+        // For decorated classes, print decorators before export keyword
+        if let internal::ExportDefaultValue::ClassDeclaration(class) = &decl.declaration
+            && !class.decorators.is_empty()
+        {
+            for decorator in &class.decorators {
+                self.print_decorator(decorator);
+                self.write("\n");
+                self.write_indent();
+            }
+            // Print export default and class without decorators
+            self.write("export default ");
+            let mut class_without_decorators = class.as_ref().clone();
+            class_without_decorators.decorators = Vec::new();
+            self.print_class_declaration(&class_without_decorators);
+            return;
+        }
+
         self.write("export default ");
         match &decl.declaration {
             internal::ExportDefaultValue::Expression(expr) => {
@@ -41,6 +76,9 @@ impl<'a> Printer<'a> {
             internal::ExportDefaultValue::FunctionDeclaration(func) => {
                 self.print_function_declaration(func);
             }
+            internal::ExportDefaultValue::TSDeclareFunction(func) => {
+                self.print_declare_function(func);
+            }
             internal::ExportDefaultValue::ClassDeclaration(class) => {
                 self.print_class_declaration(class);
             }
@@ -49,7 +87,10 @@ impl<'a> Printer<'a> {
 
     /// Print an export all declaration
     pub(super) fn print_export_all_declaration(&mut self, decl: &internal::ExportAllDeclaration) {
-        self.write("export *");
+        match decl.export_kind {
+            internal::ExportKind::Value => self.write("export *"),
+            internal::ExportKind::Type => self.write("export type *"),
+        }
         if let Some(exported) = &decl.exported {
             self.write(" as ");
             self.write(&self.resolve_symbol(exported.name));
@@ -57,6 +98,25 @@ impl<'a> Printer<'a> {
         self.write(" from ");
         self.print_literal(&decl.source);
         self.write(";");
+    }
+
+    /// Print a TypeScript export assignment: `export = value;`
+    pub(super) fn print_export_assignment(&mut self, decl: &internal::TSExportAssignment) {
+        self.write("export = ");
+        self.print_expression(&decl.expression);
+        self.write(";");
+    }
+
+    /// Build a Doc for a TypeScript export assignment
+    pub(super) fn build_export_assignment_doc(
+        &self,
+        decl: &internal::TSExportAssignment,
+    ) -> doc::Doc {
+        doc::concat(vec![
+            doc::text("export = "),
+            self.build_expression_doc(&decl.expression),
+            doc::text(";"),
+        ])
     }
 
     /// Build a Doc for an export named declaration
@@ -67,45 +127,46 @@ impl<'a> Printer<'a> {
         &self,
         decl: &internal::ExportNamedDeclaration,
     ) -> doc::Doc {
+        let export_keyword = match decl.export_kind {
+            internal::ExportKind::Value => "export ",
+            internal::ExportKind::Type => "export type ",
+        };
         if let Some(declaration) = &decl.declaration {
             doc::concat(vec![
-                doc::text("export "),
+                doc::text(export_keyword),
                 self.build_statement_doc(declaration),
             ])
         } else {
             // export { x, y as z } or export { x } from "y"
-            let mut parts = vec![doc::text("export ")];
+            let mut parts = vec![doc::text(export_keyword)];
 
             if decl.specifiers.is_empty() {
                 // Empty braces case: `export {}`
                 parts.push(doc::text("{}"));
             } else {
                 // Build specifier docs with line breaks between them
-                let mut spec_parts = Vec::new();
-                for (i, spec) in decl.specifiers.iter().enumerate() {
-                    if i > 0 {
-                        spec_parts.push(doc::text(","));
-                        spec_parts.push(doc::line());
-                    }
-                    let local = self.resolve_symbol(spec.local.name);
-                    let exported = self.resolve_symbol(spec.exported.name);
-                    if local == exported {
-                        spec_parts.push(doc::text(local));
-                    } else {
-                        spec_parts.push(doc::text(local));
-                        spec_parts.push(doc::text(" as "));
-                        spec_parts.push(doc::text(exported));
-                    }
-                }
-                // Add trailing comma only when broken
-                spec_parts.push(doc::if_break(doc::text(","), doc::text("")));
+                let spec_docs: Vec<_> = decl
+                    .specifiers
+                    .iter()
+                    .map(|spec| {
+                        let local = self.resolve_symbol(spec.local.name);
+                        let exported = self.resolve_symbol(spec.exported.name);
+                        if local == exported {
+                            doc::text_owned(local)
+                        } else {
+                            doc::concat(vec![
+                                doc::text_owned(local),
+                                doc::text(" as "),
+                                doc::text_owned(exported),
+                            ])
+                        }
+                    })
+                    .collect();
+                let spec_parts = doc::join_trailing(spec_docs, doc::comma_line());
 
                 // Build the braces content (will be wrapped in outer group)
                 parts.push(doc::text("{"));
-                parts.push(doc::indent(doc::concat(vec![
-                    doc::softline(),
-                    doc::concat(spec_parts),
-                ])));
+                parts.push(doc::indent(doc::concat(vec![doc::softline(), spec_parts])));
                 parts.push(doc::softline());
                 parts.push(doc::text("}"));
             }
@@ -133,6 +194,9 @@ impl<'a> Printer<'a> {
             internal::ExportDefaultValue::FunctionDeclaration(func) => {
                 self.build_function_declaration_doc(func)
             }
+            internal::ExportDefaultValue::TSDeclareFunction(func) => {
+                self.build_declare_function_doc(func)
+            }
             internal::ExportDefaultValue::ClassDeclaration(class) => {
                 self.build_class_declaration_doc(class)
             }
@@ -145,10 +209,14 @@ impl<'a> Printer<'a> {
         &self,
         decl: &internal::ExportAllDeclaration,
     ) -> doc::Doc {
-        let mut parts = vec![doc::text("export *")];
+        let export_keyword = match decl.export_kind {
+            internal::ExportKind::Value => "export *",
+            internal::ExportKind::Type => "export type *",
+        };
+        let mut parts = vec![doc::text(export_keyword)];
         if let Some(exported) = &decl.exported {
             parts.push(doc::text(" as "));
-            parts.push(doc::text(self.resolve_symbol(exported.name)));
+            parts.push(doc::symbol(exported.name.to_usize() as u32));
         }
         parts.push(doc::text(" from "));
         parts.push(self.build_literal_doc(&decl.source));
@@ -187,10 +255,7 @@ impl<'a> Printer<'a> {
     /// Uses doc builder with width-based wrapping for named specifiers.
     pub(super) fn print_import_declaration(&mut self, decl: &internal::ImportDeclaration) {
         let doc = self.build_import_declaration_doc(decl);
-        let base_offset = self.config.base_indent_offset * self.config.tab_width;
-        let current_col = self.current_column() + base_offset;
-        let output = doc::print_doc_with_indent(&doc, &self.config, current_col, self.indent_level);
-        self.write(&output);
+        self.write_doc(&doc);
     }
 
     /// Build a Doc for an import declaration
@@ -242,7 +307,7 @@ impl<'a> Printer<'a> {
 
         // Add default import
         if has_default {
-            parts.push(doc::text(default_name));
+            parts.push(doc::text_owned(default_name));
         }
 
         // Add namespace import
@@ -251,7 +316,7 @@ impl<'a> Printer<'a> {
                 parts.push(doc::text(", "));
             }
             parts.push(doc::text("* as "));
-            parts.push(doc::text(namespace_name));
+            parts.push(doc::text_owned(namespace_name));
         }
 
         // Build named specifiers with group wrapping (or empty braces if source had them)
@@ -265,36 +330,32 @@ impl<'a> Printer<'a> {
                 parts.push(doc::text("{}"));
             } else {
                 // Build specifier docs with line breaks between them
-                let mut spec_parts = Vec::new();
-                for (i, named_spec) in named_specs.iter().enumerate() {
-                    if i > 0 {
-                        spec_parts.push(doc::text(","));
-                        spec_parts.push(doc::line());
-                    }
-                    // Add inline type modifier if this specifier is type-only
-                    // (only when the overall import is NOT type-only)
-                    if !is_type_import && named_spec.import_kind == internal::ImportKind::Type {
-                        spec_parts.push(doc::text("type "));
-                    }
-                    let imported = self.resolve_symbol(named_spec.imported.name);
-                    let local = self.resolve_symbol(named_spec.local.name);
-                    if imported == local {
-                        spec_parts.push(doc::text(imported));
-                    } else {
-                        spec_parts.push(doc::text(imported));
-                        spec_parts.push(doc::text(" as "));
-                        spec_parts.push(doc::text(local));
-                    }
-                }
-                // Add trailing comma only when broken
-                spec_parts.push(doc::if_break(doc::text(","), doc::text("")));
+                let spec_docs: Vec<_> = named_specs
+                    .iter()
+                    .map(|named_spec| {
+                        let mut parts = Vec::new();
+                        // Add inline type modifier if this specifier is type-only
+                        // (only when the overall import is NOT type-only)
+                        if !is_type_import && named_spec.import_kind == internal::ImportKind::Type {
+                            parts.push(doc::text("type "));
+                        }
+                        let imported = self.resolve_symbol(named_spec.imported.name);
+                        let local = self.resolve_symbol(named_spec.local.name);
+                        if imported == local {
+                            parts.push(doc::text_owned(imported));
+                        } else {
+                            parts.push(doc::text_owned(imported));
+                            parts.push(doc::text(" as "));
+                            parts.push(doc::text_owned(local));
+                        }
+                        doc::concat(parts)
+                    })
+                    .collect();
+                let spec_parts = doc::join_trailing(spec_docs, doc::comma_line());
 
                 // Build the braces content (will be wrapped in outer group)
                 parts.push(doc::text("{"));
-                parts.push(doc::indent(doc::concat(vec![
-                    doc::softline(),
-                    doc::concat(spec_parts),
-                ])));
+                parts.push(doc::indent(doc::concat(vec![doc::softline(), spec_parts])));
                 parts.push(doc::softline());
                 parts.push(doc::text("}"));
             }
@@ -307,17 +368,29 @@ impl<'a> Printer<'a> {
         parts.push(self.build_literal_doc(&decl.source));
 
         // Add import attributes: `with { type: "json" }`
+        // PR #17329 (prettier 3.7): Break attributes across lines when long
         if !decl.attributes.is_empty() {
-            parts.push(doc::text(" with {"));
-            for (i, attr) in decl.attributes.iter().enumerate() {
-                if i > 0 {
-                    parts.push(doc::text(", "));
-                }
-                let key = self.resolve_symbol(attr.key.name);
-                parts.push(doc::text(key));
-                parts.push(doc::text(": "));
-                parts.push(self.build_literal_doc(&attr.value));
-            }
+            parts.push(doc::text(" with "));
+
+            // Build attribute docs with line breaks between them
+            let attr_docs: Vec<_> = decl
+                .attributes
+                .iter()
+                .map(|attr| {
+                    let key = self.resolve_symbol(attr.key.name);
+                    doc::concat(vec![
+                        doc::text_owned(key),
+                        doc::text(": "),
+                        self.build_literal_doc(&attr.value),
+                    ])
+                })
+                .collect();
+            let attr_parts = doc::join_trailing(attr_docs, doc::comma_line());
+
+            // Build the braces content with same pattern as named specifiers
+            parts.push(doc::text("{"));
+            parts.push(doc::indent(doc::concat(vec![doc::softline(), attr_parts])));
+            parts.push(doc::softline());
             parts.push(doc::text("}"));
         }
 
@@ -325,5 +398,98 @@ impl<'a> Printer<'a> {
 
         // Wrap entire statement in a group for width-based wrapping
         doc::group(doc::concat(parts))
+    }
+
+    /// Print `import x = require("y")` or `import x = A.B`
+    pub(super) fn print_import_equals_declaration(
+        &mut self,
+        decl: &internal::TSImportEqualsDeclaration,
+    ) {
+        let doc = self.build_import_equals_declaration_doc(decl);
+        self.write_doc(&doc);
+    }
+
+    /// Build doc for `import x = require("y")` or `import x = A.B`
+    pub(super) fn build_import_equals_declaration_doc(
+        &self,
+        decl: &internal::TSImportEqualsDeclaration,
+    ) -> doc::Doc {
+        let mut parts = Vec::new();
+
+        // Export prefix if present
+        if decl.is_export {
+            parts.push(doc::text("export "));
+        }
+
+        // import keyword
+        parts.push(doc::text("import "));
+
+        // type modifier if present
+        if matches!(decl.import_kind, internal::ImportKind::Type) {
+            parts.push(doc::text("type "));
+        }
+
+        // identifier
+        parts.push(doc::text_owned(self.resolve_symbol(decl.id.name)));
+
+        // = sign
+        parts.push(doc::text(" = "));
+
+        // module reference
+        match &decl.module_reference {
+            internal::TSModuleReference::ExternalModuleReference(ext_ref) => {
+                // Check for comments inside require() - expand if present
+                // The require() span includes `require(` at start and `)` at end
+                // Comments can be between `require(` and the string literal
+                let require_open_end = ext_ref.span.start + 8; // after "require("
+                let literal_start = ext_ref.expression.span.start;
+                let has_comments = self.has_line_comments_between(require_open_end, literal_start);
+
+                if has_comments {
+                    // Multi-line format with comments
+                    // Build comments doc: each comment on its own line
+                    let mut comment_parts = Vec::new();
+                    for comment in
+                        tsv_lang::comments_in_range(self.comments, require_open_end, literal_start)
+                    {
+                        comment_parts.push(self.build_comment_doc(comment));
+                        comment_parts.push(doc::hardline());
+                    }
+
+                    parts.push(doc::text("require("));
+                    parts.push(doc::indent(doc::concat(vec![
+                        doc::hardline(),
+                        doc::concat(comment_parts),
+                        self.build_literal_doc(&ext_ref.expression),
+                    ])));
+                    parts.push(doc::hardline());
+                    parts.push(doc::text(")"));
+                } else {
+                    // Check for inline block comments
+                    let has_inline_comments =
+                        self.has_comments_between(require_open_end, literal_start);
+                    if has_inline_comments {
+                        parts.push(doc::text("require("));
+                        parts.push(
+                            self.build_inline_comments_between_doc(require_open_end, literal_start),
+                        );
+                        parts.push(self.build_literal_doc(&ext_ref.expression));
+                        parts.push(doc::text(")"));
+                    } else {
+                        // Simple compact format
+                        parts.push(doc::text("require("));
+                        parts.push(self.build_literal_doc(&ext_ref.expression));
+                        parts.push(doc::text(")"));
+                    }
+                }
+            }
+            internal::TSModuleReference::EntityName(entity_name) => {
+                parts.push(super::super::build_entity_name_doc(entity_name));
+            }
+        }
+
+        parts.push(doc::text(";"));
+
+        doc::concat(parts)
     }
 }

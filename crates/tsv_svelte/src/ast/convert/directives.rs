@@ -139,8 +139,8 @@ pub(super) fn convert_transition_directive(
         name: d.name.clone(),
         expression,
         modifiers: d.modifiers.clone(),
-        intro: d.intro,
-        outro: d.outro,
+        intro: d.direction.has_intro(),
+        outro: d.direction.has_outro(),
     }
 }
 

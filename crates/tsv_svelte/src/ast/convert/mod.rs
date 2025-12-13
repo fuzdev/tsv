@@ -18,12 +18,12 @@ mod tags;
 
 // Re-export functions needed by other modules within convert/
 // These are visible via super:: from sibling modules
- use attributes::{convert_attribute_node, convert_attribute_value};
- use directives::*;
- use fragments::{convert_expression_tag, convert_text};
- use tags::*;
- use blocks::*;
- use special::{convert_special_element, convert_svelte_options};
+use attributes::{convert_attribute_node, convert_attribute_value};
+use blocks::*;
+use directives::*;
+use fragments::{convert_expression_tag, convert_text};
+use special::{convert_special_element, convert_svelte_options};
+use tags::*;
 
 // Import functions for our own use
 use fragments::convert_fragment;
@@ -321,7 +321,10 @@ fn get_comment_value(comment: &tsv_ts::ast::internal::Comment, source: &str) -> 
 }
 
 /// Convert Comment to JSON format (without loc - simplified for attachment)
-pub(crate) fn comment_to_json(comment: &tsv_ts::ast::internal::Comment, source: &str) -> serde_json::Value {
+pub(crate) fn comment_to_json(
+    comment: &tsv_ts::ast::internal::Comment,
+    source: &str,
+) -> serde_json::Value {
     let comment_type = if comment.is_block { "Block" } else { "Line" };
     let value = get_comment_value(comment, source);
 
@@ -338,90 +341,9 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
     let loc = LocationTracker::new(source);
     let interner = root.interner.borrow();
 
-    // Svelte Root start/end behavior (discovered through empirical testing)
-    //
-    // The Root node's start/end positions follow conditional rules based on fragment content:
-    //
-    // Rule 1: NULL when fragment is EMPTY (no nodes at all)
-    //   - Script-only files: `<script>...</script>` → start=null, end=null (0 fragment nodes)
-    //   - CSS-only files: `<style>...</style>` → start=null, end=null (0 fragment nodes)
-    //   - Empty files or whitespace-only → start=null, end=null (0 fragment nodes)
-    //
-    // Rule 2: SET when fragment has ANY nodes (including Text nodes)
-    //   - Text-only: `plain text` → start=0, end=10 (1 Text node)
-    //   - Template-only: `<div></div>` → start=0, end=11 (1 Element node)
-    //   - Script+template: `<script>...</script>\n<div></div>` → start=div_start, end=div_end
-    //   - Any combination with fragment content (Text, Element, ExpressionTag, etc.)
-    //
-    // Rule 3: What the positions span
-    //   - start: Position of the FIRST fragment node (Text, Element, or ExpressionTag)
-    //   - end: Position AFTER the LAST fragment node (Text, Element, or ExpressionTag)
-    //
-    // Critical insight: Text nodes ARE fragment content
-    //   - Text-only files get start/end set (e.g., "hello" → start=0, end=5)
-    //   - Script/style-only files have empty fragments, so start=null, end=null
-    //
-    // Examples:
-    //   `<div></div>` → start=0, end=11
-    //   `\n\n<div></div>` → start=2 (skips leading text), end=13
-    //   `<script>...</script>\n\n<div>{a}</div>` → start=53 (div), end=67 (after closing tag)
-    //
-    // Note: The Root span does NOT include script/CSS blocks - those are stored separately
-    // in ast.instance, ast.module, and ast.css fields.
-    //
-    // ⚠️ SVELTE BUG REPLICATION (for exact compatibility):
-    //
-    // When there's script+CSS with NO template markup, Svelte has a bug where start > end:
-    //   `<script>...</script>\n<style>...</style>` → start=34 (CSS start), end=33 (script end)
-    //
-    // This is clearly incorrect (start should never be greater than end), and the correct
-    // behavior would be start=null, end=null (no template content).
-    //
-    // However, we replicate this bug EXACTLY for compatibility with Svelte's behavior.
-    // This quirk is isolated to this conversion layer - our internal AST remains clean.
-    //
-    // Bug pattern:
-    //   - Fragment has NO non-Text nodes (no template markup)
-    //   - File has BOTH script (instance OR module) AND CSS
-    //   - Result: start = css.span.start, end = script.span.end
-    //   - This produces inverted positions since CSS comes after script
-    //
-    // See: tests/fixtures/3_svelte_parser/bug_script_style_without_markup/SVELTE_BUG.md
-    //
-    // NOTE: The parser now calculates start/end correctly in the internal AST (root.span),
-    // so we use those values directly. The parser handles all the edge cases including:
-    // - Script/style tags in any order
-    // - Proper root.start positioning (first non-instance-script item)
-    // - Maximum end across all top-level nodes
-    let (start, end) = {
-        // Check if fragment has ANY nodes (Text, Element, or ExpressionTag)
-        // Text nodes ARE content - text-only files should get start/end set
-        let has_fragment_content = !root.fragment.nodes.is_empty();
-
-        if has_fragment_content {
-            // Fragment has content (Text, Element, or ExpressionTag) - use parser's calculated span
-            (Some(root.span.start), Some(root.span.end))
-        } else {
-            // Fragment is empty (script-only, CSS-only, or empty file)
-
-            // ⚠️ BUG REPLICATION: Detect script+CSS with no template
-            // Svelte produces inverted positions (start > end) in this case
-            if let (Some(css), Some(script)) = (&root.css, &root.instance) {
-                // BUG: start=css.start, end=script.end (inverted!)
-                (Some(css.span.start), Some(script.span.end))
-            } else if let (Some(css), Some(script)) = (&root.css, &root.module) {
-                // BUG: start=css.start, end=module.end (inverted!)
-                (Some(css.span.start), Some(script.span.end))
-            } else if root.instance.is_some() || root.module.is_some() || root.css.is_some() {
-                // Script-only or CSS-only: null/null
-                (None, None)
-            } else {
-                // Empty file (no script, no CSS, no fragment content)
-                // Svelte returns null/null for completely empty files
-                (None, None)
-            }
-        }
-    };
+    // Svelte 5.x: Root.start/end always span the entire source (0 to source.len())
+    let source_len = source.len() as u32;
+    let (start, end) = (0, source_len);
 
     public::Root {
         css: root

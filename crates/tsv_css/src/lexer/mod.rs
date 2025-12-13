@@ -42,7 +42,15 @@ pub struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     pub fn new(source: &'a str) -> Self {
-        Self { source, pos: 0 }
+        // Skip UTF-8 BOM (U+FEFF) at start of file if present.
+        // BOM is a legacy artifact; we strip it (like deno fmt, VS Code).
+        // Position starts after BOM so token spans reflect actual file bytes.
+        let pos = if source.starts_with('\u{feff}') {
+            '\u{feff}'.len_utf8()
+        } else {
+            0
+        };
+        Self { source, pos }
     }
 
     fn current_char(&self) -> Option<char> {

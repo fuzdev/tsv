@@ -1,13 +1,14 @@
 //! Error types for debug utilities
 
+use crate::deno::DenoError;
 use thiserror::Error;
 
 /// Errors from debug command execution
 #[derive(Debug, Error)]
 pub enum DebugError {
-    /// Fuz daemon client error
-    #[error("fuz daemon: {0}")]
-    Client(#[from] fuz_client::ClientError),
+    /// Deno sidecar error
+    #[error("deno: {0}")]
+    Deno(#[from] DenoError),
 
     /// IO error (file/process operations)
     #[error("IO: {0}")]
@@ -20,6 +21,20 @@ pub enum DebugError {
     /// Command execution failed
     #[error("{0}")]
     Command(String),
+}
+
+impl DebugError {
+    /// Get hint for this error, if any.
+    ///
+    /// Returns the hint from the underlying [`DenoError`] for
+    /// `Deno` variants, empty string otherwise.
+    #[must_use]
+    pub fn hint(&self) -> &str {
+        match self {
+            Self::Deno(e) => e.hint(),
+            _ => "",
+        }
+    }
 }
 
 /// Result type alias for debug operations

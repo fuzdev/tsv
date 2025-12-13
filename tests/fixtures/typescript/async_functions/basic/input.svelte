@@ -1,23 +1,23 @@
 <script>
 	// Async function declaration
-	async function fetchData() {
+	async function fn1() {
 		return await fetch('/api');
 	}
 
 	// Async arrow function
-	const fn = async () => {
-		await doSomething();
+	const fn2 = async () => {
+		await fn3();
 	};
 
 	// Async arrow with params
-	const fetchUser = async (id) => {
-		const user = await getUser(id);
-		return user;
+	const fn4 = async (id) => {
+		const a = await fn5(id);
+		return a;
 	};
 
 	// Async method shorthand (in object)
 	const obj = {
-		async getData() {
+		async method() {
 			return await this.load();
 		},
 	};
@@ -29,8 +29,8 @@
 	const data = await obj.method();
 
 	// Await with call expression
-	const value = await getValue();
+	const value = await fn6();
 
 	// Nested await
-	const nested = await (await getPromise()).value;
+	const nested = await (await fn7()).value;
 </script>

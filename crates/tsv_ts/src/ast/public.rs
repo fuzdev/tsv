@@ -3,6 +3,11 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Helper for skip_serializing_if to skip false bools
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Program {
     #[serde(rename = "type")]
@@ -27,12 +32,28 @@ pub struct Position {
     pub column: usize,
 }
 
+/// Decorator: `@expression` applied to classes and class members
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Decorator {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// The decorator expression
+    pub expression: Expression,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Statement {
     ExpressionStatement(ExpressionStatement),
     VariableDeclaration(VariableDeclaration),
     TSTypeAliasDeclaration(TSTypeAliasDeclaration),
+    TSInterfaceDeclaration(TSInterfaceDeclaration),
+    TSDeclareFunction(TSDeclareFunction),
+    TSEnumDeclaration(TSEnumDeclaration),
+    TSModuleDeclaration(TSModuleDeclaration),
     ReturnStatement(ReturnStatement),
     BlockStatement(BlockStatement),
     FunctionDeclaration(FunctionDeclaration),
@@ -40,7 +61,9 @@ pub enum Statement {
     ExportNamedDeclaration(ExportNamedDeclaration),
     ExportDefaultDeclaration(ExportDefaultDeclaration),
     ExportAllDeclaration(ExportAllDeclaration),
+    TSExportAssignment(TSExportAssignment),
     ImportDeclaration(ImportDeclaration),
+    TSImportEqualsDeclaration(TSImportEqualsDeclaration),
     // Control flow statements
     IfStatement(IfStatement),
     ForStatement(ForStatement),
@@ -95,6 +118,8 @@ pub struct ExportDefaultDeclaration {
 pub enum ExportDefaultValue {
     Expression(Expression),
     FunctionDeclaration(FunctionDeclaration),
+    /// For ambient function declarations (no body)
+    TSDeclareFunction(TSDeclareFunction),
     ClassDeclaration(ClassDeclaration),
 }
 
@@ -112,6 +137,17 @@ pub struct ExportAllDeclaration {
     pub exported: Option<Identifier>,
     /// Module source
     pub source: Literal,
+}
+
+/// TypeScript export assignment: `export = value;`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSExportAssignment {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub expression: Expression,
 }
 
 /// Export specifier: `export { x }` or `export { x as y }`
@@ -202,6 +238,42 @@ pub struct ImportAttribute {
     pub value: Literal,
 }
 
+/// TypeScript import equals declaration: `import x = require("y")` or `import x = A.B`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSImportEqualsDeclaration {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "importKind")]
+    pub import_kind: String,
+    #[serde(rename = "isExport")]
+    pub is_export: bool,
+    pub id: Identifier,
+    #[serde(rename = "moduleReference")]
+    pub module_reference: TSModuleReference,
+}
+
+/// Module reference: either external module reference or entity name
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum TSModuleReference {
+    ExternalModuleReference(TSExternalModuleReference),
+    EntityName(TSEntityName),
+}
+
+/// External module reference: `require("module")`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSExternalModuleReference {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub expression: Literal,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExpressionStatement {
     #[serde(rename = "type")]
@@ -217,6 +289,7 @@ pub struct ExpressionStatement {
 pub enum Expression {
     Literal(Literal),
     Identifier(Identifier),
+    PrivateIdentifier(PrivateIdentifier),
     ObjectExpression(ObjectExpression),
     ArrayExpression(ArrayExpression),
     UnaryExpression(UnaryExpression),
@@ -228,10 +301,12 @@ pub enum Expression {
     ConditionalExpression(ConditionalExpression),
     ArrowFunctionExpression(ArrowFunctionExpression),
     FunctionExpression(FunctionExpression),
+    ClassExpression(ClassExpression),
     SpreadElement(SpreadElement),
     TemplateLiteral(TemplateLiteral),
     TaggedTemplateExpression(TaggedTemplateExpression),
     AwaitExpression(AwaitExpression),
+    YieldExpression(YieldExpression),
     SequenceExpression(SequenceExpression),
     RegexLiteral(RegexLiteral),
     Super(Super),
@@ -241,6 +316,20 @@ pub enum Expression {
     ArrayPattern(ArrayPattern),
     AssignmentPattern(AssignmentPattern),
     RestElement(RestElement),
+    // TypeScript type assertions
+    TSTypeAssertion(TSTypeAssertion),
+    TSAsExpression(TSAsExpression),
+    TSSatisfiesExpression(TSSatisfiesExpression),
+    // TypeScript instantiation expression: f<T>
+    TSInstantiationExpression(TSInstantiationExpression),
+    // TypeScript non-null assertion: expr!
+    TSNonNullExpression(TSNonNullExpression),
+    // Dynamic import: import('...')
+    ImportExpression(ImportExpression),
+    // Meta property: import.meta, new.target
+    MetaProperty(MetaProperty),
+    // TypeScript parameter property: constructor(public x)
+    TSParameterProperty(TSParameterProperty),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -253,6 +342,9 @@ pub struct Literal {
     #[serde(serialize_with = "serialize_literal_value")]
     pub value: serde_json::Value,
     pub raw: String,
+    /// BigInt string value (only for BigInt literals like `1n`)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bigint: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -268,6 +360,21 @@ pub struct Identifier {
     pub optional: bool,
     #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
     pub type_annotation: Option<TSTypeAnnotation>,
+}
+
+/// Private identifier: `#foo` in class fields and methods
+///
+/// Used for truly private class members (ES2022 private class fields).
+/// The name does NOT include the `#` prefix.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PrivateIdentifier {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// The name without the `#` prefix (e.g., "foo" for `#foo`)
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -343,6 +450,8 @@ pub struct CallExpression {
     pub end: u32,
     pub loc: SourceLocation,
     pub callee: Box<Expression>,
+    #[serde(rename = "typeArguments", skip_serializing_if = "Option::is_none")]
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
     pub arguments: Vec<Expression>,
     pub optional: bool,
 }
@@ -356,7 +465,33 @@ pub struct NewExpression {
     pub end: u32,
     pub loc: SourceLocation,
     pub callee: Box<Expression>,
+    #[serde(rename = "typeArguments", skip_serializing_if = "Option::is_none")]
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
     pub arguments: Vec<Expression>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub source: Box<Expression>,
+}
+
+/// Meta property: `import.meta`, `new.target`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetaProperty {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// The keyword: Identifier("import") or Identifier("new")
+    pub meta: Identifier,
+    /// The property: Identifier("meta") or Identifier("target")
+    pub property: Identifier,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -399,6 +534,8 @@ pub struct ArrowFunctionExpression {
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Vec<Expression>,
     pub body: ArrowFunctionBody,
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     #[serde(rename = "returnType", skip_serializing_if = "Option::is_none")]
     pub return_type: Option<TSTypeAnnotation>,
 }
@@ -437,6 +574,9 @@ pub struct FunctionDeclaration {
     pub generator: bool,
     #[serde(rename = "async")]
     pub is_async: bool,
+    /// Type parameters (TypeScript generics): `function fn<T>() {}`
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Vec<Expression>,
     /// Return type annotation (e.g., `: number`)
@@ -454,10 +594,58 @@ pub struct ClassDeclaration {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
+    /// Decorators applied to this class
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub decorators: Vec<Decorator>,
+    /// Whether this is a declare class (ambient declaration)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub declare: Option<bool>,
     /// Class name (None for anonymous export default classes)
     pub id: Option<Identifier>,
+    /// Type parameters (e.g., `<T>` in `class Foo<T>`)
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     #[serde(rename = "superClass")]
     pub super_class: Option<Box<Expression>>,
+    /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
+    #[serde(
+        rename = "superTypeParameters",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub super_type_parameters: Option<TSTypeParameterInstantiation>,
+    /// Implements clause: `implements Foo, Bar`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub implements: Option<Vec<TSExpressionWithTypeArguments>>,
+    pub body: ClassBody,
+}
+
+/// Class expression: `class { }` or `class Foo<T> extends Bar { }`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClassExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// Decorators applied to this class
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub decorators: Vec<Decorator>,
+    /// Class name (always optional for expressions)
+    pub id: Option<Identifier>,
+    /// Type parameters (e.g., `<T>` in `class Foo<T>`)
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    #[serde(rename = "superClass")]
+    pub super_class: Option<Box<Expression>>,
+    /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
+    #[serde(
+        rename = "superTypeParameters",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub super_type_parameters: Option<TSTypeParameterInstantiation>,
+    /// Implements clause: `implements Foo, Bar`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub implements: Option<Vec<TSExpressionWithTypeArguments>>,
     pub body: ClassBody,
 }
 
@@ -472,12 +660,24 @@ pub struct ClassBody {
     pub body: Vec<ClassMember>,
 }
 
-/// Class member - either method definition or property definition
+/// Class member - method definition, property definition, or static block
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ClassMember {
     MethodDefinition(MethodDefinition),
     PropertyDefinition(PropertyDefinition),
+    StaticBlock(StaticBlock),
+}
+
+/// Static initialization block in a class: `static { ... }` (ES2022)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StaticBlock {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub body: Vec<Statement>,
 }
 
 /// Method definition in a class body
@@ -488,8 +688,17 @@ pub struct MethodDefinition {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
+    /// Decorators applied to this method
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub decorators: Vec<Decorator>,
+    /// Accessibility modifier (public, private, protected)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accessibility: Option<String>,
     #[serde(rename = "static")]
     pub is_static: bool,
+    /// Whether this method overrides a base class method
+    #[serde(rename = "override")]
+    pub is_override: bool,
     pub computed: bool,
     pub key: Box<Expression>,
     pub kind: String,
@@ -504,10 +713,28 @@ pub struct PropertyDefinition {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
+    /// Decorators applied to this property
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub decorators: Vec<Decorator>,
+    /// Whether this property uses the accessor keyword (ES decorator proposal)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accessor: Option<bool>,
+    /// Accessibility modifier (public, private, protected)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accessibility: Option<String>,
+    /// Whether this is a readonly property
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub readonly: Option<bool>,
     #[serde(rename = "static")]
     pub is_static: bool,
     pub computed: bool,
     pub key: Box<Expression>,
+    /// Whether this is an optional property (`a?: string`)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub optional: Option<bool>,
+    /// Whether this has definite assignment assertion (`a!: string`)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub definite: Option<bool>,
     /// Type annotation (e.g., `: number`)
     #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
     pub type_annotation: Option<TSTypeAnnotation>,
@@ -527,6 +754,9 @@ pub struct FunctionExpression {
     pub generator: bool,
     #[serde(rename = "async")]
     pub is_async: bool,
+    /// Type parameters (TypeScript generics): `function<T>() {}`
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Vec<Expression>,
     /// Return type annotation (e.g., `: number`)
@@ -826,6 +1056,21 @@ pub struct AwaitExpression {
     pub argument: Box<Expression>,
 }
 
+/// Yield expression: `yield value` or `yield* iterable`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct YieldExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// The value to yield (None for `yield` with no argument)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub argument: Option<Box<Expression>>,
+    /// Whether this is a delegating yield: `yield*`
+    pub delegate: bool,
+}
+
 /// Sequence expression: `a, b, c`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SequenceExpression {
@@ -894,6 +1139,8 @@ pub struct ObjectPattern {
     pub end: u32,
     pub loc: SourceLocation,
     pub properties: Vec<ObjectPatternProperty>,
+    #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
+    pub type_annotation: Option<TSTypeAnnotation>,
 }
 
 /// Object pattern property - either a regular property or a rest element
@@ -913,6 +1160,8 @@ pub struct ArrayPattern {
     pub end: u32,
     pub loc: SourceLocation,
     pub elements: Vec<Option<Expression>>,
+    #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
+    pub type_annotation: Option<TSTypeAnnotation>,
 }
 
 /// Assignment pattern for default values: `a = 1`
@@ -976,6 +1225,80 @@ pub struct VariableDeclarator {
     pub init: Option<Expression>,
 }
 
+// TypeScript expression nodes
+
+/// TypeScript angle-bracket type assertion: `<Type>expr`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSTypeAssertion {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// The target type
+    #[serde(rename = "typeAnnotation")]
+    pub type_annotation: Box<TSType>,
+    /// The expression being type-asserted
+    pub expression: Box<Expression>,
+}
+
+/// TypeScript `as` type assertion: `expr as Type` or `expr as const`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSAsExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// The expression being type-asserted
+    pub expression: Box<Expression>,
+    /// The target type
+    #[serde(rename = "typeAnnotation")]
+    pub type_annotation: Box<TSType>,
+}
+
+/// TypeScript `satisfies` expression: `expr satisfies Type`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSSatisfiesExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// The expression being checked
+    pub expression: Box<Expression>,
+    /// The type to satisfy
+    #[serde(rename = "typeAnnotation")]
+    pub type_annotation: Box<TSType>,
+}
+
+/// TypeScript instantiation expression: `f<T>`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSInstantiationExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// The expression being instantiated
+    pub expression: Box<Expression>,
+    /// The type arguments
+    #[serde(rename = "typeArguments")]
+    pub type_arguments: TSTypeParameterInstantiation,
+}
+
+/// TypeScript non-null assertion expression: `expr!`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSNonNullExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// The expression being asserted non-null
+    pub expression: Box<Expression>,
+}
+
 // TypeScript type annotation nodes
 
 /// Public AST representation of TypeScript type annotation
@@ -1024,6 +1347,24 @@ pub enum TSType {
     TSBigIntKeyword(TSBigIntKeyword),
     TSLiteralType(TSLiteralType),
     TSArrayType(TSArrayType),
+    TSUnionType(TSUnionType),
+    TSIntersectionType(TSIntersectionType),
+    TSTypeReference(TSTypeReference),
+    TSTypeLiteral(TSTypeLiteral),
+    TSFunctionType(TSFunctionType),
+    TSTupleType(TSTupleType),
+    TSParenthesizedType(TSParenthesizedType),
+    TSTypePredicate(TSTypePredicate),
+    TSConditionalType(TSConditionalType),
+    TSMappedType(TSMappedType),
+    TSTypeOperator(TSTypeOperator),
+    TSImportType(TSImportType),
+    TSTypeQuery(TSTypeQuery),
+    TSIndexedAccessType(TSIndexedAccessType),
+    TSRestType(TSRestType),
+    TSOptionalType(TSOptionalType),
+    TSNamedTupleMember(TSNamedTupleMember),
+    TSInferType(TSInferType),
 }
 
 /// TypeScript array type: `number[]`, `string[]`, etc.
@@ -1036,6 +1377,20 @@ pub struct TSArrayType {
     pub loc: SourceLocation,
     #[serde(rename = "elementType")]
     pub element_type: Box<TSType>,
+}
+
+/// TypeScript indexed access type: `T[K]`, `Obj["key"]`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSIndexedAccessType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "objectType")]
+    pub object_type: Box<TSType>,
+    #[serde(rename = "indexType")]
+    pub index_type: Box<TSType>,
 }
 
 /// TypeScript `number` type keyword
@@ -1187,7 +1542,10 @@ pub struct TSLiteralType {
 #[serde(untagged)]
 pub enum TSLiteralTypeLiteral {
     TemplateLiteral(TemplateLiteralType),
-    // TODO: Add String, Number, Boolean literal variants
+    /// Unary expression for negative numbers: `-1`, `-42n`
+    UnaryExpression(UnaryExpression),
+    /// Literal value (string, number, bigint)
+    Literal(Literal),
 }
 
 /// Template literal used as a type (same structure as TemplateLiteral but expressions are TSType)
@@ -1200,6 +1558,681 @@ pub struct TemplateLiteralType {
     pub loc: SourceLocation,
     pub quasis: Vec<TemplateElement>,
     pub expressions: Vec<TSType>,
+}
+
+/// TypeScript interface declaration: `interface Foo { ... }`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSInterfaceDeclaration {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub id: Identifier,
+    #[serde(rename = "extends", skip_serializing_if = "Vec::is_empty")]
+    pub extends: Vec<TSInterfaceHeritage>,
+    pub body: TSInterfaceBody,
+}
+
+/// Interface heritage: `extends Foo, Bar`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSInterfaceHeritage {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub expression: TSEntityName,
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterInstantiation>,
+}
+
+/// Interface body: `{ members }`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSInterfaceBody {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub body: Vec<TSTypeElement>,
+}
+
+/// Entity name: `Foo` or `Foo.Bar.Baz`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum TSEntityName {
+    Identifier(Identifier),
+    QualifiedName(TSQualifiedName),
+}
+
+/// Qualified name: `Foo.Bar`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSQualifiedName {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub left: Box<TSEntityName>,
+    pub right: Identifier,
+}
+
+/// Type parameter instantiation: `<T, U>`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSTypeParameterInstantiation {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub params: Vec<TSType>,
+}
+
+/// Type parameter declaration: `<T extends U = V>`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSTypeParameterDeclaration {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub params: Vec<TSTypeParameter>,
+}
+
+/// Single type parameter: `T extends U = V`
+/// With optional modifiers: `const T`, `in T`, `out T`, `in out T`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSTypeParameter {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// `const` modifier (TS 5.0): `<const T>`
+    #[serde(rename = "const", skip_serializing_if = "is_false")]
+    pub is_const: bool,
+    /// `in` variance modifier (TS 4.7): `<in T>`
+    #[serde(rename = "in", skip_serializing_if = "is_false")]
+    pub is_in: bool,
+    /// `out` variance modifier (TS 4.7): `<out T>`
+    #[serde(rename = "out", skip_serializing_if = "is_false")]
+    pub is_out: bool,
+    pub name: Identifier,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub constraint: Option<Box<TSType>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<Box<TSType>>,
+}
+
+/// Expression with type arguments for implements clause: `implements Foo<T>`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSExpressionWithTypeArguments {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub expression: Expression,
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterInstantiation>,
+}
+
+/// Type element - member of a type literal or interface
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum TSTypeElement {
+    PropertySignature(TSPropertySignature),
+    MethodSignature(TSMethodSignature),
+    CallSignature(TSCallSignatureDeclaration),
+    ConstructSignature(TSConstructSignatureDeclaration),
+    IndexSignature(TSIndexSignature),
+}
+
+/// Property signature: `prop: T`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSPropertySignature {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub key: Expression,
+    pub computed: bool,
+    pub optional: bool,
+    pub readonly: bool,
+    #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
+    pub type_annotation: Option<TSTypeAnnotation>,
+}
+
+/// Method signature: `method(): T` or `method<T>(x: T): T`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSMethodSignature {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub computed: bool,
+    pub key: Expression,
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub parameters: Vec<Expression>,
+    #[serde(rename = "returnType", skip_serializing_if = "Option::is_none")]
+    pub return_type: Option<TSTypeAnnotation>,
+}
+
+/// Call signature: `(): T` or `<T>(): T`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSCallSignatureDeclaration {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub params: Vec<Expression>,
+    #[serde(rename = "returnType", skip_serializing_if = "Option::is_none")]
+    pub return_type: Option<TSTypeAnnotation>,
+}
+
+/// Construct signature: `new (): T` or `new <T>(): T`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSConstructSignatureDeclaration {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub params: Vec<Expression>,
+    #[serde(rename = "returnType", skip_serializing_if = "Option::is_none")]
+    pub return_type: Option<TSTypeAnnotation>,
+}
+
+/// Index signature: `[key: string]: T`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSIndexSignature {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub parameters: Vec<Identifier>,
+    #[serde(rename = "typeAnnotation")]
+    pub type_annotation: TSTypeAnnotation,
+    pub readonly: bool,
+}
+
+/// Declare function: `declare function foo(): void`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSDeclareFunction {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub id: Identifier,
+    pub params: Vec<Expression>,
+    #[serde(rename = "returnType", skip_serializing_if = "Option::is_none")]
+    pub return_type: Option<TSTypeAnnotation>,
+}
+
+/// Enum declaration: `enum Foo { A, B }`, `const enum Foo { A = 1 }`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSEnumDeclaration {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// Enum name
+    pub id: Identifier,
+    /// Enum members
+    pub members: Vec<TSEnumMember>,
+    /// Whether this is a const enum (only serialized when true)
+    #[serde(rename = "const", skip_serializing_if = "std::ops::Not::not")]
+    pub is_const: bool,
+    /// Whether this is a declare enum (ambient declaration, only serialized when true)
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub declare: bool,
+}
+
+/// Enum member: `A`, `A = 1`, `A = "value"`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSEnumMember {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// Member name (identifier or string literal)
+    pub id: TSEnumMemberId,
+    /// Optional initializer expression
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub initializer: Option<Expression>,
+}
+
+/// Enum member id - can be identifier or string literal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum TSEnumMemberId {
+    Identifier(Identifier),
+    Literal(Literal),
+}
+
+/// TypeScript module/namespace declaration: `namespace Utils { ... }` or `module Utils { ... }`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSModuleDeclaration {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// Module/namespace name - identifier for regular namespaces, string literal for ambient modules
+    pub id: TSModuleName,
+    /// Module body - either a block or nested module declaration (for `A.B.C`)
+    /// `None` for shorthand ambient modules: `declare module 'name';`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body: Option<TSModuleDeclarationBody>,
+    /// Whether this is an ambient declaration (`declare namespace/module`)
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub declare: bool,
+    /// For `declare global {}` - uses module kind but has special semantics
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub global: bool,
+}
+
+/// Module/namespace name - can be an identifier or a string literal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum TSModuleName {
+    /// Regular identifier: `namespace Foo { }`
+    Identifier(Identifier),
+    /// String literal for ambient modules: `declare module 'name' { }`
+    Literal(Literal),
+}
+
+/// Body of a TypeScript module declaration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum TSModuleDeclarationBody {
+    /// Block body with statements: `namespace A { ... }`
+    TSModuleBlock(TSModuleBlock),
+    /// Nested module declaration: `namespace A.B { ... }` - the B part
+    TSModuleDeclaration(Box<TSModuleDeclaration>),
+}
+
+/// TypeScript module block: the `{ ... }` part of a namespace/module declaration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSModuleBlock {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// Statements inside the module block
+    pub body: Vec<Statement>,
+}
+
+/// Union type: `A | B | C`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSUnionType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub types: Vec<TSType>,
+}
+
+/// Intersection type: `A & B & C`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSIntersectionType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub types: Vec<TSType>,
+}
+
+/// Type reference: `SomeType` or `Array<T>`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSTypeReference {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "typeName")]
+    pub type_name: TSEntityName,
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterInstantiation>,
+}
+
+/// Type literal (object type): `{ prop: T }`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSTypeLiteral {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub members: Vec<TSTypeElement>,
+}
+
+/// Function type: `(x: T) => U` or `<T>(x: T) => U`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSFunctionType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub params: Vec<Expression>,
+    #[serde(rename = "returnType")]
+    pub return_type: Box<TSTypeAnnotation>,
+}
+
+/// Tuple type: `[T, U, V]`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSTupleType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "elementTypes")]
+    pub element_types: Vec<TSType>,
+}
+
+/// Rest type in tuples: `...T`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSRestType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "typeAnnotation")]
+    pub type_annotation: Box<TSType>,
+}
+
+/// Optional type in tuples: `T?`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSOptionalType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "typeAnnotation")]
+    pub type_annotation: Box<TSType>,
+}
+
+/// Named tuple member: `label: T` or `label?: T`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSNamedTupleMember {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub label: Identifier,
+    #[serde(rename = "elementType")]
+    pub element_type: Box<TSType>,
+    pub optional: bool,
+}
+
+/// Infer type: `infer U` (in conditional types)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSInferType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "typeParameter")]
+    pub type_parameter: TSTypeParameter,
+}
+
+/// Parenthesized type: `(T)`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSParenthesizedType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "typeAnnotation")]
+    pub type_annotation: Box<TSType>,
+}
+
+/// TypeScript type predicate: `x is T` or `asserts x is T`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSTypePredicate {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "parameterName")]
+    pub parameter_name: Identifier,
+    #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
+    pub type_annotation: Option<Box<TSTypeAnnotation>>,
+    pub asserts: bool,
+}
+
+/// TypeScript conditional type: `T extends U ? V : W`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSConditionalType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "checkType")]
+    pub check_type: Box<TSType>,
+    #[serde(rename = "extendsType")]
+    pub extends_type: Box<TSType>,
+    #[serde(rename = "trueType")]
+    pub true_type: Box<TSType>,
+    #[serde(rename = "falseType")]
+    pub false_type: Box<TSType>,
+}
+
+/// Mapped type: `{ [K in keyof T]: V }`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSMappedType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    #[serde(rename = "typeParameter")]
+    pub type_parameter: TSMappedTypeParameter,
+    /// Optional key remapping: `as NewK`
+    #[serde(rename = "nameType")]
+    pub name_type: Option<Box<TSType>>,
+    /// The value type
+    #[serde(rename = "typeAnnotation")]
+    pub type_annotation: Option<Box<TSType>>,
+    /// Readonly modifier: true, "+", "-", or absent
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub readonly: Option<TSMappedTypeModifier>,
+    /// Optional modifier: true, "+", "-", or absent
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub optional: Option<TSMappedTypeModifier>,
+}
+
+/// Type parameter in a mapped type: `K in keyof T`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSMappedTypeParameter {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// The parameter name (just the string, not an Identifier in mapped types)
+    pub name: String,
+    /// The constraint type (e.g., `keyof T`)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub constraint: Option<Box<TSType>>,
+}
+
+/// Mapped type modifier value: true, "+", or "-"
+#[derive(Debug, Clone)]
+pub enum TSMappedTypeModifier {
+    True,
+    Plus,
+    Minus,
+}
+
+impl Serialize for TSMappedTypeModifier {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            TSMappedTypeModifier::True => serializer.serialize_bool(true),
+            TSMappedTypeModifier::Plus => serializer.serialize_str("+"),
+            TSMappedTypeModifier::Minus => serializer.serialize_str("-"),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for TSMappedTypeModifier {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, Visitor};
+
+        struct ModifierVisitor;
+
+        impl<'de> Visitor<'de> for ModifierVisitor {
+            type Value = TSMappedTypeModifier;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("true, \"+\", or \"-\"")
+            }
+
+            fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                if value {
+                    Ok(TSMappedTypeModifier::True)
+                } else {
+                    Err(E::custom("expected true, not false"))
+                }
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                match value {
+                    "+" => Ok(TSMappedTypeModifier::Plus),
+                    "-" => Ok(TSMappedTypeModifier::Minus),
+                    _ => Err(E::custom(format!("expected '+' or '-', got '{value}'"))),
+                }
+            }
+        }
+
+        deserializer.deserialize_any(ModifierVisitor)
+    }
+}
+
+/// Type operator: `keyof T`, `unique symbol`, `readonly T`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSTypeOperator {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// The operator: "keyof", "unique", "readonly"
+    pub operator: String,
+    /// The type being operated on
+    #[serde(rename = "typeAnnotation")]
+    pub type_annotation: Box<TSType>,
+}
+
+/// Import type: `import('module')` or `import('module', {with: {...}}).Qualifier<T>`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSImportType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// The module specifier (string literal)
+    pub argument: Literal,
+    /// Optional options object: `{with: {type: 'json'}}`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub options: Option<Box<Expression>>,
+    /// Optional qualifier: `.Foo` or `.Foo.Bar` after the import
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub qualifier: Option<TSEntityName>,
+    /// Optional type arguments: `<T, U>`
+    #[serde(rename = "typeArguments", skip_serializing_if = "Option::is_none")]
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
+}
+
+/// Type query expression name: Identifier, QualifiedName, or ImportType
+///
+/// The `exprName` field of `TSTypeQuery` can be:
+/// - `Identifier` for `typeof x`
+/// - `TSQualifiedName` for `typeof Foo.bar`
+/// - `TSImportType` for `typeof import("module")`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum TSTypeQueryExprName {
+    Identifier(Identifier),
+    QualifiedName(TSQualifiedName),
+    Import(TSImportType),
+}
+
+/// Type query: `typeof x`, `typeof Foo.bar`, `typeof import("module")`, `typeof Array<T>`
+///
+/// Gets the type of a value expression.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSTypeQuery {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// The expression whose type is being queried
+    #[serde(rename = "exprName")]
+    pub expr_name: TSTypeQueryExprName,
+    /// Optional type arguments: `<T, U>` (e.g., `typeof Array<string>`)
+    #[serde(rename = "typeArguments", skip_serializing_if = "Option::is_none")]
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
+}
+
+/// TypeScript parameter property: `constructor(public x: number)`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSParameterProperty {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    /// Accessibility modifier: "public", "private", or "protected"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accessibility: Option<String>,
+    /// Whether the parameter is readonly
+    #[serde(skip_serializing_if = "is_false")]
+    pub readonly: bool,
+    /// The parameter - can be Identifier or AssignmentPattern (with default value)
+    pub parameter: Box<Expression>,
 }
 
 // Serialize numbers as integers if they have no fractional part

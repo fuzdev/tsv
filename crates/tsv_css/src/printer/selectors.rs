@@ -10,6 +10,20 @@ use super::Printer;
 use crate::ast::internal;
 
 impl<'a> Printer<'a> {
+    /// Normalize spacing around comments in selector source text
+    ///
+    /// Ensures proper spacing:
+    /// - Space after comma before comment: `,/*` → `, /*`
+    /// - Space after comment before class selector: `*/.` → `*/ .`
+    /// - Reduce double spaces: `,  /*` → `, /*`, `*/  .` → `*/ .`
+    fn normalize_selector_comment_spacing(source_text: &str) -> String {
+        source_text
+            .replace(",/*", ", /*")
+            .replace("*/.", "*/ .")
+            .replace(",  /*", ", /*")
+            .replace("*/  .", "*/ .")
+    }
+
     /// Format a selector list (comma-separated complex selectors)
     ///
     /// Supports line wrapping for top-level selector lists (in rules).
@@ -32,13 +46,7 @@ impl<'a> Printer<'a> {
         // Check if source contains comments
         let source_text = list.span.extract(self.source);
         if source_text.contains("/*") {
-            // Extract from source and normalize spacing around comments
-            // Add missing spaces and reduce double spaces to single
-            let normalized = source_text
-                .replace(",/*", ", /*") // Ensure space after comma before comment
-                .replace("*/.", "*/ .") // Ensure space after comment before class selector
-                .replace(",  /*", ", /*") // Reduce double space after comma
-                .replace("*/  .", "*/ ."); // Reduce double space after comment
+            let normalized = Self::normalize_selector_comment_spacing(source_text);
             self.write(&normalized);
             return;
         }
@@ -84,16 +92,8 @@ impl<'a> Printer<'a> {
     fn print_selector_list_internal(&mut self, list: &internal::SelectorList, nested: bool) {
         // Check if source contains comments (/* ... */)
         let source_text = list.span.extract(self.source);
-        let has_comments = source_text.contains("/*");
-
-        if has_comments {
-            // Extract from source and normalize spacing around comments
-            // Add missing spaces and reduce double spaces to single
-            let normalized = source_text
-                .replace(",/*", ", /*") // Ensure space after comma before comment
-                .replace("*/.", "*/ .") // Ensure space after comment before class selector
-                .replace(",  /*", ", /*") // Reduce double space after comma
-                .replace("*/  .", "*/ ."); // Reduce double space after comment
+        if source_text.contains("/*") {
+            let normalized = Self::normalize_selector_comment_spacing(source_text);
             self.write(&normalized);
         } else {
             self.print_selector_list_with_wrapping(list, nested);
@@ -193,14 +193,12 @@ impl<'a> Printer<'a> {
     fn build_selector_list_doc(&self, list: &internal::SelectorList) -> tsv_lang::doc::Doc {
         use tsv_lang::doc;
 
-        let mut parts = Vec::new();
-        for (i, complex) in list.selectors.iter().enumerate() {
-            if i > 0 {
-                parts.push(doc::text(", "));
-            }
-            parts.push(self.build_complex_selector_doc(complex));
-        }
-        doc::concat(parts)
+        let docs: Vec<_> = list
+            .selectors
+            .iter()
+            .map(|complex| self.build_complex_selector_doc(complex))
+            .collect();
+        doc::join_doc(docs, doc::text(", "))
     }
 
     /// Build a doc representation of a complex selector for width checking
@@ -215,44 +213,19 @@ impl<'a> Printer<'a> {
         for (i, relative) in complex.children.iter().enumerate() {
             let is_first = i == 0;
 
-            // Add combinator if present
+            // Add combinator if present (uses static strings to avoid allocation)
             if let Some(combinator) = &relative.combinator {
-                let combinator_text = match combinator {
-                    internal::Combinator::Descendant => {
-                        if is_first {
-                            String::new()
-                        } else {
-                            " ".to_string()
-                        }
-                    }
-                    internal::Combinator::Child => {
-                        if is_first {
-                            "> ".to_string()
-                        } else {
-                            " > ".to_string()
-                        }
-                    }
-                    internal::Combinator::NextSibling => {
-                        if is_first {
-                            "+ ".to_string()
-                        } else {
-                            " + ".to_string()
-                        }
-                    }
-                    internal::Combinator::SubsequentSibling => {
-                        if is_first {
-                            "~ ".to_string()
-                        } else {
-                            " ~ ".to_string()
-                        }
-                    }
-                    internal::Combinator::Column => {
-                        if is_first {
-                            "|| ".to_string()
-                        } else {
-                            " || ".to_string()
-                        }
-                    }
+                let combinator_text: &'static str = match (combinator, is_first) {
+                    (internal::Combinator::Descendant, true) => "",
+                    (internal::Combinator::Descendant, false) => " ",
+                    (internal::Combinator::Child, true) => "> ",
+                    (internal::Combinator::Child, false) => " > ",
+                    (internal::Combinator::NextSibling, true) => "+ ",
+                    (internal::Combinator::NextSibling, false) => " + ",
+                    (internal::Combinator::SubsequentSibling, true) => "~ ",
+                    (internal::Combinator::SubsequentSibling, false) => " ~ ",
+                    (internal::Combinator::Column, true) => "|| ",
+                    (internal::Combinator::Column, false) => " || ",
                 };
                 if !combinator_text.is_empty() {
                     parts.push(doc::text(combinator_text));
@@ -261,7 +234,7 @@ impl<'a> Printer<'a> {
 
             // Add simple selectors
             for simple in &relative.selectors {
-                parts.push(doc::text(self.simple_selector_to_string(simple)));
+                parts.push(doc::text_owned(self.simple_selector_to_string(simple)));
             }
         }
 

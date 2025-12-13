@@ -2265,8 +2265,8 @@
 		}
 	},
 	"js": [],
-	"start": null,
-	"end": null,
+	"start": 0,
+	"end": 1835,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

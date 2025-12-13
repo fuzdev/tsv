@@ -63,19 +63,11 @@ impl<'a> Printer<'a> {
                         internal::CssBlockChild::Rule(_)
                         | internal::CssBlockChild::Atrule(_)
                         | internal::CssBlockChild::Comment(_) => {
-                            // Check if there's a blank line between children in the source
                             let prev_child = &block.children[i - 1];
-                            let has_blank_line = {
-                                let source = self.source;
-                                let prev_end = prev_child.span().end as usize;
-                                let curr_start = child.span().start as usize;
-                                if prev_end < curr_start && curr_start <= source.len() {
-                                    let between = &source[prev_end..curr_start];
-                                    between.matches('\n').count() >= 2
-                                } else {
-                                    false
-                                }
-                            };
+                            let has_blank_line = self.has_blank_line_between_spans(
+                                prev_child.span().end,
+                                child.span().start,
+                            );
 
                             // Declarations end with \n, but rules/at-rules end with }
                             // So only add separator newline if prev is not a declaration
@@ -103,32 +95,10 @@ impl<'a> Printer<'a> {
                         self.write_indent();
                         self.print_atrule_block_child(child);
 
-                        // Check if next child is an inline comment (no newline between } and /*)
-                        if let Some(internal::CssBlockChild::Comment(next_comment)) =
-                            block.children.get(i + 1)
-                        {
-                            let child_end = child.span().end as usize;
-                            let comment_start = next_comment.span.start as usize;
-
-                            // Extract text between closing brace and comment
-                            let has_newline_between = if child_end < comment_start
-                                && comment_start <= self.source.len()
-                            {
-                                self.source[child_end..comment_start].contains('\n')
-                            } else {
-                                false
-                            };
-
-                            // Only print inline if there's NO newline between them in source
-                            // This preserves user's formatting choice (inline vs standalone)
-                            if !has_newline_between {
-                                // Print comment inline after closing brace
-                                self.write(" /*");
-                                self.write(&next_comment.content);
-                                self.write("*/");
-                                i += 1; // Skip the comment in the next iteration
-                            }
-                        }
+                        // Check if next child is an inline comment
+                        let inline_count =
+                            self.try_print_inline_comments(&block.children, i, child.span().end);
+                        i += inline_count;
                     }
                     internal::CssBlockChild::Comment(_) => {
                         // Standalone comment
@@ -190,26 +160,19 @@ impl<'a> Printer<'a> {
                 self.indent_level += 1;
                 let mut i = start_index;
                 while i < rule.declarations.len() {
-                    let child = &rule.declarations[i];
-                    match child {
+                    let block_child = &rule.declarations[i];
+                    match block_child {
                         internal::CssBlockChild::Declaration(decl) => {
                             self.print_css_declaration(decl);
 
-                            // Check if next child is an inline comment
-                            if let Some(internal::CssBlockChild::Comment(next_comment)) =
-                                rule.declarations.get(i + 1)
-                                && printing::is_same_line(
-                                    self.source,
-                                    decl.span.end,
-                                    next_comment.span.start,
-                                )
-                            {
-                                // Print comment inline
-                                self.buffer_remove_trailing_newline();
-                                self.write(" /*");
-                                self.write(&next_comment.content);
-                                self.write("*/\n");
-                                i += 1; // Skip the comment in the next iteration
+                            // Check for inline comments after the declaration
+                            let inline_count = self.try_print_inline_comments_after_decl(
+                                &rule.declarations,
+                                i,
+                                decl.span.end,
+                            );
+                            if inline_count > 0 {
+                                i += inline_count;
                             }
                         }
                         internal::CssBlockChild::Comment(comment) => {
@@ -217,8 +180,7 @@ impl<'a> Printer<'a> {
                             // Check if there's a blank line before this comment in source
                             if i > start_index
                                 && let Some(prev_child) = rule.declarations.get(i - 1)
-                                && printing::has_blank_line_between(
-                                    self.source,
+                                && self.has_blank_line_between_spans(
                                     prev_child.span().end,
                                     comment.span.start,
                                 )
@@ -233,55 +195,35 @@ impl<'a> Printer<'a> {
                         }
                         internal::CssBlockChild::Rule(nested_rule) => {
                             // CSS Nesting Module - format nested rule inside at-rule block rule
-                            let prev_is_comment = i > 0
-                                && matches!(
-                                    rule.declarations.get(i - 1),
-                                    Some(internal::CssBlockChild::Comment(_))
-                                );
-                            if i > start_index && !prev_is_comment {
+                            if i > start_index && !Self::prev_is_comment(&rule.declarations, i) {
                                 self.write("\n");
                             }
                             self.write_indent();
                             self.print_css_rule(nested_rule);
 
                             // Check for inline comment after nested rule's closing brace
-                            let mut has_inline_comment = false;
-                            if let Some(internal::CssBlockChild::Comment(next_comment)) =
-                                rule.declarations.get(i + 1)
-                                && printing::is_same_line(
-                                    self.source,
-                                    nested_rule.span.end,
-                                    next_comment.span.start,
-                                )
-                            {
-                                self.write(" /*");
-                                self.write(&next_comment.content);
-                                self.write("*/");
-                                has_inline_comment = true;
-                            }
+                            let inline_count = self.try_print_inline_comments(
+                                &rule.declarations,
+                                i,
+                                nested_rule.span.end,
+                            );
 
                             self.write("\n");
 
                             // Add blank line after nested rule if next sibling is a declaration
                             // (Don't add for comments - comment handles its own spacing)
-                            if let Some(next_child) = rule.declarations.get(i + 1)
-                                && let internal::CssBlockChild::Declaration(_) = next_child
+                            let next_idx = i + 1 + inline_count;
+                            if let Some(internal::CssBlockChild::Declaration(_)) =
+                                rule.declarations.get(next_idx)
                             {
                                 self.write("\n");
                             }
 
-                            if has_inline_comment {
-                                i += 1;
-                            }
+                            i += inline_count;
                         }
                         internal::CssBlockChild::Atrule(nested_atrule) => {
                             // Nested at-rule inside rule
-                            let prev_is_comment = i > 0
-                                && matches!(
-                                    rule.declarations.get(i - 1),
-                                    Some(internal::CssBlockChild::Comment(_))
-                                );
-                            if i > start_index && !prev_is_comment {
+                            if i > start_index && !Self::prev_is_comment(&rule.declarations, i) {
                                 self.write("\n");
                             }
                             self.write_indent();

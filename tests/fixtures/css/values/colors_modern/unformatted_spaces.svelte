@@ -1,5 +1,8 @@
 <style>
 	div {
+		/* HWB color space (CSS Color 4) */
+		color: hwb(  180  20%  30%  );
+		background: hwb(  0  0%  0%  /  50%  );
 		/* Lab color space (CSS Color 4) */
 		color: lab(  50%  40  60  );
 		background: lch(  60%  50  180  );

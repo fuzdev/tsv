@@ -72,7 +72,7 @@ async fn assert_prettier_idempotency_bug(
 }
 
 async fn format_with_prettier(content: &str) -> String {
-    tsv_debug::fuz_client::run_prettier(content, "temp.svelte")
+    tsv_debug::deno::run_prettier(content, tsv_debug::deno::PrettierParser::Parser("svelte"))
         .await
         .expect("prettier formatting failed")
 }

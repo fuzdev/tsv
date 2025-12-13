@@ -1,4 +1,4 @@
-// JavaScript/TypeScript string escape decoding
+// JS/TypeScript string escape decoding
 //
 // Implements ECMAScript string escape sequences as specified in:
 // https://tc39.es/ecma262/#sec-literals-string-literals
@@ -15,7 +15,7 @@
 
 use tsv_lang::ParseError;
 
-/// Decode JavaScript/TypeScript string escape sequences
+/// Decode JS/TypeScript string escape sequences
 ///
 /// Converts escape sequences in a string literal to their actual character values.
 /// Input should be the string content WITHOUT quotes.

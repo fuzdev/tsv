@@ -39,11 +39,107 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn parse_function_declaration(&mut self) -> Result<Statement, ParseError> {
-        let func = self.parse_function_declaration_inner(true, false)?;
-        Ok(Statement::FunctionDeclaration(func))
+        self.parse_function_or_overload(false)
     }
 
-    /// Parse async function declaration: `async function foo() {}`
+    /// Parse function declaration or overload signature
+    ///
+    /// Function overloads end with semicolon instead of body:
+    /// ```typescript
+    /// function check(x: unknown): x is string;  // overload - TSDeclareFunction
+    /// function check(x: unknown): x is number;  // overload - TSDeclareFunction
+    /// function check(x: unknown) { ... }         // implementation - FunctionDeclaration
+    /// ```
+    fn parse_function_or_overload(&mut self, is_async: bool) -> Result<Statement, ParseError> {
+        let (start, _) = self.current_pos();
+
+        // Consume 'function' keyword
+        debug_assert!(matches!(
+            self.current_kind(),
+            TokenKind::Keyword(KeywordKind::Function)
+        ));
+        self.advance()?;
+
+        // Check for generator: function*
+        let is_generator = if matches!(self.current_kind(), TokenKind::Star) {
+            self.advance()?;
+            true
+        } else {
+            false
+        };
+
+        // Parse function name (required for declarations)
+        if !matches!(self.current_kind(), TokenKind::Identifier) {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected function name after 'function'".to_string(),
+                position: self.current_pos().0,
+                context: None,
+            });
+        }
+        let (id_start, id_end) = self.current_pos();
+        let symbol = self.intern_identifier();
+        self.advance()?;
+
+        let id = Identifier {
+            name: symbol,
+            optional: false,
+            type_annotation: None,
+            span: Span::new(id_start as u32, id_end as u32),
+        };
+
+        // Parse type parameters (TypeScript generics): function foo<T>()
+        let type_parameters = if self.check(&TokenKind::LessThan) {
+            Some(self.parse_type_parameters()?)
+        } else {
+            None
+        };
+
+        // Parse parameter list
+        let params = self.parse_parameter_list()?;
+
+        // Check for return type annotation
+        let return_type = if self.check(&TokenKind::Colon) {
+            Some(self.parse_return_type_annotation()?)
+        } else {
+            None
+        };
+
+        // Check if this is an overload (ends with ; or no body) or implementation (has body)
+        // Overload signatures don't have a body block - they end with ; or ASI
+        if !matches!(self.current_kind(), TokenKind::BraceOpen) {
+            // Function overload signature - parse as TSDeclareFunction
+            let end = return_type
+                .as_ref()
+                .map_or_else(|| self.current_pos().0 as u32, |rt| rt.span.end);
+            self.semicolon()?;
+
+            Ok(Statement::TSDeclareFunction(TSDeclareFunction {
+                id,
+                type_parameters,
+                params,
+                return_type,
+                declare: false, // Not a `declare function`, just an overload
+                span: Span::new(start as u32, end),
+            }))
+        } else {
+            // Function implementation - parse body
+            let body = self.parse_block_statement()?;
+            let end = body.span.end;
+
+            Ok(Statement::FunctionDeclaration(FunctionDeclaration {
+                id: Some(id),
+                type_parameters,
+                params,
+                return_type,
+                body,
+                generator: is_generator,
+                r#async: is_async,
+                span: Span::new(start as u32, end),
+            }))
+        }
+    }
+
+    /// Parse async function declaration: `async function foo() {}` or `async function* foo() {}`
     pub(super) fn parse_async_function_declaration(&mut self) -> Result<Statement, ParseError> {
         let (start, _) = self.current_pos();
 
@@ -54,25 +150,31 @@ impl<'a> Parser<'a> {
         ));
         self.advance()?;
 
-        // Parse the function (name required for declarations)
-        let mut func = self.parse_function_declaration_inner(true, true)?;
-        // Update span to include 'async' keyword
-        func.span = Span::new(start as u32, func.span.end);
+        // Parse the function (which may be an overload signature or implementation)
+        let mut stmt = self.parse_function_or_overload(true)?;
 
-        Ok(Statement::FunctionDeclaration(func))
+        // Update span to include 'async' keyword
+        match &mut stmt {
+            Statement::FunctionDeclaration(func) => {
+                func.span = Span::new(start as u32, func.span.end);
+            }
+            Statement::TSDeclareFunction(func) => {
+                func.span = Span::new(start as u32, func.span.end);
+            }
+            _ => unreachable!(),
+        }
+
+        Ok(stmt)
     }
 
-    /// Inner function that returns the FunctionDeclaration directly
-    /// Used by parse_function_declaration, parse_async_function_declaration, and export default
+    /// Inner function that can return either FunctionDeclaration or TSDeclareFunction
     ///
-    /// `name_required`: If true, function name is required. If false, name is optional
-    /// (for `export default function() {}`)
-    /// `is_async`: If true, this is an async function
-    pub(super) fn parse_function_declaration_inner(
+    /// Used by export default and export named to handle both regular and ambient contexts
+    pub(super) fn parse_function_declaration_or_declare(
         &mut self,
         name_required: bool,
         is_async: bool,
-    ) -> Result<FunctionDeclaration, ParseError> {
+    ) -> Result<ExportFunctionDeclaration, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'function' keyword
@@ -82,10 +184,18 @@ impl<'a> Parser<'a> {
         ));
         self.advance()?;
 
+        // Check for generator: function*
+        let is_generator = if matches!(self.current_kind(), TokenKind::Star) {
+            self.advance()?;
+            true
+        } else {
+            false
+        };
+
         // Parse function name (required for declarations, optional for export default)
         let id = if matches!(self.current_kind(), TokenKind::Identifier) {
             let (id_start, id_end) = self.current_pos();
-            let symbol = self.intern(self.current_value());
+            let symbol = self.intern_identifier();
             self.advance()?;
 
             Some(Identifier {
@@ -104,27 +214,151 @@ impl<'a> Parser<'a> {
             None
         };
 
-        // Parse parameter list
-        let params = self.parse_parameter_list()?;
-
-        // Check for return type annotation: (): type
-        let return_type = if self.check(&TokenKind::Colon) {
-            Some(self.parse_type_annotation()?)
+        // Parse type parameters
+        let type_parameters = if self.check(&TokenKind::LessThan) {
+            Some(self.parse_type_parameters()?)
         } else {
             None
         };
 
+        // Parse parameter list
+        let params = self.parse_parameter_list()?;
+
+        // Check for return type annotation
+        let return_type = if self.check(&TokenKind::Colon) {
+            Some(self.parse_return_type_annotation()?)
+        } else {
+            None
+        };
+
+        // Check if this is an overload signature (no body) or implementation (has body)
+        if !matches!(self.current_kind(), TokenKind::BraceOpen) {
+            // No body - this is a declare function (ambient context)
+            let end = return_type
+                .as_ref()
+                .map_or_else(|| self.current_pos().0 as u32, |rt| rt.span.end);
+            self.semicolon()?;
+
+            Ok(ExportFunctionDeclaration::Declare(TSDeclareFunction {
+                id: id.unwrap_or_else(|| Identifier {
+                    name: self.intern(""),
+                    optional: false,
+                    type_annotation: None,
+                    span: Span::new(start as u32, start as u32),
+                }),
+                type_parameters,
+                params,
+                return_type,
+                declare: false,
+                span: Span::new(start as u32, end),
+            }))
+        } else {
+            // Has body - regular function declaration
+            let body = self.parse_block_statement()?;
+            let end = body.span.end;
+
+            Ok(ExportFunctionDeclaration::Declaration(
+                FunctionDeclaration {
+                    id,
+                    type_parameters,
+                    params,
+                    return_type,
+                    body,
+                    generator: is_generator,
+                    r#async: is_async,
+                    span: Span::new(start as u32, end),
+                },
+            ))
+        }
+    }
+
+    /// Parse a function expression: `function() {}` or `function name<T>() {}`
+    ///
+    /// Function expressions are similar to function declarations but:
+    /// - The name is always optional
+    /// - They appear in expression position
+    pub fn parse_function_expression(&mut self) -> Result<Expression, ParseError> {
+        let (start, _) = self.current_pos();
+        self.parse_function_expression_inner(start, false)
+    }
+
+    /// Parse an async function expression: `async function() {}` or `async function*() {}`
+    ///
+    /// Called when we've already seen `async` and are at `function`.
+    pub fn parse_async_function_expression(
+        &mut self,
+        start: usize,
+    ) -> Result<Expression, ParseError> {
+        self.parse_function_expression_inner(start, true)
+    }
+
+    /// Core function expression parsing logic
+    fn parse_function_expression_inner(
+        &mut self,
+        start: usize,
+        is_async: bool,
+    ) -> Result<Expression, ParseError> {
+        // Consume 'function' keyword
+        debug_assert!(matches!(
+            self.current_kind(),
+            TokenKind::Keyword(KeywordKind::Function)
+        ));
+        self.advance()?;
+
+        // Check for generator: function*
+        let is_generator = if matches!(self.current_kind(), TokenKind::Star) {
+            self.advance()?;
+            true
+        } else {
+            false
+        };
+
+        // Parse optional function name
+        let id = if matches!(self.current_kind(), TokenKind::Identifier) {
+            let (id_start, id_end) = self.current_pos();
+            let symbol = self.intern_identifier();
+            self.advance()?;
+
+            Some(Identifier {
+                name: symbol,
+                optional: false,
+                type_annotation: None,
+                span: Span::new(id_start as u32, id_end as u32),
+            })
+        } else {
+            None
+        };
+
+        // Parse type parameters (TypeScript generics): function<T>()
+        let type_parameters = if self.check(&TokenKind::LessThan) {
+            Some(self.parse_type_parameters()?)
+        } else {
+            None
+        };
+
+        // Parse parameter list
+        let params = self.parse_parameter_list()?;
+
+        // Check for return type annotation
+        let return_type = if self.check(&TokenKind::Colon) {
+            Some(self.parse_return_type_annotation()?)
+        } else {
+            None
+        };
+
+        // Parse function body
         let body = self.parse_block_statement()?;
         let end = body.span.end;
 
-        Ok(FunctionDeclaration {
+        Ok(Expression::FunctionExpression(FunctionExpression {
             id,
+            type_parameters,
             params,
             return_type,
             body,
-            generator: false, // TODO: Support generator functions
+            generator: is_generator,
             r#async: is_async,
             span: Span::new(start as u32, end),
-        })
+        }))
     }
 }

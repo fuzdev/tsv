@@ -18,9 +18,12 @@ fn is_void(name: &str) -> bool {
     VOID_ELEMENTS.contains(&name) || name.eq_ignore_ascii_case("!doctype")
 }
 
-/// Check if a tag name is a component (first character uppercase)
+/// Check if a tag name is a component (last segment starts with uppercase)
+/// Examples: "Comp" -> true, "ns.Comp" -> true, "deep.nested.Comp" -> true, "div" -> false
 fn is_component(name: &str) -> bool {
-    name.chars().next().is_some_and(char::is_uppercase)
+    // For dot notation (ns.Comp), check the last segment
+    let last_segment = name.rsplit('.').next().unwrap_or(name);
+    last_segment.chars().next().is_some_and(char::is_uppercase)
 }
 
 /// Result type for parsing elements - either a regular element or a special element
@@ -62,8 +65,8 @@ impl<'a> SvelteParser<'a> {
         self.advance()?;
 
         // Check if this is a special element
-        if let Some(special_kind) = SpecialElementKind::from_tag_name(&tag_name, in_svelte_head) {
-            return self.parse_special_element_body(start, special_kind);
+        if let Some(special_tag) = SpecialElementTag::from_tag_name(&tag_name, in_svelte_head) {
+            return self.parse_special_element_body(start, special_tag);
         }
 
         // Regular element or component
@@ -113,6 +116,23 @@ impl<'a> SvelteParser<'a> {
             }));
         }
 
+        // Nested <style> and <script> elements have raw text content (not parsed as Svelte template)
+        // Per Svelte docs: "the <style> tag will be inserted as-is into the DOM"
+        if tag_name == "style" || tag_name == "script" {
+            let child_nodes = self.parse_raw_text_content(&tag_name, opening_tag_end, start)?;
+            let end = self.parse_closing_tag(&tag_name, start)?;
+            return Ok(ParsedElement::Element(Element {
+                name: tag_symbol,
+                kind,
+                attributes,
+                fragment: Fragment { nodes: child_nodes },
+                span: Span {
+                    start: start as u32,
+                    end,
+                },
+            }));
+        }
+
         // Parse children
         let child_nodes = self.parse_children(&tag_name, opening_tag_end, start, in_svelte_head)?;
 
@@ -135,13 +155,16 @@ impl<'a> SvelteParser<'a> {
     fn parse_special_element_body(
         &mut self,
         start: usize,
-        kind: SpecialElementKind,
+        tag: SpecialElementTag,
     ) -> Result<ParsedElement, ParseError> {
-        let tag_name = kind.tag_name();
-        let in_svelte_head = kind == SpecialElementKind::SvelteHead;
+        let tag_name = tag.tag_name();
+        let in_svelte_head = tag == SpecialElementTag::SvelteHead;
 
-        // Parse attributes
-        let (attributes, tag_expr, component_expr) = self.parse_special_element_attributes(kind)?;
+        // Parse attributes, extracting `this` for SvelteElement and SvelteComponent
+        let (attributes, tag_expr, component_expr) = self.parse_special_element_attributes(tag)?;
+
+        // Construct the final SpecialElementKind with associated data
+        let kind = Self::build_special_element_kind(tag, tag_expr, component_expr);
 
         // Check for self-closing tag
         let self_closing = self.check(TokenKind::Slash);
@@ -158,8 +181,6 @@ impl<'a> SvelteParser<'a> {
                 kind,
                 attributes,
                 fragment: Fragment { nodes: Vec::new() },
-                tag: tag_expr,
-                expression: component_expr,
                 span: Span {
                     start: start as u32,
                     end: opening_tag_end as u32,
@@ -177,8 +198,6 @@ impl<'a> SvelteParser<'a> {
             kind,
             attributes,
             fragment: Fragment { nodes: child_nodes },
-            tag: tag_expr,
-            expression: component_expr,
             span: Span {
                 start: start as u32,
                 end,
@@ -186,10 +205,53 @@ impl<'a> SvelteParser<'a> {
         }))
     }
 
+    /// Build the final SpecialElementKind from the tag and extracted expressions
+    fn build_special_element_kind(
+        tag: SpecialElementTag,
+        tag_expr: Option<tsv_ts::ast::internal::Expression>,
+        component_expr: Option<tsv_ts::ast::internal::Expression>,
+    ) -> SpecialElementKind {
+        match tag {
+            SpecialElementTag::SvelteElement => {
+                // For svelte:element, we need the `this` attribute
+                // If missing, create a placeholder (parser should have validated)
+                let tag = tag_expr.unwrap_or(tsv_ts::ast::internal::Expression::Literal(
+                    tsv_ts::ast::internal::Literal {
+                        value: tsv_ts::ast::internal::LiteralValue::String {
+                            content: String::new(),
+                            quote: '"',
+                        },
+                        span: Span { start: 0, end: 0 },
+                    },
+                ));
+                SpecialElementKind::SvelteElement { tag }
+            }
+            SpecialElementTag::SvelteComponent => {
+                // For svelte:component, we need the `this` attribute
+                let expression = component_expr.unwrap_or(
+                    tsv_ts::ast::internal::Expression::Literal(tsv_ts::ast::internal::Literal {
+                        value: tsv_ts::ast::internal::LiteralValue::Null,
+                        span: Span { start: 0, end: 0 },
+                    }),
+                );
+                SpecialElementKind::SvelteComponent { expression }
+            }
+            SpecialElementTag::SvelteHead => SpecialElementKind::SvelteHead,
+            SpecialElementTag::SvelteWindow => SpecialElementKind::SvelteWindow,
+            SpecialElementTag::SvelteBody => SpecialElementKind::SvelteBody,
+            SpecialElementTag::SvelteDocument => SpecialElementKind::SvelteDocument,
+            SpecialElementTag::SvelteSelf => SpecialElementKind::SvelteSelf,
+            SpecialElementTag::SlotElement => SpecialElementKind::SlotElement,
+            SpecialElementTag::SvelteFragment => SpecialElementKind::SvelteFragment,
+            SpecialElementTag::SvelteBoundary => SpecialElementKind::SvelteBoundary,
+            SpecialElementTag::TitleElement => SpecialElementKind::TitleElement,
+        }
+    }
+
     /// Parse attributes for a special element, extracting `this` for svelte:element and svelte:component
     fn parse_special_element_attributes(
         &mut self,
-        kind: SpecialElementKind,
+        tag: SpecialElementTag,
     ) -> Result<SpecialElementAttrs, ParseError> {
         let mut attributes = Vec::new();
         let mut tag_expr: Option<tsv_ts::ast::internal::Expression> = None;
@@ -209,7 +271,7 @@ impl<'a> SvelteParser<'a> {
                         .unwrap_or_default();
                     // Check for `this` attribute on svelte:element and svelte:component
                     if attr_name == "this" {
-                        if kind == SpecialElementKind::SvelteElement {
+                        if tag == SpecialElementTag::SvelteElement {
                             // Extract expression from the attribute value
                             if let Some(ref values) = a.value {
                                 if let Some(AttributeValue::ExpressionTag(et)) = values.first() {
@@ -229,7 +291,7 @@ impl<'a> SvelteParser<'a> {
                                     continue;
                                 }
                             }
-                        } else if kind == SpecialElementKind::SvelteComponent
+                        } else if tag == SpecialElementTag::SvelteComponent
                             && let Some(ref values) = a.value
                             && let Some(AttributeValue::ExpressionTag(et)) = values.first()
                         {
@@ -348,28 +410,71 @@ impl<'a> SvelteParser<'a> {
         Ok(end as u32)
     }
 
-    /// Parse an element: <tag></tag> or <tag/> or <void>
-    ///
-    /// Legacy wrapper that only returns regular elements.
-    /// For special elements, they are parsed but returned as a Component element.
-    /// This maintains backward compatibility with existing callers.
-    ///
-    /// TODO: Migrate callers to use parse_element_or_special directly and remove this.
-    #[allow(dead_code)]
-    pub(crate) fn parse_element(&mut self) -> Result<Element, ParseError> {
-        match self.parse_element_or_special(false)? {
-            ParsedElement::Element(elem) => Ok(elem),
-            ParsedElement::SpecialElement(special) => {
-                // Convert special element to a regular element for backward compatibility
-                // This loses the special element semantics but preserves the parse
-                Ok(Element {
-                    name: self.intern(special.kind.tag_name()),
-                    kind: ElementKind::Component, // Treat as component
-                    attributes: special.attributes,
-                    fragment: special.fragment,
-                    span: special.span,
-                })
+    /// Parse raw text content for nested <style> and <script> elements.
+    /// These elements should not have their content parsed as Svelte template syntax.
+    /// Returns a single Text node with the raw content, or empty vec if no content.
+    fn parse_raw_text_content(
+        &mut self,
+        tag_name: &str,
+        content_start: usize,
+        element_start: usize,
+    ) -> Result<Vec<FragmentNode>, ParseError> {
+        // Build the closing tag pattern: </style> or </script>
+        let closing_pattern = format!("</{tag_name}>");
+        let closing_bytes = closing_pattern.as_bytes();
+        let source_bytes = self.source.as_bytes();
+
+        // Scan for the closing tag
+        let mut content_end = content_start;
+        let mut found_close = false;
+
+        for i in content_start..source_bytes.len() {
+            if i + closing_bytes.len() <= source_bytes.len()
+                && source_bytes[i..].starts_with(closing_bytes)
+            {
+                content_end = i;
+                found_close = true;
+                break;
             }
+        }
+
+        if !found_close {
+            return Err(ParseError::InvalidSyntax {
+                message: format!("Unterminated <{tag_name}> element"),
+                position: element_start,
+                context: None,
+            });
+        }
+
+        // Reposition lexer to the closing tag
+        let remaining_source = &self.source[content_end..];
+        let mut new_lexer = crate::lexer::Lexer::new(remaining_source);
+
+        let (token_kind, token_start, token_end) = {
+            let token = new_lexer.next_token()?;
+            (token.kind, token.start, token.end)
+        };
+
+        self.lexer = new_lexer;
+        self.base_offset = content_end;
+        self.current_kind = token_kind;
+        self.current_start = content_end + token_start;
+        self.current_end = content_end + token_end;
+        self.peek_cache = None;
+
+        // If there's content, create a single Text node
+        if content_end > content_start {
+            let raw_content = &self.source[content_start..content_end];
+            Ok(vec![FragmentNode::Text(Text {
+                data: raw_content.to_string(),
+                raw: raw_content.to_string(),
+                span: Span {
+                    start: content_start as u32,
+                    end: content_end as u32,
+                },
+            })])
+        } else {
+            Ok(Vec::new())
         }
     }
 }

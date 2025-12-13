@@ -75,8 +75,8 @@
 		}
 	},
 	"js": [],
-	"start": null,
-	"end": null,
+	"start": 0,
+	"end": 125,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

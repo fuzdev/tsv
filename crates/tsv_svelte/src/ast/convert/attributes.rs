@@ -12,9 +12,8 @@ use tsv_lang::{InfallibleResolve, LocationTracker};
 
 use super::{
     convert_animate_directive, convert_bind_directive, convert_class_directive,
-    convert_expression_tag, convert_let_directive, convert_on_directive,
-    convert_style_directive, convert_text, convert_transition_directive, convert_use_directive,
-    to_json_value,
+    convert_expression_tag, convert_let_directive, convert_on_directive, convert_style_directive,
+    convert_text, convert_transition_directive, convert_use_directive, to_json_value,
 };
 
 pub(super) fn convert_attribute_node(

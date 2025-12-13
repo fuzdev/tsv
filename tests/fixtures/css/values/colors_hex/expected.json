@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 245,
+		"end": 393,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 236,
+					"end": 384,
 					"children": [
 						{
 							"type": "Declaration",
@@ -70,48 +70,76 @@
 						},
 						{
 							"type": "Declaration",
-							"start": 141,
-							"end": 160,
+							"start": 152,
+							"end": 164,
+							"property": "color",
+							"value": "#f00a"
+						},
+						{
+							"type": "Declaration",
+							"start": 168,
+							"end": 185,
+							"property": "background",
+							"value": "#0f08"
+						},
+						{
+							"type": "Declaration",
+							"start": 211,
+							"end": 230,
 							"property": "background",
 							"value": "#ff0000"
 						},
 						{
 							"type": "Declaration",
-							"start": 164,
-							"end": 178,
+							"start": 234,
+							"end": 248,
 							"property": "color",
 							"value": "#00ff00"
 						},
 						{
 							"type": "Declaration",
-							"start": 182,
-							"end": 207,
+							"start": 252,
+							"end": 277,
 							"property": "background-color",
 							"value": "#ffffff"
 						},
 						{
 							"type": "Declaration",
-							"start": 211,
-							"end": 232,
+							"start": 281,
+							"end": 302,
 							"property": "border-color",
 							"value": "#ff1234"
+						},
+						{
+							"type": "Declaration",
+							"start": 339,
+							"end": 355,
+							"property": "color",
+							"value": "#ff0000aa"
+						},
+						{
+							"type": "Declaration",
+							"start": 359,
+							"end": 380,
+							"property": "background",
+							"value": "#00ff0080"
 						}
 					]
 				},
 				"start": 9,
-				"end": 236
+				"end": 384
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 237,
-			"styles": "\n\tdiv {\n\t\t/* 3-char format */\n\t\tcolor: #fff;\n\t\tbackground: #f00;\n\t\tborder-color: #0f0;\n\t\toutline-color: #00f;\n\t\t/* 6-char format */\n\t\tbackground: #ff0000;\n\t\tcolor: #00ff00;\n\t\tbackground-color: #ffffff;\n\t\tborder-color: #ff1234;\n\t}\n",
+			"end": 385,
+			"styles": "\n\tdiv {\n\t\t/* 3-char format */\n\t\tcolor: #fff;\n\t\tbackground: #f00;\n\t\tborder-color: #0f0;\n\t\toutline-color: #00f;\n\t\t/* 4-char format with alpha */\n\t\tcolor: #f00a;\n\t\tbackground: #0f08;\n\t\t/* 6-char format */\n\t\tbackground: #ff0000;\n\t\tcolor: #00ff00;\n\t\tbackground-color: #ffffff;\n\t\tborder-color: #ff1234;\n\t\t/* 8-char format with alpha */\n\t\tcolor: #ff0000aa;\n\t\tbackground: #00ff0080;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
-	"start": null,
-	"end": null,
+	"start": 0,
+	"end": 394,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

@@ -16,23 +16,23 @@
 	// Optional computed access
 	const i = obj ?. [ key ];
 	const j = arr ?. [ index ] ?. value;
-	const k = config ?. [ section ] ?. [ item ];
+	const k = obj1 ?. [ key1 ] ?. [ key2 ];
 
 	// Optional method calls
 	const l = obj ?. method(  );
 	const m = obj ?. method ?. (  );
-	const n = service ?. getData ?. ();
+	const n = obj1 ?. fn ?. ();
 
 	// Chained method calls
 	const o = obj ?. first ?. second(  );
-	const p = api ?. fetch(  ) ?. json ?. ();
+	const p = obj1 ?. fn1(  ) ?. fn2 ?. ();
 
 	// Optional call with arguments
 	const q = fn ?. ( 1 , 2 , 3 );
 	const r = obj ?. method ?. ( a , b , c );
 
 	// Complex expressions
-	const s = items ?. [ 0 ] ?. name;
-	const t = data ?. results ?. [ 0 ] ?. value;
-	const u = config ?. settings ?. [ key ] ?. trim ?. ();
+	const s = arr1 ?. [ 0 ] ?. name;
+	const t = obj1 ?. arr ?. [ 0 ] ?. value;
+	const u = obj1 ?. obj2 ?. [ key ] ?. trim ?. ();
 </script>

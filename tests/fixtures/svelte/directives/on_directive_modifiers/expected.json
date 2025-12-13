@@ -1,0 +1,553 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 347,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 39,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 7,
+						"character": 7
+					}
+				},
+				"attributes": [
+					{
+						"start": 8,
+						"end": 29,
+						"type": "OnDirective",
+						"name": "click",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 8,
+								"character": 8
+							},
+							"end": {
+								"line": 1,
+								"column": 24,
+								"character": 24
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 26,
+							"end": 28,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 26
+								},
+								"end": {
+									"line": 1,
+									"column": 28
+								}
+							},
+							"name": "fn"
+						},
+						"modifiers": [
+							"passive"
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 39,
+				"end": 40,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 40,
+				"end": 82,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 41
+					},
+					"end": {
+						"line": 2,
+						"column": 7,
+						"character": 47
+					}
+				},
+				"attributes": [
+					{
+						"start": 48,
+						"end": 72,
+						"type": "OnDirective",
+						"name": "click",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 8,
+								"character": 48
+							},
+							"end": {
+								"line": 2,
+								"column": 27,
+								"character": 67
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 69,
+							"end": 71,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 29
+								},
+								"end": {
+									"line": 2,
+									"column": 31
+								}
+							},
+							"name": "fn"
+						},
+						"modifiers": [
+							"nonpassive"
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 82,
+				"end": 83,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 83,
+				"end": 119,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 84
+					},
+					"end": {
+						"line": 3,
+						"column": 7,
+						"character": 90
+					}
+				},
+				"attributes": [
+					{
+						"start": 91,
+						"end": 109,
+						"type": "OnDirective",
+						"name": "click",
+						"name_loc": {
+							"start": {
+								"line": 3,
+								"column": 8,
+								"character": 91
+							},
+							"end": {
+								"line": 3,
+								"column": 21,
+								"character": 104
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 106,
+							"end": 108,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 23
+								},
+								"end": {
+									"line": 3,
+									"column": 25
+								}
+							},
+							"name": "fn"
+						},
+						"modifiers": [
+							"once"
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 119,
+				"end": 120,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 120,
+				"end": 159,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 121
+					},
+					"end": {
+						"line": 4,
+						"column": 7,
+						"character": 127
+					}
+				},
+				"attributes": [
+					{
+						"start": 128,
+						"end": 149,
+						"type": "OnDirective",
+						"name": "click",
+						"name_loc": {
+							"start": {
+								"line": 4,
+								"column": 8,
+								"character": 128
+							},
+							"end": {
+								"line": 4,
+								"column": 24,
+								"character": 144
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 146,
+							"end": 148,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 26
+								},
+								"end": {
+									"line": 4,
+									"column": 28
+								}
+							},
+							"name": "fn"
+						},
+						"modifiers": [
+							"capture"
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 159,
+				"end": 160,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 160,
+				"end": 196,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 161
+					},
+					"end": {
+						"line": 5,
+						"column": 7,
+						"character": 167
+					}
+				},
+				"attributes": [
+					{
+						"start": 168,
+						"end": 186,
+						"type": "OnDirective",
+						"name": "click",
+						"name_loc": {
+							"start": {
+								"line": 5,
+								"column": 8,
+								"character": 168
+							},
+							"end": {
+								"line": 5,
+								"column": 21,
+								"character": 181
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 183,
+							"end": 185,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 23
+								},
+								"end": {
+									"line": 5,
+									"column": 25
+								}
+							},
+							"name": "fn"
+						},
+						"modifiers": [
+							"self"
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 196,
+				"end": 197,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 197,
+				"end": 236,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 198
+					},
+					"end": {
+						"line": 6,
+						"column": 7,
+						"character": 204
+					}
+				},
+				"attributes": [
+					{
+						"start": 205,
+						"end": 226,
+						"type": "OnDirective",
+						"name": "click",
+						"name_loc": {
+							"start": {
+								"line": 6,
+								"column": 8,
+								"character": 205
+							},
+							"end": {
+								"line": 6,
+								"column": 24,
+								"character": 221
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 223,
+							"end": 225,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 26
+								},
+								"end": {
+									"line": 6,
+									"column": 28
+								}
+							},
+							"name": "fn"
+						},
+						"modifiers": [
+							"trusted"
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 236,
+				"end": 237,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 237,
+				"end": 293,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 238
+					},
+					"end": {
+						"line": 7,
+						"column": 7,
+						"character": 244
+					}
+				},
+				"attributes": [
+					{
+						"start": 245,
+						"end": 283,
+						"type": "OnDirective",
+						"name": "click",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 8,
+								"character": 245
+							},
+							"end": {
+								"line": 7,
+								"column": 41,
+								"character": 278
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 280,
+							"end": 282,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 43
+								},
+								"end": {
+									"line": 7,
+									"column": 45
+								}
+							},
+							"name": "fn"
+						},
+						"modifiers": [
+							"stopImmediatePropagation"
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 293,
+				"end": 294,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 294,
+				"end": 346,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 295
+					},
+					"end": {
+						"line": 8,
+						"column": 7,
+						"character": 301
+					}
+				},
+				"attributes": [
+					{
+						"start": 302,
+						"end": 336,
+						"type": "OnDirective",
+						"name": "click",
+						"name_loc": {
+							"start": {
+								"line": 8,
+								"column": 8,
+								"character": 302
+							},
+							"end": {
+								"line": 8,
+								"column": 37,
+								"character": 331
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 333,
+							"end": 335,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 39
+								},
+								"end": {
+									"line": 8,
+									"column": 41
+								}
+							},
+							"name": "fn"
+						},
+						"modifiers": [
+							"passive",
+							"once",
+							"capture"
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

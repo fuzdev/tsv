@@ -32,6 +32,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 smallvec = "1.11"
 string-interner = "0.19"
 thiserror = "2"
+unicode-ident = "1.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -135,6 +136,13 @@ serde_json.workspace = true
 tsv_debug = { path = "crates/tsv_debug" }
 tsv_cli = { path = "crates/tsv_cli" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+futures-util = "0.3"
 
 [lints]
 workspace = true
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

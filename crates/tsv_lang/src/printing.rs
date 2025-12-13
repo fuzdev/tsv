@@ -275,7 +275,7 @@ pub fn has_newline_between(source: &str, start: u32, end: u32) -> bool {
     source[start..end].contains('\n')
 }
 
-/// Check if a line ends with a JavaScript/TypeScript string line continuation
+/// Check if a line ends with a JS/TypeScript string line continuation
 ///
 /// A line continuation is a backslash (`\`) at the end of a line inside a string literal.
 /// This causes the newline to be escaped, allowing the string to span multiple lines

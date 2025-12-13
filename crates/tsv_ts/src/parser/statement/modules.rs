@@ -2,6 +2,7 @@
 
 use crate::ast::internal::*;
 use crate::lexer::{KeywordKind, TokenKind};
+use string_interner::DefaultSymbol;
 use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
@@ -18,22 +19,63 @@ impl<'a> Parser<'a> {
         self.advance()?;
 
         match self.current_kind() {
+            // export = expr; (TypeScript CommonJS-style export)
+            TokenKind::Equals => {
+                self.advance()?; // consume '='
+                let expression = self.parse_expression()?;
+                let end = expression.span().end;
+                self.semicolon()?;
+                Ok(Statement::TSExportAssignment(TSExportAssignment {
+                    expression,
+                    span: Span::new(start as u32, end),
+                }))
+            }
             // export default ...
             TokenKind::Keyword(KeywordKind::Default) => {
                 self.parse_export_default_declaration(start as u32)
             }
             // export * from "y" or export * as ns from "y"
-            TokenKind::Star => self.parse_export_all_declaration(start as u32),
+            TokenKind::Star => self.parse_export_all_declaration(start as u32, ExportKind::Value),
             // export { x, y as z } or export { x } from "y"
             TokenKind::BraceOpen => self.parse_export_named_specifiers(start as u32),
-            // export const/let/var/function/class
-            TokenKind::Keyword(KeywordKind::Const | KeywordKind::Let | KeywordKind::Var) => {
+            // export const/let/var
+            TokenKind::Keyword(KeywordKind::Let | KeywordKind::Var) => {
                 let declaration = self.parse_variable_declaration()?;
                 let end = declaration.span().end;
                 Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
                     declaration: Some(Box::new(declaration)),
                     specifiers: Vec::new(),
                     source: None,
+                    export_kind: ExportKind::Value,
+                    span: Span::new(start as u32, end),
+                }))
+            }
+            // export const ... or export const enum ...
+            TokenKind::Keyword(KeywordKind::Const) => {
+                // Check for `export const enum` declaration
+                let declaration = if self.peek_kind() == TokenKind::Keyword(KeywordKind::Enum) {
+                    self.parse_enum_declaration(true, false)?
+                } else {
+                    self.parse_variable_declaration()?
+                };
+                let end = declaration.span().end;
+                Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
+                    declaration: Some(Box::new(declaration)),
+                    specifiers: Vec::new(),
+                    source: None,
+                    export_kind: ExportKind::Value,
+                    span: Span::new(start as u32, end),
+                }))
+            }
+            // export enum ...
+            TokenKind::Keyword(KeywordKind::Enum) => {
+                let declaration = self.parse_enum_declaration(false, false)?;
+                let end = declaration.span().end;
+                Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
+                    declaration: Some(Box::new(declaration)),
+                    specifiers: Vec::new(),
+                    source: None,
+                    export_kind: ExportKind::Value,
                     span: Span::new(start as u32, end),
                 }))
             }
@@ -44,6 +86,19 @@ impl<'a> Parser<'a> {
                     declaration: Some(Box::new(declaration)),
                     specifiers: Vec::new(),
                     source: None,
+                    export_kind: ExportKind::Value,
+                    span: Span::new(start as u32, end),
+                }))
+            }
+            TokenKind::Keyword(KeywordKind::Async) => {
+                // export async function foo() {}
+                let declaration = self.parse_async_function_declaration()?;
+                let end = declaration.span().end;
+                Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
+                    declaration: Some(Box::new(declaration)),
+                    specifiers: Vec::new(),
+                    source: None,
+                    export_kind: ExportKind::Value,
                     span: Span::new(start as u32, end),
                 }))
             }
@@ -54,10 +109,97 @@ impl<'a> Parser<'a> {
                     declaration: Some(Box::new(declaration)),
                     specifiers: Vec::new(),
                     source: None,
+                    export_kind: ExportKind::Value,
                     span: Span::new(start as u32, end),
                 }))
             }
-            // TODO: export type { T } - TypeScript type exports
+            // export type X = T or export interface X { } or export declare function/class
+            TokenKind::Identifier => {
+                let value = self.current_value().to_string();
+                match value.as_str() {
+                    "type" => {
+                        // Could be:
+                        // - export type { Name } from "..." - type-only re-export
+                        // - export type * from "..." - type-only re-export all
+                        // - export type * as ns from "..." - type-only namespace re-export
+                        // - export type X = T - type alias declaration
+                        self.advance()?; // consume 'type'
+
+                        if matches!(self.current_kind(), TokenKind::BraceOpen) {
+                            // export type { Name } from "..." - type-only re-export
+                            self.parse_export_type_specifiers(start as u32)
+                        } else if matches!(self.current_kind(), TokenKind::Star) {
+                            // export type * from "..." or export type * as ns from "..."
+                            self.parse_export_all_declaration(start as u32, ExportKind::Type)
+                        } else {
+                            // export type X = T - type alias declaration
+                            let declaration = self.parse_type_alias_declaration_inner()?;
+                            let end = declaration.span().end;
+                            Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
+                                declaration: Some(Box::new(declaration)),
+                                specifiers: Vec::new(),
+                                source: None,
+                                export_kind: ExportKind::Value,
+                                span: Span::new(start as u32, end),
+                            }))
+                        }
+                    }
+                    "interface" => {
+                        // export interface X { }
+                        let declaration = self.parse_interface_declaration()?;
+                        let end = declaration.span().end;
+                        Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
+                            declaration: Some(Box::new(declaration)),
+                            specifiers: Vec::new(),
+                            source: None,
+                            export_kind: ExportKind::Value,
+                            span: Span::new(start as u32, end),
+                        }))
+                    }
+                    "declare" => {
+                        // export declare function/class
+                        let declaration = self.parse_declare_statement()?;
+                        let end = declaration.span().end;
+                        Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
+                            declaration: Some(Box::new(declaration)),
+                            specifiers: Vec::new(),
+                            source: None,
+                            export_kind: ExportKind::Value,
+                            span: Span::new(start as u32, end),
+                        }))
+                    }
+                    "abstract" => {
+                        // export abstract class Foo {}
+                        let declaration = self.parse_abstract_class()?;
+                        let end = declaration.span().end;
+                        Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
+                            declaration: Some(Box::new(declaration)),
+                            specifiers: Vec::new(),
+                            source: None,
+                            export_kind: ExportKind::Value,
+                            span: Span::new(start as u32, end),
+                        }))
+                    }
+                    "namespace" | "module" => {
+                        // export namespace/module
+                        let declaration = self.parse_module_declaration(false, false)?;
+                        let end = declaration.span().end;
+                        Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
+                            declaration: Some(Box::new(declaration)),
+                            specifiers: Vec::new(),
+                            source: None,
+                            export_kind: ExportKind::Value,
+                            span: Span::new(start as u32, end),
+                        }))
+                    }
+                    _ => Err(ParseError::InvalidSyntax {
+                        message: "Expected declaration, '{', '*', or 'default' after 'export'"
+                            .to_string(),
+                        position: self.current_pos().0,
+                        context: None,
+                    }),
+                }
+            }
             _ => Err(ParseError::InvalidSyntax {
                 message: "Expected declaration, '{', '*', or 'default' after 'export'".to_string(),
                 position: self.current_pos().0,
@@ -97,21 +239,57 @@ impl<'a> Parser<'a> {
                     });
                 }
 
-                let mut func = self.parse_function_declaration_inner(false, true)?;
-                // Update span to include 'async' keyword
-                func.span = Span::new(async_start, func.span.end);
-                let end = func.span.end;
-                (ExportDefaultValue::FunctionDeclaration(Box::new(func)), end)
+                let result = self.parse_function_declaration_or_declare(false, true)?;
+                match result {
+                    ExportFunctionDeclaration::Declaration(mut func) => {
+                        // Update span to include 'async' keyword
+                        func.span = Span::new(async_start, func.span.end);
+                        let end = func.span.end;
+                        (ExportDefaultValue::FunctionDeclaration(Box::new(func)), end)
+                    }
+                    ExportFunctionDeclaration::Declare(mut func) => {
+                        func.span = Span::new(async_start, func.span.end);
+                        let end = func.span.end;
+                        (ExportDefaultValue::TSDeclareFunction(Box::new(func)), end)
+                    }
+                }
             }
             TokenKind::Keyword(KeywordKind::Function) => {
                 // Name is optional for export default function() {}
-                let func = self.parse_function_declaration_inner(false, false)?;
-                let end = func.span.end;
-                (ExportDefaultValue::FunctionDeclaration(Box::new(func)), end)
+                let result = self.parse_function_declaration_or_declare(false, false)?;
+                match result {
+                    ExportFunctionDeclaration::Declaration(func) => {
+                        let end = func.span.end;
+                        (ExportDefaultValue::FunctionDeclaration(Box::new(func)), end)
+                    }
+                    ExportFunctionDeclaration::Declare(func) => {
+                        let end = func.span.end;
+                        (ExportDefaultValue::TSDeclareFunction(Box::new(func)), end)
+                    }
+                }
             }
             TokenKind::Keyword(KeywordKind::Class) => {
                 // Name is optional for export default class {}
-                let class = self.parse_class_declaration_inner(false)?;
+                let class = self.parse_class_declaration_inner(false, false)?;
+                let end = class.span.end;
+                (ExportDefaultValue::ClassDeclaration(Box::new(class)), end)
+            }
+            TokenKind::Identifier if self.current_value() == "abstract" => {
+                // export default abstract class {}
+                let abstract_start = self.current_pos().0 as u32;
+                self.advance()?; // consume 'abstract'
+
+                if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Class)) {
+                    return Err(ParseError::InvalidSyntax {
+                        message: "Expected 'class' after 'abstract' in export default".to_string(),
+                        position: self.current_pos().0,
+                        context: None,
+                    });
+                }
+
+                let mut class = self.parse_class_declaration_inner(false, true)?;
+                // Update span to include 'abstract' keyword
+                class.span = Span::new(abstract_start, class.span.end);
                 let end = class.span.end;
                 (ExportDefaultValue::ClassDeclaration(Box::new(class)), end)
             }
@@ -140,7 +318,13 @@ impl<'a> Parser<'a> {
     /// Parse export all declaration:
     /// - `export * from "y"`
     /// - `export * as ns from "y"`
-    fn parse_export_all_declaration(&mut self, start: u32) -> Result<Statement, ParseError> {
+    /// - `export type * from "y"`
+    /// - `export type * as ns from "y"`
+    fn parse_export_all_declaration(
+        &mut self,
+        start: u32,
+        export_kind: ExportKind,
+    ) -> Result<Statement, ParseError> {
         // Consume '*'
         debug_assert!(matches!(self.current_kind(), TokenKind::Star));
         self.advance()?;
@@ -157,7 +341,7 @@ impl<'a> Parser<'a> {
                 });
             }
             let (id_start, id_end) = self.current_pos();
-            let name = self.intern(self.current_value());
+            let name = self.intern_identifier();
             self.advance()?;
 
             Some(Identifier {
@@ -188,6 +372,7 @@ impl<'a> Parser<'a> {
         Ok(Statement::ExportAllDeclaration(ExportAllDeclaration {
             exported,
             source,
+            export_kind,
             span: Span::new(start, end),
         }))
     }
@@ -207,7 +392,13 @@ impl<'a> Parser<'a> {
             let (spec_start, _) = self.current_pos();
 
             // Parse local name (the name being exported)
-            if !matches!(self.current_kind(), TokenKind::Identifier) {
+            // Can be an identifier or 'default' keyword (for re-exporting default)
+            let is_valid_local = matches!(self.current_kind(), TokenKind::Identifier)
+                || matches!(
+                    self.current_kind(),
+                    TokenKind::Keyword(KeywordKind::Default)
+                );
+            if !is_valid_local {
                 return Err(ParseError::InvalidSyntax {
                     message: "Expected identifier in export specifier".to_string(),
                     position: self.current_pos().0,
@@ -215,7 +406,7 @@ impl<'a> Parser<'a> {
                 });
             }
             let (local_start, local_end) = self.current_pos();
-            let local_name = self.intern(self.current_value());
+            let local_name = self.intern_identifier();
             self.advance()?;
 
             let local = Identifier {
@@ -238,7 +429,7 @@ impl<'a> Parser<'a> {
                         });
                     }
                     let (exp_start, exp_end) = self.current_pos();
-                    let exported_name = self.intern(self.current_value());
+                    let exported_name = self.intern_identifier();
                     self.advance()?;
 
                     (
@@ -296,6 +487,120 @@ impl<'a> Parser<'a> {
             declaration: None,
             specifiers,
             source,
+            export_kind: ExportKind::Value,
+            span: Span::new(start, end),
+        }))
+    }
+
+    /// Parse type-only export specifiers: `export type { Name } from "..."`
+    fn parse_export_type_specifiers(&mut self, start: u32) -> Result<Statement, ParseError> {
+        // Consume '{'
+        debug_assert!(matches!(self.current_kind(), TokenKind::BraceOpen));
+        self.advance()?;
+
+        let mut specifiers = Vec::new();
+
+        // Parse specifiers until '}'
+        while !matches!(self.current_kind(), TokenKind::BraceClose) {
+            let (spec_start, _) = self.current_pos();
+
+            // Parse local name (the name being exported)
+            // Can be an identifier or 'default' keyword (for re-exporting default)
+            let is_valid_local = matches!(self.current_kind(), TokenKind::Identifier)
+                || matches!(
+                    self.current_kind(),
+                    TokenKind::Keyword(KeywordKind::Default)
+                );
+            if !is_valid_local {
+                return Err(ParseError::InvalidSyntax {
+                    message: "Expected identifier in export specifier".to_string(),
+                    position: self.current_pos().0,
+                    context: None,
+                });
+            }
+            let (local_start, local_end) = self.current_pos();
+            let local_name = self.intern_identifier();
+            self.advance()?;
+
+            let local = Identifier {
+                name: local_name,
+                optional: false,
+                type_annotation: None,
+                span: Span::new(local_start as u32, local_end as u32),
+            };
+
+            // Check for 'as exported_name'
+            let (exported, spec_end) =
+                if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As)) {
+                    self.advance()?; // consume 'as'
+
+                    if !matches!(self.current_kind(), TokenKind::Identifier) {
+                        return Err(ParseError::InvalidSyntax {
+                            message: "Expected identifier after 'as' in export".to_string(),
+                            position: self.current_pos().0,
+                            context: None,
+                        });
+                    }
+                    let (exp_start, exp_end) = self.current_pos();
+                    let exported_name = self.intern_identifier();
+                    self.advance()?;
+
+                    (
+                        Identifier {
+                            name: exported_name,
+                            optional: false,
+                            type_annotation: None,
+                            span: Span::new(exp_start as u32, exp_end as u32),
+                        },
+                        exp_end as u32,
+                    )
+                } else {
+                    (local.clone(), local_end as u32)
+                };
+
+            specifiers.push(ExportSpecifier {
+                local,
+                exported,
+                span: Span::new(spec_start as u32, spec_end),
+            });
+
+            // Check for comma
+            if matches!(self.current_kind(), TokenKind::Comma) {
+                self.advance()?;
+            } else {
+                break;
+            }
+        }
+
+        // Expect '}'
+        if !matches!(self.current_kind(), TokenKind::BraceClose) {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected '}' to close export specifiers".to_string(),
+                position: self.current_pos().0,
+                context: None,
+            });
+        }
+        let (_, brace_end) = self.current_pos();
+        self.advance()?;
+
+        // Check for 'from "source"' - type exports typically require a source
+        let (source, end) = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::From))
+        {
+            self.advance()?;
+            let source = self.parse_string_literal()?;
+            let end = source.span.end;
+            (Some(source), end)
+        } else {
+            (None, brace_end as u32)
+        };
+
+        self.semicolon()?;
+
+        Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
+            declaration: None,
+            specifiers,
+            source,
+            export_kind: ExportKind::Type,
             span: Span::new(start, end),
         }))
     }
@@ -360,10 +665,23 @@ impl<'a> Parser<'a> {
         };
 
         // Parse default import: `import x from "y"` or `import type X from "y"`
+        // Also check for `import x = require("y")` or `import x = A.B`
         if matches!(self.current_kind(), TokenKind::Identifier) {
             let (id_start, id_end) = self.current_pos();
-            let symbol = self.intern(self.current_value());
+            let symbol = self.intern_identifier();
             self.advance()?;
+
+            // Check for `import x = ...` (TSImportEqualsDeclaration)
+            if matches!(self.current_kind(), TokenKind::Equals) {
+                return self.parse_import_equals_declaration(
+                    start,
+                    id_start,
+                    id_end,
+                    symbol,
+                    import_kind,
+                    false, // is_export
+                );
+            }
 
             specifiers.push(ImportSpecifier::Default(ImportDefaultSpecifier {
                 local: Identifier {
@@ -405,7 +723,7 @@ impl<'a> Parser<'a> {
                 });
             }
             let (id_start, id_end) = self.current_pos();
-            let symbol = self.intern(self.current_value());
+            let symbol = self.intern_identifier();
             self.advance()?;
 
             specifiers.push(ImportSpecifier::Namespace(ImportNamespaceSpecifier {
@@ -451,7 +769,7 @@ impl<'a> Parser<'a> {
                     });
                 }
                 let (imp_start, imp_end) = self.current_pos();
-                let imported_symbol = self.intern(self.current_value());
+                let imported_symbol = self.intern_identifier();
                 self.advance()?;
 
                 let imported = Identifier {
@@ -475,7 +793,7 @@ impl<'a> Parser<'a> {
                             });
                         }
                         let (local_start, local_end) = self.current_pos();
-                        let local_symbol = self.intern(self.current_value());
+                        let local_symbol = self.intern_identifier();
                         self.advance()?;
 
                         (
@@ -580,7 +898,7 @@ impl<'a> Parser<'a> {
                 });
             }
             let (key_start, key_end) = self.current_pos();
-            let key_symbol = self.intern(self.current_value());
+            let key_symbol = self.intern_identifier();
             self.advance()?;
 
             let key = Identifier {
@@ -629,5 +947,76 @@ impl<'a> Parser<'a> {
         self.expect(&TokenKind::BraceClose)?;
 
         Ok((attributes, Some(brace_end as u32)))
+    }
+
+    /// Parse `import x = require("y")` or `import x = A.B`
+    fn parse_import_equals_declaration(
+        &mut self,
+        start: usize,
+        id_start: usize,
+        id_end: usize,
+        symbol: DefaultSymbol,
+        import_kind: ImportKind,
+        is_export: bool,
+    ) -> Result<Statement, ParseError> {
+        // Already have: import <identifier>
+        // Current token is `=`
+        self.advance()?; // consume `=`
+
+        let id = Identifier {
+            name: symbol,
+            optional: false,
+            type_annotation: None,
+            span: Span::new(id_start as u32, id_end as u32),
+        };
+
+        let module_reference = if matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() == "require"
+            && matches!(self.peek_kind(), TokenKind::ParenOpen)
+        {
+            // `require("module")`
+            let ref_start = self.current_pos().0;
+            self.advance()?; // consume `require`
+            self.advance()?; // consume `(`
+
+            // Parse string literal
+            if !matches!(self.current_kind(), TokenKind::String) {
+                return Err(ParseError::InvalidSyntax {
+                    message: "Expected string literal in require()".to_string(),
+                    position: self.current_pos().0,
+                    context: None,
+                });
+            }
+            let expression = self.parse_string_literal()?;
+
+            // Handle optional trailing comma before closing paren
+            if matches!(self.current_kind(), TokenKind::Comma) {
+                self.advance()?;
+            }
+
+            let (_, ref_end) = self.current_pos();
+            self.expect(&TokenKind::ParenClose)?;
+
+            TSModuleReference::ExternalModuleReference(TSExternalModuleReference {
+                expression,
+                span: Span::new(ref_start as u32, ref_end as u32),
+            })
+        } else {
+            // `A.B.C` (entity name)
+            TSModuleReference::EntityName(self.parse_entity_name()?)
+        };
+
+        self.semicolon()?;
+        let end = self.prev_token_end() as u32;
+
+        Ok(Statement::TSImportEqualsDeclaration(
+            TSImportEqualsDeclaration {
+                id,
+                module_reference,
+                import_kind,
+                is_export,
+                span: Span::new(start as u32, end),
+            },
+        ))
     }
 }

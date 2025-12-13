@@ -69,7 +69,7 @@ impl<'a> Printer<'a> {
                     el.kind,
                     SpecialElementKind::SlotElement
                         | SpecialElementKind::SvelteFragment
-                        | SpecialElementKind::SvelteComponent
+                        | SpecialElementKind::SvelteComponent { .. }
                         | SpecialElementKind::SvelteSelf
                 )
             }

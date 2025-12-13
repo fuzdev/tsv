@@ -1,0 +1,1019 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 455,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 454,
+				"name": "svg",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 5,
+						"end": 26,
+						"name": "viewBox",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 5,
+								"character": 5
+							},
+							"end": {
+								"line": 1,
+								"column": 12,
+								"character": 12
+							}
+						},
+						"value": [
+							{
+								"start": 14,
+								"end": 25,
+								"type": "Text",
+								"raw": "0 0 100 100",
+								"data": "0 0 100 100"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 27,
+						"end": 61,
+						"name": "xmlns",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 27,
+								"character": 27
+							},
+							"end": {
+								"line": 1,
+								"column": 32,
+								"character": 32
+							}
+						},
+						"value": [
+							{
+								"start": 34,
+								"end": 60,
+								"type": "Text",
+								"raw": "http://www.w3.org/2000/svg",
+								"data": "http://www.w3.org/2000/svg"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 62,
+							"end": 64,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 64,
+							"end": 121,
+							"name": "rect",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 65
+								},
+								"end": {
+									"line": 2,
+									"column": 6,
+									"character": 69
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 70,
+									"end": 75,
+									"name": "x",
+									"name_loc": {
+										"start": {
+											"line": 2,
+											"column": 7,
+											"character": 70
+										},
+										"end": {
+											"line": 2,
+											"column": 8,
+											"character": 71
+										}
+									},
+									"value": [
+										{
+											"start": 73,
+											"end": 74,
+											"type": "Text",
+											"raw": "0",
+											"data": "0"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 76,
+									"end": 81,
+									"name": "y",
+									"name_loc": {
+										"start": {
+											"line": 2,
+											"column": 13,
+											"character": 76
+										},
+										"end": {
+											"line": 2,
+											"column": 14,
+											"character": 77
+										}
+									},
+									"value": [
+										{
+											"start": 79,
+											"end": 80,
+											"type": "Text",
+											"raw": "0",
+											"data": "0"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 82,
+									"end": 93,
+									"name": "width",
+									"name_loc": {
+										"start": {
+											"line": 2,
+											"column": 19,
+											"character": 82
+										},
+										"end": {
+											"line": 2,
+											"column": 24,
+											"character": 87
+										}
+									},
+									"value": [
+										{
+											"start": 89,
+											"end": 92,
+											"type": "Text",
+											"raw": "100",
+											"data": "100"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 94,
+									"end": 106,
+									"name": "height",
+									"name_loc": {
+										"start": {
+											"line": 2,
+											"column": 31,
+											"character": 94
+										},
+										"end": {
+											"line": 2,
+											"column": 37,
+											"character": 100
+										}
+									},
+									"value": [
+										{
+											"start": 102,
+											"end": 105,
+											"type": "Text",
+											"raw": "100",
+											"data": "100"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 107,
+									"end": 118,
+									"name": "fill",
+									"name_loc": {
+										"start": {
+											"line": 2,
+											"column": 44,
+											"character": 107
+										},
+										"end": {
+											"line": 2,
+											"column": 48,
+											"character": 111
+										}
+									},
+									"value": [
+										{
+											"start": 113,
+											"end": 117,
+											"type": "Text",
+											"raw": "blue",
+											"data": "blue"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 121,
+							"end": 123,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 123,
+							"end": 167,
+							"name": "circle",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 124
+								},
+								"end": {
+									"line": 3,
+									"column": 8,
+									"character": 130
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 131,
+									"end": 138,
+									"name": "cx",
+									"name_loc": {
+										"start": {
+											"line": 3,
+											"column": 9,
+											"character": 131
+										},
+										"end": {
+											"line": 3,
+											"column": 11,
+											"character": 133
+										}
+									},
+									"value": [
+										{
+											"start": 135,
+											"end": 137,
+											"type": "Text",
+											"raw": "50",
+											"data": "50"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 139,
+									"end": 146,
+									"name": "cy",
+									"name_loc": {
+										"start": {
+											"line": 3,
+											"column": 17,
+											"character": 139
+										},
+										"end": {
+											"line": 3,
+											"column": 19,
+											"character": 141
+										}
+									},
+									"value": [
+										{
+											"start": 143,
+											"end": 145,
+											"type": "Text",
+											"raw": "50",
+											"data": "50"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 147,
+									"end": 153,
+									"name": "r",
+									"name_loc": {
+										"start": {
+											"line": 3,
+											"column": 25,
+											"character": 147
+										},
+										"end": {
+											"line": 3,
+											"column": 26,
+											"character": 148
+										}
+									},
+									"value": [
+										{
+											"start": 150,
+											"end": 152,
+											"type": "Text",
+											"raw": "40",
+											"data": "40"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 154,
+									"end": 164,
+									"name": "fill",
+									"name_loc": {
+										"start": {
+											"line": 3,
+											"column": 32,
+											"character": 154
+										},
+										"end": {
+											"line": 3,
+											"column": 36,
+											"character": 158
+										}
+									},
+									"value": [
+										{
+											"start": 160,
+											"end": 163,
+											"type": "Text",
+											"raw": "red",
+											"data": "red"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 167,
+							"end": 169,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 169,
+							"end": 210,
+							"name": "path",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 2,
+									"character": 170
+								},
+								"end": {
+									"line": 4,
+									"column": 6,
+									"character": 174
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 175,
+									"end": 192,
+									"name": "d",
+									"name_loc": {
+										"start": {
+											"line": 4,
+											"column": 7,
+											"character": 175
+										},
+										"end": {
+											"line": 4,
+											"column": 8,
+											"character": 176
+										}
+									},
+									"value": [
+										{
+											"start": 178,
+											"end": 191,
+											"type": "Text",
+											"raw": "M10 10 L90 90",
+											"data": "M10 10 L90 90"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 193,
+									"end": 207,
+									"name": "stroke",
+									"name_loc": {
+										"start": {
+											"line": 4,
+											"column": 25,
+											"character": 193
+										},
+										"end": {
+											"line": 4,
+											"column": 31,
+											"character": 199
+										}
+									},
+									"value": [
+										{
+											"start": 201,
+											"end": 206,
+											"type": "Text",
+											"raw": "black",
+											"data": "black"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 210,
+							"end": 212,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 212,
+							"end": 267,
+							"name": "line",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 2,
+									"character": 213
+								},
+								"end": {
+									"line": 5,
+									"column": 6,
+									"character": 217
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 218,
+									"end": 224,
+									"name": "x1",
+									"name_loc": {
+										"start": {
+											"line": 5,
+											"column": 7,
+											"character": 218
+										},
+										"end": {
+											"line": 5,
+											"column": 9,
+											"character": 220
+										}
+									},
+									"value": [
+										{
+											"start": 222,
+											"end": 223,
+											"type": "Text",
+											"raw": "0",
+											"data": "0"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 225,
+									"end": 233,
+									"name": "y1",
+									"name_loc": {
+										"start": {
+											"line": 5,
+											"column": 14,
+											"character": 225
+										},
+										"end": {
+											"line": 5,
+											"column": 16,
+											"character": 227
+										}
+									},
+									"value": [
+										{
+											"start": 229,
+											"end": 232,
+											"type": "Text",
+											"raw": "100",
+											"data": "100"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 234,
+									"end": 242,
+									"name": "x2",
+									"name_loc": {
+										"start": {
+											"line": 5,
+											"column": 23,
+											"character": 234
+										},
+										"end": {
+											"line": 5,
+											"column": 25,
+											"character": 236
+										}
+									},
+									"value": [
+										{
+											"start": 238,
+											"end": 241,
+											"type": "Text",
+											"raw": "100",
+											"data": "100"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 243,
+									"end": 249,
+									"name": "y2",
+									"name_loc": {
+										"start": {
+											"line": 5,
+											"column": 32,
+											"character": 243
+										},
+										"end": {
+											"line": 5,
+											"column": 34,
+											"character": 245
+										}
+									},
+									"value": [
+										{
+											"start": 247,
+											"end": 248,
+											"type": "Text",
+											"raw": "0",
+											"data": "0"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 250,
+									"end": 264,
+									"name": "stroke",
+									"name_loc": {
+										"start": {
+											"line": 5,
+											"column": 39,
+											"character": 250
+										},
+										"end": {
+											"line": 5,
+											"column": 45,
+											"character": 256
+										}
+									},
+									"value": [
+										{
+											"start": 258,
+											"end": 263,
+											"type": "Text",
+											"raw": "green",
+											"data": "green"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 267,
+							"end": 269,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 269,
+							"end": 326,
+							"name": "ellipse",
+							"name_loc": {
+								"start": {
+									"line": 6,
+									"column": 2,
+									"character": 270
+								},
+								"end": {
+									"line": 6,
+									"column": 9,
+									"character": 277
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 278,
+									"end": 285,
+									"name": "cx",
+									"name_loc": {
+										"start": {
+											"line": 6,
+											"column": 10,
+											"character": 278
+										},
+										"end": {
+											"line": 6,
+											"column": 12,
+											"character": 280
+										}
+									},
+									"value": [
+										{
+											"start": 282,
+											"end": 284,
+											"type": "Text",
+											"raw": "50",
+											"data": "50"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 286,
+									"end": 293,
+									"name": "cy",
+									"name_loc": {
+										"start": {
+											"line": 6,
+											"column": 18,
+											"character": 286
+										},
+										"end": {
+											"line": 6,
+											"column": 20,
+											"character": 288
+										}
+									},
+									"value": [
+										{
+											"start": 290,
+											"end": 292,
+											"type": "Text",
+											"raw": "50",
+											"data": "50"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 294,
+									"end": 301,
+									"name": "rx",
+									"name_loc": {
+										"start": {
+											"line": 6,
+											"column": 26,
+											"character": 294
+										},
+										"end": {
+											"line": 6,
+											"column": 28,
+											"character": 296
+										}
+									},
+									"value": [
+										{
+											"start": 298,
+											"end": 300,
+											"type": "Text",
+											"raw": "40",
+											"data": "40"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 302,
+									"end": 309,
+									"name": "ry",
+									"name_loc": {
+										"start": {
+											"line": 6,
+											"column": 34,
+											"character": 302
+										},
+										"end": {
+											"line": 6,
+											"column": 36,
+											"character": 304
+										}
+									},
+									"value": [
+										{
+											"start": 306,
+											"end": 308,
+											"type": "Text",
+											"raw": "20",
+											"data": "20"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 310,
+									"end": 323,
+									"name": "fill",
+									"name_loc": {
+										"start": {
+											"line": 6,
+											"column": 42,
+											"character": 310
+										},
+										"end": {
+											"line": 6,
+											"column": 46,
+											"character": 314
+										}
+									},
+									"value": [
+										{
+											"start": 316,
+											"end": 322,
+											"type": "Text",
+											"raw": "yellow",
+											"data": "yellow"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 326,
+							"end": 328,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 328,
+							"end": 380,
+							"name": "polygon",
+							"name_loc": {
+								"start": {
+									"line": 7,
+									"column": 2,
+									"character": 329
+								},
+								"end": {
+									"line": 7,
+									"column": 9,
+									"character": 336
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 337,
+									"end": 363,
+									"name": "points",
+									"name_loc": {
+										"start": {
+											"line": 7,
+											"column": 10,
+											"character": 337
+										},
+										"end": {
+											"line": 7,
+											"column": 16,
+											"character": 343
+										}
+									},
+									"value": [
+										{
+											"start": 345,
+											"end": 362,
+											"type": "Text",
+											"raw": "50,10 90,90 10,90",
+											"data": "50,10 90,90 10,90"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 364,
+									"end": 377,
+									"name": "fill",
+									"name_loc": {
+										"start": {
+											"line": 7,
+											"column": 37,
+											"character": 364
+										},
+										"end": {
+											"line": 7,
+											"column": 41,
+											"character": 368
+										}
+									},
+									"value": [
+										{
+											"start": 370,
+											"end": 376,
+											"type": "Text",
+											"raw": "purple",
+											"data": "purple"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 380,
+							"end": 382,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 382,
+							"end": 447,
+							"name": "polyline",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 2,
+									"character": 383
+								},
+								"end": {
+									"line": 8,
+									"column": 10,
+									"character": 391
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 392,
+									"end": 416,
+									"name": "points",
+									"name_loc": {
+										"start": {
+											"line": 8,
+											"column": 11,
+											"character": 392
+										},
+										"end": {
+											"line": 8,
+											"column": 17,
+											"character": 398
+										}
+									},
+									"value": [
+										{
+											"start": 400,
+											"end": 415,
+											"type": "Text",
+											"raw": "0,0 50,50 100,0",
+											"data": "0,0 50,50 100,0"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 417,
+									"end": 428,
+									"name": "fill",
+									"name_loc": {
+										"start": {
+											"line": 8,
+											"column": 36,
+											"character": 417
+										},
+										"end": {
+											"line": 8,
+											"column": 40,
+											"character": 421
+										}
+									},
+									"value": [
+										{
+											"start": 423,
+											"end": 427,
+											"type": "Text",
+											"raw": "none",
+											"data": "none"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 429,
+									"end": 444,
+									"name": "stroke",
+									"name_loc": {
+										"start": {
+											"line": 8,
+											"column": 48,
+											"character": 429
+										},
+										"end": {
+											"line": 8,
+											"column": 54,
+											"character": 435
+										}
+									},
+									"value": [
+										{
+											"start": 437,
+											"end": 443,
+											"type": "Text",
+											"raw": "orange",
+											"data": "orange"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 447,
+							"end": 448,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

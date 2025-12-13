@@ -10,61 +10,12 @@
 use std::fmt::Write;
 
 use super::Printer;
+use super::expression_stringifier::{escape_single_quote_string, is_valid_js_identifier};
 use crate::ast::internal::{self, Expression, Literal, LiteralValue};
 use tsv_lang::SymbolResolver;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::{self, Doc};
-use tsv_lang::printing::{
-    StringFormatOptions, format_string_literal, has_blank_line_between, has_newline_between,
-    is_same_line,
-};
-
-/// Check if a string is a valid JavaScript identifier
-///
-/// Valid identifiers:
-/// - Start with a letter, underscore, or dollar sign
-/// - Contain only letters, digits, underscores, or dollar signs
-/// - Can be reserved words (prettier outputs them without quotes)
-pub(super) fn is_valid_js_identifier(s: &str) -> bool {
-    if s.is_empty() {
-        return false;
-    }
-
-    let mut chars = s.chars();
-
-    // First character must be letter, underscore, or dollar sign
-    match chars.next() {
-        Some(c) if c.is_ascii_alphabetic() || c == '_' || c == '$' => {}
-        _ => return false,
-    }
-
-    // Rest can include digits
-    for c in chars {
-        if !c.is_ascii_alphanumeric() && c != '_' && c != '$' {
-            return false;
-        }
-    }
-
-    true
-}
-
-/// Escape a string for single-quoted output
-///
-/// Escapes single quotes and backslashes in the string content.
-pub(super) fn escape_single_quote_string(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '\'' => result.push_str("\\'"),
-            '\\' => result.push_str("\\\\"),
-            '\n' => result.push_str("\\n"),
-            '\r' => result.push_str("\\r"),
-            '\t' => result.push_str("\\t"),
-            _ => result.push(c),
-        }
-    }
-    result
-}
+use tsv_lang::printing::{has_blank_line_between, has_newline_between, is_same_line};
 
 impl<'a> Printer<'a> {
     /// Print an object expression: `{ prop: value, ... }`
@@ -108,13 +59,8 @@ impl<'a> Printer<'a> {
             self.print_object_expression_inline_with_comments(obj);
         } else {
             // Use doc-builder for width-based wrapping
-            // Pass current column and indent level for accurate formatting
             let doc = self.build_object_doc(obj);
-            let base_offset = self.config.base_indent_offset * self.config.tab_width;
-            let current_col = self.current_column() + base_offset + 1; // +1 for trailing punctuation
-            let output =
-                doc::print_doc_with_indent(&doc, &self.config, current_col, self.indent_level);
-            self.write(&output);
+            self.write_doc_with_margin(&doc);
         }
     }
 
@@ -123,26 +69,7 @@ impl<'a> Printer<'a> {
     /// Prettier always expands empty objects with comments to multiline:
     /// `{/* comment */}` → `{\n\t/* comment */\n}`
     fn print_empty_object_with_comments(&mut self, obj: &internal::ObjectExpression) {
-        self.write("{\n");
-        self.indent_level += 1 + self.declaration_indent_depth;
-
-        // Print all comments inside the object
-        // Unlike print_leading_comments, we print ALL comments here (including same-line ones)
-        // because there are no "statements" to attach trailing comments to
-        // Uses binary search: O(log n + k)
-        let inner_start = obj.span.start + 1; // After '{'
-        let inner_end = obj.span.end - 1; // Before '}'
-
-        for comment in comments_in_range(self.comments, inner_start, inner_end) {
-            self.write_indent();
-            self.print_comment(comment);
-            self.write("\n");
-        }
-
-        self.indent_level -= 1;
-        self.write_indent();
-        self.indent_level -= self.declaration_indent_depth;
-        self.write("}");
+        self.print_empty_container_with_comments("{", "}", obj.span.start + 1, obj.span.end - 1);
     }
 
     /// Build a Doc for an object expression
@@ -210,7 +137,7 @@ impl<'a> Printer<'a> {
                 }
             } else {
                 // Last property: trailing comma only when broken
-                parts.push(doc::if_break(doc::text(","), doc::text("")));
+                parts.push(doc::trailing_comma());
             }
         }
 
@@ -222,15 +149,8 @@ impl<'a> Printer<'a> {
             doc::softline()
         };
 
-        // In multi-declarator context, apply extra indentation:
-        // - Properties get +1 extra indent (total 2 from declaration)
-        // - Closing line gets +1 extra indent (for closing brace alignment)
         let inner = doc::concat(vec![line_type.clone(), doc::concat(parts)]);
-        let (indented_content, closing_line) = if self.declaration_indent_depth > 0 {
-            (doc::indent(doc::indent(inner)), doc::indent(line_type))
-        } else {
-            (doc::indent(inner), line_type)
-        };
+        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, line_type);
 
         doc::group(doc::concat(vec![
             doc::text("{"),
@@ -276,21 +196,26 @@ impl<'a> Printer<'a> {
         ) {
             // Getter/setter: `get x() {}` or `set x(v) {}`
             if let Expression::FunctionExpression(func) = &prop.value {
-                let func_doc = self.build_function_doc(func);
+                let func_doc = self.build_function_doc_body(func);
                 doc::concat(vec![key_doc, func_doc])
             } else {
                 key_doc
             }
         } else if prop.method {
-            // Method shorthand: `foo() {}` or `async foo() {}` - print key followed by params and body
+            // Method shorthand: `foo() {}`, `async foo() {}`, `*gen() {}`, or `async *gen() {}`
             if let Expression::FunctionExpression(func) = &prop.value {
-                let func_doc = self.build_function_doc(func);
-                // Add async prefix if the function is async
+                let func_doc = self.build_function_doc_body(func);
+                // Build prefix: async? + *?
+                let mut parts = Vec::new();
                 if func.r#async {
-                    doc::concat(vec![doc::text("async "), key_doc, func_doc])
-                } else {
-                    doc::concat(vec![key_doc, func_doc])
+                    parts.push(doc::text("async "));
                 }
+                if func.generator {
+                    parts.push(doc::text("*"));
+                }
+                parts.push(key_doc);
+                parts.push(func_doc);
+                doc::concat(parts)
             } else {
                 // Fallback for malformed AST
                 let value_doc = self.build_expression_doc(&prop.value);
@@ -309,8 +234,40 @@ impl<'a> Printer<'a> {
                 key_doc
             }
         } else {
-            let value_doc = self.build_expression_doc(&prop.value);
-            doc::concat(vec![key_doc, doc::text(": "), value_doc])
+            // Regular property: use unified assignment layout
+            // Calculate key width for short key detection
+            let key_width = self.estimate_key_width(&prop.key, prop.computed);
+            let context =
+                super::assignment::LayoutContext::for_property(key_width, self.config.tab_width);
+            self.build_assignment_layout(key_doc, ":", &prop.value, context)
+        }
+    }
+
+    /// Estimate the width of a property key for layout decisions
+    fn estimate_key_width(&self, key: &Expression, computed: bool) -> usize {
+        let base_width = match key {
+            Expression::Identifier(id) => self.resolve_symbol(id.name).len(),
+            Expression::Literal(lit) => match &lit.value {
+                LiteralValue::String { content, .. } => {
+                    // Check if it's a valid identifier (no quotes needed)
+                    if is_valid_js_identifier(content) {
+                        content.len()
+                    } else {
+                        content.len() + 2 // Add quotes
+                    }
+                }
+                LiteralValue::Number(_) => {
+                    // Use span to get actual source width
+                    (lit.span.end - lit.span.start) as usize
+                }
+                _ => 10, // Conservative estimate
+            },
+            _ => 10, // Conservative estimate for complex keys
+        };
+        if computed {
+            base_width + 2 // Add brackets
+        } else {
+            base_width
         }
     }
 
@@ -327,10 +284,10 @@ impl<'a> Printer<'a> {
                 // Check if the string content is a valid JS identifier
                 if is_valid_js_identifier(content) {
                     // Output without quotes
-                    doc::text(content.clone())
+                    doc::text_owned(content.clone())
                 } else {
                     // Keep as quoted string (normalized to single quotes)
-                    doc::text(format!("'{}'", escape_single_quote_string(content)))
+                    doc::text_owned(format!("'{}'", escape_single_quote_string(content)))
                 }
             }
             _ => self.build_expression_doc(key),
@@ -391,15 +348,13 @@ impl<'a> Printer<'a> {
                         let value_str = self.expression_to_string(&p.value);
                         parts.push(format!("{key_str}{value_str}"));
                     } else if p.method {
-                        // Method shorthand: `foo() {}` or `async foo() {}`
+                        // Method shorthand: `foo() {}`, `async foo() {}`, `*gen() {}`, or `async *gen() {}`
                         let value_str = self.expression_to_string(&p.value);
-                        // Add async prefix if the function is async
+                        // Build prefix: async? + *?
                         if let Expression::FunctionExpression(func) = &p.value {
-                            if func.r#async {
-                                parts.push(format!("async {key_str}{value_str}"));
-                            } else {
-                                parts.push(format!("{key_str}{value_str}"));
-                            }
+                            let async_prefix = if func.r#async { "async " } else { "" };
+                            let gen_prefix = if func.generator { "*" } else { "" };
+                            parts.push(format!("{async_prefix}{gen_prefix}{key_str}{value_str}"));
                         } else {
                             parts.push(format!("{key_str}{value_str}"));
                         }
@@ -460,337 +415,6 @@ impl<'a> Printer<'a> {
         self.write(&inline_str);
     }
 
-    /// Convert an expression to a string (for inline object building)
-    pub(super) fn expression_to_string(&self, expr: &Expression) -> String {
-        match expr {
-            Expression::Literal(lit) => match &lit.value {
-                LiteralValue::Number(_) => {
-                    super::expressions::normalize_number_literal(lit.span.extract(self.source))
-                }
-                LiteralValue::String { content: _, quote } => {
-                    let start = lit.span.start as usize;
-                    let end = lit.span.end as usize;
-                    let raw_literal = &self.source[start..end];
-                    let raw_content = &raw_literal[1..raw_literal.len() - 1];
-                    format_string_literal(raw_content, *quote, StringFormatOptions::default())
-                }
-                LiteralValue::Boolean(b) => (if *b { "true" } else { "false" }).to_string(),
-                LiteralValue::Null => "null".to_string(),
-                LiteralValue::Undefined => "undefined".to_string(),
-            },
-            Expression::Identifier(id) => self.resolve_symbol(id.name),
-            Expression::ObjectExpression(obj) => {
-                // Recursively build nested object inline
-                let mut parts = Vec::new();
-                parts.push("{".to_string());
-
-                for (i, prop) in obj.properties.iter().enumerate() {
-                    match prop {
-                        internal::ObjectProperty::Property(p) => {
-                            // For computed keys, use expression_to_string (preserves string quotes)
-                            // For regular keys, use property_key_to_string (strips quotes)
-                            let base_key = if p.computed {
-                                format!("[{}]", self.expression_to_string(&p.key))
-                            } else {
-                                self.property_key_to_string(&p.key)
-                            };
-                            // Add getter/setter prefix if applicable
-                            let key_str = match p.kind {
-                                internal::PropertyKind::Get => format!("get {base_key}"),
-                                internal::PropertyKind::Set => format!("set {base_key}"),
-                                internal::PropertyKind::Init => base_key,
-                            };
-                            if matches!(
-                                p.kind,
-                                internal::PropertyKind::Get | internal::PropertyKind::Set
-                            ) {
-                                // Getter/setter: `get x() {}` or `set x(v) {}`
-                                let value_str = self.expression_to_string(&p.value);
-                                parts.push(format!("{key_str}{value_str}"));
-                            } else if p.method {
-                                // Method shorthand: `foo() {}`
-                                let value_str = self.expression_to_string(&p.value);
-                                parts.push(format!("{key_str}{value_str}"));
-                            } else if p.shorthand {
-                                // Handle shorthand with default value: {a = 1}
-                                if let Expression::AssignmentExpression(assign) = &p.value {
-                                    let default_str = self.expression_to_string(&assign.right);
-                                    parts.push(format!("{key_str} = {default_str}"));
-                                } else if let Expression::AssignmentPattern(pattern) = &p.value {
-                                    let default_str = self.expression_to_string(&pattern.right);
-                                    parts.push(format!("{key_str} = {default_str}"));
-                                } else {
-                                    parts.push(key_str);
-                                }
-                            } else {
-                                let value_str = self.expression_to_string(&p.value);
-                                parts.push(format!("{key_str}: {value_str}"));
-                            }
-                        }
-                        internal::ObjectProperty::SpreadElement(s) => {
-                            parts.push(format!("...{}", self.expression_to_string(&s.argument)));
-                        }
-                    }
-
-                    if i < obj.properties.len() - 1 {
-                        parts.push(", ".to_string());
-                    }
-                }
-
-                parts.push("}".to_string());
-                parts.concat()
-            }
-            Expression::ArrayExpression(arr) => {
-                // Recursively build nested array inline
-                let mut parts = Vec::new();
-                parts.push("[".to_string());
-
-                for (i, elem) in arr.elements.iter().enumerate() {
-                    if let Some(e) = elem {
-                        parts.push(self.expression_to_string(e));
-                    }
-                    if i < arr.elements.len() - 1 {
-                        parts.push(", ".to_string());
-                    }
-                }
-
-                parts.push("]".to_string());
-                parts.concat()
-            }
-            Expression::UnaryExpression(unary) => {
-                format!(
-                    "{}{}",
-                    unary.operator.as_str(),
-                    self.expression_to_string(&unary.argument)
-                )
-            }
-            Expression::UpdateExpression(update) => {
-                if update.prefix {
-                    format!(
-                        "{}{}",
-                        update.operator.as_str(),
-                        self.expression_to_string(&update.argument)
-                    )
-                } else {
-                    format!(
-                        "{}{}",
-                        self.expression_to_string(&update.argument),
-                        update.operator.as_str()
-                    )
-                }
-            }
-            Expression::BinaryExpression(binary) => {
-                let left = self.expression_to_string(&binary.left);
-                let right = self.expression_to_string(&binary.right);
-
-                // Wrap operands in parens if needed
-                let left_str = if let Expression::BinaryExpression(child) = binary.left.as_ref() {
-                    if super::operators::needs_parens_for_clarity(child, binary.operator, false) {
-                        format!("({left})")
-                    } else {
-                        left
-                    }
-                } else {
-                    left
-                };
-
-                let right_str = if let Expression::BinaryExpression(child) = binary.right.as_ref() {
-                    if super::operators::needs_parens_for_clarity(child, binary.operator, true) {
-                        format!("({right})")
-                    } else {
-                        right
-                    }
-                } else {
-                    right
-                };
-
-                format!("{} {} {}", left_str, binary.operator.as_str(), right_str)
-            }
-            Expression::ArrowFunctionExpression(arrow) => self.arrow_function_to_string(arrow),
-            Expression::SpreadElement(spread) => {
-                format!("...{}", self.expression_to_string(&spread.argument))
-            }
-            Expression::CallExpression(call) => {
-                let callee = self.expression_to_string(&call.callee);
-                let args: Vec<String> = call
-                    .arguments
-                    .iter()
-                    .map(|arg| self.expression_to_string(arg))
-                    .collect();
-                let opt = if call.optional { "?." } else { "" };
-                format!("{}{}({})", callee, opt, args.join(", "))
-            }
-            Expression::MemberExpression(member) => {
-                let obj = self.expression_to_string(&member.object);
-                let prop = self.expression_to_string(&member.property);
-                if member.computed {
-                    let opt = if member.optional { "?." } else { "" };
-                    format!("{obj}{opt}[{prop}]")
-                } else {
-                    let dot = if member.optional { "?." } else { "." };
-                    format!("{obj}{dot}{prop}")
-                }
-            }
-            Expression::ConditionalExpression(cond) => {
-                format!(
-                    "{} ? {} : {}",
-                    self.expression_to_string(&cond.test),
-                    self.expression_to_string(&cond.consequent),
-                    self.expression_to_string(&cond.alternate)
-                )
-            }
-            Expression::TemplateLiteral(template) => {
-                let mut result = String::from("`");
-                for (i, quasi) in template.quasis.iter().enumerate() {
-                    result.push_str(&quasi.raw);
-                    if i < template.expressions.len() {
-                        result.push_str("${");
-                        result.push_str(&self.expression_to_string(&template.expressions[i]));
-                        result.push('}');
-                    }
-                }
-                result.push('`');
-                result
-            }
-            Expression::TaggedTemplateExpression(tagged) => {
-                let tag = self.expression_to_string(&tagged.tag);
-                let quasi =
-                    self.expression_to_string(&Expression::TemplateLiteral(tagged.quasi.clone()));
-                format!("{tag}{quasi}")
-            }
-            Expression::NewExpression(new_expr) => {
-                let callee = self.expression_to_string(&new_expr.callee);
-                let args: Vec<String> = new_expr
-                    .arguments
-                    .iter()
-                    .map(|arg| self.expression_to_string(arg))
-                    .collect();
-                format!("new {}({})", callee, args.join(", "))
-            }
-            Expression::FunctionExpression(func) => {
-                // Function expressions: () { return ...; }
-                // params can be patterns, so extract from source instead of resolving names
-                let params: Vec<String> = func
-                    .params
-                    .iter()
-                    .map(|p| self.expression_to_string(p))
-                    .collect();
-                // For inline string, we just extract body from source
-                let body_start = func.body.span.start as usize;
-                let body_end = func.body.span.end as usize;
-                let body_str = &self.source[body_start..body_end];
-                format!("({}) {}", params.join(", "), body_str)
-            }
-            Expression::AwaitExpression(await_expr) => {
-                format!("await {}", self.expression_to_string(&await_expr.argument))
-            }
-            Expression::SequenceExpression(seq) => {
-                let inner = seq
-                    .expressions
-                    .iter()
-                    .map(|e| self.expression_to_string(e))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                format!("({inner})")
-            }
-            Expression::RegexLiteral(regex) => {
-                format!("/{}/{}", regex.pattern, regex.flags)
-            }
-            Expression::Super(_) => "super".to_string(),
-            Expression::AssignmentExpression(assign) => {
-                format!(
-                    "{} {} {}",
-                    self.expression_to_string(&assign.left),
-                    assign.operator.as_str(),
-                    self.expression_to_string(&assign.right)
-                )
-            }
-            Expression::ObjectPattern(obj) => {
-                let props: Vec<String> = obj
-                    .properties
-                    .iter()
-                    .map(|p| self.object_pattern_property_to_string(p))
-                    .collect();
-                format!("{{{}}}", props.join(", "))
-            }
-            Expression::ArrayPattern(arr) => {
-                let elems: Vec<String> = arr
-                    .elements
-                    .iter()
-                    .map(|e| match e {
-                        Some(expr) => self.expression_to_string(expr),
-                        None => String::new(),
-                    })
-                    .collect();
-                format!("[{}]", elems.join(", "))
-            }
-            Expression::AssignmentPattern(pattern) => {
-                format!(
-                    "{} = {}",
-                    self.expression_to_string(&pattern.left),
-                    self.expression_to_string(&pattern.right)
-                )
-            }
-            Expression::RestElement(rest) => {
-                format!("...{}", self.expression_to_string(&rest.argument))
-            }
-        }
-    }
-
-    /// Convert an object pattern property to a string
-    fn object_pattern_property_to_string(&self, prop: &internal::ObjectPatternProperty) -> String {
-        match prop {
-            internal::ObjectPatternProperty::Property(p) => {
-                if p.shorthand {
-                    // For shorthand with default value, the value is an AssignmentPattern
-                    // For shorthand without default, key and value are the same identifier
-                    match &p.value {
-                        Expression::AssignmentPattern(pattern) => {
-                            // {a = 1} - shorthand with default
-                            format!(
-                                "{} = {}",
-                                self.expression_to_string(&p.key),
-                                self.expression_to_string(&pattern.right)
-                            )
-                        }
-                        _ => self.expression_to_string(&p.key),
-                    }
-                } else {
-                    // {a: x} or {a: x = 1} or {[key]: x}
-                    // For regular keys, use property_key_to_string to normalize string keys to identifiers
-                    let key_str = if p.computed {
-                        format!("[{}]", self.expression_to_string(&p.key))
-                    } else {
-                        self.property_key_to_string(&p.key)
-                    };
-                    format!("{}: {}", key_str, self.expression_to_string(&p.value))
-                }
-            }
-            internal::ObjectPatternProperty::RestElement(r) => {
-                format!("...{}", self.expression_to_string(&r.argument))
-            }
-        }
-    }
-
-    /// Convert a property key expression to a string
-    ///
-    /// String keys that are valid identifiers are output without quotes.
-    pub(super) fn property_key_to_string(&self, key: &Expression) -> String {
-        match key {
-            Expression::Literal(Literal {
-                value: LiteralValue::String { content, .. },
-                ..
-            }) => {
-                if is_valid_js_identifier(content) {
-                    content.clone()
-                } else {
-                    format!("'{}'", escape_single_quote_string(content))
-                }
-            }
-            _ => self.expression_to_string(key),
-        }
-    }
-
     /// Print a property key (for imperative path)
     ///
     /// String keys that are valid identifiers are output without quotes.
@@ -827,8 +451,7 @@ impl<'a> Printer<'a> {
 
         if !obj.properties.is_empty() {
             self.write("\n");
-            // In multi-declarator context, add extra indent for properties
-            self.indent_level += 1 + self.declaration_indent_depth;
+            self.indent_level += self.container_indent_increment();
 
             let mut prev_end = obj.span.start + 1; // After opening brace
 
@@ -851,7 +474,19 @@ impl<'a> Printer<'a> {
                         match p.kind {
                             internal::PropertyKind::Get => self.write("get "),
                             internal::PropertyKind::Set => self.write("set "),
-                            internal::PropertyKind::Init => {}
+                            internal::PropertyKind::Init => {
+                                // For methods, print async/generator prefixes
+                                if p.method
+                                    && let Expression::FunctionExpression(func) = &p.value
+                                {
+                                    if func.r#async {
+                                        self.write("async ");
+                                    }
+                                    if func.generator {
+                                        self.write("*");
+                                    }
+                                }
+                            }
                         }
 
                         // For computed keys, use print_expression (preserves string quotes)
@@ -871,12 +506,12 @@ impl<'a> Printer<'a> {
                         ) {
                             // Getter/setter: `get x() {}` or `set x(v) {}`
                             if let Expression::FunctionExpression(func) = &p.value {
-                                self.print_function_expression(func);
+                                self.print_function_expression_body(func);
                             }
                         } else if p.method {
                             // Method shorthand: `foo() {}` - print params and body directly
                             if let Expression::FunctionExpression(func) = &p.value {
-                                self.print_function_expression(func);
+                                self.print_function_expression_body(func);
                             } else {
                                 // Fallback: shouldn't happen for well-formed AST
                                 self.write(": ");
@@ -946,57 +581,9 @@ impl<'a> Printer<'a> {
             // Print any final comments before closing brace
             self.print_leading_comments(prev_end, obj.span.end, false);
 
-            // Restore indent: first go to closing brace level (with declaration_indent_depth)
-            self.indent_level -= 1;
-            self.write_indent();
-            // Then restore fully
-            self.indent_level -= self.declaration_indent_depth;
+            self.write_container_closing_indent();
         }
 
         self.write("}");
-    }
-
-    /// Convert an arrow function to a string (for inline building)
-    pub(super) fn arrow_function_to_string(
-        &self,
-        arrow: &internal::ArrowFunctionExpression,
-    ) -> String {
-        let mut result = String::new();
-
-        // Async keyword if present
-        if arrow.r#async {
-            result.push_str("async ");
-        }
-
-        // Parameters (can be patterns, so use expression_to_string)
-        result.push('(');
-        for (i, param) in arrow.params.iter().enumerate() {
-            if i > 0 {
-                result.push_str(", ");
-            }
-            result.push_str(&self.expression_to_string(param));
-        }
-        result.push(')');
-
-        // Return type annotation
-        if let Some(return_type) = &arrow.return_type {
-            result.push_str(&self.type_annotation_to_string(return_type));
-        }
-
-        result.push_str(" => ");
-
-        // Body
-        match &arrow.body {
-            internal::ArrowFunctionBody::Expression(expr) => {
-                result.push_str(&self.expression_to_string(expr));
-            }
-            internal::ArrowFunctionBody::BlockStatement(block) => {
-                // For inline formatting, extract raw block from source
-                let raw = block.span.extract(self.source);
-                result.push_str(raw);
-            }
-        }
-
-        result
     }
 }

@@ -1,8 +1,9 @@
 // String interner utilities shared across language printers
 
+use crate::doc::TextResolver;
 use std::cell::RefCell;
 use std::rc::Rc;
-use string_interner::{DefaultStringInterner, DefaultSymbol};
+use string_interner::{DefaultStringInterner, DefaultSymbol, Symbol};
 
 /// Extension trait for infallible symbol resolution.
 ///
@@ -35,6 +36,22 @@ impl InfallibleResolve for DefaultStringInterner {
     fn resolve_infallible(&self, symbol: DefaultSymbol) -> &str {
         self.resolve(symbol)
             .expect("Symbol not found in interner - this is a bug")
+    }
+}
+
+/// Implement TextResolver for DefaultStringInterner to enable deferred symbol resolution in docs
+///
+/// This allows printers to borrow the interner and pass it to print_doc_resolved:
+/// ```ignore
+/// let interner = self.interner.borrow();
+/// let output = doc::print_doc_resolved(&doc, &config, &*interner);
+/// ```
+impl TextResolver for DefaultStringInterner {
+    #[allow(clippy::expect_used)]
+    fn resolve(&self, id: u32) -> &str {
+        let symbol = DefaultSymbol::try_from_usize(id as usize)
+            .expect("Invalid symbol ID in doc - should be from DefaultSymbol::to_usize()");
+        self.resolve_infallible(symbol)
     }
 }
 

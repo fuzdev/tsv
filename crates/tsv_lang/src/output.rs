@@ -23,7 +23,6 @@ impl OutputBuffer {
 
     /// Create a new output buffer with preallocated capacity
     #[inline]
-    #[allow(dead_code)]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             buffer: String::with_capacity(capacity),
@@ -46,24 +45,14 @@ impl OutputBuffer {
 
     /// Get the current length of the buffer
     #[inline]
-    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.buffer.len()
     }
 
     /// Check if the buffer is empty
     #[inline]
-    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.buffer.is_empty()
-    }
-
-    /// Get the last n characters of the buffer (for debugging)
-    #[inline]
-    #[allow(dead_code)]
-    pub fn tail(&self, n: usize) -> &str {
-        let start = self.buffer.len().saturating_sub(n);
-        &self.buffer[start..]
     }
 
     /// Consume the buffer and return the formatted string

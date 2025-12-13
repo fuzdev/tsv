@@ -15,8 +15,8 @@ use tsv_ts::ast::public::Expression;
 pub struct Root {
     pub css: Option<StyleSheet>,
     pub js: Vec<serde_json::Value>, // empty array for now
-    pub start: Option<u32>,
-    pub end: Option<u32>,
+    pub start: u32,
+    pub end: u32,
     #[serde(rename = "type")]
     pub node_type: String,
     pub fragment: Fragment,

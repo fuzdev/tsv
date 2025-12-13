@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 363,
+		"end": 494,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 354,
+					"end": 485,
 					"children": [
 						{
 							"type": "Declaration",
@@ -81,23 +81,37 @@
 							"end": 350,
 							"property": "background",
 							"value": "repeating-linear-gradient(45deg, red 0px, blue 10px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 354,
+							"end": 419,
+							"property": "background",
+							"value": "repeating-radial-gradient(circle, red 0px, blue 10px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 423,
+							"end": 481,
+							"property": "background",
+							"value": "repeating-conic-gradient(red 0deg, blue 30deg)"
 						}
 					]
 				},
 				"start": 9,
-				"end": 354
+				"end": 485
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 355,
-			"styles": "\n\tdiv {\n\t\tbackground: linear-gradient(45deg, red, blue);\n\t\tbackground: linear-gradient(to right, red 0%, blue 100%);\n\t\tbackground: radial-gradient(circle, red, blue);\n\t\tbackground: radial-gradient(circle at center, red, blue);\n\t\tbackground: conic-gradient(red, yellow, green);\n\t\tbackground: repeating-linear-gradient(45deg, red 0px, blue 10px);\n\t}\n",
+			"end": 486,
+			"styles": "\n\tdiv {\n\t\tbackground: linear-gradient(45deg, red, blue);\n\t\tbackground: linear-gradient(to right, red 0%, blue 100%);\n\t\tbackground: radial-gradient(circle, red, blue);\n\t\tbackground: radial-gradient(circle at center, red, blue);\n\t\tbackground: conic-gradient(red, yellow, green);\n\t\tbackground: repeating-linear-gradient(45deg, red 0px, blue 10px);\n\t\tbackground: repeating-radial-gradient(circle, red 0px, blue 10px);\n\t\tbackground: repeating-conic-gradient(red 0deg, blue 30deg);\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
-	"start": null,
-	"end": null,
+	"start": 0,
+	"end": 495,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

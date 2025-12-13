@@ -2,38 +2,20 @@ use std::fs;
 use std::io::{self, Read as _};
 use std::str::FromStr;
 
-/// Input source for parsing or formatting
+/// Input source for parsing or formatting (just the content string)
 #[derive(Debug)]
-pub enum Input {
-    File { path: String, content: String }, // File path + content
-    Content(String),                        // Direct string content
-    Stdin(String),                          // Content read from stdin
-}
+pub struct Input(String);
 
 impl Input {
     pub fn content(&self) -> &str {
-        match self {
-            Input::File { content, .. } => content,
-            Input::Content(s) | Input::Stdin(s) => s,
-        }
-    }
-
-    /// Get parser type from input source
-    pub fn parser_type(&self) -> Option<ParserType> {
-        match self {
-            Input::File { path, .. } => Some(ParserType::from_extension(path)),
-            Input::Content(_) | Input::Stdin(_) => None,
-        }
+        &self.0
     }
 
     /// Read from file path
     pub fn from_file(path: &str) -> Result<Self, String> {
         let content =
             fs::read_to_string(path).map_err(|e| format!("Error reading file '{path}': {e}"))?;
-        Ok(Input::File {
-            path: path.to_string(),
-            content,
-        })
+        Ok(Input(content))
     }
 
     /// Read from stdin
@@ -42,12 +24,12 @@ impl Input {
         io::stdin()
             .read_to_string(&mut buffer)
             .map_err(|e| format!("Error reading from stdin: {e}"))?;
-        Ok(Input::Stdin(buffer))
+        Ok(Input(buffer))
     }
 
     /// Direct string content
     pub fn from_content(content: String) -> Self {
-        Input::Content(content)
+        Input(content)
     }
 }
 

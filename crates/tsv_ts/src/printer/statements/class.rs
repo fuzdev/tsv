@@ -2,29 +2,163 @@
 
 use super::super::Printer;
 use crate::ast::internal;
+use string_interner::Symbol;
 use tsv_lang::{SymbolResolver, doc};
 
 impl<'a> Printer<'a> {
     /// Print a class declaration or anonymous class: `class Foo {}` or `class {}`
+    ///
+    /// Uses doc-based printing with width-aware wrapping for long lines.
     pub(super) fn print_class_declaration(&mut self, decl: &internal::ClassDeclaration) {
-        self.write("class");
-        if let Some(id) = &decl.id {
+        // Print decorators, each on its own line
+        for decorator in &decl.decorators {
+            self.print_decorator(decorator);
+            self.write("\n");
+            self.write_indent();
+        }
+
+        // Build the header doc (everything before the body)
+        let header_doc = self.build_class_header_doc(decl);
+        let base_offset = self.config.base_indent_offset * self.config.tab_width;
+        let current_col = self.current_column() + base_offset;
+        let header_output = {
+            let interner = self.interner.borrow();
+            doc::print_doc_with_indent_resolved(
+                &header_doc,
+                &self.config,
+                current_col,
+                self.indent_level,
+                &*interner,
+            )
+        };
+        self.write(&header_output);
+
+        // Space before body:
+        // - Skip if both extends and implements (header ends with dedent(line))
+        // - Skip if implements-only with long type params (header may end with dedent(softline))
+        // For simplicity, just check if header ends with newline
+        let has_extends = decl.super_class.is_some();
+        let has_implements = !decl.implements.is_empty();
+        let both_heritage = has_extends && has_implements;
+        // Check if header output ends with newline (from break mode)
+        let needs_space = !both_heritage && !header_output.ends_with('\n');
+        if needs_space {
             self.write(" ");
-            self.print_identifier(id);
+        }
+        self.print_class_body(&decl.body, decl.declare);
+    }
+
+    /// Build doc for class header (declare, name, type params, extends, implements)
+    ///
+    /// Prettier behavior for classes:
+    /// - If everything fits on one line, keep inline
+    /// - If type params break, put extends/implements on new lines
+    /// - Multiple heritage clauses (extends + implements) each go on their own line
+    /// - Brace goes to new line when heritage clauses are on separate lines
+    fn build_class_header_doc(&self, decl: &internal::ClassDeclaration) -> doc::Doc {
+        let mut parts = Vec::new();
+
+        // declare modifier
+        if decl.declare {
+            parts.push(doc::text("declare "));
         }
 
-        // Handle extends clause
-        if let Some(super_class) = &decl.super_class {
-            self.write(" extends ");
-            self.print_expression(super_class);
+        // abstract modifier
+        if decl.r#abstract {
+            parts.push(doc::text("abstract "));
         }
 
-        self.write(" ");
-        self.print_class_body(&decl.body);
+        parts.push(doc::text("class"));
+        if let Some(id) = &decl.id {
+            parts.push(doc::text(" "));
+            parts.push(doc::symbol(id.name.to_usize() as u32));
+        }
+
+        let has_extends = decl.super_class.is_some();
+        let has_implements = !decl.implements.is_empty();
+
+        // Type parameters - wrapped in their own group
+        if let Some(type_params) = &decl.type_parameters {
+            parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
+        }
+
+        // Build heritage docs separately first
+        // Prettier PR #18325: For extends clause, use expression_to_string to keep the member
+        // expression together (no breaks within `eslint.Rule.RuleModule`).
+        // The extends keyword can break to a new line, but the expression stays flat.
+        let extends_doc = if let Some(super_class) = &decl.super_class {
+            let mut ext_parts = vec![doc::text("extends ")];
+            // Use expression_to_string for flat output - no breaks in member expression
+            ext_parts.push(doc::text_owned(self.expression_to_string(super_class)));
+            if let Some(type_params) = &decl.super_type_parameters {
+                ext_parts.push(self.build_type_arguments_doc(type_params));
+            }
+            Some(doc::concat(ext_parts))
+        } else {
+            None
+        };
+
+        let implements_doc = if !decl.implements.is_empty() {
+            let mut impl_parts = vec![doc::text("implements ")];
+            for (i, heritage) in decl.implements.iter().enumerate() {
+                if i > 0 {
+                    impl_parts.push(doc::text(", "));
+                }
+                impl_parts.push(self.build_entity_name_doc(&heritage.expression));
+                if let Some(type_args) = &heritage.type_arguments {
+                    impl_parts.push(self.build_type_arguments_doc(type_args));
+                }
+            }
+            Some(doc::concat(impl_parts))
+        } else {
+            None
+        };
+
+        // Add heritage clauses
+        // Prettier PR #18094 behavior:
+        // - extends: stays inline after `>` (even when type params break)
+        // - implements: goes to new line when type params break, with brace on new line
+        // - Multiple heritage (extends + implements): each on separate line, brace on new line
+        if has_extends && has_implements {
+            // Multiple heritage clauses - each on separate line
+            if let Some(ext) = extends_doc {
+                parts.push(doc::indent_line(ext));
+            }
+            if let Some(impl_doc) = implements_doc {
+                parts.push(doc::indent_line(impl_doc));
+            }
+            // Brace goes to new line for multiple heritage
+            parts.push(doc::dedent(doc::line()));
+        } else if let Some(ext) = extends_doc {
+            // extends only - behavior depends on type params:
+            // - With type params: extends stays inline after `>` (Prettier PR #18094)
+            // - Without type params: extends can break when class name is long (Prettier PR #18325)
+            let has_type_params = decl.type_parameters.is_some();
+            if has_type_params {
+                // Type params present - extends stays inline after `>`
+                parts.push(doc::text(" "));
+                parts.push(ext);
+            } else {
+                // No type params - extends can break to new line when name is long
+                parts.push(doc::indent_line(ext));
+            }
+        } else if let Some(impl_doc) = implements_doc {
+            // implements only - line() becomes space in flat mode
+            parts.push(doc::indent_line(impl_doc));
+            // Brace: use softline which disappears in flat mode, becomes newline in break mode
+            parts.push(doc::dedent(doc::softline()));
+        }
+
+        doc::group(doc::concat(parts))
     }
 
     /// Print a class body with blank line preservation
-    pub(super) fn print_class_body(&mut self, body: &internal::ClassBody) {
+    /// is_declare: true for declare class (members have no implementation)
+    pub(in crate::printer) fn print_class_body(
+        &mut self,
+        body: &internal::ClassBody,
+        is_declare: bool,
+    ) {
         if body.body.is_empty() {
             self.write("{}");
             return;
@@ -33,22 +167,36 @@ impl<'a> Printer<'a> {
         self.write("{\n");
         self.indent_level += 1;
 
-        let mut prev_end = 0u32;
+        // Start after the opening '{'
+        let mut prev_end = body.span.start + 1;
 
         for (i, member) in body.body.iter().enumerate() {
+            let is_first = i == 0;
+
             // Preserve blank lines between class members
-            if i > 0
-                && tsv_lang::printing::has_blank_line_between(
-                    self.source,
-                    prev_end,
-                    member.span().start,
-                )
-            {
-                self.write("\n");
+            // Skip if there are comments - they handle their own blank line preservation
+            if !is_first {
+                let has_comments = self.has_comments_between(prev_end, member.span().start);
+                if !has_comments
+                    && tsv_lang::printing::has_blank_line_between(
+                        self.source,
+                        prev_end,
+                        member.span().start,
+                    )
+                {
+                    self.write("\n");
+                }
             }
 
+            // Print leading comments before this member
+            self.print_block_leading_comments(prev_end, member.span().start, is_first);
+
             self.write_indent();
-            self.print_class_member(member);
+            self.print_class_member(member, is_declare);
+
+            // Print trailing inline comments (on same line after member)
+            self.print_class_member_trailing_comments(member.span().end);
+
             self.write("\n");
 
             prev_end = member.span().end;
@@ -59,23 +207,85 @@ impl<'a> Printer<'a> {
         self.write("}");
     }
 
-    /// Print a class member (method or property)
-    fn print_class_member(&mut self, member: &internal::ClassMember) {
-        match member {
-            internal::ClassMember::MethodDefinition(method) => {
-                self.print_method_definition(method);
-            }
-            internal::ClassMember::PropertyDefinition(prop) => {
-                self.print_property_definition(prop);
+    /// Print trailing inline comments for a class member
+    /// Handles comments on the same line after the member ends (e.g., `prop: string; // comment`)
+    fn print_class_member_trailing_comments(&mut self, member_end: u32) {
+        // find_first_comment_from returns index of first comment at or after member_end
+        let first_idx = tsv_lang::find_first_comment_from(self.comments, member_end);
+
+        for comment in &self.comments[first_idx..] {
+            if tsv_lang::printing::is_same_line(self.source, member_end, comment.span.start) {
+                self.write(" ");
+                self.print_comment(comment);
+            } else {
+                break;
             }
         }
     }
 
+    /// Print a class member (method, property, or static block)
+    fn print_class_member(&mut self, member: &internal::ClassMember, is_declare: bool) {
+        match member {
+            internal::ClassMember::MethodDefinition(method) => {
+                self.print_method_definition(method, is_declare);
+            }
+            internal::ClassMember::PropertyDefinition(prop) => {
+                self.print_property_definition(prop, is_declare);
+            }
+            internal::ClassMember::StaticBlock(block) => {
+                self.print_static_block(block);
+            }
+        }
+    }
+
+    /// Print a static initialization block: `static { ... }`
+    fn print_static_block(&mut self, block: &internal::StaticBlock) {
+        self.write("static ");
+        // Create a BlockStatement wrapper to reuse existing printing logic
+        let block_stmt = internal::BlockStatement {
+            body: block.body.clone(),
+            span: block.span,
+        };
+        self.print_block_statement(&block_stmt);
+    }
+
     /// Print a property definition
-    fn print_property_definition(&mut self, prop: &internal::PropertyDefinition) {
+    fn print_property_definition(
+        &mut self,
+        prop: &internal::PropertyDefinition,
+        _is_declare: bool,
+    ) {
+        // Print decorators, each on its own line
+        for decorator in &prop.decorators {
+            self.print_decorator(decorator);
+            self.write("\n");
+            self.write_indent();
+        }
+
+        // Print accessibility modifier if applicable
+        if let Some(accessibility) = &prop.accessibility {
+            self.write(accessibility.as_str());
+            self.write(" ");
+        }
+
         // Print static modifier if applicable
         if prop.is_static {
             self.write("static ");
+        }
+
+        // Print abstract modifier if applicable
+        if prop.r#abstract {
+            self.write("abstract ");
+        }
+
+        // Print readonly modifier if applicable
+        if prop.readonly {
+            self.write("readonly ");
+        }
+
+        // Print accessor keyword if applicable (ES decorator proposal)
+        if prop.accessor {
+            self.write("accessor ");
         }
 
         // Print key
@@ -85,6 +295,13 @@ impl<'a> Printer<'a> {
             self.write("]");
         } else {
             self.print_expression(&prop.key);
+        }
+
+        // Print optional marker (?) or definite assignment assertion (!)
+        match prop.modifier {
+            internal::PropertyModifier::Optional => self.write("?"),
+            internal::PropertyModifier::Definite => self.write("!"),
+            internal::PropertyModifier::None => {}
         }
 
         // Print type annotation if present
@@ -102,10 +319,43 @@ impl<'a> Printer<'a> {
     }
 
     /// Print a method definition
-    fn print_method_definition(&mut self, method: &internal::MethodDefinition) {
+    fn print_method_definition(&mut self, method: &internal::MethodDefinition, is_declare: bool) {
+        // Print decorators, each on its own line
+        for decorator in &method.decorators {
+            self.print_decorator(decorator);
+            self.write("\n");
+            self.write_indent();
+        }
+
+        // Print accessibility modifier if applicable
+        if let Some(accessibility) = &method.accessibility {
+            self.write(accessibility.as_str());
+            self.write(" ");
+        }
+
         // Print static modifier if applicable
         if method.is_static {
             self.write("static ");
+        }
+
+        // Print override modifier if applicable
+        if method.r#override {
+            self.write("override ");
+        }
+
+        // Print abstract modifier if applicable
+        if method.r#abstract {
+            self.write("abstract ");
+        }
+
+        // Print async modifier if applicable
+        if method.value.r#async {
+            self.write("async ");
+        }
+
+        // Print generator marker if applicable
+        if method.value.generator {
+            self.write("*");
         }
 
         // Print get/set for accessors
@@ -125,12 +375,51 @@ impl<'a> Printer<'a> {
         }
 
         // Print parameters (can be Identifier, ArrayPattern, ObjectPattern, AssignmentPattern)
+        // Detect if source params were on multiple lines (respect original formatting)
+        let params_multiline = if let (Some(first), Some(last)) =
+            (method.value.params.first(), method.value.params.last())
+        {
+            // Check if the source between first param start and last param end contains newlines
+            tsv_lang::printing::has_newline_between(
+                self.source,
+                first.span().start,
+                last.span().end,
+            )
+        } else {
+            false
+        };
+
         self.write("(");
-        for (i, param) in method.value.params.iter().enumerate() {
-            if i > 0 {
-                self.write(", ");
+        if params_multiline {
+            // Print params on separate lines with trailing comma
+            self.write("\n");
+            self.indent_level += 1;
+            for (i, param) in method.value.params.iter().enumerate() {
+                if i > 0 {
+                    self.write(",\n");
+                }
+                self.write_indent();
+                self.print_expression(param);
             }
-            self.print_expression(param);
+            // Check if last param is rest - no trailing comma after rest
+            let has_rest_param = method
+                .value
+                .params
+                .last()
+                .is_some_and(|p| matches!(p, internal::Expression::RestElement(_)));
+            if !has_rest_param {
+                self.write(",");
+            }
+            self.write("\n");
+            self.indent_level -= 1;
+            self.write_indent();
+        } else {
+            for (i, param) in method.value.params.iter().enumerate() {
+                if i > 0 {
+                    self.write(", ");
+                }
+                self.print_expression(param);
+            }
         }
         self.write(")");
 
@@ -139,10 +428,29 @@ impl<'a> Printer<'a> {
             self.print_type_annotation(return_type);
         }
 
-        self.write(" ");
-
-        // Print body
-        self.print_block_statement(&method.value.body);
+        // For declare class, abstract methods, or overload signatures, print semicolon instead of body
+        // Overload signatures have a zero-width dummy body span (start == end), while real
+        // empty bodies `{}` have a real span covering the braces
+        let is_overload_signature = method.value.body.span.start == method.value.body.span.end;
+        if is_declare || method.r#abstract || is_overload_signature {
+            self.write(";");
+        } else {
+            self.write(" ");
+            // Find the end of the signature to check for dangling comments
+            // (comments between signature and body that should move inside)
+            let sig_end = if let Some(return_type) = &method.value.return_type {
+                return_type.span.end
+            } else if let Some(last_param) = method.value.params.last() {
+                // After last param, there's a ')' but we don't have its exact position
+                // Use last param end as approximate - comments after it will be caught
+                last_param.span().end
+            } else {
+                // Empty params like fn() - use key end as approximate start
+                method.key.span().end
+            };
+            // Print body with outer comments moved inside
+            self.print_block_statement_with_outer_comments(&method.value.body, sig_end);
+        }
     }
 
     /// Build a Doc for a class declaration
@@ -150,44 +458,88 @@ impl<'a> Printer<'a> {
         &self,
         decl: &internal::ClassDeclaration,
     ) -> doc::Doc {
-        let mut parts = vec![doc::text("class")];
+        let mut parts = vec![];
+
+        // declare modifier
+        if decl.declare {
+            parts.push(doc::text("declare "));
+        }
+
+        // abstract modifier
+        if decl.r#abstract {
+            parts.push(doc::text("abstract "));
+        }
+
+        parts.push(doc::text("class"));
         if let Some(id) = &decl.id {
             let id_str = self.resolve_symbol(id.name);
             parts.push(doc::text(" "));
-            parts.push(doc::text(id_str));
+            parts.push(doc::text_owned(id_str));
+        }
+
+        // Type parameters
+        if let Some(type_params) = &decl.type_parameters {
+            parts.push(self.build_type_parameter_declaration_doc(type_params));
         }
 
         // Handle extends clause
         if let Some(super_class) = &decl.super_class {
             parts.push(doc::text(" extends "));
             parts.push(self.build_expression_doc(super_class));
+            if let Some(type_args) = &decl.super_type_parameters {
+                parts.push(self.build_type_arguments_doc(type_args));
+            }
+        }
+
+        // Handle implements clause
+        if !decl.implements.is_empty() {
+            parts.push(doc::text(" implements "));
+            for (i, impl_item) in decl.implements.iter().enumerate() {
+                if i > 0 {
+                    parts.push(doc::text(", "));
+                }
+                parts.push(self.build_entity_name_doc(&impl_item.expression));
+                if let Some(type_args) = &impl_item.type_arguments {
+                    parts.push(self.build_type_arguments_doc(type_args));
+                }
+            }
         }
 
         parts.push(doc::text(" "));
-        parts.push(self.build_class_body_doc(&decl.body));
+        parts.push(self.build_class_body_doc(&decl.body, decl.declare));
 
         doc::concat(parts)
     }
 
     /// Build a Doc for a class body
-    fn build_class_body_doc(&self, body: &internal::ClassBody) -> doc::Doc {
+    pub(in crate::printer) fn build_class_body_doc(
+        &self,
+        body: &internal::ClassBody,
+        _is_ambient: bool,
+    ) -> doc::Doc {
         if body.body.is_empty() {
             return doc::text("{}");
         }
 
-        let mut parts = vec![doc::text("{"), doc::hardline()];
-
+        // Build member docs joined by hardlines
+        let mut member_parts = Vec::new();
         for (i, member) in body.body.iter().enumerate() {
             if i > 0 {
-                parts.push(doc::hardline());
+                member_parts.push(doc::hardline());
             }
-            parts.push(doc::indent(self.build_class_member_doc(member)));
+            member_parts.push(self.build_class_member_doc(member));
         }
 
-        parts.push(doc::hardline());
-        parts.push(doc::text("}"));
-
-        doc::concat(parts)
+        // Wrap body content in indent (like build_interface_declaration_doc)
+        doc::concat(vec![
+            doc::text("{"),
+            doc::indent(doc::concat(vec![
+                doc::hardline(),
+                doc::concat(member_parts),
+            ])),
+            doc::hardline(),
+            doc::text("}"),
+        ])
     }
 
     /// Build a Doc for a class member
@@ -199,7 +551,21 @@ impl<'a> Printer<'a> {
             internal::ClassMember::PropertyDefinition(prop) => {
                 self.build_property_definition_doc(prop)
             }
+            internal::ClassMember::StaticBlock(block) => self.build_static_block_doc(block),
         }
+    }
+
+    /// Build a Doc for a static initialization block
+    fn build_static_block_doc(&self, block: &internal::StaticBlock) -> doc::Doc {
+        // Create a BlockStatement wrapper to reuse existing doc building logic
+        let block_stmt = internal::BlockStatement {
+            body: block.body.clone(),
+            span: block.span,
+        };
+        doc::concat(vec![
+            doc::text("static "),
+            self.build_block_statement_doc(&block_stmt),
+        ])
     }
 
     /// Build a Doc for a property definition
@@ -211,6 +577,25 @@ impl<'a> Printer<'a> {
             parts.push(doc::text("static "));
         }
 
+        // Abstract modifier
+        if prop.r#abstract {
+            parts.push(doc::text("abstract "));
+        }
+
+        // Accessibility modifier
+        if let Some(accessibility) = &prop.accessibility {
+            match accessibility {
+                internal::Accessibility::Public => parts.push(doc::text("public ")),
+                internal::Accessibility::Private => parts.push(doc::text("private ")),
+                internal::Accessibility::Protected => parts.push(doc::text("protected ")),
+            }
+        }
+
+        // Readonly modifier
+        if prop.readonly {
+            parts.push(doc::text("readonly "));
+        }
+
         // Key
         if prop.computed {
             parts.push(doc::text("["));
@@ -218,6 +603,12 @@ impl<'a> Printer<'a> {
             parts.push(doc::text("]"));
         } else {
             parts.push(self.build_expression_doc(&prop.key));
+        }
+
+        // Type annotation
+        if let Some(type_ann) = &prop.type_annotation {
+            parts.push(doc::text(": "));
+            parts.push(self.build_type_doc(&type_ann.type_annotation));
         }
 
         // Value if present
@@ -240,6 +631,26 @@ impl<'a> Printer<'a> {
             parts.push(doc::text("static "));
         }
 
+        // Override modifier
+        if method.r#override {
+            parts.push(doc::text("override "));
+        }
+
+        // Abstract modifier
+        if method.r#abstract {
+            parts.push(doc::text("abstract "));
+        }
+
+        // Async modifier
+        if method.value.r#async {
+            parts.push(doc::text("async "));
+        }
+
+        // Generator marker
+        if method.value.generator {
+            parts.push(doc::text("*"));
+        }
+
         // Get/set for accessors
         match method.kind {
             internal::MethodKind::Get => parts.push(doc::text("get ")),
@@ -257,18 +668,30 @@ impl<'a> Printer<'a> {
         }
 
         // Parameters (can be Identifier, ArrayPattern, ObjectPattern, AssignmentPattern)
+        let param_docs: Vec<_> = method
+            .value
+            .params
+            .iter()
+            .map(|param| self.build_expression_doc(param))
+            .collect();
         parts.push(doc::text("("));
-        for (i, param) in method.value.params.iter().enumerate() {
-            if i > 0 {
-                parts.push(doc::text(", "));
-            }
-            parts.push(self.build_expression_doc(param));
-        }
-        parts.push(doc::text(") "));
+        parts.push(doc::join(param_docs, ", "));
 
-        // Body
-        parts.push(self.build_block_statement_doc(&method.value.body));
+        // For abstract methods, use semicolon instead of body
+        if method.r#abstract {
+            parts.push(doc::text(");"));
+        } else {
+            parts.push(doc::text(") "));
+            // Body
+            parts.push(self.build_block_statement_doc(&method.value.body));
+        }
 
         doc::concat(parts)
+    }
+
+    /// Print a decorator: `@expression`
+    pub(in crate::printer) fn print_decorator(&mut self, decorator: &internal::Decorator) {
+        self.write("@");
+        self.print_expression(&decorator.expression);
     }
 }
