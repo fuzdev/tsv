@@ -2,8 +2,7 @@
 
 use super::super::Printer;
 use crate::ast::internal;
-use string_interner::Symbol;
-use tsv_lang::{SymbolResolver, doc};
+use tsv_lang::{SymbolResolver, SymbolToU32, doc};
 
 impl<'a> Printer<'a> {
     /// Print an export named declaration
@@ -216,7 +215,7 @@ impl<'a> Printer<'a> {
         let mut parts = vec![doc::text(export_keyword)];
         if let Some(exported) = &decl.exported {
             parts.push(doc::text(" as "));
-            parts.push(doc::symbol(exported.name.to_usize() as u32));
+            parts.push(doc::symbol(exported.name.to_u32()));
         }
         parts.push(doc::text(" from "));
         parts.push(self.build_literal_doc(&decl.source));
@@ -227,12 +226,7 @@ impl<'a> Printer<'a> {
     /// Check if an import declaration has empty named braces `{}` in source.
     /// This distinguishes `import {} from 'x'` from `import 'x'`.
     fn has_empty_named_braces(&self, decl: &internal::ImportDeclaration) -> bool {
-        let start = decl.span.start as usize;
-        let end = decl.span.end as usize;
-        if start >= self.source.len() || end > self.source.len() {
-            return false;
-        }
-        let text = &self.source[start..end];
+        let text = decl.span.extract(self.source);
         // Find "from" (with or without surrounding spaces) and check if there are empty braces before it
         // Handles both `import {} from 'x'` and `import{}from'x'` and `import {  } from 'x'`
         if let Some(from_pos) = text.find("from") {

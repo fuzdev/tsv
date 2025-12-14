@@ -140,8 +140,8 @@ pub struct Printer<'a> {
     pub(crate) source: &'a str,
     /// Shared string interner for resolving symbols
     interner: Rc<RefCell<DefaultStringInterner>>,
-    /// TypeScript comments from scripts and template expressions
-    ts_comments: &'a [Comment],
+    /// Comments from scripts and template expressions
+    comments: &'a [Comment],
 }
 
 impl<'a> Printer<'a> {
@@ -149,16 +149,16 @@ impl<'a> Printer<'a> {
     pub fn new(
         source: &'a str,
         interner: Rc<RefCell<DefaultStringInterner>>,
-        ts_comments: &'a [Comment],
+        comments: &'a [Comment],
     ) -> Self {
-        Self::with_config(source, interner, ts_comments, PrintConfig::default())
+        Self::with_config(source, interner, comments, PrintConfig::default())
     }
 
     /// Create a new printer with the given source, interner, comments, and config
     pub fn with_config(
         source: &'a str,
         interner: Rc<RefCell<DefaultStringInterner>>,
-        ts_comments: &'a [Comment],
+        comments: &'a [Comment],
         config: PrintConfig,
     ) -> Self {
         Self {
@@ -167,7 +167,7 @@ impl<'a> Printer<'a> {
             config,
             source,
             interner,
-            ts_comments,
+            comments,
         }
     }
 
@@ -194,7 +194,7 @@ impl<'a> Printer<'a> {
 
 /// Format a Svelte AST back to source code
 pub fn format_svelte(root: &internal::Root, source: &str) -> String {
-    let mut printer = Printer::new(source, Rc::clone(&root.interner), &root.ts_comments);
+    let mut printer = Printer::new(source, Rc::clone(&root.interner), &root.comments);
     printer.print_root(root);
     printer.into_string()
 }

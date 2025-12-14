@@ -11,7 +11,12 @@
 		"fixtures_update_formatted": "cargo run -p tsv_debug --quiet fixtures_update_formatted",
 		"fixtures_validate": "cargo run -p tsv_debug --quiet fixtures_validate",
 		"fixtures_list": "cargo run -p tsv_debug --quiet fixtures_update_parsed --list",
-		"debug_compare": "cargo run -p tsv_debug --quiet compare"
+		"debug_compare": "cargo run -p tsv_debug --quiet compare",
+		"bench:build:ffi": "cargo build -p tsv_ffi --release",
+		"bench:build:wasm": "wasm-pack build crates/tsv_wasm --target deno --release",
+		"bench:build": "deno task bench:build:ffi && deno task bench:build:wasm",
+		"bench:run": "deno bench --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/",
+		"bench": "deno task bench:build && deno task bench:run"
 	},
 	"fmt": {
 		"useTabs": true,

@@ -4,6 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Helper for skip_serializing_if to skip false bools
+#[allow(clippy::trivially_copy_pass_by_ref)] // serde requires &T signature
 fn is_false(b: &bool) -> bool {
     !*b
 }

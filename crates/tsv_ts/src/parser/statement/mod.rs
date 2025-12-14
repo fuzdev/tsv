@@ -128,11 +128,7 @@ impl<'a> Parser<'a> {
                 | KeywordKind::Finally
                 | KeywordKind::From
                 | KeywordKind::As
-                | KeywordKind::Satisfies => Err(ParseError::InvalidSyntax {
-                    message: format!("Unexpected keyword '{kw}'"),
-                    position: self.current_pos().0,
-                    context: None,
-                }),
+                | KeywordKind::Satisfies => Err(self.error_unexpected_keyword(*kw)),
                 // Type-only keywords and binary operator keywords are not valid at statement level
                 KeywordKind::Number
                 | KeywordKind::String
@@ -145,11 +141,7 @@ impl<'a> Parser<'a> {
                 | KeywordKind::Bigint
                 | KeywordKind::Instanceof
                 | KeywordKind::In
-                | KeywordKind::Extends => Err(ParseError::InvalidSyntax {
-                    message: format!("Unexpected keyword '{kw}'"),
-                    position: self.current_pos().0,
-                    context: None,
-                }),
+                | KeywordKind::Extends => Err(self.error_unexpected_keyword(*kw)),
             },
             TokenKind::Identifier => {
                 // Check for contextual keyword 'using' followed by identifier (ES2024 Explicit Resource Management)

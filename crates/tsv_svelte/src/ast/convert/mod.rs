@@ -360,7 +360,7 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
             .as_ref()
             .map(|opts| convert_svelte_options(opts, source, &loc, &interner)),
         comments: root
-            .ts_comments
+            .comments
             .iter()
             .map(|comment| {
                 let comment_type = if comment.is_block { "Block" } else { "Line" };

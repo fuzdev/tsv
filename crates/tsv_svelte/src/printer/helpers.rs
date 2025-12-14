@@ -48,8 +48,8 @@ impl<'a> Printer<'a> {
         let (Some(first), Some(last)) = (fragment.nodes.first(), fragment.nodes.last()) else {
             return true;
         };
-        let first_start = first.span().start as usize;
-        let last_end = last.span().end as usize;
+        let first_start = first.span().start_usize();
+        let last_end = last.span().end_usize();
         let content = &self.source[first_start..last_end];
         !content.contains('\n')
     }

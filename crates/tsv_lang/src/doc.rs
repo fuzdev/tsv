@@ -148,7 +148,7 @@ impl DocText {
 
     /// Check if this is a Symbol variant (needs resolver)
     #[inline]
-    pub fn is_symbol(&self) -> bool {
+    pub const fn is_symbol(&self) -> bool {
         matches!(self, DocText::Symbol(_))
     }
 }

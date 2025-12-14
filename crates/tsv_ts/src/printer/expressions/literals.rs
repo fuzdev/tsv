@@ -96,9 +96,7 @@ impl<'a> Printer<'a> {
             }
             LiteralValue::String { content: _, quote } => {
                 // Extract raw literal from source (preserves escape sequences)
-                let start = literal.span.start as usize;
-                let end = literal.span.end as usize;
-                let raw_literal = &self.source[start..end];
+                let raw_literal = literal.span.extract(self.source);
 
                 // Extract content without surrounding quotes
                 let raw_content = &raw_literal[1..raw_literal.len() - 1];
@@ -135,9 +133,7 @@ impl<'a> Printer<'a> {
                 doc::text_owned(normalize_number_literal(raw))
             }
             LiteralValue::String { content: _, quote } => {
-                let start = literal.span.start as usize;
-                let end = literal.span.end as usize;
-                let raw_literal = &self.source[start..end];
+                let raw_literal = literal.span.extract(self.source);
                 let raw_content = &raw_literal[1..raw_literal.len() - 1];
                 let formatted =
                     format_string_literal(raw_content, *quote, StringFormatOptions::default());

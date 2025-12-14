@@ -7,7 +7,7 @@
 // See TODO_COMMENTS.md "Issue 3" for impact on comment tests.
 
 use crate::ast::internal::*;
-use crate::lexer::{Lexer, TokenKind};
+use crate::lexer::{KeywordKind, Lexer, TokenKind};
 use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
@@ -186,8 +186,9 @@ impl<'a> Parser<'a> {
 
     // Helper methods for extract-then-advance pattern
 
-    pub(super) fn current_kind(&self) -> TokenKind {
-        self.current_kind.clone()
+    #[inline]
+    pub(super) fn current_kind(&self) -> &TokenKind {
+        &self.current_kind
     }
 
     /// Update current token state from a new token (for template continuation)
@@ -198,6 +199,7 @@ impl<'a> Parser<'a> {
         self.current_decoded = token.decoded;
     }
 
+    #[inline]
     pub(super) fn current_pos(&self) -> (usize, usize) {
         (
             self.current_start + self.base_offset,
@@ -209,6 +211,7 @@ impl<'a> Parser<'a> {
     ///
     /// Useful for determining where statements end after consuming optional tokens
     /// like semicolons (via ASI or explicit).
+    #[inline]
     pub(super) fn prev_token_end(&self) -> usize {
         self.prev_end + self.base_offset
     }
@@ -218,6 +221,7 @@ impl<'a> Parser<'a> {
         self.current_end
     }
 
+    #[inline]
     pub(super) fn current_value(&self) -> &str {
         &self.source[self.current_start..self.current_end]
     }
@@ -255,6 +259,99 @@ impl<'a> Parser<'a> {
     /// interning to ensure escaped identifiers are handled correctly.
     pub(super) fn intern_identifier(&self) -> DefaultSymbol {
         self.intern(self.current_identifier_name())
+    }
+
+    // Error construction helpers - reduce boilerplate for common error patterns
+
+    /// Create an error with custom message at current position
+    pub(super) fn error_msg(&self, message: &str) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: message.to_string(),
+            position: self.current_pos().0,
+            context: None,
+        }
+    }
+
+    /// Create an error with custom message at custom position
+    pub(super) fn error_msg_at(&self, message: &str, position: usize) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: message.to_string(),
+            position,
+            context: None,
+        }
+    }
+
+    /// Create an error: "Expected X"
+    pub(super) fn error_expected(&self, what: &str) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: format!("Expected {what}"),
+            position: self.current_pos().0,
+            context: None,
+        }
+    }
+
+    /// Create an error: "Expected X" at custom position
+    pub(super) fn error_expected_at(&self, what: &str, position: usize) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: format!("Expected {what}"),
+            position,
+            context: None,
+        }
+    }
+
+    /// Create an error: "Expected X, found Y"
+    pub(super) fn error_expected_found(&self, what: &str) -> ParseError {
+        let kind = &self.current_kind;
+        ParseError::InvalidSyntax {
+            message: format!("Expected {what}, found {kind}"),
+            position: self.current_pos().0,
+            context: None,
+        }
+    }
+
+    /// Create an error: "Expected X, found Y" at custom position
+    pub(super) fn error_expected_found_at(&self, what: &str, position: usize) -> ParseError {
+        let kind = &self.current_kind;
+        ParseError::InvalidSyntax {
+            message: format!("Expected {what}, found {kind}"),
+            position,
+            context: None,
+        }
+    }
+
+    /// Create an error: "Expected X after Y, found Z"
+    pub(super) fn error_expected_after(&self, what: &str, after: &str) -> ParseError {
+        let kind = &self.current_kind;
+        ParseError::InvalidSyntax {
+            message: format!("Expected {what} after '{after}', found {kind}"),
+            position: self.current_pos().0,
+            context: None,
+        }
+    }
+
+    /// Create an error: "Unexpected keyword 'X'"
+    pub(super) fn error_unexpected_keyword(&self, kw: KeywordKind) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: format!("Unexpected keyword '{kw}'"),
+            position: self.current_pos().0,
+            context: None,
+        }
+    }
+
+    /// Create an error: "Expected 'X' or 'Y' after list element, found Z"
+    pub(super) fn error_list_separator(
+        &self,
+        separator: &TokenKind,
+        terminator: &TokenKind,
+    ) -> ParseError {
+        let kind = &self.current_kind;
+        ParseError::InvalidSyntax {
+            message: format!(
+                "Expected '{separator}' or '{terminator}' after list element, found {kind}"
+            ),
+            position: self.current_pos().0,
+            context: None,
+        }
     }
 
     pub(super) fn check(&self, kind: &TokenKind) -> bool {
@@ -417,11 +514,7 @@ impl<'a> Parser<'a> {
 
         // Must be followed by an identifier
         if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected identifier after '#'".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected_after("identifier", "#"));
         }
 
         let (_, end) = self.current_pos();
@@ -595,11 +688,7 @@ impl<'a> Parser<'a> {
         if self.can_insert_semicolon() {
             return Ok(());
         }
-        Err(ParseError::InvalidSyntax {
-            message: "Expected ';'".to_string(),
-            position: self.current_pos().0,
-            context: None,
-        })
+        Err(self.error_expected("';'"))
     }
 
     /// Handle list separator (comma) and terminator in list parsing
@@ -641,14 +730,7 @@ impl<'a> Parser<'a> {
         } else if self.check(terminator) {
             Ok(false) // End of list
         } else {
-            Err(ParseError::InvalidSyntax {
-                message: format!(
-                    "Expected '{}' or '{}' after list element, found {}",
-                    separator, terminator, self.current_kind
-                ),
-                position: self.current_pos().0,
-                context: None,
-            })
+            Err(self.error_list_separator(separator, terminator))
         }
     }
 
@@ -686,11 +768,8 @@ impl<'a> Parser<'a> {
                             // Parse the parameter name
                             let (id_start, id_end) = self.current_pos();
                             if !matches!(self.current_kind(), TokenKind::Identifier) {
-                                return Err(ParseError::InvalidSyntax {
-                                    message: "Expected parameter name after modifier".to_string(),
-                                    position: id_start,
-                                    context: None,
-                                });
+                                return Err(self
+                                    .error_expected_at("parameter name after modifier", id_start));
                             }
                             let symbol = self.intern_identifier();
                             self.advance()?;
@@ -847,14 +926,9 @@ impl<'a> Parser<'a> {
                         })
                     }
                     _ => {
-                        return Err(ParseError::InvalidSyntax {
-                            message: format!(
-                                "Expected parameter name or destructuring pattern, found {}",
-                                self.current_kind()
-                            ),
-                            position: self.current_pos().0,
-                            context: None,
-                        });
+                        return Err(
+                            self.error_expected_found("parameter name or destructuring pattern")
+                        );
                     }
                 };
 

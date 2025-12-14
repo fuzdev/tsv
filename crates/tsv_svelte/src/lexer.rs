@@ -98,6 +98,7 @@ impl<'a> Lexer<'a> {
         Self::new(source)
     }
 
+    #[inline]
     fn advance(&mut self) {
         if let Some(ch) = self.current {
             self.position += ch.len_utf8();

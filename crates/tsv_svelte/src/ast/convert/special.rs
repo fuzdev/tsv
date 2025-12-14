@@ -149,13 +149,11 @@ pub(super) fn convert_style(
     let styles = style.content_span.extract(source).to_string();
 
     // Delegate to tsv_css for CSS node conversion
-    // Filter out comments to match Svelte's CSS parser output
-    // (Our internal AST has comments for the formatter, but public JSON AST should match Svelte)
+    // Comments are stored separately in stylesheet.comments and not included in JSON output
     let children: Vec<serde_json::Value> = style
         .css_stylesheet
         .nodes
         .iter()
-        .filter(|node| !matches!(node, tsv_css::ast::internal::CssNode::Comment(_)))
         .map(|node| tsv_css::ast::convert::convert_css_node(node, source))
         .collect();
 

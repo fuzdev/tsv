@@ -69,9 +69,7 @@ impl<'a> Printer<'a> {
                     super::expressions::normalize_number_literal(lit.span.extract(self.source))
                 }
                 LiteralValue::String { content: _, quote } => {
-                    let start = lit.span.start as usize;
-                    let end = lit.span.end as usize;
-                    let raw_literal = &self.source[start..end];
+                    let raw_literal = lit.span.extract(self.source);
                     let raw_content = &raw_literal[1..raw_literal.len() - 1];
                     tsv_lang::printing::format_string_literal(
                         raw_content,
@@ -294,16 +292,12 @@ impl<'a> Printer<'a> {
                     .map(|p| self.expression_to_string(p))
                     .collect();
                 // For inline string, we just extract body from source
-                let body_start = func.body.span.start as usize;
-                let body_end = func.body.span.end as usize;
-                let body_str = &self.source[body_start..body_end];
+                let body_str = func.body.span.extract(self.source);
                 format!("({}) {}", params.join(", "), body_str)
             }
             Expression::ClassExpression(class_expr) => {
                 // Class expression: class [Name] [<T>] [extends Base] { ... }
-                let class_start = class_expr.span.start as usize;
-                let class_end = class_expr.span.end as usize;
-                self.source[class_start..class_end].to_string()
+                class_expr.span.extract(self.source).to_string()
             }
             Expression::AwaitExpression(await_expr) => {
                 format!("await {}", self.expression_to_string(&await_expr.argument))

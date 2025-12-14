@@ -41,11 +41,7 @@ fn parse_scope_prelude(
 
     // Expect opening paren
     if !parser.check(&TokenKind::LeftParen) {
-        return Err(ParseError::InvalidSyntax {
-            message: "Expected '(' in @scope prelude".to_string(),
-            position: parser.base_offset() + parser.current_start,
-            context: None,
-        });
+        return Err(parser.error_expected("'(' in @scope prelude"));
     }
     parser.advance()?; // consume '('
     parser.skip_whitespace()?;
@@ -57,11 +53,7 @@ fn parse_scope_prelude(
 
     // Expect closing paren
     if !parser.check(&TokenKind::RightParen) {
-        return Err(ParseError::InvalidSyntax {
-            message: "Expected ')' after @scope root selectors".to_string(),
-            position: parser.base_offset() + parser.current_start,
-            context: None,
-        });
+        return Err(parser.error_expected_after("')'", "@scope root selectors"));
     }
     let end_after_root_paren = parser.base_offset() + parser.current_end;
     parser.advance()?; // consume ')'
@@ -79,11 +71,7 @@ fn parse_scope_prelude(
 
             // Expect opening paren
             if !parser.check(&TokenKind::LeftParen) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected '(' after 'to' in @scope prelude".to_string(),
-                    position: parser.base_offset() + parser.current_start,
-                    context: None,
-                });
+                return Err(parser.error_expected_after("'('", "'to' in @scope prelude"));
             }
             parser.advance()?; // consume '('
             parser.skip_whitespace()?;
@@ -95,11 +83,7 @@ fn parse_scope_prelude(
 
             // Expect closing paren
             if !parser.check(&TokenKind::RightParen) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected ')' after @scope limit selectors".to_string(),
-                    position: parser.base_offset() + parser.current_start,
-                    context: None,
-                });
+                return Err(parser.error_expected_after("')'", "@scope limit selectors"));
             }
             let end_after_limit_paren = parser.base_offset() + parser.current_end;
             parser.advance()?; // consume ')'
@@ -148,12 +132,14 @@ fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span),
     if is_function {
         // url() function
         values.push(parse_function_value(parser)?);
-    } else if let TokenKind::String { content, quote } = &parser.current_kind {
+    } else if let TokenKind::String { quote } = &parser.current_kind {
         // Bare string
         let value_start = (parser.base_offset() + parser.current_start) as u32;
         let value_end = (parser.base_offset() + parser.current_end) as u32;
+        // Extract content without quotes
+        let content = parser.source()[parser.current_start + 1..parser.current_end - 1].to_string();
         values.push(CssValue::String {
-            content: content.clone(),
+            content,
             quote: *quote,
             span: Span {
                 start: value_start,
@@ -162,11 +148,7 @@ fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span),
         });
         parser.advance()?;
     } else {
-        return Err(ParseError::InvalidSyntax {
-            message: "@import expects url() or string".to_string(),
-            position: parser.base_offset() + parser.current_start,
-            context: None,
-        });
+        return Err(parser.error_msg("@import expects url() or string"));
     }
 
     parser.skip_whitespace()?;
@@ -259,22 +241,14 @@ fn parse_function_value(parser: &mut CssParser) -> Result<CssValue, ParseError> 
             .unwrap_or_else(|| parser.current_value())
             .to_string()
     } else {
-        return Err(ParseError::InvalidSyntax {
-            message: "Expected function name".to_string(),
-            position: parser.base_offset() + parser.current_start,
-            context: None,
-        });
+        return Err(parser.error_expected("function name"));
     };
 
     parser.advance()?; // consume function name
 
     // Expect '('
     if !parser.check(&TokenKind::LeftParen) {
-        return Err(ParseError::InvalidSyntax {
-            message: "Expected ( after function name".to_string(),
-            position: parser.base_offset() + parser.current_start,
-            context: None,
-        });
+        return Err(parser.error_expected_after("'('", "function name"));
     }
 
     parser.advance()?; // consume '('
@@ -285,11 +259,14 @@ fn parse_function_value(parser: &mut CssParser) -> Result<CssValue, ParseError> 
     if name == "url" {
         // url() - parse the URL argument (string or bare URL)
         parser.skip_whitespace()?;
-        if let TokenKind::String { content, quote } = &parser.current_kind {
+        if let TokenKind::String { quote } = &parser.current_kind {
             let arg_start = (parser.base_offset() + parser.current_start) as u32;
             let arg_end = (parser.base_offset() + parser.current_end) as u32;
+            // Extract content without quotes
+            let content =
+                parser.source()[parser.current_start + 1..parser.current_end - 1].to_string();
             args.push(CssValue::String {
-                content: content.clone(),
+                content,
                 quote: *quote,
                 span: Span {
                     start: arg_start,
@@ -351,10 +328,14 @@ fn parse_function_value(parser: &mut CssParser) -> Result<CssValue, ParseError> 
                     .current_identifier()
                     .unwrap_or_else(|| parser.current_value())
                     .to_string(),
-                TokenKind::String { content, quote } => format!("{quote}{content}{quote}"),
-                TokenKind::Number(n) => n.to_string(),
-                TokenKind::Percentage(n) => format!("{n}%"),
-                TokenKind::Dimension(n, unit) => format!("{n}{unit}"),
+                TokenKind::String { quote } => {
+                    let content =
+                        &parser.source()[parser.current_start + 1..parser.current_end - 1];
+                    format!("{quote}{content}{quote}")
+                }
+                TokenKind::Number | TokenKind::Percentage | TokenKind::Dimension { .. } => {
+                    parser.current_value().to_string()
+                }
                 _ => parser.current_value().to_string(),
             };
 
@@ -386,9 +367,9 @@ fn parse_function_value(parser: &mut CssParser) -> Result<CssValue, ParseError> 
                     if matches!(
                         last_non_whitespace_kind,
                         Some(TokenKind::Identifier)
-                            | Some(TokenKind::Number(_))
-                            | Some(TokenKind::Dimension(_, _))
-                            | Some(TokenKind::Percentage(_))
+                            | Some(TokenKind::Number)
+                            | Some(TokenKind::Dimension { .. })
+                            | Some(TokenKind::Percentage)
                     ) {
                         condition_parts.push(" ".to_string());
                     }
@@ -422,11 +403,7 @@ fn parse_function_value(parser: &mut CssParser) -> Result<CssValue, ParseError> 
     }
 
     if !parser.check(&TokenKind::RightParen) {
-        return Err(ParseError::InvalidSyntax {
-            message: "Expected ) to close function".to_string(),
-            position: parser.base_offset() + parser.current_start,
-            context: None,
-        });
+        return Err(parser.error_expected("')' to close function"));
     }
 
     let value_end = (parser.base_offset() + parser.current_end) as u32;
@@ -456,11 +433,7 @@ pub(crate) fn parse_atrule(
 
     // Parse at-rule name (identifier after @)
     if !parser.check(&TokenKind::Identifier) {
-        return Err(ParseError::InvalidSyntax {
-            message: "Expected at-rule name after @".to_string(),
-            position: parser.base_offset() + parser.current_start,
-            context: None,
-        });
+        return Err(parser.error_expected_after("at-rule name", "@"));
     }
 
     // Internal AST: use decoded value (spec-compliant)
@@ -547,11 +520,15 @@ pub(crate) fn parse_atrule(
                     .current_identifier()
                     .unwrap_or_else(|| parser.current_value())
                     .to_string(),
-                TokenKind::String { content, quote } => format!("{quote}{content}{quote}"),
-                TokenKind::Number(n) => n.to_string(),
-                TokenKind::Percentage(n) => format!("{n}%"),
-                TokenKind::Dimension(n, unit) => format!("{n}{unit}"),
-                TokenKind::Comment(_) => {
+                TokenKind::String { quote } => {
+                    let content =
+                        &parser.source()[parser.current_start + 1..parser.current_end - 1];
+                    format!("{quote}{content}{quote}")
+                }
+                TokenKind::Number | TokenKind::Percentage | TokenKind::Dimension { .. } => {
+                    parser.current_value().to_string()
+                }
+                TokenKind::Comment => {
                     // Include comments in prelude (Svelte includes them in the prelude string)
                     parser.current_value().to_string()
                 }
@@ -603,9 +580,9 @@ pub(crate) fn parse_atrule(
                         && matches!(
                             last_non_whitespace_kind,
                             Some(TokenKind::Identifier)
-                                | Some(TokenKind::Number(_))
-                                | Some(TokenKind::Dimension(_, _))
-                                | Some(TokenKind::Percentage(_))
+                                | Some(TokenKind::Number)
+                                | Some(TokenKind::Dimension { .. })
+                                | Some(TokenKind::Percentage)
                         );
 
                     if should_add_space {
@@ -651,11 +628,7 @@ pub(crate) fn parse_atrule(
             },
         });
     } else {
-        return Err(ParseError::InvalidSyntax {
-            message: "Expected '{' or ';' after at-rule prelude".to_string(),
-            position: parser.base_offset() + parser.current_start,
-            context: None,
-        });
+        return Err(parser.error_expected_after("'{' or ';'", "at-rule prelude"));
     };
 
     Ok(CssAtrule {
@@ -719,16 +692,19 @@ fn parse_atrule_block(
 
     while !parser.check(&TokenKind::RightBrace) && !parser.check(&TokenKind::Eof) {
         // Handle comments
-        if let TokenKind::Comment(content) = &parser.current_kind {
+        if matches!(&parser.current_kind, TokenKind::Comment) {
             let comment_start = parser.base_offset() + parser.current_start;
             let comment_end = parser.base_offset() + parser.current_end;
-            let content = content.clone();
+            // Extract content without /* */ delimiters
+            let content =
+                parser.source()[parser.current_start + 2..parser.current_end - 2].to_string();
 
             parser.advance()?;
             parser.skip_whitespace()?;
 
-            children.push(CssBlockChild::Comment(CssComment {
+            children.push(CssBlockChild::Comment(Comment {
                 content,
+                is_block: true,
                 span: Span {
                     start: comment_start as u32,
                     end: comment_end as u32,
@@ -780,20 +756,12 @@ fn parse_atrule_block(
         }
 
         // Fallback: unexpected token
-        return Err(ParseError::InvalidSyntax {
-            message: format!("Unexpected token in @{atrule_name} block"),
-            position: parser.base_offset() + parser.current_start,
-            context: None,
-        });
+        return Err(parser.error_unexpected(&format!("token in @{atrule_name} block")));
     }
 
     // Expect }
     if !parser.check(&TokenKind::RightBrace) {
-        return Err(ParseError::InvalidSyntax {
-            message: "Expected '}'".to_string(),
-            position: parser.base_offset() + parser.current_start,
-            context: None,
-        });
+        return Err(parser.error_expected("'}'"));
     }
     let end = parser.base_offset() + parser.current_end;
     parser.advance()?; // consume }

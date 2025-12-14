@@ -86,13 +86,13 @@ impl<'a> Parser<'a> {
 
         // Check for `using` contextual keyword (ES2024 Explicit Resource Management)
         // `for (using resource of resources) { ... }`
-        let is_using = self.current_kind() == TokenKind::Identifier
+        let is_using = *self.current_kind() == TokenKind::Identifier
             && self.current_value() == "using"
             && self.peek_is_identifier();
 
         // Check for `await using` in for-of
         // `for await (await using resource of resources) { ... }`
-        let is_await_using = self.current_kind() == TokenKind::Keyword(KeywordKind::Await)
+        let is_await_using = *self.current_kind() == TokenKind::Keyword(KeywordKind::Await)
             && self.peek_is_identifier()
             && self.peek_value() == "using";
 
@@ -110,11 +110,7 @@ impl<'a> Parser<'a> {
                 );
             }
 
-            return Err(ParseError::InvalidSyntax {
-                message: "'await using' can only be used in for-of loops".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_msg("'await using' can only be used in for-of loops"));
         }
 
         if is_using {
@@ -131,11 +127,7 @@ impl<'a> Parser<'a> {
                 );
             }
 
-            return Err(ParseError::InvalidSyntax {
-                message: "'using' can only be used in for-of loops".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_msg("'using' can only be used in for-of loops"));
         }
 
         if is_var_decl {
@@ -295,11 +287,7 @@ impl<'a> Parser<'a> {
 
         // Expect 'while'
         if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::While)) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected 'while' after do statement body".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected_after("'while'", "do statement body"));
         }
         self.advance()?;
 
@@ -368,11 +356,7 @@ impl<'a> Parser<'a> {
             self.advance()?;
             None
         } else {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected 'case' or 'default'".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("'case' or 'default'"));
         };
 
         self.expect(&TokenKind::Colon)?;
@@ -389,7 +373,7 @@ impl<'a> Parser<'a> {
             consequent.push(self.parse_statement()?);
         }
 
-        let end = consequent.last().map_or(start, |s| s.span().end as usize);
+        let end = consequent.last().map_or(start, |s| s.span().end_usize());
 
         Ok(SwitchCase {
             test,
@@ -432,11 +416,7 @@ impl<'a> Parser<'a> {
 
         // Must have at least catch or finally
         if handler.is_none() && finalizer.is_none() {
-            return Err(ParseError::InvalidSyntax {
-                message: "Missing catch or finally after try".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_msg("Missing catch or finally after try"));
         }
 
         let end = finalizer.as_ref().map_or_else(
@@ -498,11 +478,7 @@ impl<'a> Parser<'a> {
         // throw must have an argument (no line terminator allowed between throw and expr)
         // ASI: `throw\nexpr` is a syntax error, not `throw; expr;`
         if self.can_insert_semicolon() {
-            return Err(ParseError::InvalidSyntax {
-                message: "Illegal newline after throw".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_msg("Illegal newline after throw"));
         }
 
         let argument = self.parse_expression()?;

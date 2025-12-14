@@ -151,7 +151,7 @@ impl<'a> Printer<'a> {
 
         // Opening tag
         self.write("{#await ");
-        self.write(&self.source[block.expression.span().range()]);
+        self.write(block.expression.span().extract(self.source));
 
         // Determine main fragment for inline detection
         let main_fragment = if is_shorthand_then {
@@ -167,7 +167,7 @@ impl<'a> Printer<'a> {
             // {#await expr then value}
             if let Some(value) = &block.value {
                 self.write(" then ");
-                self.write(&self.source[value.span().range()]);
+                self.write(value.span().extract(self.source));
             }
             self.write("}");
             if let Some(then_block) = &block.then {
@@ -177,7 +177,7 @@ impl<'a> Printer<'a> {
             // {#await expr catch error}
             if let Some(error) = &block.error {
                 self.write(" catch ");
-                self.write(&self.source[error.span().range()]);
+                self.write(error.span().extract(self.source));
             }
             self.write("}");
             if let Some(catch_block) = &block.catch {
@@ -194,7 +194,7 @@ impl<'a> Printer<'a> {
                 self.write_continuation("{:then", is_inline);
                 if let Some(value) = &block.value {
                     self.write(" ");
-                    self.write(&self.source[value.span().range()]);
+                    self.write(value.span().extract(self.source));
                 }
                 self.write("}");
                 self.format_block_body(then_block);
@@ -204,7 +204,7 @@ impl<'a> Printer<'a> {
                 self.write_continuation("{:catch", is_inline);
                 if let Some(error) = &block.error {
                     self.write(" ");
-                    self.write(&self.source[error.span().range()]);
+                    self.write(error.span().extract(self.source));
                 }
                 self.write("}");
                 self.format_block_body(catch_block);
@@ -222,7 +222,7 @@ impl<'a> Printer<'a> {
     /// Format a key block: {#key expr}...{/key}
     pub(super) fn print_key_block(&mut self, block: &internal::KeyBlock) {
         self.write("{#key ");
-        self.write(&self.source[block.expression.span().range()]);
+        self.write(block.expression.span().extract(self.source));
         self.write("}");
 
         let is_inline = self.format_block_body(&block.fragment);
@@ -236,7 +236,7 @@ impl<'a> Printer<'a> {
     /// Format a snippet block: {#snippet name(params)}...{/snippet}
     pub(super) fn print_snippet_block(&mut self, block: &internal::SnippetBlock) {
         self.write("{#snippet ");
-        self.write(&self.source[block.expression.span().range()]);
+        self.write(block.expression.span().extract(self.source));
 
         // Type parameters (generics)
         if let Some(ref type_params) = block.type_parameters {

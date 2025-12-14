@@ -1,5 +1,5 @@
 use crate::cli::input_parser;
-use crate::deno::{run_prettier, PrettierParser};
+use crate::deno::{PrettierParser, run_prettier};
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
 use tsv_cli::cli::input::{Input, ParserType};

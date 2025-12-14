@@ -2,8 +2,7 @@
 
 use super::super::Printer;
 use crate::ast::internal;
-use string_interner::Symbol;
-use tsv_lang::{SymbolResolver, doc};
+use tsv_lang::{SymbolResolver, SymbolToU32, doc};
 
 impl<'a> Printer<'a> {
     /// Print a class declaration or anonymous class: `class Foo {}` or `class {}`
@@ -71,7 +70,7 @@ impl<'a> Printer<'a> {
         parts.push(doc::text("class"));
         if let Some(id) = &decl.id {
             parts.push(doc::text(" "));
-            parts.push(doc::symbol(id.name.to_usize() as u32));
+            parts.push(doc::symbol(id.name.to_u32()));
         }
 
         let has_extends = decl.super_class.is_some();

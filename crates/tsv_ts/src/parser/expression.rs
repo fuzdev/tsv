@@ -268,8 +268,8 @@ impl ParsedExpr {
     fn from_expr(expr: Expression) -> Self {
         let span = expr.span();
         Self {
-            actual_start: span.start as usize,
-            actual_end: span.end as usize,
+            actual_start: span.start_usize(),
+            actual_end: span.end_usize(),
             expr,
         }
     }
@@ -277,7 +277,7 @@ impl ParsedExpr {
     /// Create a ParsedExpr with explicit actual_end (for parenthesized expressions)
     fn with_end(expr: Expression, actual_end: usize) -> Self {
         Self {
-            actual_start: expr.span().start as usize,
+            actual_start: expr.span().start_usize(),
             actual_end,
             expr,
         }
@@ -383,10 +383,10 @@ impl<'a> Parser<'a> {
 
         // Parse infix operators
         loop {
-            let kind = self.current_kind().clone();
+            let kind = self.current_kind();
 
             // Check if this is an infix operator
-            let Some((left_bp, right_bp, operator)) = infix_operator_info(&kind) else {
+            let Some((left_bp, right_bp, operator)) = infix_operator_info(kind) else {
                 break;
             };
 
@@ -433,7 +433,7 @@ impl<'a> Parser<'a> {
                             span,
                         }),
                         actual_start: expr_start,
-                        actual_end: span.end as usize,
+                        actual_end: span.end_usize(),
                     };
                 }
                 TokenKind::Keyword(KeywordKind::Satisfies) => {
@@ -447,7 +447,7 @@ impl<'a> Parser<'a> {
                             span,
                         }),
                         actual_start: expr_start,
-                        actual_end: span.end as usize,
+                        actual_end: span.end_usize(),
                     };
                 }
                 _ => break,
@@ -656,10 +656,10 @@ impl<'a> Parser<'a> {
 
                     // Property must be an identifier, keyword, or private identifier
                     // Keywords are valid property names: obj.class, obj.if, obj.default()
-                    let (property, prop_end) = if self.current_kind() == TokenKind::Hash {
+                    let (property, prop_end) = if *self.current_kind() == TokenKind::Hash {
                         // Private identifier: obj.#private
                         let private_id = self.parse_private_identifier()?;
-                        let end = private_id.span.end as usize;
+                        let end = private_id.span.end_usize();
                         (Expression::PrivateIdentifier(private_id), end)
                     } else if self.current_is_identifier_or_keyword() {
                         let (prop_start, prop_end) = self.current_pos();
@@ -675,14 +675,7 @@ impl<'a> Parser<'a> {
                             prop_end,
                         )
                     } else {
-                        return Err(ParseError::InvalidSyntax {
-                            message: format!(
-                                "Expected property name after '.', found {}",
-                                self.current_kind()
-                            ),
-                            position: self.current_pos().0,
-                            context: None,
-                        });
+                        return Err(self.error_expected_after("property name", "."));
                     };
 
                     let span = Span::new(left.actual_start as u32, prop_end as u32);
@@ -705,7 +698,7 @@ impl<'a> Parser<'a> {
                         TokenKind::Hash => {
                             // obj?.#private - optional private property access
                             let private_id = self.parse_private_identifier()?;
-                            let prop_end = private_id.span.end as usize;
+                            let prop_end = private_id.span.end_usize();
 
                             let span = Span::new(left.actual_start as u32, prop_end as u32);
                             left = ParsedExpr::with_end(
@@ -782,14 +775,9 @@ impl<'a> Parser<'a> {
                             );
                         }
                         _ => {
-                            return Err(ParseError::InvalidSyntax {
-                                message: format!(
-                                    "Expected property name, '[', or '(' after '?.', found {}",
-                                    self.current_kind()
-                                ),
-                                position: self.current_pos().0,
-                                context: None,
-                            });
+                            return Err(
+                                self.error_expected_after("property name, '[', or '('", "?.")
+                            );
                         }
                     }
                 }
@@ -843,7 +831,7 @@ impl<'a> Parser<'a> {
                                 quasi: template,
                                 span,
                             }),
-                            quasi_span.end as usize,
+                            quasi_span.end_usize(),
                         );
                     }
                 }
@@ -854,7 +842,7 @@ impl<'a> Parser<'a> {
                     // ASI Rule: If there's a line terminator before ++/--, ASI fires
                     // and the ++/-- becomes a prefix operator on the next statement.
                     // So we only parse postfix if NO line terminator preceded this token.
-                    let operator = if kind == TokenKind::PlusPlus {
+                    let operator = if *kind == TokenKind::PlusPlus {
                         UpdateOperator::Increment
                     } else {
                         UpdateOperator::Decrement
@@ -913,11 +901,8 @@ impl<'a> Parser<'a> {
             TokenKind::Number => {
                 let (start, end) = self.current_pos();
                 let raw = self.current_value();
-                let number = parse_number_literal(raw).map_err(|_| ParseError::InvalidSyntax {
-                    message: format!("Invalid number: {raw}"),
-                    position: start,
-                    context: None,
-                })?;
+                let number = parse_number_literal(raw)
+                    .map_err(|_| self.error_msg_at(&format!("Invalid number: {raw}"), start))?;
                 self.advance()?;
                 Ok(ParsedExpr::with_end(
                     Expression::Literal(Literal {
@@ -1074,7 +1059,7 @@ impl<'a> Parser<'a> {
             TokenKind::Hash => {
                 // Private identifier as standalone expression (for brand check: #field in obj)
                 let private_id = self.parse_private_identifier()?;
-                let end = private_id.span.end as usize;
+                let end = private_id.span.end_usize();
                 Ok(ParsedExpr::with_end(
                     Expression::PrivateIdentifier(private_id),
                     end,
@@ -1389,7 +1374,7 @@ impl<'a> Parser<'a> {
                 self.advance()?; // consume '...'
                 // Use assignment_expression because comma separates properties
                 let argument = self.parse_assignment_expression()?;
-                let prop_end = argument.span().end as usize;
+                let prop_end = argument.span().end_usize();
                 properties.push(ObjectProperty::SpreadElement(SpreadElement {
                     argument: Box::new(argument),
                     span: Span::new(prop_start as u32, prop_end as u32),
@@ -1422,7 +1407,7 @@ impl<'a> Parser<'a> {
             // Note: async getters/setters and generator getters/setters are not valid in JS
             let accessor_kind = if !is_async_method
                 && !is_generator
-                && self.current_kind() == TokenKind::Identifier
+                && *self.current_kind() == TokenKind::Identifier
             {
                 let is_get = self.current_value() == "get";
                 let is_set = self.current_value() == "set";
@@ -1501,11 +1486,7 @@ impl<'a> Parser<'a> {
                     )
                 }
                 _ => {
-                    return Err(ParseError::InvalidSyntax {
-                        message: format!("Expected property key, found {}", self.current_kind()),
-                        position: prop_start,
-                        context: None,
-                    });
+                    return Err(self.error_expected_found_at("property key", prop_start));
                 }
             };
 
@@ -1562,7 +1543,7 @@ impl<'a> Parser<'a> {
             };
 
             // Property span should end at value's end, not including trailing comments
-            let prop_end = value.span().end as usize;
+            let prop_end = value.span().end_usize();
             properties.push(ObjectProperty::Property(Property {
                 key,
                 value,
@@ -1858,9 +1839,9 @@ impl<'a> Parser<'a> {
         self.advance()?; // consume 'new'
 
         // Check for new.target meta property
-        if self.current_kind() == TokenKind::Dot {
+        if *self.current_kind() == TokenKind::Dot {
             self.advance()?; // consume '.'
-            if self.current_kind() == TokenKind::Identifier && self.current_value() == "target" {
+            if *self.current_kind() == TokenKind::Identifier && self.current_value() == "target" {
                 let (prop_start, prop_end) = self.current_pos();
                 self.advance()?; // consume 'target'
                 return Ok(Expression::MetaProperty(MetaProperty {
@@ -1879,14 +1860,7 @@ impl<'a> Parser<'a> {
                     span: Span::new(start as u32, prop_end as u32),
                 }));
             }
-            return Err(ParseError::InvalidSyntax {
-                message: format!(
-                    "Expected 'target' after 'new.', found '{}'",
-                    self.current_value()
-                ),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected_after("'target'", "new."));
         }
 
         // Parse the callee - this could be an identifier, member expression, or even nested `new`
@@ -1907,14 +1881,7 @@ impl<'a> Parser<'a> {
                     self.advance()?; // consume '.'
                     // Keywords are valid property names: new Foo.class()
                     if !self.current_is_identifier_or_keyword() {
-                        return Err(ParseError::InvalidSyntax {
-                            message: format!(
-                                "Expected property name after '.', found {}",
-                                self.current_kind()
-                            ),
-                            position: self.current_pos().0,
-                            context: None,
-                        });
+                        return Err(self.error_expected_after("property name", "."));
                     }
                     let (prop_start, prop_end) = self.current_pos();
                     let name = self.intern(self.current_property_name());
@@ -2009,9 +1976,9 @@ impl<'a> Parser<'a> {
         self.advance()?; // consume 'import'
 
         // Check for import.meta meta property
-        if self.current_kind() == TokenKind::Dot {
+        if *self.current_kind() == TokenKind::Dot {
             self.advance()?; // consume '.'
-            if self.current_kind() == TokenKind::Identifier && self.current_value() == "meta" {
+            if *self.current_kind() == TokenKind::Identifier && self.current_value() == "meta" {
                 let (prop_start, prop_end) = self.current_pos();
                 self.advance()?; // consume 'meta'
                 return Ok(Expression::MetaProperty(MetaProperty {
@@ -2030,14 +1997,7 @@ impl<'a> Parser<'a> {
                     span: Span::new(start as u32, prop_end as u32),
                 }));
             }
-            return Err(ParseError::InvalidSyntax {
-                message: format!(
-                    "Expected 'meta' after 'import.', found '{}'",
-                    self.current_value()
-                ),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected_after("'meta'", "import."));
         }
 
         // Dynamic import: import('module')
@@ -2184,11 +2144,7 @@ impl<'a> Parser<'a> {
                 None,
             )
         } else {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected '(' or identifier after 'async'".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected_after("'(' or identifier", "async"));
         };
 
         // Check for return type annotation or type predicate
@@ -2262,11 +2218,7 @@ impl<'a> Parser<'a> {
         // Parse statements until we hit '}'
         while !self.check(&TokenKind::BraceClose) {
             if self.check(&TokenKind::Eof) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Unexpected end of file in block".to_string(),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(self.error_msg("Unexpected end of file in block"));
             }
 
             let stmt = self.parse_statement()?;
@@ -2360,14 +2312,10 @@ impl<'a> Parser<'a> {
                     // Expect closing } of the interpolation
                     let (brace_start, _) = self.current_pos();
                     if !self.check(&TokenKind::BraceClose) {
-                        return Err(ParseError::InvalidSyntax {
-                            message: format!(
-                                "Expected '}}' at end of template interpolation, found {}",
-                                self.current_kind()
-                            ),
-                            position: brace_start,
-                            context: None,
-                        });
+                        return Err(self.error_expected_found_at(
+                            "'}' at end of template interpolation",
+                            brace_start,
+                        ));
                     }
 
                     // Get the raw end position (without base_offset) for the lexer
@@ -2382,7 +2330,7 @@ impl<'a> Parser<'a> {
                     let (elem_start, elem_end) = self.current_pos();
                     let raw = self.current_value().to_string();
 
-                    match self.current_kind().clone() {
+                    match *self.current_kind() {
                         TokenKind::TemplateMiddle => {
                             // More interpolations to come: }content${
                             let content = extract_template_head_content(&raw).to_string();
@@ -2420,14 +2368,9 @@ impl<'a> Parser<'a> {
                             break;
                         }
                         _ => {
-                            return Err(ParseError::InvalidSyntax {
-                                message: format!(
-                                    "Expected template middle or tail, found {}",
-                                    self.current_kind()
-                                ),
-                                position: elem_start,
-                                context: None,
-                            });
+                            return Err(
+                                self.error_expected_found_at("template middle or tail", elem_start)
+                            );
                         }
                     }
                 }
@@ -2440,11 +2383,7 @@ impl<'a> Parser<'a> {
                     span: Span::new(start as u32, end),
                 }))
             }
-            _ => Err(ParseError::InvalidSyntax {
-                message: format!("Expected template literal, found {}", self.current_kind()),
-                position: start,
-                context: None,
-            }),
+            _ => Err(self.error_expected_found_at("template literal", start)),
         }
     }
 
@@ -2529,11 +2468,7 @@ impl<'a> Parser<'a> {
             | Expression::RestElement(_) => Ok(expr),
 
             // Invalid assignment target
-            _ => Err(ParseError::InvalidSyntax {
-                message: "Invalid assignment target".to_string(),
-                position: expr.span().start as usize,
-                context: None,
-            }),
+            _ => Err(self.error_msg_at("Invalid assignment target", expr.span().start_usize())),
         }
     }
 

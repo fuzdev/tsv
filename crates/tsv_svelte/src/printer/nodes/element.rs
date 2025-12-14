@@ -733,7 +733,7 @@ impl<'a> Printer<'a> {
         if let Some(content) = content {
             // Format content based on tag type
             let formatted = if tag_name == "style" {
-                tsv_css::parse_css(content, 0).ok().map(|ast| {
+                tsv_css::parse(content).ok().map(|ast| {
                     let config = tsv_lang::PrintConfig {
                         base_indent_offset: self.indent_level + 1,
                         ..Default::default()

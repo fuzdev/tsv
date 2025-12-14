@@ -77,14 +77,7 @@ impl<'a> SvelteParser<'a> {
                     attributes.push(AttributeNode::Attribute(self.parse_shorthand_attribute()?));
                 }
             } else {
-                return Err(ParseError::InvalidSyntax {
-                    message: format!(
-                        "Expected attribute name or '>', found {}",
-                        self.current_kind
-                    ),
-                    position: self.current_start,
-                    context: None,
-                });
+                return Err(self.error_expected_found("attribute name or '>'"));
             }
         }
 
@@ -133,11 +126,10 @@ impl<'a> SvelteParser<'a> {
         let modifiers: Vec<String> = parts.map(str::to_string).collect();
 
         if directive_name.is_empty() {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Directive '{}' is missing a name", &full_name[..=colon_idx]),
-                position: start,
-                context: None,
-            });
+            return Err(self.error_msg_at(
+                &format!("Directive '{}' is missing a name", &full_name[..=colon_idx]),
+                start,
+            ));
         }
 
         self.advance()?; // consume the identifier
@@ -157,7 +149,7 @@ impl<'a> SvelteParser<'a> {
 
         // Calculate end position
         let end = if let Some(expr) = &expression {
-            expr.span().end as usize
+            expr.span().end_usize()
         } else {
             name_end
         };
@@ -248,11 +240,7 @@ impl<'a> SvelteParser<'a> {
     fn parse_directive_expression(&mut self) -> Result<Expression, ParseError> {
         // Expect { for expression
         if !self.check(TokenKind::LeftBrace) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Directive value must be an expression wrapped in {}".to_string(),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_msg("Directive value must be an expression wrapped in {}"));
         }
 
         // Parse as expression tag and extract the expression
@@ -296,12 +284,9 @@ impl<'a> SvelteParser<'a> {
                 let parts = self.parse_attribute_value()?;
                 StyleDirectiveValue::Parts(parts)
             } else {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Style directive value must be an expression or quoted string"
-                        .to_string(),
-                    position: self.current_start,
-                    context: None,
-                });
+                return Err(
+                    self.error_msg("Style directive value must be an expression or quoted string")
+                );
             }
         } else {
             // Shorthand: style:color (no value, uses variable with same name)
@@ -310,10 +295,10 @@ impl<'a> SvelteParser<'a> {
 
         // Calculate end position
         let end = match &value {
-            StyleDirectiveValue::ExpressionTag(et) => et.span.end as usize,
+            StyleDirectiveValue::ExpressionTag(et) => et.span.end_usize(),
             StyleDirectiveValue::Parts(parts) => parts.last().map_or(name_end, |p| match p {
-                AttributeValue::Text(t) => t.span.end as usize,
-                AttributeValue::ExpressionTag(et) => et.span.end as usize,
+                AttributeValue::Text(t) => t.span.end_usize(),
+                AttributeValue::ExpressionTag(et) => et.span.end_usize(),
             }),
             StyleDirectiveValue::True => name_end,
         };
@@ -365,11 +350,7 @@ impl<'a> SvelteParser<'a> {
         }
 
         if depth != 0 {
-            return Err(ParseError::InvalidSyntax {
-                message: "Unclosed {@attach} tag".to_string(),
-                position: start,
-                context: None,
-            });
+            return Err(self.error_unclosed_at("{@attach} tag", start));
         }
 
         // pos is now at the closing '}'
@@ -380,21 +361,13 @@ impl<'a> SvelteParser<'a> {
         let content = &self.source[content_start..content_end];
 
         // Parse: "attach expr"
-        let expr_str = content
-            .strip_prefix("attach ")
-            .ok_or_else(|| ParseError::InvalidSyntax {
-                message: "Expected 'attach' keyword".to_string(),
-                position: content_start,
-                context: None,
-            })?
-            .trim();
+        let Some(after_attach) = content.strip_prefix("attach ") else {
+            return Err(self.error_expected_at("'attach' keyword", content_start));
+        };
+        let expr_str = after_attach.trim();
 
         if expr_str.is_empty() {
-            return Err(ParseError::InvalidSyntax {
-                message: "{@attach} requires an expression".to_string(),
-                position: content_start,
-                context: None,
-            });
+            return Err(self.error_msg_at("{@attach} requires an expression", content_start));
         }
 
         // Calculate the offset of the expression in the source
@@ -449,11 +422,7 @@ impl<'a> SvelteParser<'a> {
         }
 
         if depth != 0 {
-            return Err(ParseError::InvalidSyntax {
-                message: "Unclosed spread attribute".to_string(),
-                position: start,
-                context: None,
-            });
+            return Err(self.error_unclosed_at("spread attribute", start));
         }
 
         // pos is now at the closing '}'
@@ -465,21 +434,13 @@ impl<'a> SvelteParser<'a> {
         let trimmed = content.trim_start();
 
         // Parse: "...expr"
-        let after_dots = trimmed
-            .strip_prefix("...")
-            .ok_or_else(|| ParseError::InvalidSyntax {
-                message: "Expected '...' in spread attribute".to_string(),
-                position: content_start,
-                context: None,
-            })?;
+        let Some(after_dots) = trimmed.strip_prefix("...") else {
+            return Err(self.error_expected_at("'...' in spread attribute", content_start));
+        };
         let expr_str = after_dots.trim();
 
         if expr_str.is_empty() {
-            return Err(ParseError::InvalidSyntax {
-                message: "Spread attribute requires an expression".to_string(),
-                position: content_start,
-                context: None,
-            });
+            return Err(self.error_msg_at("Spread attribute requires an expression", content_start));
         }
 
         // Calculate the offset of the expression in the source
@@ -526,11 +487,7 @@ impl<'a> SvelteParser<'a> {
         }
 
         if pos >= self.source.len() {
-            return Err(ParseError::InvalidSyntax {
-                message: "Unclosed shorthand attribute".to_string(),
-                position: start,
-                context: None,
-            });
+            return Err(self.error_unclosed_at("shorthand attribute", start));
         }
 
         // pos is now at the closing '}'
@@ -541,11 +498,9 @@ impl<'a> SvelteParser<'a> {
         let name_str = self.source[content_start..content_end].trim();
 
         if name_str.is_empty() {
-            return Err(ParseError::InvalidSyntax {
-                message: "Shorthand attribute requires an identifier".to_string(),
-                position: content_start,
-                context: None,
-            });
+            return Err(
+                self.error_msg_at("Shorthand attribute requires an identifier", content_start)
+            );
         }
 
         // Validate it's a valid identifier (simple check - no spaces or special chars)
@@ -553,11 +508,10 @@ impl<'a> SvelteParser<'a> {
             .chars()
             .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
         {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Invalid shorthand attribute: '{name_str}'"),
-                position: content_start,
-                context: None,
-            });
+            return Err(self.error_msg_at(
+                &format!("Invalid shorthand attribute: '{name_str}'"),
+                content_start,
+            ));
         }
 
         // Intern the name
@@ -602,11 +556,7 @@ impl<'a> SvelteParser<'a> {
 
         // Parse attribute name
         if !self.check(TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected attribute name, found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("attribute name"));
         }
 
         let name_str = self.current_value().to_string();
@@ -628,19 +578,15 @@ impl<'a> SvelteParser<'a> {
                         // For string values, the Text span covers content only (without quotes)
                         // The attribute span must include the closing quote, so add 1 to content_end
                         // Example: type="text" → Text span is "text" (positions 13-17), token is "text" (positions 12-18)
-                        text.span.end as usize + 1
+                        text.span.end_usize() + 1
                     }
                     AttributeValue::ExpressionTag(tag) => {
                         // Expression span already includes the closing } so use as-is
-                        tag.span.end as usize
+                        tag.span.end_usize()
                     }
                 }
             } else {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Attribute value is empty".to_string(),
-                    position: self.current_start,
-                    context: None,
-                });
+                return Err(self.error_msg("Attribute value is empty"));
             };
 
             Ok(Attribute {
@@ -698,14 +644,7 @@ impl<'a> SvelteParser<'a> {
 
         // Otherwise expect string value
         if !self.check(TokenKind::String) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!(
-                    "Expected string or expression value, found {}",
-                    self.current_kind
-                ),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("string or expression value"));
         }
 
         // Extract string content (without quotes)

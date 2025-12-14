@@ -1,5 +1,6 @@
 pub mod ast_diff;
 pub mod canonical_parse;
+pub mod check;
 pub mod compare;
 pub mod fixtures_update;
 pub mod fixtures_update_formatted;

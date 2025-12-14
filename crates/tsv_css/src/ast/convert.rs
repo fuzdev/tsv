@@ -201,19 +201,8 @@ fn format_css_value_for_json(value: &internal::CssValue) -> String {
 pub fn convert_css_node(node: &internal::CssNode, source: &str) -> serde_json::Value {
     match node {
         internal::CssNode::Rule(rule) => convert_css_rule(rule, source),
-        internal::CssNode::Comment(comment) => convert_css_comment(comment),
         internal::CssNode::Atrule(atrule) => convert_css_atrule(atrule, source),
     }
-}
-
-/// Convert a CSS comment to JSON representation
-fn convert_css_comment(comment: &internal::CssComment) -> serde_json::Value {
-    serde_json::json!({
-        "type": "Comment",
-        "start": comment.span.start,
-        "end": comment.span.end,
-        "data": comment.content,
-    })
 }
 
 /// Convert a CSS rule to JSON representation
@@ -362,8 +351,7 @@ fn value_to_string(value: &internal::CssValue, source: &str) -> String {
         }
         _ => {
             // For other types, extract from source
-            let span = value.span();
-            source[span.start as usize..span.end as usize].to_string()
+            value.span().extract(source).to_string()
         }
     }
 }
@@ -376,7 +364,7 @@ fn convert_atrule_block_child(child: &internal::CssBlockChild, source: &str) -> 
         internal::CssBlockChild::Rule(rule) => convert_css_rule(rule, source),
         internal::CssBlockChild::Declaration(decl) => {
             // SVELTE QUIRK: Extract property and value from source to preserve raw escapes
-            let decl_source = &source[decl.span.start as usize..decl.span.end as usize];
+            let decl_source = decl.span.extract(source);
 
             // Split using Svelte-compatible logic (handles comment-before-colon quirk)
             let (property_source, value_source) = split_declaration_svelte_compat(decl_source);
@@ -641,29 +629,15 @@ fn convert_simple_selector(simple: &internal::SimpleSelector) -> serde_json::Val
 
 /// Convert a list of CSS nodes to a StyleSheet JSON structure
 pub fn convert_css_nodes(nodes: &[internal::CssNode], source: &str) -> serde_json::Value {
-    // Filter out comments to match Svelte's CSS parser output
-    // (Our internal AST has comments for the formatter, but public JSON AST should match Svelte)
+    // Convert all nodes (comments are stored separately and not included in JSON output)
     let children: Vec<serde_json::Value> = nodes
         .iter()
-        .filter(|node| !matches!(node, internal::CssNode::Comment(_)))
         .map(|node| convert_css_node(node, source))
         .collect();
 
-    // Calculate content span from all nodes (including comments for accurate bounds)
+    // Calculate content span from nodes
     let (content_start, content_end) = match (nodes.first(), nodes.last()) {
-        (Some(first), Some(last)) => {
-            let start = match first {
-                internal::CssNode::Rule(rule) => rule.span.start,
-                internal::CssNode::Comment(comment) => comment.span.start,
-                internal::CssNode::Atrule(atrule) => atrule.span.start,
-            };
-            let end = match last {
-                internal::CssNode::Rule(rule) => rule.span.end,
-                internal::CssNode::Comment(comment) => comment.span.end,
-                internal::CssNode::Atrule(atrule) => atrule.span.end,
-            };
-            (start, end)
-        }
+        (Some(first), Some(last)) => (first.span().start, last.span().end),
         _ => (0, 0),
     };
 

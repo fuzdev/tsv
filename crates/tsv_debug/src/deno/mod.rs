@@ -111,6 +111,59 @@ pub async fn parse_typescript(source: &str) -> Result<String, DenoError> {
         .ok_or(DenoError::MissingOutput)
 }
 
+/// Version information from the Deno sidecar
+#[derive(Debug, Clone)]
+pub struct VersionInfo {
+    /// Deno runtime version
+    pub deno: String,
+    /// TypeScript version (bundled with Deno)
+    pub typescript: String,
+    /// prettier version
+    pub prettier: String,
+    /// prettier-plugin-svelte version
+    pub prettier_plugin_svelte: String,
+    /// svelte compiler version
+    pub svelte: String,
+    /// acorn parser version
+    pub acorn: String,
+    /// @sveltejs/acorn-typescript version
+    pub acorn_typescript: String,
+}
+
+/// Check that Deno sidecar is available and return version info
+///
+/// This spawns the sidecar if not already running, making it useful for
+/// verifying the environment is correctly set up.
+///
+/// # Errors
+/// Returns an error if Deno is not installed or the sidecar fails to start.
+pub async fn check() -> Result<VersionInfo, DenoError> {
+    let result = get_actor().await?.call("__version_info", "", None).await?;
+
+    let info = result.as_object().ok_or(DenoError::MissingOutput)?;
+    let deps = info
+        .get("dependencies")
+        .and_then(|d| d.as_object())
+        .ok_or(DenoError::MissingOutput)?;
+
+    let get_str = |obj: &serde_json::Map<String, serde_json::Value>, key: &str| {
+        obj.get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or("?")
+            .to_string()
+    };
+
+    Ok(VersionInfo {
+        deno: get_str(info, "runtime"),
+        typescript: get_str(info, "typescript"),
+        prettier: get_str(deps, "prettier"),
+        prettier_plugin_svelte: get_str(deps, "prettier-plugin-svelte"),
+        svelte: get_str(deps, "svelte"),
+        acorn: get_str(deps, "acorn"),
+        acorn_typescript: get_str(deps, "@sveltejs/acorn-typescript"),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -119,6 +172,13 @@ mod tests {
     /// with the shared static actor across multiple tokio runtimes.
     #[tokio::test]
     async fn test_deno_tools() {
+        // Test check (version info)
+        let result = check().await;
+        assert!(result.is_ok(), "check failed: {result:?}");
+        let info = result.unwrap();
+        assert!(!info.deno.is_empty());
+        assert!(!info.prettier.is_empty());
+
         // Test prettier
         let result = run_prettier("<div>hello</div>", PrettierParser::Parser("svelte")).await;
         assert!(result.is_ok(), "prettier failed: {result:?}");

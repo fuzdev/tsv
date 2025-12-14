@@ -10,6 +10,12 @@ node_modules
 /.gro
 /.zzz
 
+# WASM build output
+/crates/tsv_wasm/pkg
+
+# Benchmark results (JSON output)
+/benches/deno/results/*.json
+
 # Env
 .env*
 !.env.example

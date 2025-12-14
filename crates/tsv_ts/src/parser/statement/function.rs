@@ -70,11 +70,7 @@ impl<'a> Parser<'a> {
 
         // Parse function name (required for declarations)
         if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected function name after 'function'".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected_after("function name", "function"));
         }
         let (id_start, id_end) = self.current_pos();
         let symbol = self.intern_identifier();
@@ -205,11 +201,7 @@ impl<'a> Parser<'a> {
                 span: Span::new(id_start as u32, id_end as u32),
             })
         } else if name_required {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected function name after 'function'".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected_after("function name", "function"));
         } else {
             None
         };

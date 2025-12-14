@@ -135,12 +135,12 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Check if this is a call node
-    pub fn is_call(&self) -> bool {
+    pub const fn is_call(&self) -> bool {
         matches!(self, Self::Call { .. })
     }
 
     /// Check if this is a member node (including computed)
-    pub fn is_member(&self) -> bool {
+    pub const fn is_member(&self) -> bool {
         matches!(
             self,
             Self::Member { .. } | Self::PrivateMember { .. } | Self::ComputedMember { .. }
@@ -148,7 +148,7 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Check if this is a non-null node
-    pub fn is_non_null(&self) -> bool {
+    pub const fn is_non_null(&self) -> bool {
         matches!(self, Self::NonNull)
     }
 
@@ -163,12 +163,12 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Check if this is a computed member access
-    pub fn is_computed(&self) -> bool {
+    pub const fn is_computed(&self) -> bool {
         matches!(self, Self::ComputedMember { .. })
     }
 
     /// Get property symbol for Member nodes
-    pub fn property(&self) -> Option<DefaultSymbol> {
+    pub const fn property(&self) -> Option<DefaultSymbol> {
         match self {
             Self::Member { property, .. } => Some(*property),
             _ => None,

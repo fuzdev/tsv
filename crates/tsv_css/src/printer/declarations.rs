@@ -241,7 +241,7 @@ impl<'a> Printer<'a> {
                 self.write(" !important");
             }
             self.write(";\n");
-        } else if self.value_comments.contains_key(&decl.span.start) {
+        } else if self.has_value_comments_in_decl(decl) {
             // Value has comments - extract from source to preserve them
             if let Some(normalized) = source_fidelity::extract_value_with_comments(decl_source) {
                 self.write(": ");

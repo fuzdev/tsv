@@ -2,8 +2,7 @@
 
 use super::super::Printer;
 use crate::ast::internal::{self, Statement};
-use string_interner::Symbol;
-use tsv_lang::doc;
+use tsv_lang::{SymbolToU32, doc};
 
 /// Check if a statement can be printed inline after `if (cond)` without a newline.
 ///
@@ -622,7 +621,7 @@ impl<'a> Printer<'a> {
         if let Some(label) = &stmt.label {
             doc::concat(vec![
                 doc::text("break "),
-                doc::symbol(label.name.to_usize() as u32),
+                doc::symbol(label.name.to_u32()),
                 doc::text(";"),
             ])
         } else {
@@ -637,7 +636,7 @@ impl<'a> Printer<'a> {
         if let Some(label) = &stmt.label {
             doc::concat(vec![
                 doc::text("continue "),
-                doc::symbol(label.name.to_usize() as u32),
+                doc::symbol(label.name.to_u32()),
                 doc::text(";"),
             ])
         } else {
@@ -656,7 +655,7 @@ impl<'a> Printer<'a> {
             ": "
         };
         doc::concat(vec![
-            doc::symbol(stmt.label.name.to_usize() as u32),
+            doc::symbol(stmt.label.name.to_u32()),
             doc::text(separator),
             self.build_statement_doc(&stmt.body),
         ])

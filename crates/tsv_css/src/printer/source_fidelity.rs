@@ -13,18 +13,12 @@
 // ## Usage
 //
 // ```rust
-// use crate::printer::source_fidelity::{extract_raw_value, needs_source_extraction};
+// use crate::printer::source_fidelity::extract_raw_value;
 //
-// if needs_source_extraction(&value, value_comments) {
-//     let raw = extract_raw_value(source, value.span());
-//     output.write(raw);
-// } else {
-//     format_value_semantic(&value, output);
-// }
+// let raw = extract_raw_value(source, value.span());
+// output.write(raw);
 // ```
 
-use crate::ast::internal::{CssComment, CssValue};
-use std::collections::HashMap;
 use tsv_lang::Span;
 
 /// Extract raw source text for a value (preserves escapes, comments, quirks)
@@ -45,52 +39,6 @@ use tsv_lang::Span;
 /// ```
 pub fn extract_raw_value(source: &str, span: Span) -> &str {
     span.extract(source)
-}
-
-/// Check if value needs source extraction (has comments, complex escapes, etc.)
-///
-/// Use this to decide between source extraction (fidelity) vs semantic formatting (normalization).
-///
-/// # Arguments
-/// * `value` - The CSS value to check
-/// * `value_comments` - Side table of value comments (span.start -> comments)
-///
-/// # Returns
-/// * `true` if raw source extraction is needed
-/// * `false` if semantic formatting is safe
-///
-/// # Decision Logic
-/// 1. Has value comments (/* comment */ inside property value)? → extract source
-/// 2. String with complex escapes? → extract source (TODO: improve detection)
-/// 3. Dimension with leading zeros? → extract source (handled via span extraction)
-/// 4. Otherwise → use semantic formatting
-///
-/// # Example
-/// ```ignore
-/// if needs_source_extraction(&decl.value, &value_comments) {
-///     let raw = extract_raw_value(source, decl.span());
-///     printer.write(raw);
-/// } else {
-///     format_value_semantic(&decl.value, printer);
-/// }
-/// ```
-pub fn needs_source_extraction(
-    _value: &CssValue,
-    value_comments: &HashMap<u32, Vec<CssComment>>,
-    decl_span_start: u32,
-) -> bool {
-    // Check if declaration has value comments
-    if value_comments.contains_key(&decl_span_start) {
-        return true;
-    }
-
-    // TODO: Add detection for:
-    // - Complex escape sequences (unicode, newlines, etc.)
-    // - Unusual formatting that should be preserved
-    // - Other quirks identified in testing
-
-    // For now, default to semantic formatting
-    false
 }
 
 /// Format an identifier value semantically
@@ -631,36 +579,5 @@ mod tests {
         let source = "color: #ff0000;";
         let span = Span { start: 7, end: 14 };
         assert_eq!(extract_raw_value(source, span), "#ff0000");
-    }
-
-    #[test]
-    fn test_needs_source_extraction_with_comments() {
-        let mut value_comments = HashMap::new();
-        value_comments.insert(
-            10,
-            vec![CssComment {
-                content: " test ".to_string(),
-                span: Span { start: 15, end: 25 },
-            }],
-        );
-
-        let value = CssValue::Identifier {
-            name: "red".to_string(),
-            span: Span { start: 10, end: 13 },
-        };
-
-        assert!(needs_source_extraction(&value, &value_comments, 10));
-    }
-
-    #[test]
-    fn test_needs_source_extraction_no_comments() {
-        let value_comments = HashMap::new();
-
-        let value = CssValue::Identifier {
-            name: "red".to_string(),
-            span: Span { start: 10, end: 13 },
-        };
-
-        assert!(!needs_source_extraction(&value, &value_comments, 10));
     }
 }

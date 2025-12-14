@@ -9,27 +9,27 @@
 //
 // See CSS_SPEC.md for full expansion roadmap.
 
-use std::collections::HashMap;
+pub use tsv_lang::Comment;
 use tsv_lang::Span;
 
-/// CSS Stylesheet - top-level container for CSS nodes and metadata
+/// CSS Stylesheet - top-level container for CSS nodes and comments
 ///
-/// Contains the parsed CSS nodes and a side table for value comments.
-/// The side table keeps value comments (comments inside property values)
-/// separate from the main AST to avoid polluting CssDeclaration.
+/// Comments are stored in a separate Vec, sorted by span.start.
+/// This matches the TS/Svelte pattern and enables efficient range queries
+/// using `comments_in_range()` from tsv_lang.
 #[derive(Debug, Clone)]
 pub struct CssStyleSheet {
-    /// CSS nodes (rules, comments, at-rules)
+    /// CSS nodes (rules, at-rules) - no longer includes Comment variant
     pub nodes: Vec<CssNode>,
 
-    /// Side table: declaration span -> value comments
-    /// Key: declaration span.start (u32)
-    /// Value: comments found inside the property value
+    /// All comments sorted by span.start (top-level and value comments)
     ///
-    /// Example: `font-size: /* comment */ 12px;`
-    /// - Key: span.start of the declaration
-    /// - Value: vec![CssComment { content: " comment ", ... }]
-    pub value_comments: HashMap<u32, Vec<CssComment>>,
+    /// Includes:
+    /// - Top-level comments (between rules)
+    /// - Value comments (inside property values like `font-size: /* comment */ 12px;`)
+    ///
+    /// Use `tsv_lang::comments_in_range()` for efficient range lookups.
+    pub comments: Vec<Comment>,
 }
 
 impl CssStyleSheet {
@@ -37,15 +37,15 @@ impl CssStyleSheet {
     pub fn new() -> Self {
         Self {
             nodes: Vec::new(),
-            value_comments: HashMap::new(),
+            comments: Vec::new(),
         }
     }
 
-    /// Create a stylesheet with nodes (no value comments)
+    /// Create a stylesheet with nodes (no comments)
     pub fn with_nodes(nodes: Vec<CssNode>) -> Self {
         Self {
             nodes,
-            value_comments: HashMap::new(),
+            comments: Vec::new(),
         }
     }
 }
@@ -57,18 +57,18 @@ impl Default for CssStyleSheet {
 }
 
 /// CSS AST node types
+///
+/// Comments are stored separately in `CssStyleSheet.comments` and looked up by position.
 #[derive(Debug, Clone)]
 pub enum CssNode {
     Rule(CssRule),
-    Comment(CssComment),
-    Atrule(CssAtrule), // Phase 3: @media, @keyframes, @supports, etc.
+    Atrule(CssAtrule), // @media, @keyframes, @supports, etc.
 }
 
 impl CssNode {
     pub fn span(&self) -> Span {
         match self {
             CssNode::Rule(rule) => rule.span,
-            CssNode::Comment(comment) => comment.span,
             CssNode::Atrule(atrule) => atrule.span,
         }
     }
@@ -460,14 +460,6 @@ pub enum Color {
     },
 }
 
-/// CSS Comment - /* ... */
-#[derive(Debug, Clone)]
-pub struct CssComment {
-    /// Comment content without /* */ delimiters
-    pub content: String,
-    pub span: Span,
-}
-
 // ============================================================================
 // At-Rule AST (Phase 3)
 // ============================================================================
@@ -565,7 +557,7 @@ pub enum CssBlockChild {
     Rule(CssRule),
     Declaration(CssDeclaration),
     Atrule(CssAtrule),
-    Comment(CssComment),
+    Comment(Comment),
 }
 
 impl CssBlockChild {

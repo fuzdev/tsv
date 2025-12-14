@@ -34,9 +34,8 @@ mod pseudo;
 mod selectors;
 mod value;
 
-use crate::ast::internal::{CssComment, CssNode, CssStyleSheet};
+use crate::ast::internal::{Comment, CssNode, CssStyleSheet};
 use crate::lexer::{Lexer, TokenKind};
-use std::collections::HashMap;
 use tsv_lang::{ParseError, PeekData, Span};
 
 pub(crate) struct CssParser<'a> {
@@ -48,7 +47,7 @@ pub(crate) struct CssParser<'a> {
     current_decoded: Option<String>, // Decoded value for current token (e.g., identifier escapes)
     peek_cache: Option<PeekData<TokenKind>>,
     base_offset: usize, // Offset in full source (when parsing embedded CSS)
-    pub(crate) value_comments: HashMap<u32, Vec<CssComment>>, // Side table for property value comments
+    pub(crate) comments: Vec<Comment>,
 }
 
 impl<'a> CssParser<'a> {
@@ -67,8 +66,13 @@ impl<'a> CssParser<'a> {
             current_decoded: decoded,
             peek_cache: None,
             base_offset,
-            value_comments: HashMap::new(),
+            comments: Vec::new(),
         })
+    }
+
+    /// Add a comment to the comments Vec
+    pub(crate) fn add_comment(&mut self, comment: Comment) {
+        self.comments.push(comment);
     }
 
     pub(crate) fn advance(&mut self) -> Result<(), ParseError> {
@@ -113,7 +117,7 @@ impl<'a> CssParser<'a> {
         loop {
             let token = temp_lexer.next_token()?;
             match &token.kind {
-                TokenKind::Whitespace | TokenKind::Comment(_) => continue,
+                TokenKind::Whitespace | TokenKind::Comment => continue,
                 _ => return Ok(token.kind),
             }
         }
@@ -125,11 +129,7 @@ impl<'a> CssParser<'a> {
 
     pub(crate) fn expect(&mut self, kind: &TokenKind) -> Result<(), ParseError> {
         if !self.check(kind) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected {:?}, found {:?}", kind, self.current_kind),
-                position: self.base_offset + self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found(&format!("{kind:?}")));
         }
         self.advance()
     }
@@ -138,11 +138,7 @@ impl<'a> CssParser<'a> {
     /// Used for nodes whose span should end at the delimiter token.
     pub(crate) fn expect_and_capture(&mut self, kind: &TokenKind) -> Result<u32, ParseError> {
         if !self.check(kind) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected {:?}, found {:?}", kind, self.current_kind),
-                position: self.base_offset + self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found(&format!("{kind:?}")));
         }
         let end = (self.base_offset + self.current_end) as u32;
         self.advance()?;
@@ -160,7 +156,7 @@ impl<'a> CssParser<'a> {
     pub(crate) fn skip_whitespace_and_comments(&mut self) -> Result<(), ParseError> {
         loop {
             if self.check(&TokenKind::Whitespace)
-                || matches!(&self.current_kind, TokenKind::Comment(_))
+                || matches!(&self.current_kind, TokenKind::Comment)
             {
                 self.advance()?;
             } else {
@@ -193,28 +189,102 @@ impl<'a> CssParser<'a> {
         self.source
     }
 
+    /// Get current position (base_offset + current_start)
+    #[inline]
+    pub(crate) fn current_pos(&self) -> usize {
+        self.base_offset + self.current_start
+    }
+
+    // ==================== Error Helpers ====================
+
+    /// Create an error with custom message at current position
+    pub(crate) fn error_msg(&self, message: &str) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: message.to_string(),
+            position: self.current_pos(),
+            context: None,
+        }
+    }
+
+    /// Create an error with custom message at custom position
+    pub(crate) fn error_msg_at(&self, message: &str, position: usize) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: message.to_string(),
+            position,
+            context: None,
+        }
+    }
+
+    /// Create an error: "Expected X"
+    pub(crate) fn error_expected(&self, what: &str) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: format!("Expected {what}"),
+            position: self.current_pos(),
+            context: None,
+        }
+    }
+
+    /// Create an error: "Expected X" at custom position
+    pub(crate) fn error_expected_at(&self, what: &str, position: usize) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: format!("Expected {what}"),
+            position,
+            context: None,
+        }
+    }
+
+    /// Create an error: "Expected X, found Y"
+    pub(crate) fn error_expected_found(&self, what: &str) -> ParseError {
+        let kind = &self.current_kind;
+        ParseError::InvalidSyntax {
+            message: format!("Expected {what}, found {kind}"),
+            position: self.current_pos(),
+            context: None,
+        }
+    }
+
+    /// Create an error: "Expected X after 'Y'"
+    pub(crate) fn error_expected_after(&self, what: &str, after: &str) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: format!("Expected {what} after '{after}'"),
+            position: self.current_pos(),
+            context: None,
+        }
+    }
+
+    /// Create an error: "Unexpected X"
+    pub(crate) fn error_unexpected(&self, what: &str) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: format!("Unexpected {what}"),
+            position: self.current_pos(),
+            context: None,
+        }
+    }
+
     pub(crate) fn parse(&mut self) -> Result<CssStyleSheet, ParseError> {
         let mut nodes = Vec::new();
 
         self.skip_whitespace()?;
 
         while !self.check(&TokenKind::Eof) {
-            // Handle comments at top level
-            if let TokenKind::Comment(content) = &self.current_kind {
+            // Handle comments at top level - add to comments Vec
+            if matches!(&self.current_kind, TokenKind::Comment) {
                 let comment_start = self.base_offset() + self.current_start;
                 let comment_end = self.base_offset() + self.current_end;
-                let content = content.clone();
+                // Extract content without /* */ delimiters
+                let content = self.source[self.current_start + 2..self.current_end - 2].to_string();
 
                 self.advance()?;
                 self.skip_whitespace()?;
 
-                nodes.push(CssNode::Comment(CssComment {
+                self.add_comment(Comment {
                     content,
+                    is_block: true,
                     span: Span {
                         start: comment_start as u32,
                         end: comment_end as u32,
                     },
-                }));
+                });
                 continue;
             }
 
@@ -234,9 +304,10 @@ impl<'a> CssParser<'a> {
             self.skip_whitespace()?;
         }
 
+        // Comments are already sorted by span.start since we add them in order during parsing
         Ok(CssStyleSheet {
             nodes,
-            value_comments: self.value_comments.clone(),
+            comments: std::mem::take(&mut self.comments),
         })
     }
 }

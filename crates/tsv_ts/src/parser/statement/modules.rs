@@ -192,19 +192,13 @@ impl<'a> Parser<'a> {
                             span: Span::new(start as u32, end),
                         }))
                     }
-                    _ => Err(ParseError::InvalidSyntax {
-                        message: "Expected declaration, '{', '*', or 'default' after 'export'"
-                            .to_string(),
-                        position: self.current_pos().0,
-                        context: None,
-                    }),
+                    _ => {
+                        Err(self
+                            .error_expected_after("declaration, '{', '*', or 'default'", "export"))
+                    }
                 }
             }
-            _ => Err(ParseError::InvalidSyntax {
-                message: "Expected declaration, '{', '*', or 'default' after 'export'".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            }),
+            _ => Err(self.error_expected_after("declaration, '{', '*', or 'default'", "export")),
         }
     }
 
@@ -232,11 +226,7 @@ impl<'a> Parser<'a> {
                     self.current_kind(),
                     TokenKind::Keyword(KeywordKind::Function)
                 ) {
-                    return Err(ParseError::InvalidSyntax {
-                        message: "Expected 'function' after 'async' in export default".to_string(),
-                        position: self.current_pos().0,
-                        context: None,
-                    });
+                    return Err(self.error_expected_after("'function'", "async"));
                 }
 
                 let result = self.parse_function_declaration_or_declare(false, true)?;
@@ -280,11 +270,7 @@ impl<'a> Parser<'a> {
                 self.advance()?; // consume 'abstract'
 
                 if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Class)) {
-                    return Err(ParseError::InvalidSyntax {
-                        message: "Expected 'class' after 'abstract' in export default".to_string(),
-                        position: self.current_pos().0,
-                        context: None,
-                    });
+                    return Err(self.error_expected_after("'class'", "abstract"));
                 }
 
                 let mut class = self.parse_class_declaration_inner(false, true)?;
@@ -334,11 +320,7 @@ impl<'a> Parser<'a> {
             self.advance()?; // consume 'as'
 
             if !matches!(self.current_kind(), TokenKind::Identifier) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected identifier after 'as' in export".to_string(),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(self.error_expected_after("identifier", "as"));
             }
             let (id_start, id_end) = self.current_pos();
             let name = self.intern_identifier();
@@ -356,11 +338,7 @@ impl<'a> Parser<'a> {
 
         // Expect 'from'
         if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::From)) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected 'from' in export all declaration".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("'from' in export all declaration"));
         }
         self.advance()?;
 
@@ -399,11 +377,7 @@ impl<'a> Parser<'a> {
                     TokenKind::Keyword(KeywordKind::Default)
                 );
             if !is_valid_local {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected identifier in export specifier".to_string(),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(self.error_expected("identifier in export specifier"));
             }
             let (local_start, local_end) = self.current_pos();
             let local_name = self.intern_identifier();
@@ -422,11 +396,7 @@ impl<'a> Parser<'a> {
                     self.advance()?; // consume 'as'
 
                     if !matches!(self.current_kind(), TokenKind::Identifier) {
-                        return Err(ParseError::InvalidSyntax {
-                            message: "Expected identifier after 'as' in export".to_string(),
-                            position: self.current_pos().0,
-                            context: None,
-                        });
+                        return Err(self.error_expected_after("identifier", "as"));
                     }
                     let (exp_start, exp_end) = self.current_pos();
                     let exported_name = self.intern_identifier();
@@ -461,11 +431,7 @@ impl<'a> Parser<'a> {
 
         // Expect '}'
         if !matches!(self.current_kind(), TokenKind::BraceClose) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected '}' to close export specifiers".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("'}' to close export specifiers"));
         }
         let (_, brace_end) = self.current_pos();
         self.advance()?;
@@ -512,11 +478,7 @@ impl<'a> Parser<'a> {
                     TokenKind::Keyword(KeywordKind::Default)
                 );
             if !is_valid_local {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected identifier in export specifier".to_string(),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(self.error_expected("identifier in export specifier"));
             }
             let (local_start, local_end) = self.current_pos();
             let local_name = self.intern_identifier();
@@ -535,11 +497,7 @@ impl<'a> Parser<'a> {
                     self.advance()?; // consume 'as'
 
                     if !matches!(self.current_kind(), TokenKind::Identifier) {
-                        return Err(ParseError::InvalidSyntax {
-                            message: "Expected identifier after 'as' in export".to_string(),
-                            position: self.current_pos().0,
-                            context: None,
-                        });
+                        return Err(self.error_expected_after("identifier", "as"));
                     }
                     let (exp_start, exp_end) = self.current_pos();
                     let exported_name = self.intern_identifier();
@@ -574,11 +532,7 @@ impl<'a> Parser<'a> {
 
         // Expect '}'
         if !matches!(self.current_kind(), TokenKind::BraceClose) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected '}' to close export specifiers".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("'}' to close export specifiers"));
         }
         let (_, brace_end) = self.current_pos();
         self.advance()?;
@@ -706,21 +660,13 @@ impl<'a> Parser<'a> {
 
             // Expect 'as' keyword
             if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As)) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected 'as' after '*' in namespace import".to_string(),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(self.error_expected_after("'as'", "*"));
             }
             self.advance()?;
 
             // Parse local name
             if !matches!(self.current_kind(), TokenKind::Identifier) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected identifier after 'as' in namespace import".to_string(),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(self.error_expected_after("identifier", "as"));
             }
             let (id_start, id_end) = self.current_pos();
             let symbol = self.intern_identifier();
@@ -762,11 +708,7 @@ impl<'a> Parser<'a> {
 
                 // Parse imported name
                 if !matches!(self.current_kind(), TokenKind::Identifier) {
-                    return Err(ParseError::InvalidSyntax {
-                        message: "Expected identifier in import specifier".to_string(),
-                        position: self.current_pos().0,
-                        context: None,
-                    });
+                    return Err(self.error_expected("identifier in import specifier"));
                 }
                 let (imp_start, imp_end) = self.current_pos();
                 let imported_symbol = self.intern_identifier();
@@ -785,12 +727,7 @@ impl<'a> Parser<'a> {
                         self.advance()?;
 
                         if !matches!(self.current_kind(), TokenKind::Identifier) {
-                            return Err(ParseError::InvalidSyntax {
-                                message: "Expected identifier after 'as' in import specifier"
-                                    .to_string(),
-                                position: self.current_pos().0,
-                                context: None,
-                            });
+                            return Err(self.error_expected_after("identifier", "as"));
                         }
                         let (local_start, local_end) = self.current_pos();
                         let local_symbol = self.intern_identifier();
@@ -830,21 +767,13 @@ impl<'a> Parser<'a> {
 
         // Expect 'from' keyword
         if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::From)) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected 'from' after import specifiers".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected_after("'from'", "import specifiers"));
         }
         self.advance()?;
 
         // Parse module source
         if !matches!(self.current_kind(), TokenKind::String) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected string literal as module source".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("string literal as module source"));
         }
         let source = self.parse_string_literal()?;
 
@@ -876,11 +805,7 @@ impl<'a> Parser<'a> {
 
         // Expect opening brace
         if !matches!(self.current_kind(), TokenKind::BraceOpen) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected '{' after 'with' in import attributes".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected_after("'{'", "with"));
         }
         self.advance()?;
 
@@ -891,11 +816,7 @@ impl<'a> Parser<'a> {
 
             // Parse attribute key (identifier)
             if !matches!(self.current_kind(), TokenKind::Identifier) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected identifier as import attribute key".to_string(),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(self.error_expected("identifier as import attribute key"));
             }
             let (key_start, key_end) = self.current_pos();
             let key_symbol = self.intern_identifier();
@@ -910,21 +831,13 @@ impl<'a> Parser<'a> {
 
             // Expect colon
             if !matches!(self.current_kind(), TokenKind::Colon) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected ':' after import attribute key".to_string(),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(self.error_expected_after("':'", "import attribute key"));
             }
             self.advance()?;
 
             // Parse attribute value (string literal)
             if !matches!(self.current_kind(), TokenKind::String) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected string literal as import attribute value".to_string(),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(self.error_expected("string literal as import attribute value"));
             }
             let value = self.parse_string_literal()?;
             let attr_end = value.span.end;
@@ -981,11 +894,7 @@ impl<'a> Parser<'a> {
 
             // Parse string literal
             if !matches!(self.current_kind(), TokenKind::String) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected string literal in require()".to_string(),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(self.error_expected("string literal in require()"));
             }
             let expression = self.parse_string_literal()?;
 

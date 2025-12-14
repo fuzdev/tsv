@@ -21,11 +21,7 @@ pub(crate) fn parse_attribute_selector(
         // Universal namespace: *|attr
         parser.advance()?;
         if !parser.check(&TokenKind::Pipe) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected '|' after '*' in attribute selector".to_string(),
-                position: parser.base_offset() + parser.current_start,
-                context: None,
-            });
+            return Err(parser.error_expected_after("'|'", "'*' in attribute selector"));
         }
         parser.advance()?; // consume |
         parser.skip_whitespace()?;
@@ -39,11 +35,7 @@ pub(crate) fn parse_attribute_selector(
         // Could be: ns|attr or just attr (or lang with |= operator)
         let maybe_namespace = parser
             .current_identifier()
-            .ok_or_else(|| ParseError::InvalidSyntax {
-                message: "Expected identifier".to_string(),
-                position: parser.base_offset() + parser.current_start,
-                context: None,
-            })?
+            .ok_or_else(|| parser.error_expected("identifier"))?
             .to_string();
         parser.advance()?;
         parser.skip_whitespace()?;
@@ -76,13 +68,15 @@ pub(crate) fn parse_attribute_selector(
                             .unwrap_or_else(|| parser.current_value())
                             .to_string(),
                     ),
-                    TokenKind::String { content, .. } => Some(content.clone()),
+                    TokenKind::String { .. } => {
+                        // Extract content without quotes
+                        Some(
+                            parser.source()[parser.current_start + 1..parser.current_end - 1]
+                                .to_string(),
+                        )
+                    }
                     _ => {
-                        return Err(ParseError::InvalidSyntax {
-                            message: "Expected attribute value".to_string(),
-                            position: parser.base_offset() + parser.current_start,
-                            context: None,
-                        });
+                        return Err(parser.error_expected("attribute value"));
                     }
                 };
                 parser.advance()?;
@@ -142,13 +136,15 @@ pub(crate) fn parse_attribute_selector(
                             .unwrap_or_else(|| parser.current_value())
                             .to_string(),
                     ),
-                    TokenKind::String { content, .. } => Some(content.clone()),
+                    TokenKind::String { .. } => {
+                        // Extract content without quotes
+                        Some(
+                            parser.source()[parser.current_start + 1..parser.current_end - 1]
+                                .to_string(),
+                        )
+                    }
                     _ => {
-                        return Err(ParseError::InvalidSyntax {
-                            message: "Expected attribute value".to_string(),
-                            position: parser.base_offset() + parser.current_start,
-                            context: None,
-                        });
+                        return Err(parser.error_expected("attribute value"));
                     }
                 };
                 parser.advance()?;
@@ -189,30 +185,18 @@ pub(crate) fn parse_attribute_selector(
             });
         }
     } else {
-        return Err(ParseError::InvalidSyntax {
-            message: "Expected attribute name, '*', or '|'".to_string(),
-            position: parser.base_offset() + parser.current_start,
-            context: None,
-        });
+        return Err(parser.error_expected("attribute name, '*', or '|'"));
     };
 
     // Now parse the attribute name (after namespace|)
     if !parser.check(&TokenKind::Identifier) {
-        return Err(ParseError::InvalidSyntax {
-            message: "Expected attribute name after namespace".to_string(),
-            position: parser.base_offset() + parser.current_start,
-            context: None,
-        });
+        return Err(parser.error_expected_after("attribute name", "namespace"));
     }
 
     // Internal AST: use decoded value (spec-compliant)
     let name = parser
         .current_identifier()
-        .ok_or_else(|| ParseError::InvalidSyntax {
-            message: "Expected identifier".to_string(),
-            position: parser.base_offset() + parser.current_start,
-            context: None,
-        })?
+        .ok_or_else(|| parser.error_expected("identifier"))?
         .to_string();
     parser.advance()?;
     parser.skip_whitespace()?;
@@ -233,13 +217,12 @@ pub(crate) fn parse_attribute_selector(
                     .unwrap_or_else(|| parser.current_value())
                     .to_string(),
             ),
-            TokenKind::String { content, .. } => Some(content.clone()),
+            TokenKind::String { .. } => {
+                // Extract content without quotes
+                Some(parser.source()[parser.current_start + 1..parser.current_end - 1].to_string())
+            }
             _ => {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected attribute value".to_string(),
-                    position: parser.base_offset() + parser.current_start,
-                    context: None,
-                });
+                return Err(parser.error_expected("attribute value"));
             }
         };
         parser.advance()?;
@@ -288,11 +271,7 @@ fn parse_attribute_matcher(parser: &mut CssParser) -> Result<AttributeMatcher, P
             // ~= (contains in whitespace-separated list)
             parser.advance()?;
             if !parser.check(&TokenKind::Equals) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected '=' after '~'".to_string(),
-                    position: parser.base_offset() + parser.current_start,
-                    context: None,
-                });
+                return Err(parser.error_expected_after("'='", "'~'"));
             }
             parser.advance()?; // consume =
             return Ok(AttributeMatcher::Contains);
@@ -301,11 +280,7 @@ fn parse_attribute_matcher(parser: &mut CssParser) -> Result<AttributeMatcher, P
             // |= (dash-match)
             parser.advance()?;
             if !parser.check(&TokenKind::Equals) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected '=' after '|'".to_string(),
-                    position: parser.base_offset() + parser.current_start,
-                    context: None,
-                });
+                return Err(parser.error_expected_after("'='", "'|'"));
             }
             parser.advance()?; // consume =
             return Ok(AttributeMatcher::DashMatch);
@@ -314,11 +289,7 @@ fn parse_attribute_matcher(parser: &mut CssParser) -> Result<AttributeMatcher, P
             // ^= (prefix match)
             parser.advance()?;
             if !parser.check(&TokenKind::Equals) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected '=' after '^'".to_string(),
-                    position: parser.base_offset() + parser.current_start,
-                    context: None,
-                });
+                return Err(parser.error_expected_after("'='", "'^'"));
             }
             parser.advance()?; // consume =
             return Ok(AttributeMatcher::Prefix);
@@ -327,11 +298,7 @@ fn parse_attribute_matcher(parser: &mut CssParser) -> Result<AttributeMatcher, P
             // $= (suffix match)
             parser.advance()?;
             if !parser.check(&TokenKind::Equals) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected '=' after '$'".to_string(),
-                    position: parser.base_offset() + parser.current_start,
-                    context: None,
-                });
+                return Err(parser.error_expected_after("'='", "'$'"));
             }
             parser.advance()?; // consume =
             return Ok(AttributeMatcher::Suffix);
@@ -340,21 +307,16 @@ fn parse_attribute_matcher(parser: &mut CssParser) -> Result<AttributeMatcher, P
             // *= (substring match)
             parser.advance()?;
             if !parser.check(&TokenKind::Equals) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected '=' after '*'".to_string(),
-                    position: parser.base_offset() + parser.current_start,
-                    context: None,
-                });
+                return Err(parser.error_expected_after("'='", "'*'"));
             }
             parser.advance()?; // consume =
             return Ok(AttributeMatcher::Substring);
         }
         _ => {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Unsupported attribute matcher: {:?}", parser.current_kind),
-                position: parser.base_offset() + parser.current_start,
-                context: None,
-            });
+            return Err(parser.error_msg(&format!(
+                "Unsupported attribute matcher: {:?}",
+                parser.current_kind
+            )));
         }
     };
 

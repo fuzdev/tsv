@@ -26,7 +26,7 @@ pub enum InputType {
 
 impl InputType {
     /// Get the file extension for this input type
-    pub fn extension(self) -> &'static str {
+    pub const fn extension(self) -> &'static str {
         match self {
             InputType::Svelte => ".svelte",
             InputType::TypeScript => ".ts",
@@ -726,7 +726,7 @@ pub fn format_with_our_formatter(content: &str, filepath: &str) -> Result<String
         };
         Ok(tsv_ts::format_with_config(&ast, content, config))
     } else if filepath.ends_with(".css") {
-        let ast = tsv_css::parse(content, 0).map_err(|e| format!("Format error (parse): {e:?}"))?;
+        let ast = tsv_css::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
         Ok(tsv_css::format(&ast, content))
     } else {
         Err(format!("Unsupported file type for formatting: {filepath}"))

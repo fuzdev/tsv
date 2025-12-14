@@ -168,7 +168,7 @@ impl<'a> Parser<'a> {
 
         // Keyword types: string, number, boolean, true, false, etc.
         if let TokenKind::Keyword(kw) = self.current_kind()
-            && let Some(ts_kind) = TSKeywordKind::from_lexer_keyword(kw)
+            && let Some(ts_kind) = TSKeywordKind::from_lexer_keyword(*kw)
         {
             self.advance()?;
             return Ok(TSType::Keyword(TSKeywordType::new(ts_kind, span)));
@@ -208,14 +208,8 @@ impl<'a> Parser<'a> {
                     }
                 } else {
                     // Regular number
-                    let number =
-                        super::super::expression::parse_number_literal(raw).map_err(|_| {
-                            ParseError::InvalidSyntax {
-                                message: format!("Invalid number: {raw}"),
-                                position: start,
-                                context: None,
-                            }
-                        })?;
+                    let number = super::super::expression::parse_number_literal(raw)
+                        .map_err(|_| self.error_msg_at(&format!("Invalid number: {raw}"), start))?;
                     Literal {
                         value: LiteralValue::Number(number),
                         span: Span::new(start as u32, end as u32),
@@ -254,11 +248,7 @@ impl<'a> Parser<'a> {
                 self.advance()?; // consume '-'
 
                 if !matches!(self.current_kind(), TokenKind::Number) {
-                    return Err(ParseError::InvalidSyntax {
-                        message: "Expected number after '-' in type context".to_string(),
-                        position: self.current_pos().0,
-                        context: None,
-                    });
+                    return Err(self.error_expected("number after '-' in type context"));
                 }
 
                 let (num_start, num_end) = self.current_pos();
@@ -274,11 +264,7 @@ impl<'a> Parser<'a> {
                 } else {
                     let number =
                         super::super::expression::parse_number_literal(raw).map_err(|_| {
-                            ParseError::InvalidSyntax {
-                                message: format!("Invalid number: {raw}"),
-                                position: num_start,
-                                context: None,
-                            }
+                            self.error_msg_at(&format!("Invalid number: {raw}"), num_start)
                         })?;
                     Literal {
                         value: LiteralValue::Number(number),
@@ -334,11 +320,7 @@ impl<'a> Parser<'a> {
             TokenKind::LessThan => self.parse_generic_function_type(),
             // Type query: typeof x, typeof Foo.bar, typeof import("module")
             TokenKind::Keyword(KeywordKind::Typeof) => self.parse_type_query(),
-            _ => Err(ParseError::InvalidSyntax {
-                message: format!("Expected type, found {}", self.current_kind()),
-                position: self.current_pos().0,
-                context: None,
-            }),
+            _ => Err(self.error_expected_found("type")),
         }
     }
 
@@ -365,11 +347,7 @@ impl<'a> Parser<'a> {
 
         // Parse the type parameter name (must be an identifier)
         if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected type parameter name after 'infer'".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("type parameter name after 'infer'"));
         }
 
         let (id_start, id_end) = self.current_pos();
@@ -484,11 +462,7 @@ impl<'a> Parser<'a> {
 
         // Parse the module specifier (string literal)
         if !matches!(self.current_kind(), TokenKind::String) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected string literal in import type".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("string literal in import type"));
         }
 
         let (arg_start, arg_end) = self.current_pos();
@@ -565,11 +539,7 @@ impl<'a> Parser<'a> {
 
             // Parse the module specifier (string literal)
             if !matches!(self.current_kind(), TokenKind::String) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected string literal in import type".to_string(),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(self.error_expected("string literal in import type"));
             }
 
             let (arg_start, arg_end) = self.current_pos();
@@ -669,11 +639,7 @@ impl<'a> Parser<'a> {
             self.advance()?; // consume '.'
 
             if !matches!(self.current_kind(), TokenKind::Identifier) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected identifier after '.'".to_string(),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(self.error_expected_after("identifier", "."));
             }
 
             let (right_start, right_end) = self.current_pos();
@@ -773,11 +739,7 @@ impl<'a> Parser<'a> {
                     span: Span::new(start as u32, end),
                 }))
             } else {
-                Err(ParseError::InvalidSyntax {
-                    message: "Invalid parenthesized type".to_string(),
-                    position: self.current_pos().0,
-                    context: None,
-                })
+                Err(self.error_msg("Invalid parenthesized type"))
             }
         } else {
             // Empty params or params with types - function type with implicit void return
@@ -906,11 +868,7 @@ impl<'a> Parser<'a> {
         let (id_start, id_end) = self.current_pos();
 
         if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected parameter name".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("parameter name"));
         }
 
         let symbol = self.intern_identifier();
@@ -998,11 +956,7 @@ impl<'a> Parser<'a> {
         // Parse the identifier (parameter name for mapped type, or key name for index sig)
         let param_start = self.current_pos().0;
         if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected identifier after '['".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected_after("identifier", "["));
         }
         let param_name = self.current_value().to_string();
         let param_symbol = self.intern(&param_name);
@@ -1025,15 +979,11 @@ impl<'a> Parser<'a> {
                 readonly,
             )
         } else {
-            Err(ParseError::InvalidSyntax {
-                message: format!(
-                    "Expected 'in' or ':' after '[{}', found {}",
-                    param_name,
-                    self.current_kind()
-                ),
-                position: self.current_pos().0,
-                context: None,
-            })
+            Err(self.error_msg(&format!(
+                "Expected 'in' or ':' after '[{}', found {}",
+                param_name,
+                self.current_kind()
+            )))
         }
     }
 
@@ -1163,22 +1113,14 @@ impl<'a> Parser<'a> {
         // Parse type parameter name: `K`
         let param_start = self.current_pos().0;
         if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected type parameter name in mapped type".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("type parameter name in mapped type"));
         }
         let param_name = self.current_value().to_string();
         self.advance()?;
 
         // Expect `in`
         if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected 'in' in mapped type".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("'in' in mapped type"));
         }
         self.advance()?; // consume 'in'
 
@@ -1474,11 +1416,7 @@ impl<'a> Parser<'a> {
                     // Expect closing } of the interpolation
                     let (brace_start, _) = self.current_pos();
                     if !self.check(&TokenKind::BraceClose) {
-                        return Err(ParseError::InvalidSyntax {
-                            message: "Expected '}' after type in template literal".to_string(),
-                            position: self.current_pos().0,
-                            context: None,
-                        });
+                        return Err(self.error_expected("'}' after type in template literal"));
                     }
 
                     // Use lexer to continue template from }
@@ -1487,7 +1425,7 @@ impl<'a> Parser<'a> {
                         .continue_template_from_brace(self.current_raw_end())?;
                     self.update_current(token);
 
-                    match self.current_kind().clone() {
+                    match *self.current_kind() {
                         TokenKind::TemplateTail => {
                             // Final part: }content`
                             let (_tail_start, tail_end) = self.current_pos();
@@ -1550,23 +1488,12 @@ impl<'a> Parser<'a> {
                             // Continue loop for next interpolation
                         }
                         _ => {
-                            return Err(ParseError::InvalidSyntax {
-                                message: "Unexpected token in template literal type".to_string(),
-                                position: self.current_pos().0,
-                                context: None,
-                            });
+                            return Err(self.error_msg("Unexpected token in template literal type"));
                         }
                     }
                 }
             }
-            _ => Err(ParseError::InvalidSyntax {
-                message: format!(
-                    "Expected template literal type, found {}",
-                    self.current_kind()
-                ),
-                position: self.current_pos().0,
-                context: None,
-            }),
+            _ => Err(self.error_expected_found("template literal type")),
         }
     }
 
@@ -1598,11 +1525,7 @@ impl<'a> Parser<'a> {
     ) -> Result<TSTypeAliasDeclaration, ParseError> {
         // Parse type name (identifier)
         if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected type name after 'type'".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected_after("type name", "type"));
         }
 
         let (id_start, id_end) = self.current_pos();
@@ -1653,11 +1576,7 @@ impl<'a> Parser<'a> {
 
         // Parse interface name
         if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected interface name after 'interface'".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected_after("interface name", "interface"));
         }
 
         let (id_start, id_end) = self.current_pos();
@@ -1709,11 +1628,7 @@ impl<'a> Parser<'a> {
             let start = self.current_pos().0;
 
             if !matches!(self.current_kind(), TokenKind::Identifier) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected interface name in extends clause".to_string(),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(self.error_expected("interface name in extends clause"));
             }
 
             let expression = self.parse_entity_name()?;
@@ -1894,11 +1809,7 @@ impl<'a> Parser<'a> {
                 }),
             )
         } else {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected property name".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("property name"));
         };
 
         // Check for optional: ?
@@ -1998,13 +1909,10 @@ impl<'a> Parser<'a> {
                 // declare global { }
                 self.parse_declare_global(start)
             }
-            _ => Err(ParseError::InvalidSyntax {
-                message:
-                    "Expected 'function', 'class', 'enum', 'const', 'let', 'var', 'namespace', 'module', or 'global' after 'declare'"
-                        .to_string(),
-                position: self.current_pos().0,
-                context: None,
-            }),
+            _ => Err(self.error_expected_after(
+                "'function', 'class', 'enum', 'const', 'let', 'var', 'namespace', 'module', or 'global'",
+                "declare",
+            )),
         }
     }
 
@@ -2051,11 +1959,7 @@ impl<'a> Parser<'a> {
 
         // Parse function name
         if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected function name".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("function name"));
         }
 
         let (id_start, id_end) = self.current_pos();
@@ -2161,11 +2065,7 @@ impl<'a> Parser<'a> {
         } else if asserts {
             // `asserts x` without `is T` - just the parameter name
             if !matches!(self.current_kind(), TokenKind::Identifier) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected identifier after 'asserts'".to_string(),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(self.error_expected_after("identifier", "asserts"));
             }
 
             let (id_start, id_end) = self.current_pos();
@@ -2210,11 +2110,7 @@ impl<'a> Parser<'a> {
 
         // Parse class name
         if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected class name after 'declare class'".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected_after("class name", "declare class"));
         }
 
         let (id_start, id_end) = self.current_pos();
@@ -2242,11 +2138,7 @@ impl<'a> Parser<'a> {
 
                 // Parse the superclass identifier
                 if !matches!(self.current_kind(), TokenKind::Identifier) {
-                    return Err(ParseError::InvalidSyntax {
-                        message: "Expected class name after 'extends'".to_string(),
-                        position: self.current_pos().0,
-                        context: None,
-                    });
+                    return Err(self.error_expected_after("class name", "extends"));
                 }
 
                 let (id_start, id_end) = self.current_pos();
@@ -2359,11 +2251,7 @@ impl<'a> Parser<'a> {
                 name == "constructor",
             )
         } else {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected class member name".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("class member name"));
         };
 
         // Check if it's a method (has parentheses)
@@ -2517,14 +2405,7 @@ impl<'a> Parser<'a> {
 
         // Parse the type parameter name (must be an identifier)
         if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!(
-                    "Expected type parameter name, found {:?}",
-                    self.current_kind()
-                ),
-                position: id_start,
-                context: None,
-            });
+            return Err(self.error_expected_found_at("type parameter name", id_start));
         }
         let symbol = self.intern_identifier();
         self.advance()?;
@@ -2624,11 +2505,7 @@ impl<'a> Parser<'a> {
 
         // Parse enum name
         if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected enum name after 'enum'".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected_after("enum name", "enum"));
         }
 
         let (id_start, id_end) = self.current_pos();
@@ -2653,11 +2530,7 @@ impl<'a> Parser<'a> {
             if !self.eat(TokenKind::Comma) {
                 // No comma, break if not at closing brace
                 if !matches!(self.current_kind(), TokenKind::BraceClose) {
-                    return Err(ParseError::InvalidSyntax {
-                        message: "Expected ',' or '}' in enum".to_string(),
-                        position: self.current_pos().0,
-                        context: None,
-                    });
+                    return Err(self.error_expected("',' or '}' in enum"));
                 }
             }
         }
@@ -2693,11 +2566,7 @@ impl<'a> Parser<'a> {
             }
             TokenKind::String => TSEnumMemberId::String(self.parse_string_literal()?),
             _ => {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected enum member name (identifier or string)".to_string(),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(self.error_expected("enum member name (identifier or string)"));
             }
         };
 
@@ -2773,11 +2642,7 @@ impl<'a> Parser<'a> {
 
             TSModuleName::Identifier(ident)
         } else {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected identifier or string literal for module name".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("identifier or string literal for module name"));
         };
 
         // Parse body or semicolon for shorthand
@@ -2876,11 +2741,7 @@ impl<'a> Parser<'a> {
     ) -> Result<TSModuleDeclaration, ParseError> {
         // Parse namespace name (identifier for nested parts)
         if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected identifier for namespace name".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("identifier for namespace name"));
         }
         let (id_start, id_end) = self.current_pos();
         let name = self.intern_identifier();
@@ -2933,11 +2794,7 @@ impl<'a> Parser<'a> {
     ) -> Result<TSModuleDeclarationBody, ParseError> {
         // Expect opening brace
         if !matches!(self.current_kind(), TokenKind::BraceOpen) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected '{' to open namespace body".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("'{' to open namespace body"));
         }
         let (block_start, _) = self.current_pos();
         self.advance()?; // consume '{'
@@ -2960,11 +2817,7 @@ impl<'a> Parser<'a> {
 
         // Expect closing brace
         if !matches!(self.current_kind(), TokenKind::BraceClose) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected '}' to close namespace body".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("'}' to close namespace body"));
         }
         let (_, block_end) = self.current_pos();
         self.advance()?; // consume '}'

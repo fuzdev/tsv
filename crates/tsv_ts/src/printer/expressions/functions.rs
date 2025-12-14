@@ -701,8 +701,8 @@ impl<'a> Printer<'a> {
             // Extract implements list from source (between extends and body or between class header and body)
             let first_impl = &class_expr.implements[0];
             let last_impl = &class_expr.implements[class_expr.implements.len() - 1];
-            let impl_start = first_impl.span.start as usize;
-            let impl_end = last_impl.span.end as usize;
+            let impl_start = first_impl.span.start_usize();
+            let impl_end = last_impl.span.end_usize();
             let impl_str = &self.source[impl_start..impl_end];
             self.write(impl_str);
         }
@@ -748,8 +748,8 @@ impl<'a> Printer<'a> {
             parts.push(doc::text(" implements "));
             let first_impl = &class_expr.implements[0];
             let last_impl = &class_expr.implements[class_expr.implements.len() - 1];
-            let impl_start = first_impl.span.start as usize;
-            let impl_end = last_impl.span.end as usize;
+            let impl_start = first_impl.span.start_usize();
+            let impl_end = last_impl.span.end_usize();
             let impl_str = &self.source[impl_start..impl_end];
             parts.push(doc::text_owned(impl_str.to_string()));
         }

@@ -88,18 +88,11 @@ impl<'a> Parser<'a> {
                 pattern
             }
             _ => {
-                return Err(ParseError::InvalidSyntax {
-                    message: format!(
-                        "Expected identifier or destructuring pattern, found {}",
-                        self.current_kind()
-                    ),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(self.error_expected_found("identifier or destructuring pattern"));
             }
         };
 
-        let id_end = id.span().end as usize;
+        let id_end = id.span().end_usize();
 
         // Check for initializer
         // Use assignment_expression because comma separates declarators
@@ -109,7 +102,7 @@ impl<'a> Parser<'a> {
             None
         };
 
-        let end = init.as_ref().map_or(id_end, |e| e.span().end as usize);
+        let end = init.as_ref().map_or(id_end, |e| e.span().end_usize());
 
         Ok(VariableDeclarator {
             id,
@@ -188,7 +181,7 @@ impl<'a> Parser<'a> {
         let (start, _) = self.current_pos();
 
         // Consume 'await' keyword
-        debug_assert!(self.current_kind() == TokenKind::Keyword(KeywordKind::Await));
+        debug_assert!(*self.current_kind() == TokenKind::Keyword(KeywordKind::Await));
         self.advance()?;
 
         // Consume 'using' contextual keyword
@@ -247,7 +240,7 @@ impl<'a> Parser<'a> {
         let (decl_start, _) = self.current_pos();
 
         // Consume 'await' keyword
-        debug_assert!(self.current_kind() == TokenKind::Keyword(KeywordKind::Await));
+        debug_assert!(*self.current_kind() == TokenKind::Keyword(KeywordKind::Await));
         self.advance()?;
 
         // Consume 'using' contextual keyword
@@ -282,7 +275,7 @@ impl<'a> Parser<'a> {
 
         let id_end = type_annotation
             .as_ref()
-            .map_or(end, |ta| ta.span.end as usize);
+            .map_or(end, |ta| ta.span.end_usize());
 
         Ok(Expression::Identifier(Identifier {
             name: symbol,

@@ -49,14 +49,10 @@ impl<'a> SvelteParser<'a> {
 
                 // Parse svelte:options tag
                 let svelte_options = self.parse_svelte_options()?;
-                last_end = svelte_options.span.end as usize;
+                last_end = svelte_options.span.end_usize();
 
                 if options.is_some() {
-                    return Err(ParseError::InvalidSyntax {
-                        message: "Duplicate <svelte:options> found".to_string(),
-                        position: self.current_start,
-                        context: None,
-                    });
+                    return Err(self.error_duplicate("<svelte:options>"));
                 }
                 options = Some(svelte_options);
             // Check for script or style tags
@@ -66,7 +62,7 @@ impl<'a> SvelteParser<'a> {
 
                 // Parse script tag
                 let script = self.parse_script_tag()?;
-                last_end = script.span.end as usize;
+                last_end = script.span.end_usize();
 
                 // Assign to instance or module based on script context
                 // Valid script configurations:
@@ -78,21 +74,13 @@ impl<'a> SvelteParser<'a> {
                 match script.context {
                     ScriptContext::Module => {
                         if module.is_some() {
-                            return Err(ParseError::InvalidSyntax {
-                                message: "Duplicate module script found".to_string(),
-                                position: self.current_start,
-                                context: None,
-                            });
+                            return Err(self.error_duplicate("module script"));
                         }
                         module = Some(Box::new(script));
                     }
                     ScriptContext::Default => {
                         if instance.is_some() {
-                            return Err(ParseError::InvalidSyntax {
-                                message: "Duplicate instance script found".to_string(),
-                                position: self.current_start,
-                                context: None,
-                            });
+                            return Err(self.error_duplicate("instance script"));
                         }
                         instance = Some(Box::new(script));
                     }
@@ -103,14 +91,10 @@ impl<'a> SvelteParser<'a> {
 
                 // Parse style tag
                 let style = self.parse_style_tag()?;
-                last_end = style.span.end as usize;
+                last_end = style.span.end_usize();
 
                 if css.is_some() {
-                    return Err(ParseError::InvalidSyntax {
-                        message: "More than one style tag found".to_string(),
-                        position: self.current_start,
-                        context: None,
-                    });
+                    return Err(self.error_duplicate("style tag"));
                 }
                 css = Some(Box::new(style));
             } else {
@@ -121,38 +105,37 @@ impl<'a> SvelteParser<'a> {
 
                 if self.check(TokenKind::Comment) {
                     let comment = self.parse_comment()?;
-                    last_end = comment.span.end as usize;
+                    last_end = comment.span.end_usize();
                     fragment_nodes.push(FragmentNode::Comment(comment));
                 } else if self.check(TokenKind::LeftAngle) {
                     use crate::parser::element::ParsedElement;
                     match self.parse_element_or_special(false)? {
                         ParsedElement::Element(elem) => {
-                            last_end = elem.span.end as usize;
+                            last_end = elem.span.end_usize();
                             fragment_nodes.push(FragmentNode::Element(elem));
                         }
                         ParsedElement::SpecialElement(elem) => {
-                            last_end = elem.span.end as usize;
+                            last_end = elem.span.end_usize();
                             fragment_nodes.push(FragmentNode::SpecialElement(elem));
                         }
                     }
                 } else if self.check(TokenKind::LeftBrace) {
                     let expression_tag = self.parse_expression_tag()?;
-                    last_end = expression_tag.span.end as usize;
+                    last_end = expression_tag.span.end_usize();
                     fragment_nodes.push(FragmentNode::ExpressionTag(expression_tag));
                 } else if self.check(TokenKind::BlockOpen) {
                     let block = self.parse_block()?;
-                    last_end = block.span().end as usize;
+                    last_end = block.span().end_usize();
                     fragment_nodes.push(block);
                 } else if self.check(TokenKind::TagOpen) {
                     let tag = self.parse_template_tag()?;
-                    last_end = tag.span().end as usize;
+                    last_end = tag.span().end_usize();
                     fragment_nodes.push(tag);
                 } else {
-                    return Err(ParseError::InvalidSyntax {
-                        message: format!("Unexpected token in markup: {}", self.current_kind),
-                        position: self.current_start,
-                        context: None,
-                    });
+                    return Err(self.error_msg(&format!(
+                        "Unexpected token in markup: {}",
+                        self.current_kind
+                    )));
                 }
             }
         }
@@ -186,10 +169,10 @@ impl<'a> SvelteParser<'a> {
                 FragmentNode::Text(text) => {
                     if text.data.trim().is_empty() {
                         // Whitespace-only: skip it (start after the whitespace)
-                        root_start = Some(text.span.end as usize);
+                        root_start = Some(text.span.end_usize());
                     } else {
                         // Has content: include it
-                        root_start = Some(text.span.start as usize);
+                        root_start = Some(text.span.start_usize());
                     }
                 }
                 FragmentNode::Element(_)
@@ -205,7 +188,7 @@ impl<'a> SvelteParser<'a> {
                 | FragmentNode::ConstTag(_)
                 | FragmentNode::DebugTag(_)
                 | FragmentNode::RenderTag(_) => {
-                    root_start = Some(first_node.span().start as usize);
+                    root_start = Some(first_node.span().start_usize());
                 }
             }
         }
@@ -254,11 +237,11 @@ impl<'a> SvelteParser<'a> {
         // Use calculated root_start (from first fragment node), or 0 if no fragments
         let start = root_start.unwrap_or(0) as u32;
 
-        // Collect all TypeScript comments from scripts and template expressions
-        let mut ts_comments = Vec::new();
+        // Collect all comments from scripts and template expressions
+        let mut comments = Vec::new();
         if let Some(ref script) = instance {
             for ts_comment in &script.content.comments {
-                ts_comments.push(Comment {
+                comments.push(Comment {
                     content: ts_comment.content.clone(),
                     is_block: ts_comment.is_block,
                     span: ts_comment.span,
@@ -267,7 +250,7 @@ impl<'a> SvelteParser<'a> {
         }
         if let Some(ref script) = module {
             for ts_comment in &script.content.comments {
-                ts_comments.push(Comment {
+                comments.push(Comment {
                     content: ts_comment.content.clone(),
                     is_block: ts_comment.is_block,
                     span: ts_comment.span,
@@ -277,9 +260,9 @@ impl<'a> SvelteParser<'a> {
         // Add expression comments collected during template parsing
         // Currently extracted from: {@debug} tags (intentional divergence from prettier)
         // Future: could extend to other template tags if needed
-        ts_comments.append(&mut self.expression_comments);
+        comments.append(&mut self.expression_comments);
         // Sort by position for consistent lookup via comments_in_range()
-        ts_comments.sort_by_key(|c| c.span.start);
+        comments.sort_by_key(|c| c.span.start);
         // TODO: Consider extracting CSS comments if needed for public AST
 
         Ok(Root {
@@ -288,7 +271,7 @@ impl<'a> SvelteParser<'a> {
             module,
             css,
             options,
-            ts_comments,
+            comments,
             span: Span { start, end },
             interner: Rc::clone(&self.interner),
         })
@@ -322,11 +305,7 @@ impl<'a> SvelteParser<'a> {
             self.expect(TokenKind::LeftAngle)?;
             self.expect(TokenKind::Slash)?;
             if !self.check(TokenKind::Identifier) || self.current_value() != "svelte:options" {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected </svelte:options>".to_string(),
-                    position: self.current_start,
-                    context: None,
-                });
+                return Err(self.error_expected("</svelte:options>"));
             }
             self.advance()?;
             self.expect(TokenKind::RightAngle)?;

@@ -19,11 +19,7 @@ impl<'a> SvelteParser<'a> {
 
         // We're at {#, consume it
         if !self.check(TokenKind::BlockOpen) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected '{{#', found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("'{#'"));
         }
 
         // Look at the source to determine the block type
@@ -43,11 +39,7 @@ impl<'a> SvelteParser<'a> {
             "await" => self.parse_await_block(start),
             "key" => self.parse_key_block(start),
             "snippet" => self.parse_snippet_block(start),
-            _ => Err(ParseError::InvalidSyntax {
-                message: format!("Unknown block type: {{#{keyword}}}"),
-                position: start,
-                context: None,
-            }),
+            _ => Err(self.error_unknown_at("block type", &format!("{{#{keyword}}}"), start)),
         }
     }
 
@@ -296,11 +288,7 @@ impl<'a> SvelteParser<'a> {
                 .find(|c: char| !c.is_alphanumeric() && c != '_' && c != '$')
                 .unwrap_or(trimmed.len());
             if end == 0 {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected identifier or pattern".to_string(),
-                    position: offset,
-                    context: None,
-                });
+                return Err(self.error_expected_at("identifier or pattern", offset));
             }
             let ident_str = &trimmed[..end];
             let expr = tsv_ts::parse_expression(ident_str, adjusted, Rc::clone(&self.interner))?;
@@ -816,11 +804,7 @@ impl<'a> SvelteParser<'a> {
 
         // We're at {@, consume it
         if !self.check(TokenKind::TagOpen) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected '{{@', found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("'{@'"));
         }
 
         // Look at the source to determine the tag type
@@ -838,11 +822,7 @@ impl<'a> SvelteParser<'a> {
             "const" => self.parse_const_tag(start),
             "debug" => self.parse_debug_tag(start),
             "render" => self.parse_render_tag(start),
-            _ => Err(ParseError::InvalidSyntax {
-                message: format!("Unknown template tag: {{@{keyword}}}"),
-                position: start,
-                context: None,
-            }),
+            _ => Err(self.error_unknown_at("template tag", &format!("{{@{keyword}}}"), start)),
         }
     }
 
@@ -955,7 +935,7 @@ impl<'a> SvelteParser<'a> {
     /// Parse a debug tag: {@debug} or {@debug x, y, z}
     ///
     /// Unlike Prettier (which strips comments), we preserve TS comments in debug tags.
-    /// Comments are extracted and stored in Root.ts_comments for lookup by span.
+    /// Comments are extracted and stored in Root.comments for lookup by span.
     fn parse_debug_tag(&mut self, start: usize) -> Result<FragmentNode, ParseError> {
         let tag_content_start = self.current_end;
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
@@ -973,7 +953,7 @@ impl<'a> SvelteParser<'a> {
             ("", tag_content_start)
         };
 
-        // Extract TS comments from the identifiers portion (preserves in Root.ts_comments)
+        // Extract TS comments from the identifiers portion (preserves in Root.comments)
         // Returns content with comments replaced by spaces (positions preserved)
         let cleaned_idents = self.extract_ts_comments(idents_str, idents_offset);
 
@@ -1208,7 +1188,7 @@ impl<'a> SvelteParser<'a> {
             // Parse child nodes
             if self.check(TokenKind::Comment) {
                 let comment = self.parse_comment()?;
-                last_end = comment.span.end as usize;
+                last_end = comment.span.end_usize();
                 nodes.push(FragmentNode::Comment(comment));
             } else if self.check(TokenKind::LeftAngle) {
                 // Check if closing tag
@@ -1218,25 +1198,25 @@ impl<'a> SvelteParser<'a> {
                 use crate::parser::element::ParsedElement;
                 match self.parse_element_or_special(false)? {
                     ParsedElement::Element(elem) => {
-                        last_end = elem.span.end as usize;
+                        last_end = elem.span.end_usize();
                         nodes.push(FragmentNode::Element(elem));
                     }
                     ParsedElement::SpecialElement(elem) => {
-                        last_end = elem.span.end as usize;
+                        last_end = elem.span.end_usize();
                         nodes.push(FragmentNode::SpecialElement(elem));
                     }
                 }
             } else if self.check(TokenKind::LeftBrace) {
                 let expr = self.parse_expression_tag()?;
-                last_end = expr.span.end as usize;
+                last_end = expr.span.end_usize();
                 nodes.push(FragmentNode::ExpressionTag(expr));
             } else if self.check(TokenKind::BlockOpen) {
                 let block = self.parse_block()?;
-                last_end = block.span().end as usize;
+                last_end = block.span().end_usize();
                 nodes.push(block);
             } else if self.check(TokenKind::TagOpen) {
                 let tag = self.parse_template_tag()?;
-                last_end = tag.span().end as usize;
+                last_end = tag.span().end_usize();
                 nodes.push(tag);
             } else {
                 // Unknown token - might be text content that wasn't captured

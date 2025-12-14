@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenKind {
     // Identifiers and keywords
@@ -33,22 +35,60 @@ pub enum TokenKind {
     ColumnCombinator, // || (CSS Grid column combinator)
     Bang,             // ! (for !important)
 
-    // Values - composite tokens per CSS Syntax Level 3
-    String {
-        content: String, // Raw content with escapes preserved: hel\"lo
-        quote: char,     // ' or "
-    },
-    Number(String),            // 123, 1.5, .5, 007 - preserve source representation
-    Percentage(String),        // 50% - preserve source representation
-    Dimension(String, String), // 16px, 1.5em - preserve source representation (value, unit)
+    // Values - no String allocations, extract from source via start/end positions
+    String { quote: char },     // content: source[start+1..end-1]
+    Number,                     // value: source[start..end]
+    Percentage,                 // value: source[start..end-1] (excludes %)
+    Dimension { unit_len: u8 }, // value: source[start..end-unit_len], unit: source[end-unit_len..end]
 
-    // Comments - preserved for printers
-    Comment(String), // /* ... */ - content without delimiters
+    // Comments - content: source[start+2..end-2] (excludes /* */)
+    Comment,
 
     // Whitespace
     Whitespace, // spaces, tabs, newlines
 
     Eof,
+}
+
+impl fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TokenKind::Identifier => write!(f, "identifier"),
+            TokenKind::LeftBrace => write!(f, "'{{'"),
+            TokenKind::RightBrace => write!(f, "'}}'"),
+            TokenKind::LeftBracket => write!(f, "'['"),
+            TokenKind::RightBracket => write!(f, "']'"),
+            TokenKind::LeftParen => write!(f, "'('"),
+            TokenKind::RightParen => write!(f, "')'"),
+            TokenKind::Colon => write!(f, "':'"),
+            TokenKind::Semicolon => write!(f, "';'"),
+            TokenKind::Comma => write!(f, "','"),
+            TokenKind::Dot => write!(f, "'.'"),
+            TokenKind::Hash => write!(f, "'#'"),
+            TokenKind::GreaterThan => write!(f, "'>'"),
+            TokenKind::LessThan => write!(f, "'<'"),
+            TokenKind::Plus => write!(f, "'+'"),
+            TokenKind::Tilde => write!(f, "'~'"),
+            TokenKind::Asterisk => write!(f, "'*'"),
+            TokenKind::Ampersand => write!(f, "'&'"),
+            TokenKind::AtSign => write!(f, "'@'"),
+            TokenKind::Slash => write!(f, "'/'"),
+            TokenKind::Equals => write!(f, "'='"),
+            TokenKind::Percent => write!(f, "'%'"),
+            TokenKind::Caret => write!(f, "'^'"),
+            TokenKind::Dollar => write!(f, "'$'"),
+            TokenKind::Pipe => write!(f, "'|'"),
+            TokenKind::ColumnCombinator => write!(f, "'||'"),
+            TokenKind::Bang => write!(f, "'!'"),
+            TokenKind::String { .. } => write!(f, "string"),
+            TokenKind::Number => write!(f, "number"),
+            TokenKind::Percentage => write!(f, "percentage"),
+            TokenKind::Dimension { .. } => write!(f, "dimension"),
+            TokenKind::Comment => write!(f, "comment"),
+            TokenKind::Whitespace => write!(f, "whitespace"),
+            TokenKind::Eof => write!(f, "end of file"),
+        }
+    }
 }
 
 #[derive(Debug)]

@@ -7,13 +7,11 @@ use tsv_lang::ParseError;
 /// Dimensions: 16px, 1.5em, -2.5rem
 pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseError> {
     let start = *pos;
-    let mut num_str = String::new();
 
     // Read optional sign
     if let Some(ch) = source[*pos..].chars().next()
         && (ch == '-' || ch == '+')
     {
-        num_str.push(ch);
         *pos += 1;
     }
 
@@ -21,7 +19,6 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
     loop {
         match source[*pos..].chars().next() {
             Some(ch) if ch.is_ascii_digit() => {
-                num_str.push(ch);
                 *pos += 1;
             }
             _ => break,
@@ -32,13 +29,11 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
     if source[*pos..].starts_with('.') {
         let peek_char = source[*pos + 1..].chars().next();
         if peek_char.is_some_and(|ch| ch.is_ascii_digit()) {
-            num_str.push('.');
-            *pos += 1;
+            *pos += 1; // consume '.'
 
             loop {
                 match source[*pos..].chars().next() {
                     Some(ch) if ch.is_ascii_digit() => {
-                        num_str.push(ch);
                         *pos += 1;
                     }
                     _ => break,
@@ -47,7 +42,10 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
         }
     }
 
-    // Validate number (parseable as f64), but preserve source string
+    let num_end = *pos;
+
+    // Validate number (parseable as f64)
+    let num_str = &source[start..num_end];
     num_str
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidSyntax {
@@ -60,7 +58,7 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
     if source[*pos..].starts_with('%') {
         *pos += 1;
         return Ok(Token {
-            kind: TokenKind::Percentage(num_str),
+            kind: TokenKind::Percentage,
             start,
             end: *pos,
             decoded: None,
@@ -72,21 +70,22 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
         && (ch.is_alphabetic() || ch == '-')
     {
         let unit_start = *pos;
-        let mut unit = String::new();
 
         loop {
             match source[*pos..].chars().next() {
                 Some(ch) if ch.is_alphanumeric() || ch == '-' || ch == '_' => {
-                    unit.push(ch);
                     *pos += ch.len_utf8();
                 }
                 _ => break,
             }
         }
 
-        if !unit.is_empty() {
+        let unit_len = *pos - unit_start;
+        if unit_len > 0 {
             return Ok(Token {
-                kind: TokenKind::Dimension(num_str, unit),
+                kind: TokenKind::Dimension {
+                    unit_len: unit_len as u8,
+                },
                 start,
                 end: *pos,
                 decoded: None,
@@ -99,7 +98,7 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
 
     // Just a number
     Ok(Token {
-        kind: TokenKind::Number(num_str),
+        kind: TokenKind::Number,
         start,
         end: *pos,
         decoded: None,

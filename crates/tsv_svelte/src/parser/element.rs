@@ -54,11 +54,7 @@ impl<'a> SvelteParser<'a> {
         self.expect(TokenKind::LeftAngle)?;
 
         if !self.check(TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected tag name, found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("tag name"));
         }
 
         let tag_name = self.current_value().to_string();
@@ -328,11 +324,11 @@ impl<'a> SvelteParser<'a> {
 
             if self.check(TokenKind::Comment) {
                 let comment = self.parse_comment()?;
-                last_end = comment.span.end as usize;
+                last_end = comment.span.end_usize();
                 child_nodes.push(FragmentNode::Comment(comment));
             } else if self.check(TokenKind::LeftBrace) {
                 let expression_tag = self.parse_expression_tag()?;
-                last_end = expression_tag.span.end as usize;
+                last_end = expression_tag.span.end_usize();
                 child_nodes.push(FragmentNode::ExpressionTag(expression_tag));
             } else if self.check(TokenKind::LeftAngle) {
                 if self.is_next_token(TokenKind::Slash)? {
@@ -342,37 +338,28 @@ impl<'a> SvelteParser<'a> {
                 let child = self.parse_element_or_special(in_svelte_head)?;
                 match child {
                     ParsedElement::Element(elem) => {
-                        last_end = elem.span.end as usize;
+                        last_end = elem.span.end_usize();
                         child_nodes.push(FragmentNode::Element(elem));
                     }
                     ParsedElement::SpecialElement(elem) => {
-                        last_end = elem.span.end as usize;
+                        last_end = elem.span.end_usize();
                         child_nodes.push(FragmentNode::SpecialElement(elem));
                     }
                 }
             } else if self.check(TokenKind::BlockOpen) {
                 let block = self.parse_block()?;
-                last_end = block.span().end as usize;
+                last_end = block.span().end_usize();
                 child_nodes.push(block);
             } else if self.check(TokenKind::TagOpen) {
                 let tag = self.parse_template_tag()?;
-                last_end = tag.span().end as usize;
+                last_end = tag.span().end_usize();
                 child_nodes.push(tag);
             } else if self.check(TokenKind::Eof) {
-                return Err(ParseError::InvalidSyntax {
-                    message: format!("Unclosed element: <{tag_name}>"),
-                    position: start,
-                    context: None,
-                });
+                return Err(self.error_unclosed_at(&format!("element: <{tag_name}>"), start));
             } else {
-                return Err(ParseError::InvalidSyntax {
-                    message: format!(
-                        "Expected element, expression tag, comment, block, or closing tag, found {}",
-                        self.current_kind
-                    ),
-                    position: self.current_start,
-                    context: None,
-                });
+                return Err(self.error_expected_found(
+                    "element, expression tag, comment, block, or closing tag",
+                ));
             }
         }
 
@@ -385,22 +372,14 @@ impl<'a> SvelteParser<'a> {
         self.expect(TokenKind::Slash)?;
 
         if !self.check(TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected tag name, found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("tag name"));
         }
 
         let closing_tag_name = self.current_value();
         if closing_tag_name != expected_name {
-            return Err(ParseError::InvalidSyntax {
-                message: format!(
-                    "Mismatched tags: expected closing tag for '{expected_name}' but found '{closing_tag_name}'"
-                ),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_msg(&format!(
+                "Mismatched tags: expected closing tag for '{expected_name}' but found '{closing_tag_name}'"
+            )));
         }
         self.advance()?;
 
@@ -439,11 +418,9 @@ impl<'a> SvelteParser<'a> {
         }
 
         if !found_close {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Unterminated <{tag_name}> element"),
-                position: element_start,
-                context: None,
-            });
+            return Err(
+                self.error_msg_at(&format!("Unterminated <{tag_name}> element"), element_start)
+            );
         }
 
         // Reposition lexer to the closing tag

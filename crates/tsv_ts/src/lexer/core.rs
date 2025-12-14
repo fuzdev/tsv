@@ -109,6 +109,7 @@ impl<'a> Lexer<'a> {
         self.next_token()
     }
 
+    #[inline]
     fn advance(&mut self) {
         if let Some(ch) = self.current {
             self.position += ch.len_utf8();

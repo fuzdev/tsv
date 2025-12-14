@@ -22,9 +22,9 @@ pub struct Root {
     pub css: Option<Box<Style>>,
     /// `<svelte:options>` configuration (not part of fragment)
     pub options: Option<SvelteOptions>,
-    /// All TypeScript comments from scripts and template expressions.
+    /// All comments from scripts and template expressions.
     /// Use `comments_in_range(span)` to find comments for a specific node.
-    pub ts_comments: Vec<Comment>,
+    pub comments: Vec<Comment>,
     pub span: Span,
     pub interner: Rc<RefCell<DefaultStringInterner>>,
 }
@@ -169,7 +169,7 @@ pub struct ConstTag {
 /// Empty identifiers array means "debug all state".
 ///
 /// Note: Unlike Prettier (which strips comments), we preserve TS comments
-/// within debug tags. Comments are stored in `Root.ts_comments` and looked
+/// within debug tags. Comments are stored in `Root.comments` and looked
 /// up by span during formatting. This is an intentional divergence.
 #[derive(Debug, Clone)]
 pub struct DebugTag {
@@ -457,7 +457,7 @@ pub enum SpecialElementKind {
 impl SpecialElementKind {
     /// Returns the tag name as it appears in source code
     #[inline]
-    pub fn tag_name(&self) -> &'static str {
+    pub const fn tag_name(&self) -> &'static str {
         match self {
             Self::SvelteHead => "svelte:head",
             Self::SvelteWindow => "svelte:window",
@@ -475,7 +475,7 @@ impl SpecialElementKind {
 
     /// Returns the AST node type name for JSON output
     #[inline]
-    pub fn node_type(&self) -> &'static str {
+    pub const fn node_type(&self) -> &'static str {
         match self {
             Self::SvelteHead => "SvelteHead",
             Self::SvelteWindow => "SvelteWindow",

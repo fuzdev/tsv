@@ -3,8 +3,8 @@
 //! All validation errors for a single fixture are collected together,
 //! enabling better DX with grouped error reporting.
 
+use crate::deno::{PrettierParser, parse_svelte, parse_typescript, run_prettier};
 use crate::diff;
-use crate::deno::{parse_svelte, parse_typescript, run_prettier, PrettierParser};
 use crate::fixtures::{
     self, Fixture, InputType, discover_prettier_quirk_variants, discover_unformatted_ours_variants,
     discover_unformatted_variants, has_prettier_divergence_suffix, has_svelte_divergence_suffix,
@@ -736,14 +736,13 @@ async fn validate_formatter_prettier(
     let output_prettier_path = fixture.output_prettier_path();
     let output_prettier_filename = fixture.output_prettier_filename();
 
-    let formatted =
-        match run_prettier(input, fixture.input_type().prettier_parser()).await {
-            Ok(f) => f,
-            Err(e) => {
-                result.add_error(ValidationError::FormatterError(format!("Prettier: {e}")));
-                return;
-            }
-        };
+    let formatted = match run_prettier(input, fixture.input_type().prettier_parser()).await {
+        Ok(f) => f,
+        Err(e) => {
+            result.add_error(ValidationError::FormatterError(format!("Prettier: {e}")));
+            return;
+        }
+    };
 
     if output_prettier_path.exists() {
         // F2: Check output_prettier file matches prettier
@@ -787,9 +786,7 @@ async fn validate_normalization_prettier(
             continue;
         };
 
-        match run_prettier(&quirk_content, PrettierParser::Parser("svelte"))
-            .await
-        {
+        match run_prettier(&quirk_content, PrettierParser::Parser("svelte")).await {
             Ok(formatted) => {
                 if formatted != quirk_content {
                     result.add_error(ValidationError::NormalizationPrettierQuirkNotPreserved(

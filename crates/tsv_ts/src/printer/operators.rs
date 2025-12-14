@@ -312,8 +312,8 @@ impl<'a> Printer<'a> {
                 // Find the operator position in the source to split comments correctly
                 // Comments before operator stay before, comments after operator stay after
                 let op_str = operator.as_str();
-                let range_start = prev_operand.span.end as usize;
-                let range_end = operand.span.start as usize;
+                let range_start = prev_operand.span.end_usize();
+                let range_end = operand.span.start_usize();
                 let search_range = &self.source[range_start..range_end];
                 let op_offset = search_range.find(op_str).unwrap_or(0);
                 let op_pos = (range_start + op_offset) as u32;

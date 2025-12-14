@@ -10,8 +10,8 @@ use crate::ast::internal::{
     self, TSArrayType, TSIntersectionType, TSLiteralType, TSType, TSTypeParameter,
     TSTypeParameterDeclaration, TSUnionType, TemplateLiteralType,
 };
-use string_interner::Symbol;
 use tsv_lang::SymbolResolver;
+use tsv_lang::SymbolToU32;
 use tsv_lang::doc::{self, Doc};
 
 impl<'a> Printer<'a> {
@@ -189,7 +189,7 @@ impl<'a> Printer<'a> {
             parts.push(doc::text("out "));
         }
 
-        parts.push(doc::symbol(param.name.name.to_usize() as u32));
+        parts.push(doc::symbol(param.name.name.to_u32()));
 
         if let Some(constraint) = &param.constraint {
             parts.push(doc::text(" extends "));
@@ -454,7 +454,7 @@ impl<'a> Printer<'a> {
                 if p.asserts {
                     parts.push(doc::text("asserts "));
                 }
-                parts.push(doc::symbol(p.parameter_name.name.to_usize() as u32));
+                parts.push(doc::symbol(p.parameter_name.name.to_u32()));
                 if let Some(type_ann) = &p.type_annotation {
                     parts.push(doc::text(" is "));
                     parts.push(self.build_type_doc(type_ann));
@@ -534,7 +534,7 @@ impl<'a> Printer<'a> {
                 doc::text("?"),
             ]),
             TSType::NamedTupleMember(n) => {
-                let mut parts = vec![doc::symbol(n.label.name.to_usize() as u32)];
+                let mut parts = vec![doc::symbol(n.label.name.to_u32())];
                 if n.optional {
                     parts.push(doc::text("?"));
                 }
@@ -544,7 +544,7 @@ impl<'a> Printer<'a> {
             }
             TSType::Infer(i) => doc::concat(vec![
                 doc::text("infer "),
-                doc::symbol(i.type_parameter.name.name.to_usize() as u32),
+                doc::symbol(i.type_parameter.name.name.to_u32()),
             ]),
         }
     }
@@ -823,7 +823,7 @@ impl<'a> Printer<'a> {
                     idx.parameters
                         .iter()
                         .map(|param| {
-                            let mut param_parts = vec![doc::symbol(param.name.to_usize() as u32)];
+                            let mut param_parts = vec![doc::symbol(param.name.to_u32())];
                             if let Some(type_ann) = &param.type_annotation {
                                 match type_ann.type_annotation.as_ref() {
                                     TSType::Union(u) => {
@@ -1076,7 +1076,7 @@ impl<'a> Printer<'a> {
             TSType::TypeLiteral(t) => {
                 // Check if original was multi-line (newline immediately after opening brace)
                 // This matches prettier's behavior: `{ a: T }` → single-line, `{\n a: T; }` → multi-line
-                let source_text = &self.source[t.span.start as usize..t.span.end as usize];
+                let source_text = t.span.extract(self.source);
                 let after_brace = source_text.strip_prefix('{').unwrap_or("");
                 let is_single_line = !after_brace.starts_with('\n')
                     && !after_brace.starts_with("\r\n")
@@ -1513,14 +1513,8 @@ impl<'a> Printer<'a> {
                     name
                 }
             }
-            TSType::TypeLiteral(t) => {
-                let span = t.span;
-                self.source[span.start as usize..span.end as usize].to_string()
-            }
-            TSType::Function(f) => {
-                let span = f.span;
-                self.source[span.start as usize..span.end as usize].to_string()
-            }
+            TSType::TypeLiteral(t) => t.span.extract(self.source).to_string(),
+            TSType::Function(f) => f.span.extract(self.source).to_string(),
             TSType::Tuple(t) => {
                 let elems: Vec<_> = t
                     .element_types
@@ -1716,9 +1710,7 @@ impl<'a> Printer<'a> {
                 normalize_number_literal(literal.span.extract(self.source))
             }
             internal::LiteralValue::String { content: _, quote } => {
-                let start = literal.span.start as usize;
-                let end = literal.span.end as usize;
-                let raw_literal = &self.source[start..end];
+                let raw_literal = literal.span.extract(self.source);
                 let raw_content = &raw_literal[1..raw_literal.len() - 1];
                 format_string_literal(raw_content, *quote, StringFormatOptions::default())
             }

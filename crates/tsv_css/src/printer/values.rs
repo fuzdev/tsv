@@ -24,7 +24,7 @@ impl<'a> Printer<'a> {
             source: self.source,
             indent_level: 0, // Don't include indentation in width calculation
             config: no_wrap_config,
-            value_comments: self.value_comments,
+            comments: self.comments,
         };
         // Use semantic printing to avoid source extraction (which includes original formatting)
         temp_printer.print_css_value_semantic(value);
@@ -61,7 +61,7 @@ impl<'a> Printer<'a> {
         let span = value.span();
 
         // Try source extraction (spans are now accurate from ValueParser!)
-        if span.end as usize <= self.source.len() {
+        if span.end_usize() <= self.source.len() {
             let raw = span.extract(self.source);
 
             if !raw.is_empty() {
@@ -178,7 +178,7 @@ impl<'a> Printer<'a> {
             }
             CssValue::Function { name, args, span } => {
                 // For functions with no parsed args (like supports()), extract from source
-                if args.is_empty() && span.end as usize <= self.source.len() {
+                if args.is_empty() && span.end_usize() <= self.source.len() {
                     let raw = span.extract(self.source);
                     self.write(raw);
                 } else {

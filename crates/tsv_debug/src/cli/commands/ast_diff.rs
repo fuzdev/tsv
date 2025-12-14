@@ -1,5 +1,5 @@
 use crate::cli::input_parser;
-use crate::diff::{diff_to_string, ColorChoice, DiffOptions};
+use crate::diff::{ColorChoice, DiffOptions, diff_to_string};
 use crate::error;
 use crate::fixtures;
 use crate::{deno, subprocess};
@@ -147,8 +147,7 @@ fn compare_asts(json1: &str, json2: &str) -> error::Result<bool> {
     let pretty2 = serde_json::to_string_pretty(&ast2_clean)?;
 
     println!("\n=== AST Diff ===");
-    let options =
-        DiffOptions::default().with_color_choice(ColorChoice::Auto);
+    let options = DiffOptions::default().with_color_choice(ColorChoice::Auto);
     let options = DiffOptions {
         context_lines: None,
         show_summary: true,
@@ -157,10 +156,7 @@ fn compare_asts(json1: &str, json2: &str) -> error::Result<bool> {
         show_json_paths: true,
         ..options
     };
-    print!(
-        "{}",
-        diff_to_string(&pretty1, &pretty2, &options)
-    );
+    print!("{}", diff_to_string(&pretty1, &pretty2, &options));
 
     Ok(false)
 }

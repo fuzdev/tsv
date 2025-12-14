@@ -20,11 +20,7 @@ pub(crate) fn parse_pseudo_selector(
     }
 
     if !parser.check(&TokenKind::Identifier) {
-        return Err(ParseError::InvalidSyntax {
-            message: "Expected pseudo-class or pseudo-element name".to_string(),
-            position: parser.base_offset() + parser.current_start,
-            context: None,
-        });
+        return Err(parser.error_expected("pseudo-class or pseudo-element name"));
     }
 
     // Internal AST: use decoded value (spec-compliant)
@@ -105,11 +101,9 @@ fn parse_pseudo_args(
                 || parser.check(&TokenKind::Tilde)
                 || parser.check(&TokenKind::ColumnCombinator)
             {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Combinators not allowed in ::slotted() compound selector".to_string(),
-                    position: parser.base_offset() + parser.current_start,
-                    context: None,
-                });
+                return Err(
+                    parser.error_msg("Combinators not allowed in ::slotted() compound selector")
+                );
             }
 
             // Try to parse one simple selector
@@ -121,11 +115,10 @@ fn parse_pseudo_args(
         }
 
         if compound_selectors.is_empty() {
-            return Err(ParseError::InvalidSyntax {
-                message: "::slotted() requires a compound selector argument".to_string(),
-                position: parser.base_offset() + compound_start,
-                context: None,
-            });
+            return Err(parser.error_msg_at(
+                "::slotted() requires a compound selector argument",
+                parser.base_offset() + compound_start,
+            ));
         }
 
         let end = parser.expect_and_capture(&TokenKind::RightParen)?;
@@ -154,11 +147,7 @@ fn parse_pseudo_args(
         // Parse space-separated identifiers
         while !parser.check(&TokenKind::RightParen) && !parser.check(&TokenKind::Eof) {
             if !parser.check(&TokenKind::Identifier) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "::part() requires identifier arguments".to_string(),
-                    position: parser.base_offset() + parser.current_start,
-                    context: None,
-                });
+                return Err(parser.error_msg("::part() requires identifier arguments"));
             }
 
             let ident = parser
@@ -172,11 +161,10 @@ fn parse_pseudo_args(
         }
 
         if idents.is_empty() {
-            return Err(ParseError::InvalidSyntax {
-                message: "::part() requires at least one identifier".to_string(),
-                position: parser.base_offset() + args_start,
-                context: None,
-            });
+            return Err(parser.error_msg_at(
+                "::part() requires at least one identifier",
+                parser.base_offset() + args_start,
+            ));
         }
 
         let end = parser.expect_and_capture(&TokenKind::RightParen)?;

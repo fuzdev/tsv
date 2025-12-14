@@ -210,7 +210,7 @@ async fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult
         }
         InputType::Css => {
             // CSS fixtures use our own parser (no external canonical source)
-            let ast = match tsv_css::parse(&source, 0) {
+            let ast = match tsv_css::parse(&source) {
                 Ok(ast) => ast,
                 Err(e) => return FixtureResult::Failed(format!("CSS parse error: {e:?}")),
             };

@@ -81,8 +81,8 @@ impl LocationTracker {
     /// assert_eq!(loc.end.column, 5);
     /// ```
     pub fn span_to_location(&self, span: Span) -> SourceLocation {
-        let start = self.offset_to_position(span.start as usize);
-        let end = self.offset_to_position(span.end as usize);
+        let start = self.offset_to_position(span.start_usize());
+        let end = self.offset_to_position(span.end_usize());
         SourceLocation { start, end }
     }
 

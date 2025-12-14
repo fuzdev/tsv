@@ -1,19 +1,27 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@std/fs@1": "1.0.8",
     "jsr:@std/fs@1.0.8": "1.0.8",
+    "jsr:@std/path@1": "1.0.8",
     "jsr:@std/path@1.0.8": "1.0.8",
     "jsr:@std/path@^1.0.8": "1.0.8",
-    "npm:@sveltejs/acorn-typescript@^1.0.1": "1.0.6_acorn@8.15.0",
+    "jsr:@std/streams@1": "1.0.14",
+    "npm:@sveltejs/acorn-typescript@1.0.8": "1.0.8_acorn@8.14.0",
+    "npm:@sveltejs/acorn-typescript@^1.0.1": "1.0.8_acorn@8.14.0",
     "npm:acorn-typescript@1.4.13": "1.4.13_acorn@8.14.0",
     "npm:acorn@8.14.0": "8.14.0",
+    "npm:acorn@8.15.0": "8.15.0",
     "npm:acorn@^8.14.0": "8.15.0",
-    "npm:prettier-plugin-svelte@3": "3.4.0_prettier@3.6.2_svelte@5.43.2__acorn@8.15.0",
-    "npm:prettier-plugin-svelte@^3.3.0": "3.4.0_prettier@3.6.2_svelte@5.43.2__acorn@8.15.0",
-    "npm:prettier-plugin-svelte@^3.3.2": "3.4.0_prettier@3.6.2_svelte@5.43.2__acorn@8.15.0",
-    "npm:prettier-plugin-svelte@^3.4.0": "3.4.0_prettier@3.6.2_svelte@5.43.2__acorn@8.15.0",
+    "npm:prettier-plugin-svelte@3": "3.4.0_prettier@3.7.4_svelte@5.45.8__acorn@8.15.0",
+    "npm:prettier-plugin-svelte@3.4.0": "3.4.0_prettier@3.7.4_svelte@5.45.8__acorn@8.15.0",
+    "npm:prettier-plugin-svelte@^3.3.0": "3.4.0_prettier@3.7.4_svelte@5.45.8__acorn@8.15.0",
+    "npm:prettier-plugin-svelte@^3.3.2": "3.4.0_prettier@3.7.4_svelte@5.45.8__acorn@8.15.0",
+    "npm:prettier-plugin-svelte@^3.4.0": "3.4.0_prettier@3.7.4_svelte@5.45.8__acorn@8.15.0",
+    "npm:prettier@3.7.4": "3.7.4",
     "npm:prettier@^3.7.4": "3.7.4",
-    "npm:svelte@^5.43.0": "5.43.2_acorn@8.15.0"
+    "npm:svelte@5.45.8": "5.45.8_acorn@8.15.0",
+    "npm:svelte@^5.43.0": "5.45.8_acorn@8.15.0"
   },
   "jsr": {
     "@std/fs@1.0.8": {
@@ -24,6 +32,9 @@
     },
     "@std/path@1.0.8": {
       "integrity": "548fa456bb6a04d3c1a1e7477986b6cffbce95102d0bb447c67c4ee70e0364be"
+    },
+    "@std/streams@1.0.14": {
+      "integrity": "c0df6cdd73bd4bbcbe4baa89e323b88418c90ceb2d926f95aa99bdcdbfca2411"
     }
   },
   "npm": {
@@ -54,8 +65,14 @@
         "@jridgewell/sourcemap-codec"
       ]
     },
-    "@sveltejs/acorn-typescript@1.0.6_acorn@8.15.0": {
-      "integrity": "sha512-4awhxtMh4cx9blePWl10HRHj8Iivtqj+2QdDCSMDzxG+XKa9+VCNupQuCuvzEhYPzZSrX+0gC+0lHA/0fFKKQQ==",
+    "@sveltejs/acorn-typescript@1.0.8_acorn@8.14.0": {
+      "integrity": "sha512-esgN+54+q0NjB0Y/4BomT9samII7jGwNy/2a3wNZbT2A2RpmXsXwUt24LvLhx6jUq2gVk4cWEvcRO6MFQbOfNA==",
+      "dependencies": [
+        "acorn@8.14.0"
+      ]
+    },
+    "@sveltejs/acorn-typescript@1.0.8_acorn@8.15.0": {
+      "integrity": "sha512-esgN+54+q0NjB0Y/4BomT9samII7jGwNy/2a3wNZbT2A2RpmXsXwUt24LvLhx6jUq2gVk4cWEvcRO6MFQbOfNA==",
       "dependencies": [
         "acorn@8.15.0"
       ]
@@ -86,11 +103,14 @@
     "clsx@2.1.1": {
       "integrity": "sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA=="
     },
+    "devalue@5.6.0": {
+      "integrity": "sha512-BaD1s81TFFqbD6Uknni42TrolvEWA1Ih5L+OiHWmi4OYMJVwAYPGtha61I9KxTf52OvVHozHyjPu8zljqdF3uA=="
+    },
     "esm-env@1.2.2": {
       "integrity": "sha512-Epxrv+Nr/CaL4ZcFGPJIYLWFom+YeV1DqMLHJoEd9SYRxNbaFruBwfEX/kkHUJf55j2+TUbmDcmuilbP1TmXHA=="
     },
-    "esrap@2.1.2": {
-      "integrity": "sha512-DgvlIQeowRNyvLPWW4PT7Gu13WznY288Du086E751mwwbsgr29ytBiYeLzAGIo0qk3Ujob0SDk8TiSaM5WQzNg==",
+    "esrap@2.2.1": {
+      "integrity": "sha512-GiYWG34AN/4CUyaWAgunGt0Rxvr1PTMlGC0vvEov/uOQYWne2bpN03Um+k8jT+q3op33mKouP2zeJ6OlM+qeUg==",
       "dependencies": [
         "@jridgewell/sourcemap-codec"
       ]
@@ -110,32 +130,29 @@
         "@jridgewell/sourcemap-codec"
       ]
     },
-    "prettier-plugin-svelte@3.4.0_prettier@3.6.2_svelte@5.43.2__acorn@8.15.0": {
+    "prettier-plugin-svelte@3.4.0_prettier@3.7.4_svelte@5.45.8__acorn@8.15.0": {
       "integrity": "sha512-pn1ra/0mPObzqoIQn/vUTR3ZZI6UuZ0sHqMK5x2jMLGrs53h0sXhkVuDcrlssHwIMk7FYrMjHBPoUSyyEEDlBQ==",
       "dependencies": [
-        "prettier@3.6.2",
+        "prettier",
         "svelte"
       ]
-    },
-    "prettier@3.6.2": {
-      "integrity": "sha512-I7AIg5boAr5R0FFtJ6rCfD+LFsWHp81dolrFD8S79U9tb8Az2nGrJncnMSnys+bpQJfRUzqs9hnA81OAA3hCuQ==",
-      "bin": true
     },
     "prettier@3.7.4": {
       "integrity": "sha512-v6UNi1+3hSlVvv8fSaoUbggEM5VErKmmpGA7Pl3HF8V6uKY7rvClBOJlH6yNwQtfTueNkGVpOv/mtWL9L4bgRA==",
       "bin": true
     },
-    "svelte@5.43.2_acorn@8.15.0": {
-      "integrity": "sha512-ro1umEzX8rT5JpCmlf0PPv7ncD8MdVob9e18bhwqTKNoLjS8kDvhVpaoYVPc+qMwDAOfcwJtyY7ZFSDbOaNPgA==",
+    "svelte@5.45.8_acorn@8.15.0": {
+      "integrity": "sha512-1Jh7FwVh/2Uxg0T7SeE1qFKMhwYH45b2v53bcZpW7qHa6O8iU1ByEj56PF0IQ6dU4HE5gRkic6h+vx+tclHeiw==",
       "dependencies": [
         "@jridgewell/remapping",
         "@jridgewell/sourcemap-codec",
-        "@sveltejs/acorn-typescript",
+        "@sveltejs/acorn-typescript@1.0.8_acorn@8.15.0",
         "@types/estree",
         "acorn@8.15.0",
         "aria-query",
         "axobject-query",
         "clsx",
+        "devalue",
         "esm-env",
         "esrap",
         "is-reference",

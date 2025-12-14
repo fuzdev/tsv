@@ -19,7 +19,6 @@ pub use tsv_lang::{ParseError, PrintConfig, Result, Span};
 ///
 /// # Arguments
 /// * `source` - CSS source code
-/// * `base_offset` - Offset in larger file (for embedded CSS in Svelte)
 ///
 /// # Returns
 /// * `Ok(CssStyleSheet)` - Parsed AST with nodes and value comments
@@ -30,9 +29,25 @@ pub use tsv_lang::{ParseError, PrintConfig, Result, Span};
 /// use tsv_css::parse;
 ///
 /// let css = "div { color: red; }";
-/// let stylesheet = parse(css, 0).expect("Failed to parse CSS");
+/// let stylesheet = parse(css).expect("Failed to parse CSS");
 /// ```
-pub fn parse(source: &str, base_offset: usize) -> Result<CssStyleSheet> {
+pub fn parse(source: &str) -> Result<CssStyleSheet> {
+    parse_css(source, 0).map_err(|e| e.with_context(source))
+}
+
+/// Parse embedded CSS source into internal AST
+///
+/// Use this when parsing CSS embedded in another language (e.g., Svelte `<style>` tags)
+/// where span positions need to reflect the offset in the parent file.
+///
+/// # Arguments
+/// * `source` - CSS source code
+/// * `base_offset` - Offset in parent file (for error reporting and span calculation)
+///
+/// # Returns
+/// * `Ok(CssStyleSheet)` - Parsed AST with nodes and value comments
+/// * `Err(ParseError)` - Parse error with position and context
+pub fn parse_embedded(source: &str, base_offset: usize) -> Result<CssStyleSheet> {
     parse_css(source, base_offset).map_err(|e| e.with_context(source))
 }
 
@@ -50,7 +65,7 @@ pub fn parse(source: &str, base_offset: usize) -> Result<CssStyleSheet> {
 /// use tsv_css::{parse, format};
 ///
 /// let css = "div{color:red;}";
-/// let stylesheet = parse(css, 0).expect("Failed to parse CSS");
+/// let stylesheet = parse(css).expect("Failed to parse CSS");
 /// let formatted = format(&stylesheet, css);
 /// assert_eq!(formatted, "div {\n\tcolor: red;\n}\n");
 /// ```
@@ -74,7 +89,7 @@ pub fn format(stylesheet: &CssStyleSheet, source: &str) -> String {
 /// use tsv_lang::PrintConfig;
 ///
 /// let css = "div{color:red;}";
-/// let stylesheet = parse(css, 0).expect("Failed to parse CSS");
+/// let stylesheet = parse(css).expect("Failed to parse CSS");
 /// let config = PrintConfig { base_indent_offset: 1, ..Default::default() };
 /// let formatted = format_with_config(&stylesheet, css, config);
 /// ```
@@ -96,7 +111,7 @@ pub fn format_with_config(stylesheet: &CssStyleSheet, source: &str, config: Prin
 /// use tsv_css::{parse, convert_ast};
 ///
 /// let css = "div { color: red; }";
-/// let stylesheet = parse(css, 0).expect("Failed to parse CSS");
+/// let stylesheet = parse(css).expect("Failed to parse CSS");
 /// let json = convert_ast(&stylesheet, css);
 /// ```
 pub fn convert_ast(stylesheet: &CssStyleSheet, source: &str) -> serde_json::Value {

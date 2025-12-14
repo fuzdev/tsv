@@ -3,15 +3,13 @@ use tsv_lang::ParseError;
 
 /// Read a CSS string: "..." or '...'
 /// Preserves raw escape sequences exactly as written (no quirks applied)
-/// Returns the raw string content (with escapes) and quote character
+/// Content extracted via source[start+1..end-1]
 ///
 /// **Architecture**: Lexer preserves raw content → Parser decodes → Conversion applies Svelte quirks
 /// This matches TypeScript's approach and keeps the lexer simple and consistent.
 pub(crate) fn read_string(source: &str, pos: &mut usize, quote: char) -> Result<Token, ParseError> {
     let start = *pos;
     *pos += 1; // skip opening quote
-
-    let content_start = *pos;
 
     // Scan through string to find closing quote
     loop {
@@ -25,14 +23,10 @@ pub(crate) fn read_string(source: &str, pos: &mut usize, quote: char) -> Result<
                 });
             }
             Some(ch) if ch == quote => {
-                let content_end = *pos;
                 *pos += 1; // skip closing quote
 
-                // Extract raw content exactly as written
-                let content = source[content_start..content_end].to_string();
-
                 return Ok(Token {
-                    kind: TokenKind::String { content, quote },
+                    kind: TokenKind::String { quote },
                     start,
                     end: *pos,
                     decoded: None,

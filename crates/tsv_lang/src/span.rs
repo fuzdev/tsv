@@ -31,4 +31,16 @@ impl Span {
     pub fn range(&self) -> std::ops::Range<usize> {
         self.start as usize..self.end as usize
     }
+
+    /// Get start position as usize (for indexing)
+    #[inline]
+    pub fn start_usize(&self) -> usize {
+        self.start as usize
+    }
+
+    /// Get end position as usize (for indexing)
+    #[inline]
+    pub fn end_usize(&self) -> usize {
+        self.end as usize
+    }
 }

@@ -26,8 +26,7 @@ mod selectors;
 pub mod source_fidelity;
 mod values;
 
-use crate::ast::internal::{CssBlockChild, CssComment, CssNode, CssStyleSheet};
-use std::collections::HashMap;
+use crate::ast::internal::{Comment, CssBlockChild, CssNode, CssStyleSheet};
 use tsv_lang::{OutputBuffer, PrintConfig, doc, printing};
 
 /// Printer state for building output
@@ -40,28 +39,41 @@ pub struct Printer<'a> {
     config: PrintConfig,
     /// Original source (for blank line detection and raw value extraction)
     pub(crate) source: &'a str,
-    /// Value comments side table (declaration span.start -> comments in value)
-    pub(crate) value_comments: &'a HashMap<u32, Vec<CssComment>>,
+    /// All comments sorted by span.start
+    pub(crate) comments: &'a [Comment],
 }
 
 impl<'a> Printer<'a> {
-    /// Create a new printer with source and value comments
-    pub fn new(source: &'a str, value_comments: &'a HashMap<u32, Vec<CssComment>>) -> Self {
-        Self::with_config(source, value_comments, PrintConfig::default())
+    /// Create a new printer with source and comments
+    pub fn new(source: &'a str, comments: &'a [Comment]) -> Self {
+        Self::with_config(source, comments, PrintConfig::default())
     }
 
     /// Create a new printer with the given config
-    pub fn with_config(
-        source: &'a str,
-        value_comments: &'a HashMap<u32, Vec<CssComment>>,
-        config: PrintConfig,
-    ) -> Self {
+    pub fn with_config(source: &'a str, comments: &'a [Comment], config: PrintConfig) -> Self {
         Self {
             buffer: OutputBuffer::new(),
             indent_level: 0,
             config,
             source,
-            value_comments,
+            comments,
+        }
+    }
+
+    /// Check if a declaration has value comments (comments inside the value, not property name)
+    ///
+    /// Value comments are comments that appear after the colon, e.g., `color: /* comment */ red;`
+    /// Detected by scanning the source text directly (value comments are not stored in the Vec).
+    pub(crate) fn has_value_comments_in_decl(
+        &self,
+        decl: &crate::ast::internal::CssDeclaration,
+    ) -> bool {
+        let decl_source = decl.span.extract(self.source);
+        if let Some(colon_pos) = decl_source.find(':') {
+            let value_part = &decl_source[colon_pos + 1..];
+            value_part.contains("/*")
+        } else {
+            false
         }
     }
 
@@ -112,103 +124,164 @@ impl<'a> Printer<'a> {
         self.buffer.into_string()
     }
 
-    /// Print a list of CSS nodes (rules)
+    /// Print a list of CSS nodes (rules) with comments interspersed by position
     pub fn print_css_nodes(&mut self, nodes: &[CssNode]) {
-        let mut i = 0;
-        while i < nodes.len() {
-            let node = &nodes[i];
+        // Use comment index for efficient traversal (comments are sorted)
+        let mut comment_idx = 0;
+        let mut prev_end: u32 = 0;
+        let mut printed_any = false;
 
-            if i > 0 {
-                let prev_node = &nodes[i - 1];
+        for node in nodes {
+            let node_start = node.span().start;
+            let node_end = node.span().end;
 
-                // Special case: consecutive comments on same line
-                if let (CssNode::Comment(_), CssNode::Comment(curr_comment)) = (prev_node, node)
-                    && printing::is_same_line(
-                        self.source,
-                        prev_node.span().end,
-                        curr_comment.span.start,
-                    )
-                {
-                    // Print comment inline with space separator
-                    self.write(" /*");
-                    self.write(&curr_comment.content);
-                    self.write("*/");
-                    i += 1;
-                    continue;
-                }
+            // Print comments between prev_end and this node
+            let comments_before =
+                self.print_leading_comments(prev_end, node_start, &mut comment_idx);
 
-                let has_blank_line_in_source = self.has_blank_line_between(prev_node, node);
+            // Add separator before node
+            if printed_any || comments_before > 0 {
+                // Determine where to measure blank line from
+                let gap_start = if comments_before > 0 {
+                    self.comments
+                        .get(comment_idx.saturating_sub(1))
+                        .map_or(prev_end, |c| c.span.end)
+                } else {
+                    prev_end
+                };
 
-                // Prettier preserves blank lines from source, otherwise uses single newline
-                if has_blank_line_in_source {
+                if self.has_blank_line_between_spans(gap_start, node_start) {
                     self.write("\n\n");
                 } else {
-                    // All transitions (rule→rule, rule→comment, comment→rule, etc.) use single newline
                     self.write("\n");
                 }
             }
 
             self.print_css_node(node);
 
-            // Check if next node is an inline comment after a rule/at-rule closing brace
-            if matches!(node, CssNode::Rule(_) | CssNode::Atrule(_))
-                && let Some(CssNode::Comment(next_comment)) = nodes.get(i + 1)
-                && printing::is_same_line(self.source, node.span().end, next_comment.span.start)
-            {
-                // Print comment inline after the closing brace
-                self.write(" /*");
-                self.write(&next_comment.content);
-                self.write("*/");
-                i += 1; // Skip the comment in next iteration
-            }
+            // Check for inline comments on same line as node's closing brace
+            let inline_count = self.print_inline_comments_after_node(node_end, &mut comment_idx);
 
-            i += 1;
+            prev_end = if inline_count > 0 {
+                self.comments
+                    .get(comment_idx - 1)
+                    .map_or(node_end, |c| c.span.end)
+            } else {
+                node_end
+            };
+
+            printed_any = true;
         }
+
+        // Print trailing comments after all nodes
+        self.print_trailing_comments(prev_end, &mut comment_idx);
+
         // Add trailing newline (matches prettier)
         self.write("\n");
     }
 
-    /// Check if there's a blank line in the source between two nodes
-    fn has_blank_line_between(&self, prev: &CssNode, curr: &CssNode) -> bool {
-        let source = self.source;
-        let prev_end = prev.span().end as usize;
-        let curr_start = curr.span().start as usize;
+    /// Print leading comments between prev_end and curr_start
+    /// Returns the number of comments printed
+    fn print_leading_comments(
+        &mut self,
+        prev_end: u32,
+        curr_start: u32,
+        comment_idx: &mut usize,
+    ) -> usize {
+        let mut printed = 0;
+        let mut last_end = prev_end;
 
-        // For adjacent spans, check for trailing whitespace in prev span
-        // AND leading whitespace in curr span
-        let (search_start, search_end) = if prev_end == curr_start {
-            // Look back for trailing whitespace in prev span
-            let mut start = prev_end;
-            for ch in source[..prev_end].chars().rev().take(20) {
-                if ch.is_whitespace() {
-                    start = start.saturating_sub(ch.len_utf8());
+        while *comment_idx < self.comments.len() {
+            let comment = &self.comments[*comment_idx];
+            if comment.span.start >= curr_start {
+                break;
+            }
+
+            // Skip inline comments (same line as prev node) - those are trailing comments
+            if prev_end > 0 && printing::is_same_line(self.source, prev_end, comment.span.start) {
+                *comment_idx += 1;
+                last_end = comment.span.end;
+                continue;
+            }
+
+            // Print with proper spacing
+            if printed > 0 {
+                // Check if this comment is on the same line as the previous comment
+                if printing::is_same_line(self.source, last_end, comment.span.start) {
+                    self.write(" ");
+                } else if self.has_blank_line_between_spans(last_end, comment.span.start) {
+                    self.write("\n\n");
                 } else {
-                    break;
+                    self.write("\n");
+                }
+            } else if prev_end > 0 {
+                // First comment after a node
+                if self.has_blank_line_between_spans(last_end, comment.span.start) {
+                    self.write("\n\n");
+                } else {
+                    self.write("\n");
                 }
             }
 
-            // Look ahead for leading whitespace in curr span
-            let mut end = curr_start;
-            for ch in source[curr_start..].chars().take(20) {
-                if ch.is_whitespace() {
-                    end += ch.len_utf8();
-                } else {
-                    break;
-                }
+            self.print_css_comment(comment);
+            last_end = comment.span.end;
+            *comment_idx += 1;
+            printed += 1;
+        }
+
+        printed
+    }
+
+    /// Print inline comments on the same line after a node
+    /// Returns the number of comments printed
+    fn print_inline_comments_after_node(
+        &mut self,
+        node_end: u32,
+        comment_idx: &mut usize,
+    ) -> usize {
+        let mut printed = 0;
+        let mut last_end = node_end;
+
+        while *comment_idx < self.comments.len() {
+            let comment = &self.comments[*comment_idx];
+            if !printing::is_same_line(self.source, last_end, comment.span.start) {
+                break;
             }
 
-            (start, end)
-        } else {
-            // Non-adjacent spans - check the gap between them
-            (prev_end, curr_start)
-        };
+            self.write(" ");
+            self.print_css_comment(comment);
+            last_end = comment.span.end;
+            *comment_idx += 1;
+            printed += 1;
+        }
 
-        if search_start < search_end && search_end <= source.len() {
-            let between = &source[search_start..search_end];
-            // Blank line = 2+ newlines in the whitespace
-            between.matches('\n').count() >= 2
-        } else {
-            false
+        printed
+    }
+
+    /// Print trailing comments after all nodes
+    fn print_trailing_comments(&mut self, prev_end: u32, comment_idx: &mut usize) {
+        let mut last_end = prev_end;
+
+        while *comment_idx < self.comments.len() {
+            let comment = &self.comments[*comment_idx];
+
+            // Skip inline comments (same line as last item) - already handled
+            if printing::is_same_line(self.source, prev_end, comment.span.start) {
+                *comment_idx += 1;
+                last_end = comment.span.end;
+                continue;
+            }
+
+            // Print with proper spacing
+            if self.has_blank_line_between_spans(last_end, comment.span.start) {
+                self.write("\n\n");
+            } else {
+                self.write("\n");
+            }
+
+            self.print_css_comment(comment);
+            last_end = comment.span.end;
+            *comment_idx += 1;
         }
     }
 
@@ -274,13 +347,12 @@ impl<'a> Printer<'a> {
     fn print_css_node(&mut self, node: &CssNode) {
         match node {
             CssNode::Rule(rule) => self.print_css_rule(rule),
-            CssNode::Comment(comment) => self.print_css_comment(comment),
             CssNode::Atrule(atrule) => self.print_css_atrule(atrule),
         }
     }
 
     /// Print a CSS comment
-    pub(crate) fn print_css_comment(&mut self, comment: &CssComment) {
+    pub(crate) fn print_css_comment(&mut self, comment: &Comment) {
         // Write comment with delimiters - content is preserved exactly as written
         self.write("/*");
         self.write(&comment.content);
@@ -383,7 +455,7 @@ impl<'a> Printer<'a> {
 /// Format CSS stylesheet to a string
 /// Requires source for blank line preservation and raw value extraction
 pub fn format_css(stylesheet: &CssStyleSheet, source: &str) -> String {
-    let mut printer = Printer::new(source, &stylesheet.value_comments);
+    let mut printer = Printer::new(source, &stylesheet.comments);
     printer.print_css_nodes(&stylesheet.nodes);
     printer.into_string()
 }
@@ -396,7 +468,7 @@ pub fn format_css_with_config(
     source: &str,
     config: PrintConfig,
 ) -> String {
-    let mut printer = Printer::with_config(source, &stylesheet.value_comments, config);
+    let mut printer = Printer::with_config(source, &stylesheet.comments, config);
     printer.print_css_nodes(&stylesheet.nodes);
     printer.into_string()
 }

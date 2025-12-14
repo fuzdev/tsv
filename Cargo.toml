@@ -8,6 +8,8 @@ members = [
     "crates/tsv_svelte",
     "crates/tsv_cli",
     "crates/tsv_debug",
+    "crates/tsv_wasm",
+    "crates/tsv_ffi",
 ]
 
 [workspace.package]

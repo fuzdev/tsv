@@ -1081,7 +1081,7 @@ pub enum Accessibility {
 }
 
 impl Accessibility {
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Accessibility::Public => "public",
             Accessibility::Private => "private",
@@ -1104,6 +1104,7 @@ pub struct TSParameterProperty {
 
 /// Method definition in a class body: `method() { ... }` or `get x() { ... }`
 #[derive(Debug, Clone)]
+#[allow(clippy::struct_excessive_bools)] // independent flags, not a state machine
 pub struct MethodDefinition {
     /// Decorators applied to this method
     pub decorators: Vec<Decorator>,
@@ -2235,7 +2236,7 @@ pub enum TSTypeOperatorKind {
 }
 
 impl TSTypeOperatorKind {
-    pub fn as_str(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             TSTypeOperatorKind::Keyof => "keyof",
             TSTypeOperatorKind::Unique => "unique",

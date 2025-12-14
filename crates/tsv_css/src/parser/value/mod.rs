@@ -43,7 +43,7 @@ pub fn parse_value_from_source(
     base_offset: u32,
 ) -> CssValue {
     // Extract value directly from source using source-relative positions
-    let value_str = &source[source_relative_span.start as usize..source_relative_span.end as usize];
+    let value_str = source_relative_span.extract(source);
     let trimmed = value_str.trim();
 
     if trimmed.is_empty() {

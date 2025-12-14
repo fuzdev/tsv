@@ -92,7 +92,7 @@ fn parse_to_json(input: &Input, pretty: bool, parser_type: ParserType) -> Result
         }
         ParserType::Css => {
             // Parse as CSS
-            let nodes = tsv_css::parse(source, 0).map_err(|e| e.to_string())?;
+            let nodes = tsv_css::parse(source).map_err(|e| e.to_string())?;
             let json_value = tsv_css::convert_ast(&nodes, source);
 
             // Serialize to JSON

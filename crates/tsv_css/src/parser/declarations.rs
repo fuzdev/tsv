@@ -57,17 +57,19 @@ pub(crate) fn parse_rule(parser: &mut CssParser) -> Result<CssRule, ParseError> 
     // Capture any comment after selector (before {)
     let mut declarations = Vec::new();
     parser.skip_whitespace()?;
-    if let TokenKind::Comment(content) = &parser.current_kind {
+    if matches!(&parser.current_kind, TokenKind::Comment) {
         let comment_start = parser.base_offset() + parser.current_start;
         let comment_end = parser.base_offset() + parser.current_end;
-        let content = content.clone();
+        // Extract content without /* */ delimiters
+        let content = parser.source()[parser.current_start + 2..parser.current_end - 2].to_string();
 
         parser.advance()?;
         parser.skip_whitespace()?;
 
         // Store comment as first child (will be formatted before opening brace)
-        declarations.push(CssBlockChild::Comment(CssComment {
+        declarations.push(CssBlockChild::Comment(Comment {
             content,
+            is_block: true,
             span: Span {
                 start: comment_start as u32,
                 end: comment_end as u32,
@@ -83,16 +85,19 @@ pub(crate) fn parse_rule(parser: &mut CssParser) -> Result<CssRule, ParseError> 
     // Parse declarations, comments, and nested rules
     while !parser.check(&TokenKind::RightBrace) && !parser.check(&TokenKind::Eof) {
         // Capture comments in declaration blocks
-        if let TokenKind::Comment(content) = &parser.current_kind {
+        if matches!(&parser.current_kind, TokenKind::Comment) {
             let comment_start = parser.base_offset() + parser.current_start;
             let comment_end = parser.base_offset() + parser.current_end;
-            let content = content.clone();
+            // Extract content without /* */ delimiters
+            let content =
+                parser.source()[parser.current_start + 2..parser.current_end - 2].to_string();
 
             parser.advance()?;
             parser.skip_whitespace()?;
 
-            declarations.push(CssBlockChild::Comment(CssComment {
+            declarations.push(CssBlockChild::Comment(Comment {
                 content,
+                is_block: true,
                 span: Span {
                     start: comment_start as u32,
                     end: comment_end as u32,
@@ -133,11 +138,7 @@ pub(crate) fn parse_rule(parser: &mut CssParser) -> Result<CssRule, ParseError> 
 
     // Expect } and capture its end position
     if !parser.check(&TokenKind::RightBrace) {
-        return Err(ParseError::InvalidSyntax {
-            message: "Expected '}'".to_string(),
-            position: parser.base_offset() + parser.current_start,
-            context: None,
-        });
+        return Err(parser.error_expected("'}'"));
     }
     let block_end = parser.base_offset() + parser.current_end;
     let end = block_end;
@@ -163,21 +164,13 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
 
     // Parse property
     if !parser.check(&TokenKind::Identifier) {
-        return Err(ParseError::InvalidSyntax {
-            message: "Expected property name".to_string(),
-            position: start,
-            context: None,
-        });
+        return Err(parser.error_expected_at("property name", start));
     }
     // Internal AST: use decoded value (spec-compliant)
     // Svelte quirk (raw value) will be applied in conversion layer
     let property = parser
         .current_identifier()
-        .ok_or_else(|| ParseError::InvalidSyntax {
-            message: "Expected identifier".to_string(),
-            position: start,
-            context: None,
-        })?
+        .ok_or_else(|| parser.error_expected_at("identifier", start))?
         .to_string();
     parser.advance()?;
 
@@ -194,7 +187,7 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
     // Parse value (collect tokens until ; or })
     // IMPORTANT: Track parenthesis depth to handle semicolons inside functions like url(data:image/png;base64,...)
     let mut value_parts = Vec::new();
-    let mut value_comments = Vec::new(); // Collect comments found in the value
+    let mut has_value_comment = false;
     let mut value_end = value_start;
     // Track recent end positions for !important stripping (stores ends for last 2 tokens)
     let mut prev_value_end = value_start;
@@ -211,25 +204,21 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
                 .current_identifier()
                 .unwrap_or_else(|| parser.current_value())
                 .to_string(),
-            TokenKind::String { content, quote } => format!("{quote}{content}{quote}"),
-            TokenKind::Number(n) => n.clone(),
-            TokenKind::Percentage(n) => format!("{n}%"),
-            TokenKind::Dimension(n, unit) => format!("{n}{unit}"),
+            TokenKind::String { quote } => {
+                let content = &parser.source()[parser.current_start + 1..parser.current_end - 1];
+                format!("{quote}{content}{quote}")
+            }
+            TokenKind::Number | TokenKind::Percentage | TokenKind::Dimension { .. } => {
+                // Extract raw value from source - preserves exact representation
+                parser.current_value().to_string()
+            }
             TokenKind::Whitespace => {
                 parser.advance()?;
                 continue;
             }
-            TokenKind::Comment(content) => {
-                // Capture comment for value comments side table
-                let comment_start = parser.base_offset() + parser.current_start;
-                let comment_end = parser.base_offset() + parser.current_end;
-                value_comments.push(CssComment {
-                    content: content.clone(),
-                    span: Span {
-                        start: comment_start as u32,
-                        end: comment_end as u32,
-                    },
-                });
+            TokenKind::Comment => {
+                // Track that we have a comment (for allowing comment-only values)
+                has_value_comment = true;
                 // Update value_end to include the comment in the declaration span
                 prev_prev_value_end = prev_value_end;
                 prev_value_end = value_end;
@@ -298,12 +287,8 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
 
     // Allow empty value_str if we have comments (e.g., `color: /* comment */;`)
     // Svelte treats the comment as the value in this case
-    if value_str.is_empty() && value_comments.is_empty() {
-        return Err(ParseError::InvalidSyntax {
-            message: "Empty CSS value".to_string(),
-            position: start,
-            context: None,
-        });
+    if value_str.is_empty() && !has_value_comment {
+        return Err(parser.error_msg_at("Empty CSS value", start));
     }
 
     // Create span for the value (from first token to last token, excluding comments)
@@ -325,8 +310,7 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
 
     // Custom properties (--*) with unusual values (e.g., leading comma) preserve raw value
     // Normal custom property values are still parsed for proper formatting
-    let raw_value =
-        &parser.source()[source_relative_span.start as usize..source_relative_span.end as usize];
+    let raw_value = source_relative_span.extract(parser.source());
     let trimmed_value = raw_value.trim();
 
     let value = if property.starts_with("--") && trimmed_value.starts_with(',') {
@@ -351,13 +335,6 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
         start: start as u32,
         end: end as u32,
     };
-
-    // Store value comments in side table if any were found
-    if !value_comments.is_empty() {
-        parser
-            .value_comments
-            .insert(decl_span.start, value_comments);
-    }
 
     // Span covers the entire declaration (property + value, not including semicolon)
     // The source value will be extracted on-demand during conversion using this span

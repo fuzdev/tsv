@@ -1,0 +1,29 @@
+[package]
+name = "tsv_ffi"
+version.workspace = true
+edition.workspace = true
+description = "TypeScript and Svelte tools - C FFI for benchmarking"
+license.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+tsv_svelte.workspace = true
+tsv_ts.workspace = true
+tsv_css.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+# FFI requires unsafe code - override workspace lint
+[lints.rust]
+unsafe_code = "allow"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# Relax some pedantic lints for FFI code
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+similar_names = "allow"

@@ -2,8 +2,7 @@
 
 use super::super::Printer;
 use crate::ast::internal;
-use string_interner::Symbol;
-use tsv_lang::{SymbolResolver, doc};
+use tsv_lang::{SymbolResolver, SymbolToU32, doc};
 
 /// Check if a type is "generic" - i.e., has type parameters.
 /// This matches prettier's `isGeneric` function in assignment.js.
@@ -52,7 +51,7 @@ impl<'a> Printer<'a> {
         decl: &internal::TSTypeAliasDeclaration,
     ) -> doc::Doc {
         let mut parts = vec![doc::text("type ")];
-        parts.push(doc::symbol(decl.id.name.to_usize() as u32));
+        parts.push(doc::symbol(decl.id.name.to_u32()));
 
         if let Some(type_params) = &decl.type_parameters {
             parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
@@ -154,7 +153,7 @@ impl<'a> Printer<'a> {
     /// - If type params need to break, put extends on new line with extra indent
     fn build_interface_header_doc(&self, decl: &internal::TSInterfaceDeclaration) -> doc::Doc {
         let mut parts = vec![doc::text("interface ")];
-        parts.push(doc::symbol(decl.id.name.to_usize() as u32));
+        parts.push(doc::symbol(decl.id.name.to_u32()));
 
         let has_type_params = decl.type_parameters.is_some();
         let has_extends = !decl.extends.is_empty();
@@ -204,7 +203,7 @@ impl<'a> Printer<'a> {
         decl: &internal::TSInterfaceDeclaration,
     ) -> doc::Doc {
         let mut parts = vec![doc::text("interface ")];
-        parts.push(doc::symbol(decl.id.name.to_usize() as u32));
+        parts.push(doc::symbol(decl.id.name.to_u32()));
         if let Some(type_params) = &decl.type_parameters {
             parts.push(self.build_type_parameter_declaration_doc(type_params));
         }
@@ -252,13 +251,10 @@ impl<'a> Printer<'a> {
         let mut parts = if decl.declare {
             vec![
                 doc::text("declare function "),
-                doc::symbol(decl.id.name.to_usize() as u32),
+                doc::symbol(decl.id.name.to_u32()),
             ]
         } else {
-            vec![
-                doc::text("function "),
-                doc::symbol(decl.id.name.to_usize() as u32),
-            ]
+            vec![doc::text("function "), doc::symbol(decl.id.name.to_u32())]
         };
 
         // Type parameters with wrapping support
@@ -526,7 +522,7 @@ impl<'a> Printer<'a> {
                     if idx > 0 {
                         parts.push(doc::text(", "));
                     }
-                    parts.push(doc::symbol(param.name.to_usize() as u32));
+                    parts.push(doc::symbol(param.name.to_u32()));
                     if let Some(ta) = &param.type_annotation {
                         parts.push(doc::text(": "));
                         parts.push(self.build_type_doc(&ta.type_annotation));
@@ -578,7 +574,7 @@ impl<'a> Printer<'a> {
         }
 
         parts.push(doc::text("enum "));
-        parts.push(doc::symbol(decl.id.name.to_usize() as u32));
+        parts.push(doc::symbol(decl.id.name.to_u32()));
         parts.push(doc::text(" {"));
 
         if !decl.members.is_empty() {
@@ -607,7 +603,7 @@ impl<'a> Printer<'a> {
     fn build_enum_member_doc(&self, member: &internal::TSEnumMember) -> doc::Doc {
         // Member id (identifier or string literal)
         let id_doc = match &member.id {
-            internal::TSEnumMemberId::Identifier(id) => doc::symbol(id.name.to_usize() as u32),
+            internal::TSEnumMemberId::Identifier(id) => doc::symbol(id.name.to_u32()),
             internal::TSEnumMemberId::String(lit) => {
                 // String literal member name: `"hello"` in `enum { "hello" = 1 }`
                 self.build_literal_doc(lit)
@@ -690,7 +686,7 @@ impl<'a> Printer<'a> {
         if !decl.global {
             match &decl.id {
                 internal::TSModuleName::Identifier(id) => {
-                    parts.push(doc::symbol(id.name.to_usize() as u32));
+                    parts.push(doc::symbol(id.name.to_u32()));
                 }
                 internal::TSModuleName::Literal(lit) => {
                     parts.push(self.build_literal_doc(lit));

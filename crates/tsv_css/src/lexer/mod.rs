@@ -53,10 +53,12 @@ impl<'a> Lexer<'a> {
         Self { source, pos }
     }
 
+    #[inline]
     fn current_char(&self) -> Option<char> {
         self.source[self.pos..].chars().next()
     }
 
+    #[inline]
     fn peek_char(&self, offset: usize) -> Option<char> {
         self.source[self.pos..].chars().nth(offset)
     }

@@ -19,11 +19,7 @@ impl<'a> SvelteParser<'a> {
 
         // Expect identifier "script"
         if !self.check(TokenKind::Identifier) || self.current_value() != "script" {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected 'script', found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("'script'"));
         }
         self.advance()?;
 
@@ -32,11 +28,7 @@ impl<'a> SvelteParser<'a> {
 
         // Verify we're at > and save position for content start
         if !self.check(TokenKind::RightAngle) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected '>', found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("'>'"));
         }
 
         // Content starts right after the >
@@ -66,11 +58,7 @@ impl<'a> SvelteParser<'a> {
         }
 
         if !found_close {
-            return Err(ParseError::InvalidSyntax {
-                message: "Unterminated script tag".to_string(),
-                position: start,
-                context: None,
-            });
+            return Err(self.error_msg_at("Unterminated script tag", start));
         }
 
         // Extract script content
@@ -99,29 +87,17 @@ impl<'a> SvelteParser<'a> {
 
         // Verify it's the closing tag: </script>
         if !self.check(TokenKind::LeftAngle) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected '</script>', found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("'</script>'"));
         }
         self.advance()?; // consume <
 
         if !self.check(TokenKind::Slash) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected '/', found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("'/'"));
         }
         self.advance()?; // consume /
 
         if !self.check(TokenKind::Identifier) || self.current_value() != "script" {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected 'script', found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("'script'"));
         }
         self.advance()?; // consume script
 

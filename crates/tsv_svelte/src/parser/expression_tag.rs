@@ -15,11 +15,7 @@ impl<'a> SvelteParser<'a> {
 
         // Verify we're at opening brace
         if !self.check(TokenKind::LeftBrace) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected '{{', found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("'{'"));
         }
 
         // Calculate expression start (after the '{')
@@ -96,11 +92,7 @@ impl<'a> SvelteParser<'a> {
         }
 
         if !found_close {
-            return Err(ParseError::InvalidSyntax {
-                message: "Unterminated expression tag".to_string(),
-                position: start,
-                context: None,
-            });
+            return Err(self.error_unclosed_at("expression tag", start));
         }
 
         // Extract expression content
@@ -153,11 +145,7 @@ impl<'a> SvelteParser<'a> {
 
         // Verify it's the closing brace
         if !self.check(TokenKind::RightBrace) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected '}}', found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("'}'"));
         }
 
         // Save the end position (right after the '}') before advancing

@@ -83,11 +83,7 @@ impl<'a> SvelteParser<'a> {
 
     pub(crate) fn expect(&mut self, kind: TokenKind) -> Result<(), ParseError> {
         if !self.check(kind) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected {}, found {}", kind, self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found(&kind.to_string()));
         }
         self.advance()
     }
@@ -260,5 +256,80 @@ impl<'a> SvelteParser<'a> {
         }
 
         result
+    }
+
+    // ========== Error Construction Helpers ==========
+    // Note: No #[inline] - error paths are cold paths, inlining would just bloat code size
+
+    /// Create error with custom message at current position
+    pub(crate) fn error_msg(&self, message: &str) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: message.to_string(),
+            position: self.current_start,
+            context: None,
+        }
+    }
+
+    /// Create error with custom message at specified position
+    pub(crate) fn error_msg_at(&self, message: &str, position: usize) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: message.to_string(),
+            position,
+            context: None,
+        }
+    }
+
+    /// Create "Expected X" error at current position
+    pub(crate) fn error_expected(&self, what: &str) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: format!("Expected {what}"),
+            position: self.current_start,
+            context: None,
+        }
+    }
+
+    /// Create "Expected X" error at specified position
+    pub(crate) fn error_expected_at(&self, what: &str, position: usize) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: format!("Expected {what}"),
+            position,
+            context: None,
+        }
+    }
+
+    /// Create "Expected X, found Y" error at current position
+    pub(crate) fn error_expected_found(&self, what: &str) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: format!("Expected {what}, found {}", self.current_kind),
+            position: self.current_start,
+            context: None,
+        }
+    }
+
+    /// Create "Unclosed X" error at specified position
+    pub(crate) fn error_unclosed_at(&self, what: &str, position: usize) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: format!("Unclosed {what}"),
+            position,
+            context: None,
+        }
+    }
+
+    /// Create "Duplicate X found" error at current position
+    pub(crate) fn error_duplicate(&self, what: &str) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: format!("Duplicate {what} found"),
+            position: self.current_start,
+            context: None,
+        }
+    }
+
+    /// Create "Unknown X: Y" error at specified position
+    pub(crate) fn error_unknown_at(&self, kind: &str, value: &str, position: usize) -> ParseError {
+        ParseError::InvalidSyntax {
+            message: format!("Unknown {kind}: {value}"),
+            position,
+            context: None,
+        }
     }
 }

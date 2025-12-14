@@ -38,10 +38,10 @@ impl<'a> Parser<'a> {
         let decorators = self.parse_decorators()?;
 
         // Check for `export` before class
-        let is_export = self.current_kind() == TokenKind::Keyword(KeywordKind::Export);
+        let is_export = *self.current_kind() == TokenKind::Keyword(KeywordKind::Export);
         let is_default = if is_export {
             self.advance()?; // consume 'export'
-            if self.current_kind() == TokenKind::Keyword(KeywordKind::Default) {
+            if *self.current_kind() == TokenKind::Keyword(KeywordKind::Default) {
                 self.advance()?; // consume 'default'
                 true
             } else {
@@ -52,7 +52,7 @@ impl<'a> Parser<'a> {
         };
 
         // Check for `abstract` before `class`
-        let is_abstract = if self.current_kind() == TokenKind::Identifier
+        let is_abstract = if *self.current_kind() == TokenKind::Identifier
             && self.current_value() == "abstract"
             && self.peek_kind() == TokenKind::Keyword(KeywordKind::Class)
         {
@@ -63,12 +63,8 @@ impl<'a> Parser<'a> {
         };
 
         // Expect `class` keyword
-        if self.current_kind() != TokenKind::Keyword(KeywordKind::Class) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected 'class' after decorator".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+        if *self.current_kind() != TokenKind::Keyword(KeywordKind::Class) {
+            return Err(self.error_expected_after("'class'", "decorator"));
         }
 
         // Parse the class (name optional for export default)
@@ -109,7 +105,7 @@ impl<'a> Parser<'a> {
     fn parse_decorators(&mut self) -> Result<Vec<Decorator>, ParseError> {
         let mut decorators = Vec::new();
 
-        while self.current_kind() == TokenKind::At {
+        while *self.current_kind() == TokenKind::At {
             decorators.push(self.parse_decorator()?);
         }
 
@@ -126,7 +122,7 @@ impl<'a> Parser<'a> {
         let start = self.current_pos().0;
 
         // Consume '@'
-        debug_assert!(self.current_kind() == TokenKind::At);
+        debug_assert!(*self.current_kind() == TokenKind::At);
         self.advance()?;
 
         // Parse the decorator expression (identifier, member, or call)
@@ -259,11 +255,7 @@ impl<'a> Parser<'a> {
                 span: Span::new(id_start as u32, id_end as u32),
             })
         } else if name_required {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected class name after 'class'".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected_after("class name", "class"));
         } else {
             None
         };
@@ -464,11 +456,7 @@ impl<'a> Parser<'a> {
                 Some(name_str),
             )
         } else {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected class member name".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected("class member name"));
         };
 
         // Detect if this is a method (has `(`) or property (has `=` or `;` or end of class)
@@ -643,11 +631,7 @@ impl<'a> Parser<'a> {
     fn parse_heritage_expression(&mut self) -> Result<Expression, ParseError> {
         // Start with an identifier
         if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected class name after 'extends'".to_string(),
-                position: self.current_pos().0,
-                context: None,
-            });
+            return Err(self.error_expected_after("class name", "extends"));
         }
 
         let (start, end) = self.current_pos();
@@ -669,11 +653,7 @@ impl<'a> Parser<'a> {
                     self.advance()?; // consume '.'
 
                     if !self.current_is_identifier_or_keyword() {
-                        return Err(ParseError::InvalidSyntax {
-                            message: "Expected property name after '.'".to_string(),
-                            position: self.current_pos().0,
-                            context: None,
-                        });
+                        return Err(self.error_expected_after("property name", "."));
                     }
 
                     let (prop_start, prop_end) = self.current_pos();

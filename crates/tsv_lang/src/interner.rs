@@ -161,3 +161,29 @@ pub trait SymbolResolver {
         f(interner.resolve_infallible(symbol))
     }
 }
+
+/// Extension trait for Symbol to provide u32 conversion for doc builder
+///
+/// The doc builder's `doc::symbol()` function takes `u32` IDs, but `DefaultSymbol::to_usize()`
+/// returns `usize`. This trait provides a convenient conversion method to avoid repeated
+/// `.to_usize() as u32` casts throughout printer code.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use tsv_lang::SymbolToU32;
+///
+/// let id = sym.to_u32();  // Instead of: sym.to_usize() as u32
+/// doc::symbol(id)
+/// ```
+pub trait SymbolToU32 {
+    /// Convert symbol to u32 for doc builder
+    fn to_u32(self) -> u32;
+}
+
+impl SymbolToU32 for DefaultSymbol {
+    #[inline]
+    fn to_u32(self) -> u32 {
+        self.to_usize() as u32
+    }
+}

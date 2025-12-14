@@ -276,7 +276,7 @@ fn parse_relative_complex_selector(parser: &mut CssParser) -> Result<ComplexSele
             || parser.check(&TokenKind::Comma)
             || parser.check(&TokenKind::RightParen)
             || parser.check(&TokenKind::Eof)
-            || matches!(&parser.current_kind, TokenKind::Comment(_))
+            || matches!(&parser.current_kind, TokenKind::Comment)
         {
             break;
         }
@@ -321,7 +321,7 @@ pub(crate) fn parse_complex_selector(
             || parser.check(&TokenKind::Comma)
             || parser.check(&TokenKind::RightParen)
             || parser.check(&TokenKind::Eof)
-            || matches!(&parser.current_kind, TokenKind::Comment(_))
+            || matches!(&parser.current_kind, TokenKind::Comment)
         {
             break;
         }
@@ -464,7 +464,7 @@ fn parse_relative_selector(
     // Start position is either the combinator start (if present) or the current selector start
     let start = combinator_span.map_or_else(
         || parser.base_offset() + parser.current_start(),
-        |s| s.start as usize,
+        |s| s.start_usize(),
     );
     let mut selectors = Vec::new();
 
@@ -482,11 +482,7 @@ fn parse_relative_selector(
     let end = parser.base_offset() + parser.current_start();
 
     if selectors.is_empty() {
-        return Err(ParseError::InvalidSyntax {
-            message: "Expected selector".to_string(),
-            position: start,
-            context: None,
-        });
+        return Err(parser.error_expected_at("selector", start));
     }
 
     Ok(RelativeSelector {
@@ -518,11 +514,7 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
             // Could also be namespace prefix: svg|rect, *|div
             let name = parser
                 .current_identifier()
-                .ok_or_else(|| ParseError::InvalidSyntax {
-                    message: "Expected identifier".to_string(),
-                    position: parser.base_offset() + parser.current_start(),
-                    context: None,
-                })?
+                .ok_or_else(|| parser.error_expected("identifier"))?
                 .to_string();
             parser.advance()?;
 
@@ -533,20 +525,12 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
 
                 // Must be followed by an identifier (element name)
                 if !parser.check(&TokenKind::Identifier) {
-                    return Err(ParseError::InvalidSyntax {
-                        message: "Expected element name after namespace prefix".to_string(),
-                        position: parser.base_offset() + parser.current_start(),
-                        context: None,
-                    });
+                    return Err(parser.error_expected_after("element name", "namespace prefix"));
                 }
 
                 let element_name = parser
                     .current_identifier()
-                    .ok_or_else(|| ParseError::InvalidSyntax {
-                        message: "Expected identifier".to_string(),
-                        position: parser.base_offset() + parser.current_start(),
-                        context: None,
-                    })?
+                    .ok_or_else(|| parser.error_expected("identifier"))?
                     .to_string();
                 let end = parser.base_offset() + parser.current_end;
                 parser.advance()?;
@@ -576,19 +560,11 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
             // Class selector: .class
             parser.advance()?; // consume .
             if !parser.check(&TokenKind::Identifier) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected class name after '.'".to_string(),
-                    position: parser.base_offset() + parser.current_start(),
-                    context: None,
-                });
+                return Err(parser.error_expected_after("class name", "."));
             }
             let name = parser
                 .current_identifier()
-                .ok_or_else(|| ParseError::InvalidSyntax {
-                    message: "Expected identifier".to_string(),
-                    position: parser.base_offset() + parser.current_start(),
-                    context: None,
-                })?
+                .ok_or_else(|| parser.error_expected("identifier"))?
                 .to_string();
             let end = parser.base_offset() + parser.current_end;
             parser.advance()?;
@@ -604,19 +580,11 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
             // ID selector: #id
             parser.advance()?; // consume #
             if !parser.check(&TokenKind::Identifier) {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected ID name after '#'".to_string(),
-                    position: parser.base_offset() + parser.current_start(),
-                    context: None,
-                });
+                return Err(parser.error_expected_after("ID name", "#"));
             }
             let name = parser
                 .current_identifier()
-                .ok_or_else(|| ParseError::InvalidSyntax {
-                    message: "Expected identifier".to_string(),
-                    position: parser.base_offset() + parser.current_start(),
-                    context: None,
-                })?
+                .ok_or_else(|| parser.error_expected("identifier"))?
                 .to_string();
             let end = parser.base_offset() + parser.current_end;
             parser.advance()?;
@@ -639,21 +607,14 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
 
                 // Must be followed by an identifier (element name)
                 if !parser.check(&TokenKind::Identifier) {
-                    return Err(ParseError::InvalidSyntax {
-                        message: "Expected element name after universal namespace prefix"
-                            .to_string(),
-                        position: parser.base_offset() + parser.current_start(),
-                        context: None,
-                    });
+                    return Err(
+                        parser.error_expected_after("element name", "universal namespace prefix")
+                    );
                 }
 
                 let element_name = parser
                     .current_identifier()
-                    .ok_or_else(|| ParseError::InvalidSyntax {
-                        message: "Expected identifier".to_string(),
-                        position: parser.base_offset() + parser.current_start(),
-                        context: None,
-                    })?
+                    .ok_or_else(|| parser.error_expected("identifier"))?
                     .to_string();
                 let end = parser.base_offset() + parser.current_end;
                 parser.advance()?;
@@ -697,15 +658,13 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
                 },
             })
         }
-        TokenKind::Percentage(value_str) => {
+        TokenKind::Percentage => {
             // Percentage selector: 0%, 50%, 100% (used in @keyframes)
-            let value = value_str
-                .parse::<f64>()
-                .map_err(|_| ParseError::InvalidSyntax {
-                    message: format!("Invalid percentage value: {value_str}"),
-                    position: start,
-                    context: None,
-                })?;
+            // Extract value without the % suffix
+            let value_str = &parser.source()[parser.current_start..parser.current_end - 1];
+            let value = value_str.parse::<f64>().map_err(|_| {
+                parser.error_msg_at(&format!("Invalid percentage value: {value_str}"), start)
+            })?;
             let end = parser.base_offset() + parser.current_end;
             parser.advance()?;
             Ok(SimpleSelector::Percentage {
@@ -725,11 +684,7 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
             if parser.check(&TokenKind::Identifier) {
                 let element_name = parser
                     .current_identifier()
-                    .ok_or_else(|| ParseError::InvalidSyntax {
-                        message: "Expected identifier".to_string(),
-                        position: parser.base_offset() + parser.current_start(),
-                        context: None,
-                    })?
+                    .ok_or_else(|| parser.error_expected("identifier"))?
                     .to_string();
                 let end = parser.base_offset() + parser.current_end;
                 parser.advance()?;
@@ -755,18 +710,12 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
                     },
                 })
             } else {
-                Err(ParseError::InvalidSyntax {
-                    message: "Expected element name or '*' after no-namespace prefix '|'"
-                        .to_string(),
-                    position: parser.base_offset() + parser.current_start(),
-                    context: None,
-                })
+                Err(parser.error_expected_after("element name or '*'", "no-namespace prefix '|'"))
             }
         }
-        _ => Err(ParseError::InvalidSyntax {
-            message: format!("Unexpected token in selector: {:?}", parser.current_kind),
-            position: start,
-            context: None,
-        }),
+        _ => Err(parser.error_msg_at(
+            &format!("Unexpected token in selector: {:?}", parser.current_kind),
+            start,
+        )),
     }
 }

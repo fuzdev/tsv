@@ -15,11 +15,7 @@ impl<'a> SvelteParser<'a> {
 
         // Expect identifier "style"
         if !self.check(TokenKind::Identifier) || self.current_value() != "style" {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected 'style', found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("'style'"));
         }
         self.advance()?;
 
@@ -28,11 +24,7 @@ impl<'a> SvelteParser<'a> {
 
         // Verify we're at > and save position for content start
         if !self.check(TokenKind::RightAngle) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected '>', found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("'>'"));
         }
 
         // Content starts right after the >
@@ -55,11 +47,7 @@ impl<'a> SvelteParser<'a> {
         }
 
         if !found_close {
-            return Err(ParseError::InvalidSyntax {
-                message: "Unterminated style tag".to_string(),
-                position: start,
-                context: None,
-            });
+            return Err(self.error_msg_at("Unterminated style tag", start));
         }
 
         // Recreate lexer starting from the closing tag position
@@ -80,29 +68,17 @@ impl<'a> SvelteParser<'a> {
 
         // Verify it's the closing tag: </style>
         if !self.check(TokenKind::LeftAngle) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected '</style>', found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("'</style>'"));
         }
         self.advance()?; // consume <
 
         if !self.check(TokenKind::Slash) {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected '/', found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("'/'"));
         }
         self.advance()?; // consume /
 
         if !self.check(TokenKind::Identifier) || self.current_value() != "style" {
-            return Err(ParseError::InvalidSyntax {
-                message: format!("Expected 'style', found {}", self.current_kind),
-                position: self.current_start,
-                context: None,
-            });
+            return Err(self.error_expected_found("'style'"));
         }
         self.advance()?; // consume style
 
@@ -112,7 +88,7 @@ impl<'a> SvelteParser<'a> {
 
         // Parse CSS content
         let css_content = &self.source[content_start..content_end];
-        let css_stylesheet = tsv_css::parse_css(css_content, content_start)?;
+        let css_stylesheet = tsv_css::parse_embedded(css_content, content_start)?;
 
         Ok(Style {
             span: Span {

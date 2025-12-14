@@ -36,7 +36,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::DefaultStringInterner;
 use tsv_lang::{
-    OutputBuffer, PrintConfig, SymbolResolver, comments_after, comments_in_range,
+    OutputBuffer, PrintConfig, SymbolResolver, SymbolToU32, comments_after, comments_in_range,
     doc::{self, Doc},
     has_comments_in_range, has_line_comments_in_range, printing,
 };
@@ -220,7 +220,7 @@ pub(crate) fn is_multiline_string_literal(expr: &internal::Expression, source: &
 /// Detects newline immediately after opening brace: `{\n  ...}` vs `{ ... }`
 /// Used for both formatting decisions and skip-fluid-layout checks.
 pub(crate) fn is_type_literal_multiline(source: &str, span: tsv_lang::Span) -> bool {
-    let source_text = &source[span.start as usize..span.end as usize];
+    let source_text = span.extract(source);
     let after_brace = source_text.strip_prefix('{').unwrap_or("");
     after_brace.starts_with('\n')
         || after_brace.starts_with("\r\n")
@@ -395,15 +395,14 @@ pub(crate) fn has_multiline_content(expr: &internal::Expression, source: &str) -
 /// This is a standalone function since it doesn't need printer state -
 /// it only uses `doc::symbol()` for deferred symbol resolution.
 pub(crate) fn build_entity_name_doc(name: &internal::TSEntityName) -> Doc {
-    use string_interner::Symbol;
     use tsv_lang::doc;
 
     match name {
-        internal::TSEntityName::Identifier(id) => doc::symbol(id.name.to_usize() as u32),
+        internal::TSEntityName::Identifier(id) => doc::symbol(id.name.to_u32()),
         internal::TSEntityName::QualifiedName(qn) => doc::concat(vec![
             build_entity_name_doc(&qn.left),
             doc::text("."),
-            doc::symbol(qn.right.name.to_usize() as u32),
+            doc::symbol(qn.right.name.to_u32()),
         ]),
     }
 }
@@ -421,7 +420,7 @@ pub struct Printer<'a> {
     /// Original source code (for extracting raw values, preserving escape sequences, etc.)
     pub(crate) source: &'a str,
     /// Comments from the program (for printing leading/trailing comments)
-    pub(crate) comments: &'a Vec<internal::Comment>,
+    pub(crate) comments: &'a [internal::Comment],
     /// Extra indent depth for declaration contexts (0 normally, 1+ in multi-declarator)
     /// When > 0, multiline objects/arrays get extra indentation
     pub(crate) declaration_indent_depth: usize,
@@ -432,7 +431,7 @@ impl<'a> Printer<'a> {
     pub fn with_config(
         interner: Rc<RefCell<DefaultStringInterner>>,
         source: &'a str,
-        comments: &'a Vec<internal::Comment>,
+        comments: &'a [internal::Comment],
         config: PrintConfig,
     ) -> Self {
         Self {
@@ -1039,7 +1038,7 @@ impl<'a> Printer<'a> {
             && comment.span.end <= end
         {
             // Check if there's a newline between start and comment start
-            let between = &self.source[start as usize..comment.span.start as usize];
+            let between = &self.source[start as usize..comment.span.start_usize()];
             return between.contains('\n');
         }
         false

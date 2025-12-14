@@ -2,8 +2,8 @@ pub mod commands;
 pub mod input_parser;
 
 use commands::{
-    ast_diff::AstDiffCommand, canonical_parse::CanonicalParseCommand, compare::CompareCommand,
-    fixtures_update::FixturesUpdateCommand,
+    ast_diff::AstDiffCommand, canonical_parse::CanonicalParseCommand, check::CheckCommand,
+    compare::CompareCommand, fixtures_update::FixturesUpdateCommand,
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
     fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
@@ -14,6 +14,9 @@ use tsv_cli::cli::commands::CommandRegistry;
 /// Build and return the command registry with debug commands
 pub fn build_registry() -> CommandRegistry {
     let mut registry = CommandRegistry::new();
+
+    // Register utility commands
+    registry.register(Box::new(CheckCommand));
 
     // Register debug commands
     registry.register(Box::new(CompareCommand));

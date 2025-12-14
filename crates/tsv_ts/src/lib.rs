@@ -20,9 +20,9 @@
 
 pub mod ast;
 pub mod escapes;
-mod lexer;
-pub(crate) mod parser;
-mod printer;
+pub mod lexer;
+pub mod parser;
+pub mod printer;
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -51,7 +51,7 @@ impl<'a> Printer<'a> {
         let force_params_break = if let Some(tp) = &decl.type_parameters {
             // Type params break if: multiple params OR contains multiline content
             let has_multiple_params = tp.params.len() > 1;
-            let span_str = &self.source[tp.span.start as usize..tp.span.end as usize];
+            let span_str = tp.span.extract(self.source);
             let is_multiline = span_str.contains('\n');
             let type_params_will_break = has_multiple_params || is_multiline;
 

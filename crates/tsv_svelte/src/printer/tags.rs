@@ -40,14 +40,14 @@ impl<'a> Printer<'a> {
     /// Format a debug tag: {@debug} or {@debug x, y, z}
     ///
     /// Unlike Prettier (which strips comments), we preserve TS comments.
-    /// Comments are looked up from Root.ts_comments by span position.
+    /// Comments are looked up from Root.comments by span position.
     pub(super) fn print_debug_tag(&mut self, tag: &internal::DebugTag) {
         self.write("{@debug");
 
         // Get comments within the tag's content (after "{@debug" and before "}")
         // The tag span includes the full `{@debug ... }`, so we look inside
         let tag_comments: Vec<_> =
-            comments_in_range(self.ts_comments, tag.span.start, tag.span.end).collect();
+            comments_in_range(self.comments, tag.span.start, tag.span.end).collect();
 
         if tag.identifiers.is_empty() && tag_comments.is_empty() {
             // Just {@debug} with no identifiers or comments

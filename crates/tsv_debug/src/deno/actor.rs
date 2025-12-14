@@ -212,7 +212,9 @@ impl ActorState {
                 response.output.ok_or(DenoError::MissingOutput)
             } else {
                 Err(DenoError::ToolError {
-                    message: response.error.unwrap_or_else(|| "Unknown error".to_string()),
+                    message: response
+                        .error
+                        .unwrap_or_else(|| "Unknown error".to_string()),
                 })
             };
             let _ = tx.send(result);
