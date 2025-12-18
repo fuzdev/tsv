@@ -396,6 +396,7 @@ pub(in crate::ast) fn convert_identifier(
         name: interner.resolve_infallible(id.name).to_string(),
         optional: false,
         type_annotation: None,
+        decorators: Vec::new(),
     }
 }
 
@@ -473,6 +474,7 @@ fn convert_entity_name(
                 name: interner.resolve_infallible(id.name).to_string(),
                 optional: false,
                 type_annotation: None,
+                decorators: Vec::new(),
             })
         }
         internal::TSEntityName::QualifiedName(qn) => {
@@ -490,6 +492,7 @@ fn convert_entity_name(
                     name: interner.resolve_infallible(qn.right.name).to_string(),
                     optional: false,
                     type_annotation: None,
+                    decorators: Vec::new(),
                 },
             })
         }

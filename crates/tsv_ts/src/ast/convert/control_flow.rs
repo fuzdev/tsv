@@ -286,6 +286,7 @@ pub(in crate::ast) fn convert_break_statement(
             name: interner.resolve_infallible(id.name).to_string(),
             optional: false,
             type_annotation: None,
+            decorators: Vec::new(),
         }),
     }
 }
@@ -309,6 +310,7 @@ pub(in crate::ast) fn convert_continue_statement(
             name: interner.resolve_infallible(id.name).to_string(),
             optional: false,
             type_annotation: None,
+            decorators: Vec::new(),
         }),
     }
 }
@@ -333,6 +335,7 @@ pub(in crate::ast) fn convert_labeled_statement(
             name: interner.resolve_infallible(labeled.label.name).to_string(),
             optional: false,
             type_annotation: None,
+            decorators: Vec::new(),
         },
         body: Box::new(convert_statement(
             &labeled.body,

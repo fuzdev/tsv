@@ -1,0 +1,20 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 62,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 61,
+				"data": " ⟳ (3-byte UTF-8), 👨‍👩‍👧‍👦 (family, ZWJ sequence) "
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

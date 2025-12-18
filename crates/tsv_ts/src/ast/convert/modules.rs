@@ -29,6 +29,7 @@ pub(in crate::ast) fn convert_import_specifier(
                         .to_string(),
                     optional: false,
                     type_annotation: None,
+                    decorators: Vec::new(),
                 },
             })
         }
@@ -48,6 +49,7 @@ pub(in crate::ast) fn convert_import_specifier(
                         .to_string(),
                     optional: false,
                     type_annotation: None,
+                    decorators: Vec::new(),
                 },
                 local: public::Identifier {
                     node_type: "Identifier".to_string(),
@@ -59,6 +61,7 @@ pub(in crate::ast) fn convert_import_specifier(
                         .to_string(),
                     optional: false,
                     type_annotation: None,
+                    decorators: Vec::new(),
                 },
                 import_kind: match named_spec.import_kind {
                     internal::ImportKind::Value => "value".to_string(),
@@ -80,6 +83,7 @@ pub(in crate::ast) fn convert_import_specifier(
                     name: interner.resolve_infallible(ns_spec.local.name).to_string(),
                     optional: false,
                     type_annotation: None,
+                    decorators: Vec::new(),
                 },
             })
         }
@@ -106,6 +110,7 @@ pub(in crate::ast) fn convert_import_attribute(
             name: interner.resolve_infallible(attr.key.name).to_string(),
             optional: false,
             type_annotation: None,
+            decorators: Vec::new(),
         },
         value: convert_literal(&attr.value, source, loc, offset),
     }
@@ -130,6 +135,7 @@ pub(in crate::ast) fn convert_export_specifier(
             name: interner.resolve_infallible(spec.local.name).to_string(),
             optional: false,
             type_annotation: None,
+            decorators: Vec::new(),
         },
         exported: public::Identifier {
             node_type: "Identifier".to_string(),
@@ -139,9 +145,12 @@ pub(in crate::ast) fn convert_export_specifier(
             name: interner.resolve_infallible(spec.exported.name).to_string(),
             optional: false,
             type_annotation: None,
+            decorators: Vec::new(),
         },
-        // TODO: Support "type" for TypeScript `export type { T }`
-        export_kind: "value".to_string(),
+        export_kind: match spec.export_kind {
+            internal::ExportKind::Value => "value".to_string(),
+            internal::ExportKind::Type => "type".to_string(),
+        },
     }
 }
 

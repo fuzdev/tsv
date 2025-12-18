@@ -361,6 +361,9 @@ pub struct Identifier {
     pub optional: bool,
     #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
     pub type_annotation: Option<TSTypeAnnotation>,
+    /// Decorators applied to this parameter (TypeScript parameter decorators)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub decorators: Vec<Decorator>,
 }
 
 /// Private identifier: `#foo` in class fields and methods
@@ -596,8 +599,8 @@ pub struct ClassDeclaration {
     pub end: u32,
     pub loc: SourceLocation,
     /// Decorators applied to this class
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub decorators: Vec<Decorator>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decorators: Option<Vec<Decorator>>,
     /// Whether this is a declare class (ambient declaration)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub declare: Option<bool>,
@@ -629,8 +632,8 @@ pub struct ClassExpression {
     pub end: u32,
     pub loc: SourceLocation,
     /// Decorators applied to this class
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub decorators: Vec<Decorator>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decorators: Option<Vec<Decorator>>,
     /// Class name (always optional for expressions)
     pub id: Option<Identifier>,
     /// Type parameters (e.g., `<T>` in `class Foo<T>`)
@@ -668,6 +671,7 @@ pub enum ClassMember {
     MethodDefinition(MethodDefinition),
     PropertyDefinition(PropertyDefinition),
     StaticBlock(StaticBlock),
+    TSIndexSignature(TSIndexSignature),
 }
 
 /// Static initialization block in a class: `static { ... }` (ES2022)
@@ -690,8 +694,8 @@ pub struct MethodDefinition {
     pub end: u32,
     pub loc: SourceLocation,
     /// Decorators applied to this method
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub decorators: Vec<Decorator>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decorators: Option<Vec<Decorator>>,
     /// Accessibility modifier (public, private, protected)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub accessibility: Option<String>,
@@ -715,8 +719,8 @@ pub struct PropertyDefinition {
     pub end: u32,
     pub loc: SourceLocation,
     /// Decorators applied to this property
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub decorators: Vec<Decorator>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decorators: Option<Vec<Decorator>>,
     /// Whether this property uses the accessor keyword (ES decorator proposal)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub accessor: Option<bool>,
@@ -1353,6 +1357,7 @@ pub enum TSType {
     TSTypeReference(TSTypeReference),
     TSTypeLiteral(TSTypeLiteral),
     TSFunctionType(TSFunctionType),
+    TSConstructorType(TSConstructorType),
     TSTupleType(TSTupleType),
     TSParenthesizedType(TSParenthesizedType),
     TSTypePredicate(TSTypePredicate),
@@ -1937,6 +1942,22 @@ pub struct TSFunctionType {
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub params: Vec<Expression>,
     #[serde(rename = "returnType")]
+    pub return_type: Box<TSTypeAnnotation>,
+}
+
+/// Constructor type: `new () => T` or `abstract new <T>() => T`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSConstructorType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub abstract_: bool,
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub params: Vec<Expression>,
+    #[serde(rename = "typeAnnotation")]
     pub return_type: Box<TSTypeAnnotation>,
 }
 

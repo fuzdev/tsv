@@ -126,11 +126,16 @@ impl<'a> Parser<'a> {
                 | KeywordKind::Default
                 | KeywordKind::Catch
                 | KeywordKind::Finally
-                | KeywordKind::From
-                | KeywordKind::As
-                | KeywordKind::Satisfies => Err(self.error_unexpected_keyword(*kw)),
-                // Type-only keywords and binary operator keywords are not valid at statement level
-                KeywordKind::Number
+                | KeywordKind::From => Err(self.error_unexpected_keyword(*kw)),
+                // Binary operator keywords are not valid at statement level
+                KeywordKind::Instanceof | KeywordKind::In | KeywordKind::Extends => {
+                    Err(self.error_unexpected_keyword(*kw))
+                }
+                // Contextual keywords that can be used as identifiers in expression statements
+                // E.g., `as = 'updated';` where `as` is a variable name
+                KeywordKind::As
+                | KeywordKind::Satisfies
+                | KeywordKind::Number
                 | KeywordKind::String
                 | KeywordKind::Boolean
                 | KeywordKind::Any
@@ -138,10 +143,17 @@ impl<'a> Parser<'a> {
                 | KeywordKind::Unknown
                 | KeywordKind::Object
                 | KeywordKind::Symbol
-                | KeywordKind::Bigint
-                | KeywordKind::Instanceof
-                | KeywordKind::In
-                | KeywordKind::Extends => Err(self.error_unexpected_keyword(*kw)),
+                | KeywordKind::Bigint => {
+                    // These keywords can be identifiers, so parse as expression statement
+                    let expr = self.parse_expression()?;
+                    let start = expr.span().start;
+                    self.semicolon()?;
+                    let end = self.prev_token_end() as u32;
+                    Ok(Statement::ExpressionStatement(ExpressionStatement {
+                        expression: expr,
+                        span: Span::new(start, end),
+                    }))
+                }
             },
             TokenKind::Identifier => {
                 // Check for contextual keyword 'using' followed by identifier (ES2024 Explicit Resource Management)

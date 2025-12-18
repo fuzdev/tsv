@@ -52,8 +52,9 @@ impl<'a> Parser<'a> {
                 let symbol = self.intern_identifier();
                 self.parse_simple_binding(symbol)?
             }
-            // Keywords that can be used as variable names (contextual keywords like `async`)
-            TokenKind::Keyword(kw) if kw.can_be_identifier() => {
+            // Keywords that can be used as variable names (contextual keywords like `async`, `as`, etc.)
+            // Note: `await`, `yield`, `let` are NOT allowed as binding names
+            TokenKind::Keyword(kw) if kw.can_be_binding_name() => {
                 let symbol = self.intern(kw.as_str());
                 self.parse_simple_binding(symbol)?
             }
@@ -281,6 +282,7 @@ impl<'a> Parser<'a> {
             name: symbol,
             optional: false,
             type_annotation,
+            decorators: None,
             span: Span::new(start as u32, id_end as u32),
         }))
     }

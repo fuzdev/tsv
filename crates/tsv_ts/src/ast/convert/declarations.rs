@@ -9,7 +9,7 @@ use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
 
 /// Convert a decorator from internal to public AST
-fn convert_decorator(
+pub(super) fn convert_decorator(
     decorator: &internal::Decorator,
     source: &str,
     loc: &LocationTracker,
@@ -45,6 +45,7 @@ pub(in crate::ast) fn convert_type_alias_declaration(
             name: interner.resolve_infallible(type_alias.id.name).to_string(),
             optional: false,
             type_annotation: None,
+            decorators: Vec::new(),
         },
         type_annotation: convert_type(&type_alias.type_annotation, source, loc, interner, offset),
     }
@@ -70,6 +71,7 @@ pub(in crate::ast) fn convert_function_declaration(
             name: interner.resolve_infallible(id.name).to_string(),
             optional: false,
             type_annotation: None,
+            decorators: Vec::new(),
         }),
         expression: false,
         generator: func_decl.generator,
@@ -103,11 +105,11 @@ pub(in crate::ast) fn convert_class_declaration(
         start: class_decl.span.start,
         end: class_decl.span.end,
         loc: create_location(class_decl.span, loc, offset),
-        decorators: class_decl
-            .decorators
-            .iter()
-            .map(|d| convert_decorator(d, source, loc, interner, offset))
-            .collect(),
+        decorators: class_decl.decorators.as_ref().map(|decs| {
+            decs.iter()
+                .map(|d| convert_decorator(d, source, loc, interner, offset))
+                .collect()
+        }),
         declare: if class_decl.declare { Some(true) } else { None },
         id: class_decl.id.as_ref().map(|id| public::Identifier {
             node_type: "Identifier".to_string(),
@@ -117,6 +119,7 @@ pub(in crate::ast) fn convert_class_declaration(
             name: interner.resolve_infallible(id.name).to_string(),
             optional: false,
             type_annotation: None,
+            decorators: Vec::new(),
         }),
         type_parameters: class_decl
             .type_parameters
@@ -159,11 +162,11 @@ pub(in crate::ast) fn convert_class_expression(
         start: class_expr.span.start,
         end: class_expr.span.end,
         loc: create_location(class_expr.span, loc, offset),
-        decorators: class_expr
-            .decorators
-            .iter()
-            .map(|d| convert_decorator(d, source, loc, interner, offset))
-            .collect(),
+        decorators: class_expr.decorators.as_ref().map(|decs| {
+            decs.iter()
+                .map(|d| convert_decorator(d, source, loc, interner, offset))
+                .collect()
+        }),
         id: class_expr.id.as_ref().map(|id| public::Identifier {
             node_type: "Identifier".to_string(),
             start: id.span.start,
@@ -172,6 +175,7 @@ pub(in crate::ast) fn convert_class_expression(
             name: interner.resolve_infallible(id.name).to_string(),
             optional: false,
             type_annotation: None,
+            decorators: Vec::new(),
         }),
         type_parameters: class_expr
             .type_parameters
@@ -239,6 +243,56 @@ fn convert_class_member(
         internal::ClassMember::StaticBlock(block) => public::ClassMember::StaticBlock(
             convert_static_block(block, source, loc, interner, offset),
         ),
+        internal::ClassMember::IndexSignature(sig) => public::ClassMember::TSIndexSignature(
+            convert_index_signature(sig, source, loc, interner, offset),
+        ),
+    }
+}
+
+fn convert_index_signature(
+    sig: &internal::TSIndexSignature,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::TSIndexSignature {
+    use super::types::convert_type_annotation;
+
+    public::TSIndexSignature {
+        node_type: "TSIndexSignature".to_string(),
+        start: sig.span.start,
+        end: sig.span.end,
+        loc: create_location(sig.span, loc, offset),
+        parameters: sig
+            .parameters
+            .iter()
+            .map(|p| {
+                let name = interner
+                    .resolve(p.name)
+                    .map_or_else(String::new, str::to_string);
+                public::Identifier {
+                    node_type: "Identifier".to_string(),
+                    start: p.span.start,
+                    end: p.span.end,
+                    loc: create_location(p.span, loc, offset),
+                    name,
+                    optional: p.optional,
+                    type_annotation: p
+                        .type_annotation
+                        .as_ref()
+                        .map(|ta| convert_type_annotation(ta, source, loc, interner, offset)),
+                    decorators: Vec::new(),
+                }
+            })
+            .collect(),
+        type_annotation: convert_type_annotation(
+            &sig.type_annotation,
+            source,
+            loc,
+            interner,
+            offset,
+        ),
+        readonly: sig.readonly,
     }
 }
 
@@ -286,6 +340,7 @@ fn convert_method_definition(
             name: interner.resolve_infallible(id.name).to_string(),
             optional: id.optional,
             type_annotation: None,
+            decorators: Vec::new(),
         }),
         expression: false,
         generator: func.generator,
@@ -311,11 +366,11 @@ fn convert_method_definition(
         start: method.span.start,
         end: method.span.end,
         loc: create_location(method.span, loc, offset),
-        decorators: method
-            .decorators
-            .iter()
-            .map(|d| convert_decorator(d, source, loc, interner, offset))
-            .collect(),
+        decorators: method.decorators.as_ref().map(|decs| {
+            decs.iter()
+                .map(|d| convert_decorator(d, source, loc, interner, offset))
+                .collect()
+        }),
         accessibility: method.accessibility.map(|a| a.as_str().to_string()),
         is_static: method.is_static,
         is_override: method.r#override,
@@ -344,11 +399,11 @@ fn convert_property_definition(
         start: prop.span.start,
         end: prop.span.end,
         loc: create_location(prop.span, loc, offset),
-        decorators: prop
-            .decorators
-            .iter()
-            .map(|d| convert_decorator(d, source, loc, interner, offset))
-            .collect(),
+        decorators: prop.decorators.as_ref().map(|decs| {
+            decs.iter()
+                .map(|d| convert_decorator(d, source, loc, interner, offset))
+                .collect()
+        }),
         accessor: if prop.accessor { Some(true) } else { None },
         accessibility: prop.accessibility.map(|a| a.as_str().to_string()),
         readonly: if prop.readonly { Some(true) } else { None },
@@ -413,6 +468,7 @@ fn convert_type_parameter(
             name: interner.resolve_infallible(param.name.name).to_string(),
             optional: false,
             type_annotation: None,
+            decorators: Vec::new(),
         },
         constraint: param
             .constraint
@@ -487,6 +543,7 @@ fn convert_entity_name_to_expression(
                 name: interner.resolve_infallible(id.name).to_string(),
                 optional: id.optional,
                 type_annotation: None,
+                decorators: Vec::new(),
             })
         }
         internal::TSEntityName::QualifiedName(qn) => {
@@ -506,6 +563,7 @@ fn convert_entity_name_to_expression(
                     name: interner.resolve_infallible(qn.right.name).to_string(),
                     optional: qn.right.optional,
                     type_annotation: None,
+                    decorators: Vec::new(),
                 })),
                 computed: false,
                 optional: false,

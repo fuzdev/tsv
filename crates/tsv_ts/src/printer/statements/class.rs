@@ -10,10 +10,12 @@ impl<'a> Printer<'a> {
     /// Uses doc-based printing with width-aware wrapping for long lines.
     pub(super) fn print_class_declaration(&mut self, decl: &internal::ClassDeclaration) {
         // Print decorators, each on its own line
-        for decorator in &decl.decorators {
-            self.print_decorator(decorator);
-            self.write("\n");
-            self.write_indent();
+        if let Some(decorators) = &decl.decorators {
+            for decorator in decorators {
+                self.print_decorator(decorator);
+                self.write("\n");
+                self.write_indent();
+            }
         }
 
         // Build the header doc (everything before the body)
@@ -234,7 +236,27 @@ impl<'a> Printer<'a> {
             internal::ClassMember::StaticBlock(block) => {
                 self.print_static_block(block);
             }
+            internal::ClassMember::IndexSignature(sig) => {
+                self.print_index_signature(sig);
+            }
         }
+    }
+
+    /// Print an index signature: `[key: Type]: ValueType;`
+    fn print_index_signature(&mut self, sig: &internal::TSIndexSignature) {
+        if sig.readonly {
+            self.write("readonly ");
+        }
+        self.write("[");
+        for (i, param) in sig.parameters.iter().enumerate() {
+            if i > 0 {
+                self.write(", ");
+            }
+            self.print_identifier(param);
+        }
+        self.write("]");
+        self.print_type_annotation(&sig.type_annotation);
+        self.write(";");
     }
 
     /// Print a static initialization block: `static { ... }`
@@ -255,10 +277,12 @@ impl<'a> Printer<'a> {
         _is_declare: bool,
     ) {
         // Print decorators, each on its own line
-        for decorator in &prop.decorators {
-            self.print_decorator(decorator);
-            self.write("\n");
-            self.write_indent();
+        if let Some(decorators) = &prop.decorators {
+            for decorator in decorators {
+                self.print_decorator(decorator);
+                self.write("\n");
+                self.write_indent();
+            }
         }
 
         // Print accessibility modifier if applicable
@@ -320,10 +344,12 @@ impl<'a> Printer<'a> {
     /// Print a method definition
     fn print_method_definition(&mut self, method: &internal::MethodDefinition, is_declare: bool) {
         // Print decorators, each on its own line
-        for decorator in &method.decorators {
-            self.print_decorator(decorator);
-            self.write("\n");
-            self.write_indent();
+        if let Some(decorators) = &method.decorators {
+            for decorator in decorators {
+                self.print_decorator(decorator);
+                self.write("\n");
+                self.write_indent();
+            }
         }
 
         // Print accessibility modifier if applicable
@@ -371,6 +397,11 @@ impl<'a> Printer<'a> {
             self.write("]");
         } else {
             self.print_expression(&method.key);
+        }
+
+        // Print type parameters if present: method<T>()
+        if let Some(type_params) = &method.value.type_parameters {
+            self.print_type_parameter_declaration(type_params);
         }
 
         // Print parameters (can be Identifier, ArrayPattern, ObjectPattern, AssignmentPattern)
@@ -551,7 +582,30 @@ impl<'a> Printer<'a> {
                 self.build_property_definition_doc(prop)
             }
             internal::ClassMember::StaticBlock(block) => self.build_static_block_doc(block),
+            internal::ClassMember::IndexSignature(sig) => self.build_index_signature_doc(sig),
         }
+    }
+
+    /// Build a Doc for an index signature: `[key: Type]: ValueType;`
+    fn build_index_signature_doc(&self, sig: &internal::TSIndexSignature) -> doc::Doc {
+        let mut parts = Vec::new();
+
+        if sig.readonly {
+            parts.push(doc::text("readonly "));
+        }
+
+        parts.push(doc::text("["));
+        let param_docs: Vec<_> = sig
+            .parameters
+            .iter()
+            .map(|p| self.build_identifier_doc(p))
+            .collect();
+        parts.push(doc::join(param_docs, ", "));
+        parts.push(doc::text("]"));
+        parts.push(self.build_type_annotation_doc(&sig.type_annotation));
+        parts.push(doc::text(";"));
+
+        doc::concat(parts)
     }
 
     /// Build a Doc for a static initialization block
@@ -664,6 +718,11 @@ impl<'a> Printer<'a> {
             parts.push(doc::text("]"));
         } else {
             parts.push(self.build_expression_doc(&method.key));
+        }
+
+        // Type parameters if present: method<T>()
+        if let Some(type_params) = &method.value.type_parameters {
+            parts.push(self.build_type_parameter_declaration_doc(type_params));
         }
 
         // Parameters (can be Identifier, ArrayPattern, ObjectPattern, AssignmentPattern)

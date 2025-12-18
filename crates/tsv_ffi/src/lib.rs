@@ -87,6 +87,44 @@ where
     }
 }
 
+/// Helper for internal parse (no conversion, no JSON serialization).
+/// Returns empty string on success, error JSON on failure.
+///
+/// Uses `std::hint::black_box` to prevent the compiler from optimizing away
+/// the parse when the AST result is unused.
+///
+/// # Safety
+/// Caller must ensure `source_ptr` points to valid UTF-8 of `source_len` bytes.
+unsafe fn with_source_parse_internal<F, T>(
+    source_ptr: *const u8,
+    source_len: usize,
+    out_len: *mut usize,
+    f: F,
+) -> *mut u8
+where
+    F: FnOnce(&str) -> Result<T, String>,
+{
+    // Safety: Caller guarantees valid UTF-8 pointer and length
+    let source = unsafe {
+        let bytes = slice::from_raw_parts(source_ptr, source_len);
+        match std::str::from_utf8(bytes) {
+            Ok(s) => s,
+            Err(e) => {
+                return error_result(&format!("Invalid UTF-8: {e}"), out_len);
+            }
+        }
+    };
+
+    match f(source) {
+        Ok(ast) => {
+            // Prevent compiler from optimizing away the parse
+            std::hint::black_box(ast);
+            string_to_ptr(String::new(), out_len) // Success: empty string
+        }
+        Err(e) => error_result(&e, out_len),
+    }
+}
+
 /// Convert a String to a raw pointer, writing the length to `out_len`.
 fn string_to_ptr(s: String, out_len: *mut usize) -> *mut u8 {
     let bytes = s.into_bytes().into_boxed_slice();
@@ -123,6 +161,26 @@ pub unsafe extern "C" fn tsv_parse_svelte(
         with_source(source_ptr, source_len, out_len, |source| {
             let ast = tsv_svelte::parse(source).map_err(|e| e.to_string())?;
             Ok(tsv_svelte::convert_ast(&ast, source))
+        })
+    }
+}
+
+/// Parse Svelte source to internal AST only (no conversion, no serialization).
+/// Returns empty string on success for minimal overhead benchmarking.
+///
+/// # Safety
+/// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
+/// - `out_len` must point to a valid `usize` for writing output length
+/// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsv_parse_internal_svelte(
+    source_ptr: *const u8,
+    source_len: usize,
+    out_len: *mut usize,
+) -> *mut u8 {
+    unsafe {
+        with_source_parse_internal(source_ptr, source_len, out_len, |source| {
+            tsv_svelte::parse(source).map_err(|e| e.to_string())
         })
     }
 }
@@ -171,6 +229,26 @@ pub unsafe extern "C" fn tsv_parse_typescript(
     }
 }
 
+/// Parse TypeScript source to internal AST only (no conversion, no serialization).
+/// Returns empty string on success for minimal overhead benchmarking.
+///
+/// # Safety
+/// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
+/// - `out_len` must point to a valid `usize` for writing output length
+/// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsv_parse_internal_typescript(
+    source_ptr: *const u8,
+    source_len: usize,
+    out_len: *mut usize,
+) -> *mut u8 {
+    unsafe {
+        with_source_parse_internal(source_ptr, source_len, out_len, |source| {
+            tsv_ts::parse(source).map_err(|e| e.to_string())
+        })
+    }
+}
+
 /// Format TypeScript source code.
 ///
 /// # Safety
@@ -211,6 +289,26 @@ pub unsafe extern "C" fn tsv_parse_css(
         with_source(source_ptr, source_len, out_len, |source| {
             let ast = tsv_css::parse(source).map_err(|e| e.to_string())?;
             Ok(tsv_css::convert_ast(&ast, source))
+        })
+    }
+}
+
+/// Parse CSS source to internal AST only (no conversion, no serialization).
+/// Returns empty string on success for minimal overhead benchmarking.
+///
+/// # Safety
+/// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
+/// - `out_len` must point to a valid `usize` for writing output length
+/// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsv_parse_internal_css(
+    source_ptr: *const u8,
+    source_len: usize,
+    out_len: *mut usize,
+) -> *mut u8 {
+    unsafe {
+        with_source_parse_internal(source_ptr, source_len, out_len, |source| {
+            tsv_css::parse(source).map_err(|e| e.to_string())
         })
     }
 }

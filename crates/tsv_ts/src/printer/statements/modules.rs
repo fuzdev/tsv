@@ -19,9 +19,9 @@ impl<'a> Printer<'a> {
         if let Some(declaration) = &decl.declaration {
             // For decorated classes, print decorators before export keyword
             if let internal::Statement::ClassDeclaration(class_decl) = declaration.as_ref()
-                && !class_decl.decorators.is_empty()
+                && let Some(decorators) = &class_decl.decorators
             {
-                for decorator in &class_decl.decorators {
+                for decorator in decorators {
                     self.print_decorator(decorator);
                     self.write("\n");
                     self.write_indent();
@@ -29,7 +29,7 @@ impl<'a> Printer<'a> {
                 // Print export keyword and class without decorators (already printed above)
                 self.write(export_keyword);
                 let mut class_without_decorators = class_decl.clone();
-                class_without_decorators.decorators = Vec::new();
+                class_without_decorators.decorators = None;
                 self.print_class_declaration(&class_without_decorators);
                 return;
             }
@@ -51,9 +51,9 @@ impl<'a> Printer<'a> {
     ) {
         // For decorated classes, print decorators before export keyword
         if let internal::ExportDefaultValue::ClassDeclaration(class) = &decl.declaration
-            && !class.decorators.is_empty()
+            && let Some(decorators) = &class.decorators
         {
-            for decorator in &class.decorators {
+            for decorator in decorators {
                 self.print_decorator(decorator);
                 self.write("\n");
                 self.write_indent();
@@ -61,7 +61,7 @@ impl<'a> Printer<'a> {
             // Print export default and class without decorators
             self.write("export default ");
             let mut class_without_decorators = class.as_ref().clone();
-            class_without_decorators.decorators = Vec::new();
+            class_without_decorators.decorators = None;
             self.print_class_declaration(&class_without_decorators);
             return;
         }
@@ -139,6 +139,9 @@ impl<'a> Printer<'a> {
             // export { x, y as z } or export { x } from "y"
             let mut parts = vec![doc::text(export_keyword)];
 
+            // Check if the overall export is type-only
+            let is_type_export = decl.export_kind == internal::ExportKind::Type;
+
             if decl.specifiers.is_empty() {
                 // Empty braces case: `export {}`
                 parts.push(doc::text("{}"));
@@ -148,17 +151,22 @@ impl<'a> Printer<'a> {
                     .specifiers
                     .iter()
                     .map(|spec| {
+                        let mut spec_parts = Vec::new();
+                        // Add inline type modifier if this specifier is type-only
+                        // (only when the overall export is NOT type-only)
+                        if !is_type_export && spec.export_kind == internal::ExportKind::Type {
+                            spec_parts.push(doc::text("type "));
+                        }
                         let local = self.resolve_symbol(spec.local.name);
                         let exported = self.resolve_symbol(spec.exported.name);
                         if local == exported {
-                            doc::text_owned(local)
+                            spec_parts.push(doc::text_owned(local));
                         } else {
-                            doc::concat(vec![
-                                doc::text_owned(local),
-                                doc::text(" as "),
-                                doc::text_owned(exported),
-                            ])
+                            spec_parts.push(doc::text_owned(local));
+                            spec_parts.push(doc::text(" as "));
+                            spec_parts.push(doc::text_owned(exported));
                         }
+                        doc::concat(spec_parts)
                     })
                     .collect();
                 let spec_parts = doc::join_trailing(spec_docs, doc::comma_line());

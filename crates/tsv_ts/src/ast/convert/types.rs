@@ -105,7 +105,11 @@ pub(in crate::ast) fn convert_type(
             type_parameters: f.type_parameters.as_ref().map(|tp| {
                 convert_type_parameter_declaration_simple(tp, source, loc, interner, offset)
             }),
-            params: Vec::new(), // TODO: convert params properly
+            params: f
+                .params
+                .iter()
+                .map(|p| super::convert_expression(p, source, loc, interner, offset))
+                .collect(),
             return_type: Box::new(convert_type_annotation(
                 &f.return_type,
                 source,
@@ -114,6 +118,30 @@ pub(in crate::ast) fn convert_type(
                 offset,
             )),
         }),
+        internal::TSType::Constructor(c) => {
+            public::TSType::TSConstructorType(public::TSConstructorType {
+                node_type: "TSConstructorType".to_string(),
+                start: c.span.start,
+                end: c.span.end,
+                loc: create_location(c.span, loc, offset),
+                abstract_: c.abstract_,
+                type_parameters: c.type_parameters.as_ref().map(|tp| {
+                    convert_type_parameter_declaration_simple(tp, source, loc, interner, offset)
+                }),
+                params: c
+                    .params
+                    .iter()
+                    .map(|p| super::convert_expression(p, source, loc, interner, offset))
+                    .collect(),
+                return_type: Box::new(convert_type_annotation(
+                    &c.return_type,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                )),
+            })
+        }
         internal::TSType::Tuple(t) => public::TSType::TSTupleType(public::TSTupleType {
             node_type: "TSTupleType".to_string(),
             start: t.span.start,
@@ -151,6 +179,7 @@ pub(in crate::ast) fn convert_type(
                 name: format!("__symbol_{:?}", p.parameter_name.name), // Placeholder
                 optional: false,
                 type_annotation: None,
+                decorators: Vec::new(),
             };
             public::TSType::TSTypePredicate(public::TSTypePredicate {
                 node_type: "TSTypePredicate".to_string(),
@@ -343,6 +372,7 @@ pub(in crate::ast) fn convert_type(
                     name: format!("__symbol_{:?}", n.label.name), // Placeholder
                     optional: false,
                     type_annotation: None,
+                    decorators: Vec::new(),
                 },
                 element_type: Box::new(convert_type(
                     &n.element_type,
@@ -375,6 +405,7 @@ pub(in crate::ast) fn convert_type(
                     name: format!("__symbol_{:?}", i.type_parameter.name.name), // Placeholder
                     optional: false,
                     type_annotation: None,
+                    decorators: Vec::new(),
                 },
                 constraint: None, // infer doesn't have constraints
                 default: None,    // infer doesn't have defaults
@@ -401,6 +432,7 @@ fn convert_type_query_expr_name(
                     name: format!("__symbol_{:?}", id.name), // Placeholder
                     optional: false,
                     type_annotation: None,
+                    decorators: Vec::new(),
                 })
             }
             internal::TSEntityName::QualifiedName(qn) => {
@@ -418,6 +450,7 @@ fn convert_type_query_expr_name(
                         name: format!("__symbol_{:?}", qn.right.name),
                         optional: false,
                         type_annotation: None,
+                        decorators: Vec::new(),
                     },
                 })
             }
@@ -706,6 +739,7 @@ fn convert_entity_name(
                 name: format!("__symbol_{:?}", id.name), // Placeholder
                 optional: false,
                 type_annotation: None,
+                decorators: Vec::new(),
             })
         }
         internal::TSEntityName::QualifiedName(qn) => {
@@ -723,6 +757,7 @@ fn convert_entity_name(
                     name: format!("__symbol_{:?}", qn.right.name),
                     optional: false,
                     type_annotation: None,
+                    decorators: Vec::new(),
                 },
             })
         }
@@ -781,6 +816,7 @@ fn convert_type_parameter_declaration_simple(
                     name: "TODO".to_string(), // Would need interner to resolve symbol
                     optional: false,
                     type_annotation: None,
+                    decorators: Vec::new(),
                 },
                 constraint: p
                     .constraint
@@ -817,6 +853,7 @@ fn convert_type_element(
                     name: "TODO".to_string(), // Would need interner
                     optional: false,
                     type_annotation: None,
+                    decorators: Vec::new(),
                 }),
                 computed: p.computed,
                 optional: p.optional,
@@ -842,6 +879,7 @@ fn convert_type_element(
                     name: "TODO".to_string(), // Would need interner
                     optional: false,
                     type_annotation: None,
+                    decorators: Vec::new(),
                 }),
                 type_parameters: m.type_parameters.as_ref().map(|tp| {
                     convert_type_parameter_declaration_simple(tp, source, loc, interner, offset)
@@ -905,6 +943,7 @@ fn convert_type_element(
                             .type_annotation
                             .as_ref()
                             .map(|ta| convert_type_annotation(ta, source, loc, interner, offset)),
+                        decorators: Vec::new(),
                     })
                     .collect(),
                 type_annotation: convert_type_annotation(
@@ -943,6 +982,7 @@ pub(in crate::ast) fn convert_interface_declaration(
             name: interner.resolve_infallible(iface.id.name).to_string(),
             optional: false,
             type_annotation: None,
+            decorators: Vec::new(),
         },
         extends: iface
             .extends
@@ -991,6 +1031,7 @@ fn convert_entity_name_with_interner(
                 name: interner.resolve_infallible(id.name).to_string(),
                 optional: false,
                 type_annotation: None,
+                decorators: Vec::new(),
             })
         }
         internal::TSEntityName::QualifiedName(qn) => {
@@ -1010,6 +1051,7 @@ fn convert_entity_name_with_interner(
                     name: interner.resolve_infallible(qn.right.name).to_string(),
                     optional: false,
                     type_annotation: None,
+                    decorators: Vec::new(),
                 },
             })
         }
@@ -1059,6 +1101,7 @@ pub(in crate::ast) fn convert_declare_function(
             name: interner.resolve_infallible(func.id.name).to_string(),
             optional: false,
             type_annotation: None,
+            decorators: Vec::new(),
         },
         params: Vec::new(), // TODO: convert params properly
         return_type: func

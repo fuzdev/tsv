@@ -83,6 +83,8 @@ pub struct IfBlock {
     pub consequent: Fragment,
     pub alternate: Option<Fragment>,
     pub span: Span,
+    /// Span of the opening tag `{#if ... }` or `{:else if ... }` for comment lookup
+    pub opening_tag_span: Span,
 }
 
 /// Svelte EachBlock - list iteration
@@ -95,9 +97,13 @@ pub struct EachBlock {
     pub context: Option<Expression>, // Pattern (identifier or destructuring), None if no `as`
     pub index: Option<String>,
     pub key: Option<Expression>,
+    /// Span of the key including parentheses `(key)` for comment lookup
+    pub key_span: Option<Span>,
     pub body: Fragment,
     pub fallback: Option<Fragment>,
     pub span: Span,
+    /// Span of the opening tag `{#each ... }` for comment lookup
+    pub opening_tag_span: Span,
 }
 
 /// Svelte AwaitBlock - promise handling
@@ -113,6 +119,8 @@ pub struct AwaitBlock {
     pub then: Option<Fragment>,
     pub catch: Option<Fragment>,
     pub span: Span,
+    /// Span of the opening tag `{#await ... }` for comment lookup
+    pub opening_tag_span: Span,
 }
 
 /// Svelte KeyBlock - keyed updates
@@ -124,6 +132,8 @@ pub struct KeyBlock {
     pub expression: Expression,
     pub fragment: Fragment,
     pub span: Span,
+    /// Span of the opening tag `{#key ... }` for comment lookup
+    pub opening_tag_span: Span,
 }
 
 /// Svelte SnippetBlock - reusable template snippets
@@ -138,6 +148,8 @@ pub struct SnippetBlock {
     pub raw_parameters: Option<String>, // Raw parameter string for TypeScript (when type annotations present)
     pub body: Fragment,
     pub span: Span,
+    /// Span of the opening tag `{#snippet ... }` for comment lookup
+    pub opening_tag_span: Span,
 }
 
 /// Svelte HtmlTag - raw HTML injection
@@ -211,6 +223,8 @@ pub struct OnDirective {
     pub expression: Option<Expression>, // Handler function
     pub modifiers: Vec<String>,         // "preventDefault", "stopPropagation", etc.
     pub span: Span,
+    /// Span of the expression tag `{...}` for comment lookup (None if no expression)
+    pub expression_tag_span: Option<Span>,
 }
 
 /// BindDirective - two-way binding (`bind:value={name}`)
@@ -223,6 +237,8 @@ pub struct BindDirective {
     pub expression: Expression, // Binding target (always present - auto-generated for shorthand)
     pub modifiers: Vec<String>, // Currently empty for bindings
     pub span: Span,
+    /// Span of the expression tag `{...}` for comment lookup (None for shorthand bindings)
+    pub expression_tag_span: Option<Span>,
 }
 
 /// ClassDirective - conditional class (`class:active={isActive}`)
@@ -235,6 +251,8 @@ pub struct ClassDirective {
     pub expression: Expression, // Condition (always present - auto-generated for shorthand)
     pub modifiers: Vec<String>, // Currently empty for class directives
     pub span: Span,
+    /// Span of the expression tag `{...}` for comment lookup (None for shorthand)
+    pub expression_tag_span: Option<Span>,
 }
 
 /// StyleDirective - inline style (`style:color={value}`)
@@ -270,6 +288,8 @@ pub struct UseDirective {
     pub expression: Option<Expression>, // Parameters passed to the action
     pub modifiers: Vec<String>,         // Currently unused
     pub span: Span,
+    /// Span of the expression tag `{...}` for comment lookup (None if no expression)
+    pub expression_tag_span: Option<Span>,
 }
 
 /// Direction of a transition directive

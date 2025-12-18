@@ -162,6 +162,21 @@ pub fn parse_expression(
         .map_err(|e| e.with_context(source))
 }
 
+/// Parse a single TypeScript expression and return it with any comments.
+///
+/// This is used when parsing expressions in contexts where comments need to be
+/// preserved (e.g., Svelte expression tags `{/* comment */ expr}`).
+pub fn parse_expression_with_comments(
+    source: &str,
+    base_offset: usize,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+) -> Result<(Expression, Vec<ast::Comment>)> {
+    let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
+    parser
+        .parse_expression_with_comments()
+        .map_err(|e| e.with_context(source))
+}
+
 /// Format a single TypeScript expression back to source code
 ///
 /// This formats an expression AST node that was parsed as part of a larger document
@@ -208,6 +223,25 @@ pub fn format_expression_with_indent(
     printer.into_string()
 }
 
+/// Format a single TypeScript expression with a base indentation level and comments
+///
+/// This is used when formatting expressions embedded in other content
+/// (e.g., Svelte templates) where the expression needs to respect the
+/// surrounding indentation context, and comments need to be preserved.
+pub fn format_expression_with_indent_and_comments(
+    expression: &Expression,
+    source: &str,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+    indent_level: usize,
+    comments: &[ast::Comment],
+) -> String {
+    let mut printer =
+        printer::Printer::with_config(interner, source, comments, tsv_lang::PrintConfig::default());
+    printer.set_indent_level(indent_level);
+    printer.print_expression(expression);
+    printer.into_string()
+}
+
 /// Format a single TypeScript expression in an isolated context.
 ///
 /// Similar to `format_expression`, but handles sequence expressions specially:
@@ -225,6 +259,22 @@ pub fn format_expression_isolated(
         &comments,
         tsv_lang::PrintConfig::default(),
     );
+    printer.print_expression_isolated(expression);
+    printer.into_string()
+}
+
+/// Format a single TypeScript expression in an isolated context with comments.
+///
+/// Like `format_expression_isolated`, but preserves comments that were collected
+/// during parsing. Used for Svelte expression tags that may contain comments.
+pub fn format_expression_isolated_with_comments(
+    expression: &Expression,
+    source: &str,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+    comments: &[ast::Comment],
+) -> String {
+    let mut printer =
+        printer::Printer::with_config(interner, source, comments, tsv_lang::PrintConfig::default());
     printer.print_expression_isolated(expression);
     printer.into_string()
 }
@@ -264,6 +314,26 @@ pub fn parse_pattern(
         .map_err(|e| e.with_context(source))
 }
 
+/// Parse a pattern and return it with any collected comments.
+///
+/// Like `parse_pattern`, but also returns comments for preservation
+/// in Svelte template contexts.
+pub fn parse_pattern_with_comments(
+    source: &str,
+    base_offset: usize,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+) -> Result<(Expression, Vec<ast::Comment>)> {
+    let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
+    let expr = parser
+        .parse_expression_public()
+        .map_err(|e| e.with_context(source))?;
+    let pattern = parser
+        .expression_to_pattern(expr)
+        .map_err(|e| e.with_context(source))?;
+    let comments = parser.take_comments();
+    Ok((pattern, comments))
+}
+
 /// Parse a partial expression, stopping at top-level commas.
 ///
 /// This is used when parsing patterns in contexts where commas have other meanings,
@@ -293,6 +363,23 @@ pub fn parse_expression_partial(
     parser
         .parse_assignment_expression_partial()
         .map_err(|e| e.with_context(source))
+}
+
+/// Parse a partial expression and return it with any collected comments.
+///
+/// Like `parse_expression_partial`, but also returns comments for preservation
+/// in Svelte template contexts.
+pub fn parse_expression_partial_with_comments(
+    source: &str,
+    base_offset: usize,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+) -> Result<(Expression, usize, Vec<ast::Comment>)> {
+    let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
+    let (expr, end_pos) = parser
+        .parse_assignment_expression_partial()
+        .map_err(|e| e.with_context(source))?;
+    let comments = parser.take_comments();
+    Ok((expr, end_pos, comments))
 }
 
 /// Build a Doc tree for a TypeScript expression
@@ -330,6 +417,20 @@ pub fn build_expression_doc_isolated(
 ) -> tsv_lang::doc::Doc {
     let comments = Vec::new();
     let printer = printer::Printer::with_config(interner, source, &comments, *config);
+    printer.build_expression_doc_isolated_public(expression)
+}
+
+/// Build a Doc for a TypeScript expression in an isolated context, with comments.
+///
+/// Like `build_expression_doc_isolated`, but includes comments collected during parsing.
+pub fn build_expression_doc_isolated_with_comments(
+    expression: &Expression,
+    source: &str,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+    config: &tsv_lang::PrintConfig,
+    comments: &[ast::Comment],
+) -> tsv_lang::doc::Doc {
+    let printer = printer::Printer::with_config(interner, source, comments, *config);
     printer.build_expression_doc_isolated_public(expression)
 }
 

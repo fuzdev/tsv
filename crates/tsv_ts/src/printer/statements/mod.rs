@@ -15,7 +15,7 @@ mod modules;
 mod types;
 mod variable;
 
-use super::Printer;
+use super::{ParenContext, Printer, needs_parens};
 use crate::ast::internal::{self, Statement};
 use tsv_lang::doc;
 
@@ -140,7 +140,7 @@ impl<'a> Printer<'a> {
     fn print_expression_statement(&mut self, stmt: &internal::ExpressionStatement) {
         // Object pattern assignments need parentheses to avoid ambiguity with block statements
         // e.g., `({a, b} = obj);` not `{a, b} = obj;`
-        let needs_parens = self.expression_statement_needs_parens(&stmt.expression);
+        let needs_parens = needs_parens(&stmt.expression, ParenContext::ExpressionStatement);
 
         if needs_parens {
             self.write("(");
@@ -178,33 +178,5 @@ impl<'a> Printer<'a> {
                 break;
             }
         }
-    }
-
-    /// Check if an expression statement needs parentheses
-    ///
-    /// Object pattern assignments need parens to avoid ambiguity with block statements.
-    /// Array pattern assignments don't need parens (no ambiguity with array literal).
-    fn expression_statement_needs_parens(&self, expr: &internal::Expression) -> bool {
-        expression_needs_parens_at_statement_level(expr)
-    }
-}
-
-/// Check if an expression needs parentheses at statement level
-///
-/// Separate function to avoid clippy warning about &self only used in recursion.
-fn expression_needs_parens_at_statement_level(expr: &internal::Expression) -> bool {
-    match expr {
-        internal::Expression::AssignmentExpression(assign) => {
-            matches!(assign.left.as_ref(), internal::Expression::ObjectPattern(_))
-        }
-        // Sequence expressions with object pattern assignment in first position also need parens
-        internal::Expression::SequenceExpression(seq) => {
-            if let Some(first) = seq.expressions.first() {
-                expression_needs_parens_at_statement_level(first)
-            } else {
-                false
-            }
-        }
-        _ => false,
     }
 }

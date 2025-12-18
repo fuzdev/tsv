@@ -107,29 +107,20 @@ impl<'a> Printer<'a> {
                     .filter(|n| matches!(n, FragmentNode::ExpressionTag(_)))
                     .count();
 
-                // Check if expressions are on separate lines in source
-                // (only split if source has newlines between expressions OR inside expressions)
-                let has_newlines_between_exprs = if expr_count > 1 {
-                    nodes[i..=run_end].iter().any(|n| match n {
-                        // Text nodes with non-whitespace content or newlines
-                        FragmentNode::Text(text) => {
-                            !text.raw.is_whitespace_only() || text.raw.contains('\n')
-                        }
-                        // Expression tags with newlines in source (check span)
-                        FragmentNode::ExpressionTag(expr) => {
-                            let source_slice = expr.span.extract(self.source);
-                            source_slice.contains('\n')
-                        }
-                        _ => false,
-                    })
-                } else {
-                    false
-                };
+                // Check if expressions should be split to separate lines
+                // Split ONLY if there's whitespace-only text BETWEEN expressions
+                // (layout whitespace like `{a} {b}` should split to separate lines)
+                // Keep together if:
+                // - Semantic text between (e.g., `{'<'}div{'>'}`)
+                // - Directly adjacent (e.g., `{'{'}{'}'}`)
+                // - Only trailing whitespace after last expression (not between)
+                let should_split_expressions =
+                    expr_count > 1 && has_whitespace_between_expressions(&nodes[i..=run_end]);
 
                 // Multiple expressions in multiline mode: format each on its own line
                 // (Regular elements stay together, only expressions get broken)
-                // BUT: only if they were on separate lines in the source
-                if expr_count > 1 && has_newlines_between_exprs {
+                // BUT: only if no semantic text binds them together
+                if expr_count > 1 && should_split_expressions {
                     let mut first = true;
                     for run_node in &nodes[i..=run_end] {
                         // Skip whitespace-only text nodes
@@ -162,12 +153,10 @@ impl<'a> Printer<'a> {
                 } else {
                     // Check if the last node in the run ended with a blank line
                     // This sets up blank line for the NEXT iteration
-                    if let FragmentNode::Text(text) = &nodes[run_end] {
-                        let after_layout_ws = text.raw.trim_end();
-                        let trailing_part = &text.raw[after_layout_ws.len()..];
-                        if trailing_part.has_blank_line() {
-                            had_blank_line = true;
-                        }
+                    if let FragmentNode::Text(text) = &nodes[run_end]
+                        && text.raw.has_trailing_blank_line()
+                    {
+                        had_blank_line = true;
                     }
                     prev_block_inline = false;
                     i = run_end + 1;
@@ -365,4 +354,31 @@ fn find_content_boundary_indices(nodes: &[FragmentNode]) -> (Option<usize>, Opti
     let last = nodes.iter().rposition(is_content);
 
     (first, last)
+}
+
+/// Check if there's whitespace-only text BETWEEN expressions in a run.
+///
+/// This is used to decide whether to split expressions to separate lines in multiline mode.
+/// Layout whitespace like `{a} {b}` should split, but semantic patterns like `{'<'}div{'>'}`
+/// should stay together because the text between expressions is meaningful content.
+///
+/// Only checks whitespace between the first and last expression - trailing whitespace
+/// after the last expression doesn't count as "between".
+fn has_whitespace_between_expressions(nodes: &[FragmentNode]) -> bool {
+    let first_expr = nodes
+        .iter()
+        .position(|n| matches!(n, FragmentNode::ExpressionTag(_)));
+    let last_expr = nodes
+        .iter()
+        .rposition(|n| matches!(n, FragmentNode::ExpressionTag(_)));
+
+    match (first_expr, last_expr) {
+        (Some(first), Some(last)) if first < last => {
+            // Check only nodes between first and last expression
+            nodes[first..=last]
+                .iter()
+                .any(|n| matches!(n, FragmentNode::Text(text) if text.raw.is_whitespace_only()))
+        }
+        _ => false,
+    }
 }

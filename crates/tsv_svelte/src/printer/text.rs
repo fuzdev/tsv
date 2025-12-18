@@ -22,6 +22,7 @@ pub trait TextAnalysis {
     fn has_trailing_newline(&self) -> bool;
     fn has_leading_space_only(&self) -> bool;
     fn has_trailing_space_only(&self) -> bool;
+    fn has_trailing_blank_line(&self) -> bool;
 }
 
 impl TextAnalysis for str {
@@ -77,6 +78,11 @@ impl TextAnalysis for str {
     fn has_trailing_space_only(&self) -> bool {
         let ws = self.trailing_whitespace();
         !ws.is_empty() && !ws.contains('\n')
+    }
+
+    /// Check if trailing whitespace contains a blank line (2+ newlines)
+    fn has_trailing_blank_line(&self) -> bool {
+        self.trailing_whitespace().has_blank_line()
     }
 }
 

@@ -112,9 +112,10 @@ pub struct ExportNamedDeclaration {
 }
 
 /// Export kind for TypeScript type-only exports
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ExportKind {
     /// Regular value export: `export { x }`
+    #[default]
     Value,
     /// Type-only export: `export type { X }`
     Type,
@@ -169,13 +170,15 @@ pub struct TSExportAssignment {
     pub span: Span,
 }
 
-/// Export specifier: `export { x }` or `export { x as y }`
+/// Export specifier: `export { x }` or `export { x as y }` or `export { type x }`
 #[derive(Debug, Clone)]
 pub struct ExportSpecifier {
     /// Local name (what's exported from this module)
     pub local: Identifier,
     /// Exported name (what it's called externally, may be same as local)
     pub exported: Identifier,
+    /// Export kind for inline type modifier: `export { type A, b }`
+    pub export_kind: ExportKind,
     pub span: Span,
 }
 
@@ -971,7 +974,7 @@ pub struct EmptyStatement {
 #[derive(Debug, Clone)]
 pub struct ClassDeclaration {
     /// Decorators applied to this class
-    pub decorators: Vec<Decorator>,
+    pub decorators: Option<Vec<Decorator>>,
     /// Class name (required for declarations, optional for export default)
     pub id: Option<Identifier>,
     /// Optional superclass expression (for `extends`)
@@ -998,7 +1001,7 @@ pub struct ClassDeclaration {
 #[derive(Debug, Clone)]
 pub struct ClassExpression {
     /// Decorators applied to this class
-    pub decorators: Vec<Decorator>,
+    pub decorators: Option<Vec<Decorator>>,
     /// Class name (always optional for expressions)
     pub id: Option<Identifier>,
     /// Optional superclass expression (for `extends`)
@@ -1031,6 +1034,7 @@ pub enum ClassMember {
     MethodDefinition(MethodDefinition),
     PropertyDefinition(PropertyDefinition),
     StaticBlock(StaticBlock),
+    IndexSignature(TSIndexSignature),
 }
 
 impl ClassMember {
@@ -1039,6 +1043,7 @@ impl ClassMember {
             ClassMember::MethodDefinition(m) => m.span,
             ClassMember::PropertyDefinition(p) => p.span,
             ClassMember::StaticBlock(s) => s.span,
+            ClassMember::IndexSignature(i) => i.span,
         }
     }
 }
@@ -1107,7 +1112,7 @@ pub struct TSParameterProperty {
 #[allow(clippy::struct_excessive_bools)] // independent flags, not a state machine
 pub struct MethodDefinition {
     /// Decorators applied to this method
-    pub decorators: Vec<Decorator>,
+    pub decorators: Option<Vec<Decorator>>,
     /// Method name (key)
     pub key: Expression,
     /// Method implementation (value)
@@ -1149,7 +1154,7 @@ pub enum PropertyModifier {
 #[derive(Debug, Clone)]
 pub struct PropertyDefinition {
     /// Decorators applied to this property
-    pub decorators: Vec<Decorator>,
+    pub decorators: Option<Vec<Decorator>>,
     /// Property name (key)
     pub key: Expression,
     /// Type annotation (e.g., `: number` in `a: number = 0;`)
@@ -1571,7 +1576,26 @@ pub struct Identifier {
     /// Whether this is an optional parameter (e.g., `a?` in `function fn(a?: number) {}`)
     pub optional: bool,
     pub type_annotation: Option<TSTypeAnnotation>,
+    /// Decorators applied to this parameter (TypeScript parameter decorators)
+    pub decorators: Option<Vec<Decorator>>,
     pub span: Span,
+}
+
+impl Identifier {
+    /// Create a simple identifier with no optional flag or type annotation.
+    ///
+    /// Use this for identifiers in expression context (not parameters).
+    /// For parameters that may have `?` or type annotations, construct directly.
+    #[inline]
+    pub fn simple(name: DefaultSymbol, span: Span) -> Self {
+        Self {
+            name,
+            optional: false,
+            type_annotation: None,
+            decorators: None,
+            span,
+        }
+    }
 }
 
 /// Private identifier: `#foo` in class fields and methods
@@ -1668,6 +1692,8 @@ pub enum TSType {
     TypeLiteral(TSTypeLiteral),
     /// Function types: `(x: T) => U`
     Function(TSFunctionType),
+    /// Constructor types: `new () => T` or `abstract new <T>() => T`
+    Constructor(TSConstructorType),
     /// Tuple types: `[T, U]`
     Tuple(TSTupleType),
     /// Parenthesized types: `(T)`
@@ -1708,6 +1734,7 @@ impl TSType {
             TSType::TypeReference(r) => r.span,
             TSType::TypeLiteral(t) => t.span,
             TSType::Function(f) => f.span,
+            TSType::Constructor(c) => c.span,
             TSType::Tuple(t) => t.span,
             TSType::Parenthesized(p) => p.span,
             TSType::TypePredicate(p) => p.span,
@@ -2105,6 +2132,16 @@ pub struct TSIndexSignature {
 /// Function type: `(x: T) => U` or `<T>(x: T) => U`
 #[derive(Debug, Clone)]
 pub struct TSFunctionType {
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub params: Vec<Expression>,
+    pub return_type: Box<TSTypeAnnotation>,
+    pub span: Span,
+}
+
+/// Constructor type: `new () => T` or `abstract new <T>() => T`
+#[derive(Debug, Clone)]
+pub struct TSConstructorType {
+    pub abstract_: bool,
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub params: Vec<Expression>,
     pub return_type: Box<TSTypeAnnotation>,

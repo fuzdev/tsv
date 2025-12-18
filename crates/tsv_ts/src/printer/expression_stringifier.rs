@@ -8,7 +8,7 @@
 // This is a "best-effort" serializer that reconstructs minimal string
 // representations without comments or complex formatting.
 
-use super::Printer;
+use super::{ParenContext, Printer, needs_parens};
 use crate::ast::internal::{self, Expression, Literal, LiteralValue};
 use tsv_lang::SymbolResolver;
 use tsv_lang::printing::StringFormatOptions;
@@ -191,22 +191,20 @@ impl<'a> Printer<'a> {
                 let right = self.expression_to_string(&binary.right);
 
                 // Wrap operands in parens if needed
-                let left_str = if let Expression::BinaryExpression(child) = binary.left.as_ref() {
-                    if super::operators::needs_parens_for_clarity(child, binary.operator, false) {
-                        format!("({left})")
-                    } else {
-                        left
-                    }
+                let left_ctx = ParenContext::BinaryLeft {
+                    parent_op: binary.operator,
+                };
+                let left_str = if needs_parens(&binary.left, left_ctx) {
+                    format!("({left})")
                 } else {
                     left
                 };
 
-                let right_str = if let Expression::BinaryExpression(child) = binary.right.as_ref() {
-                    if super::operators::needs_parens_for_clarity(child, binary.operator, true) {
-                        format!("({right})")
-                    } else {
-                        right
-                    }
+                let right_ctx = ParenContext::BinaryRight {
+                    parent_op: binary.operator,
+                };
+                let right_str = if needs_parens(&binary.right, right_ctx) {
+                    format!("({right})")
                 } else {
                     right
                 };

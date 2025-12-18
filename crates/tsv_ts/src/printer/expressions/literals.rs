@@ -152,6 +152,15 @@ impl<'a> Printer<'a> {
 
     /// Print an identifier
     pub(in crate::printer) fn print_identifier(&mut self, identifier: &internal::Identifier) {
+        // Print decorators (for parameter decorators)
+        if let Some(decorators) = &identifier.decorators {
+            for decorator in decorators {
+                self.write("@");
+                self.print_expression(&decorator.expression);
+                self.write(" ");
+            }
+        }
+
         // Resolve symbol from interner using centralized helper
         let name = self.resolve_symbol(identifier.name);
         self.write(&name);
@@ -184,27 +193,36 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an identifier
-    pub(super) fn build_identifier_doc(&self, id: &internal::Identifier) -> Doc {
+    pub(in crate::printer) fn build_identifier_doc(&self, id: &internal::Identifier) -> Doc {
+        let mut parts = Vec::new();
+
+        // Handle decorators (for parameter decorators)
+        if let Some(decorators) = &id.decorators {
+            for decorator in decorators {
+                parts.push(doc::text("@"));
+                parts.push(self.build_expression_doc(&decorator.expression));
+                parts.push(doc::text(" "));
+            }
+        }
+
+        // Add identifier name
         let name = self.resolve_symbol(id.name);
-        let name_doc = doc::text_owned(name);
+        parts.push(doc::text_owned(name));
 
-        // Fast path: no optional marker or type annotation
-        if !id.optional && id.type_annotation.is_none() {
-            name_doc
-        } else {
-            let mut parts = vec![name_doc];
+        // Handle optional marker (e.g., `a?` in `function fn(a?: number) {}`)
+        if id.optional {
+            parts.push(doc::text("?"));
+        }
 
-            // Handle optional marker (e.g., `a?` in `function fn(a?: number) {}`)
-            if id.optional {
-                parts.push(doc::text("?"));
-            }
+        // Handle type annotations
+        if let Some(type_annotation) = &id.type_annotation {
+            parts.push(self.build_type_annotation_doc(type_annotation));
+        }
 
-            // Handle type annotations
-            if let Some(type_annotation) = &id.type_annotation {
-                parts.push(self.build_type_annotation_doc(type_annotation));
-            }
-
-            doc::concat(parts)
+        // Optimize for common case: single part (just the name)
+        match &parts[..] {
+            [single] => single.clone(),
+            _ => doc::concat(parts),
         }
     }
 

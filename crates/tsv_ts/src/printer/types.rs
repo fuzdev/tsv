@@ -396,40 +396,39 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
                 }
 
-                // Function parameters with softlines (no group - outer group controls)
-                if f.params.is_empty() {
-                    parts.push(doc::text("()"));
-                } else {
-                    let mut param_parts = Vec::new();
-                    for (i, p) in f.params.iter().enumerate() {
-                        if i > 0 {
-                            param_parts.push(doc::text(","));
-                            param_parts.push(doc::line());
-                        }
-                        param_parts.push(self.build_expression_doc(p));
-                    }
-                    parts.push(doc::text("("));
-                    parts.push(doc::indent(doc::concat(vec![
-                        doc::softline(),
-                        doc::concat(param_parts),
-                    ])));
-                    // Trailing comma when breaking, UNLESS last param is a rest element
-                    // (matches prettier's behavior)
-                    let last_is_rest = f
-                        .params
-                        .last()
-                        .is_some_and(|p| matches!(p, internal::Expression::RestElement(_)));
-                    if !last_is_rest {
-                        parts.push(doc::trailing_comma());
-                    }
-                    parts.push(doc::softline());
-                    parts.push(doc::text(")"));
-                }
+                // Function parameters
+                parts.extend(self.build_function_params_doc(&f.params));
 
                 parts.push(doc::text(" => "));
                 parts.push(self.build_type_doc(&f.return_type.type_annotation));
 
                 // Wrap entire function type in a group for width-aware breaking
+                doc::group(doc::concat(parts))
+            }
+            TSType::Constructor(c) => {
+                // Constructor types: `new () => T` or `abstract new <T>() => T`
+                let mut parts = Vec::new();
+
+                // Add 'abstract' keyword if present
+                if c.abstract_ {
+                    parts.push(doc::text("abstract "));
+                }
+
+                // Add 'new' keyword
+                parts.push(doc::text("new "));
+
+                // Type parameters wrapped in their own group (can break independently)
+                if let Some(type_params) = &c.type_parameters {
+                    parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
+                }
+
+                // Constructor parameters
+                parts.extend(self.build_function_params_doc(&c.params));
+
+                parts.push(doc::text(" => "));
+                parts.push(self.build_type_doc(&c.return_type.type_annotation));
+
+                // Wrap entire constructor type in a group for width-aware breaking
                 doc::group(doc::concat(parts))
             }
             TSType::Tuple(t) => {
@@ -910,6 +909,39 @@ impl<'a> Printer<'a> {
         ])
     }
 
+    /// Build parameter list docs for function/constructor types
+    /// Returns docs that should be pushed to a parts vector
+    fn build_function_params_doc(&self, params: &[internal::Expression]) -> Vec<Doc> {
+        let mut parts = Vec::new();
+        if params.is_empty() {
+            parts.push(doc::text("()"));
+        } else {
+            let mut param_parts = Vec::new();
+            for (i, p) in params.iter().enumerate() {
+                if i > 0 {
+                    param_parts.push(doc::text(","));
+                    param_parts.push(doc::line());
+                }
+                param_parts.push(self.build_expression_doc(p));
+            }
+            parts.push(doc::text("("));
+            parts.push(doc::indent(doc::concat(vec![
+                doc::softline(),
+                doc::concat(param_parts),
+            ])));
+            // Trailing comma when breaking, UNLESS last param is a rest element
+            let last_is_rest = params
+                .last()
+                .is_some_and(|p| matches!(p, internal::Expression::RestElement(_)));
+            if !last_is_rest {
+                parts.push(doc::trailing_comma());
+            }
+            parts.push(doc::softline());
+            parts.push(doc::text(")"));
+        }
+        parts
+    }
+
     /// Build a Doc for a literal type
     fn build_literal_type_doc(&self, lit: &TSLiteralType) -> Doc {
         match lit {
@@ -1121,6 +1153,27 @@ impl<'a> Printer<'a> {
                 }
                 self.write(") => ");
                 self.print_type(&f.return_type.type_annotation);
+            }
+            TSType::Constructor(c) => {
+                // Print 'abstract' if present
+                if c.abstract_ {
+                    self.write("abstract ");
+                }
+                // Print 'new'
+                self.write("new ");
+                // Print type parameters if present: <T, U>
+                if let Some(type_params) = &c.type_parameters {
+                    self.print_type_parameter_declaration(type_params);
+                }
+                self.write("(");
+                for (i, p) in c.params.iter().enumerate() {
+                    if i > 0 {
+                        self.write(", ");
+                    }
+                    self.print_expression(p);
+                }
+                self.write(") => ");
+                self.print_type(&c.return_type.type_annotation);
             }
             TSType::Tuple(t) => {
                 self.write("[");
@@ -1515,6 +1568,7 @@ impl<'a> Printer<'a> {
             }
             TSType::TypeLiteral(t) => t.span.extract(self.source).to_string(),
             TSType::Function(f) => f.span.extract(self.source).to_string(),
+            TSType::Constructor(c) => c.span.extract(self.source).to_string(),
             TSType::Tuple(t) => {
                 let elems: Vec<_> = t
                     .element_types

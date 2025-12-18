@@ -28,56 +28,86 @@ impl<'a> SvelteParser<'a> {
         let mut brace_depth = 1; // Already saw opening {
         let mut in_string = false;
         let mut string_char = '\0';
-        let mut in_comment = false;
+        let mut in_block_comment = false;
+        let mut in_line_comment = false;
         let mut escape_next = false;
 
         // Scan raw source for matching closing brace
-        for (i, &byte) in source_bytes.iter().enumerate().skip(expr_start) {
-            let ch = byte as char;
+        let mut i = expr_start;
+        while i < source_bytes.len() {
+            let ch = source_bytes[i] as char;
 
             // Handle escape sequences in strings
             if in_string && escape_next {
                 escape_next = false;
+                i += 1;
                 continue;
             }
 
             if in_string && ch == '\\' {
                 escape_next = true;
+                i += 1;
+                continue;
+            }
+
+            // Handle line comment end (newline ends line comment)
+            if in_line_comment {
+                if ch == '\n' {
+                    in_line_comment = false;
+                }
+                i += 1;
                 continue;
             }
 
             // Handle strings (skip braces when inside)
-            if !in_comment {
+            if !in_block_comment {
                 if in_string {
                     if ch == string_char {
                         in_string = false;
                     }
+                    i += 1;
+                    continue;
                 } else if ch == '"' || ch == '\'' || ch == '`' {
                     in_string = true;
                     string_char = ch;
+                    i += 1;
+                    continue;
                 }
             }
 
-            // Handle comments (skip braces when inside)
+            // Handle comments and regex (skip braces when inside)
             if !in_string {
-                if in_comment {
+                if in_block_comment {
                     // Block comment: /* ... */
                     if ch == '*' && i + 1 < source_bytes.len() && source_bytes[i + 1] as char == '/'
                     {
-                        in_comment = false;
+                        in_block_comment = false;
+                        i += 2; // Skip */
+                        continue;
                     }
+                    i += 1;
+                    continue;
                 } else if ch == '/' && i + 1 < source_bytes.len() {
                     let next_char = source_bytes[i + 1] as char;
                     if next_char == '*' {
-                        in_comment = true;
+                        in_block_comment = true;
+                        i += 2; // Skip /*
+                        continue;
+                    } else if next_char == '/' {
+                        in_line_comment = true;
+                        i += 2; // Skip //
+                        continue;
+                    } else if is_regex_start(source_bytes, i, expr_start) {
+                        // Regex literal: /pattern/flags - skip to end
+                        i = skip_regex_literal(source_bytes, i);
+                        continue;
                     }
-                    // Note: Line comments (//) are not relevant in expressions inside {}
-                    // since newlines break the expression anyway
+                    // Otherwise, treat / as division operator - continue normal processing
                 }
             }
 
-            // Count braces (only outside strings and comments)
-            if !in_string && !in_comment {
+            // Count braces (only outside strings, comments, and regex)
+            if !in_string && !in_block_comment {
                 if ch == '{' {
                     brace_depth += 1;
                 } else if ch == '}' {
@@ -89,6 +119,8 @@ impl<'a> SvelteParser<'a> {
                     }
                 }
             }
+
+            i += 1;
         }
 
         if !found_close {
@@ -98,62 +130,47 @@ impl<'a> SvelteParser<'a> {
         // Extract expression content
         let expr_content = &self.source[expr_start..expr_end];
 
-        // Parse expression using TypeScript parser
-        let expression =
-            tsv_ts::parse_expression(expr_content, expr_start, Rc::clone(&self.interner))?;
+        // Parse expression using TypeScript parser (with comments)
+        let (expression, comments) = tsv_ts::parse_expression_with_comments(
+            expr_content,
+            expr_start,
+            Rc::clone(&self.interner),
+        )?;
 
-        // Recreate lexer starting from the closing brace position
-        // TODO(refactor): This lexer reconstruction pattern works but is somewhat unusual.
-        // Alternative approaches to consider:
-        // 1. "Skip mode" - lexer that skips unknown content until sync point
-        // 2. Explicit position tracking without lexer replacement
-        // 3. Unified lexer that understands both template and expression contexts
-        // Current approach chosen for:
-        // - Simplicity: Clean lexer state after expression
-        // - Safety: No stale peek cache or position drift
-        // - Performance: ~170ns overhead is negligible
-        // Keep this pattern for now, but document for future review.
-        let remaining_source = &self.source[expr_end..];
+        // Add expression comments to the parser's collection for later inclusion in Root.comments
+        self.expression_comments.extend(comments);
+
+        // The span end is right after the closing brace
+        let end = expr_end + 1;
+
+        // Recreate lexer AFTER the closing brace (not at it)
+        // This way we don't need the lexer to produce a RightBrace token,
+        // which allows '}' in template text to be treated as plain text.
+        // This matches Svelte's parser behavior where '}' is consumed directly
+        // after expression parsing, not tokenized.
+        let remaining_source = &self.source[end..];
 
         // Save the lexer state before creating new lexer
         // This preserves the context (tag vs template) after expression parsing
         // Example: class={expr}> - we're still in tag mode after the }
         // Example: {expr}</div> - we're in template mode after the }
-        // TODO(future optimization/redesign):
-        // Could track ParsingContext explicitly in SvelteParser (Template vs TagAttributes enum)
-        // and set lexer.inside_tag from parser context instead of saving/restoring.
-        // Pros: More explicit parsing context available for error messages/validation.
-        // Cons: ~3ns slower (branch instead of direct copy), parser state to maintain.
-        // Current approach (save/restore) is simpler and slightly faster - YAGNI principle.
         let saved_inside_tag = self.lexer.inside_tag;
         let mut new_lexer = crate::lexer::Lexer::new(remaining_source);
         new_lexer.inside_tag = saved_inside_tag;
 
-        // Get the first token (should be }) and extract its data
+        // Get the first token at the new position (after the '}')
         let (token_kind, token_start, token_end) = {
             let token = new_lexer.next_token()?;
             (token.kind, token.start, token.end)
         };
 
-        // Now we can move the lexer and set base_offset
+        // Update parser state
         self.lexer = new_lexer;
-        self.base_offset = expr_end; // Lexer's source starts at expr_end in full source
+        self.base_offset = end;
         self.current_kind = token_kind;
-        self.current_start = expr_end + token_start;
-        self.current_end = expr_end + token_end;
+        self.current_start = end + token_start;
+        self.current_end = end + token_end;
         self.peek_cache = None;
-
-        // Verify it's the closing brace
-        if !self.check(TokenKind::RightBrace) {
-            return Err(self.error_expected_found("'}'"));
-        }
-
-        // Save the end position (right after the '}') before advancing
-        // The lexer skips whitespace on advance, so we must capture end first
-        let end = self.current_end;
-
-        // Consume the closing brace
-        self.advance()?;
 
         Ok(ExpressionTag {
             expression,
@@ -163,4 +180,71 @@ impl<'a> SvelteParser<'a> {
             },
         })
     }
+}
+
+/// Determine if `/` at position `slash_pos` is starting a regex literal.
+///
+/// Uses context: if the previous non-whitespace character could end an expression
+/// (identifier, number, `)`, `]`), then `/` is likely division.
+/// Otherwise, it's likely a regex start.
+fn is_regex_start(source: &[u8], slash_pos: usize, expr_start: usize) -> bool {
+    // Find the previous non-whitespace character
+    let mut j = slash_pos;
+    while j > expr_start {
+        j -= 1;
+        let ch = source[j] as char;
+        if !ch.is_ascii_whitespace() {
+            // Characters that END an expression - / after these is DIVISION
+            // Identifier chars (a-z, A-Z, 0-9, _), ), ], numbers
+            if ch.is_ascii_alphanumeric() || ch == '_' || ch == ')' || ch == ']' {
+                return false;
+            }
+            // Characters that could PRECEDE a regex - / after these is REGEX
+            // (, [, {, ,, ;, :, =, !, ~, +, -, *, /, %, <, >, &, |, ^, ?, arrow (>)
+            return true;
+        }
+    }
+    // At start of expression, / is likely regex (e.g., {/pattern/})
+    true
+}
+
+/// Skip past a regex literal starting at `start_pos`, returning position after the regex.
+///
+/// Handles escape sequences, character classes `[...]`, and regex flags.
+fn skip_regex_literal(source: &[u8], start_pos: usize) -> usize {
+    let mut i = start_pos + 1; // Move past opening /
+
+    while i < source.len() {
+        let ch = source[i] as char;
+
+        if ch == '\\' && i + 1 < source.len() {
+            // Escape sequence - skip next char
+            i += 2;
+        } else if ch == '/' {
+            // Found closing / - skip it and any flags
+            i += 1;
+            while i < source.len() && (source[i] as char).is_ascii_lowercase() {
+                i += 1;
+            }
+            return i;
+        } else if ch == '[' {
+            // Character class - skip to closing ]
+            i += 1;
+            while i < source.len() {
+                let class_ch = source[i] as char;
+                if class_ch == '\\' && i + 1 < source.len() {
+                    i += 2;
+                } else if class_ch == ']' {
+                    i += 1;
+                    break;
+                } else {
+                    i += 1;
+                }
+            }
+        } else {
+            i += 1;
+        }
+    }
+
+    i
 }

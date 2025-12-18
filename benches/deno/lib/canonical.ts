@@ -5,7 +5,17 @@
  */
 
 import type { Language, TsvImplementation } from './types.ts';
-import { VERSIONS } from '../../../crates/tsv_debug/src/deno/versions.ts';
+
+// Versions are defined in deno.json import map (single source of truth)
+// These are extracted for display in benchmark output
+// SYNC: Keep in sync with deno.json imports and crates/tsv_debug/src/deno/sidecar.ts
+export const VERSIONS = {
+	prettier: '3.7.4',
+	'prettier-plugin-svelte': '3.4.0',
+	svelte: '5.45.8',
+	acorn: '8.15.0',
+	'@sveltejs/acorn-typescript': '1.0.8',
+} as const;
 
 // deno-lint-ignore no-explicit-any
 let prettier: any = null;
@@ -14,22 +24,26 @@ let prettierSvelte: any = null;
 // deno-lint-ignore no-explicit-any
 let svelteCompiler: any = null;
 // deno-lint-ignore no-explicit-any
-let acorn: any = null;
-// deno-lint-ignore no-explicit-any
-let acornTypescript: any = null;
+let acornTsParser: any = null;
 
 export class CanonicalImplementation implements TsvImplementation {
 	name = 'canonical' as const;
 
 	async init(): Promise<void> {
-		// Import all dependencies
-		[prettier, prettierSvelte, svelteCompiler, acorn, acornTypescript] = await Promise.all([
-			import(`npm:prettier@${VERSIONS.prettier}`),
-			import(`npm:prettier-plugin-svelte@${VERSIONS['prettier-plugin-svelte']}`),
-			import(`npm:svelte@${VERSIONS.svelte}/compiler`),
-			import(`npm:acorn@${VERSIONS.acorn}`),
-			import(`npm:@sveltejs/acorn-typescript@${VERSIONS['@sveltejs/acorn-typescript']}`),
+		// Import all dependencies via deno.json import map
+		const [prettierMod, prettierSvelteMod, svelteMod, acornMod, acornTsMod] = await Promise.all([
+			import('prettier'),
+			import('prettier-plugin-svelte'),
+			import('svelte/compiler'),
+			import('acorn'),
+			import('@sveltejs/acorn-typescript'),
 		]);
+		prettier = prettierMod;
+		prettierSvelte = prettierSvelteMod;
+		svelteCompiler = svelteMod;
+		// Create TypeScript parser once (acorn.Parser.extend is expensive)
+		// deno-lint-ignore no-explicit-any
+		acornTsParser = acornMod.Parser.extend(acornTsMod.tsPlugin() as any);
 	}
 
 	parse(source: string, language: Language): unknown {
@@ -39,14 +53,8 @@ export class CanonicalImplementation implements TsvImplementation {
 			case 'typescript':
 				return this.parseTypeScript(source);
 			case 'css':
-				// We don't have a canonical CSS parser - our parser IS the reference
-				throw new Error('No canonical CSS parser - tsv_css is the reference implementation');
+				return this.parseCss(source);
 		}
-	}
-
-	format(_source: string, _language: Language): string {
-		// prettier.format is async-only in 3.x
-		throw new Error('Use formatAsync for formatting');
 	}
 
 	private parseSvelte(source: string): unknown {
@@ -55,17 +63,20 @@ export class CanonicalImplementation implements TsvImplementation {
 	}
 
 	private parseTypeScript(source: string): unknown {
-		if (!acorn || !acornTypescript) throw new Error('Acorn not initialized');
-
-		const Parser = acorn.Parser.extend(acornTypescript.tsPlugin);
-		return Parser.parse(source, {
+		if (!acornTsParser) throw new Error('Acorn not initialized');
+		return acornTsParser.parse(source, {
 			sourceType: 'module',
-			ecmaVersion: 'latest',
+			ecmaVersion: 2025,
 			locations: true,
 		});
 	}
 
-	// Async versions for actual use (prettier 3.x is async-only)
+	private parseCss(source: string): unknown {
+		// Wrap CSS in <style> tags and parse as Svelte to get CSS AST
+		if (!svelteCompiler) throw new Error('Svelte compiler not initialized');
+		return svelteCompiler.parse(`<style>${source}</style>`, { modern: true });
+	}
+
 	async formatAsync(source: string, language: Language): Promise<string> {
 		if (!prettier || !prettierSvelte) throw new Error('Prettier not initialized');
 
@@ -83,7 +94,6 @@ export class CanonicalImplementation implements TsvImplementation {
 		prettier = null;
 		prettierSvelte = null;
 		svelteCompiler = null;
-		acorn = null;
-		acornTypescript = null;
+		acornTsParser = null;
 	}
 }

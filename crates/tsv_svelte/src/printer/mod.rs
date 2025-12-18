@@ -404,6 +404,8 @@ impl<'a> Printer<'a> {
                         // Set pending whitespace for next node based on trailing whitespace
                         let trailing_ws = if has_trailing_space {
                             PendingWhitespace::AlreadyHandled
+                        } else if text.raw.has_trailing_blank_line() {
+                            PendingWhitespace::BlankLine
                         } else if text_has_trailing_newline {
                             PendingWhitespace::Newline
                         } else {

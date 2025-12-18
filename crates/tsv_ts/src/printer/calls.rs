@@ -8,7 +8,7 @@
 // - Test function calls: `it()`, `test.skip()`, `describe()`, etc.
 
 use super::chain::{self, ChainPrinter, SymbolLookup};
-use super::{Printer, has_multiline_content};
+use super::{ParenContext, Printer, has_multiline_content, needs_parens};
 use crate::ast::internal;
 use string_interner::DefaultSymbol;
 use tsv_lang::SymbolResolver;
@@ -24,37 +24,6 @@ fn chain_has_calls(expr: &internal::Expression) -> bool {
         }
         _ => false,
     }
-}
-
-/// Check if an expression needs parentheses when wrapped in non-null assertion
-/// These are low-precedence expressions that would bind incorrectly without parens
-fn needs_parens_in_non_null(expr: &internal::Expression) -> bool {
-    matches!(
-        expr,
-        internal::Expression::BinaryExpression(_)
-            | internal::Expression::UnaryExpression(_)
-            | internal::Expression::ConditionalExpression(_)
-            | internal::Expression::AssignmentExpression(_)
-            | internal::Expression::AwaitExpression(_)
-            | internal::Expression::TSTypeAssertion(_)
-            | internal::Expression::TSAsExpression(_)
-            | internal::Expression::TSSatisfiesExpression(_)
-    )
-}
-
-/// Check if an expression needs parentheses when used as a callee
-/// - Ternary expressions: `(a ? b : c)()`
-/// - Arrow/function expressions: `(async () => {})()` - without parens, `{}` would be call target
-pub(super) fn callee_needs_parens(expr: &internal::Expression) -> bool {
-    matches!(
-        expr,
-        internal::Expression::ConditionalExpression(_)
-            | internal::Expression::BinaryExpression(_)
-            | internal::Expression::AssignmentExpression(_)
-            | internal::Expression::SequenceExpression(_)
-            | internal::Expression::ArrowFunctionExpression(_)
-            | internal::Expression::FunctionExpression(_)
-    )
 }
 
 /// Check if an expression is a logical binary expression
@@ -412,7 +381,7 @@ impl<'a> Printer<'a> {
         let callee_doc = self.build_expression_doc(&call.callee);
 
         // Wrap callee in parens if needed (e.g., ternary: `(a ? b : c)()`)
-        let callee = if callee_needs_parens(&call.callee) {
+        let callee = if needs_parens(&call.callee, ParenContext::Callee) {
             doc::parens(callee_doc)
         } else {
             callee_doc
@@ -673,6 +642,43 @@ impl<'a> Printer<'a> {
             ]);
         }
 
+        // Check for leading comments before first argument in multi-arg calls
+        if !call.arguments.is_empty() {
+            let paren_open = call.callee.span().end;
+            let first_arg_start = call.arguments[0].span().start;
+            let has_leading_comments = self.has_comments_between(paren_open, first_arg_start);
+
+            if has_leading_comments {
+                let mut arg_docs: Vec<_> = call
+                    .arguments
+                    .iter()
+                    .map(|arg| self.build_expression_doc(arg))
+                    .collect();
+
+                // Build first arg with leading comments
+                let first_with_comments = doc::concat(vec![
+                    self.build_inline_comments_between_doc_no_leading_space(
+                        paren_open,
+                        first_arg_start,
+                    ),
+                    doc::text(" "),
+                    arg_docs.remove(0),
+                ]);
+
+                let mut all_args = vec![first_with_comments];
+                all_args.extend(arg_docs);
+                let arg_parts = doc::join_doc(all_args, doc::comma_line());
+
+                return doc::group(doc::concat(vec![
+                    callee,
+                    doc::text("("),
+                    doc::indent_softline(doc::concat(vec![arg_parts, doc::trailing_comma()])),
+                    doc::softline(),
+                    doc::text(")"),
+                ]));
+            }
+        }
+
         // Build args with line separators (one per line when broken)
         let arg_docs: Vec<_> = call
             .arguments
@@ -726,7 +732,7 @@ impl<'a> Printer<'a> {
         let callee_doc = self.build_expression_doc(&new_expr.callee);
 
         // Wrap callee in parens if needed (e.g., `new (a || b)()`, `new (a ? b : c)()`)
-        let callee = if callee_needs_parens(&new_expr.callee) {
+        let callee = if needs_parens(&new_expr.callee, ParenContext::NewCallee) {
             // For logical expressions, use a group with softlines so the parens
             // can break independently when the content is too long:
             // new (
@@ -1001,8 +1007,7 @@ impl<'a> Printer<'a> {
                     // wrap them and add `!` as a base segment
                     _ => {
                         let inner_doc = self.build_expression_doc(&non_null.expression);
-                        let needs_parens = needs_parens_in_non_null(&non_null.expression);
-                        if needs_parens {
+                        if needs_parens(&non_null.expression, ParenContext::NonNull) {
                             segments.push(doc::concat(vec![
                                 doc::text("("),
                                 inner_doc,

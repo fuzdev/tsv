@@ -9,31 +9,65 @@ use tsv_lang::comments_in_range;
 impl<'a> Printer<'a> {
     /// Format an html tag: {@html expr}
     pub(super) fn print_html_tag(&mut self, tag: &internal::HtmlTag) {
-        self.write("{@html ");
-        self.print_ts_expression(&tag.expression);
+        self.print_simple_expression_tag("html", &tag.expression, tag.span);
+    }
+
+    /// Format a render tag: {@render fn()} or {@render fn?.()}
+    pub(super) fn print_render_tag(&mut self, tag: &internal::RenderTag) {
+        self.print_simple_expression_tag("render", &tag.expression, tag.span);
+    }
+
+    /// Format a simple expression tag: {@name expr}
+    ///
+    /// Used by @html, @render, and similar single-expression tags.
+    fn print_simple_expression_tag(
+        &mut self,
+        name: &str,
+        expression: &tsv_ts::Expression,
+        span: tsv_lang::Span,
+    ) {
+        self.write("{@");
+        self.write(name);
+        self.write(" ");
+        self.print_ts_expression_with_comments(expression, span.start, span.end);
         self.write("}");
     }
 
     /// Format a const tag: {@const name = expr}
     pub(super) fn print_const_tag(&mut self, tag: &internal::ConstTag) {
         self.write("{@const ");
+
         // Format the id (pattern) with current indent level for multiline patterns
-        let formatted_id = tsv_ts::format_expression_with_indent(
+        let formatted_id = tsv_ts::format_expression_with_indent_and_comments(
             &tag.id,
             self.source,
             Rc::clone(&self.interner),
             self.indent_level,
+            self.comments,
         );
         self.write(&formatted_id);
         self.write(" = ");
+
+        // Print any leading comments between "=" and the init expression
+        for comment in comments_in_range(self.comments, tag.id.span().end, tag.init.span().start) {
+            self.write_leading_js_comment(comment);
+        }
+
         // Format the init expression
-        let formatted_init = tsv_ts::format_expression_with_indent(
+        let formatted_init = tsv_ts::format_expression_with_indent_and_comments(
             &tag.init,
             self.source,
             Rc::clone(&self.interner),
             self.indent_level,
+            self.comments,
         );
         self.write(&formatted_init);
+
+        // Print any trailing comments between the init expression and closing brace
+        for comment in comments_in_range(self.comments, tag.init.span().end, tag.span.end - 1) {
+            self.write_trailing_js_comment(comment);
+        }
+
         self.write("}");
     }
 
@@ -70,15 +104,7 @@ impl<'a> Printer<'a> {
             // Emit any comments that appear before this identifier
             for comment in &tag_comments {
                 if comment.span.start >= last_end && comment.span.end <= id.span().start {
-                    if comment.is_block {
-                        self.write("/*");
-                        self.write(&comment.content);
-                        self.write("*/ ");
-                    } else {
-                        self.write("//");
-                        self.write(&comment.content);
-                        self.write("\n");
-                    }
+                    self.write_leading_js_comment(comment);
                     last_end = comment.span.end;
                 }
             }
@@ -90,25 +116,10 @@ impl<'a> Printer<'a> {
         // Emit any trailing comments (after last identifier)
         for comment in &tag_comments {
             if comment.span.start >= last_end {
-                self.write(" ");
-                if comment.is_block {
-                    self.write("/*");
-                    self.write(&comment.content);
-                    self.write("*/");
-                } else {
-                    self.write("//");
-                    self.write(&comment.content);
-                }
+                self.write_trailing_js_comment(comment);
             }
         }
 
-        self.write("}");
-    }
-
-    /// Format a render tag: {@render fn()} or {@render fn?.()}
-    pub(super) fn print_render_tag(&mut self, tag: &internal::RenderTag) {
-        self.write("{@render ");
-        self.print_ts_expression(&tag.expression);
         self.write("}");
     }
 }

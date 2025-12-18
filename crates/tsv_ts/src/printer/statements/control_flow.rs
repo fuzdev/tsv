@@ -57,7 +57,12 @@ impl<'a> Printer<'a> {
             if !matches!(stmt.consequent.as_ref(), Statement::EmptyStatement(_)) {
                 self.write(" ");
             }
-            self.print_statement(&stmt.consequent);
+            // Empty blocks expand in if context: `if (x) {\n}` not `if (x) {}`
+            if let Statement::BlockStatement(block) = stmt.consequent.as_ref() {
+                self.print_block_statement_expand_empty(block);
+            } else {
+                self.print_statement(&stmt.consequent);
+            }
         } else {
             self.write("\n");
             self.indent_level += 1;
@@ -89,7 +94,12 @@ impl<'a> Printer<'a> {
             }
             // Print alternate - inline or newline+indent based on statement type
             if is_inline_alternate(alternate) {
-                self.print_statement(alternate);
+                // Empty blocks expand in else context: `else {\n}` not `else {}`
+                if let Statement::BlockStatement(block) = alternate.as_ref() {
+                    self.print_block_statement_expand_empty(block);
+                } else {
+                    self.print_statement(alternate);
+                }
             } else {
                 self.write("\n");
                 self.indent_level += 1;
@@ -275,7 +285,12 @@ impl<'a> Printer<'a> {
         self.write(" in ");
         self.print_expression(&stmt.right);
         self.write(") ");
-        self.print_statement(&stmt.body);
+        // Prettier expands empty blocks for for-in (unlike regular for)
+        if let Statement::BlockStatement(block) = stmt.body.as_ref() {
+            self.print_block_statement_expand_empty(block);
+        } else {
+            self.print_statement(&stmt.body);
+        }
     }
 
     pub(super) fn print_for_of_statement(&mut self, stmt: &internal::ForOfStatement) {
@@ -288,7 +303,12 @@ impl<'a> Printer<'a> {
         self.write(" of ");
         self.print_expression(&stmt.right);
         self.write(") ");
-        self.print_statement(&stmt.body);
+        // Prettier expands empty blocks for for-of (unlike regular for)
+        if let Statement::BlockStatement(block) = stmt.body.as_ref() {
+            self.print_block_statement_expand_empty(block);
+        } else {
+            self.print_statement(&stmt.body);
+        }
     }
 
     fn print_for_in_of_left(&mut self, left: &internal::ForInOfLeft) {
@@ -366,7 +386,8 @@ impl<'a> Printer<'a> {
 
     pub(super) fn print_try_statement(&mut self, stmt: &internal::TryStatement) {
         self.write("try ");
-        self.print_block_statement(&stmt.block);
+        // Try block expands empty: `try {\n}` not `try {}`
+        self.print_block_statement_expand_empty(&stmt.block);
         if let Some(handler) = &stmt.handler {
             self.write(" catch");
             if let Some(param) = &handler.param {
@@ -375,11 +396,13 @@ impl<'a> Printer<'a> {
                 self.write(")");
             }
             self.write(" ");
+            // Catch block stays inline: `catch (e) {}`
             self.print_block_statement(&handler.body);
         }
         if let Some(finalizer) = &stmt.finalizer {
             self.write(" finally ");
-            self.print_block_statement(finalizer);
+            // Finally block expands empty: `finally {\n}` not `finally {}`
+            self.print_block_statement_expand_empty(finalizer);
         }
     }
 

@@ -1,0 +1,220 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 452,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 49,
+				"data": " 100 chars - exactly at boundary, no wrap "
+			},
+			{
+				"type": "Text",
+				"start": 49,
+				"end": 50,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 50,
+				"end": 150,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 51
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 54
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 55,
+						"end": 143,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 5,
+								"character": 55
+							},
+							"end": {
+								"line": 2,
+								"column": 14,
+								"character": 64
+							}
+						},
+						"value": [
+							{
+								"start": 66,
+								"end": 142,
+								"type": "Text",
+								"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 150,
+				"end": 152,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 152,
+				"end": 196,
+				"data": " 101 chars - exceeds boundary, WRAPS "
+			},
+			{
+				"type": "Text",
+				"start": 196,
+				"end": 197,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 197,
+				"end": 300,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 198
+					},
+					"end": {
+						"line": 5,
+						"column": 4,
+						"character": 201
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 203,
+						"end": 292,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 6,
+								"column": 1,
+								"character": 203
+							},
+							"end": {
+								"line": 6,
+								"column": 10,
+								"character": 212
+							}
+						},
+						"value": [
+							{
+								"start": 214,
+								"end": 291,
+								"type": "Text",
+								"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 300,
+				"end": 302,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 302,
+				"end": 346,
+				"data": " 102 chars - exceeds boundary, WRAPS "
+			},
+			{
+				"type": "Text",
+				"start": 346,
+				"end": 347,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 347,
+				"end": 451,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 348
+					},
+					"end": {
+						"line": 10,
+						"column": 4,
+						"character": 351
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 353,
+						"end": 443,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 11,
+								"column": 1,
+								"character": 353
+							},
+							"end": {
+								"line": 11,
+								"column": 10,
+								"character": 362
+							}
+						},
+						"value": [
+							{
+								"start": 364,
+								"end": 442,
+								"type": "Text",
+								"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

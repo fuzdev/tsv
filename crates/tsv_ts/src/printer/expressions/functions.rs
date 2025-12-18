@@ -6,7 +6,7 @@
 //
 // Note: Block statements are in blocks.rs as a reusable utility
 
-use super::super::{CommentSpacing, Printer};
+use super::super::{CommentSpacing, ParenContext, Printer, needs_parens};
 use crate::ast::internal;
 use tsv_lang::doc::{self, Doc};
 
@@ -334,7 +334,8 @@ impl<'a> Printer<'a> {
                 CommentSpacing::Trailing,
             ));
 
-            inner_parts.push(self.build_expression_doc(param));
+            // Use FunctionParameter context for object patterns
+            inner_parts.push(self.build_function_parameter_doc(param));
         }
 
         // Check if last param is a rest parameter - no trailing comma after rest
@@ -361,17 +362,10 @@ impl<'a> Printer<'a> {
 
     /// Build doc for arrow function body expression.
     fn build_arrow_body_doc(&self, expr: &internal::Expression) -> Doc {
-        // Object expressions need parentheses to distinguish from block statements
-        if is_object_expression(expr) {
-            // Direct object: `() => ({})`
-            doc::concat(vec![
-                doc::text("("),
-                self.build_expression_doc(expr),
-                doc::text(")"),
-            ])
-        } else if let Some(assertion) = get_type_assertion_with_object(expr) {
-            // Object with type assertion: `() => ({}) as T` - parens only around object
-            match assertion {
+        // Special case: type assertion wrapping object - parens go around inner object only
+        // `() => ({}) as T` not `() => (({}) as T)`
+        if let Some(assertion) = get_type_assertion_with_object(expr) {
+            return match assertion {
                 TypeAssertionWithObject::As(as_expr) => doc::concat(vec![
                     doc::text("("),
                     self.build_expression_doc(&as_expr.expression),
@@ -384,9 +378,11 @@ impl<'a> Printer<'a> {
                     doc::text(") satisfies "),
                     self.build_type_doc(&sat_expr.type_annotation),
                 ]),
-            }
-        } else if matches!(expr, internal::Expression::AssignmentExpression(_)) {
-            // Assignment expressions in arrow body need parens for clarity: `(v) => (val = v)`
+            };
+        }
+
+        // Standard cases: objects and assignments need parens
+        if needs_parens(expr, ParenContext::ArrowBody) {
             doc::concat(vec![
                 doc::text("("),
                 self.build_expression_doc(expr),

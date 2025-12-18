@@ -1,12 +1,21 @@
 // Variable declaration printing for TypeScript
 
 use super::super::Printer;
-use crate::ast::internal;
+use crate::ast::internal::{self, Expression};
 use crate::printer::{
-    is_module_path_fluid_call, is_multiline_string_literal, is_pure_property_chain,
-    needs_doc_based_wrapping,
+    ParenContext, is_module_path_fluid_call, is_multiline_string_literal, is_pure_property_chain,
+    needs_doc_based_wrapping, needs_parens,
 };
 use tsv_lang::doc;
+
+/// Wrap a doc in parentheses if the expression needs them for variable init context
+fn wrap_init_doc(init_doc: doc::Doc, init: &Expression) -> doc::Doc {
+    if needs_parens(init, ParenContext::VariableInit) {
+        doc::concat(vec![doc::text("("), init_doc, doc::text(")")])
+    } else {
+        init_doc
+    }
+}
 
 impl<'a> Printer<'a> {
     /// Print a variable declaration
@@ -131,7 +140,14 @@ impl<'a> Printer<'a> {
             if has_comments_after_eq {
                 self.write(" ");
             }
-            self.print_expression(init);
+            // Wrap assignment expressions in parens for clarity
+            if needs_parens(init, ParenContext::VariableInit) {
+                self.write("(");
+                self.print_expression(init);
+                self.write(")");
+            } else {
+                self.print_expression(init);
+            }
             return;
         }
 
@@ -143,7 +159,7 @@ impl<'a> Printer<'a> {
             // Multiline strings: mandatory break after `=`
             // Structure: id + " =" + hardline + indent + value
             let id_doc = self.build_expression_doc(&declarator.id);
-            let init_doc = self.build_expression_doc(init);
+            let init_doc = wrap_init_doc(self.build_expression_doc(init), init);
 
             let assignment_doc = doc::concat(vec![
                 id_doc,
@@ -154,7 +170,7 @@ impl<'a> Printer<'a> {
             self.write_doc(&assignment_doc);
         } else if (is_pure_property_chain(init)
             || is_module_path_fluid_call(init, &self.interner.borrow())
-            || matches!(init, internal::Expression::BinaryExpression(_)))
+            || matches!(init, Expression::BinaryExpression(_)))
             && !self.pattern_should_expand(&declarator.id)
             && !self.id_has_multiline_type(&declarator.id)
         {
@@ -171,7 +187,7 @@ impl<'a> Printer<'a> {
             // Note: Skip this for expanded patterns and multiline type annotations -
             // the group-based approach causes unwanted line breaks after `=`.
             let id_doc = self.build_expression_doc(&declarator.id);
-            let init_doc = self.build_expression_doc(init);
+            let init_doc = wrap_init_doc(self.build_expression_doc(init), init);
 
             let assignment_doc = doc::group(doc::concat(vec![
                 id_doc,
@@ -188,14 +204,14 @@ impl<'a> Printer<'a> {
             // to break based on line width. We need to use the doc system to
             // evaluate those groups.
             let id_doc = self.build_expression_doc(&declarator.id);
-            let init_doc = self.build_expression_doc(init);
+            let init_doc = wrap_init_doc(self.build_expression_doc(init), init);
 
             let assignment_doc = doc::concat(vec![id_doc, doc::text(" = "), init_doc]);
 
             self.write_doc(&assignment_doc);
         } else if matches!(
             declarator.id,
-            internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_)
+            Expression::ObjectPattern(_) | Expression::ArrayPattern(_)
         ) {
             // Destructuring patterns with groups that need width-based evaluation
             // e.g., `let {a, b}: {a: number; b: string} = obj`
@@ -206,7 +222,7 @@ impl<'a> Printer<'a> {
             //
             // Pre-calculate if expanding is needed by measuring flat width of full statement.
             let id_doc = self.build_expression_doc(&declarator.id);
-            let init_doc = self.build_expression_doc(init);
+            let init_doc = wrap_init_doc(self.build_expression_doc(init), init);
 
             let assignment_doc = doc::concat(vec![id_doc, doc::text(" = "), init_doc]);
 
@@ -231,7 +247,7 @@ impl<'a> Printer<'a> {
                 // but " = value" stays together on one line
                 // Don't wrap in group - hardlines in LHS would force group to break
                 let id_doc = self.build_expression_doc_forced_expand(&declarator.id);
-                let init_doc = self.build_expression_doc(init);
+                let init_doc = wrap_init_doc(self.build_expression_doc(init), init);
                 let forced_doc = doc::concat(vec![id_doc, doc::text(" = "), init_doc]);
                 let output = {
                     let interner = self.interner.borrow();
@@ -260,7 +276,14 @@ impl<'a> Printer<'a> {
             // Direct printing for expressions that handle their own wrapping
             self.print_expression(&declarator.id);
             self.write(" = ");
-            self.print_expression(init);
+            // Wrap assignment expressions in parens for clarity
+            if needs_parens(init, ParenContext::VariableInit) {
+                self.write("(");
+                self.print_expression(init);
+                self.write(")");
+            } else {
+                self.print_expression(init);
+            }
         }
     }
 }

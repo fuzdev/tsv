@@ -4,7 +4,7 @@
 // - Operator precedence and parenthesization
 // - Clarity-based parens (mixing logical operators, etc.)
 
-use super::Printer;
+use super::{ParenContext, Printer, needs_parens};
 use crate::ast::internal::{self, BinaryOperator, Expression};
 use tsv_lang::Span;
 use tsv_lang::doc::{self, Doc};
@@ -14,77 +14,6 @@ use tsv_lang::doc::{self, Doc};
 struct ChainOperand {
     doc: Doc,
     span: Span,
-}
-
-/// Check if child binary expression needs parens for clarity
-///
-/// Based on prettier's logic from:
-/// - ~/dev/prettier/src/language-js/print/binaryish.js (shouldFlatten usage)
-/// - ~/dev/prettier/src/language-js/needs-parens.js (lines 409-446)
-/// - ~/dev/prettier/src/language-js/utils/index.js (shouldFlatten function)
-///
-/// Returns true when:
-/// 1. Mixing different logical operators (&&, ||, ??) regardless of precedence
-/// 2. Child has weaker precedence than parent (for correctness)
-/// 3. Same precedence but can't flatten (determined by should_flatten rules)
-/// 4. Right operand with same precedence (preserve programmer's grouping intent)
-/// 5. Parent is a bitwise operator and precedences differ (for clarity)
-pub(super) fn needs_parens_for_clarity(
-    child: &internal::BinaryExpression,
-    parent_op: BinaryOperator,
-    is_right: bool,
-) -> bool {
-    let child_op = child.operator;
-
-    // Special case: Logical operators (&&, ||, ??) mixing requires parens
-    // prettier adds parens when mixing different logical operators for clarity
-    if parent_op.is_logical() && child_op.is_logical() && parent_op != child_op {
-        return true;
-    }
-
-    let parent_prec = parent_op.precedence();
-    let child_prec = child_op.precedence();
-
-    // Need parens when:
-    // 1. Child has weaker precedence (lower number) - e.g., (a + b) * c needs parens around +
-    if child_prec < parent_prec {
-        return true;
-    }
-
-    // 2. Right operand with same precedence - preserve programmer's grouping intent
-    // e.g., x + (y + z) keeps parens, but (x + y) + z removes them
-    // See: prettier/src/language-js/needs-parens.js (lines 423-425)
-    if is_right && child_prec == parent_prec {
-        return true;
-    }
-
-    // 3. Same precedence but can't flatten - e.g., (a == b) == c, 2 ** (3 ** 2), etc.
-    if child_prec == parent_prec && !parent_op.can_flatten_with(child_op) {
-        return true;
-    }
-
-    // 4. Special handling for modulo with lower-precedence parent
-    // When modulo is the child and parent has lower precedence, add parens for +/- and bitwise
-    // This acts as a gate - if child is %, we return here and skip subsequent checks
-    // See: prettier/src/language-js/needs-parens.js (lines 434-440)
-    // PR #18163 (prettier 3.7): Add parens for bitwise operators too (<<, >>, etc.)
-    if parent_prec < child_prec && child_op == BinaryOperator::Percent {
-        return is_additive_operator(parent_op) || parent_op.is_bitwise();
-    }
-
-    // 5. Add parenthesis when working with bitwise operators and different precedence
-    // It's not strictly needed but helps with code understanding
-    // See: prettier/src/language-js/needs-parens.js (lines 442-446)
-    if parent_op.is_bitwise() && child_prec != parent_prec {
-        return true;
-    }
-
-    false
-}
-
-/// Check if operator is an additive operator (+, -)
-fn is_additive_operator(op: BinaryOperator) -> bool {
-    matches!(op, BinaryOperator::Plus | BinaryOperator::Minus)
 }
 
 impl<'a> Printer<'a> {
@@ -112,13 +41,12 @@ impl<'a> Printer<'a> {
 
         // Add parens around binary/logical expressions since unary has higher precedence
         // e.g., !(a && b) must keep parens, otherwise becomes !a && b (different meaning)
-        match unary.argument.as_ref() {
-            Expression::BinaryExpression(_) => {
-                self.write("(");
-                self.print_expression(&unary.argument);
-                self.write(")");
-            }
-            _ => self.print_expression(&unary.argument),
+        if needs_parens(&unary.argument, ParenContext::UnaryArgument) {
+            self.write("(");
+            self.print_expression(&unary.argument);
+            self.write(")");
+        } else {
+            self.print_expression(&unary.argument);
         }
     }
 
@@ -157,17 +85,17 @@ impl<'a> Printer<'a> {
         parent_op: BinaryOperator,
         is_right: bool,
     ) {
-        match operand {
-            Expression::BinaryExpression(child) => {
-                if needs_parens_for_clarity(child, parent_op, is_right) {
-                    self.write("(");
-                    self.print_expression(operand);
-                    self.write(")");
-                } else {
-                    self.print_expression(operand);
-                }
-            }
-            _ => self.print_expression(operand),
+        let ctx = if is_right {
+            ParenContext::BinaryRight { parent_op }
+        } else {
+            ParenContext::BinaryLeft { parent_op }
+        };
+        if needs_parens(operand, ctx) {
+            self.write("(");
+            self.print_expression(operand);
+            self.write(")");
+        } else {
+            self.print_expression(operand);
         }
     }
 
@@ -187,33 +115,34 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a unary expression
     pub(super) fn build_unary_doc(&self, unary: &internal::UnaryExpression) -> Doc {
-        let argument_doc = match unary.argument.as_ref() {
-            // Add parens around binary/logical expressions (unary has higher precedence)
-            // For long expressions, the content inside parens can wrap
-            Expression::BinaryExpression(binary) if binary.operator.is_logical() => {
-                let inner = self.build_expression_doc(&unary.argument);
-                doc::group(doc::concat(vec![
-                    doc::text("("),
-                    doc::indent_softline(inner),
-                    doc::softline(),
-                    doc::text(")"),
-                ]))
-            }
-            Expression::BinaryExpression(_) => doc::concat(vec![
-                doc::text("("),
-                self.build_expression_doc(&unary.argument),
-                doc::text(")"),
-            ]),
-            // Handle !! with logical expression: !!(a || b) - the inner ! wraps
-            Expression::UnaryExpression(inner_unary) => {
-                if Self::unary_contains_logical(&inner_unary.argument) {
-                    // For !!(logical), we need the parens from the inner unary to wrap
-                    self.build_expression_doc(&unary.argument)
+        let argument_doc = if needs_parens(&unary.argument, ParenContext::UnaryArgument) {
+            // Binary expressions need parens - use grouping for logical ops to allow line breaking
+            if let Expression::BinaryExpression(binary) = unary.argument.as_ref() {
+                if binary.operator.is_logical() {
+                    let inner = self.build_expression_doc(&unary.argument);
+                    doc::group(doc::concat(vec![
+                        doc::text("("),
+                        doc::indent_softline(inner),
+                        doc::softline(),
+                        doc::text(")"),
+                    ]))
                 } else {
-                    self.build_expression_doc(&unary.argument)
+                    doc::concat(vec![
+                        doc::text("("),
+                        self.build_expression_doc(&unary.argument),
+                        doc::text(")"),
+                    ])
                 }
+            } else {
+                // Non-binary that needs parens (shouldn't happen currently)
+                doc::concat(vec![
+                    doc::text("("),
+                    self.build_expression_doc(&unary.argument),
+                    doc::text(")"),
+                ])
             }
-            _ => self.build_expression_doc(&unary.argument),
+        } else {
+            self.build_expression_doc(&unary.argument)
         };
 
         // Keyword operators need a space before the operand
@@ -225,15 +154,6 @@ impl<'a> Printer<'a> {
             ])
         } else {
             doc::concat(vec![doc::text(unary.operator.as_str()), argument_doc])
-        }
-    }
-
-    /// Check if a unary expression's argument (eventually) contains a logical expression
-    fn unary_contains_logical(expr: &Expression) -> bool {
-        match expr {
-            Expression::BinaryExpression(binary) => binary.operator.is_logical(),
-            Expression::UnaryExpression(unary) => Self::unary_contains_logical(&unary.argument),
-            _ => false,
         }
     }
 
@@ -417,17 +337,16 @@ impl<'a> Printer<'a> {
         parent_op: BinaryOperator,
         is_right: bool,
     ) -> Doc {
-        match operand {
-            Expression::BinaryExpression(child) => {
-                let child_doc = self.build_expression_doc(operand);
-
-                if needs_parens_for_clarity(child, parent_op, is_right) {
-                    doc::parens(child_doc)
-                } else {
-                    child_doc
-                }
-            }
-            _ => self.build_expression_doc(operand),
+        let ctx = if is_right {
+            ParenContext::BinaryRight { parent_op }
+        } else {
+            ParenContext::BinaryLeft { parent_op }
+        };
+        let operand_doc = self.build_expression_doc(operand);
+        if needs_parens(operand, ctx) {
+            doc::parens(operand_doc)
+        } else {
+            operand_doc
         }
     }
 
@@ -436,26 +355,25 @@ impl<'a> Printer<'a> {
         self.write("await ");
 
         // Add parens around binary expressions since await has higher precedence
-        match await_expr.argument.as_ref() {
-            Expression::BinaryExpression(_) => {
-                self.write("(");
-                self.print_expression(&await_expr.argument);
-                self.write(")");
-            }
-            _ => self.print_expression(&await_expr.argument),
+        if needs_parens(&await_expr.argument, ParenContext::AwaitArgument) {
+            self.write("(");
+            self.print_expression(&await_expr.argument);
+            self.write(")");
+        } else {
+            self.print_expression(&await_expr.argument);
         }
     }
 
     /// Build a Doc for an await expression
     pub(super) fn build_await_doc(&self, await_expr: &internal::AwaitExpression) -> Doc {
-        let argument_doc = match await_expr.argument.as_ref() {
-            // Add parens around binary expressions (await has higher precedence)
-            Expression::BinaryExpression(_) => doc::concat(vec![
+        let argument_doc = if needs_parens(&await_expr.argument, ParenContext::AwaitArgument) {
+            doc::concat(vec![
                 doc::text("("),
                 self.build_expression_doc(&await_expr.argument),
                 doc::text(")"),
-            ]),
-            _ => self.build_expression_doc(&await_expr.argument),
+            ])
+        } else {
+            self.build_expression_doc(&await_expr.argument)
         };
 
         doc::concat(vec![doc::text("await "), argument_doc])

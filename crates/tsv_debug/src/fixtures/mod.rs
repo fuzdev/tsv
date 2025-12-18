@@ -261,6 +261,30 @@ pub fn discover_unformatted_ours_variants(fixture_dir: &Path, ext: &str) -> Vec<
     variants
 }
 
+/// Discover input_invalid_* files in a fixture directory
+///
+/// These files test that parsers correctly reject invalid syntax.
+/// They should fail to parse with both our parser and the canonical parser.
+///
+/// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
+pub fn discover_invalid_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
+    let mut variants = Vec::new();
+
+    if let Ok(entries) = fs::read_dir(fixture_dir) {
+        for entry in entries.flatten() {
+            if let Some(filename) = entry.file_name().to_str()
+                && filename.starts_with("input_invalid_")
+                && filename.ends_with(ext)
+            {
+                variants.push(filename.to_string());
+            }
+        }
+    }
+
+    variants.sort();
+    variants
+}
+
 /// Check if directory name indicates svelte parser divergence
 /// (ends with `_svelte_divergence` or `_svelte_prettier_divergence`)
 pub fn has_svelte_divergence_suffix(dir_name: &str) -> bool {
@@ -345,7 +369,7 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
                 When using the expected_ours.json + expected_svelte.json pattern, both files must exist.\n\
                 - expected_ours.json: Our parser's AST (source of truth for our tests)\n\
                 - expected_svelte.json: Svelte's AST (documents the difference)\n\
-                Run: deno task fixtures_update_parsed".to_string()
+                Run: deno task fixtures:update:parsed".to_string()
             );
         }
 
@@ -395,7 +419,7 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
                 If the ASTs match, use the standard expected.json pattern instead:\n\
                 1. Remove _svelte_divergence suffix from directory name\n\
                 2. Delete expected_ours.json and expected_svelte.json\n\
-                3. Run: deno task fixtures_update_parsed"
+                3. Run: deno task fixtures:update:parsed"
                     .to_string(),
             );
         }
@@ -412,7 +436,7 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         // Standard pattern: expected.json (required)
         if !has_expected {
             return Err("Missing expected.json (required for parser tests).\n\
-                Run: deno task fixtures_update_parsed"
+                Run: deno task fixtures:update:parsed"
                 .to_string());
         }
     }

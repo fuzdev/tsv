@@ -326,12 +326,10 @@ impl<'a> Parser<'a> {
             let name = self.intern_identifier();
             self.advance()?;
 
-            Some(Identifier {
+            Some(Identifier::simple(
                 name,
-                optional: false,
-                type_annotation: None,
-                span: Span::new(id_start as u32, id_end as u32),
-            })
+                Span::new(id_start as u32, id_end as u32),
+            ))
         } else {
             None
         };
@@ -358,6 +356,7 @@ impl<'a> Parser<'a> {
     /// Parse export named specifiers:
     /// - `export { x, y as z }`
     /// - `export { x } from "y"`
+    /// - `export { type x, y }` (inline type modifier)
     fn parse_export_named_specifiers(&mut self, start: u32) -> Result<Statement, ParseError> {
         // Consume '{'
         debug_assert!(matches!(self.current_kind(), TokenKind::BraceOpen));
@@ -368,6 +367,22 @@ impl<'a> Parser<'a> {
         // Parse specifiers until '}'
         while !matches!(self.current_kind(), TokenKind::BraceClose) {
             let (spec_start, _) = self.current_pos();
+
+            // Check for inline type modifier: `export { type A, B }`
+            let specifier_export_kind = if matches!(self.current_kind(), TokenKind::Identifier)
+                && self.current_value() == "type"
+            {
+                // Look ahead to see if next is identifier (inline type) or 'as'/',' (regular export named "type")
+                let next_kind = self.peek_kind();
+                if matches!(next_kind, TokenKind::Identifier) {
+                    self.advance()?; // consume 'type'
+                    ExportKind::Type
+                } else {
+                    ExportKind::Value
+                }
+            } else {
+                ExportKind::Value
+            };
 
             // Parse local name (the name being exported)
             // Can be an identifier or 'default' keyword (for re-exporting default)
@@ -383,12 +398,8 @@ impl<'a> Parser<'a> {
             let local_name = self.intern_identifier();
             self.advance()?;
 
-            let local = Identifier {
-                name: local_name,
-                optional: false,
-                type_annotation: None,
-                span: Span::new(local_start as u32, local_end as u32),
-            };
+            let local =
+                Identifier::simple(local_name, Span::new(local_start as u32, local_end as u32));
 
             // Check for 'as exported_name'
             let (exported, spec_end) =
@@ -403,12 +414,10 @@ impl<'a> Parser<'a> {
                     self.advance()?;
 
                     (
-                        Identifier {
-                            name: exported_name,
-                            optional: false,
-                            type_annotation: None,
-                            span: Span::new(exp_start as u32, exp_end as u32),
-                        },
+                        Identifier::simple(
+                            exported_name,
+                            Span::new(exp_start as u32, exp_end as u32),
+                        ),
                         exp_end as u32,
                     )
                 } else {
@@ -418,6 +427,7 @@ impl<'a> Parser<'a> {
             specifiers.push(ExportSpecifier {
                 local,
                 exported,
+                export_kind: specifier_export_kind,
                 span: Span::new(spec_start as u32, spec_end),
             });
 
@@ -484,12 +494,8 @@ impl<'a> Parser<'a> {
             let local_name = self.intern_identifier();
             self.advance()?;
 
-            let local = Identifier {
-                name: local_name,
-                optional: false,
-                type_annotation: None,
-                span: Span::new(local_start as u32, local_end as u32),
-            };
+            let local =
+                Identifier::simple(local_name, Span::new(local_start as u32, local_end as u32));
 
             // Check for 'as exported_name'
             let (exported, spec_end) =
@@ -504,12 +510,10 @@ impl<'a> Parser<'a> {
                     self.advance()?;
 
                     (
-                        Identifier {
-                            name: exported_name,
-                            optional: false,
-                            type_annotation: None,
-                            span: Span::new(exp_start as u32, exp_end as u32),
-                        },
+                        Identifier::simple(
+                            exported_name,
+                            Span::new(exp_start as u32, exp_end as u32),
+                        ),
                         exp_end as u32,
                     )
                 } else {
@@ -519,6 +523,8 @@ impl<'a> Parser<'a> {
             specifiers.push(ExportSpecifier {
                 local,
                 exported,
+                // For `export type { ... }`, specifiers are value (type is on declaration)
+                export_kind: ExportKind::Value,
                 span: Span::new(spec_start as u32, spec_end),
             });
 
@@ -638,12 +644,7 @@ impl<'a> Parser<'a> {
             }
 
             specifiers.push(ImportSpecifier::Default(ImportDefaultSpecifier {
-                local: Identifier {
-                    name: symbol,
-                    optional: false,
-                    type_annotation: None,
-                    span: Span::new(id_start as u32, id_end as u32),
-                },
+                local: Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32)),
                 span: Span::new(id_start as u32, id_end as u32),
             }));
 
@@ -673,12 +674,7 @@ impl<'a> Parser<'a> {
             self.advance()?;
 
             specifiers.push(ImportSpecifier::Namespace(ImportNamespaceSpecifier {
-                local: Identifier {
-                    name: symbol,
-                    optional: false,
-                    type_annotation: None,
-                    span: Span::new(id_start as u32, id_end as u32),
-                },
+                local: Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32)),
                 span: Span::new(ns_start as u32, id_end as u32),
             }));
         }
@@ -714,12 +710,10 @@ impl<'a> Parser<'a> {
                 let imported_symbol = self.intern_identifier();
                 self.advance()?;
 
-                let imported = Identifier {
-                    name: imported_symbol,
-                    optional: false,
-                    type_annotation: None,
-                    span: Span::new(imp_start as u32, imp_end as u32),
-                };
+                let imported = Identifier::simple(
+                    imported_symbol,
+                    Span::new(imp_start as u32, imp_end as u32),
+                );
 
                 // Check for 'as' rename
                 let (local, spec_end) =
@@ -734,12 +728,10 @@ impl<'a> Parser<'a> {
                         self.advance()?;
 
                         (
-                            Identifier {
-                                name: local_symbol,
-                                optional: false,
-                                type_annotation: None,
-                                span: Span::new(local_start as u32, local_end as u32),
-                            },
+                            Identifier::simple(
+                                local_symbol,
+                                Span::new(local_start as u32, local_end as u32),
+                            ),
                             local_end,
                         )
                     } else {
@@ -822,12 +814,7 @@ impl<'a> Parser<'a> {
             let key_symbol = self.intern_identifier();
             self.advance()?;
 
-            let key = Identifier {
-                name: key_symbol,
-                optional: false,
-                type_annotation: None,
-                span: Span::new(key_start as u32, key_end as u32),
-            };
+            let key = Identifier::simple(key_symbol, Span::new(key_start as u32, key_end as u32));
 
             // Expect colon
             if !matches!(self.current_kind(), TokenKind::Colon) {
@@ -876,12 +863,7 @@ impl<'a> Parser<'a> {
         // Current token is `=`
         self.advance()?; // consume `=`
 
-        let id = Identifier {
-            name: symbol,
-            optional: false,
-            type_annotation: None,
-            span: Span::new(id_start as u32, id_end as u32),
-        };
+        let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
 
         let module_reference = if matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == "require"

@@ -26,10 +26,13 @@ mod calls;
 mod chain;
 mod expression_stringifier;
 mod expressions;
+mod needs_parens;
 mod objects;
 mod operators;
 mod statements;
 mod types;
+
+pub(crate) use needs_parens::{ParenContext, needs_parens};
 
 use crate::ast::internal;
 use std::cell::RefCell;
@@ -199,7 +202,7 @@ pub(crate) fn is_pure_property_chain(expr: &internal::Expression) -> bool {
     }
 }
 
-/// Check if an expression is a multiline string literal (contains line continuations)
+/// Check if an expression is a multiline string literal (contains line continuations).
 ///
 /// Strings with `\<newline>` need fluid layout because:
 /// 1. They span multiple lines in source
@@ -210,9 +213,10 @@ pub(crate) fn is_multiline_string_literal(expr: &internal::Expression, source: &
     {
         let raw = lit.span.extract(source);
         // Check for line continuation: backslash followed by newline
-        return raw.contains("\\\n") || raw.contains("\\\r");
+        raw.contains("\\\n") || raw.contains("\\\r")
+    } else {
+        false
     }
-    false
 }
 
 /// Check if a type literal was written as multiline in source
@@ -227,27 +231,100 @@ pub(crate) fn is_type_literal_multiline(source: &str, span: tsv_lang::Span) -> b
         || after_brace.trim_start_matches(' ').starts_with('\n')
 }
 
+/// Context for object pattern expansion decisions
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PatternContext {
+    /// Pattern in function parameter position
+    FunctionParameter,
+    /// Pattern in standalone context (variable declaration, assignment)
+    Standalone,
+}
+
 /// Check if an expression contains multiline string literals at any depth
 /// Check if an object pattern should expand (print across multiple lines).
 ///
 /// Prettier expands object patterns when any property has a nested pattern
 /// (ObjectPattern or ArrayPattern) as its value. This is different from the
 /// multiline content rule used for object expressions.
-pub(crate) fn object_pattern_should_expand(obj: &internal::ObjectPattern) -> bool {
-    obj.properties.iter().any(|prop| match prop {
-        internal::ObjectPatternProperty::Property(p) => {
-            // Check if the value is a nested pattern
-            matches!(
-                p.value,
-                internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_)
-            ) ||
-            // Also check AssignmentPattern with nested pattern left side
-            matches!(&p.value, internal::Expression::AssignmentPattern(ap)
-                if matches!(ap.left.as_ref(),
-                    internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_)))
+///
+/// Prettier expands based on nesting depth and context:
+/// - In function parameters: depth 3+ expands (e.g., {a: {b}} stays, {a: {b: {c}}} expands)
+/// - In standalone contexts: depth 2+ expands (e.g., {a: {b}} expands)
+pub(crate) fn object_pattern_should_expand(
+    obj: &internal::ObjectPattern,
+    context: PatternContext,
+) -> bool {
+    let depth = pattern_nesting_depth(obj);
+    match context {
+        PatternContext::FunctionParameter => depth >= 3,
+        PatternContext::Standalone => depth >= 2,
+    }
+}
+
+/// Calculate the maximum nesting depth of an object pattern
+/// Depth 1 = simple pattern like {a}
+/// Depth 2 = one level of nesting like {a: {b}}
+/// Depth 3 = two levels of nesting like {a: {b: {c}}}
+fn pattern_nesting_depth(obj: &internal::ObjectPattern) -> usize {
+    let mut max_depth = 1;
+
+    for prop in &obj.properties {
+        match prop {
+            internal::ObjectPatternProperty::Property(p) => {
+                let nested_depth = match &p.value {
+                    internal::Expression::ObjectPattern(nested_obj) => {
+                        1 + pattern_nesting_depth(nested_obj)
+                    }
+                    internal::Expression::ArrayPattern(nested_arr) => {
+                        1 + array_pattern_nesting_depth(nested_arr)
+                    }
+                    internal::Expression::AssignmentPattern(ap) => match ap.left.as_ref() {
+                        internal::Expression::ObjectPattern(nested_obj) => {
+                            1 + pattern_nesting_depth(nested_obj)
+                        }
+                        internal::Expression::ArrayPattern(nested_arr) => {
+                            1 + array_pattern_nesting_depth(nested_arr)
+                        }
+                        _ => 1,
+                    },
+                    _ => 1,
+                };
+                max_depth = max_depth.max(nested_depth);
+            }
+            internal::ObjectPatternProperty::RestElement(_) => {}
         }
-        internal::ObjectPatternProperty::RestElement(_) => false,
-    })
+    }
+
+    max_depth
+}
+
+/// Calculate the maximum nesting depth of an array pattern
+fn array_pattern_nesting_depth(arr: &internal::ArrayPattern) -> usize {
+    let mut max_depth = 1;
+
+    for elem in arr.elements.iter().flatten() {
+        let nested_depth = match elem {
+            internal::Expression::ObjectPattern(nested_obj) => {
+                1 + pattern_nesting_depth(nested_obj)
+            }
+            internal::Expression::ArrayPattern(nested_arr) => {
+                1 + array_pattern_nesting_depth(nested_arr)
+            }
+            internal::Expression::AssignmentPattern(ap) => match ap.left.as_ref() {
+                internal::Expression::ObjectPattern(nested_obj) => {
+                    1 + pattern_nesting_depth(nested_obj)
+                }
+                internal::Expression::ArrayPattern(nested_arr) => {
+                    1 + array_pattern_nesting_depth(nested_arr)
+                }
+                _ => 1,
+            },
+            _ => 1,
+        };
+        max_depth = max_depth.max(nested_depth);
+    }
+
+    max_depth
 }
 
 ///
@@ -599,7 +676,9 @@ impl<'a> Printer<'a> {
     #[allow(clippy::only_used_in_recursion)]
     pub(crate) fn pattern_should_expand(&self, expr: &internal::Expression) -> bool {
         match expr {
-            internal::Expression::ObjectPattern(obj) => object_pattern_should_expand(obj),
+            internal::Expression::ObjectPattern(obj) => {
+                object_pattern_should_expand(obj, PatternContext::Standalone)
+            }
             internal::Expression::ArrayPattern(_) => false, // Array patterns don't expand based on nesting
             internal::Expression::AssignmentPattern(ap) => self.pattern_should_expand(&ap.left),
             _ => false,

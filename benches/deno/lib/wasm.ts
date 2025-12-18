@@ -9,10 +9,13 @@ import type { Language, TsvImplementation } from './types.ts';
 // These will be dynamically imported from the wasm-pack output
 let wasmModule: {
 	parse_svelte: (source: string) => unknown;
+	parse_internal_svelte: (source: string) => void;
 	format_svelte: (source: string) => string;
 	parse_typescript: (source: string) => unknown;
+	parse_internal_typescript: (source: string) => void;
 	format_typescript: (source: string) => string;
 	parse_css: (source: string) => unknown;
+	parse_internal_css: (source: string) => void;
 	format_css: (source: string) => string;
 } | null = null;
 
@@ -44,10 +47,13 @@ export class WasmImplementation implements TsvImplementation {
 
 		wasmModule = {
 			parse_svelte: module.parse_svelte,
+			parse_internal_svelte: module.parse_internal_svelte,
 			format_svelte: module.format_svelte,
 			parse_typescript: module.parse_typescript,
+			parse_internal_typescript: module.parse_internal_typescript,
 			format_typescript: module.format_typescript,
 			parse_css: module.parse_css,
+			parse_internal_css: module.parse_internal_css,
 			format_css: module.format_css,
 		};
 	}
@@ -62,6 +68,22 @@ export class WasmImplementation implements TsvImplementation {
 				return wasmModule.parse_typescript(source);
 			case 'css':
 				return wasmModule.parse_css(source);
+		}
+	}
+
+	parseInternal(source: string, language: Language): void {
+		if (!wasmModule) throw new Error('WASM module not initialized');
+
+		switch (language) {
+			case 'svelte':
+				wasmModule.parse_internal_svelte(source);
+				break;
+			case 'typescript':
+				wasmModule.parse_internal_typescript(source);
+				break;
+			case 'css':
+				wasmModule.parse_internal_css(source);
+				break;
 		}
 	}
 

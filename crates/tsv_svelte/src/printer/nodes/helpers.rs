@@ -13,8 +13,8 @@ impl<'a> Printer<'a> {
     /// expressions in the template: `{expression}`
     pub fn print_expression_tag(&mut self, tag: &crate::ast::internal::ExpressionTag) {
         self.write("{");
-        // Format the expression directly
-        self.print_ts_expression(&tag.expression);
+        // Format the expression - comments are looked up from Root.comments by span position
+        self.print_ts_expression_with_comments(&tag.expression, tag.span.start, tag.span.end);
         self.write("}");
     }
 
@@ -114,6 +114,69 @@ impl<'a> Printer<'a> {
         let formatted =
             tsv_ts::format_expression(expr, self.source(), std::rc::Rc::clone(&self.interner));
         self.write(&formatted);
+    }
+
+    /// Write a JS comment as a leading comment (before content)
+    ///
+    /// Block comments: `/*content*/ ` (with trailing space)
+    /// Line comments: `// content\n` (with newline)
+    pub fn write_leading_js_comment(&mut self, comment: &tsv_lang::Comment) {
+        if comment.is_block {
+            self.write("/*");
+            self.write(&comment.content);
+            self.write("*/ ");
+        } else {
+            self.write("// ");
+            self.write(&comment.content);
+            self.write("\n");
+        }
+    }
+
+    /// Write a JS comment as a trailing comment (after content)
+    ///
+    /// Block comments: ` /*content*/` (with leading space)
+    /// Line comments: ` // content` (with leading space, no newline)
+    pub fn write_trailing_js_comment(&mut self, comment: &tsv_lang::Comment) {
+        if comment.is_block {
+            self.write(" /*");
+            self.write(&comment.content);
+            self.write("*/");
+        } else {
+            self.write(" // ");
+            self.write(&comment.content);
+        }
+    }
+
+    /// Format a TypeScript expression with leading comments from the given span range.
+    ///
+    /// This looks up comments from Root.comments that fall within the span range
+    /// and prints them before the expression.
+    pub fn print_ts_expression_with_comments(
+        &mut self,
+        expr: &tsv_ts::Expression,
+        span_start: u32,
+        span_end: u32,
+    ) {
+        // Print any leading comments between the opening brace and the expression
+        let expr_start = expr.span().start;
+        for comment in tsv_lang::comments_in_range(self.comments, span_start + 1, expr_start) {
+            self.write_leading_js_comment(comment);
+        }
+
+        // Format the expression with comments so nested comments are preserved
+        let formatted = tsv_ts::format_expression_isolated_with_comments(
+            expr,
+            self.source(),
+            std::rc::Rc::clone(&self.interner),
+            self.comments,
+        );
+        self.write(&formatted);
+
+        // Print any trailing comments between the expression and closing brace
+        let expr_end = expr.span().end;
+        for comment in tsv_lang::comments_in_range(self.comments, expr_end, span_end - 1) {
+            self.write_trailing_js_comment(comment);
+        }
     }
 
     /// Get the content span for a node, skipping layout whitespace for text nodes

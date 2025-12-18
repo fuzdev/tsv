@@ -443,12 +443,73 @@ impl<'a> Parser<'a> {
         ));
         self.advance()?;
 
-        // Parse optional parameter: (param)
+        // Parse optional parameter: (param) or (param: type) or ({destructuring}) or ({destructuring}: Type)
         let param = if self.check(&TokenKind::ParenOpen) {
             self.advance()?;
-            let param_expr = self.parse_expression()?;
+
+            let param = match self.current_kind() {
+                TokenKind::Identifier => {
+                    // Simple identifier: catch (e) or catch (e: Error)
+                    let (id_start, id_end) = self.current_pos();
+                    let symbol = self.intern_identifier();
+                    self.advance()?;
+
+                    // Check for type annotation: param: type
+                    let (type_annotation, param_end) = if self.check(&TokenKind::Colon) {
+                        let ta = self.parse_type_annotation()?;
+                        let end = ta.span.end as usize;
+                        (Some(ta), end)
+                    } else {
+                        (None, id_end)
+                    };
+
+                    Expression::Identifier(Identifier {
+                        name: symbol,
+                        optional: false,
+                        type_annotation,
+                        decorators: None,
+                        span: Span::new(id_start as u32, param_end as u32),
+                    })
+                }
+                TokenKind::BraceOpen => {
+                    // Object destructuring: catch ({message}) or catch ({message}: ErrorType)
+                    let expr = self.parse_object_expression()?;
+                    let mut pattern = self.to_assignable(expr)?;
+
+                    // Check for type annotation
+                    if self.check(&TokenKind::Colon) {
+                        let ta = self.parse_type_annotation()?;
+                        let end = ta.span.end;
+                        if let Expression::ObjectPattern(ref mut op) = pattern {
+                            op.type_annotation = Some(ta);
+                            op.span.end = end;
+                        }
+                    }
+                    pattern
+                }
+                TokenKind::BracketOpen => {
+                    // Array destructuring: catch ([x, y]) or catch ([x, y]: ErrorType)
+                    let expr = self.parse_array_expression()?;
+                    let mut pattern = self.to_assignable(expr)?;
+
+                    // Check for type annotation
+                    if self.check(&TokenKind::Colon) {
+                        let ta = self.parse_type_annotation()?;
+                        let end = ta.span.end;
+                        if let Expression::ArrayPattern(ref mut ap) = pattern {
+                            ap.type_annotation = Some(ta);
+                            ap.span.end = end;
+                        }
+                    }
+                    pattern
+                }
+                _ => {
+                    return Err(self.error_expected("catch parameter"));
+                }
+            };
+
             self.expect(&TokenKind::ParenClose)?;
-            Some(param_expr)
+            Some(param)
         } else {
             None
         };
@@ -511,12 +572,10 @@ impl<'a> Parser<'a> {
             let symbol = self.intern_identifier();
             self.advance()?;
             (
-                Some(Identifier {
-                    name: symbol,
-                    optional: false,
-                    type_annotation: None,
-                    span: Span::new(label_start as u32, label_end as u32),
-                }),
+                Some(Identifier::simple(
+                    symbol,
+                    Span::new(label_start as u32, label_end as u32),
+                )),
                 label_end,
             )
         } else {
@@ -551,12 +610,10 @@ impl<'a> Parser<'a> {
             let symbol = self.intern_identifier();
             self.advance()?;
             (
-                Some(Identifier {
-                    name: symbol,
-                    optional: false,
-                    type_annotation: None,
-                    span: Span::new(label_start as u32, label_end as u32),
-                }),
+                Some(Identifier::simple(
+                    symbol,
+                    Span::new(label_start as u32, label_end as u32),
+                )),
                 label_end,
             )
         } else {
@@ -580,12 +637,7 @@ impl<'a> Parser<'a> {
         let symbol = self.intern_identifier();
         self.advance()?;
 
-        let label = Identifier {
-            name: symbol,
-            optional: false,
-            type_annotation: None,
-            span: Span::new(start as u32, label_end as u32),
-        };
+        let label = Identifier::simple(symbol, Span::new(start as u32, label_end as u32));
 
         // Consume ':'
         self.expect(&TokenKind::Colon)?;

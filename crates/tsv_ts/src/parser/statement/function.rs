@@ -76,12 +76,7 @@ impl<'a> Parser<'a> {
         let symbol = self.intern_identifier();
         self.advance()?;
 
-        let id = Identifier {
-            name: symbol,
-            optional: false,
-            type_annotation: None,
-            span: Span::new(id_start as u32, id_end as u32),
-        };
+        let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
 
         // Parse type parameters (TypeScript generics): function foo<T>()
         let type_parameters = if self.check(&TokenKind::LessThan) {
@@ -194,12 +189,10 @@ impl<'a> Parser<'a> {
             let symbol = self.intern_identifier();
             self.advance()?;
 
-            Some(Identifier {
-                name: symbol,
-                optional: false,
-                type_annotation: None,
-                span: Span::new(id_start as u32, id_end as u32),
-            })
+            Some(Identifier::simple(
+                symbol,
+                Span::new(id_start as u32, id_end as u32),
+            ))
         } else if name_required {
             return Err(self.error_expected_after("function name", "function"));
         } else {
@@ -232,11 +225,8 @@ impl<'a> Parser<'a> {
             self.semicolon()?;
 
             Ok(ExportFunctionDeclaration::Declare(TSDeclareFunction {
-                id: id.unwrap_or_else(|| Identifier {
-                    name: self.intern(""),
-                    optional: false,
-                    type_annotation: None,
-                    span: Span::new(start as u32, start as u32),
+                id: id.unwrap_or_else(|| {
+                    Identifier::simple(self.intern(""), Span::new(start as u32, start as u32))
                 }),
                 type_parameters,
                 params,
@@ -311,12 +301,10 @@ impl<'a> Parser<'a> {
             let symbol = self.intern_identifier();
             self.advance()?;
 
-            Some(Identifier {
-                name: symbol,
-                optional: false,
-                type_annotation: None,
-                span: Span::new(id_start as u32, id_end as u32),
-            })
+            Some(Identifier::simple(
+                symbol,
+                Span::new(id_start as u32, id_end as u32),
+            ))
         } else {
             None
         };

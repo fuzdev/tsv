@@ -2,13 +2,22 @@
 //
 // Handles: {#if}, {#each}, {#await}, {#key} blocks
 
-use std::rc::Rc;
-
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;
+
+/// Return type for parse_each_binding: (context, index, key_expr, key_span)
+type EachBindingResult = (
+    tsv_ts::Expression,
+    Option<String>,
+    Option<tsv_ts::Expression>,
+    Option<Span>,
+);
+
+/// Return type for parse_index_and_key_after_context: (index, key_expr, key_span)
+type IndexAndKeyResult = (Option<String>, Option<tsv_ts::Expression>, Option<Span>);
 
 impl<'a> SvelteParser<'a> {
     /// Parse a control flow block starting with {#
@@ -75,10 +84,16 @@ impl<'a> SvelteParser<'a> {
                 .trim()
         };
 
-        // Parse the test expression
+        // Parse the test expression (with comments)
         let expr_offset = tag_content_start + expr_content.find(expr_str).unwrap_or(0);
 
-        let test = tsv_ts::parse_expression(expr_str, expr_offset, Rc::clone(&self.interner))?;
+        let test = self.parse_ts_expression(expr_str, expr_offset)?;
+
+        // Opening tag span is from start to content_start (includes the closing })
+        let opening_tag_span = Span {
+            start: start as u32,
+            end: content_start as u32,
+        };
 
         // Parse consequent (content until {:else}, {:else if}, or {/if})
         let consequent = self.parse_block_children(&["else", "if"], content_start)?;
@@ -131,6 +146,7 @@ impl<'a> SvelteParser<'a> {
                 start: start as u32,
                 end: end as u32,
             },
+            opening_tag_span,
         }))
     }
 
@@ -154,26 +170,31 @@ impl<'a> SvelteParser<'a> {
 
         // Use partial parsing for the iterable expression - stops at identifiers like "as"
         // This correctly handles cases like `getItems(" as ")` where " as " is inside a string
-        let (expression, expr_end_pos) = tsv_ts::parse_expression_partial(
+        let (expression, expr_end_pos) = self.parse_ts_expression_partial(
             content.trim_start(),
             content_offset + (content.len() - content.trim_start().len()),
-            Rc::clone(&self.interner),
         )?;
+
+        // Opening tag span is from start to content_start (includes the closing })
+        let opening_tag_span = Span {
+            start: start as u32,
+            end: content_start as u32,
+        };
 
         // After the expression, check for " as " or ", index" or just "}"
         let expr_consumed = expr_end_pos - content_offset;
         let after_expr = &content[expr_consumed..];
 
         // Try to strip " as " to get binding (with context pattern)
-        let (context, index, key) = if let Some(binding_str) = after_expr
+        let (context, index, key, key_span) = if let Some(binding_str) = after_expr
             .strip_prefix(" as ")
             .or_else(|| after_expr.trim_start().strip_prefix("as "))
         {
             // Has `as` clause: parse context pattern, index, and key
             let as_len = after_expr.len() - binding_str.len();
             let binding_offset = content_offset + expr_consumed + as_len;
-            let (ctx, idx, k) = self.parse_each_binding(binding_str, binding_offset)?;
-            (Some(ctx), idx, k)
+            let (ctx, idx, k, k_span) = self.parse_each_binding(binding_str, binding_offset)?;
+            (Some(ctx), idx, k, k_span)
         } else {
             // No `as` clause: {#each expr} or {#each expr, index}
             // Check for ", index" syntax
@@ -181,10 +202,10 @@ impl<'a> SvelteParser<'a> {
             if let Some(rest) = trimmed.strip_prefix(',') {
                 // {#each expr, index} - just index, no context
                 let index_str = rest.trim().to_string();
-                (None, Some(index_str), None)
+                (None, Some(index_str), None, None)
             } else {
                 // {#each expr} - no context, no index
-                (None, None, None)
+                (None, None, None, None)
             }
         };
 
@@ -214,12 +235,14 @@ impl<'a> SvelteParser<'a> {
             context,
             index,
             key,
+            key_span,
             body,
             fallback,
             span: Span {
                 start: start as u32,
                 end: end as u32,
             },
+            opening_tag_span,
         }))
     }
 
@@ -233,18 +256,13 @@ impl<'a> SvelteParser<'a> {
     /// - Template literals: `` { a: `${x}` } ``
     ///
     /// The TS parser stops at top-level commas, so `{ a, b }, i` parses `{ a, b }` and leaves `, i`.
+    ///
+    /// Returns (context, index, key, key_span) where key_span includes the parentheses.
     fn parse_each_binding(
-        &self,
+        &mut self,
         binding: &str,
         binding_offset: usize,
-    ) -> Result<
-        (
-            tsv_ts::Expression,
-            Option<String>,
-            Option<tsv_ts::Expression>,
-        ),
-        ParseError,
-    > {
+    ) -> Result<EachBindingResult, ParseError> {
         // Calculate leading whitespace and adjust offset accordingly
         let leading_ws = binding.len() - binding.trim_start().len();
         let trimmed = binding.trim();
@@ -259,15 +277,16 @@ impl<'a> SvelteParser<'a> {
         // Parse remaining: ", index" and/or "(key)"
         let consumed = pattern_end - adjusted_offset;
         let remaining = &trimmed[consumed..];
-        let (index, key) = self.parse_index_and_key_after_context(remaining, pattern_end)?;
+        let (index, key, key_span) =
+            self.parse_index_and_key_after_context(remaining, pattern_end)?;
 
-        Ok((context, index, key))
+        Ok((context, index, key, key_span))
     }
 
     /// Parse a context pattern: identifier or destructuring pattern.
     /// Like Svelte's read_pattern, this stops at whitespace/comma/paren for identifiers.
     fn parse_context_pattern(
-        &self,
+        &mut self,
         input: &str,
         offset: usize,
     ) -> Result<(tsv_ts::Expression, usize), ParseError> {
@@ -280,7 +299,7 @@ impl<'a> SvelteParser<'a> {
             let end = self.find_matching_bracket(trimmed)?;
             let pattern_str = &trimmed[..end];
             // Use parse_pattern to get ObjectPattern/ArrayPattern instead of ObjectExpression/ArrayExpression
-            let expr = tsv_ts::parse_pattern(pattern_str, adjusted, Rc::clone(&self.interner))?;
+            let expr = self.parse_ts_pattern(pattern_str, adjusted)?;
             Ok((expr, adjusted + end))
         } else {
             // Simple identifier - read until non-identifier char
@@ -291,7 +310,7 @@ impl<'a> SvelteParser<'a> {
                 return Err(self.error_expected_at("identifier or pattern", offset));
             }
             let ident_str = &trimmed[..end];
-            let expr = tsv_ts::parse_expression(ident_str, adjusted, Rc::clone(&self.interner))?;
+            let expr = self.parse_ts_expression(ident_str, adjusted)?;
             Ok((expr, adjusted + end))
         }
     }
@@ -345,11 +364,13 @@ impl<'a> SvelteParser<'a> {
     }
 
     /// Parse ", index" and/or "(key)" after the context pattern
+    ///
+    /// Returns (index, key_expression, key_span) where key_span includes the parentheses.
     fn parse_index_and_key_after_context(
-        &self,
+        &mut self,
         remaining: &str,
         remaining_offset: usize,
-    ) -> Result<(Option<String>, Option<tsv_ts::Expression>), ParseError> {
+    ) -> Result<IndexAndKeyResult, ParseError> {
         let trimmed = remaining.trim_start();
         let ws_len = remaining.len() - trimmed.len();
         let offset = remaining_offset + ws_len;
@@ -377,20 +398,26 @@ impl<'a> SvelteParser<'a> {
 
         // Check for "(key)"
         let rest_trimmed = rest.trim_start();
-        let key = if rest_trimmed.starts_with('(') && rest_trimmed.ends_with(')') {
+        let (key, key_span) = if rest_trimmed.starts_with('(') && rest_trimmed.ends_with(')') {
             let key_str = &rest_trimmed[1..rest_trimmed.len() - 1];
             let key_ws = rest.len() - rest_trimmed.len();
             let key_offset = rest_offset + key_ws + 1; // +1 for '('
-            Some(tsv_ts::parse_expression(
+            let key_expr = self.parse_ts_expression(
                 key_str.trim(),
                 key_offset + (key_str.len() - key_str.trim_start().len()),
-                Rc::clone(&self.interner),
-            )?)
+            )?;
+            // Span includes the parentheses: from '(' to after ')'
+            let span_start = (rest_offset + key_ws) as u32;
+            let span_end = (rest_offset + key_ws + rest_trimmed.len()) as u32;
+            (
+                Some(key_expr),
+                Some(tsv_lang::Span::new(span_start, span_end)),
+            )
         } else {
-            None
+            (None, None)
         };
 
-        Ok((index, key))
+        Ok((index, key, key_span))
     }
 
     /// Parse an await block: {#await expression}...{:then value}...{:catch error}...{/await}
@@ -413,11 +440,16 @@ impl<'a> SvelteParser<'a> {
 
         // Use partial parsing for the promise expression
         // This correctly handles cases like `fetch(" then ")` where " then " is inside a string
-        let (expression, expr_end_pos) = tsv_ts::parse_expression_partial(
+        let (expression, expr_end_pos) = self.parse_ts_expression_partial(
             content.trim_start(),
             content_offset + (content.len() - content.trim_start().len()),
-            Rc::clone(&self.interner),
         )?;
+
+        // Opening tag span is from start to content_start (includes the closing })
+        let opening_tag_span = Span {
+            start: start as u32,
+            end: content_start as u32,
+        };
 
         // Check what follows the expression
         let expr_consumed = expr_end_pos - content_offset;
@@ -454,11 +486,7 @@ impl<'a> SvelteParser<'a> {
                 let then_keyword_end = expr_end_pos + (after_expr.len() - value_str.len());
                 let value_trimmed = value_str.trim_start();
                 let value_offset = then_keyword_end + (value_str.len() - value_trimmed.len());
-                Some(tsv_ts::parse_expression(
-                    value_trimmed,
-                    value_offset,
-                    Rc::clone(&self.interner),
-                )?)
+                Some(self.parse_ts_expression(value_trimmed, value_offset)?)
             } else {
                 None
             };
@@ -482,11 +510,7 @@ impl<'a> SvelteParser<'a> {
                 let catch_keyword_end = expr_end_pos + (after_expr.len() - error_str.len());
                 let error_trimmed = error_str.trim_start();
                 let error_offset = catch_keyword_end + (error_str.len() - error_trimmed.len());
-                Some(tsv_ts::parse_expression(
-                    error_trimmed,
-                    error_offset,
-                    Rc::clone(&self.interner),
-                )?)
+                Some(self.parse_ts_expression(error_trimmed, error_offset)?)
             } else {
                 None
             };
@@ -540,11 +564,7 @@ impl<'a> SvelteParser<'a> {
                     if !value_str.is_empty() {
                         let value_offset =
                             then_tag_start + then_tag_content.find(value_str).unwrap_or(0);
-                        value = Some(tsv_ts::parse_expression(
-                            value_str,
-                            value_offset,
-                            Rc::clone(&self.interner),
-                        )?);
+                        value = Some(self.parse_ts_expression(value_str, value_offset)?);
                     }
 
                     then_fragment =
@@ -562,11 +582,7 @@ impl<'a> SvelteParser<'a> {
                     if !error_str.is_empty() {
                         let error_offset =
                             catch_tag_start + catch_tag_content.find(error_str).unwrap_or(0);
-                        error = Some(tsv_ts::parse_expression(
-                            error_str,
-                            error_offset,
-                            Rc::clone(&self.interner),
-                        )?);
+                        error = Some(self.parse_ts_expression(error_str, error_offset)?);
                     }
 
                     catch_fragment =
@@ -606,6 +622,7 @@ impl<'a> SvelteParser<'a> {
                 start: start as u32,
                 end: end as u32,
             },
+            opening_tag_span,
         }))
     }
 
@@ -624,8 +641,13 @@ impl<'a> SvelteParser<'a> {
             .trim();
 
         let expr_offset = tag_content_start + tag_content.find(expr_str).unwrap_or(0);
-        let expression =
-            tsv_ts::parse_expression(expr_str, expr_offset, Rc::clone(&self.interner))?;
+        let expression = self.parse_ts_expression(expr_str, expr_offset)?;
+
+        // Opening tag span is from start to content_start (includes the closing })
+        let opening_tag_span = Span {
+            start: start as u32,
+            end: content_start as u32,
+        };
 
         // Parse fragment
         let fragment = self.parse_block_children(&["key"], content_start)?;
@@ -646,6 +668,7 @@ impl<'a> SvelteParser<'a> {
                 start: start as u32,
                 end: end as u32,
             },
+            opening_tag_span,
         }))
     }
 
@@ -687,8 +710,13 @@ impl<'a> SvelteParser<'a> {
 
         let name_str = content[..name_end].trim();
         let name_offset = tag_content_start + tag_content.find(name_str).unwrap_or(0);
-        let expression =
-            tsv_ts::parse_expression(name_str, name_offset, Rc::clone(&self.interner))?;
+        let expression = self.parse_ts_expression(name_str, name_offset)?;
+
+        // Opening tag span is from start to content_start (includes the closing })
+        let opening_tag_span = Span {
+            start: start as u32,
+            end: content_start as u32,
+        };
 
         // Parse parameters (between parentheses)
         let mut parameters = Vec::new();
@@ -732,12 +760,13 @@ impl<'a> SvelteParser<'a> {
                 start: start as u32,
                 end: end as u32,
             },
+            opening_tag_span,
         }))
     }
 
     /// Parse snippet parameters (comma-separated patterns with optional defaults)
     fn parse_snippet_parameters(
-        &self,
+        &mut self,
         params: &str,
         base_offset: usize,
     ) -> Result<Vec<tsv_ts::Expression>, ParseError> {
@@ -771,11 +800,8 @@ impl<'a> SvelteParser<'a> {
                 let full_param = &params[current_pos
                     ..param_end - base_offset + after_param.len() - after_param_trimmed.len()
                         + next_comma];
-                let full_param_expr = tsv_ts::parse_pattern(
-                    full_param.trim(),
-                    base_offset + current_pos + ws_len,
-                    Rc::clone(&self.interner),
-                )?;
+                let full_param_expr =
+                    self.parse_ts_pattern(full_param.trim(), base_offset + current_pos + ws_len)?;
                 parameters.push(full_param_expr);
                 current_pos = param_end - base_offset + after_param.len()
                     - after_param_trimmed.len()
@@ -838,8 +864,7 @@ impl<'a> SvelteParser<'a> {
             .trim();
 
         let expr_offset = tag_content_start + tag_content.find(expr_str).unwrap_or(0);
-        let expression =
-            tsv_ts::parse_expression(expr_str, expr_offset, Rc::clone(&self.interner))?;
+        let expression = self.parse_ts_expression(expr_str, expr_offset)?;
 
         // End is right after the closing }
         let end = after_close;
@@ -879,10 +904,10 @@ impl<'a> SvelteParser<'a> {
 
         // Parse id as a pattern (identifier or destructuring)
         // Use parse_pattern to convert ObjectExpression/ArrayExpression to patterns
-        let id = tsv_ts::parse_pattern(id_str, id_offset, Rc::clone(&self.interner))?;
+        let id = self.parse_ts_pattern(id_str, id_offset)?;
 
         // Parse init as an expression
-        let init = tsv_ts::parse_expression(init_str, init_offset, Rc::clone(&self.interner))?;
+        let init = self.parse_ts_expression(init_str, init_offset)?;
 
         let end = after_close;
 
@@ -968,8 +993,7 @@ impl<'a> SvelteParser<'a> {
                     // Find where trimmed content starts within this chunk
                     let trim_offset = chunk.find(trimmed).unwrap_or(0);
                     let ident_offset = idents_offset + pos + trim_offset;
-                    let expr =
-                        tsv_ts::parse_expression(trimmed, ident_offset, Rc::clone(&self.interner))?;
+                    let expr = self.parse_ts_expression(trimmed, ident_offset)?;
                     identifiers.push(expr);
                 }
                 pos += chunk.len() + 1; // +1 for the comma
@@ -999,8 +1023,7 @@ impl<'a> SvelteParser<'a> {
             .trim();
 
         let expr_offset = tag_content_start + tag_content.find(expr_str).unwrap_or(0);
-        let expression =
-            tsv_ts::parse_expression(expr_str, expr_offset, Rc::clone(&self.interner))?;
+        let expression = self.parse_ts_expression(expr_str, expr_offset)?;
 
         let end = after_close;
 

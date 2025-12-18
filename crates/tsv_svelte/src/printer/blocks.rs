@@ -57,7 +57,11 @@ impl<'a> Printer<'a> {
     pub(super) fn print_if_block(&mut self, block: &internal::IfBlock) {
         // Opening tag
         self.write("{#if ");
-        self.print_ts_expression(&block.test);
+        self.print_ts_expression_with_comments(
+            &block.test,
+            block.opening_tag_span.start,
+            block.opening_tag_span.end,
+        );
         self.write("}");
 
         // Consequent body
@@ -75,12 +79,26 @@ impl<'a> Printer<'a> {
     /// Print the alternate branch of an if block (recursive for else-if chains)
     pub(super) fn print_if_alternate(&mut self, alt: &Fragment, parent_inline: bool) {
         // Check if this is an else-if or plain else
-        if let Some(FragmentNode::IfBlock(else_if)) = alt.nodes.first()
-            && else_if.elseif
+        // Normalize {:else}{#if} to {:else if} when else contains only the if block
+        // (ignoring whitespace-only text nodes which get stripped anyway)
+        let is_only_if_block = alt.nodes.iter().all(|n| match n {
+            FragmentNode::IfBlock(_) => true,
+            FragmentNode::Text(t) => t.raw.trim().is_empty(),
+            _ => false,
+        });
+        if let Some(FragmentNode::IfBlock(else_if)) = alt
+            .nodes
+            .iter()
+            .find(|n| matches!(n, FragmentNode::IfBlock(_)))
+            && (else_if.elseif || is_only_if_block)
         {
             // {:else if condition}
             self.write_continuation("{:else if ", parent_inline);
-            self.print_ts_expression(&else_if.test);
+            self.print_ts_expression_with_comments(
+                &else_if.test,
+                else_if.opening_tag_span.start,
+                else_if.opening_tag_span.end,
+            );
             self.write("}");
 
             let is_inline = self.format_block_body(&else_if.consequent);
@@ -105,7 +123,18 @@ impl<'a> Printer<'a> {
     pub(super) fn print_each_block(&mut self, block: &internal::EachBlock) {
         // Opening tag
         self.write("{#each ");
-        self.print_ts_expression(&block.expression);
+
+        // For collection expression, only look for trailing comments up to before "as"
+        // to avoid capturing comments that belong to the key expression
+        let expr_comment_end = block
+            .context
+            .as_ref()
+            .map_or(block.opening_tag_span.end, |c| c.span().start);
+        self.print_ts_expression_with_comments(
+            &block.expression,
+            block.opening_tag_span.start,
+            expr_comment_end,
+        );
 
         if let Some(context) = &block.context {
             self.write(" as ");
@@ -116,7 +145,12 @@ impl<'a> Printer<'a> {
             }
             if let Some(key) = &block.key {
                 self.write(" (");
-                self.print_ts_expression(key);
+                // Use key_span for comment lookup (includes parentheses)
+                if let Some(key_span) = block.key_span {
+                    self.print_ts_expression_with_comments(key, key_span.start, key_span.end);
+                } else {
+                    self.print_ts_expression(key);
+                }
                 self.write(")");
             }
         } else if let Some(idx) = &block.index {
@@ -151,7 +185,11 @@ impl<'a> Printer<'a> {
 
         // Opening tag
         self.write("{#await ");
-        self.write(block.expression.span().extract(self.source));
+        self.print_ts_expression_with_comments(
+            &block.expression,
+            block.opening_tag_span.start,
+            block.opening_tag_span.end,
+        );
 
         // Determine main fragment for inline detection
         let main_fragment = if is_shorthand_then {
@@ -222,7 +260,11 @@ impl<'a> Printer<'a> {
     /// Format a key block: {#key expr}...{/key}
     pub(super) fn print_key_block(&mut self, block: &internal::KeyBlock) {
         self.write("{#key ");
-        self.write(block.expression.span().extract(self.source));
+        self.print_ts_expression_with_comments(
+            &block.expression,
+            block.opening_tag_span.start,
+            block.opening_tag_span.end,
+        );
         self.write("}");
 
         let is_inline = self.format_block_body(&block.fragment);

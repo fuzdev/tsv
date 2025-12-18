@@ -40,6 +40,49 @@ impl<'a> Printer<'a> {
     }
 
     // =========================================================================
+    // JS Comment Doc builders
+    // =========================================================================
+
+    /// Build a Doc for a leading JS comment (before content)
+    ///
+    /// Block comments: `/*content*/ ` (with trailing space)
+    /// Line comments: `// content\n` (with hardline)
+    fn build_leading_js_comment_doc(comment: &tsv_lang::Comment) -> Doc {
+        if comment.is_block {
+            doc::concat(vec![
+                doc::text("/*"),
+                doc::text_owned(comment.content.clone()),
+                doc::text("*/ "),
+            ])
+        } else {
+            doc::concat(vec![
+                doc::text("// "),
+                doc::text_owned(comment.content.clone()),
+                doc::hardline(),
+            ])
+        }
+    }
+
+    /// Build a Doc for a trailing JS comment (after content)
+    ///
+    /// Block comments: ` /*content*/` (with leading space)
+    /// Line comments: ` // content` (with leading space, no hardline)
+    fn build_trailing_js_comment_doc(comment: &tsv_lang::Comment) -> Doc {
+        if comment.is_block {
+            doc::concat(vec![
+                doc::text(" /*"),
+                doc::text_owned(comment.content.clone()),
+                doc::text("*/"),
+            ])
+        } else {
+            doc::concat(vec![
+                doc::text(" // "),
+                doc::text_owned(comment.content.clone()),
+            ])
+        }
+    }
+
+    // =========================================================================
     // Attribute node printing (unified via Doc)
     // =========================================================================
 
@@ -124,24 +167,63 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a spread attribute: `{...expr}`
     fn build_spread_attribute_doc(&self, spread: &internal::SpreadAttribute) -> Doc {
-        let expr_doc = tsv_ts::build_expression_doc(
+        let mut parts = vec![doc::text("{...")];
+
+        // Leading comments (between `{...` and expression)
+        let expr_start = spread.expression.span().start;
+        for comment in tsv_lang::comments_in_range(self.comments, spread.span.start + 4, expr_start)
+        {
+            parts.push(Self::build_leading_js_comment_doc(comment));
+        }
+
+        // Expression doc with any nested comments
+        let expr_doc = tsv_ts::build_expression_doc_isolated_with_comments(
             &spread.expression,
             self.source,
             Rc::clone(&self.interner),
             &self.config,
+            self.comments,
         );
-        doc::concat(vec![doc::text("{..."), expr_doc, doc::text("}")])
+        parts.push(expr_doc);
+
+        // Trailing comments (between expression and `}`)
+        let expr_end = spread.expression.span().end;
+        for comment in tsv_lang::comments_in_range(self.comments, expr_end, spread.span.end - 1) {
+            parts.push(Self::build_trailing_js_comment_doc(comment));
+        }
+
+        parts.push(doc::text("}"));
+        doc::concat(parts)
     }
 
     /// Build a Doc for an attach tag: `{@attach expr}`
     fn build_attach_tag_doc(&self, tag: &internal::AttachTag) -> Doc {
-        let expr_doc = tsv_ts::build_expression_doc(
+        let mut parts = vec![doc::text("{@attach ")];
+
+        // Leading comments (between `{@attach ` and expression)
+        let expr_start = tag.expression.span().start;
+        for comment in tsv_lang::comments_in_range(self.comments, tag.span.start + 9, expr_start) {
+            parts.push(Self::build_leading_js_comment_doc(comment));
+        }
+
+        // Expression doc with any nested comments
+        let expr_doc = tsv_ts::build_expression_doc_isolated_with_comments(
             &tag.expression,
             self.source,
             Rc::clone(&self.interner),
             &self.config,
+            self.comments,
         );
-        doc::concat(vec![doc::text("{@attach "), expr_doc, doc::text("}")])
+        parts.push(expr_doc);
+
+        // Trailing comments (between expression and `}`)
+        let expr_end = tag.expression.span().end;
+        for comment in tsv_lang::comments_in_range(self.comments, expr_end, tag.span.end - 1) {
+            parts.push(Self::build_trailing_js_comment_doc(comment));
+        }
+
+        parts.push(doc::text("}"));
+        doc::concat(parts)
     }
 
     // =========================================================================
@@ -153,7 +235,7 @@ impl<'a> Printer<'a> {
         let mut parts = vec![doc::text("on:"), doc::text_owned(d.name.clone())];
         parts.extend(self.build_modifiers_doc(&d.modifiers));
         if let Some(expr) = &d.expression {
-            parts.extend(self.build_expression_doc_parts(expr));
+            parts.extend(self.build_expression_doc_parts_with_span(expr, d.expression_tag_span));
         }
         doc::concat(parts)
     }
@@ -164,7 +246,9 @@ impl<'a> Printer<'a> {
         parts.extend(self.build_modifiers_doc(&d.modifiers));
         // Only include expression if not shorthand
         if !self.is_identifier_with_name(&d.expression, &d.name) {
-            parts.extend(self.build_expression_doc_parts(&d.expression));
+            parts.extend(
+                self.build_expression_doc_parts_with_span(&d.expression, d.expression_tag_span),
+            );
         }
         doc::concat(parts)
     }
@@ -175,7 +259,9 @@ impl<'a> Printer<'a> {
         parts.extend(self.build_modifiers_doc(&d.modifiers));
         // Only include expression if not shorthand
         if !self.is_identifier_with_name(&d.expression, &d.name) {
-            parts.extend(self.build_expression_doc_parts(&d.expression));
+            parts.extend(
+                self.build_expression_doc_parts_with_span(&d.expression, d.expression_tag_span),
+            );
         }
         doc::concat(parts)
     }
@@ -206,7 +292,7 @@ impl<'a> Printer<'a> {
         let mut parts = vec![doc::text("use:"), doc::text_owned(d.name.clone())];
         parts.extend(self.build_modifiers_doc(&d.modifiers));
         if let Some(expr) = &d.expression {
-            parts.extend(self.build_expression_doc_parts(expr));
+            parts.extend(self.build_expression_doc_parts_with_span(expr, d.expression_tag_span));
         }
         doc::concat(parts)
     }
@@ -258,26 +344,81 @@ impl<'a> Printer<'a> {
 
     /// Build Doc parts for an expression: `={expr}`
     fn build_expression_doc_parts(&self, expr: &tsv_ts::ast::internal::Expression) -> Vec<Doc> {
+        self.build_expression_doc_parts_with_span(expr, None)
+    }
+
+    /// Build Doc parts for an expression with optional span for comment lookup: `={expr}`
+    fn build_expression_doc_parts_with_span(
+        &self,
+        expr: &tsv_ts::ast::internal::Expression,
+        tag_span: Option<tsv_lang::Span>,
+    ) -> Vec<Doc> {
+        let mut parts = vec![doc::text("={")];
+
+        // Add leading comments if we have the tag span
+        if let Some(span) = tag_span {
+            let expr_start = expr.span().start;
+            for comment in tsv_lang::comments_in_range(self.comments, span.start + 1, expr_start) {
+                parts.push(Self::build_leading_js_comment_doc(comment));
+            }
+        }
+
         // Use isolated context since the braces provide grouping (no extra parens for sequences)
-        let expr_doc = tsv_ts::build_expression_doc_isolated(
+        // Pass comments so nested comments (in call args, binary expressions) are preserved
+        let expr_doc = tsv_ts::build_expression_doc_isolated_with_comments(
             expr,
             self.source,
             Rc::clone(&self.interner),
             &self.config,
+            self.comments,
         );
-        vec![doc::text("={"), expr_doc, doc::text("}")]
+        parts.push(expr_doc);
+
+        // Add trailing comments if we have the tag span
+        if let Some(span) = tag_span {
+            let expr_end = expr.span().end;
+            for comment in tsv_lang::comments_in_range(self.comments, expr_end, span.end - 1) {
+                parts.push(Self::build_trailing_js_comment_doc(comment));
+            }
+        }
+
+        parts.push(doc::text("}"));
+        parts
     }
 
     /// Build a Doc for an expression tag: `{expr}`
     pub(super) fn build_expression_tag_doc(&self, tag: &internal::ExpressionTag) -> Doc {
+        let mut parts = vec![doc::text("{")];
+
+        // Add leading comments between opening brace and expression
+        let expr_start = tag.expression.span().start;
+        for comment in tsv_lang::comments_in_range(self.comments, tag.span.start + 1, expr_start) {
+            if comment.is_block {
+                parts.push(doc::text_owned(format!("/*{}*/ ", comment.content)));
+            }
+        }
+
         // Use isolated context since the braces provide grouping (no extra parens for sequences)
-        let expr_doc = tsv_ts::build_expression_doc_isolated(
+        // Pass comments so nested comments (in call args, binary expressions) are preserved
+        let expr_doc = tsv_ts::build_expression_doc_isolated_with_comments(
             &tag.expression,
             self.source,
             Rc::clone(&self.interner),
             &self.config,
+            self.comments,
         );
-        doc::braces(expr_doc)
+        parts.push(expr_doc);
+
+        // Add trailing comments between expression and closing brace
+        let expr_end = tag.expression.span().end;
+        for comment in tsv_lang::comments_in_range(self.comments, expr_end, tag.span.end - 1) {
+            if comment.is_block {
+                parts.push(doc::text_owned(format!(" /*{}*/", comment.content)));
+            }
+        }
+
+        parts.push(doc::text("}"));
+        doc::concat(parts)
     }
 
     /// Check if an attribute is a shorthand: {name} where value is ExpressionTag(Identifier(name))

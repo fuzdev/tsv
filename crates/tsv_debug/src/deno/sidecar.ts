@@ -1,8 +1,17 @@
 // Deno Sidecar for tsv_debug
 // Long-running process for JS tools. Communicates via JSON-lines over stdio.
 
-// NOTE: Import versions must match versions.ts (can't use dynamic imports for npm:)
-import { VERSIONS } from './versions.ts';
+// SYNC: Keep versions in sync with benches/deno/lib/canonical.ts
+// NOTE: Requires deno.json with "acorn": "npm:acorn@8.15.0" import map
+// to ensure @sveltejs/acorn-typescript uses the same acorn instance
+const VERSIONS = {
+	prettier: '3.7.4',
+	'prettier-plugin-svelte': '3.4.0',
+	svelte: '5.45.8',
+	acorn: '8.15.0',
+	'@sveltejs/acorn-typescript': '1.0.8',
+} as const;
+
 import * as prettier from 'npm:prettier@3.7.4';
 import prettierPluginSvelte from 'npm:prettier-plugin-svelte@3.4.0';
 import { parse as svelteParse } from 'npm:svelte@5.45.8/compiler';

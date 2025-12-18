@@ -33,6 +33,15 @@ pub fn convert_expression(
                     .type_annotation
                     .as_ref()
                     .map(|ta| convert_type_annotation(ta, source, loc, interner, offset)),
+                decorators: id
+                    .decorators
+                    .as_ref()
+                    .map(|decs| {
+                        decs.iter()
+                            .map(|d| super::convert_decorator(d, source, loc, interner, offset))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
             })
         }
         internal::Expression::PrivateIdentifier(pid) => {
@@ -453,6 +462,7 @@ pub fn convert_expression(
                     name: interner.resolve_infallible(meta.meta.name).to_string(),
                     optional: false,
                     type_annotation: None,
+                    decorators: Vec::new(),
                 },
                 property: public::Identifier {
                     node_type: "Identifier".to_string(),
@@ -462,6 +472,7 @@ pub fn convert_expression(
                     name: interner.resolve_infallible(meta.property.name).to_string(),
                     optional: false,
                     type_annotation: None,
+                    decorators: Vec::new(),
                 },
             })
         }

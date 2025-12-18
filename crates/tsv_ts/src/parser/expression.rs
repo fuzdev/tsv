@@ -48,6 +48,36 @@ fn skip_whitespace(bytes: &[u8], mut pos: usize) -> usize {
     pos
 }
 
+/// Check if a byte can start an identifier (letter, underscore, dollar sign, or non-ASCII)
+///
+/// Non-ASCII bytes (> 127) are included for lookahead purposes - they're part of multi-byte
+/// UTF-8 sequences that are likely unicode identifier chars. The actual lexer uses proper
+/// `is_xid_start` from `unicode_ident` crate for validation.
+#[inline]
+fn is_identifier_start(b: u8) -> bool {
+    b.is_ascii_alphabetic() || b == b'_' || b == b'$' || b > 127
+}
+
+/// Check if a byte can continue an identifier (alphanumeric, underscore, dollar sign, or non-ASCII)
+///
+/// Non-ASCII bytes (> 127) are included for lookahead purposes - they're part of multi-byte
+/// UTF-8 sequences that are likely unicode identifier chars. The actual lexer uses proper
+/// `is_xid_continue` from `unicode_ident` crate for validation.
+#[inline]
+fn is_identifier_continue(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b > 127
+}
+
+/// Skip an identifier, returning position after the identifier
+/// Assumes `pos` is at the start of an identifier
+#[inline]
+fn skip_identifier(bytes: &[u8], mut pos: usize) -> usize {
+    while pos < bytes.len() && is_identifier_continue(bytes[pos]) {
+        pos += 1;
+    }
+    pos
+}
+
 /// Skip a string literal (single or double quoted), returning position after closing quote
 /// Assumes `pos` is at the opening quote character
 #[inline]
@@ -129,17 +159,7 @@ fn scan_for_arrow(bytes: &[u8], mut pos: usize) -> bool {
 /// Returns `true` if pattern `identifier =>` is found (with optional whitespace).
 fn scan_identifier_then_arrow(bytes: &[u8], pos: usize) -> bool {
     // Skip the identifier (already validated by lexer as TokenKind::Identifier)
-    // Find where it ends by scanning for non-identifier characters
-    let mut end = pos;
-    while end < bytes.len() {
-        let b = bytes[end];
-        // Identifier chars: a-z, A-Z, 0-9, _, $ (and unicode, but we're just skipping)
-        if b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b > 127 {
-            end += 1;
-        } else {
-            break;
-        }
-    }
+    let end = skip_identifier(bytes, pos);
 
     // Skip whitespace after identifier
     let pos = skip_whitespace(bytes, end);
@@ -567,21 +587,28 @@ impl<'a> Parser<'a> {
                 ParsedExpr::from_expr(expr)
             }
             TokenKind::Keyword(KeywordKind::Async) => {
-                // Could be async arrow function or async function expression
-                let (start, _) = self.current_pos();
-                self.advance()?; // consume 'async'
-
-                let expr = if matches!(
-                    self.current_kind(),
-                    TokenKind::Keyword(KeywordKind::Function)
-                ) {
+                // Could be async arrow function, async function expression, or just identifier
+                // Look ahead to determine what follows 'async'
+                let peek = self.peek_kind();
+                if peek == TokenKind::Keyword(KeywordKind::Function) {
                     // Async function expression: `async function() {}`
-                    self.parse_async_function_expression(start)?
+                    let (start, _) = self.current_pos();
+                    self.advance()?; // consume 'async'
+                    let expr = self.parse_async_function_expression(start)?;
+                    ParsedExpr::from_expr(expr)
+                } else if matches!(
+                    peek,
+                    TokenKind::ParenOpen | TokenKind::Identifier | TokenKind::LessThan
+                ) {
+                    // Async arrow function: `async () => ...` or `async x => ...` or `async <T>() => ...`
+                    let (start, _) = self.current_pos();
+                    self.advance()?; // consume 'async'
+                    let expr = self.parse_async_arrow_function_after_async(start)?;
+                    ParsedExpr::from_expr(expr)
                 } else {
-                    // Async arrow function: `async () => ...` or `async x => ...`
-                    self.parse_async_arrow_function_after_async(start)?
-                };
-                ParsedExpr::from_expr(expr)
+                    // `async` used as identifier (e.g., `[async]`, `async = 1`)
+                    self.parse_primary_expression_with_end()?
+                }
             }
             TokenKind::Keyword(KeywordKind::Class) => {
                 // Class expression: `class { }` or `class Foo<T> { }`
@@ -666,12 +693,10 @@ impl<'a> Parser<'a> {
                         let name = self.intern(self.current_property_name());
                         self.advance()?;
                         (
-                            Expression::Identifier(Identifier {
+                            Expression::Identifier(Identifier::simple(
                                 name,
-                                optional: false,
-                                type_annotation: None,
-                                span: Span::new(prop_start as u32, prop_end as u32),
-                            }),
+                                Span::new(prop_start as u32, prop_end as u32),
+                            )),
                             prop_end,
                         )
                     } else {
@@ -723,12 +748,10 @@ impl<'a> Parser<'a> {
                             left = ParsedExpr::with_end(
                                 Expression::MemberExpression(MemberExpression {
                                     object: Box::new(left.expr),
-                                    property: Box::new(Expression::Identifier(Identifier {
+                                    property: Box::new(Expression::Identifier(Identifier::simple(
                                         name,
-                                        optional: false,
-                                        type_annotation: None,
-                                        span: Span::new(prop_start as u32, prop_end as u32),
-                                    })),
+                                        Span::new(prop_start as u32, prop_end as u32),
+                                    ))),
                                     computed: false,
                                     optional: true,
                                     span,
@@ -914,24 +937,7 @@ impl<'a> Parser<'a> {
             }
             TokenKind::String => {
                 let (start, end) = self.current_pos();
-                let raw = self.current_value().to_string();
-
-                // Extract quote character (first char of raw string)
-                let quote = raw.chars().next().unwrap_or('"');
-
-                // Use decoded value from lexer (escapes already processed)
-                // If no decoded value, extract content without quotes (no escapes present)
-                let content = if let Some(decoded) = self.current_decoded() {
-                    decoded.to_string()
-                } else {
-                    // No escapes - extract content between quotes
-                    if raw.len() >= 2 {
-                        raw[1..raw.len() - 1].to_string()
-                    } else {
-                        String::new()
-                    }
-                };
-
+                let (content, quote) = self.extract_string_literal();
                 self.advance()?;
                 Ok(ParsedExpr::with_end(
                     Expression::Literal(Literal {
@@ -946,12 +952,10 @@ impl<'a> Parser<'a> {
                 let symbol = self.intern_identifier();
                 self.advance()?;
                 Ok(ParsedExpr::with_end(
-                    Expression::Identifier(Identifier {
-                        name: symbol,
-                        optional: false,
-                        type_annotation: None,
-                        span: Span::new(start as u32, end as u32),
-                    }),
+                    Expression::Identifier(Identifier::simple(
+                        symbol,
+                        Span::new(start as u32, end as u32),
+                    )),
                     end,
                 ))
             }
@@ -1019,10 +1023,13 @@ impl<'a> Parser<'a> {
             TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
                 Ok(ParsedExpr::from_expr(self.parse_template_literal()?))
             }
-            TokenKind::Slash => {
-                // In expression context, `/` is a regex literal, not division
+            TokenKind::Slash | TokenKind::SlashEquals => {
+                // In expression context, `/` or `/=` starts a regex literal, not division
                 // Division is only possible after a value (identifier, number, closing bracket)
-                // but we're in parse_primary_expression which is called when expecting a value
+                // but we're in parse_primary_expression which is called when expecting a value.
+                //
+                // When lexer sees `/=`, it returns SlashEquals (division assignment), but in
+                // expression-start context this is actually a regex starting with `=` like /=\s*/.
                 //
                 // Use current_start directly (not current_pos) because the lexer expects positions
                 // relative to its source slice, not the full document offset.
@@ -1062,6 +1069,33 @@ impl<'a> Parser<'a> {
                 let end = private_id.span.end_usize();
                 Ok(ParsedExpr::with_end(
                     Expression::PrivateIdentifier(private_id),
+                    end,
+                ))
+            }
+            // TypeScript type keywords and contextual keywords are valid identifiers in expression context
+            TokenKind::Keyword(KeywordKind::Number)
+            | TokenKind::Keyword(KeywordKind::String)
+            | TokenKind::Keyword(KeywordKind::Boolean)
+            | TokenKind::Keyword(KeywordKind::Any)
+            | TokenKind::Keyword(KeywordKind::Void)
+            | TokenKind::Keyword(KeywordKind::Never)
+            | TokenKind::Keyword(KeywordKind::Unknown)
+            | TokenKind::Keyword(KeywordKind::Object)
+            | TokenKind::Keyword(KeywordKind::Symbol)
+            | TokenKind::Keyword(KeywordKind::Bigint)
+            // Contextual keywords that can be identifiers
+            | TokenKind::Keyword(KeywordKind::Async)
+            | TokenKind::Keyword(KeywordKind::From)
+            | TokenKind::Keyword(KeywordKind::As)
+            | TokenKind::Keyword(KeywordKind::Satisfies) => {
+                let (start, end) = self.current_pos();
+                let symbol = self.intern_identifier();
+                self.advance()?;
+                Ok(ParsedExpr::with_end(
+                    Expression::Identifier(Identifier::simple(
+                        symbol,
+                        Span::new(start as u32, end as u32),
+                    )),
                     end,
                 ))
             }
@@ -1263,33 +1297,104 @@ impl<'a> Parser<'a> {
         // - Identifiers followed by valid type patterns
         // - '(' for function types, '{' for object types, '[' for tuple types
 
-        // Check for type keywords - these are definitely type arguments
+        // Check for type keywords - these are usually type arguments
+        // Exception: `this` followed by `.` is a member expression, not a type
+        // (e.g., `a < this.prop` is comparison, not `a<this.prop>` type instantiation)
         if self.is_type_keyword_at(bytes, pos) {
+            // Special case for `this` - check if it's followed by `.` (member access)
+            if pos + 4 <= bytes.len() && &bytes[pos..pos + 4] == b"this" {
+                let after_this = skip_whitespace(bytes, pos + 4);
+                if after_this < bytes.len() && bytes[after_this] == b'.' {
+                    // `this.` is a member expression, not a type
+                    return false;
+                }
+            }
             return true;
         }
 
         // Check for identifier - could be type reference
-        if bytes[pos].is_ascii_alphabetic() || bytes[pos] == b'_' || bytes[pos] == b'$' {
-            // Skip identifier
+        if is_identifier_start(bytes[pos]) {
+            // Skip identifier and any qualified parts (e.g., Namespace.Type.SubType)
             let mut pos = pos;
-            while pos < bytes.len()
-                && (bytes[pos].is_ascii_alphanumeric() || bytes[pos] == b'_' || bytes[pos] == b'$')
-            {
-                pos += 1;
+            loop {
+                pos = skip_identifier(bytes, pos);
+                pos = skip_whitespace(bytes, pos);
+
+                // If followed by '.', continue scanning qualified name
+                if pos < bytes.len() && bytes[pos] == b'.' {
+                    pos += 1;
+                    pos = skip_whitespace(bytes, pos);
+                    // Must be followed by another identifier
+                    if pos < bytes.len() && is_identifier_start(bytes[pos]) {
+                        continue;
+                    }
+                }
+                break;
             }
 
-            pos = skip_whitespace(bytes, pos);
-
-            // After identifier, valid type argument patterns:
-            // - '>' closes single type arg: f<T>
-            // - ',' separates type args: f<T, U>
+            // After full qualified name, valid type argument patterns:
+            // - '>' closes single type arg: f<T> or f<Ns.T>
+            // - ',' separates type args: f<T, U> (but careful with qualified names!)
             // - 'extends' is constraint: f<T extends U>
-            // - '[' starts indexed type: f<T[K]>
-            // - '.' starts qualified type: f<Foo.Bar>
+            // - '[' starts indexed type: f<T[K]> (but NOT array access like arr[0])
             // - '<' starts nested type args: f<T<U>>
+            // NOT '.' - we already consumed the full qualified name above
             if pos < bytes.len() {
                 match bytes[pos] {
-                    b'>' | b',' | b'[' | b'.' | b'<' => return true,
+                    b'>' | b'<' => return true,
+                    // For ',', scan ahead to verify this is type args:
+                    // `f<T, U>` or `f<Ns.T, U>` - find `>` → type args
+                    // `[a < b, c]` or `fn(a < b.c, d)` - find `]`/`)` → comparison
+                    b',' => {
+                        let mut scan = skip_whitespace(bytes, pos + 1);
+                        let mut depth = 1; // We're inside one `<`
+                        while scan < bytes.len() {
+                            match bytes[scan] {
+                                b'<' => depth += 1,
+                                b'>' => {
+                                    depth -= 1;
+                                    if depth == 0 {
+                                        return true; // Found matching `>`
+                                    }
+                                }
+                                b']' | b')' | b';' => {
+                                    return false; // Hit array/call end or statement end
+                                }
+                                _ => {}
+                            }
+                            scan += 1;
+                        }
+                        return false;
+                    }
+                    b'[' => {
+                        // Indexed type `T[K]` vs array access `arr[0]` or `arr[i]`
+                        let inside = skip_whitespace(bytes, pos + 1);
+                        if inside >= bytes.len() {
+                            return false;
+                        }
+                        // `arr[0]` - numeric index is definitely array access
+                        if bytes[inside].is_ascii_digit() {
+                            return false;
+                        }
+                        // `arr[i]` or `T[K]` - check what follows `]`
+                        if is_identifier_start(bytes[inside]) {
+                            let after_id = skip_identifier(bytes, inside);
+                            let after_bracket = skip_whitespace(bytes, after_id);
+                            if after_bracket < bytes.len() && bytes[after_bracket] == b']' {
+                                let after_close = skip_whitespace(bytes, after_bracket + 1);
+                                // Type args: `T[K]>` or `T[K],`
+                                // Array access: `arr[i] <` or `arr[i];`
+                                if after_close < bytes.len()
+                                    && matches!(bytes[after_close], b'>' | b',')
+                                {
+                                    return true;
+                                }
+                                return false;
+                            }
+                        }
+                        // Other patterns (string keys, etc.) - assume type args
+                        return true;
+                    }
                     b'e' if pos + 7 <= bytes.len() && &bytes[pos..pos + 7] == b"extends" => {
                         return true;
                     }
@@ -1299,8 +1404,35 @@ impl<'a> Parser<'a> {
         }
 
         // Check for type literal patterns
-        // Note: We're conservative - bare numbers like `a < 10` are comparisons, not type instantiation
-        matches!(bytes[pos], b'(' | b'{' | b'[' | b'\'' | b'"')
+        // Note: We're conservative - bare numbers like `a < 10` are comparisons
+        if bytes[pos] == b'(' {
+            // '(' is ambiguous - could be function type `(arg: T) => R` or expression `(x + y)`
+            // Only treat as type args if it looks like a function type
+            let after_paren = skip_whitespace(bytes, pos + 1);
+            if after_paren >= bytes.len() {
+                return false;
+            }
+            // `(identifier:` or `(identifier?:` → function type parameter
+            if is_identifier_start(bytes[after_paren]) {
+                let after_id = skip_whitespace(bytes, skip_identifier(bytes, after_paren));
+                if after_id < bytes.len() && matches!(bytes[after_id], b':' | b'?') {
+                    return true;
+                }
+            }
+            // `() =>` → no-params function type
+            if bytes[after_paren] == b')' {
+                let after_close = skip_whitespace(bytes, after_paren + 1);
+                if after_close + 1 < bytes.len()
+                    && bytes[after_close] == b'='
+                    && bytes[after_close + 1] == b'>'
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        // Other type literal starters: object `{`, tuple `[`, string literals
+        matches!(bytes[pos], b'{' | b'[' | b'\'' | b'"')
     }
 
     /// Check if position points to a TypeScript type keyword
@@ -1428,47 +1560,58 @@ impl<'a> Parser<'a> {
 
             // Parse property key
             // Supports: identifiers, keywords (as identifiers), string literals, number literals, computed keys
-            let (key, computed) = match self.current_kind() {
+            // Track if key is a restricted keyword (can't be used in shorthand)
+            let (key, computed, is_restricted_keyword) = match self.current_kind() {
                 // Computed property: { [expr]: value }
                 TokenKind::BracketOpen => {
                     self.advance()?; // consume '['
                     let key_expr = self.parse_expression()?;
                     self.expect(&TokenKind::BracketClose)?; // consume ']'
-                    (key_expr, true)
+                    (key_expr, true, false)
                 }
                 // Both identifiers and keywords can be property keys: { foo: 1, object: 2, in: 3 }
-                TokenKind::Identifier | TokenKind::Keyword(_) => {
+                TokenKind::Identifier => {
                     let (key_start, key_end) = self.current_pos();
                     let symbol = self.intern_identifier();
                     self.advance()?;
                     (
-                        Expression::Identifier(Identifier {
-                            name: symbol,
-                            optional: false,
-                            type_annotation: None,
-                            span: Span::new(key_start as u32, key_end as u32),
-                        }),
+                        Expression::Identifier(Identifier::simple(
+                            symbol,
+                            Span::new(key_start as u32, key_end as u32),
+                        )),
                         false,
+                        false,
+                    )
+                }
+                TokenKind::Keyword(kw) => {
+                    let (key_start, key_end) = self.current_pos();
+                    let symbol = self.intern_identifier();
+                    // Track if this keyword cannot be used as identifier reference in shorthand
+                    let restricted = matches!(
+                        kw,
+                        KeywordKind::Await | KeywordKind::Yield | KeywordKind::Let
+                    );
+                    self.advance()?;
+                    (
+                        Expression::Identifier(Identifier::simple(
+                            symbol,
+                            Span::new(key_start as u32, key_end as u32),
+                        )),
+                        false,
+                        restricted,
                     )
                 }
                 TokenKind::String => {
                     // String literal key: {"prop-name": value}
                     let (key_start, key_end) = self.current_pos();
-                    let raw = self.current_value().to_string();
-                    let quote = raw.chars().next().unwrap_or('"');
-                    let content = if let Some(decoded) = self.current_decoded() {
-                        decoded.to_string()
-                    } else if raw.len() >= 2 {
-                        raw[1..raw.len() - 1].to_string()
-                    } else {
-                        String::new()
-                    };
+                    let (content, quote) = self.extract_string_literal();
                     self.advance()?;
                     (
                         Expression::Literal(Literal {
                             value: LiteralValue::String { content, quote },
                             span: Span::new(key_start as u32, key_end as u32),
                         }),
+                        false,
                         false,
                     )
                 }
@@ -1482,6 +1625,7 @@ impl<'a> Parser<'a> {
                             value: LiteralValue::Number(value),
                             span: Span::new(key_start as u32, key_end as u32),
                         }),
+                        false,
                         false,
                     )
                 }
@@ -1523,6 +1667,13 @@ impl<'a> Parser<'a> {
                 // Shorthand with default value: `{a = 1}` (only for simple identifiers)
                 // This parses as an AssignmentExpression, which gets converted to
                 // AssignmentPattern by to_assignable() when used in destructuring context
+                // Restricted keywords (await, yield, let) can't be used as shorthand identifiers
+                if is_restricted_keyword {
+                    return Err(self.error_msg_at(
+                        "Cannot use restricted keyword as shorthand property",
+                        key.span().start_usize(),
+                    ));
+                }
                 self.advance()?; // consume '='
                 let default_value = self.parse_assignment_expression()?;
                 let assign_end = default_value.span().end;
@@ -1539,6 +1690,13 @@ impl<'a> Parser<'a> {
                 )
             } else {
                 // Shorthand: key is duplicated as value
+                // Restricted keywords (await, yield, let) can't be used as shorthand identifiers
+                if is_restricted_keyword {
+                    return Err(self.error_msg_at(
+                        "Cannot use restricted keyword as shorthand property",
+                        key.span().start_usize(),
+                    ));
+                }
                 (PropertyKind::Init, key.clone(), true, false)
             };
 
@@ -1845,18 +2003,14 @@ impl<'a> Parser<'a> {
                 let (prop_start, prop_end) = self.current_pos();
                 self.advance()?; // consume 'target'
                 return Ok(Expression::MetaProperty(MetaProperty {
-                    meta: Identifier {
-                        name: self.intern("new"),
-                        optional: false,
-                        type_annotation: None,
-                        span: Span::new(start as u32, new_end as u32),
-                    },
-                    property: Identifier {
-                        name: self.intern("target"),
-                        optional: false,
-                        type_annotation: None,
-                        span: Span::new(prop_start as u32, prop_end as u32),
-                    },
+                    meta: Identifier::simple(
+                        self.intern("new"),
+                        Span::new(start as u32, new_end as u32),
+                    ),
+                    property: Identifier::simple(
+                        self.intern("target"),
+                        Span::new(prop_start as u32, prop_end as u32),
+                    ),
                     span: Span::new(start as u32, prop_end as u32),
                 }));
             }
@@ -1891,12 +2045,10 @@ impl<'a> Parser<'a> {
                     callee = ParsedExpr::with_end(
                         Expression::MemberExpression(MemberExpression {
                             object: Box::new(callee.expr),
-                            property: Box::new(Expression::Identifier(Identifier {
+                            property: Box::new(Expression::Identifier(Identifier::simple(
                                 name,
-                                optional: false,
-                                type_annotation: None,
-                                span: Span::new(prop_start as u32, prop_end as u32),
-                            })),
+                                Span::new(prop_start as u32, prop_end as u32),
+                            ))),
                             computed: false,
                             optional: false,
                             span,
@@ -1982,18 +2134,14 @@ impl<'a> Parser<'a> {
                 let (prop_start, prop_end) = self.current_pos();
                 self.advance()?; // consume 'meta'
                 return Ok(Expression::MetaProperty(MetaProperty {
-                    meta: Identifier {
-                        name: self.intern("import"),
-                        optional: false,
-                        type_annotation: None,
-                        span: Span::new(start as u32, import_end as u32),
-                    },
-                    property: Identifier {
-                        name: self.intern("meta"),
-                        optional: false,
-                        type_annotation: None,
-                        span: Span::new(prop_start as u32, prop_end as u32),
-                    },
+                    meta: Identifier::simple(
+                        self.intern("import"),
+                        Span::new(start as u32, import_end as u32),
+                    ),
+                    property: Identifier::simple(
+                        self.intern("meta"),
+                        Span::new(prop_start as u32, prop_end as u32),
+                    ),
                     span: Span::new(start as u32, prop_end as u32),
                 }));
             }
@@ -2085,12 +2233,10 @@ impl<'a> Parser<'a> {
         let symbol = self.intern_identifier();
         self.advance()?;
 
-        let params = vec![Expression::Identifier(Identifier {
-            name: symbol,
-            optional: false,
-            type_annotation: None,
-            span: Span::new(id_start as u32, id_end as u32),
-        })];
+        let params = vec![Expression::Identifier(Identifier::simple(
+            symbol,
+            Span::new(id_start as u32, id_end as u32),
+        ))];
 
         self.expect(&TokenKind::Arrow)?; // consume '=>'
 
@@ -2135,12 +2281,10 @@ impl<'a> Parser<'a> {
             let symbol = self.intern_identifier();
             self.advance()?;
             (
-                vec![Expression::Identifier(Identifier {
-                    name: symbol,
-                    optional: false,
-                    type_annotation: None,
-                    span: Span::new(id_start as u32, id_end as u32),
-                })],
+                vec![Expression::Identifier(Identifier::simple(
+                    symbol,
+                    Span::new(id_start as u32, id_end as u32),
+                ))],
                 None,
             )
         } else {

@@ -21,7 +21,7 @@ mod patterns;
 
 pub(super) use literals::normalize_number_literal;
 
-use super::{CommentFilter, CommentSpacing, Printer};
+use super::{CommentFilter, CommentSpacing, ParenContext, Printer, needs_parens};
 use crate::ast::internal::Expression;
 use tsv_lang::doc::{self, Doc};
 
@@ -169,15 +169,21 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Build doc for function parameter expression, using FunctionParameter context for patterns
+    pub(super) fn build_function_parameter_doc(&self, expr: &Expression) -> Doc {
+        match expr {
+            Expression::ObjectPattern(obj) => self.build_object_pattern_doc_with_context(
+                obj,
+                crate::printer::PatternContext::FunctionParameter,
+            ),
+            // For other expressions, use normal doc building
+            _ => self.build_expression_doc(expr),
+        }
+    }
+
     // =========================================================================
     // TypeScript Type Assertions
     // =========================================================================
-
-    /// Check if an expression needs parentheses when used as the left operand of `as`/`satisfies`
-    /// Prettier wraps binary expressions in parens for clarity
-    fn needs_parens_in_type_assertion(expr: &Expression) -> bool {
-        matches!(expr, Expression::BinaryExpression(_))
-    }
 
     /// Print a TypeScript angle-bracket type assertion: `<Type>expr`
     fn print_ts_type_assertion(&mut self, type_assert: &crate::ast::internal::TSTypeAssertion) {
@@ -194,7 +200,7 @@ impl<'a> Printer<'a> {
     /// - Single-line comments between `as` and type → print before `as`
     /// - Multi-line comments between `as` and type → print after type
     fn print_ts_as_expression(&mut self, as_expr: &crate::ast::internal::TSAsExpression) {
-        let needs_parens = Self::needs_parens_in_type_assertion(&as_expr.expression);
+        let needs_parens = needs_parens(&as_expr.expression, ParenContext::TypeAssertion);
         if needs_parens {
             self.write("(");
         }
@@ -253,7 +259,7 @@ impl<'a> Printer<'a> {
         &mut self,
         sat_expr: &crate::ast::internal::TSSatisfiesExpression,
     ) {
-        let needs_parens = Self::needs_parens_in_type_assertion(&sat_expr.expression);
+        let needs_parens = needs_parens(&sat_expr.expression, ParenContext::TypeAssertion);
         if needs_parens {
             self.write("(");
         }
@@ -288,7 +294,7 @@ impl<'a> Printer<'a> {
     ///
     /// Preserves comments between expression and `as` keyword (Prettier 3.7 #18161)
     fn build_ts_as_doc(&self, as_expr: &crate::ast::internal::TSAsExpression) -> Doc {
-        let needs_parens = Self::needs_parens_in_type_assertion(&as_expr.expression);
+        let needs_parens = needs_parens(&as_expr.expression, ParenContext::TypeAssertion);
         let mut parts = Vec::new();
         if needs_parens {
             parts.push(doc::text("("));
@@ -315,7 +321,7 @@ impl<'a> Printer<'a> {
         &self,
         sat_expr: &crate::ast::internal::TSSatisfiesExpression,
     ) -> Doc {
-        let needs_parens = Self::needs_parens_in_type_assertion(&sat_expr.expression);
+        let needs_parens = needs_parens(&sat_expr.expression, ParenContext::TypeAssertion);
         let mut parts = Vec::new();
         if needs_parens {
             parts.push(doc::text("("));
@@ -341,7 +347,8 @@ impl<'a> Printer<'a> {
         inst_expr: &crate::ast::internal::TSInstantiationExpression,
     ) {
         // Arrow functions need parentheses for disambiguation
-        let needs_parens = Self::instantiation_expression_needs_parens(&inst_expr.expression);
+        let needs_parens =
+            needs_parens(&inst_expr.expression, ParenContext::InstantiationExpression);
         if needs_parens {
             self.write("(");
         }
@@ -358,7 +365,8 @@ impl<'a> Printer<'a> {
         inst_expr: &crate::ast::internal::TSInstantiationExpression,
     ) -> Doc {
         let mut parts = Vec::new();
-        let needs_parens = Self::instantiation_expression_needs_parens(&inst_expr.expression);
+        let needs_parens =
+            needs_parens(&inst_expr.expression, ParenContext::InstantiationExpression);
         if needs_parens {
             parts.push(doc::text("("));
         }
@@ -368,35 +376,6 @@ impl<'a> Printer<'a> {
         }
         parts.push(self.build_type_parameter_instantiation_doc(&inst_expr.type_arguments));
         doc::concat(parts)
-    }
-
-    /// Check if expression in TSInstantiationExpression needs parentheses
-    fn instantiation_expression_needs_parens(expr: &Expression) -> bool {
-        // Arrow functions need parentheses: (<T>() => {})<U>
-        // Function expressions might also benefit: (function() {})<T>
-        matches!(
-            expr,
-            Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_)
-        )
-    }
-
-    /// Check if an expression needs parentheses when used as the operand of non-null assertion
-    /// Non-null assertion `!` has very high precedence (like member access), so most operators
-    /// need parentheses to avoid changing the meaning.
-    fn needs_parens_in_non_null(expr: &Expression) -> bool {
-        // Note: SequenceExpression is NOT included because print_sequence_expression
-        // already wraps the expression in parentheses
-        matches!(
-            expr,
-            Expression::BinaryExpression(_)
-                | Expression::UnaryExpression(_)
-                | Expression::ConditionalExpression(_)
-                | Expression::AssignmentExpression(_)
-                | Expression::AwaitExpression(_)
-                | Expression::TSTypeAssertion(_)
-                | Expression::TSAsExpression(_)
-                | Expression::TSSatisfiesExpression(_)
-        )
     }
 
     /// Print a TypeScript non-null assertion expression: `expr!`
@@ -422,7 +401,7 @@ impl<'a> Printer<'a> {
         &self,
         non_null_expr: &crate::ast::internal::TSNonNullExpression,
     ) -> Doc {
-        let needs_parens = Self::needs_parens_in_non_null(&non_null_expr.expression);
+        let needs_parens = needs_parens(&non_null_expr.expression, ParenContext::NonNull);
 
         if needs_parens {
             // For expressions that need parens, use a special doc structure
@@ -522,8 +501,6 @@ impl<'a> Printer<'a> {
         operands: &mut Vec<Doc>,
         operators: &mut Vec<crate::ast::internal::BinaryOperator>,
     ) {
-        use crate::printer::operators::needs_parens_for_clarity;
-
         // Recursively flatten left side if it can be chained with current operator
         if let Expression::BinaryExpression(left_binary) = &*expr.left {
             if expr.operator.can_flatten_with(left_binary.operator) {
@@ -531,7 +508,10 @@ impl<'a> Printer<'a> {
             } else {
                 // Can't flatten - build operand with parens if needed
                 let doc = self.build_expression_doc(&expr.left);
-                if needs_parens_for_clarity(left_binary, expr.operator, false) {
+                let ctx = ParenContext::BinaryLeft {
+                    parent_op: expr.operator,
+                };
+                if needs_parens(&expr.left, ctx) {
                     operands.push(doc::parens(doc));
                 } else {
                     operands.push(doc);
@@ -545,9 +525,12 @@ impl<'a> Printer<'a> {
         operators.push(expr.operator);
 
         // Add right operand with parens if needed
-        if let Expression::BinaryExpression(right_binary) = &*expr.right {
+        if let Expression::BinaryExpression(_) = &*expr.right {
             let doc = self.build_expression_doc(&expr.right);
-            if needs_parens_for_clarity(right_binary, expr.operator, true) {
+            let ctx = ParenContext::BinaryRight {
+                parent_op: expr.operator,
+            };
+            if needs_parens(&expr.right, ctx) {
                 operands.push(doc::parens(doc));
             } else {
                 operands.push(doc);

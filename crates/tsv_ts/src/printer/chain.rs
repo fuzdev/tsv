@@ -18,6 +18,7 @@
 // - prettier/src/language-js/print/member-chain.js
 
 use crate::ast::internal::{self, Expression, LiteralValue};
+use crate::printer::{ParenContext, needs_parens};
 use string_interner::DefaultSymbol;
 use tsv_lang::Span;
 use tsv_lang::doc::{self, Doc};
@@ -275,31 +276,10 @@ fn linearize_recursive<'a>(expr: &'a Expression, nodes: &mut Vec<ChainNode<'a>>)
 
         // Base case: expression that's not part of the chain structure
         _ => {
-            let needs_parens = base_needs_parens(expr);
+            let needs_parens = needs_parens(expr, ParenContext::ChainBase);
             nodes.push(ChainNode::base(expr, needs_parens));
         }
     }
-}
-
-/// Check if a base expression needs parentheses when used in a chain
-///
-/// Expressions with lower precedence than member access need parens:
-/// - Binary expressions: `(a + b).method()`
-/// - Conditional expressions: `(a ? b : c).method()`
-/// - Assignment expressions: `(a = b).method()`
-/// - Await expressions: `(await promise).method()`
-/// - Sequence expressions (already have parens from parsing)
-fn base_needs_parens(expr: &Expression) -> bool {
-    matches!(
-        expr,
-        Expression::BinaryExpression(_)
-            | Expression::ConditionalExpression(_)
-            | Expression::AssignmentExpression(_)
-            | Expression::AwaitExpression(_)
-            | Expression::TSAsExpression(_)
-            | Expression::TSSatisfiesExpression(_)
-            | Expression::TSTypeAssertion(_)
-    )
 }
 
 // =============================================================================

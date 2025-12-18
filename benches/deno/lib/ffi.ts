@@ -12,6 +12,10 @@ const symbols = {
 		parameters: ['buffer', 'usize', 'buffer'],
 		result: 'pointer',
 	},
+	tsv_parse_internal_svelte: {
+		parameters: ['buffer', 'usize', 'buffer'],
+		result: 'pointer',
+	},
 	tsv_format_svelte: {
 		parameters: ['buffer', 'usize', 'buffer'],
 		result: 'pointer',
@@ -20,11 +24,19 @@ const symbols = {
 		parameters: ['buffer', 'usize', 'buffer'],
 		result: 'pointer',
 	},
+	tsv_parse_internal_typescript: {
+		parameters: ['buffer', 'usize', 'buffer'],
+		result: 'pointer',
+	},
 	tsv_format_typescript: {
 		parameters: ['buffer', 'usize', 'buffer'],
 		result: 'pointer',
 	},
 	tsv_parse_css: {
+		parameters: ['buffer', 'usize', 'buffer'],
+		result: 'pointer',
+	},
+	tsv_parse_internal_css: {
 		parameters: ['buffer', 'usize', 'buffer'],
 		result: 'pointer',
 	},
@@ -122,6 +134,29 @@ export class NativeImplementation implements TsvImplementation {
 			throw new Error(parsed.error);
 		}
 		return parsed;
+	}
+
+	parseInternal(source: string, language: Language): void {
+		if (!this.lib) throw new Error('Native library not initialized');
+
+		let result: string;
+		switch (language) {
+			case 'svelte':
+				result = this.callFfi(this.lib.symbols.tsv_parse_internal_svelte, source);
+				break;
+			case 'typescript':
+				result = this.callFfi(this.lib.symbols.tsv_parse_internal_typescript, source);
+				break;
+			case 'css':
+				result = this.callFfi(this.lib.symbols.tsv_parse_internal_css, source);
+				break;
+		}
+
+		// Check for error (empty string = success)
+		if (result.startsWith('{"error":')) {
+			const parsed = JSON.parse(result);
+			throw new Error(parsed.error);
+		}
 	}
 
 	format(source: string, language: Language): string {

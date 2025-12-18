@@ -12,10 +12,10 @@ import type { CorpusStats, Language, SourceFile } from './types.ts';
 /** Hardcoded list of repos to benchmark */
 const REPOS = [
 	'zzz',
-	'moss',
+	'fuz_css',
 	'fuz_ui',
 	'gro',
-	'belt',
+	'fuz_util',
 	'fuz_template',
 	'fuz_blog',
 	'fuz_mastodon',
@@ -61,9 +61,7 @@ function shouldExclude(path: string): boolean {
 }
 
 /** Load all source files from a single repo */
-async function loadRepoFiles(
-	repoPath: string,
-): Promise<SourceFile[]> {
+async function loadRepoFiles(repoPath: string): Promise<SourceFile[]> {
 	const srcPath = `${repoPath}/src`;
 	const files: SourceFile[] = [];
 
@@ -167,9 +165,7 @@ export async function loadCorpus(): Promise<{
 }
 
 /** Group files by language for targeted benchmarks */
-export function groupByLanguage(
-	files: SourceFile[],
-): Record<Language, SourceFile[]> {
+export function groupByLanguage(files: SourceFile[]): Record<Language, SourceFile[]> {
 	return {
 		svelte: files.filter((f) => f.language === 'svelte'),
 		typescript: files.filter((f) => f.language === 'typescript'),

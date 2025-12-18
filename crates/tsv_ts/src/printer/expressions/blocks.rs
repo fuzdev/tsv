@@ -129,6 +129,34 @@ impl<'a> Printer<'a> {
         self.write("}");
     }
 
+    /// Print a block statement with empty blocks always expanded to `{\n}`
+    ///
+    /// Used for if/else/try/finally where prettier expands empty blocks.
+    pub(in crate::printer) fn print_block_statement_expand_empty(
+        &mut self,
+        block: &internal::BlockStatement,
+    ) {
+        if block.body.is_empty() {
+            // Check for comments inside empty block
+            let block_start = block.span.start + 1; // After '{'
+            let block_end = block.span.end - 1; // Before '}'
+            let has_inner_comments = self.has_comments_between(block_start, block_end);
+
+            self.write("{\n");
+            self.indent_level += 1;
+            if has_inner_comments {
+                self.print_leading_comments(block_start, block_end, false);
+            }
+            self.indent_level -= 1;
+            self.write_indent();
+            self.write("}");
+            return;
+        }
+
+        // Non-empty blocks use standard printing
+        self.print_block_statement(block);
+    }
+
     /// Print a block statement: `{ stmt1; stmt2; }`
     ///
     /// Handles comments between statements similar to print_program.
@@ -202,34 +230,72 @@ impl<'a> Printer<'a> {
         block: &internal::BlockStatement,
     ) -> Doc {
         if block.body.is_empty() {
+            // Check for comments inside empty block
+            let block_start = block.span.start + 1; // After '{'
+            let block_end = block.span.end - 1; // Before '}'
+            let has_inner_comments = self.has_comments_between(block_start, block_end);
+
+            if has_inner_comments {
+                let mut comment_parts = Vec::new();
+                for comment in tsv_lang::comments_in_range(self.comments, block_start, block_end) {
+                    comment_parts.push(self.build_comment_doc(comment));
+                    if !comment.is_block {
+                        // Line comments need a hardline after
+                        comment_parts.push(doc::hardline());
+                    }
+                }
+                return doc::concat(vec![
+                    doc::text("{"),
+                    doc::indent(doc::concat(vec![
+                        doc::hardline(),
+                        doc::concat(comment_parts),
+                    ])),
+                    doc::hardline(),
+                    doc::text("}"),
+                ]);
+            }
+
             return doc::text("{}");
         }
 
         // Build statements with line breaks between them
-        // Preserve blank lines from source (like print_block_statement does)
+        // Preserve blank lines and comments from source
         let mut body_parts = Vec::new();
         let mut prev_end = block.span.start + 1; // Start after '{'
 
         for (i, stmt) in block.body.iter().enumerate() {
+            let stmt_start = stmt.span().start;
+
+            // Check for comments between previous position and this statement
+            let has_comments = self
+                .comments
+                .iter()
+                .any(|c| c.span.start >= prev_end && c.span.end <= stmt_start);
+
             if i > 0 {
                 // Check for blank lines between statements (when no comments)
-                let has_comments = self
-                    .comments
-                    .iter()
-                    .any(|c| c.span.start >= prev_end && c.span.end <= stmt.span().start);
-
                 if !has_comments
-                    && tsv_lang::printing::has_blank_line_between(
-                        self.source,
-                        prev_end,
-                        stmt.span().start,
-                    )
+                    && tsv_lang::printing::has_blank_line_between(self.source, prev_end, stmt_start)
                 {
                     // Blank line: literalline (no indent) + hardline (with indent for next stmt)
                     body_parts.push(doc::literalline());
                 }
                 body_parts.push(doc::hardline());
             }
+
+            // Print leading comments before this statement
+            if has_comments {
+                for comment in tsv_lang::comments_in_range(self.comments, prev_end, stmt_start) {
+                    body_parts.push(self.build_comment_doc(comment));
+                    // Line comments need a hardline after, block comments just need spacing
+                    if !comment.is_block {
+                        body_parts.push(doc::hardline());
+                    } else {
+                        body_parts.push(doc::text(" "));
+                    }
+                }
+            }
+
             body_parts.push(self.build_statement_doc(stmt));
             prev_end = stmt.span().end;
         }

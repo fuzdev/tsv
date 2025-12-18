@@ -5,6 +5,7 @@ use crate::ast::internal::{
     ClassMember, Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind,
     ExportNamedDeclaration, Expression, FunctionExpression, Identifier, MemberExpression,
     MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier, Statement, StaticBlock,
+    TSIndexSignature,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
@@ -71,7 +72,11 @@ impl<'a> Parser<'a> {
         let mut class = self.parse_class_declaration_inner(!is_default, is_abstract)?;
 
         // Attach decorators to the class
-        class.decorators = decorators;
+        class.decorators = if decorators.is_empty() {
+            None
+        } else {
+            Some(decorators)
+        };
 
         // Update span to include decorators
         class.span = Span::new(start as u32, class.span.end);
@@ -102,7 +107,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a list of decorators: `@dec1 @dec2 ...`
-    fn parse_decorators(&mut self) -> Result<Vec<Decorator>, ParseError> {
+    pub(super) fn parse_decorators(&mut self) -> Result<Vec<Decorator>, ParseError> {
         let mut decorators = Vec::new();
 
         while *self.current_kind() == TokenKind::At {
@@ -159,12 +164,10 @@ impl<'a> Parser<'a> {
             let symbol = self.intern_identifier();
             self.advance()?;
 
-            Some(Identifier {
-                name: symbol,
-                optional: false,
-                type_annotation: None,
-                span: Span::new(id_start as u32, id_end as u32),
-            })
+            Some(Identifier::simple(
+                symbol,
+                Span::new(id_start as u32, id_end as u32),
+            ))
         } else {
             None
         };
@@ -210,7 +213,7 @@ impl<'a> Parser<'a> {
         let end = body.span.end;
 
         Ok(Expression::ClassExpression(ClassExpression {
-            decorators: Vec::new(),
+            decorators: None,
             id,
             super_class,
             super_type_parameters,
@@ -248,12 +251,10 @@ impl<'a> Parser<'a> {
             let symbol = self.intern_identifier();
             self.advance()?;
 
-            Some(Identifier {
-                name: symbol,
-                optional: false,
-                type_annotation: None,
-                span: Span::new(id_start as u32, id_end as u32),
-            })
+            Some(Identifier::simple(
+                symbol,
+                Span::new(id_start as u32, id_end as u32),
+            ))
         } else if name_required {
             return Err(self.error_expected_after("class name", "class"));
         } else {
@@ -301,7 +302,7 @@ impl<'a> Parser<'a> {
         let end = body.span.end;
 
         Ok(ClassDeclaration {
-            decorators: Vec::new(),
+            decorators: None,
             id,
             super_class,
             super_type_parameters,
@@ -341,18 +342,43 @@ impl<'a> Parser<'a> {
         let decorators = self.parse_decorators()?;
 
         // Handle accessibility modifiers (public, private, protected)
-        let accessibility = if self.eat_contextual_keyword("public") {
-            Some(Accessibility::Public)
-        } else if self.eat_contextual_keyword("private") {
-            Some(Accessibility::Private)
-        } else if self.eat_contextual_keyword("protected") {
-            Some(Accessibility::Protected)
+        // Only consume as modifier if followed by a class member name or `*` (generator)
+        // Otherwise the keyword itself is the property name: `private = 1;`
+        let accessibility = if matches!(self.current_kind(), TokenKind::Identifier)
+            && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
+        {
+            match self.current_value() {
+                "public" => {
+                    self.advance().ok();
+                    Some(Accessibility::Public)
+                }
+                "private" => {
+                    self.advance().ok();
+                    Some(Accessibility::Private)
+                }
+                "protected" => {
+                    self.advance().ok();
+                    Some(Accessibility::Protected)
+                }
+                _ => None,
+            }
         } else {
             None
         };
 
-        // Handle 'static' contextual keyword
-        let is_static = self.eat_contextual_keyword("static");
+        // Handle 'static' contextual keyword - only if followed by a class member name or `{` (static block)
+        // Otherwise `static` itself is the property name: `static = 2;`
+        let is_static = if matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() == "static"
+            && (self.peek_is_class_member_name()
+                || self.peek_is(&TokenKind::BraceOpen)
+                || self.peek_is(&TokenKind::Star))
+        {
+            self.advance().ok();
+            true
+        } else {
+            false
+        };
 
         // Check for static initialization block: `static { ... }` (ES2022)
         if is_static && matches!(self.current_kind(), TokenKind::BraceOpen) {
@@ -366,10 +392,11 @@ impl<'a> Parser<'a> {
             }));
         }
 
-        // Handle 'override' contextual keyword - only if followed by a class member name
+        // Handle 'override' contextual keyword - only if followed by a class member name or `*`
+        // Otherwise `override` itself is the property name: `override = 1;`
         let is_override = if matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == "override"
-            && self.peek_is_class_member_name()
+            && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
         {
             self.advance().ok();
             true
@@ -377,10 +404,11 @@ impl<'a> Parser<'a> {
             false
         };
 
-        // Handle 'abstract' contextual keyword (only if followed by identifier, bracket, or #)
+        // Handle 'abstract' contextual keyword - only if followed by a class member name or `*`
+        // Otherwise `abstract` itself is the property name: `abstract = 1;`
         let is_abstract = if matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == "abstract"
-            && self.peek_is_class_member_name()
+            && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
         {
             self.advance().ok();
             true
@@ -388,11 +416,29 @@ impl<'a> Parser<'a> {
             false
         };
 
-        // Handle 'readonly' contextual keyword
-        let readonly = self.eat_contextual_keyword("readonly");
+        // Handle 'readonly' contextual keyword - only if followed by a class member name
+        // Otherwise `readonly` itself is the property name: `readonly = 1;`
+        let readonly = if matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() == "readonly"
+            && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
+        {
+            self.advance().ok();
+            true
+        } else {
+            false
+        };
 
         // Handle 'accessor' contextual keyword (ES decorator proposal)
-        let accessor = self.eat_contextual_keyword("accessor");
+        // Only consume as modifier if followed by a class member name
+        let accessor = if matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() == "accessor"
+            && self.peek_is_class_member_name()
+        {
+            self.advance().ok();
+            true
+        } else {
+            false
+        };
 
         // Handle 'async' keyword for async methods
         // async is only a modifier if followed by: identifier, [, #, or *
@@ -427,6 +473,12 @@ impl<'a> Parser<'a> {
             None
         };
 
+        // Check for index signature: [key: Type]: ValueType
+        // Index signatures look like `[ident: Type]` followed by `: ValueType`
+        if self.is_index_signature_start() {
+            return self.parse_class_index_signature(start, readonly);
+        }
+
         // Parse member name (key)
         let (computed, key, method_name) = if matches!(self.current_kind(), TokenKind::BracketOpen)
         {
@@ -439,24 +491,29 @@ impl<'a> Parser<'a> {
             // Private identifier key: #name
             let private_id = self.parse_private_identifier()?;
             (false, Expression::PrivateIdentifier(private_id), None)
-        } else if matches!(self.current_kind(), TokenKind::Identifier) {
-            // Regular identifier key - capture name before advancing
-            let name_str = self.current_value().to_string();
+        } else if self.current_is_identifier_or_keyword() {
+            // Identifier or keyword as key - keywords are valid as class member names
+            let name_str = self.current_property_name().to_string();
             let (key_start, key_end) = self.current_pos();
             let symbol = self.intern(&name_str);
             self.advance()?;
             (
                 false,
-                Expression::Identifier(Identifier {
-                    name: symbol,
-                    optional: false,
-                    type_annotation: None,
-                    span: Span::new(key_start as u32, key_end as u32),
-                }),
+                Expression::Identifier(Identifier::simple(
+                    symbol,
+                    Span::new(key_start as u32, key_end as u32),
+                )),
                 Some(name_str),
             )
         } else {
             return Err(self.error_expected("class member name"));
+        };
+
+        // Parse type parameters (TypeScript generics): method<T>()
+        let type_parameters = if self.check(&TokenKind::LessThan) {
+            Some(self.parse_type_parameters()?)
+        } else {
+            None
         };
 
         // Detect if this is a method (has `(`) or property (has `=` or `;` or end of class)
@@ -506,7 +563,7 @@ impl<'a> Parser<'a> {
             // Create FunctionExpression for the method value
             let value = FunctionExpression {
                 id: None,
-                type_parameters: None, // TODO: parse type parameters for class methods
+                type_parameters,
                 params,
                 return_type,
                 body: body_block,
@@ -516,7 +573,11 @@ impl<'a> Parser<'a> {
             };
 
             Ok(ClassMember::MethodDefinition(MethodDefinition {
-                decorators,
+                decorators: if decorators.is_empty() {
+                    None
+                } else {
+                    Some(decorators)
+                },
                 key,
                 value,
                 kind,
@@ -566,7 +627,11 @@ impl<'a> Parser<'a> {
             self.eat(TokenKind::Semicolon);
 
             Ok(ClassMember::PropertyDefinition(PropertyDefinition {
-                decorators,
+                decorators: if decorators.is_empty() {
+                    None
+                } else {
+                    Some(decorators)
+                },
                 key,
                 type_annotation,
                 value,
@@ -638,12 +703,10 @@ impl<'a> Parser<'a> {
         let name = self.intern_identifier();
         self.advance()?;
 
-        let mut expr = Expression::Identifier(Identifier {
+        let mut expr = Expression::Identifier(Identifier::simple(
             name,
-            optional: false,
-            type_annotation: None,
-            span: Span::new(start as u32, end as u32),
-        });
+            Span::new(start as u32, end as u32),
+        ));
 
         // Parse member access chain and call expressions: `.identifier`, `(args)`
         // Keywords are valid property names in member expressions
@@ -662,12 +725,10 @@ impl<'a> Parser<'a> {
 
                     expr = Expression::MemberExpression(MemberExpression {
                         object: Box::new(expr),
-                        property: Box::new(Expression::Identifier(Identifier {
-                            name: prop_name,
-                            optional: false,
-                            type_annotation: None,
-                            span: Span::new(prop_start as u32, prop_end as u32),
-                        })),
+                        property: Box::new(Expression::Identifier(Identifier::simple(
+                            prop_name,
+                            Span::new(prop_start as u32, prop_end as u32),
+                        ))),
                         computed: false,
                         optional: false,
                         span: Span::new(start as u32, prop_end as u32),
@@ -706,5 +767,60 @@ impl<'a> Parser<'a> {
         }
 
         Ok(expr)
+    }
+
+    /// Parse an index signature: `[key: KeyType]: ValueType` or `readonly [key: KeyType]: ValueType`
+    fn parse_class_index_signature(
+        &mut self,
+        start: usize,
+        readonly: bool,
+    ) -> Result<ClassMember, ParseError> {
+        // Consume `[`
+        self.expect(&TokenKind::BracketOpen)?;
+
+        // Parse parameter: `key: KeyType`
+        let (id_start, id_end) = self.current_pos();
+        if !matches!(self.current_kind(), TokenKind::Identifier) {
+            return Err(self.error_expected("index signature parameter name"));
+        }
+        let param_name = self.intern_identifier();
+        self.advance()?;
+
+        // Parse type annotation on parameter: `: KeyType`
+        let param_type = if self.check(&TokenKind::Colon) {
+            Some(self.parse_type_annotation()?)
+        } else {
+            return Err(self.error_expected("type annotation for index signature parameter"));
+        };
+
+        let param_end = param_type.as_ref().map_or(id_end, |t| t.span.end as usize);
+        let parameter = Identifier {
+            name: param_name,
+            optional: false,
+            type_annotation: param_type,
+            decorators: None,
+            span: Span::new(id_start as u32, param_end as u32),
+        };
+
+        // Consume `]`
+        self.expect(&TokenKind::BracketClose)?;
+
+        // Parse value type annotation: `: ValueType`
+        let value_type = if self.check(&TokenKind::Colon) {
+            self.parse_type_annotation()?
+        } else {
+            return Err(self.error_expected("type annotation for index signature value"));
+        };
+
+        // Consume semicolon
+        let end = value_type.span.end;
+        self.eat(TokenKind::Semicolon);
+
+        Ok(ClassMember::IndexSignature(TSIndexSignature {
+            parameters: vec![parameter],
+            type_annotation: value_type,
+            readonly,
+            span: Span::new(start as u32, end),
+        }))
     }
 }

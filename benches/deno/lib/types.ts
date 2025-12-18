@@ -81,8 +81,11 @@ export interface TsvImplementation {
 	/** Parse source and return AST (as object or JSON string) */
 	parse(source: string, language: Language): unknown;
 
-	/** Format source and return formatted string */
-	format(source: string, language: Language): string;
+	/** Format source synchronously (native, wasm) */
+	format?(source: string, language: Language): string;
+
+	/** Format source asynchronously (canonical/prettier) */
+	formatAsync?(source: string, language: Language): Promise<string>;
 
 	/** Clean up resources */
 	dispose(): void;

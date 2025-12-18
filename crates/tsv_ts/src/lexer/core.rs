@@ -117,6 +117,15 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Peek at the next n characters without consuming them.
+    /// Returns a string slice containing up to n characters (may be fewer if EOF).
+    fn peek_chars(&self, n: usize) -> &str {
+        let remaining = &self.source[self.position..];
+        // Count n characters (not bytes) to find the correct byte offset
+        let byte_count: usize = remaining.chars().take(n).map(char::len_utf8).sum();
+        &remaining[..byte_count]
+    }
+
     /// Create a token with the current position as end
     #[inline]
     fn make_token(&self, kind: TokenKind, start: usize) -> Token {
@@ -495,31 +504,35 @@ impl<'a> Lexer<'a> {
                 Ok(self.make_token(TokenKind::ParenClose, start))
             }
             Some('.') => {
-                let peek1 = self.source[self.position + 1..].chars().next();
-                let peek2 = self.source[self.position + 2..].chars().next();
-                if peek1 == Some('.') && peek2 == Some('.') {
+                // Use peek_chars to safely check for spread operator (...) without UTF-8 boundary issues
+                let peek = self.peek_chars(3); // Peek at current '.' plus next 2 chars
+                if peek == "..." {
                     // Spread operator: ...
                     self.advance(); // consume first .
                     self.advance(); // consume second .
                     self.advance(); // consume third .
                     Ok(self.make_token(TokenKind::DotDotDot, start))
-                } else if peek1.is_some_and(|c| c.is_ascii_digit()) {
-                    // Number starting with decimal: .5
-                    self.advance(); // consume '.'
-                    self.scan_digits(|c| c.is_ascii_digit());
-                    // Check for exponent
-                    if matches!(self.current, Some('e' | 'E')) {
-                        self.advance();
-                        if matches!(self.current, Some('+' | '-')) {
-                            self.advance();
-                        }
-                        self.scan_digits(|c| c.is_ascii_digit());
-                    }
-                    Ok(self.make_token(TokenKind::Number, start))
                 } else {
-                    // Single dot: member access operator
-                    self.advance();
-                    Ok(self.make_token(TokenKind::Dot, start))
+                    // Check if next char is a digit (for decimal numbers like .5)
+                    let next_char = peek.chars().nth(1); // Skip current '.' and get next char
+                    if next_char.is_some_and(|c| c.is_ascii_digit()) {
+                        // Number starting with decimal: .5
+                        self.advance(); // consume '.'
+                        self.scan_digits(|c| c.is_ascii_digit());
+                        // Check for exponent
+                        if matches!(self.current, Some('e' | 'E')) {
+                            self.advance();
+                            if matches!(self.current, Some('+' | '-')) {
+                                self.advance();
+                            }
+                            self.scan_digits(|c| c.is_ascii_digit());
+                        }
+                        Ok(self.make_token(TokenKind::Number, start))
+                    } else {
+                        // Single dot: member access operator
+                        self.advance();
+                        Ok(self.make_token(TokenKind::Dot, start))
+                    }
                 }
             }
             Some('-') => {
@@ -871,12 +884,13 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Read a regex literal starting from a `/` token.
+    /// Read a regex literal starting from a `/` or `/=` token.
     ///
-    /// Called by the parser when it determines that `/` should be a regex, not division.
-    /// The parser passes the start position of the `/` token it received.
+    /// Called by the parser when it determines that `/` or `/=` should be a regex, not division.
+    /// The parser passes the start position of the token it received.
     ///
     /// The lexer syncs to that position and reads `/pattern/flags`.
+    /// For `/=` tokens, the `=` becomes the first character of the pattern (e.g., `/=\s*/`).
     ///
     /// Pattern and flags are stored in token.decoded as "pattern\0flags" (null-separated).
     pub fn read_regex_literal(&mut self, slash_start: usize) -> Result<Token, ParseError> {

@@ -183,12 +183,10 @@ impl<'a> Parser<'a> {
                 self.advance()?;
 
                 Ok(TSType::TypeReference(TSTypeReference {
-                    type_name: TSEntityName::Identifier(Identifier {
-                        name: symbol,
-                        optional: false,
-                        type_annotation: None,
-                        span: Span::new(start as u32, end as u32),
-                    }),
+                    type_name: TSEntityName::Identifier(Identifier::simple(
+                        symbol,
+                        Span::new(start as u32, end as u32),
+                    )),
                     type_arguments: None,
                     span: Span::new(start as u32, end as u32),
                 }))
@@ -226,15 +224,7 @@ impl<'a> Parser<'a> {
             // String literal types: `"hello"`, `'world'`
             TokenKind::String => {
                 let (start, end) = self.current_pos();
-                let raw = self.current_value().to_string();
-                let quote = raw.chars().next().unwrap_or('"');
-                let content = if let Some(decoded) = self.current_decoded() {
-                    decoded.to_string()
-                } else if raw.len() >= 2 {
-                    raw[1..raw.len() - 1].to_string()
-                } else {
-                    String::new()
-                };
+                let (content, quote) = self.extract_string_literal();
                 self.advance()?;
 
                 Ok(TSType::Literal(TSLiteralType::String(Literal {
@@ -292,9 +282,9 @@ impl<'a> Parser<'a> {
             TokenKind::BraceOpen => self.parse_object_type(),
             // Tuple type: [T, U]
             TokenKind::BracketOpen => self.parse_tuple_type(),
-            // Type reference or type operator (keyof, unique, readonly) or infer
+            // Type reference or type operator (keyof, unique, readonly) or infer or abstract constructor
             TokenKind::Identifier => {
-                // Check for type operators: keyof, unique, readonly
+                // Check for type operators: keyof, unique, readonly, abstract
                 match self.current_value() {
                     "keyof" => self.parse_type_operator(TSTypeOperatorKind::Keyof),
                     "unique" => self.parse_type_operator(TSTypeOperatorKind::Unique),
@@ -310,6 +300,15 @@ impl<'a> Parser<'a> {
                             self.parse_type_reference()
                         }
                     }
+                    "abstract" => {
+                        // Check if next token is 'new' for abstract constructor type
+                        if matches!(self.peek_kind(), TokenKind::Keyword(KeywordKind::New)) {
+                            self.parse_constructor_type(true)
+                        } else {
+                            // 'abstract' as a type reference (rare but valid)
+                            self.parse_type_reference()
+                        }
+                    }
                     "infer" => self.parse_infer_type(),
                     _ => self.parse_type_reference(),
                 }
@@ -320,6 +319,8 @@ impl<'a> Parser<'a> {
             TokenKind::LessThan => self.parse_generic_function_type(),
             // Type query: typeof x, typeof Foo.bar, typeof import("module")
             TokenKind::Keyword(KeywordKind::Typeof) => self.parse_type_query(),
+            // Constructor type: new () => T or new <T>() => T
+            TokenKind::Keyword(KeywordKind::New) => self.parse_constructor_type(false),
             _ => Err(self.error_expected_found("type")),
         }
     }
@@ -354,12 +355,7 @@ impl<'a> Parser<'a> {
         let symbol = self.intern_identifier();
         self.advance()?;
 
-        let name = Identifier {
-            name: symbol,
-            optional: false,
-            type_annotation: None,
-            span: Span::new(id_start as u32, id_end as u32),
-        };
+        let name = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
 
         Ok(TSType::Infer(TSInferType {
             type_parameter: TSTypeParameter {
@@ -393,7 +389,7 @@ impl<'a> Parser<'a> {
     /// Index signatures always have the form `[identifier: type]` where the identifier
     /// is immediately followed by `:`. Computed properties have `[expression]` where
     /// the expression can be any expression followed by `]`.
-    fn is_index_signature_start(&self) -> bool {
+    pub(in crate::parser) fn is_index_signature_start(&self) -> bool {
         // Must start with '['
         if !matches!(self.current_kind, TokenKind::BracketOpen) {
             return false;
@@ -466,15 +462,7 @@ impl<'a> Parser<'a> {
         }
 
         let (arg_start, arg_end) = self.current_pos();
-        let raw = self.current_value().to_string();
-        let quote = raw.chars().next().unwrap_or('"');
-        let content = if let Some(decoded) = self.current_decoded() {
-            decoded.to_string()
-        } else if raw.len() >= 2 {
-            raw[1..raw.len() - 1].to_string()
-        } else {
-            String::new()
-        };
+        let (content, quote) = self.extract_string_literal();
         self.advance()?;
 
         let argument = Literal {
@@ -543,15 +531,7 @@ impl<'a> Parser<'a> {
             }
 
             let (arg_start, arg_end) = self.current_pos();
-            let raw = self.current_value().to_string();
-            let quote = raw.chars().next().unwrap_or('"');
-            let content = if let Some(decoded) = self.current_decoded() {
-                decoded.to_string()
-            } else if raw.len() >= 2 {
-                raw[1..raw.len() - 1].to_string()
-            } else {
-                String::new()
-            };
+            let (content, quote) = self.extract_string_literal();
             self.advance()?;
 
             let argument = Literal {
@@ -628,12 +608,10 @@ impl<'a> Parser<'a> {
         let symbol = self.intern_identifier();
         self.advance()?;
 
-        let mut result = TSEntityName::Identifier(Identifier {
-            name: symbol,
-            optional: false,
-            type_annotation: None,
-            span: Span::new(id_start as u32, id_end as u32),
-        });
+        let mut result = TSEntityName::Identifier(Identifier::simple(
+            symbol,
+            Span::new(id_start as u32, id_end as u32),
+        ));
 
         while self.check(&TokenKind::Dot) {
             self.advance()?; // consume '.'
@@ -646,12 +624,10 @@ impl<'a> Parser<'a> {
             let right_symbol = self.intern_identifier();
             self.advance()?;
 
-            let right = Identifier {
-                name: right_symbol,
-                optional: false,
-                type_annotation: None,
-                span: Span::new(right_start as u32, right_end as u32),
-            };
+            let right = Identifier::simple(
+                right_symbol,
+                Span::new(right_start as u32, right_end as u32),
+            );
 
             result = TSEntityName::QualifiedName(Box::new(TSQualifiedName {
                 left: result,
@@ -825,6 +801,47 @@ impl<'a> Parser<'a> {
         }))
     }
 
+    /// Parse constructor type: `new () => T`, `new <T>() => T`, `abstract new () => T`
+    fn parse_constructor_type(&mut self, is_abstract: bool) -> Result<TSType, ParseError> {
+        let start = self.current_pos().0;
+
+        // If abstract, consume 'abstract' keyword
+        if is_abstract {
+            self.advance()?; // consume 'abstract'
+        }
+
+        // Expect 'new' keyword
+        self.expect(&TokenKind::Keyword(KeywordKind::New))?;
+
+        // Parse optional type parameters: <T>
+        let type_parameters = if self.check(&TokenKind::LessThan) {
+            Some(self.parse_type_parameters()?)
+        } else {
+            None
+        };
+
+        // Parse parameter list
+        self.expect(&TokenKind::ParenOpen)?;
+        let params = self.parse_function_type_params()?;
+        self.expect(&TokenKind::ParenClose)?;
+
+        // Expect arrow
+        let arrow_start = self.current_pos().0 as u32;
+        self.expect(&TokenKind::Arrow)?;
+
+        // Parse return type (may be a type predicate)
+        let return_type = self.parse_return_type_inner(arrow_start)?;
+        let end = return_type.span.end;
+
+        Ok(TSType::Constructor(TSConstructorType {
+            abstract_: is_abstract,
+            type_parameters,
+            params,
+            return_type: Box::new(return_type),
+            span: Span::new(start as u32, end),
+        }))
+    }
+
     /// Check if an expression is a function parameter (has type annotation)
     fn is_function_param(&self, expr: &Expression) -> bool {
         match expr {
@@ -892,6 +909,7 @@ impl<'a> Parser<'a> {
             name: symbol,
             optional,
             type_annotation,
+            decorators: None,
             span: Span::new(id_start as u32, end),
         }))
     }
@@ -1059,6 +1077,7 @@ impl<'a> Parser<'a> {
                 type_annotation: Box::new(param_type.clone()),
                 span: param_type.span(),
             }),
+            decorators: None,
             span: Span::new(id_start as u32, param_type.span().end),
         };
 
@@ -1284,12 +1303,10 @@ impl<'a> Parser<'a> {
                     // This was actually `TypeRef?` - we need to create the type reference
                     // and wrap it in optional
                     let type_ref = TSType::TypeReference(TSTypeReference {
-                        type_name: TSEntityName::Identifier(Identifier {
-                            name: label_symbol,
-                            optional: false,
-                            type_annotation: None,
-                            span: Span::new(label_start as u32, label_end as u32),
-                        }),
+                        type_name: TSEntityName::Identifier(Identifier::simple(
+                            label_symbol,
+                            Span::new(label_start as u32, label_end as u32),
+                        )),
                         type_arguments: None,
                         span: Span::new(label_start as u32, label_end as u32),
                     });
@@ -1308,12 +1325,10 @@ impl<'a> Parser<'a> {
             let end = element_type.span().end;
 
             return Ok(TSType::NamedTupleMember(TSNamedTupleMember {
-                label: Identifier {
-                    name: label_symbol,
-                    optional: false,
-                    type_annotation: None,
-                    span: Span::new(label_start as u32, label_end as u32),
-                },
+                label: Identifier::simple(
+                    label_symbol,
+                    Span::new(label_start as u32, label_end as u32),
+                ),
                 element_type: Box::new(element_type),
                 optional,
                 span: Span::new(elem_start as u32, end),
@@ -1532,12 +1547,7 @@ impl<'a> Parser<'a> {
         let symbol = self.intern_identifier();
         self.advance()?;
 
-        let id = Identifier {
-            name: symbol,
-            optional: false,
-            type_annotation: None,
-            span: Span::new(id_start as u32, id_end as u32),
-        };
+        let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
 
         // Parse optional type parameters: <T, U>
         let type_parameters = if self.check(&TokenKind::LessThan) {
@@ -1583,12 +1593,7 @@ impl<'a> Parser<'a> {
         let symbol = self.intern_identifier();
         self.advance()?;
 
-        let id = Identifier {
-            name: symbol,
-            optional: false,
-            type_annotation: None,
-            span: Span::new(id_start as u32, id_end as u32),
-        };
+        let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
 
         // Parse optional type parameters: <T, U>
         let type_parameters = if self.check(&TokenKind::LessThan) {
@@ -1685,8 +1690,30 @@ impl<'a> Parser<'a> {
     fn parse_type_element(&mut self) -> Result<TSTypeElement, ParseError> {
         let start = self.current_pos().0;
 
-        // Check for readonly modifier
-        let readonly = self.eat_contextual_keyword("readonly");
+        // Check for readonly modifier - only if followed by a property name or bracket
+        // Otherwise `readonly` itself is the property name: `readonly: string` or `readonly?: boolean`
+        let readonly = if matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() == "readonly"
+        {
+            // Peek ahead to see what follows
+            match self.peek_kind() {
+                TokenKind::Identifier
+                | TokenKind::Keyword(_)
+                | TokenKind::BracketOpen
+                | TokenKind::ParenOpen
+                | TokenKind::LessThan => {
+                    // 'readonly' is a modifier - consume it
+                    self.advance().ok();
+                    true
+                }
+                _ => {
+                    // 'readonly' is a property name - don't consume
+                    false
+                }
+            }
+        } else {
+            false
+        };
 
         // Check for call signature: `(): T` or `<T>(): T`
         if self.check(&TokenKind::ParenOpen) || self.check(&TokenKind::LessThan) {
@@ -1765,6 +1792,7 @@ impl<'a> Parser<'a> {
                         type_annotation: Box::new(param_type.clone()),
                         span: param_type.span(),
                     }),
+                    decorators: None,
                     span: Span::new(param_start as u32, param_type.span().end),
                 };
 
@@ -1801,12 +1829,10 @@ impl<'a> Parser<'a> {
             self.advance()?;
             (
                 false,
-                Expression::Identifier(Identifier {
-                    name: symbol,
-                    optional: false,
-                    type_annotation: None,
-                    span: Span::new(key_start as u32, key_end as u32),
-                }),
+                Expression::Identifier(Identifier::simple(
+                    symbol,
+                    Span::new(key_start as u32, key_end as u32),
+                )),
             )
         } else {
             return Err(self.error_expected("property name"));
@@ -1966,12 +1992,7 @@ impl<'a> Parser<'a> {
         let symbol = self.intern_identifier();
         self.advance()?;
 
-        let id = Identifier {
-            name: symbol,
-            optional: false,
-            type_annotation: None,
-            span: Span::new(id_start as u32, id_end as u32),
-        };
+        let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
 
         // Parse optional type parameters: <T, U>
         let type_parameters = if self.check(&TokenKind::LessThan) {
@@ -2037,12 +2058,8 @@ impl<'a> Parser<'a> {
             let param_symbol = self.intern(&param_name_str);
             self.advance()?;
 
-            let parameter_name = Identifier {
-                name: param_symbol,
-                optional: false,
-                type_annotation: None,
-                span: Span::new(id_start as u32, id_end as u32),
-            };
+            let parameter_name =
+                Identifier::simple(param_symbol, Span::new(id_start as u32, id_end as u32));
 
             // Consume 'is' keyword
             self.advance()?;
@@ -2073,12 +2090,8 @@ impl<'a> Parser<'a> {
             let param_symbol = self.intern(&param_name_str);
             self.advance()?;
 
-            let parameter_name = Identifier {
-                name: param_symbol,
-                optional: false,
-                type_annotation: None,
-                span: Span::new(id_start as u32, id_end as u32),
-            };
+            let parameter_name =
+                Identifier::simple(param_symbol, Span::new(id_start as u32, id_end as u32));
 
             let predicate = TSTypePredicate {
                 parameter_name,
@@ -2117,12 +2130,7 @@ impl<'a> Parser<'a> {
         let symbol = self.intern_identifier();
         self.advance()?;
 
-        let id = Identifier {
-            name: symbol,
-            optional: false,
-            type_annotation: None,
-            span: Span::new(id_start as u32, id_end as u32),
-        };
+        let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
 
         // Parse type parameters if present (e.g., <T> in `class Foo<T>`)
         let type_parameters = if self.check(&TokenKind::LessThan) {
@@ -2145,12 +2153,10 @@ impl<'a> Parser<'a> {
                 let super_symbol = self.intern_identifier();
                 self.advance()?;
 
-                let super_id = Expression::Identifier(Identifier {
-                    name: super_symbol,
-                    optional: false,
-                    type_annotation: None,
-                    span: Span::new(id_start as u32, id_end as u32),
-                });
+                let super_id = Expression::Identifier(Identifier::simple(
+                    super_symbol,
+                    Span::new(id_start as u32, id_end as u32),
+                ));
 
                 // Parse optional type arguments: <T, U>
                 let type_args = if self.check(&TokenKind::LessThan) {
@@ -2176,7 +2182,7 @@ impl<'a> Parser<'a> {
         let end = body.span.end;
 
         Ok(Statement::ClassDeclaration(ClassDeclaration {
-            decorators: Vec::new(),
+            decorators: None,
             id: Some(id),
             super_class,
             super_type_parameters,
@@ -2242,12 +2248,10 @@ impl<'a> Parser<'a> {
             self.advance()?;
             (
                 false,
-                Expression::Identifier(Identifier {
-                    name: symbol,
-                    optional: false,
-                    type_annotation: None,
-                    span: Span::new(key_start as u32, key_end as u32),
-                }),
+                Expression::Identifier(Identifier::simple(
+                    symbol,
+                    Span::new(key_start as u32, key_end as u32),
+                )),
                 name == "constructor",
             )
         } else {
@@ -2289,7 +2293,7 @@ impl<'a> Parser<'a> {
             };
 
             Ok(ClassMember::MethodDefinition(MethodDefinition {
-                decorators: Vec::new(),
+                decorators: None,
                 key,
                 value,
                 kind,
@@ -2323,7 +2327,7 @@ impl<'a> Parser<'a> {
                 .map_or_else(|| key.span().end, |ta| ta.span.end);
 
             Ok(ClassMember::PropertyDefinition(PropertyDefinition {
-                decorators: Vec::new(),
+                decorators: None,
                 key,
                 type_annotation,
                 value: None,
@@ -2409,12 +2413,7 @@ impl<'a> Parser<'a> {
         }
         let symbol = self.intern_identifier();
         self.advance()?;
-        let name = Identifier {
-            name: symbol,
-            optional: false,
-            type_annotation: None,
-            span: Span::new(id_start as u32, id_end as u32),
-        };
+        let name = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
 
         // Parse optional constraint: `extends U`
         let constraint = if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
@@ -2512,12 +2511,7 @@ impl<'a> Parser<'a> {
         let symbol = self.intern_identifier();
         self.advance()?;
 
-        let id = Identifier {
-            name: symbol,
-            optional: false,
-            type_annotation: None,
-            span: Span::new(id_start as u32, id_end as u32),
-        };
+        let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
 
         // Parse enum body: { members }
         self.expect(&TokenKind::BraceOpen)?;
@@ -2557,12 +2551,10 @@ impl<'a> Parser<'a> {
                 let (id_start, id_end) = self.current_pos();
                 let symbol = self.intern_identifier();
                 self.advance()?;
-                TSEnumMemberId::Identifier(Identifier {
-                    name: symbol,
-                    optional: false,
-                    type_annotation: None,
-                    span: Span::new(id_start as u32, id_end as u32),
-                })
+                TSEnumMemberId::Identifier(Identifier::simple(
+                    symbol,
+                    Span::new(id_start as u32, id_end as u32),
+                ))
             }
             TokenKind::String => TSEnumMemberId::String(self.parse_string_literal()?),
             _ => {
@@ -2627,12 +2619,7 @@ impl<'a> Parser<'a> {
         } else if matches!(self.current_kind(), TokenKind::Identifier) {
             let (id_start, id_end) = self.current_pos();
             let name = self.intern_identifier();
-            let ident = Identifier {
-                name,
-                optional: false,
-                type_annotation: None,
-                span: Span::new(id_start as u32, id_end as u32),
-            };
+            let ident = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
             self.advance()?;
 
             // Check for nested namespace: `namespace Outer.Inner { }`
@@ -2679,12 +2666,10 @@ impl<'a> Parser<'a> {
         let name = self.intern_identifier();
         self.advance()?;
 
-        let id = TSModuleName::Identifier(Identifier {
+        let id = TSModuleName::Identifier(Identifier::simple(
             name,
-            optional: false,
-            type_annotation: None,
-            span: Span::new(global_start as u32, global_end as u32),
-        });
+            Span::new(global_start as u32, global_end as u32),
+        ));
 
         // Parse body
         let block = self.parse_module_block(true)?;
@@ -2745,12 +2730,7 @@ impl<'a> Parser<'a> {
         }
         let (id_start, id_end) = self.current_pos();
         let name = self.intern_identifier();
-        let id = Identifier {
-            name,
-            optional: false,
-            type_annotation: None,
-            span: Span::new(id_start as u32, id_end as u32),
-        };
+        let id = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
         self.advance()?;
 
         // Check for nested namespace: `namespace Outer.Inner { }`

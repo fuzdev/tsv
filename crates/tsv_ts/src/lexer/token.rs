@@ -201,6 +201,43 @@ impl KeywordKind {
                 | KeywordKind::Bigint
         )
     }
+
+    /// Returns true if this keyword can be used as a binding name (variable name, parameter).
+    ///
+    /// This is more restrictive than `can_be_identifier()`. Some keywords like `await`,
+    /// `yield`, and `let` can be property names but NOT binding names.
+    ///
+    /// - `await` - cannot be a binding name (reserved in module code)
+    /// - `yield` - cannot be a binding name (reserved in strict mode)
+    /// - `let` - cannot be a binding name (reserved in strict mode)
+    ///
+    /// Examples:
+    /// - `const as = 1;` - valid, `as` can be a binding name
+    /// - `const await = 1;` - INVALID, `await` cannot be a binding name
+    /// - `function fn(yield: string) {}` - INVALID, `yield` cannot be a parameter
+    #[inline]
+    pub const fn can_be_binding_name(self) -> bool {
+        matches!(
+            self,
+            // Fully contextual keywords that can be binding names
+            KeywordKind::Async
+                | KeywordKind::From
+                | KeywordKind::As
+                | KeywordKind::Satisfies
+                // Type keywords are also valid binding names in value positions
+                | KeywordKind::Number
+                | KeywordKind::String
+                | KeywordKind::Boolean
+                | KeywordKind::Any
+                | KeywordKind::Void
+                | KeywordKind::Never
+                | KeywordKind::Unknown
+                | KeywordKind::Object
+                | KeywordKind::Symbol
+                | KeywordKind::Bigint
+        )
+        // NOTE: Await, Yield, Let are NOT included - they cannot be binding names
+    }
 }
 
 impl fmt::Display for KeywordKind {

@@ -332,4 +332,53 @@ impl<'a> SvelteParser<'a> {
             context: None,
         }
     }
+
+    // ========== TypeScript Expression Parsing Helpers ==========
+    // These helpers wrap tsv_ts parsing functions and automatically collect comments.
+
+    /// Parse a TypeScript expression and collect any comments.
+    ///
+    /// Comments are added to `self.expression_comments` for later inclusion in `Root.comments`.
+    /// Use this instead of calling `tsv_ts::parse_expression` directly.
+    pub(crate) fn parse_ts_expression(
+        &mut self,
+        source: &str,
+        base_offset: usize,
+    ) -> Result<tsv_ts::Expression, ParseError> {
+        let (expr, comments) =
+            tsv_ts::parse_expression_with_comments(source, base_offset, Rc::clone(&self.interner))?;
+        self.expression_comments.extend(comments);
+        Ok(expr)
+    }
+
+    /// Parse a partial TypeScript expression (stops at top-level identifiers like `as`).
+    ///
+    /// Comments are collected. Use this instead of `tsv_ts::parse_expression_partial` directly.
+    pub(crate) fn parse_ts_expression_partial(
+        &mut self,
+        source: &str,
+        base_offset: usize,
+    ) -> Result<(tsv_ts::Expression, usize), ParseError> {
+        let (expr, end_pos, comments) = tsv_ts::parse_expression_partial_with_comments(
+            source,
+            base_offset,
+            Rc::clone(&self.interner),
+        )?;
+        self.expression_comments.extend(comments);
+        Ok((expr, end_pos))
+    }
+
+    /// Parse a TypeScript pattern (destructuring) and collect any comments.
+    ///
+    /// Comments are collected. Use this instead of `tsv_ts::parse_pattern` directly.
+    pub(crate) fn parse_ts_pattern(
+        &mut self,
+        source: &str,
+        base_offset: usize,
+    ) -> Result<tsv_ts::Expression, ParseError> {
+        let (pattern, comments) =
+            tsv_ts::parse_pattern_with_comments(source, base_offset, Rc::clone(&self.interner))?;
+        self.expression_comments.extend(comments);
+        Ok(pattern)
+    }
 }

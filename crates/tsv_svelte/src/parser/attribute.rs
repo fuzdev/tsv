@@ -1,7 +1,5 @@
 // Attribute parsing
 
-use std::rc::Rc;
-
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
@@ -140,16 +138,17 @@ impl<'a> SvelteParser<'a> {
         }
 
         // Check for = (directive with value)
-        let expression = if self.check(TokenKind::Equals) {
+        let (expression, expression_tag_span) = if self.check(TokenKind::Equals) {
             self.advance()?; // consume =
-            Some(self.parse_directive_expression()?)
+            let (expr, tag_span) = self.parse_directive_expression()?;
+            (Some(expr), Some(tag_span))
         } else {
-            None
+            (None, None)
         };
 
         // Calculate end position
-        let end = if let Some(expr) = &expression {
-            expr.span().end_usize()
+        let end = if let Some(tag_span) = &expression_tag_span {
+            tag_span.end as usize
         } else {
             name_end
         };
@@ -166,6 +165,7 @@ impl<'a> SvelteParser<'a> {
                 expression,
                 modifiers,
                 span,
+                expression_tag_span,
             })),
             DirectiveType::Bind => {
                 // Bind directive always has an expression (auto-generated for shorthand)
@@ -177,6 +177,7 @@ impl<'a> SvelteParser<'a> {
                     expression: expr,
                     modifiers,
                     span,
+                    expression_tag_span,
                 }))
             }
             DirectiveType::Class => {
@@ -189,6 +190,7 @@ impl<'a> SvelteParser<'a> {
                     expression: expr,
                     modifiers,
                     span,
+                    expression_tag_span,
                 }))
             }
             DirectiveType::Style => unreachable!("handled above"),
@@ -197,6 +199,7 @@ impl<'a> SvelteParser<'a> {
                 expression,
                 modifiers,
                 span,
+                expression_tag_span,
             })),
             DirectiveType::Transition => {
                 Ok(AttributeNode::TransitionDirective(TransitionDirective {
@@ -237,15 +240,16 @@ impl<'a> SvelteParser<'a> {
     }
 
     /// Parse directive expression (the part after `=`)
-    fn parse_directive_expression(&mut self) -> Result<Expression, ParseError> {
+    /// Returns the expression and the span of the expression tag (for comment lookup)
+    fn parse_directive_expression(&mut self) -> Result<(Expression, Span), ParseError> {
         // Expect { for expression
         if !self.check(TokenKind::LeftBrace) {
             return Err(self.error_msg("Directive value must be an expression wrapped in {}"));
         }
 
-        // Parse as expression tag and extract the expression
+        // Parse as expression tag and extract the expression with its span
         let expr_tag = self.parse_expression_tag()?;
-        Ok(expr_tag.expression)
+        Ok((expr_tag.expression, expr_tag.span))
     }
 
     /// Create an identifier expression for shorthand directives (bind:value, class:active)
@@ -255,6 +259,7 @@ impl<'a> SvelteParser<'a> {
             name: symbol,
             optional: false,
             type_annotation: None,
+            decorators: None,
             span: Span {
                 start: start as u32,
                 end: end as u32,
@@ -374,8 +379,7 @@ impl<'a> SvelteParser<'a> {
         let expr_offset = content_start + content.find(expr_str).unwrap_or(0);
 
         // Parse the expression using the TypeScript parser
-        let expression =
-            tsv_ts::parse_expression(expr_str, expr_offset, Rc::clone(&self.interner))?;
+        let expression = self.parse_ts_expression(expr_str, expr_offset)?;
 
         // Advance the lexer past the entire {@attach ...} construct
         // We need to update the lexer position to after the closing '}'
@@ -449,8 +453,7 @@ impl<'a> SvelteParser<'a> {
         let expr_offset = content_start + leading_ws + 3; // Skip whitespace + "..."
 
         // Parse the expression using the TypeScript parser
-        let expression =
-            tsv_ts::parse_expression(expr_str, expr_offset, Rc::clone(&self.interner))?;
+        let expression = self.parse_ts_expression(expr_str, expr_offset)?;
 
         // Advance the lexer past the entire {...} construct
         self.advance_to_position(end)?;
@@ -523,6 +526,7 @@ impl<'a> SvelteParser<'a> {
             name,
             optional: false,
             type_annotation: None,
+            decorators: None,
             span: Span {
                 start: content_start as u32,
                 end: content_end as u32,
@@ -654,24 +658,138 @@ impl<'a> SvelteParser<'a> {
         let content_start = token_start + 1;
         let content_end = token_end - 1;
 
-        // Extract the actual text content from source
-        let text_content = self.source[content_start..content_end].to_string();
-
-        // Decode HTML entities in attribute values (is_attribute_value=true)
-        let decoded = tsv_html::decode_character_references(&text_content, true);
-
-        let text = Text {
-            raw: text_content,
-            data: decoded,
-            span: Span {
-                start: content_start as u32,
-                end: content_end as u32,
-            },
-        };
-
+        // Advance past the string token now, before we start parsing expression tags
         self.advance()?;
 
-        parts.push(AttributeValue::Text(text));
+        // Scan for expression tags within the quoted value
+        // Example: "delete {'\"'}" contains text "delete " and expression {'\"'}
+        let mut pos = content_start;
+        let source_bytes = self.source.as_bytes();
+
+        while pos < content_end {
+            // Scan for the start of an expression tag
+            let text_start = pos;
+            while pos < content_end && source_bytes[pos] != b'{' {
+                pos += 1;
+            }
+
+            // If we found text before the expression tag (or we're at the end), create a text part
+            if pos > text_start {
+                let text_content = self.source[text_start..pos].to_string();
+                let decoded = tsv_html::decode_character_references(&text_content, true);
+                parts.push(AttributeValue::Text(Text {
+                    raw: text_content,
+                    data: decoded,
+                    span: Span {
+                        start: text_start as u32,
+                        end: pos as u32,
+                    },
+                }));
+            }
+
+            // If we're at an expression tag, parse it
+            if pos < content_end && source_bytes[pos] == b'{' {
+                // Check if this is really an expression tag (not a block tag)
+                // Expression tags start with { followed by anything except # / : @
+                let next_char = source_bytes.get(pos + 1);
+                let is_expression_tag =
+                    !matches!(next_char, Some(b'#') | Some(b'/') | Some(b':') | Some(b'@'));
+
+                if is_expression_tag {
+                    // Manually extract the expression content by scanning for the matching }
+                    let expr_start = pos + 1; // Skip the opening {
+                    let mut brace_depth = 1;
+                    let mut expr_end = expr_start;
+                    let mut in_string = false;
+                    let mut string_char = '\0';
+                    let mut escape_next = false;
+
+                    let mut i = expr_start;
+                    while i < content_end && brace_depth > 0 {
+                        let ch = source_bytes[i] as char;
+
+                        if in_string && escape_next {
+                            escape_next = false;
+                            i += 1;
+                            continue;
+                        }
+
+                        if in_string && ch == '\\' {
+                            escape_next = true;
+                            i += 1;
+                            continue;
+                        }
+
+                        if in_string {
+                            if ch == string_char {
+                                in_string = false;
+                            }
+                        } else if ch == '"' || ch == '\'' || ch == '`' {
+                            in_string = true;
+                            string_char = ch;
+                        } else if ch == '{' {
+                            brace_depth += 1;
+                        } else if ch == '}' {
+                            brace_depth -= 1;
+                            if brace_depth == 0 {
+                                expr_end = i;
+                                break;
+                            }
+                        }
+
+                        i += 1;
+                    }
+
+                    if brace_depth != 0 {
+                        return Err(ParseError::InvalidSyntax {
+                            message: "Unclosed expression tag in attribute value".to_string(),
+                            position: pos,
+                            context: None,
+                        });
+                    }
+
+                    // Parse the expression content
+                    let expr_content = &self.source[expr_start..expr_end];
+                    let (expression, comments) = tsv_ts::parse_expression_with_comments(
+                        expr_content,
+                        expr_start,
+                        std::rc::Rc::clone(&self.interner),
+                    )?;
+
+                    // Add expression comments to the parser's collection
+                    self.expression_comments.extend(comments);
+
+                    // Create the expression tag
+                    let tag_end = expr_end + 1; // Include the closing }
+                    parts.push(AttributeValue::ExpressionTag(ExpressionTag {
+                        expression,
+                        span: Span {
+                            start: pos as u32,
+                            end: tag_end as u32,
+                        },
+                    }));
+
+                    // Move past the expression tag
+                    pos = tag_end;
+                } else {
+                    // Not an expression tag, treat { as literal text
+                    pos += 1;
+                }
+            }
+        }
+
+        // If no parts were created (empty string or quote mismatch), create empty text
+        if parts.is_empty() {
+            parts.push(AttributeValue::Text(Text {
+                raw: String::new(),
+                data: String::new(),
+                span: Span {
+                    start: content_start as u32,
+                    end: content_end as u32,
+                },
+            }));
+        }
+
         Ok(parts)
     }
 }

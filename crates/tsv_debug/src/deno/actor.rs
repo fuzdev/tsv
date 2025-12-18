@@ -18,6 +18,9 @@ use tokio::sync::{mpsc, oneshot};
 /// Embedded sidecar script
 const SIDECAR_SCRIPT: &str = include_str!("sidecar.ts");
 
+/// Deno config for import map (ensures acorn-typescript uses same acorn instance)
+const DENO_CONFIG: &str = r#"{"imports":{"acorn":"npm:acorn@8.15.0"}}"#;
+
 /// Request ID counter
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -53,6 +56,12 @@ impl DenoActor {
             .write_all(SIDECAR_SCRIPT.as_bytes())
             .map_err(DenoError::ScriptWrite)?;
 
+        // Write deno.json config for import map (ensures acorn version alignment)
+        let mut config_file = NamedTempFile::new().map_err(DenoError::TempfileCreate)?;
+        config_file
+            .write_all(DENO_CONFIG.as_bytes())
+            .map_err(DenoError::ScriptWrite)?;
+
         // Spawn Deno process
         let mut child = Command::new("deno")
             .args([
@@ -62,6 +71,7 @@ impl DenoActor {
                 "--allow-sys=cpus",
                 "--quiet",
             ])
+            .arg(format!("--config={}", config_file.path().display()))
             .arg(script_file.path())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -106,6 +116,7 @@ impl DenoActor {
             stdout: BufReader::new(stdout),
             pending: HashMap::new(),
             _script_file: script_file, // Keep alive for process lifetime
+            _config_file: config_file, // Keep alive for process lifetime
         };
         tokio::spawn(run_actor(actor_state, rx));
 
@@ -156,6 +167,7 @@ struct ActorState {
     stdout: BufReader<ChildStdout>,
     pending: HashMap<u64, oneshot::Sender<Result<Value, DenoError>>>,
     _script_file: NamedTempFile,
+    _config_file: NamedTempFile,
 }
 
 impl ActorState {

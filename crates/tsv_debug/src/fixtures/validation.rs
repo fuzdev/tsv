@@ -6,9 +6,9 @@
 use crate::deno::{PrettierParser, parse_svelte, parse_typescript, run_prettier};
 use crate::diff;
 use crate::fixtures::{
-    self, Fixture, InputType, discover_prettier_quirk_variants, discover_unformatted_ours_variants,
-    discover_unformatted_variants, has_prettier_divergence_suffix, has_svelte_divergence_suffix,
-    read_file,
+    self, Fixture, InputType, discover_invalid_variants, discover_prettier_quirk_variants,
+    discover_unformatted_ours_variants, discover_unformatted_variants, has_prettier_divergence_suffix,
+    has_svelte_divergence_suffix, read_file,
 };
 use std::collections::HashMap;
 use std::fmt;
@@ -110,6 +110,16 @@ pub enum ValidationError {
     DuplicatePrettierQuirkWithinFixture(Vec<String>),
     #[error("{0} is redundant (identical to {1})")]
     RedundantUnformattedMatchesQuirk(String, String),
+
+    // Invalid syntax (input_invalid_* files)
+    #[error("{0} parsed successfully by our parser (should fail)")]
+    InvalidSyntaxParsedByOurs(String),
+    #[error("{0} parsed successfully by Svelte (should fail)")]
+    InvalidSyntaxParsedBySvelte(String),
+    #[error("{0} parsed successfully by acorn-typescript (should fail)")]
+    InvalidSyntaxParsedByAcorn(String),
+    #[error("{0} parsed successfully by our CSS parser (should fail)")]
+    InvalidSyntaxParsedByOurCss(String),
 }
 
 impl ValidationError {
@@ -117,7 +127,7 @@ impl ValidationError {
     pub fn fix_hint(&self) -> &'static str {
         match self {
             Self::StructureMissingInput => "Add input.svelte file",
-            Self::StructureMissingExpected => "Run: deno task fixtures_update_parsed <pattern>",
+            Self::StructureMissingExpected => "Run: deno task fixtures:update:parsed <pattern>",
             Self::StructureExpectedJsonWithDivergenceFiles
             | Self::StructureSvelteDivergenceMissingSuffix
             | Self::StructureSvelteDivergenceSuffixWithoutFiles
@@ -145,14 +155,14 @@ impl ValidationError {
             Self::ParserExpectedJsonOutdated
             | Self::ParserExpectedOursOutdated
             | Self::ParserExpectedSvelteOutdated => {
-                "Run: deno task fixtures_update_parsed <pattern>"
+                "Run: deno task fixtures:update:parsed <pattern>"
             }
             Self::ParserError(_) => "Check the input file syntax",
             Self::FormatterInputNotIdempotent => {
                 "Debug: cargo run -p tsv_debug compare <fixture>/input.svelte"
             }
             Self::FormatterOutputPrettierOutdated => {
-                "Run: deno task fixtures_update_formatted <pattern>"
+                "Run: deno task fixtures:update:formatted <pattern>"
             }
             Self::FormatterInputDiffersFromPrettier => {
                 "Run: cargo run -p tsv_debug compare <fixture>/input.svelte to see difference"
@@ -175,6 +185,18 @@ impl ValidationError {
             }
             Self::RedundantUnformattedMatchesQuirk(_, _) => {
                 "Remove redundant file (already covered by prettier_quirk_*.svelte)"
+            }
+            Self::InvalidSyntaxParsedByOurs(_) => {
+                "Our parser is too permissive - it accepts syntax that the canonical parser rejects. Fix the parser."
+            }
+            Self::InvalidSyntaxParsedBySvelte(_) => {
+                "Svelte accepts this syntax - it's not actually invalid. Remove the file or fix the syntax."
+            }
+            Self::InvalidSyntaxParsedByAcorn(_) => {
+                "Acorn-typescript accepts this syntax - it's not actually invalid. Remove the file or fix the syntax."
+            }
+            Self::InvalidSyntaxParsedByOurCss(_) => {
+                "Our CSS parser is too permissive - it accepts invalid syntax. Fix the parser."
             }
         }
     }
@@ -220,6 +242,11 @@ impl ValidationError {
             Self::DuplicateUnformattedWithinFixture(_)
             | Self::DuplicatePrettierQuirkWithinFixture(_)
             | Self::RedundantUnformattedMatchesQuirk(_, _) => "Duplicates",
+
+            Self::InvalidSyntaxParsedByOurs(_)
+            | Self::InvalidSyntaxParsedBySvelte(_)
+            | Self::InvalidSyntaxParsedByAcorn(_)
+            | Self::InvalidSyntaxParsedByOurCss(_) => "InvalidSyntax",
         }
     }
 }
@@ -235,6 +262,7 @@ pub enum ValidationSuccess {
     FormatterMatchesPrettier,
     NormalizationVariantsOk(usize), // number of variants checked
     NormalizationSkipped,           // skipped due to formatter failure
+    InvalidSyntaxVariantsOk(usize), // number of invalid syntax files validated
 }
 
 impl fmt::Display for ValidationSuccess {
@@ -250,6 +278,9 @@ impl fmt::Display for ValidationSuccess {
             Self::FormatterMatchesPrettier => write!(f, "input.svelte matches prettier"),
             Self::NormalizationVariantsOk(n) => write!(f, "{n} variants normalize correctly"),
             Self::NormalizationSkipped => write!(f, "SKIPPED (formatter not idempotent)"),
+            Self::InvalidSyntaxVariantsOk(n) => {
+                write!(f, "{n} invalid syntax files correctly rejected")
+            }
         }
     }
 }
@@ -264,6 +295,7 @@ pub struct FixtureValidation {
     pub unformatted_count: usize,
     pub unformatted_ours_count: usize,
     pub prettier_quirk_count: usize,
+    pub invalid_syntax_count: usize,
     /// Input content for cross-fixture duplicate detection (populated during validation)
     pub input_content: Option<String>,
 }
@@ -277,6 +309,7 @@ impl FixtureValidation {
             unformatted_count: 0,
             unformatted_ours_count: 0,
             prettier_quirk_count: 0,
+            invalid_syntax_count: 0,
             input_content: None,
         }
     }
@@ -399,6 +432,12 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
 
         // N1, N3: Prettier normalization (Svelte only)
         validate_normalization_prettier(&mut result, fixture, &input, input_ext).await;
+    }
+
+    // Phase 6: Invalid syntax validation (input_invalid_* files)
+    // Skip in prettier_only mode (these test our parser rejection, not prettier)
+    if !prettier_only {
+        validate_invalid_syntax(&mut result, fixture, input_type, input_ext).await;
     }
 
     result
@@ -843,6 +882,98 @@ async fn validate_normalization_prettier(
     }
 }
 
+/// Validate input_invalid_* files: must fail to parse with both our parser and canonical parser
+///
+/// For Svelte files: both our parser and Svelte's parser must fail
+/// For TypeScript files: both our parser and acorn-typescript must fail
+/// For CSS files: our parser must fail (no canonical source)
+async fn validate_invalid_syntax(
+    result: &mut FixtureValidation,
+    fixture: &Fixture,
+    input_type: InputType,
+    input_ext: &str,
+) {
+    let fixture_dir = &fixture.path;
+    let invalid_variants = discover_invalid_variants(fixture_dir, input_ext);
+
+    if invalid_variants.is_empty() {
+        return;
+    }
+
+    result.invalid_syntax_count = invalid_variants.len();
+    let mut valid_count = 0;
+
+    for variant_name in &invalid_variants {
+        let variant_path = fixture_dir.join(variant_name);
+        let Ok(variant_content) = read_file(&variant_path) else {
+            continue;
+        };
+
+        // Check our parser
+        let ours_failed = match input_type {
+            InputType::Svelte => tsv_svelte::parse(&variant_content).is_err(),
+            InputType::TypeScript => tsv_ts::parse(&variant_content).is_err(),
+            InputType::Css => tsv_css::parse(&variant_content).is_err(),
+        };
+
+        // Check canonical parser
+        let canonical_failed = match input_type {
+            InputType::Svelte => parse_svelte(&variant_content).await.is_err(),
+            InputType::TypeScript => parse_typescript(&variant_content).await.is_err(),
+            InputType::Css => {
+                let wrapped = format!("<style>{variant_content}</style>");
+                parse_svelte(&wrapped).await.is_err()
+            }
+        };
+
+        // Evaluate results - both must fail for a valid invalid-syntax test
+        match (ours_failed, canonical_failed) {
+            (true, true) => {
+                // Good - both parsers reject it
+                valid_count += 1;
+            }
+            (false, true) => {
+                // Our parser is too permissive
+                let error = if input_type == InputType::Css {
+                    ValidationError::InvalidSyntaxParsedByOurCss(variant_name.clone())
+                } else {
+                    ValidationError::InvalidSyntaxParsedByOurs(variant_name.clone())
+                };
+                result.add_error(error);
+            }
+            (true, false) => {
+                // Canonical accepts it - file isn't actually invalid
+                let error = match input_type {
+                    InputType::Svelte | InputType::Css => {
+                        ValidationError::InvalidSyntaxParsedBySvelte(variant_name.clone())
+                    }
+                    InputType::TypeScript => {
+                        ValidationError::InvalidSyntaxParsedByAcorn(variant_name.clone())
+                    }
+                };
+                result.add_error(error);
+            }
+            (false, false) => {
+                // Both accept it - file isn't actually invalid
+                // Report the canonical parser accepting it (more authoritative)
+                let error = match input_type {
+                    InputType::Svelte | InputType::Css => {
+                        ValidationError::InvalidSyntaxParsedBySvelte(variant_name.clone())
+                    }
+                    InputType::TypeScript => {
+                        ValidationError::InvalidSyntaxParsedByAcorn(variant_name.clone())
+                    }
+                };
+                result.add_error(error);
+            }
+        }
+    }
+
+    if valid_count > 0 {
+        result.add_success(ValidationSuccess::InvalidSyntaxVariantsOk(valid_count));
+    }
+}
+
 /// Aggregate results from validating multiple fixtures
 #[derive(Debug, Default)]
 pub struct ValidationSummary {
@@ -852,6 +983,7 @@ pub struct ValidationSummary {
     pub total_unformatted: usize,
     pub total_unformatted_ours: usize,
     pub total_prettier_quirk: usize,
+    pub total_invalid_syntax: usize,
     pub results: Vec<FixtureValidation>,
     pub cross_fixture_duplicates: Vec<Vec<String>>,
 }
@@ -866,6 +998,7 @@ impl ValidationSummary {
         self.total_unformatted += result.unformatted_count;
         self.total_unformatted_ours += result.unformatted_ours_count;
         self.total_prettier_quirk += result.prettier_quirk_count;
+        self.total_invalid_syntax += result.invalid_syntax_count;
 
         if result.is_valid() {
             self.passed_fixtures += 1;
@@ -972,13 +1105,24 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
 
     // Print summary
     if failed.is_empty() && summary.cross_fixture_duplicates.is_empty() {
-        println!(
-            "✓ All {} fixtures validated ({} unformatted_*.svelte, {} unformatted_ours_*.svelte, {} prettier_quirk_*.svelte)",
-            summary.total_fixtures,
-            summary.total_unformatted,
-            summary.total_unformatted_ours,
-            summary.total_prettier_quirk
-        );
+        let mut parts = vec![format!("✓ All {} fixtures validated", summary.total_fixtures)];
+        let mut variant_parts = Vec::new();
+        if summary.total_unformatted > 0 {
+            variant_parts.push(format!("{} unformatted_*", summary.total_unformatted));
+        }
+        if summary.total_unformatted_ours > 0 {
+            variant_parts.push(format!("{} unformatted_ours_*", summary.total_unformatted_ours));
+        }
+        if summary.total_prettier_quirk > 0 {
+            variant_parts.push(format!("{} prettier_quirk_*", summary.total_prettier_quirk));
+        }
+        if summary.total_invalid_syntax > 0 {
+            variant_parts.push(format!("{} input_invalid_*", summary.total_invalid_syntax));
+        }
+        if !variant_parts.is_empty() {
+            parts.push(format!("({})", variant_parts.join(", ")));
+        }
+        println!("{}", parts.join(" "));
     } else {
         eprintln!("════════════════════");
         eprintln!();
@@ -1035,5 +1179,9 @@ fn error_type_name(error: &ValidationError) -> &'static str {
         ValidationError::DuplicateUnformattedWithinFixture(_)
         | ValidationError::DuplicatePrettierQuirkWithinFixture(_)
         | ValidationError::RedundantUnformattedMatchesQuirk(_, _) => "Duplicate",
+        ValidationError::InvalidSyntaxParsedByOurs(_)
+        | ValidationError::InvalidSyntaxParsedBySvelte(_)
+        | ValidationError::InvalidSyntaxParsedByAcorn(_)
+        | ValidationError::InvalidSyntaxParsedByOurCss(_) => "InvalidSyntax",
     }
 }

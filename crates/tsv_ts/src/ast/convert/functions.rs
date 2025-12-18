@@ -71,6 +71,7 @@ pub(in crate::ast) fn convert_function_expression(
             name: interner.resolve_infallible(id.name).to_string(),
             optional: id.optional,
             type_annotation: None,
+            decorators: Vec::new(),
         }),
         expression: false,
         generator: func.generator,

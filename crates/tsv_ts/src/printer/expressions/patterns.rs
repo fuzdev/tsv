@@ -83,7 +83,10 @@ impl<'a> Printer<'a> {
             return;
         }
 
-        let should_expand = super::super::object_pattern_should_expand(obj);
+        let should_expand = super::super::object_pattern_should_expand(
+            obj,
+            super::super::PatternContext::Standalone,
+        );
 
         if should_expand {
             // Nested patterns: always expand (imperative path for performance)
@@ -167,10 +170,19 @@ impl<'a> Printer<'a> {
     /// 1. Any property has a nested pattern value (always expand)
     /// 2. The pattern exceeds print width (width-based expansion)
     pub(super) fn build_object_pattern_doc(&self, obj: &internal::ObjectPattern) -> Doc {
+        self.build_object_pattern_doc_with_context(obj, super::super::PatternContext::Standalone)
+    }
+
+    /// Build object pattern doc with explicit context
+    pub(super) fn build_object_pattern_doc_with_context(
+        &self,
+        obj: &internal::ObjectPattern,
+        context: super::super::PatternContext,
+    ) -> Doc {
         if obj.properties.is_empty() {
             self.build_empty_object_pattern_doc(obj)
         } else {
-            let should_expand = super::super::object_pattern_should_expand(obj);
+            let should_expand = super::super::object_pattern_should_expand(obj, context);
 
             if should_expand {
                 // Nested patterns: always expand

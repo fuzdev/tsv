@@ -119,8 +119,10 @@ impl<'a> Lexer<'a> {
 
     /// Peek at the next n characters without consuming them
     fn peek_chars(&self, n: usize) -> &str {
-        let end = (self.position + n).min(self.source.len());
-        &self.source[self.position..end]
+        let remaining = &self.source[self.position..];
+        // Count n characters (not bytes) to find the correct byte offset
+        let byte_count: usize = remaining.chars().take(n).map(char::len_utf8).sum();
+        &remaining[..byte_count]
     }
 
     fn skip_whitespace(&mut self) {
@@ -133,12 +135,15 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Skip everything until we hit a special character (<, {, })
+    /// Skip everything until we hit a special character (<, {)
     /// Used in template mode to treat text content as gaps
+    /// Note: '}' is NOT special in template mode - it's only consumed directly
+    /// during expression tag parsing. This allows '}' in text (e.g., after {'{'}text})
+    /// to be treated as plain text, matching Svelte's parser behavior.
     fn skip_to_special_char(&mut self) {
         while let Some(ch) = self.current {
             match ch {
-                '<' | '{' | '}' => break,
+                '<' | '{' => break,
                 _ => self.advance(),
             }
         }
@@ -217,8 +222,15 @@ impl<'a> Lexer<'a> {
                         Ok(self.make_token(TokenKind::BlockContinue, start))
                     }
                     Some('/') => {
-                        self.advance();
-                        Ok(self.make_token(TokenKind::BlockClose, start))
+                        // Check if next char is '*' - that means {/* (comment), not {/if (block close)
+                        if self.source.as_bytes().get(self.position + 1) == Some(&b'*') {
+                            // Comment inside expression: {/* ... */} - return just '{'
+                            Ok(self.make_token(TokenKind::LeftBrace, start))
+                        } else {
+                            // Block close: {/if}, {/each}, etc
+                            self.advance();
+                            Ok(self.make_token(TokenKind::BlockClose, start))
+                        }
                     }
                     Some('@') => {
                         self.advance();
@@ -237,16 +249,21 @@ impl<'a> Lexer<'a> {
             }
             Some(quote @ '\'' | quote @ '"') => {
                 // String literal for attribute values
-                // TODO: Handle escape sequences in attribute values
-                // Currently missing: \n, \t, \\, \', \", HTML entities (&lt;, &quot;, etc.)
-                // Simple quoted strings work for current test cases.
+                // Handle escape sequences: \n, \t, \\, \', \", etc.
                 self.advance(); // consume opening quote
                 while let Some(ch) = self.current {
-                    if ch == quote {
+                    if ch == '\\' {
+                        // Escape sequence - skip the backslash and the next character
+                        self.advance();
+                        if self.current.is_some() {
+                            self.advance();
+                        }
+                    } else if ch == quote {
                         self.advance(); // consume closing quote
                         return Ok(self.make_token(TokenKind::String, start));
+                    } else {
+                        self.advance();
                     }
-                    self.advance();
                 }
                 // Unterminated string
                 Err(ParseError::InvalidSyntax {
@@ -255,9 +272,10 @@ impl<'a> Lexer<'a> {
                     context: None,
                 })
             }
-            Some(ch) if ch.is_alphabetic() || ch == '_' || ch == '$' => {
+            Some(ch) if ch.is_alphabetic() || ch == '_' || ch == '$' || ch == '-' => {
                 // Tag names and identifiers
-                // Also include : and | for directive syntax (on:click|preventDefault)
+                // Also include - as a start character for CSS custom property attributes (--margin)
+                // and include : and | for directive syntax (on:click|preventDefault)
                 // and -- for CSS custom properties (style:--custom)
                 // and . for dot notation components (ns.Comp)
                 while let Some(ch) = self.current {

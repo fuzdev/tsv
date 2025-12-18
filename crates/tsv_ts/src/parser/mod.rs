@@ -261,6 +261,27 @@ impl<'a> Parser<'a> {
         self.intern(self.current_identifier_name())
     }
 
+    /// Extract string literal content and quote character from current token.
+    ///
+    /// Assumes current token is `TokenKind::String`. Returns `(content, quote)` where:
+    /// - `content` is the decoded string value (escapes processed)
+    /// - `quote` is the quote character used (`'` or `"`)
+    ///
+    /// Uses decoded value from lexer if available (escapes present),
+    /// otherwise extracts content by stripping quotes from raw value.
+    pub(super) fn extract_string_literal(&self) -> (String, char) {
+        let raw = self.current_value();
+        let quote = raw.chars().next().unwrap_or('"');
+        let content = if let Some(decoded) = self.current_decoded() {
+            decoded.to_string()
+        } else if raw.len() >= 2 {
+            raw[1..raw.len() - 1].to_string()
+        } else {
+            String::new()
+        };
+        (content, quote)
+    }
+
     // Error construction helpers - reduce boilerplate for common error patterns
 
     /// Create an error with custom message at current position
@@ -746,6 +767,63 @@ impl<'a> Parser<'a> {
             loop {
                 // Parse parameter: identifier, array pattern, or object pattern
                 let param = match self.current_kind() {
+                    // Parameter decorators: @dec1 @dec2 identifier
+                    TokenKind::At => {
+                        // Parse decorators
+                        let mut decorators = Vec::new();
+                        while self.check(&TokenKind::At) {
+                            let start = self.current_pos().0;
+                            self.advance()?; // consume '@'
+                            let expression = self.parse_assignment_expression()?;
+                            let end = expression.span().end;
+                            decorators.push(Decorator {
+                                expression,
+                                span: Span::new(start as u32, end),
+                            });
+                        }
+                        let decorators_opt = Some(decorators);
+
+                        // After decorators, we must have an identifier parameter
+                        if !matches!(self.current_kind(), TokenKind::Identifier) {
+                            return Err(self.error_expected("parameter name after decorator"));
+                        }
+
+                        let param_start = self.current_pos().0;
+                        let symbol = self.intern_identifier();
+                        self.advance()?;
+
+                        let optional = self.eat(TokenKind::Question);
+
+                        let (type_annotation, id_end) = if self.check(&TokenKind::Colon) {
+                            let ta = self.parse_type_annotation()?;
+                            let end = ta.span.end;
+                            (Some(ta), end as usize)
+                        } else {
+                            (None, self.current_pos().0)
+                        };
+
+                        let mut param = Expression::Identifier(Identifier {
+                            name: symbol,
+                            optional,
+                            type_annotation,
+                            decorators: decorators_opt,
+                            span: Span::new(param_start as u32, id_end as u32),
+                        });
+
+                        // Check for default value
+                        if self.check(&TokenKind::Equals) {
+                            self.advance()?;
+                            let default_value = self.parse_assignment_expression()?;
+                            let assign_end = default_value.span().end;
+                            param = Expression::AssignmentPattern(AssignmentPattern {
+                                left: Box::new(param),
+                                right: Box::new(default_value),
+                                span: Span::new(param_start as u32, assign_end),
+                            });
+                        }
+
+                        param
+                    }
                     TokenKind::Identifier => {
                         let param_start = self.current_pos().0;
 
@@ -790,6 +868,7 @@ impl<'a> Parser<'a> {
                                 name: symbol,
                                 optional,
                                 type_annotation,
+                                decorators: None,
                                 span: Span::new(id_start as u32, end_pos as u32),
                             };
 
@@ -839,6 +918,7 @@ impl<'a> Parser<'a> {
                                 name: symbol,
                                 optional,
                                 type_annotation,
+                                decorators: None,
                                 span: Span::new(param_start as u32, id_end as u32),
                             });
 
@@ -856,10 +936,62 @@ impl<'a> Parser<'a> {
                             param
                         }
                     }
+                    // Keywords that can be used as parameter names (contextual keywords like `from`, `async`)
+                    // Note: `await`, `yield`, `let` are NOT allowed as parameter names
+                    TokenKind::Keyword(kw) if kw.can_be_binding_name() => {
+                        let (param_start, param_end) = self.current_pos();
+                        let symbol = self.intern(kw.as_str());
+                        self.advance()?;
+
+                        // Check for optional marker: param?
+                        let optional = self.eat(TokenKind::Question);
+
+                        // Check for type annotation: param: type
+                        let (type_annotation, id_end) = if self.check(&TokenKind::Colon) {
+                            let ta = self.parse_type_annotation()?;
+                            let end = ta.span.end;
+                            (Some(ta), end as usize)
+                        } else {
+                            (None, param_end)
+                        };
+
+                        let mut param = Expression::Identifier(Identifier {
+                            name: symbol,
+                            optional,
+                            type_annotation,
+                            decorators: None,
+                            span: Span::new(param_start as u32, id_end as u32),
+                        });
+
+                        // Check for default value: param = default
+                        if self.check(&TokenKind::Equals) {
+                            self.advance()?; // consume '='
+                            let default_value = self.parse_assignment_expression()?;
+                            let assign_end = default_value.span().end;
+                            param = Expression::AssignmentPattern(AssignmentPattern {
+                                left: Box::new(param),
+                                right: Box::new(default_value),
+                                span: Span::new(param_start as u32, assign_end),
+                            });
+                        }
+                        param
+                    }
                     TokenKind::BracketOpen => {
-                        // Array destructuring pattern: [a, b]
+                        // Array destructuring pattern: [a, b] or [a, b]: Type
                         let expr = self.parse_array_expression()?;
-                        let pattern = self.to_assignable(expr)?;
+                        let mut pattern = self.to_assignable(expr)?;
+
+                        // Check for type annotation: [a, b]: Type
+                        if self.check(&TokenKind::Colon) {
+                            let ta = self.parse_type_annotation()?;
+                            let end = ta.span.end;
+                            // Update the pattern with type annotation
+                            if let Expression::ArrayPattern(ref mut ap) = pattern {
+                                ap.type_annotation = Some(ta);
+                                ap.span.end = end;
+                            }
+                        }
+
                         // Check for default value
                         if self.check(&TokenKind::Equals) {
                             let pattern_start = pattern.span().start;
@@ -876,9 +1008,21 @@ impl<'a> Parser<'a> {
                         }
                     }
                     TokenKind::BraceOpen => {
-                        // Object destructuring pattern: {a, b}
+                        // Object destructuring pattern: {a, b} or {a, b}: Type
                         let expr = self.parse_object_expression()?;
-                        let pattern = self.to_assignable(expr)?;
+                        let mut pattern = self.to_assignable(expr)?;
+
+                        // Check for type annotation: {a, b}: Type
+                        if self.check(&TokenKind::Colon) {
+                            let ta = self.parse_type_annotation()?;
+                            let end = ta.span.end;
+                            // Update the pattern with type annotation
+                            if let Expression::ObjectPattern(ref mut op) = pattern {
+                                op.type_annotation = Some(ta);
+                                op.span.end = end;
+                            }
+                        }
+
                         // Check for default value
                         if self.check(&TokenKind::Equals) {
                             let pattern_start = pattern.span().start;
@@ -917,6 +1061,7 @@ impl<'a> Parser<'a> {
                             name: symbol,
                             optional: false,
                             type_annotation,
+                            decorators: None,
                             span: Span::new(id_start as u32, arg_end as u32),
                         });
 
@@ -967,6 +1112,22 @@ impl<'a> Parser<'a> {
     /// Parse a single expression (used by Svelte for expression tags)
     pub fn parse_expression_public(&mut self) -> Result<Expression, ParseError> {
         self.parse_expression()
+    }
+
+    /// Parse a single expression and return it with any collected comments.
+    /// Used for expressions in Svelte templates where comments need to be preserved.
+    pub fn parse_expression_with_comments(
+        &mut self,
+    ) -> Result<(Expression, Vec<Comment>), ParseError> {
+        let expr = self.parse_expression()?;
+        let comments = self.take_comments();
+        Ok((expr, comments))
+    }
+
+    /// Take ownership of collected comments.
+    /// Used when parsing expressions that need to return comments to the caller.
+    pub fn take_comments(&mut self) -> Vec<Comment> {
+        std::mem::take(&mut self.comments)
     }
 
     /// Parse a single assignment expression and return position where parsing stopped.
@@ -1021,17 +1182,7 @@ impl<'a> Parser<'a> {
         debug_assert!(matches!(self.current_kind(), TokenKind::String));
 
         let (start, end) = self.current_pos();
-        let raw = self.current_value().to_string();
-        let quote = raw.chars().next().unwrap_or('"');
-
-        let content = if let Some(decoded) = self.current_decoded() {
-            decoded.to_string()
-        } else if raw.len() >= 2 {
-            raw[1..raw.len() - 1].to_string()
-        } else {
-            String::new()
-        };
-
+        let (content, quote) = self.extract_string_literal();
         self.advance()?;
 
         Ok(Literal {

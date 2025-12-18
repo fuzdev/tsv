@@ -19,6 +19,16 @@ pub fn parse_svelte(source: &str) -> Result<JsValue, JsError> {
     serde_wasm_bindgen::to_value(&public).map_err(|e| JsError::new(&e.to_string()))
 }
 
+/// Parse Svelte source to internal AST only (no conversion, no serialization).
+/// Returns nothing on success for minimal overhead benchmarking.
+/// Uses `black_box` to prevent the compiler from optimizing away the parse.
+#[wasm_bindgen]
+pub fn parse_internal_svelte(source: &str) -> Result<(), JsError> {
+    let ast = tsv_svelte::parse(source).map_err(|e| JsError::new(&e.to_string()))?;
+    std::hint::black_box(ast);
+    Ok(())
+}
+
 /// Format Svelte source code.
 ///
 /// Parses the source and returns formatted output matching Prettier's style.
@@ -42,6 +52,16 @@ pub fn parse_typescript(source: &str) -> Result<JsValue, JsError> {
     serde_wasm_bindgen::to_value(&public).map_err(|e| JsError::new(&e.to_string()))
 }
 
+/// Parse TypeScript source to internal AST only (no conversion, no serialization).
+/// Returns nothing on success for minimal overhead benchmarking.
+/// Uses `black_box` to prevent the compiler from optimizing away the parse.
+#[wasm_bindgen]
+pub fn parse_internal_typescript(source: &str) -> Result<(), JsError> {
+    let ast = tsv_ts::parse(source).map_err(|e| JsError::new(&e.to_string()))?;
+    std::hint::black_box(ast);
+    Ok(())
+}
+
 /// Format TypeScript source code.
 ///
 /// Parses the source and returns formatted output matching Prettier's style.
@@ -61,6 +81,16 @@ pub fn parse_css(source: &str) -> Result<JsValue, JsError> {
     let ast = tsv_css::parse(source).map_err(|e| JsError::new(&e.to_string()))?;
     let public = tsv_css::convert_ast(&ast, source);
     serde_wasm_bindgen::to_value(&public).map_err(|e| JsError::new(&e.to_string()))
+}
+
+/// Parse CSS source to internal AST only (no conversion, no serialization).
+/// Returns nothing on success for minimal overhead benchmarking.
+/// Uses `black_box` to prevent the compiler from optimizing away the parse.
+#[wasm_bindgen]
+pub fn parse_internal_css(source: &str) -> Result<(), JsError> {
+    let ast = tsv_css::parse(source).map_err(|e| JsError::new(&e.to_string()))?;
+    std::hint::black_box(ast);
+    Ok(())
 }
 
 /// Format CSS source code.

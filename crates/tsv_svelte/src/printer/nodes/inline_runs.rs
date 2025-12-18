@@ -17,8 +17,9 @@ impl<'a> Printer<'a> {
     ///
     /// Returns the index of the last node in the run.
     pub fn find_inline_run_end(&self, nodes: &[FragmentNode], start_idx: usize) -> usize {
-        let current_span = self.get_content_span(&nodes[start_idx]);
         let mut run_end = start_idx;
+        // Track the span of the last non-whitespace node to compare adjacency
+        let mut last_content_span = self.get_content_span(&nodes[start_idx]);
 
         while run_end + 1 < nodes.len() {
             let next_node = &nodes[run_end + 1];
@@ -35,12 +36,22 @@ impl<'a> Printer<'a> {
                 continue;
             }
 
-            // Check if next node should end the run
-            if self.should_end_inline_run(next_node, current_span) {
+            // Check if next node should end the run (compare to last content node, not first)
+            if self.should_end_inline_run(next_node, last_content_span) {
                 break;
             }
 
+            // Update the last content span as we extend the run
+            last_content_span = self.get_content_span(next_node);
             run_end += 1;
+
+            // If text node has trailing blank line, end run here
+            // (blank line separates this content from what follows)
+            if let FragmentNode::Text(text) = next_node
+                && text.raw.has_trailing_blank_line()
+            {
+                break;
+            }
         }
 
         run_end
@@ -50,8 +61,16 @@ impl<'a> Printer<'a> {
     ///
     /// Inline runs terminate when:
     /// - Next node is a block element (break in flow)
-    /// - Next node is on a different source line (layout significance)
-    pub fn should_end_inline_run(&self, node: &FragmentNode, current_span: tsv_lang::Span) -> bool {
+    /// - Next node is on a different source line from the previous content node
+    ///
+    /// The `prev_content_span` should be the span of the last non-whitespace node
+    /// in the current run, not the first node. This ensures multiline expressions
+    /// that are adjacent in the source stay grouped together.
+    pub fn should_end_inline_run(
+        &self,
+        node: &FragmentNode,
+        prev_content_span: tsv_lang::Span,
+    ) -> bool {
         // Block element ends the run
         if !self.is_inline_node(node) {
             return true;
@@ -59,7 +78,7 @@ impl<'a> Printer<'a> {
 
         // Different source line ends the run (preserves source layout)
         let node_span = self.get_content_span(node);
-        !printing::spans_on_same_line(self.source, current_span, node_span)
+        !printing::spans_on_same_line(self.source, prev_content_span, node_span)
     }
 
     /// Format an inline run (consecutive inline content on same source line)
