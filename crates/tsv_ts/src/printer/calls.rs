@@ -57,6 +57,12 @@ fn is_hopefully_short_arg(expr: &internal::Expression) -> bool {
     }
 }
 
+/// Check if an expression is an object that could expand (has properties)
+/// Used for "expand last arg" pattern in import expressions
+fn is_expandable_object(expr: &internal::Expression) -> bool {
+    matches!(expr, internal::Expression::ObjectExpression(obj) if !obj.properties.is_empty())
+}
+
 /// Test function patterns that Prettier keeps on a single line
 /// Includes: Jest, Mocha, Jasmine, Playwright, Vitest patterns
 const TEST_CALL_PATTERNS: &[&str] = &[
@@ -1065,14 +1071,28 @@ impl<'a> Printer<'a> {
         let comments_after_test =
             self.build_inline_comments_between_doc(test_end, consequent_start);
 
-        // Wrap nested conditional in consequent with parentheses
-        let consequent = if matches!(
-            &*cond.consequent,
-            internal::Expression::ConditionalExpression(_)
-        ) {
+        // Wrap expressions that need parens in ternary branches:
+        // - Nested conditionals avoid right-associativity confusion: `a ? (b ? c : d) : e`
+        // - `as`/`satisfies` avoid `:` ambiguity: `a ? (b as T) : c` (not `a ? b as T : c`)
+        let needs_parens = |expr: &internal::Expression| {
+            matches!(
+                expr,
+                internal::Expression::ConditionalExpression(_)
+                    | internal::Expression::TSAsExpression(_)
+                    | internal::Expression::TSSatisfiesExpression(_)
+            )
+        };
+
+        let consequent = if needs_parens(&cond.consequent) {
             doc::parens(consequent)
         } else {
             consequent
+        };
+
+        let alternate = if needs_parens(&cond.alternate) {
+            doc::parens(alternate)
+        } else {
+            alternate
         };
 
         // When flat: `test ? consequent : alternate`
@@ -1123,14 +1143,46 @@ impl<'a> Printer<'a> {
         self.write_doc_with_margin(&doc);
     }
 
-    /// Build a Doc for a dynamic import expression
+    /// Build a Doc for a dynamic import expression: `import('module')` or `import('module', options)`
+    ///
+    /// Uses "expand last arg" pattern when options is an object:
+    /// - First arg stays on same line as `import(`
+    /// - Only the options object expands with its properties indented
     pub(super) fn build_import_expression_doc(
         &self,
         import_expr: &internal::ImportExpression,
     ) -> Doc {
         let source_doc = self.build_expression_doc(&import_expr.source);
 
-        doc::concat(vec![doc::text("import"), doc::parens(source_doc)])
+        // If no options, simple case
+        let Some(options) = &import_expr.options else {
+            return doc::concat(vec![doc::text("import"), doc::parens(source_doc)]);
+        };
+
+        let options_doc = self.build_expression_doc(options);
+
+        // "Expand last arg" pattern for objects: keep first arg inline, only expand the object
+        // Result: import(source, {\n\twith: {...},\n})
+        if is_expandable_object(options) {
+            doc::concat(vec![
+                doc::text("import"),
+                doc::text("("),
+                source_doc,
+                doc::text(", "),
+                options_doc,
+                doc::text(")"),
+            ])
+        } else {
+            // Standard wrapping for non-object options
+            let arg_parts = doc::join_doc(vec![source_doc, options_doc], doc::comma_line());
+            doc::group(doc::concat(vec![
+                doc::text("import"),
+                doc::text("("),
+                doc::indent_softline(arg_parts),
+                doc::softline(),
+                doc::text(")"),
+            ]))
+        }
     }
 
     /// Print a meta property: `import.meta`, `new.target`

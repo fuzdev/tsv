@@ -196,7 +196,12 @@ impl<'a> Printer<'a> {
             self.print_class_member(member, is_declare);
 
             // Print trailing inline comments (on same line after member)
-            self.print_class_member_trailing_comments(member.span().end);
+            // Upper bound: next member's start, or body end for last member
+            let upper_bound = body
+                .body
+                .get(i + 1)
+                .map_or(body.span.end, |next| next.span().start);
+            self.print_class_member_trailing_comments(member.span().end, upper_bound);
 
             self.write("\n");
 
@@ -210,11 +215,18 @@ impl<'a> Printer<'a> {
 
     /// Print trailing inline comments for a class member
     /// Handles comments on the same line after the member ends (e.g., `prop: string; // comment`)
-    fn print_class_member_trailing_comments(&mut self, member_end: u32) {
+    /// `upper_bound` limits the search to avoid including comments inside the next member
+    fn print_class_member_trailing_comments(&mut self, member_end: u32, upper_bound: u32) {
         // find_first_comment_from returns index of first comment at or after member_end
         let first_idx = tsv_lang::find_first_comment_from(self.comments, member_end);
 
         for comment in &self.comments[first_idx..] {
+            // Only include comments that are:
+            // 1. On the same line as member_end
+            // 2. Before the upper bound (next member's start or body end)
+            if comment.span.start >= upper_bound {
+                break;
+            }
             if tsv_lang::printing::is_same_line(self.source, member_end, comment.span.start) {
                 self.write(" ");
                 self.print_comment(comment);
@@ -404,54 +416,10 @@ impl<'a> Printer<'a> {
             self.print_type_parameter_declaration(type_params);
         }
 
-        // Print parameters (can be Identifier, ArrayPattern, ObjectPattern, AssignmentPattern)
-        // Detect if source params were on multiple lines (respect original formatting)
-        let params_multiline = if let (Some(first), Some(last)) =
-            (method.value.params.first(), method.value.params.last())
-        {
-            // Check if the source between first param start and last param end contains newlines
-            tsv_lang::printing::has_newline_between(
-                self.source,
-                first.span().start,
-                last.span().end,
-            )
-        } else {
-            false
-        };
-
-        self.write("(");
-        if params_multiline {
-            // Print params on separate lines with trailing comma
-            self.write("\n");
-            self.indent_level += 1;
-            for (i, param) in method.value.params.iter().enumerate() {
-                if i > 0 {
-                    self.write(",\n");
-                }
-                self.write_indent();
-                self.print_expression(param);
-            }
-            // Check if last param is rest - no trailing comma after rest
-            let has_rest_param = method
-                .value
-                .params
-                .last()
-                .is_some_and(|p| matches!(p, internal::Expression::RestElement(_)));
-            if !has_rest_param {
-                self.write(",");
-            }
-            self.write("\n");
-            self.indent_level -= 1;
-            self.write_indent();
-        } else {
-            for (i, param) in method.value.params.iter().enumerate() {
-                if i > 0 {
-                    self.write(", ");
-                }
-                self.print_expression(param);
-            }
-        }
-        self.write(")");
+        // Print parameters using doc-based printing (handles comments properly)
+        // Wrap in a group so softlines only break when needed
+        let params_doc = self.build_method_params_doc_ungrouped(&method.value);
+        self.write_doc(&doc::group(params_doc));
 
         // Print return type annotation if present
         if let Some(return_type) = &method.value.return_type {
@@ -468,15 +436,13 @@ impl<'a> Printer<'a> {
             self.write(" ");
             // Find the end of the signature to check for dangling comments
             // (comments between signature and body that should move inside)
+            // We need position AFTER `)` to avoid re-printing param comments.
             let sig_end = if let Some(return_type) = &method.value.return_type {
                 return_type.span.end
-            } else if let Some(last_param) = method.value.params.last() {
-                // After last param, there's a ')' but we don't have its exact position
-                // Use last param end as approximate - comments after it will be caught
-                last_param.span().end
             } else {
-                // Empty params like fn() - use key end as approximate start
-                method.key.span().end
+                // Find closing `)` to get accurate boundary
+                self.find_closing_paren(method.value.params_start, method.value.body.span.start)
+                    .unwrap_or(method.value.body.span.start)
             };
             // Print body with outer comments moved inside
             self.print_block_statement_with_outer_comments(&method.value.body, sig_end);

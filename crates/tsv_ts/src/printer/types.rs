@@ -14,6 +14,60 @@ use tsv_lang::SymbolResolver;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::{self, Doc};
 
+// =============================================================================
+// Type parenthesization helpers
+// =============================================================================
+
+/// Recursively unwrap TSParenthesizedType to get the inner type.
+fn unwrap_parenthesized(ts_type: &TSType) -> &TSType {
+    match ts_type {
+        TSType::Parenthesized(p) => unwrap_parenthesized(&p.type_annotation),
+        _ => ts_type,
+    }
+}
+
+/// Check if a type needs parentheses when used as the object in indexed access (`T[K]`).
+/// Without parens: `A | B[K]` parses as `A | (B[K])`, not `(A | B)[K]`
+fn type_needs_parens_for_indexed_access_object(ts_type: &TSType) -> bool {
+    let inner = unwrap_parenthesized(ts_type);
+    // TypeOperator included: `(keyof T)[K]` is valid and different from `keyof T[K]`
+    matches!(
+        inner,
+        TSType::Union(_)
+            | TSType::Intersection(_)
+            | TSType::TypeQuery(_)
+            | TSType::TypeOperator(_)
+            | TSType::Conditional(_)
+            | TSType::Infer(_)
+            | TSType::Function(_)
+            | TSType::Constructor(_)
+    )
+}
+
+/// Check if a type needs parentheses when used as the element type in an array (`T[]`).
+/// Without parens: `A | B[]` parses as `A | (B[])`, not `(A | B)[]`
+fn type_needs_parens_for_array_element(ts_type: &TSType) -> bool {
+    let inner = unwrap_parenthesized(ts_type);
+    // TypeOperator excluded: `(readonly T)[]` is invalid TypeScript
+    matches!(
+        inner,
+        TSType::Union(_)
+            | TSType::Intersection(_)
+            | TSType::TypeQuery(_)
+            | TSType::Conditional(_)
+            | TSType::Infer(_)
+            | TSType::Function(_)
+            | TSType::Constructor(_)
+    )
+}
+
+/// Check if a type needs parentheses when used as the operand of a prefix type operator
+/// (keyof, readonly, unique). Without parens: `keyof A | B` parses as `(keyof A) | B`
+fn type_needs_parens_for_prefix_operator(ts_type: &TSType) -> bool {
+    let inner = unwrap_parenthesized(ts_type);
+    matches!(inner, TSType::Union(_) | TSType::Intersection(_))
+}
+
 impl<'a> Printer<'a> {
     /// Print a TypeScript type annotation (e.g., `: number`)
     ///
@@ -373,11 +427,32 @@ impl<'a> Printer<'a> {
                             .collect();
                         parts.push(doc::join(member_docs, "; "));
                     } else {
-                        // Multi-line format
+                        // Multi-line format with leading comment handling
                         let mut member_parts = vec![];
-                        for m in &t.members {
+                        let mut prev_end = t.span.start + 1; // after opening brace
+                        for (i, m) in t.members.iter().enumerate() {
+                            let is_first = i == 0;
+                            // Build leading comments
+                            let (comments_doc, has_blank) =
+                                self.build_leading_line_comments_doc(prev_end, m.span().start);
+                            let has_comments =
+                                !matches!(&comments_doc, Doc::Concat(v) if v.is_empty());
+
+                            // Add blank line if present (for blank line preservation)
+                            // Use literalline (no indentation) for the blank line itself
+                            if has_blank && !is_first {
+                                member_parts.push(doc::literalline());
+                            }
+
+                            // Add hardline before comments (comments need to start on their own line)
+                            if has_comments {
+                                member_parts.push(doc::hardline());
+                                member_parts.push(comments_doc);
+                            }
+
                             member_parts.push(doc::hardline());
                             member_parts.push(self.build_type_member_doc(m));
+                            prev_end = m.span().end;
                         }
                         parts.push(doc::indent(doc::concat(member_parts)));
                         parts.push(doc::hardline());
@@ -443,11 +518,9 @@ impl<'a> Printer<'a> {
                     doc::text("]"),
                 ])
             }
-            TSType::Parenthesized(p) => doc::concat(vec![
-                doc::text("("),
-                self.build_type_doc(&p.type_annotation),
-                doc::text(")"),
-            ]),
+            // Parenthesized types: just unwrap. Parent contexts (IndexedAccess, Array,
+            // TypeOperator) add parens when needed based on the inner type.
+            TSType::Parenthesized(p) => self.build_type_doc(&p.type_annotation),
             TSType::TypePredicate(p) => {
                 let mut parts = vec![];
                 if p.asserts {
@@ -473,11 +546,24 @@ impl<'a> Printer<'a> {
                 doc::group(self.build_conditional_type_doc_inner(c))
             }
             TSType::Mapped(m) => self.build_mapped_type_doc(m),
-            TSType::TypeOperator(o) => doc::concat(vec![
-                doc::text(o.operator.as_str()),
-                doc::text(" "),
-                self.build_type_doc(&o.type_annotation),
-            ]),
+            TSType::TypeOperator(o) => {
+                let needs_parens = type_needs_parens_for_prefix_operator(&o.type_annotation);
+                let operand_doc = self.build_type_doc(&o.type_annotation);
+                if needs_parens {
+                    doc::concat(vec![
+                        doc::text(o.operator.as_str()),
+                        doc::text(" ("),
+                        operand_doc,
+                        doc::text(")"),
+                    ])
+                } else {
+                    doc::concat(vec![
+                        doc::text(o.operator.as_str()),
+                        doc::text(" "),
+                        operand_doc,
+                    ])
+                }
+            }
             TSType::Import(i) => {
                 let mut parts = vec![doc::text("import(")];
                 parts.push(self.build_literal_doc(&i.argument));
@@ -518,12 +604,26 @@ impl<'a> Printer<'a> {
                 }
                 doc::concat(parts)
             }
-            TSType::IndexedAccess(i) => doc::concat(vec![
-                self.build_type_doc(&i.object_type),
-                doc::text("["),
-                self.build_type_doc(&i.index_type),
-                doc::text("]"),
-            ]),
+            TSType::IndexedAccess(i) => {
+                let object_doc = self.build_type_doc(&i.object_type);
+                let needs_parens = type_needs_parens_for_indexed_access_object(&i.object_type);
+                if needs_parens {
+                    doc::concat(vec![
+                        doc::text("("),
+                        object_doc,
+                        doc::text(")["),
+                        self.build_type_doc(&i.index_type),
+                        doc::text("]"),
+                    ])
+                } else {
+                    doc::concat(vec![
+                        object_doc,
+                        doc::text("["),
+                        self.build_type_doc(&i.index_type),
+                        doc::text("]"),
+                    ])
+                }
+            }
             TSType::Rest(r) => doc::concat(vec![
                 doc::text("..."),
                 self.build_type_doc(&r.type_annotation),
@@ -553,19 +653,30 @@ impl<'a> Printer<'a> {
     ///
     /// Structure: `check extends extends_type [indent: line, "? ", true_type, line, ": ", false_type]`
     fn build_conditional_type_doc_inner(&self, c: &internal::TSConditionalType) -> Doc {
-        // Build true_type doc: if it's a conditional, don't wrap in group
-        let true_type_doc = if let TSType::Conditional(inner) = c.true_type.as_ref() {
-            self.build_conditional_type_doc_inner(inner)
-        } else {
-            self.build_type_doc(&c.true_type)
-        };
+        // Build true_type doc: if it's a conditional (possibly wrapped in parens), don't wrap in group
+        // Add parens for readability only when flat (single-line), not when broken (multi-line)
+        let true_type_doc =
+            if let TSType::Conditional(inner) = unwrap_parenthesized(c.true_type.as_ref()) {
+                // Nested conditional in true position:
+                // - Flat: add parens for readability: `T extends A ? (T extends B ? C : D) : E`
+                // - Broken: no parens (the line breaks provide clarity)
+                let inner_doc = self.build_conditional_type_doc_inner(inner);
+                doc::if_break(
+                    inner_doc.clone(),
+                    doc::concat(vec![doc::text("("), inner_doc, doc::text(")")]),
+                )
+            } else {
+                self.build_type_doc(&c.true_type)
+            };
 
         // Build false_type doc: if it's a conditional, don't wrap in group
-        let false_type_doc = if let TSType::Conditional(inner) = c.false_type.as_ref() {
-            self.build_conditional_type_doc_inner(inner)
-        } else {
-            self.build_type_doc(&c.false_type)
-        };
+        // No parens needed for nested conditionals in false position (right-associative)
+        let false_type_doc =
+            if let TSType::Conditional(inner) = unwrap_parenthesized(c.false_type.as_ref()) {
+                self.build_conditional_type_doc_inner(inner)
+            } else {
+                self.build_type_doc(&c.false_type)
+            };
 
         // Build extends_type doc - unions need special handling to avoid trailing space
         // after "extends" when the union breaks (e.g., `T extends\n\t| A\n\t| B`)
@@ -735,6 +846,12 @@ impl<'a> Printer<'a> {
             }
             internal::TSTypeElement::MethodSignature(method) => {
                 let mut parts = vec![];
+                // Print accessor keyword for get/set signatures
+                match method.kind {
+                    internal::MethodKind::Get => parts.push(doc::text("get ")),
+                    internal::MethodKind::Set => parts.push(doc::text("set ")),
+                    _ => {}
+                }
                 if method.computed {
                     parts.push(doc::text("["));
                     parts.push(self.build_expression_doc(&method.key));
@@ -903,10 +1020,13 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for an array type (e.g., `number[]`)
     fn build_array_type_doc(&self, arr: &TSArrayType) -> Doc {
-        doc::concat(vec![
-            self.build_type_doc(&arr.element_type),
-            doc::text("[]"),
-        ])
+        let needs_parens = type_needs_parens_for_array_element(&arr.element_type);
+        let element_doc = self.build_type_doc(&arr.element_type);
+        if needs_parens {
+            doc::concat(vec![doc::text("("), element_doc, doc::text(")[]")])
+        } else {
+            doc::concat(vec![element_doc, doc::text("[]")])
+        }
     }
 
     /// Build parameter list docs for function/constructor types
@@ -1051,7 +1171,15 @@ impl<'a> Printer<'a> {
                 // After separator: line when broken, space when flat
                 parts.push(doc::line());
             }
-            parts.push(self.build_type_doc(t));
+            // Union has lower precedence than intersection, so wrap in parens
+            let inner = unwrap_parenthesized(t);
+            if matches!(inner, TSType::Union(_)) {
+                parts.push(doc::text("("));
+                parts.push(self.build_type_doc(t));
+                parts.push(doc::text(")"));
+            } else {
+                parts.push(self.build_type_doc(t));
+            }
             if i < intersection.types.len() - 1 {
                 // Separator: " &" after each type except the last
                 parts.push(doc::text(" &"));
@@ -1126,12 +1254,16 @@ impl<'a> Printer<'a> {
                         }
                     } else {
                         // Multi-line format
-                        self.write("\n");
                         self.indent_level += 1;
-                        for m in &t.members {
+                        let mut prev_end = t.span.start + 1; // after opening brace
+                        for (i, m) in t.members.iter().enumerate() {
+                            let is_first = i == 0;
+                            // Print leading comments (including blank line preservation)
+                            self.print_block_leading_comments(prev_end, m.span().start, is_first);
                             self.write_indent();
                             self.print_type_member(m);
                             self.write("\n");
+                            prev_end = m.span().end;
                         }
                         self.indent_level -= 1;
                         self.write_indent();
@@ -1403,6 +1535,12 @@ impl<'a> Printer<'a> {
                 }
             }
             internal::TSTypeElement::MethodSignature(method) => {
+                // Print accessor keyword for get/set signatures
+                match method.kind {
+                    internal::MethodKind::Get => self.write("get "),
+                    internal::MethodKind::Set => self.write("set "),
+                    _ => {}
+                }
                 if method.computed {
                     self.write("[");
                     self.print_expression(&method.key);

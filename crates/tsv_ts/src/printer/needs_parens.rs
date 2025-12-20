@@ -134,10 +134,12 @@ pub fn needs_parens(expr: &Expression, ctx: ParenContext) -> bool {
         // Await argument: `await (a + b)` - binary needs parens (higher precedence)
         ParenContext::AwaitArgument => matches!(expr, Expression::BinaryExpression(_)),
 
-        // Arrow body: `() => ({})`, `() => (x = y)`
+        // Arrow body: `() => ({})`, `() => (x = y)`, `() => (a ? b : c)`
         ParenContext::ArrowBody => matches!(
             expr,
-            Expression::ObjectExpression(_) | Expression::AssignmentExpression(_)
+            Expression::ObjectExpression(_)
+                | Expression::AssignmentExpression(_)
+                | Expression::ConditionalExpression(_)
         ),
     }
 }

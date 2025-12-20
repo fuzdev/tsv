@@ -13,8 +13,9 @@ node_modules
 # WASM build output
 /crates/tsv_wasm/pkg
 
-# Benchmark results (JSON output)
+# Benchmark results
 /benches/deno/results/*.json
+/benches/deno/baseline.json
 
 # Env
 .env*

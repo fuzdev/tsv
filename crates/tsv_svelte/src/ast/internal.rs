@@ -235,7 +235,6 @@ pub struct OnDirective {
 pub struct BindDirective {
     pub name: String,           // Property name: "value", "checked", "this", etc.
     pub expression: Expression, // Binding target (always present - auto-generated for shorthand)
-    pub modifiers: Vec<String>, // Currently empty for bindings
     pub span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None for shorthand bindings)
     pub expression_tag_span: Option<Span>,
@@ -249,7 +248,6 @@ pub struct BindDirective {
 pub struct ClassDirective {
     pub name: String,           // Class name: "active", "visible", etc.
     pub expression: Expression, // Condition (always present - auto-generated for shorthand)
-    pub modifiers: Vec<String>, // Currently empty for class directives
     pub span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None for shorthand)
     pub expression_tag_span: Option<Span>,
@@ -286,7 +284,6 @@ pub enum StyleDirectiveValue {
 pub struct UseDirective {
     pub name: String,                   // Action name: "action", "tooltip", etc.
     pub expression: Option<Expression>, // Parameters passed to the action
-    pub modifiers: Vec<String>,         // Currently unused
     pub span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
     pub expression_tag_span: Option<Span>,
@@ -357,7 +354,6 @@ pub struct TransitionDirective {
 pub struct AnimateDirective {
     pub name: String,                   // Animation name: "flip", etc.
     pub expression: Option<Expression>, // Animation parameters
-    pub modifiers: Vec<String>,         // Currently unused
     pub span: Span,
 }
 
@@ -368,7 +364,6 @@ pub struct AnimateDirective {
 pub struct LetDirective {
     pub name: String,                   // Slot prop name: "item", "index", etc.
     pub expression: Option<Expression>, // Local binding pattern (Identifier, ArrayPattern, ObjectPattern)
-    pub modifiers: Vec<String>,         // Currently unused
     pub span: Span,
 }
 

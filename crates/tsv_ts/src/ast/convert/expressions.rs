@@ -446,6 +446,10 @@ pub fn convert_expression(
                     interner,
                     offset,
                 )),
+                options: import_expr
+                    .options
+                    .as_ref()
+                    .map(|opts| Box::new(convert_expression(opts, source, loc, interner, offset))),
             })
         }
         internal::Expression::MetaProperty(meta) => {

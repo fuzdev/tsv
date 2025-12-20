@@ -524,6 +524,9 @@ impl<'a> Parser<'a> {
                 _ => MethodKind::Method,
             });
 
+            // Capture paren position before parsing params (for comment detection)
+            let (params_start, _) = self.current_pos();
+
             // Parse parameter list and block body (like a function)
             let params = self.parse_parameter_list()?;
 
@@ -569,6 +572,7 @@ impl<'a> Parser<'a> {
                 body: body_block,
                 generator: is_generator,
                 r#async: is_async,
+                params_start: params_start as u32,
                 span: Span::new(start as u32, end),
             };
 

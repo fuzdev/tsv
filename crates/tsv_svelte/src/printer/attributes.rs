@@ -243,7 +243,6 @@ impl<'a> Printer<'a> {
     /// Build a Doc for bind:prop directive
     fn build_bind_directive_doc(&self, d: &internal::BindDirective) -> Doc {
         let mut parts = vec![doc::text("bind:"), doc::text_owned(d.name.clone())];
-        parts.extend(self.build_modifiers_doc(&d.modifiers));
         // Only include expression if not shorthand
         if !self.is_identifier_with_name(&d.expression, &d.name) {
             parts.extend(
@@ -256,7 +255,6 @@ impl<'a> Printer<'a> {
     /// Build a Doc for class:name directive
     fn build_class_directive_doc(&self, d: &internal::ClassDirective) -> Doc {
         let mut parts = vec![doc::text("class:"), doc::text_owned(d.name.clone())];
-        parts.extend(self.build_modifiers_doc(&d.modifiers));
         // Only include expression if not shorthand
         if !self.is_identifier_with_name(&d.expression, &d.name) {
             parts.extend(
@@ -290,7 +288,6 @@ impl<'a> Printer<'a> {
     /// Build a Doc for use:action directive
     fn build_use_directive_doc(&self, d: &internal::UseDirective) -> Doc {
         let mut parts = vec![doc::text("use:"), doc::text_owned(d.name.clone())];
-        parts.extend(self.build_modifiers_doc(&d.modifiers));
         if let Some(expr) = &d.expression {
             parts.extend(self.build_expression_doc_parts_with_span(expr, d.expression_tag_span));
         }
@@ -313,7 +310,6 @@ impl<'a> Printer<'a> {
     /// Build a Doc for animate:name directive
     fn build_animate_directive_doc(&self, d: &internal::AnimateDirective) -> Doc {
         let mut parts = vec![doc::text("animate:"), doc::text_owned(d.name.clone())];
-        parts.extend(self.build_modifiers_doc(&d.modifiers));
         if let Some(expr) = &d.expression {
             parts.extend(self.build_expression_doc_parts(expr));
         }
@@ -323,7 +319,6 @@ impl<'a> Printer<'a> {
     /// Build a Doc for let:name directive
     fn build_let_directive_doc(&self, d: &internal::LetDirective) -> Doc {
         let mut parts = vec![doc::text("let:"), doc::text_owned(d.name.clone())];
-        parts.extend(self.build_modifiers_doc(&d.modifiers));
         if let Some(expr) = &d.expression {
             parts.extend(self.build_expression_doc_parts(expr));
         }

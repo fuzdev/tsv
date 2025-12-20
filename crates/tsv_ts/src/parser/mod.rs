@@ -17,6 +17,7 @@ use tsv_lang::{ParseError, PeekData, Span};
 mod expression;
 mod statement; // Statement parsing (refactored into submodules)
 
+#[allow(clippy::struct_excessive_bools)]
 pub struct Parser<'a> {
     source: &'a str,
     lexer: Lexer<'a>,
@@ -44,6 +45,9 @@ pub struct Parser<'a> {
     /// Stored lexer error from peek_kind(). Returned on next advance() call.
     /// This ensures lexer errors propagate even when peek swallows them.
     lexer_error: Option<ParseError>,
+    /// Whether to allow `in` as a binary operator.
+    /// Set to false when parsing for-loop headers to distinguish `for (x in y)` from expressions.
+    allow_in: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -102,6 +106,7 @@ impl<'a> Parser<'a> {
             allow_ts_type_assertions: true, // Enable by default (TypeScript context)
             in_ambient_context: false,      // Not in declare namespace/module
             lexer_error: None,              // No stored lexer error
+            allow_in: true,                 // Allow `in` binary operator by default
         })
     }
 
@@ -466,6 +471,7 @@ impl<'a> Parser<'a> {
             TokenKind::Identifier
                 | TokenKind::BracketOpen
                 | TokenKind::String
+                | TokenKind::Number
                 | TokenKind::Keyword(_)
         )
     }

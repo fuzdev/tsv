@@ -6,6 +6,7 @@ use crate::printer::{
     ParenContext, is_module_path_fluid_call, is_multiline_string_literal, is_pure_property_chain,
     needs_doc_based_wrapping, needs_parens,
 };
+use tsv_lang::SymbolResolver;
 use tsv_lang::doc;
 
 /// Wrap a doc in parentheses if the expression needs them for variable init context
@@ -18,6 +19,67 @@ fn wrap_init_doc(init_doc: doc::Doc, init: &Expression) -> doc::Doc {
 }
 
 impl<'a> Printer<'a> {
+    /// Build a doc for a variable binding pattern with optional definite assignment assertion
+    ///
+    /// For identifiers with `definite: true`, builds doc for `name!: type` instead of `name: type`.
+    fn build_variable_binding_doc(&self, id: &Expression, definite: bool) -> doc::Doc {
+        if definite {
+            if let Expression::Identifier(ident) = id {
+                let name = self.resolve_symbol(ident.name);
+                let mut parts = vec![doc::text_owned(name), doc::text("!")];
+
+                if let Some(type_annotation) = &ident.type_annotation {
+                    parts.push(self.build_type_annotation_doc(type_annotation));
+                }
+
+                doc::concat(parts)
+            } else {
+                // Destructuring patterns don't support definite assignment
+                self.build_expression_doc(id)
+            }
+        } else {
+            self.build_expression_doc(id)
+        }
+    }
+
+    /// Print a variable binding pattern with optional definite assignment assertion
+    ///
+    /// For identifiers with `definite: true`, prints `name!: type` instead of `name: type`.
+    fn print_variable_binding(&mut self, id: &Expression, definite: bool) {
+        if definite {
+            // For definite assignment, we need to insert `!` between name and type annotation
+            if let Expression::Identifier(ident) = id {
+                // Print decorators (rare for variable declarations, but handle for completeness)
+                if let Some(decorators) = &ident.decorators {
+                    for decorator in decorators {
+                        self.write("@");
+                        self.print_expression(&decorator.expression);
+                        self.write(" ");
+                    }
+                }
+
+                // Print the identifier name
+                let name = self.resolve_symbol(ident.name);
+                self.write(&name);
+
+                // Print definite assignment marker
+                self.write("!");
+
+                // Print type annotation if present
+                if let Some(type_annotation) = &ident.type_annotation {
+                    self.print_type_annotation(type_annotation);
+                }
+            } else {
+                // Destructuring patterns don't support definite assignment
+                // (parser sets definite=false for these)
+                self.print_expression(id);
+            }
+        } else {
+            // Normal case: just print the expression
+            self.print_expression(id);
+        }
+    }
+
     /// Print a variable declaration
     pub(super) fn print_variable_declaration(&mut self, decl: &internal::VariableDeclaration) {
         // Print declare modifier if present
@@ -46,13 +108,75 @@ impl<'a> Printer<'a> {
         self.write(" ");
 
         // Print declarators
-        // Multiple declarators: one per line with extra indent
-        // Example: `const a = 1,\n\t\tb = 2;`
-        // When multiple declarators, multiline objects/arrays get extra indentation
-        // Use save/restore pattern for nested multi-declarator safety
+        // Prettier's rule: if ANY declarator has an initializer, break to multiple lines
+        // If no initializers, use soft breaks that break at print_width
         let is_multi_declarator = decl.declarations.len() > 1;
+        let has_any_init = decl.declarations.iter().any(|d| d.init.is_some());
+        let should_break = is_multi_declarator && has_any_init;
+
+        // When no initializers: use doc-based printing with line separators
+        // that break at print_width (prettier uses `line` separator)
+        if is_multi_declarator && !has_any_init {
+            // Check for comments between declarators - fall back to direct printing if present
+            let has_comments = decl.declarations.windows(2).any(|pair| {
+                let prev_end = pair[0].span.end;
+                let curr_start = pair[1].span.start;
+                self.has_comments_between(prev_end, curr_start)
+            });
+
+            if !has_comments {
+                // Use doc-based printing with soft breaks
+                // Structure: group(d1 + "," + indent(line + d2 + "," + line + d3 + ...))
+                let mut parts = vec![];
+                let mut rest_parts = vec![];
+                let mut last_span_end = 0u32;
+
+                for (i, declarator) in decl.declarations.iter().enumerate() {
+                    last_span_end = declarator.span.end;
+                    let decl_doc =
+                        self.build_variable_binding_doc(&declarator.id, declarator.definite);
+                    if i == 0 {
+                        parts.push(decl_doc);
+                        parts.push(doc::text(","));
+                    } else {
+                        rest_parts.push(doc::line());
+                        rest_parts.push(decl_doc);
+                        if i < decl.declarations.len() - 1 {
+                            rest_parts.push(doc::text(","));
+                        }
+                    }
+                }
+
+                parts.push(doc::indent(doc::concat(rest_parts)));
+                parts.push(doc::text(";"));
+
+                let declarator_doc = doc::group(doc::concat(parts));
+
+                // Print using doc system with current column position
+                let base_offset = self.config.base_indent_offset * self.config.tab_width;
+                let current_col = self.current_column() + base_offset;
+                let output = {
+                    let interner = self.interner.borrow();
+                    doc::print_doc_at_column_resolved(
+                        &declarator_doc,
+                        &self.config,
+                        current_col,
+                        &*interner,
+                    )
+                };
+                self.write(&output);
+
+                // Handle trailing comments
+                self.print_inline_comments_in_statement(last_span_end, decl.span.end);
+
+                return;
+            }
+        }
+
+        // When breaking to multiple lines, multiline objects/arrays get extra indentation
+        // Use save/restore pattern for nested multi-declarator safety
         let old_indent_depth = self.declaration_indent_depth;
-        if is_multi_declarator {
+        if should_break {
             self.declaration_indent_depth = old_indent_depth + 1;
         }
 
@@ -73,17 +197,24 @@ impl<'a> Printer<'a> {
                     self.print_inline_comments_between(prev_end, curr_start);
                 }
 
-                self.write("\n");
-                // Continuation indent: one extra tab
-                // (Svelte printer adds base indent to each line from TypeScript output)
-                self.write(self.config.indent);
+                if should_break || has_line_comment {
+                    self.write("\n");
+                    // Continuation indent: one extra tab
+                    // (Svelte printer adds base indent to each line from TypeScript output)
+                    self.write(self.config.indent);
 
-                if !has_line_comment {
-                    // Print block comments on new line (e.g., `const a = 1, /* comment */ b = 2`)
-                    // Note: print WITHOUT leading space (already indented) but WITH trailing space
-                    if self.print_leading_comments_for_declarator(prev_end, curr_start) {
-                        self.write(" ");
+                    if !has_line_comment {
+                        // Print block comments on new line (e.g., `const a = 1, /* comment */ b = 2`)
+                        // Note: print WITHOUT leading space (already indented) but WITH trailing space
+                        if self.print_leading_comments_for_declarator(prev_end, curr_start) {
+                            self.write(" ");
+                        }
                     }
+                } else {
+                    // Keep on same line: just add space after comma
+                    self.write(" ");
+                    // Print any block comments inline
+                    self.print_inline_comments_between(prev_end, curr_start);
                 }
             }
             self.print_variable_declarator(declarator);
@@ -116,7 +247,7 @@ impl<'a> Printer<'a> {
     pub(super) fn print_variable_declarator(&mut self, declarator: &internal::VariableDeclarator) {
         // Check if we have an initializer - if not, just print the binding pattern
         let Some(init) = &declarator.init else {
-            self.print_expression(&declarator.id);
+            self.print_variable_binding(&declarator.id, declarator.definite);
             return;
         };
 
@@ -129,7 +260,7 @@ impl<'a> Printer<'a> {
 
         // If there are comments, use direct printing (comment handling with doc IR is complex)
         if has_comments_before_eq || has_comments_after_eq {
-            self.print_expression(&declarator.id);
+            self.print_variable_binding(&declarator.id, declarator.definite);
             let _ = self.print_inline_comments_between(id_end, equals_pos);
             if has_comments_after_eq {
                 self.write(" =");
@@ -158,7 +289,7 @@ impl<'a> Printer<'a> {
         if is_multiline_string {
             // Multiline strings: mandatory break after `=`
             // Structure: id + " =" + hardline + indent + value
-            let id_doc = self.build_expression_doc(&declarator.id);
+            let id_doc = self.build_variable_binding_doc(&declarator.id, declarator.definite);
             let init_doc = wrap_init_doc(self.build_expression_doc(init), init);
 
             let assignment_doc = doc::concat(vec![
@@ -186,7 +317,7 @@ impl<'a> Printer<'a> {
             //
             // Note: Skip this for expanded patterns and multiline type annotations -
             // the group-based approach causes unwanted line breaks after `=`.
-            let id_doc = self.build_expression_doc(&declarator.id);
+            let id_doc = self.build_variable_binding_doc(&declarator.id, declarator.definite);
             let init_doc = wrap_init_doc(self.build_expression_doc(init), init);
 
             let assignment_doc = doc::group(doc::concat(vec![
@@ -203,7 +334,7 @@ impl<'a> Printer<'a> {
             // These expressions have doc groups inside them that decide whether
             // to break based on line width. We need to use the doc system to
             // evaluate those groups.
-            let id_doc = self.build_expression_doc(&declarator.id);
+            let id_doc = self.build_variable_binding_doc(&declarator.id, declarator.definite);
             let init_doc = wrap_init_doc(self.build_expression_doc(init), init);
 
             let assignment_doc = doc::concat(vec![id_doc, doc::text(" = "), init_doc]);
@@ -221,7 +352,9 @@ impl<'a> Printer<'a> {
             // the pattern, because the group makes its break decision in isolation.
             //
             // Pre-calculate if expanding is needed by measuring flat width of full statement.
-            let id_doc = self.build_expression_doc(&declarator.id);
+            // Note: Destructuring patterns don't support definite assignment, so we can use
+            // build_expression_doc directly (definite is always false for patterns).
+            let id_doc = self.build_variable_binding_doc(&declarator.id, declarator.definite);
             let init_doc = wrap_init_doc(self.build_expression_doc(init), init);
 
             let assignment_doc = doc::concat(vec![id_doc, doc::text(" = "), init_doc]);
@@ -274,7 +407,7 @@ impl<'a> Printer<'a> {
             }
         } else {
             // Direct printing for expressions that handle their own wrapping
-            self.print_expression(&declarator.id);
+            self.print_variable_binding(&declarator.id, declarator.definite);
             self.write(" = ");
             // Wrap assignment expressions in parens for clarity
             if needs_parens(init, ParenContext::VariableInit) {

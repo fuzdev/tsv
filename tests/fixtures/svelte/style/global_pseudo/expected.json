@@ -1,0 +1,481 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 458,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 51,
+					"end": 67,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 51,
+							"end": 67,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "global",
+											"args": {
+												"type": "SelectorList",
+												"start": 59,
+												"end": 60,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 59,
+														"end": 60,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "a",
+																		"start": 59,
+																		"end": 60
+																	}
+																],
+																"start": 59,
+																"end": 60
+															}
+														]
+													}
+												]
+											},
+											"start": 51,
+											"end": 61
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "hover",
+											"args": null,
+											"start": 61,
+											"end": 67
+										}
+									],
+									"start": 51,
+									"end": 67
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 68,
+					"end": 86,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 72,
+							"end": 82,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 51,
+				"end": 86
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 118,
+					"end": 143,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 118,
+							"end": 143,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "global",
+											"args": {
+												"type": "SelectorList",
+												"start": 126,
+												"end": 130,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 126,
+														"end": 130,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "body",
+																		"start": 126,
+																		"end": 130
+																	}
+																],
+																"start": 126,
+																"end": 130
+															}
+														]
+													}
+												]
+											},
+											"start": 118,
+											"end": 131
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "has",
+											"args": {
+												"type": "SelectorList",
+												"start": 136,
+												"end": 142,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 136,
+														"end": 142,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "class",
+																		"start": 136,
+																		"end": 142
+																	}
+																],
+																"start": 136,
+																"end": 142
+															}
+														]
+													}
+												]
+											},
+											"start": 131,
+											"end": 143
+										}
+									],
+									"start": 118,
+									"end": 143
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 144,
+					"end": 168,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 148,
+							"end": 164,
+							"property": "background",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 118,
+				"end": 168
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 208,
+					"end": 226,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 208,
+							"end": 226,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "global",
+											"args": {
+												"type": "SelectorList",
+												"start": 216,
+												"end": 217,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 216,
+														"end": 217,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "a",
+																		"start": 216,
+																		"end": 217
+																	}
+																],
+																"start": 216,
+																"end": 217
+															}
+														]
+													}
+												]
+											},
+											"start": 208,
+											"end": 218
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "before",
+											"start": 218,
+											"end": 226
+										}
+									],
+									"start": 208,
+									"end": 226
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 227,
+					"end": 246,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 231,
+							"end": 242,
+							"property": "content",
+							"value": "''"
+						}
+					]
+				},
+				"start": 208,
+				"end": 246
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 302,
+					"end": 330,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 302,
+							"end": 330,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class",
+											"start": 302,
+											"end": 308
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "global",
+											"args": {
+												"type": "SelectorList",
+												"start": 316,
+												"end": 323,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 316,
+														"end": 323,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "class1",
+																		"start": 316,
+																		"end": 323
+																	}
+																],
+																"start": 316,
+																"end": 323
+															}
+														]
+													}
+												]
+											},
+											"start": 308,
+											"end": 324
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "focus",
+											"args": null,
+											"start": 324,
+											"end": 330
+										}
+									],
+									"start": 302,
+									"end": 330
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 331,
+					"end": 352,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 335,
+							"end": 348,
+							"property": "outline",
+							"value": "none"
+						}
+					]
+				},
+				"start": 302,
+				"end": 352
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 400,
+					"end": 428,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 400,
+							"end": 428,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "global",
+											"args": {
+												"type": "SelectorList",
+												"start": 408,
+												"end": 415,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 408,
+														"end": 415,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "a",
+																		"start": 408,
+																		"end": 409
+																	},
+																	{
+																		"type": "ClassSelector",
+																		"name": "class",
+																		"start": 409,
+																		"end": 415
+																	}
+																],
+																"start": 408,
+																"end": 415
+															}
+														]
+													}
+												]
+											},
+											"start": 400,
+											"end": 416
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "hover",
+											"args": null,
+											"start": 416,
+											"end": 422
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "focus",
+											"args": null,
+											"start": 422,
+											"end": 428
+										}
+									],
+									"start": 400,
+									"end": 428
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 429,
+					"end": 449,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 433,
+							"end": 445,
+							"property": "opacity",
+							"value": "0.8"
+						}
+					]
+				},
+				"start": 400,
+				"end": 449
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 450,
+			"styles": "\n\t/* :global() followed by pseudo-class */\n\t:global(a):hover {\n\t\tcolor: red;\n\t}\n\n\t/* :global() with :has() */\n\t:global(body):has(.class) {\n\t\tbackground: blue;\n\t}\n\n\t/* :global() with pseudo-element */\n\t:global(a)::before {\n\t\tcontent: '';\n\t}\n\n\t/* Local class adjacent to :global() with pseudo */\n\t.class:global(.class1):focus {\n\t\toutline: none;\n\t}\n\n\t/* Compound with multiple pseudo-classes */\n\t:global(a.class):hover:focus {\n\t\topacity: 0.8;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 459,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

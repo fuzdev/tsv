@@ -154,7 +154,8 @@ impl<'a> Parser<'a> {
         }
 
         // Parse expression (could be init or left-hand side)
-        let expr = self.parse_expression()?;
+        // Use parse_expression_no_in to prevent `in` from being parsed as binary operator
+        let expr = self.parse_expression_no_in()?;
 
         // Check for 'in' or 'of'
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {

@@ -12,11 +12,19 @@ const VERSIONS = {
 	'@sveltejs/acorn-typescript': '1.0.8',
 } as const;
 
+// TODO verify there's not a better solution to use deno.json here, see the above NOTE too
+// Imports are like this because these don't have the deno.json when used by the release binary.
+// deno-lint-ignore no-import-prefix
 import * as prettier from 'npm:prettier@3.7.4';
+// deno-lint-ignore no-import-prefix
 import prettierPluginSvelte from 'npm:prettier-plugin-svelte@3.4.0';
+// deno-lint-ignore no-import-prefix
 import { parse as svelteParse } from 'npm:svelte@5.45.8/compiler';
+// deno-lint-ignore no-import-prefix
 import * as acorn from 'npm:acorn@8.15.0';
+// deno-lint-ignore no-import-prefix
 import { tsPlugin } from 'npm:@sveltejs/acorn-typescript@1.0.8';
+// deno-lint-ignore no-import-prefix
 import { TextLineStream } from 'jsr:@std/streams@1/text-line-stream';
 
 // Create TypeScript-enabled parser
@@ -85,7 +93,7 @@ async function dispatch(
 			return JSON.stringify(ast, jsonReplacer, '\t');
 		}
 
-		case 'acorn-ts-parse': {
+		case 'acorn-typescript-parse': {
 			const ast = ParserWithTS.parse(content, {
 				sourceType: 'module',
 				ecmaVersion: 2025,

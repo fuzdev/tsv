@@ -663,10 +663,12 @@ pub struct NewExpression {
     pub span: Span,
 }
 
-/// Dynamic import expression: `import('module')`
+/// Dynamic import expression: `import('module')` or `import('module', options)`
 #[derive(Debug, Clone)]
 pub struct ImportExpression {
     pub source: Box<Expression>,
+    /// Optional second argument for import attributes: `{with: {type: 'json'}}`
+    pub options: Option<Box<Expression>>,
     pub span: Span,
 }
 
@@ -769,6 +771,8 @@ pub struct FunctionExpression {
     pub generator: bool,
     /// Whether this is an async function (`async function`)
     pub r#async: bool,
+    /// Position of opening paren for params (for comment detection)
+    pub params_start: u32,
     pub span: Span,
 }
 
@@ -805,6 +809,8 @@ pub struct FunctionDeclaration {
     pub generator: bool,
     /// Whether this is an async function (`async function`)
     pub r#async: bool,
+    /// Position of opening paren for params (for comment detection)
+    pub params_start: u32,
     pub span: Span,
 }
 
@@ -1650,6 +1656,8 @@ pub struct VariableDeclarator {
     /// The binding pattern (Identifier, ArrayPattern, or ObjectPattern)
     pub id: Expression,
     pub init: Option<Expression>,
+    /// Definite assignment assertion (`!` after identifier, e.g., `let x!: string;`)
+    pub definite: bool,
     pub span: Span,
 }
 
@@ -2090,12 +2098,14 @@ pub struct TSPropertySignature {
     pub span: Span,
 }
 
-/// Method signature: `method(): T` or `method<T>(x: T): T`
+/// Method signature: `method(): T` or `method<T>(x: T): T` or `get x(): T` or `set x(v: T)`
 #[derive(Debug, Clone)]
 pub struct TSMethodSignature {
     pub key: Expression,
     pub computed: bool,
     pub optional: bool,
+    /// Method kind: method, get, or set (for accessor signatures in type literals)
+    pub kind: MethodKind,
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub params: Vec<Expression>,
     pub return_type: Option<TSTypeAnnotation>,

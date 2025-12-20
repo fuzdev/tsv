@@ -1,0 +1,355 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 98,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 21,
+			"end": 28,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 12
+				},
+				"end": {
+					"line": 2,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 34,
+			"end": 41,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 25
+				},
+				"end": {
+					"line": 2,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 62,
+			"end": 69,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 12
+				},
+				"end": {
+					"line": 3,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 72,
+			"end": 79,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 22
+				},
+				"end": {
+					"line": 3,
+					"column": 29
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 97,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 88,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 0
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 49,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 40
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 16,
+							"end": 48,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 2,
+									"column": 39
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 16,
+								"end": 17,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 20,
+								"end": 48,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 11
+									},
+									"end": {
+										"line": 2,
+										"column": 39
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 29,
+										"end": 30,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 20
+											},
+											"end": {
+												"line": 2,
+												"column": 21
+											}
+										},
+										"name": "a",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 21,
+												"end": 28
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 32,
+										"end": 33,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 23
+											},
+											"end": {
+												"line": 2,
+												"column": 24
+											}
+										},
+										"name": "b",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 34,
+												"end": 41
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 46,
+									"end": 48,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 37
+										},
+										"end": {
+											"line": 2,
+											"column": 39
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 51,
+					"end": 87,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 37
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 57,
+							"end": 86,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 36
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 57,
+								"end": 58,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "g"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 61,
+								"end": 86,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 36
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 70,
+										"end": 71,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 20
+											},
+											"end": {
+												"line": 3,
+												"column": 21
+											}
+										},
+										"name": "x",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 62,
+												"end": 69
+											}
+										],
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 72,
+												"end": 79
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 84,
+									"end": 86,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 34
+										},
+										"end": {
+											"line": 3,
+											"column": 36
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

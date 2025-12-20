@@ -335,6 +335,12 @@ impl<'a> Printer<'a> {
                 }
             }
             internal::TSTypeElement::MethodSignature(m) => {
+                // Print accessor keyword for get/set signatures
+                match m.kind {
+                    internal::MethodKind::Get => self.write("get "),
+                    internal::MethodKind::Set => self.write("set "),
+                    _ => {}
+                }
                 if m.computed {
                     self.write("[");
                     self.print_expression(&m.key);
@@ -457,6 +463,12 @@ impl<'a> Printer<'a> {
             }
             internal::TSTypeElement::MethodSignature(m) => {
                 let mut parts = Vec::new();
+                // Print accessor keyword for get/set signatures
+                match m.kind {
+                    internal::MethodKind::Get => parts.push(doc::text("get ")),
+                    internal::MethodKind::Set => parts.push(doc::text("set ")),
+                    _ => {}
+                }
                 parts.push(self.build_expression_doc(&m.key));
                 if m.optional {
                     parts.push(doc::text("?"));

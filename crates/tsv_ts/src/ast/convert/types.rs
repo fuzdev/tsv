@@ -865,6 +865,12 @@ fn convert_type_element(
             })
         }
         internal::TSTypeElement::MethodSignature(m) => {
+            // Only include kind for accessor signatures (get/set), not regular methods
+            let kind = match m.kind {
+                internal::MethodKind::Get => Some("get".to_string()),
+                internal::MethodKind::Set => Some("set".to_string()),
+                _ => None, // Regular methods don't have a kind field
+            };
             public::TSTypeElement::MethodSignature(public::TSMethodSignature {
                 node_type: "TSMethodSignature".to_string(),
                 start: m.span.start,
@@ -881,6 +887,7 @@ fn convert_type_element(
                     type_annotation: None,
                     decorators: Vec::new(),
                 }),
+                kind,
                 type_parameters: m.type_parameters.as_ref().map(|tp| {
                     convert_type_parameter_declaration_simple(tp, source, loc, interner, offset)
                 }),

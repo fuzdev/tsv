@@ -249,20 +249,69 @@ impl<'a> Lexer<'a> {
             }
             Some(quote @ '\'' | quote @ '"') => {
                 // String literal for attribute values
-                // Handle escape sequences: \n, \t, \\, \', \", etc.
+                // Handle escape sequences AND embedded expression tags like {expr}
+                // Inside {}, quotes are part of JS strings, not attribute delimiters
+                //
+                // NOTE: Similar brace/string tracking logic exists in parse_attribute_value()
+                // (attribute.rs). The lexer tokenizes the whole string; the parser later
+                // extracts Text and ExpressionTag parts from it. Both need to track JS
+                // string contexts to handle quotes correctly.
                 self.advance(); // consume opening quote
+
+                let mut brace_depth = 0;
+                let mut in_js_string = false;
+                let mut js_string_char = '\0';
+
                 while let Some(ch) = self.current {
-                    if ch == '\\' {
-                        // Escape sequence - skip the backslash and the next character
-                        self.advance();
-                        if self.current.is_some() {
+                    if in_js_string {
+                        // Inside a JS string within {expr}
+                        if ch == '\\' {
+                            // Escape sequence in JS string
+                            self.advance();
+                            if self.current.is_some() {
+                                self.advance();
+                            }
+                        } else if ch == js_string_char {
+                            // End of JS string
+                            in_js_string = false;
+                            self.advance();
+                        } else {
                             self.advance();
                         }
-                    } else if ch == quote {
-                        self.advance(); // consume closing quote
-                        return Ok(self.make_token(TokenKind::String, start));
+                    } else if brace_depth > 0 {
+                        // Inside an expression tag {expr}
+                        if ch == '\'' || ch == '"' || ch == '`' {
+                            // Start of JS string
+                            in_js_string = true;
+                            js_string_char = ch;
+                            self.advance();
+                        } else if ch == '{' {
+                            brace_depth += 1;
+                            self.advance();
+                        } else if ch == '}' {
+                            brace_depth -= 1;
+                            self.advance();
+                        } else {
+                            self.advance();
+                        }
                     } else {
-                        self.advance();
+                        // Outside expression tags
+                        if ch == '\\' {
+                            // Escape sequence - skip the backslash and the next character
+                            self.advance();
+                            if self.current.is_some() {
+                                self.advance();
+                            }
+                        } else if ch == quote {
+                            self.advance(); // consume closing quote
+                            return Ok(self.make_token(TokenKind::String, start));
+                        } else if ch == '{' {
+                            // Start of expression tag
+                            brace_depth = 1;
+                            self.advance();
+                        } else {
+                            self.advance();
+                        }
                     }
                 }
                 // Unterminated string

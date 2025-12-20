@@ -7,8 +7,8 @@ use crate::deno::{PrettierParser, parse_svelte, parse_typescript, run_prettier};
 use crate::diff;
 use crate::fixtures::{
     self, Fixture, InputType, discover_invalid_variants, discover_prettier_quirk_variants,
-    discover_unformatted_ours_variants, discover_unformatted_variants, has_prettier_divergence_suffix,
-    has_svelte_divergence_suffix, read_file,
+    discover_unformatted_ours_variants, discover_unformatted_variants,
+    has_prettier_divergence_suffix, has_svelte_divergence_suffix, read_file,
 };
 use std::collections::HashMap;
 use std::fmt;
@@ -1105,13 +1105,19 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
 
     // Print summary
     if failed.is_empty() && summary.cross_fixture_duplicates.is_empty() {
-        let mut parts = vec![format!("✓ All {} fixtures validated", summary.total_fixtures)];
+        let mut parts = vec![format!(
+            "✓ All {} fixtures validated",
+            summary.total_fixtures
+        )];
         let mut variant_parts = Vec::new();
         if summary.total_unformatted > 0 {
             variant_parts.push(format!("{} unformatted_*", summary.total_unformatted));
         }
         if summary.total_unformatted_ours > 0 {
-            variant_parts.push(format!("{} unformatted_ours_*", summary.total_unformatted_ours));
+            variant_parts.push(format!(
+                "{} unformatted_ours_*",
+                summary.total_unformatted_ours
+            ));
         }
         if summary.total_prettier_quirk > 0 {
             variant_parts.push(format!("{} prettier_quirk_*", summary.total_prettier_quirk));

@@ -4,30 +4,51 @@
  * Uses the same approach as tsv_debug's Deno sidecar for consistency.
  */
 
-import type { Language, TsvImplementation } from './types.ts';
+import { type Language, LANGUAGE_PRETTIER_PARSERS, type TsvImplementation } from './types.ts';
+import type { CanonicalVersions } from './versions.ts';
 
-// Versions are defined in deno.json import map (single source of truth)
-// These are extracted for display in benchmark output
-// SYNC: Keep in sync with deno.json imports and crates/tsv_debug/src/deno/sidecar.ts
-export const VERSIONS = {
-	prettier: '3.7.4',
-	'prettier-plugin-svelte': '3.4.0',
-	svelte: '5.45.8',
-	acorn: '8.15.0',
-	'@sveltejs/acorn-typescript': '1.0.8',
-} as const;
+/** Module-level versions (set by constructor for external access) */
+export let VERSIONS: CanonicalVersions = {
+	prettier: 'unknown',
+	'prettier-plugin-svelte': 'unknown',
+	svelte: 'unknown',
+	acorn: 'unknown',
+	'@sveltejs/acorn-typescript': 'unknown',
+};
 
-// deno-lint-ignore no-explicit-any
-let prettier: any = null;
-// deno-lint-ignore no-explicit-any
-let prettierSvelte: any = null;
-// deno-lint-ignore no-explicit-any
-let svelteCompiler: any = null;
-// deno-lint-ignore no-explicit-any
-let acornTsParser: any = null;
+/** Prettier module */
+interface PrettierModule {
+	format: (source: string, options: Record<string, unknown>) => Promise<string>;
+}
+
+/** Parser function type */
+type ParserFn = (source: string) => unknown;
 
 export class CanonicalImplementation implements TsvImplementation {
 	name = 'canonical' as const;
+	private _prettier: PrettierModule | null = null;
+
+	/** Languages supported for parsing */
+	static readonly PARSE_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
+
+	/** Languages supported for formatting */
+	static readonly FORMAT_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
+	// deno-lint-ignore no-explicit-any
+	private _prettierSvelte: any = null;
+	// deno-lint-ignore no-explicit-any
+	private _svelteCompiler: any = null;
+	// deno-lint-ignore no-explicit-any
+	private _acornTsParser: any = null;
+
+	constructor(versions: CanonicalVersions) {
+		VERSIONS = versions;
+	}
+
+	/** Get initialized prettier or throw */
+	private get prettier(): PrettierModule {
+		if (!this._prettier) throw new Error('Prettier not initialized');
+		return this._prettier;
+	}
 
 	async init(): Promise<void> {
 		// Import all dependencies via deno.json import map
@@ -38,62 +59,67 @@ export class CanonicalImplementation implements TsvImplementation {
 			import('acorn'),
 			import('@sveltejs/acorn-typescript'),
 		]);
-		prettier = prettierMod;
-		prettierSvelte = prettierSvelteMod;
-		svelteCompiler = svelteMod;
+		this._prettier = prettierMod as PrettierModule;
+		this._prettierSvelte = prettierSvelteMod;
+		this._svelteCompiler = svelteMod;
 		// Create TypeScript parser once (acorn.Parser.extend is expensive)
 		// deno-lint-ignore no-explicit-any
-		acornTsParser = acornMod.Parser.extend(acornTsMod.tsPlugin() as any);
+		this._acornTsParser = acornMod.Parser.extend(acornTsMod.tsPlugin() as any);
+	}
+
+	/** Check if parsing is supported for this language */
+	supportsParseLanguage(language: Language): boolean {
+		return CanonicalImplementation.PARSE_LANGUAGES.includes(language);
+	}
+
+	/** Check if formatting is supported for this language */
+	supportsFormatLanguage(language: Language): boolean {
+		return CanonicalImplementation.FORMAT_LANGUAGES.includes(language);
+	}
+
+	// Lookup table for parse functions by language
+	private get parseFns(): Record<Language, ParserFn> {
+		return {
+			svelte: (source) => {
+				if (!this._svelteCompiler) throw new Error('Svelte compiler not initialized');
+				return this._svelteCompiler.parse(source, { modern: true });
+			},
+			typescript: (source) => {
+				if (!this._acornTsParser) throw new Error('Acorn not initialized');
+				return this._acornTsParser.parse(source, {
+					sourceType: 'module',
+					ecmaVersion: 2025,
+					locations: true,
+				});
+			},
+			css: (source) => {
+				// Wrap CSS in <style> tags and parse as Svelte to get CSS AST
+				if (!this._svelteCompiler) throw new Error('Svelte compiler not initialized');
+				return this._svelteCompiler.parse(`<style>${source}</style>`, { modern: true });
+			},
+		};
 	}
 
 	parse(source: string, language: Language): unknown {
-		switch (language) {
-			case 'svelte':
-				return this.parseSvelte(source);
-			case 'typescript':
-				return this.parseTypeScript(source);
-			case 'css':
-				return this.parseCss(source);
-		}
-	}
-
-	private parseSvelte(source: string): unknown {
-		if (!svelteCompiler) throw new Error('Svelte compiler not initialized');
-		return svelteCompiler.parse(source, { modern: true });
-	}
-
-	private parseTypeScript(source: string): unknown {
-		if (!acornTsParser) throw new Error('Acorn not initialized');
-		return acornTsParser.parse(source, {
-			sourceType: 'module',
-			ecmaVersion: 2025,
-			locations: true,
-		});
-	}
-
-	private parseCss(source: string): unknown {
-		// Wrap CSS in <style> tags and parse as Svelte to get CSS AST
-		if (!svelteCompiler) throw new Error('Svelte compiler not initialized');
-		return svelteCompiler.parse(`<style>${source}</style>`, { modern: true });
+		return this.parseFns[language](source);
 	}
 
 	async formatAsync(source: string, language: Language): Promise<string> {
-		if (!prettier || !prettierSvelte) throw new Error('Prettier not initialized');
+		if (!this._prettierSvelte) throw new Error('Prettier Svelte plugin not initialized');
 
-		const parser = language === 'svelte' ? 'svelte' : language === 'css' ? 'css' : 'typescript';
-		const plugins = language === 'svelte' ? [prettierSvelte] : [];
+		const plugins = language === 'svelte' ? [this._prettierSvelte] : [];
 
-		return await prettier.format(source, {
-			parser,
+		return await this.prettier.format(source, {
+			parser: LANGUAGE_PRETTIER_PARSERS[language],
 			plugins,
 			useTabs: true,
 		});
 	}
 
 	dispose(): void {
-		prettier = null;
-		prettierSvelte = null;
-		svelteCompiler = null;
-		acornTsParser = null;
+		this._prettier = null;
+		this._prettierSvelte = null;
+		this._svelteCompiler = null;
+		this._acornTsParser = null;
 	}
 }

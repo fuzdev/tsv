@@ -85,6 +85,9 @@ impl<'a> Parser<'a> {
             None
         };
 
+        // Capture paren position before parsing params (for comment detection)
+        let (params_start, _) = self.current_pos();
+
         // Parse parameter list
         let params = self.parse_parameter_list()?;
 
@@ -125,6 +128,7 @@ impl<'a> Parser<'a> {
                 body,
                 generator: is_generator,
                 r#async: is_async,
+                params_start: params_start as u32,
                 span: Span::new(start as u32, end),
             }))
         }
@@ -206,6 +210,9 @@ impl<'a> Parser<'a> {
             None
         };
 
+        // Capture paren position before parsing params (for comment detection)
+        let (params_start, _) = self.current_pos();
+
         // Parse parameter list
         let params = self.parse_parameter_list()?;
 
@@ -248,6 +255,7 @@ impl<'a> Parser<'a> {
                     body,
                     generator: is_generator,
                     r#async: is_async,
+                    params_start: params_start as u32,
                     span: Span::new(start as u32, end),
                 },
             ))
@@ -316,6 +324,9 @@ impl<'a> Parser<'a> {
             None
         };
 
+        // Capture paren position before parsing params (for comment detection)
+        let (params_start, _) = self.current_pos();
+
         // Parse parameter list
         let params = self.parse_parameter_list()?;
 
@@ -338,6 +349,7 @@ impl<'a> Parser<'a> {
             body,
             generator: is_generator,
             r#async: is_async,
+            params_start: params_start as u32,
             span: Span::new(start as u32, end),
         }))
     }

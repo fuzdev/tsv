@@ -16,6 +16,27 @@ fn is_object_expression(expr: &internal::Expression) -> bool {
     matches!(expr, internal::Expression::ObjectExpression(_))
 }
 
+/// Check if an arrow body should stay on the same line as `=>` (no line break option).
+///
+/// Prettier's `mayBreakAfterShortPrefix` - these expression types stay hugged to `=>`:
+/// - Object literals: `() => ({...})`
+/// - Array literals: `() => [...]`
+/// - Arrow functions: `() => () => ...`
+/// - Block statements (handled separately)
+/// - JSX elements (not yet supported)
+/// - Template literals on own line (not yet implemented)
+///
+/// When true, body uses `" " + body` (simple space).
+/// When false, body uses `indent([line, body])` (can break to new line).
+fn should_hug_arrow_body(expr: &internal::Expression) -> bool {
+    matches!(
+        expr,
+        internal::Expression::ObjectExpression(_)
+            | internal::Expression::ArrayExpression(_)
+            | internal::Expression::ArrowFunctionExpression(_)
+    )
+}
+
 /// Check if an expression is a type assertion (as/satisfies) wrapping an object literal
 /// Returns the inner expression type for special handling in arrow body context
 fn get_type_assertion_with_object(
@@ -85,20 +106,14 @@ impl<'a> Printer<'a> {
 
         let has_params = !arrow.params.is_empty();
 
-        // Type parameters handling depends on whether there are function params
+        // Type parameters: group them independently only when function params exist
         if let Some(tp) = &arrow.type_parameters {
-            if has_params {
-                // Function params exist - type params in their own group so they break independently
-                sig_parts.push(self.build_type_params_doc_for_arrow_grouped(tp));
-            } else {
-                // No function params - type params NOT in own group, break with outer signature
-                sig_parts.push(self.build_type_params_doc_for_arrow_ungrouped(tp));
-            }
+            sig_parts.push(self.build_type_params_doc_for_arrow(tp, has_params));
         }
 
         // Function parameters - NOT in their own group, just softlines
         // These will break when the outer signature group breaks
-        sig_parts.push(self.build_arrow_params_doc_ungrouped(&arrow.params, arrow.params_start));
+        sig_parts.push(self.build_arrow_params_doc_ungrouped(arrow));
 
         // Return type annotation - union types need special handling for breaking
         if let Some(return_type) = &arrow.return_type {
@@ -113,15 +128,19 @@ impl<'a> Printer<'a> {
 
         // Calculate signature end position for comment detection
         // This is the position after which comments belong to the body (between => and body)
+        // We need the position AFTER `)` to avoid re-printing param comments.
         let sig_end = if let Some(rt) = &arrow.return_type {
             rt.span.end
-        } else if let Some(last_param) = arrow.params.last() {
-            // After last param, but we need to account for the closing `)`
-            // We'll use the body start and check backwards
-            last_param.span().end
+        } else if let Some(params_start) = arrow.params_start {
+            // Find closing `)` to get accurate boundary
+            self.find_closing_paren(params_start, arrow.body.span().start)
+                .unwrap_or_else(|| arrow.body.span().start)
         } else {
-            // No params or return type - signature is just `()`
-            arrow.span.start
+            // No parens (single param arrow like `x => x`) - use param end
+            arrow
+                .params
+                .last()
+                .map_or(arrow.span.start, |p| p.span().end)
         };
 
         // Body - expression bodies can break to new line with indent
@@ -132,21 +151,29 @@ impl<'a> Printer<'a> {
                 let body_start = expr.span().start;
                 let has_leading_comments = self.has_comments_between(sig_end, body_start);
 
-                // Expression body: can break after => with indentation
-                // Short: (x) => x + 1
-                // Long:  (veryLongParams) =>
-                //            veryLongExpr
-                // With comment: (x) =>
-                //            /* comment */ expr
+                // Prettier's `shouldPutBodyOnSameLine`: certain expression types stay hugged to =>
+                // Object/array literals and nested arrows don't break after =>
+                let should_hug = !has_leading_comments && should_hug_arrow_body(expr);
+
                 if has_leading_comments {
-                    // Build body doc with leading comments
+                    // Build body doc with leading comments - always breaks
                     let body_with_comments =
                         self.build_arrow_body_with_comments_doc(expr, sig_end, body_start);
                     parts.push(doc::group(doc::indent(doc::concat(vec![
                         doc::line(),
                         body_with_comments,
                     ]))));
+                } else if should_hug {
+                    // Hugged body: simple space, no line break option
+                    // `() => ({...})` stays on same line regardless of object's internal breaks
+                    let body_doc = self.build_arrow_body_doc(expr);
+                    parts.push(doc::text(" "));
+                    parts.push(body_doc);
                 } else {
+                    // Normal expression: can break after => with indentation
+                    // Short: (x) => x + 1
+                    // Long:  (veryLongParams) =>
+                    //            veryLongExpr
                     let body_doc = self.build_arrow_body_doc(expr);
                     parts.push(doc::group(doc::indent(doc::concat(vec![
                         doc::line(),
@@ -219,145 +246,110 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build doc for type params NOT in their own group (when no function params)
-    /// Softlines break with the outer signature group
-    fn build_type_params_doc_for_arrow_ungrouped(
-        &self,
-        decl: &internal::TSTypeParameterDeclaration,
-    ) -> Doc {
-        if decl.params.is_empty() {
-            return doc::text("<>");
-        }
-
-        let param_docs: Vec<_> = decl
-            .params
-            .iter()
-            .map(|param| self.build_type_parameter_doc(param))
-            .collect();
-
-        // Svelte disambiguation: single param without constraint needs trailing comma
-        // in Svelte files to avoid confusion with template syntax like `<Component>`.
-        // In pure .ts files (arrow_type_param_trailing_comma=false), no trailing comma needed.
-        let needs_trailing_comma = self.config.arrow_type_param_trailing_comma
-            && decl.params.len() == 1
-            && decl.params[0].constraint.is_none();
-        let inner_parts = if needs_trailing_comma {
-            doc::concat(vec![doc::join(param_docs, ", "), doc::text(",")])
-        } else {
-            doc::join_trailing(param_docs, doc::comma_line())
-        };
-
-        // No group wrapper - softlines break with outer signature group
-        doc::concat(vec![
-            doc::text("<"),
-            doc::indent_softline(inner_parts),
-            doc::softline(),
-            doc::text(">"),
-        ])
-    }
-
-    /// Build doc for type params wrapped in their own group (for multiple type params)
-    fn build_type_params_doc_for_arrow_grouped(
-        &self,
-        decl: &internal::TSTypeParameterDeclaration,
-    ) -> Doc {
-        if decl.params.is_empty() {
-            return doc::text("<>");
-        }
-
-        let param_docs: Vec<_> = decl
-            .params
-            .iter()
-            .map(|param| self.build_type_parameter_doc(param))
-            .collect();
-
-        // Svelte disambiguation: single param without constraint needs trailing comma
-        // in Svelte files to avoid confusion with template syntax like `<Component>`.
-        // In pure .ts files (arrow_type_param_trailing_comma=false), no trailing comma needed.
-        let needs_trailing_comma = self.config.arrow_type_param_trailing_comma
-            && decl.params.len() == 1
-            && decl.params[0].constraint.is_none();
-        let inner_parts = if needs_trailing_comma {
-            doc::concat(vec![doc::join(param_docs, ", "), doc::text(",")])
-        } else {
-            doc::join_trailing(param_docs, doc::comma_line())
-        };
-
-        // Wrap in own group so multiple type params can break independently
-        doc::group(doc::concat(vec![
-            doc::text("<"),
-            doc::indent_softline(inner_parts),
-            doc::softline(),
-            doc::text(">"),
-        ]))
-    }
-
-    /// Build doc for params NOT in their own group (outer signature group controls breaking)
+    /// Build doc for arrow function type params
     ///
-    /// `params_start` is the position of the opening paren (if parenthesized), used for
-    /// accurate comment detection. For arrows without parens (`x => x`), this is `None`.
+    /// When `grouped` is true, wraps in its own group so type params can break independently.
+    /// When false, softlines break with the outer signature group.
+    fn build_type_params_doc_for_arrow(
+        &self,
+        decl: &internal::TSTypeParameterDeclaration,
+        grouped: bool,
+    ) -> Doc {
+        if decl.params.is_empty() {
+            return doc::text("<>");
+        }
+
+        let param_docs: Vec<_> = decl
+            .params
+            .iter()
+            .map(|param| self.build_type_parameter_doc(param))
+            .collect();
+
+        // Svelte disambiguation: single param without constraint needs trailing comma
+        // in Svelte files to avoid confusion with template syntax like `<Component>`.
+        // In pure .ts files (arrow_type_param_trailing_comma=false), no trailing comma needed.
+        let needs_trailing_comma = self.config.arrow_type_param_trailing_comma
+            && decl.params.len() == 1
+            && decl.params[0].constraint.is_none();
+        let inner_parts = if needs_trailing_comma {
+            doc::concat(vec![doc::join(param_docs, ", "), doc::text(",")])
+        } else {
+            doc::join_trailing(param_docs, doc::comma_line())
+        };
+
+        let brackets_doc = doc::concat(vec![
+            doc::text("<"),
+            doc::indent_softline(inner_parts),
+            doc::softline(),
+            doc::text(">"),
+        ]);
+
+        if grouped {
+            doc::group(brackets_doc)
+        } else {
+            brackets_doc
+        }
+    }
+
+    /// Build doc for arrow params NOT in their own group (outer signature group controls breaking)
     ///
     /// Structure matches prettier's function-parameters.js:
     /// `[typeParams, "(", indent([softline, ...params]), ifBreak(","), softline, ")"]`
-    fn build_arrow_params_doc_ungrouped(
+    fn build_arrow_params_doc_ungrouped(&self, arrow: &internal::ArrowFunctionExpression) -> Doc {
+        let params_start = arrow.params_start;
+
+        // Compute trailing comments boundary for params
+        let trailing_comments_end = if let Some(rt) = &arrow.return_type {
+            Some(rt.span.start)
+        } else {
+            Some(arrow.body.span().start)
+        };
+
+        // Delegate to shared implementation
+        self.build_params_doc_with_comments(&arrow.params, params_start, trailing_comments_end)
+    }
+
+    /// Check if any param has a trailing line comment
+    fn has_trailing_line_comment_in_params(
         &self,
         params: &[internal::Expression],
-        params_start: Option<u32>,
-    ) -> Doc {
-        if params.is_empty() {
-            return doc::text("()");
+        trailing_comments_end: Option<u32>,
+    ) -> bool {
+        params.iter().enumerate().any(|(i, param)| {
+            let trailing_end = self.param_trailing_end(params, i, trailing_comments_end);
+            self.has_line_comments_between(param.span().end, trailing_end)
+        })
+    }
+
+    /// Get the end position for trailing comments after a parameter
+    fn param_trailing_end(
+        &self,
+        params: &[internal::Expression],
+        index: usize,
+        trailing_comments_end: Option<u32>,
+    ) -> u32 {
+        if index + 1 < params.len() {
+            params[index + 1].span().start
+        } else {
+            trailing_comments_end.unwrap_or_else(|| params[index].span().end)
         }
+    }
 
-        let mut inner_parts = Vec::new();
-        for (i, param) in params.iter().enumerate() {
-            let param_start = param.span().start;
+    /// Build doc for trailing same-line comments after a parameter
+    fn build_trailing_param_comments(&self, start: u32, end: u32) -> Doc {
+        use tsv_lang::printing::is_same_line;
 
-            // Check for leading comments before this param
-            let search_start = if i == 0 {
-                // First param: search from after '(' (position + 1)
-                params_start.map_or(param_start, |pos| pos + 1)
-            } else {
-                // Subsequent params: search from after the previous param
-                params[i - 1].span().end
-            };
+        let mut parts = Vec::new();
 
-            // Add separator before non-first params
-            if i > 0 {
-                inner_parts.push(doc::text(","));
-                inner_parts.push(doc::line());
+        for comment in tsv_lang::comments_in_range(self.comments, start, end) {
+            // Only include comments on the same line as the param (trailing comments)
+            if is_same_line(self.source, start, comment.span.start) {
+                parts.push(doc::text(" "));
+                parts.push(self.build_comment_doc(comment));
             }
-
-            // Add leading comments for this param
-            inner_parts.push(self.build_comments_between(
-                search_start,
-                param_start,
-                CommentSpacing::Trailing,
-            ));
-
-            // Use FunctionParameter context for object patterns
-            inner_parts.push(self.build_function_parameter_doc(param));
         }
 
-        // Check if last param is a rest parameter - no trailing comma after rest
-        let has_rest_param = params
-            .last()
-            .is_some_and(|p| matches!(p, internal::Expression::RestElement(_)));
-
-        // No group - outer signature group controls breaking
-        let mut result = vec![
-            doc::text("("),
-            doc::indent_softline(doc::concat(inner_parts)),
-        ];
-
-        // Trailing comma when broken, unless there's a rest param
-        if !has_rest_param {
-            result.push(doc::trailing_comma());
-        }
-
-        result.push(doc::softline());
-        result.push(doc::text(")"));
-
-        doc::concat(result)
+        doc::concat(parts)
     }
 
     /// Build doc for arrow function body expression.
@@ -460,15 +452,15 @@ impl<'a> Printer<'a> {
 
         // Find the end of the signature to check for dangling comments
         // (comments between signature and body that should move inside)
+        // We need the position AFTER the closing `)` to avoid re-printing
+        // comments that were already handled by the params printer.
         let sig_end = if let Some(return_type) = &func.return_type {
             return_type.span.end
-        } else if let Some(last_param) = func.params.last() {
-            // After last param end (comments after ) will be caught)
-            last_param.span().end
         } else {
-            // Empty params like fn() - use function span start
-            // This catches comments after () like: fn() // comment { }
-            func.span.start
+            // No return type - find the closing `)` by scanning from params_start
+            // to body start. Comments between `)` and `{` should move into body.
+            self.find_closing_paren(func.params_start, func.body.span.start)
+                .unwrap_or(func.body.span.start)
         };
 
         // Print body imperatively (preserves comments)
@@ -533,7 +525,7 @@ impl<'a> Printer<'a> {
         let mut sig_parts = Vec::new();
 
         // Function parameters - NOT in their own group, just softlines
-        sig_parts.push(self.build_method_params_doc_ungrouped(&func.params));
+        sig_parts.push(self.build_method_params_doc_ungrouped(func));
 
         // Return type annotation (e.g., `: number`)
         if let Some(return_type) = &func.return_type {
@@ -556,7 +548,7 @@ impl<'a> Printer<'a> {
         let mut sig_parts = Vec::new();
 
         // Function parameters - NOT in their own group, just softlines
-        sig_parts.push(self.build_method_params_doc_ungrouped(&func.params));
+        sig_parts.push(self.build_method_params_doc_ungrouped(func));
 
         // Return type annotation (e.g., `: number`)
         if let Some(return_type) = &func.return_type {
@@ -629,35 +621,147 @@ impl<'a> Printer<'a> {
         doc::concat(parts)
     }
 
-    /// Build doc for method params NOT in their own group
-    fn build_method_params_doc_ungrouped(&self, params: &[internal::Expression]) -> Doc {
+    /// Build doc for function/method params NOT in their own group
+    ///
+    /// `params_start` is the position of the opening paren (for comment detection).
+    /// `trailing_comments_end` is where trailing comments after the last param end
+    /// (typically return type start or body start).
+    pub(in crate::printer) fn build_method_params_doc_ungrouped(
+        &self,
+        func: &internal::FunctionExpression,
+    ) -> Doc {
+        let params = &func.params;
+        let params_start = Some(func.params_start);
+
+        // Compute trailing comments boundary
+        let trailing_comments_end = if let Some(rt) = &func.return_type {
+            Some(rt.span.start)
+        } else {
+            Some(func.body.span.start)
+        };
+
+        // Delegate to shared implementation
+        self.build_params_doc_with_comments(params, params_start, trailing_comments_end)
+    }
+
+    /// Shared implementation for building params doc with comment handling
+    ///
+    /// Used by arrow functions, function expressions, function declarations, and class methods.
+    pub(in crate::printer) fn build_params_doc_with_comments(
+        &self,
+        params: &[internal::Expression],
+        params_start: Option<u32>,
+        trailing_comments_end: Option<u32>,
+    ) -> Doc {
+        self.build_params_doc_with_comments_ext(params, params_start, trailing_comments_end, false)
+    }
+
+    /// Extended version with external force_break flag
+    ///
+    /// `force_break_external` allows callers to force multiline based on width heuristics.
+    pub(in crate::printer) fn build_params_doc_with_comments_ext(
+        &self,
+        params: &[internal::Expression],
+        params_start: Option<u32>,
+        trailing_comments_end: Option<u32>,
+        force_break_external: bool,
+    ) -> Doc {
         if params.is_empty() {
             return doc::text("()");
         }
 
-        let mut inner_parts = Vec::new();
-        for (i, param) in params.iter().enumerate() {
-            if i > 0 {
-                inner_parts.push(doc::text(","));
-                inner_parts.push(doc::line());
-            }
-            inner_parts.push(self.build_expression_doc(param));
-        }
+        // Check if any trailing line comments exist on params
+        // If so, we must use hardlines to force the group to break
+        let has_trailing_line_comment =
+            self.has_trailing_line_comment_in_params(params, trailing_comments_end);
 
+        // Prettier rule: force break when 2+ params and at least one is TSParameterProperty
+        // (has access modifiers like private/public/protected/readonly)
+        let should_break_for_param_properties = params.len() > 1
+            && params
+                .iter()
+                .any(|p| matches!(p, internal::Expression::TSParameterProperty(_)));
+
+        // Combined condition for forcing multiline (includes external width-based force)
+        let force_break =
+            force_break_external || has_trailing_line_comment || should_break_for_param_properties;
+
+        // Check if last param is a rest parameter - no trailing comma after rest
         let has_rest_param = params
             .last()
             .is_some_and(|p| matches!(p, internal::Expression::RestElement(_)));
 
-        let mut result = vec![
-            doc::text("("),
-            doc::indent_softline(doc::concat(inner_parts)),
-        ];
+        let mut inner_parts = Vec::new();
+        for (i, param) in params.iter().enumerate() {
+            let param_start = param.span().start;
+            let is_last = i == params.len() - 1;
 
-        if !has_rest_param {
-            result.push(doc::trailing_comma());
+            // Check for leading comments before this param
+            let search_start = if i == 0 {
+                // First param: search from after '(' (position + 1)
+                params_start.map_or(param_start, |pos| pos + 1)
+            } else {
+                // Subsequent params: search from after the previous param
+                params[i - 1].span().end
+            };
+
+            // Add separator before non-first params
+            if i > 0 {
+                // Use hardline when forcing break (trailing line comments or param properties)
+                if force_break {
+                    inner_parts.push(doc::hardline());
+                } else {
+                    inner_parts.push(doc::line());
+                }
+            }
+
+            // Add leading comments for this param
+            inner_parts.push(self.build_comments_between(
+                search_start,
+                param_start,
+                CommentSpacing::Trailing,
+            ));
+
+            // Use FunctionParameter context for object patterns
+            inner_parts.push(self.build_function_parameter_doc(param));
+
+            // Add trailing comma BEFORE trailing comments
+            // For non-last params: always add comma (it's a separator)
+            // For last param: add comma if forcing break and not rest param
+            let needs_comma = !is_last || (force_break && !has_rest_param);
+            if needs_comma {
+                inner_parts.push(doc::text(","));
+            }
+
+            // Add trailing comments ONLY for the last param
+            // For non-last params, comments after the comma are handled as leading
+            // comments for the next param (via build_comments_between above)
+            if is_last {
+                let trailing_end = self.param_trailing_end(params, i, trailing_comments_end);
+                inner_parts
+                    .push(self.build_trailing_param_comments(param.span().end, trailing_end));
+            }
         }
 
-        result.push(doc::softline());
+        // No group - outer signature group controls breaking
+        let mut result = vec![doc::text("(")];
+
+        if force_break {
+            // When forcing break (trailing comments or param properties), use hardlines
+            result.push(doc::indent(doc::concat(vec![
+                doc::hardline(),
+                doc::concat(inner_parts),
+            ])));
+            result.push(doc::hardline());
+        } else {
+            result.push(doc::indent_softline(doc::concat(inner_parts)));
+            // Trailing comma when broken, unless there's a rest param
+            if !has_rest_param {
+                result.push(doc::trailing_comma());
+            }
+            result.push(doc::softline());
+        }
+
         result.push(doc::text(")"));
 
         doc::concat(result)

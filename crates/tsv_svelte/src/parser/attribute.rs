@@ -175,7 +175,6 @@ impl<'a> SvelteParser<'a> {
                 Ok(AttributeNode::BindDirective(BindDirective {
                     name: directive_name,
                     expression: expr,
-                    modifiers,
                     span,
                     expression_tag_span,
                 }))
@@ -188,7 +187,6 @@ impl<'a> SvelteParser<'a> {
                 Ok(AttributeNode::ClassDirective(ClassDirective {
                     name: directive_name,
                     expression: expr,
-                    modifiers,
                     span,
                     expression_tag_span,
                 }))
@@ -197,7 +195,6 @@ impl<'a> SvelteParser<'a> {
             DirectiveType::Use => Ok(AttributeNode::UseDirective(UseDirective {
                 name: directive_name,
                 expression,
-                modifiers,
                 span,
                 expression_tag_span,
             })),
@@ -227,13 +224,11 @@ impl<'a> SvelteParser<'a> {
             DirectiveType::Animate => Ok(AttributeNode::AnimateDirective(AnimateDirective {
                 name: directive_name,
                 expression,
-                modifiers,
                 span,
             })),
             DirectiveType::Let => Ok(AttributeNode::LetDirective(LetDirective {
                 name: directive_name,
                 expression,
-                modifiers,
                 span,
             })),
         }
@@ -697,6 +692,8 @@ impl<'a> SvelteParser<'a> {
 
                 if is_expression_tag {
                     // Manually extract the expression content by scanning for the matching }
+                    // NOTE: Similar brace/string tracking logic exists in the lexer (lexer.rs).
+                    // The lexer tokenizes the whole string; we extract expression boundaries here.
                     let expr_start = pos + 1; // Skip the opening {
                     let mut brace_depth = 1;
                     let mut expr_end = expr_start;

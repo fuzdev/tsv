@@ -175,7 +175,6 @@ pub struct BindDirective {
     pub end: u32,
     pub name: String,
     pub expression: Expression,
-    pub modifiers: Vec<String>,
 }
 
 /// ClassDirective - conditional class (`class:active={isActive}`)
@@ -187,7 +186,6 @@ pub struct ClassDirective {
     pub end: u32,
     pub name: String,
     pub expression: Expression,
-    pub modifiers: Vec<String>,
 }
 
 /// StyleDirective - inline style (`style:color={value}`)
@@ -212,7 +210,6 @@ pub struct UseDirective {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expression: Option<Expression>,
-    pub modifiers: Vec<String>,
 }
 
 /// TransitionDirective - transition (`transition:fade`, `in:fly`, `out:slide`)
@@ -240,7 +237,6 @@ pub struct AnimateDirective {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expression: Option<Expression>,
-    pub modifiers: Vec<String>,
 }
 
 /// LetDirective - slot prop (`let:item={localItem}`)
@@ -253,7 +249,6 @@ pub struct LetDirective {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expression: Option<Expression>,
-    pub modifiers: Vec<String>,
 }
 
 /// Svelte attribute-like node

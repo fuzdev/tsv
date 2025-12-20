@@ -482,6 +482,9 @@ pub struct ImportExpression {
     pub end: u32,
     pub loc: SourceLocation,
     pub source: Box<Expression>,
+    /// Optional second argument for import attributes: `{with: {type: 'json'}}`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub options: Option<Box<Expression>>,
 }
 
 /// Meta property: `import.meta`, `new.target`
@@ -1227,6 +1230,9 @@ pub struct VariableDeclarator {
     pub loc: SourceLocation,
     /// The binding pattern (Identifier, ArrayPattern, or ObjectPattern)
     pub id: Expression,
+    /// Definite assignment assertion (`!` after identifier, e.g., `let x!: string;`)
+    #[serde(skip_serializing_if = "is_false")]
+    pub definite: bool,
     pub init: Option<Expression>,
 }
 
@@ -1711,7 +1717,7 @@ pub struct TSPropertySignature {
     pub type_annotation: Option<TSTypeAnnotation>,
 }
 
-/// Method signature: `method(): T` or `method<T>(x: T): T`
+/// Method signature: `method(): T` or `method<T>(x: T): T` or `get x(): T` or `set x(v: T)`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TSMethodSignature {
     #[serde(rename = "type")]
@@ -1721,6 +1727,9 @@ pub struct TSMethodSignature {
     pub loc: SourceLocation,
     pub computed: bool,
     pub key: Expression,
+    /// Method kind: "get" or "set" for accessor signatures (omitted for regular methods)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
     #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub parameters: Vec<Expression>,

@@ -48,6 +48,60 @@ fn skip_whitespace(bytes: &[u8], mut pos: usize) -> usize {
     pos
 }
 
+/// Skip a line comment (// ...), returning position after the newline
+/// Assumes `pos` is at the first `/`
+#[inline]
+fn skip_line_comment(bytes: &[u8], mut pos: usize) -> usize {
+    // Skip //
+    pos += 2;
+    // Read until newline or EOF
+    while pos < bytes.len() && bytes[pos] != b'\n' && bytes[pos] != b'\r' {
+        pos += 1;
+    }
+    pos
+}
+
+/// Skip a block comment (/* ... */), returning position after the closing */
+/// Assumes `pos` is at the first `/`
+#[inline]
+fn skip_block_comment(bytes: &[u8], mut pos: usize) -> usize {
+    // Skip /*
+    pos += 2;
+    while pos + 1 < bytes.len() {
+        if bytes[pos] == b'*' && bytes[pos + 1] == b'/' {
+            return pos + 2;
+        }
+        pos += 1;
+    }
+    pos
+}
+
+/// Skip whitespace and comments, returning new position
+#[inline]
+fn skip_whitespace_and_comments(bytes: &[u8], mut pos: usize) -> usize {
+    loop {
+        let start = pos;
+        pos = skip_whitespace(bytes, pos);
+        // Check for comments
+        if pos + 1 < bytes.len() && bytes[pos] == b'/' {
+            if bytes[pos + 1] == b'/' {
+                pos = skip_line_comment(bytes, pos);
+            } else if bytes[pos + 1] == b'*' {
+                pos = skip_block_comment(bytes, pos);
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+        // Continue loop to handle whitespace after comment
+        if pos == start {
+            break;
+        }
+    }
+    pos
+}
+
 /// Check if a byte can start an identifier (letter, underscore, dollar sign, or non-ASCII)
 ///
 /// Non-ASCII bytes (> 127) are included for lookahead purposes - they're part of multi-byte
@@ -90,7 +144,8 @@ fn skip_string_literal(bytes: &[u8], mut pos: usize) -> usize {
         }
         pos += 1;
     }
-    pos
+    // Return position AFTER the closing quote (if found)
+    if pos < bytes.len() { pos + 1 } else { pos }
 }
 
 /// Scan through parentheses and check if followed by `=>`
@@ -98,6 +153,7 @@ fn skip_string_literal(bytes: &[u8], mut pos: usize) -> usize {
 /// Assumes `pos` is at the opening `(`. Handles:
 /// - Nested parentheses
 /// - String literals inside parens
+/// - Comments (line and block)
 /// - Optional type annotation after `)`: `)` or `): type`
 ///
 /// Returns `true` if the pattern `(...) =>` or `(...): type =>` is found.
@@ -116,7 +172,24 @@ fn scan_parens_then_arrow(bytes: &[u8], mut pos: usize) -> bool {
                     return check_arrow_after_paren(bytes, pos + 1);
                 }
             }
-            b'"' | b'\'' => pos = skip_string_literal(bytes, pos),
+            b'"' | b'\'' => {
+                pos = skip_string_literal(bytes, pos);
+                continue; // Don't increment pos again
+            }
+            b'/' if pos + 1 < bytes.len() => {
+                // Handle comments
+                match bytes[pos + 1] {
+                    b'/' => {
+                        pos = skip_line_comment(bytes, pos);
+                        continue; // Don't increment pos again
+                    }
+                    b'*' => {
+                        pos = skip_block_comment(bytes, pos);
+                        continue; // Don't increment pos again
+                    }
+                    _ => {}
+                }
+            }
             _ => {}
         }
         pos += 1;
@@ -127,7 +200,7 @@ fn scan_parens_then_arrow(bytes: &[u8], mut pos: usize) -> bool {
 /// Check if `=>` follows (possibly with type annotation `: type`)
 #[inline]
 fn check_arrow_after_paren(bytes: &[u8], pos: usize) -> bool {
-    let pos = skip_whitespace(bytes, pos);
+    let pos = skip_whitespace_and_comments(bytes, pos);
     // Check for => directly
     if pos + 1 < bytes.len() && bytes[pos] == b'=' && bytes[pos + 1] == b'>' {
         return true;
@@ -140,15 +213,80 @@ fn check_arrow_after_paren(bytes: &[u8], pos: usize) -> bool {
 }
 
 /// Scan forward looking for `=>` (used after type annotations)
+///
+/// Properly handles:
+/// - Statement boundaries: stops at `;` (not an arrow function)
+/// - Nested structures: tracks depth for `()`, `[]`, `{}`, `<>` to find `=>` at depth 0
+/// - Type function signatures: `(x: (a: number) => void): T => ...` correctly finds outer `=>`
 fn scan_for_arrow(bytes: &[u8], mut pos: usize) -> bool {
-    while pos + 1 < bytes.len() {
-        pos = skip_whitespace(bytes, pos);
-        if pos + 1 < bytes.len() && bytes[pos] == b'=' && bytes[pos + 1] == b'>' {
-            return true;
+    let mut paren_depth = 0;
+    let mut bracket_depth = 0;
+    let mut brace_depth = 0;
+    let mut angle_depth = 0;
+
+    while pos < bytes.len() {
+        pos = skip_whitespace_and_comments(bytes, pos);
+        if pos >= bytes.len() {
+            break;
         }
-        if pos < bytes.len() {
-            pos += 1;
+
+        // Check if we're at the outermost nesting level (no open brackets/braces/parens/angles)
+        let at_depth_zero =
+            paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 && angle_depth == 0;
+
+        match bytes[pos] {
+            // Statement boundary - not an arrow function (only at depth 0)
+            // Semicolons inside braces are valid separators in object type literals
+            b';' if at_depth_zero => return false,
+
+            // Track nesting depth
+            b'(' => paren_depth += 1,
+            b')' => {
+                if paren_depth > 0 {
+                    paren_depth -= 1;
+                }
+            }
+            b'[' => bracket_depth += 1,
+            b']' => {
+                if bracket_depth > 0 {
+                    bracket_depth -= 1;
+                }
+            }
+            b'{' => brace_depth += 1,
+            b'}' => {
+                if brace_depth > 0 {
+                    brace_depth -= 1;
+                } else {
+                    // Unbalanced brace - end of scope
+                    return false;
+                }
+            }
+            b'<' => angle_depth += 1,
+            b'>' => {
+                // Only decrement if not part of `=>`
+                if pos > 0 && bytes[pos - 1] != b'=' && angle_depth > 0 {
+                    angle_depth -= 1;
+                }
+            }
+
+            // Check for `=>` at depth 0
+            b'=' if pos + 1 < bytes.len() && bytes[pos + 1] == b'>' && at_depth_zero => {
+                return true;
+            }
+            b'=' if pos + 1 < bytes.len() && bytes[pos + 1] == b'>' => {
+                // Not at depth zero - skip past `=>` to avoid matching the `>` as angle close
+                pos += 1;
+            }
+
+            // Skip string literals to avoid matching delimiters inside them
+            b'"' | b'\'' | b'`' => {
+                pos = skip_string_literal(bytes, pos);
+                continue; // Don't increment pos again
+            }
+
+            _ => {}
         }
+        pos += 1;
     }
     false
 }
@@ -171,7 +309,7 @@ fn scan_identifier_then_arrow(bytes: &[u8], pos: usize) -> bool {
 /// Scan through angle brackets `<...>` for type parameters
 ///
 /// Assumes `pos` is at `<`. Returns position after closing `>`, or 0 if not found.
-/// Handles nested angle brackets and arrow functions in constraints: `<T extends () => void>`
+/// Handles nested angle brackets, comments, and arrow functions in constraints: `<T extends () => void>`
 fn scan_angle_brackets(bytes: &[u8], pos: usize) -> usize {
     if pos >= bytes.len() || bytes[pos] != b'<' {
         return 0;
@@ -189,7 +327,24 @@ fn scan_angle_brackets(bytes: &[u8], pos: usize) -> usize {
                     depth -= 1;
                 }
             }
-            b'"' | b'\'' | b'`' => pos = skip_string_literal(bytes, pos),
+            b'"' | b'\'' | b'`' => {
+                pos = skip_string_literal(bytes, pos);
+                continue; // Don't increment pos again
+            }
+            b'/' if pos + 1 < bytes.len() => {
+                // Handle comments
+                match bytes[pos + 1] {
+                    b'/' => {
+                        pos = skip_line_comment(bytes, pos);
+                        continue;
+                    }
+                    b'*' => {
+                        pos = skip_block_comment(bytes, pos);
+                        continue;
+                    }
+                    _ => {}
+                }
+            }
             _ => {}
         }
         pos += 1;
@@ -389,6 +544,18 @@ impl<'a> Parser<'a> {
         Ok(self.parse_expression_bp(BP_ASSIGNMENT)?.expr)
     }
 
+    /// Parse an expression without allowing `in` as a binary operator.
+    ///
+    /// Used in for-loop headers to distinguish `for (x in y)` from expressions.
+    /// The `in` keyword is recognized as the for-in separator, not as a binary operator.
+    pub(super) fn parse_expression_no_in(&mut self) -> Result<Expression, ParseError> {
+        let old_allow_in = self.allow_in;
+        self.allow_in = false;
+        let result = self.parse_expression();
+        self.allow_in = old_allow_in;
+        result
+    }
+
     /// Pratt parser: parse expression with minimum binding power
     ///
     /// Returns ParsedExpr with actual end position tracking for parentheses
@@ -409,6 +576,11 @@ impl<'a> Parser<'a> {
             let Some((left_bp, right_bp, operator)) = infix_operator_info(kind) else {
                 break;
             };
+
+            // Skip `in` operator when allow_in is false (parsing for-loop headers)
+            if matches!(operator, BinaryOperator::In) && !self.allow_in {
+                break;
+            }
 
             // Check if operator binds tighter than minimum
             if left_bp < min_bp {
@@ -2148,11 +2320,19 @@ impl<'a> Parser<'a> {
             return Err(self.error_expected_after("'meta'", "import."));
         }
 
-        // Dynamic import: import('module')
+        // Dynamic import: import('module') or import('module', options)
         self.expect(&TokenKind::ParenOpen)?;
 
         // Parse the source expression (usually a string literal)
         let source = self.parse_assignment_expression()?;
+
+        // Check for optional second argument (import options/attributes)
+        let options = if self.check(&TokenKind::Comma) {
+            self.advance()?; // consume ','
+            Some(Box::new(self.parse_assignment_expression()?))
+        } else {
+            None
+        };
 
         // Capture end position before consuming ')'
         let (_, paren_end) = self.current_pos();
@@ -2160,6 +2340,7 @@ impl<'a> Parser<'a> {
 
         Ok(Expression::ImportExpression(ImportExpression {
             source: Box::new(source),
+            options,
             span: Span::new(start as u32, paren_end as u32),
         }))
     }
@@ -2326,6 +2507,8 @@ impl<'a> Parser<'a> {
         is_async: bool,
         is_generator: bool,
     ) -> Result<FunctionExpression, ParseError> {
+        // Capture paren position before parsing params (for comment detection)
+        let (params_start, _) = self.current_pos();
         let params = self.parse_parameter_list()?;
 
         // Check for return type annotation: (): type or type predicate
@@ -2346,6 +2529,7 @@ impl<'a> Parser<'a> {
             body,
             generator: is_generator,
             r#async: is_async,
+            params_start: params_start as u32,
             span: Span::new(start, end),
         })
     }

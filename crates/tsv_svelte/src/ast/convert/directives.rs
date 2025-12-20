@@ -1,7 +1,7 @@
 // Svelte directive conversions
 //
 // Converts internal directive nodes to public format.
-// All directives share common structure: name, expression, modifiers.
+// Only OnDirective, TransitionDirective, and StyleDirective have modifiers.
 
 use crate::ast::{internal, public};
 use string_interner::DefaultStringInterner;
@@ -45,7 +45,6 @@ pub(super) fn convert_bind_directive(
         end: d.span.end,
         name: d.name.clone(),
         expression,
-        modifiers: d.modifiers.clone(),
     }
 }
 
@@ -64,7 +63,6 @@ pub(super) fn convert_class_directive(
         end: d.span.end,
         name: d.name.clone(),
         expression,
-        modifiers: d.modifiers.clone(),
     }
 }
 
@@ -117,7 +115,6 @@ pub(super) fn convert_use_directive(
         end: d.span.end,
         name: d.name.clone(),
         expression,
-        modifiers: d.modifiers.clone(),
     }
 }
 
@@ -161,7 +158,6 @@ pub(super) fn convert_animate_directive(
         end: d.span.end,
         name: d.name.clone(),
         expression,
-        modifiers: d.modifiers.clone(),
     }
 }
 
@@ -182,6 +178,5 @@ pub(super) fn convert_let_directive(
         end: d.span.end,
         name: d.name.clone(),
         expression,
-        modifiers: d.modifiers.clone(),
     }
 }

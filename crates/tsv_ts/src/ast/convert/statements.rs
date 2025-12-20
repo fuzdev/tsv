@@ -373,6 +373,7 @@ pub(in crate::ast) fn convert_variable_declarator(
         loc: create_location(declarator.span, loc, offset),
         // id can be Identifier, ArrayPattern, or ObjectPattern
         id: convert_expression(&declarator.id, source, loc, interner, offset),
+        definite: declarator.definite,
         init: declarator
             .init
             .as_ref()

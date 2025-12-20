@@ -6,15 +6,67 @@
  * - Native: tsv via FFI (Rust, maximum performance)
  * - WASM: tsv compiled to WebAssembly (portable, near-native)
  *
- * Run with: deno bench --allow-ffi --allow-read --allow-env benches/deno/bench.ts
+ * Run with: deno task bench:run
+ *
+ * CLI options:
+ *   --json              Output results as JSON
+ *   --markdown          Output results as Markdown
+ *   --save-baseline     Save results as baseline for regression detection
+ *   --compare-baseline  Compare against saved baseline
+ *
+ * Environment variables:
+ *   BENCH_LIMIT         Limit files per language (default: all)
+ *   BENCH_FILTER        Filter files by path pattern (default: none)
+ *   BENCH_DURATION      Duration per benchmark in ms (default: 5000)
+ *   BENCH_WARMUP        Warmup iterations (default: 3)
  */
 
-import { groupByLanguage, loadCorpus } from './lib/corpus.ts';
-import { NativeImplementation } from './lib/ffi.ts';
-import { WasmImplementation } from './lib/wasm.ts';
-import { CanonicalImplementation, VERSIONS } from './lib/canonical.ts';
-import { chooseTimeUnit, createBar, formatTimeWithUnit } from './lib/format.ts';
+// Type declaration for V8's gc function (available with --expose-gc)
+declare global {
+	var gc: (() => void) | undefined;
+}
+
+import { Benchmark } from '@fuzdev/fuz_util/benchmark.js';
+import { benchmark_format_markdown } from '@fuzdev/fuz_util/benchmark_format.js';
+import { DevReposLoader, groupByLanguage } from './lib/corpus.ts';
+import {
+	canonicalParserLabel,
+	getAlternativeVersions,
+	getBenchmarkTasks,
+	getFormattersForValidation,
+	initImplementations,
+	VERSIONS,
+} from './lib/implementations.ts';
+import {
+	generateCorpusInfo,
+	generateEffectiveCorpusReport,
+	generateSkippedFilesReport,
+	generateSummaryReport,
+	type GroupResults,
+} from './lib/report.ts';
 import type { Language, SourceFile } from './lib/types.ts';
+
+// ============================================================================
+// CLI Arguments
+// ============================================================================
+
+const args = {
+	json: Deno.args.includes('--json'),
+	markdown: Deno.args.includes('--markdown'),
+	saveBaseline: Deno.args.includes('--save-baseline'),
+	compareBaseline: Deno.args.includes('--compare-baseline'),
+};
+
+// In JSON/markdown mode, progress goes to stderr so stdout is clean structured output
+const structuredOutput = args.json || args.markdown;
+
+function log(...messages: unknown[]): void {
+	if (structuredOutput) {
+		console.error(...messages);
+	} else {
+		console.log(...messages);
+	}
+}
 
 // ============================================================================
 // Configuration
@@ -26,20 +78,17 @@ const envInt = (name: string): number | undefined => {
 	return val ? parseInt(val) : undefined;
 };
 
-/** Skip implementations that aren't built yet */
-const SKIP_MISSING_IMPLEMENTATIONS = true;
-
 /** Limit files per language (default: all) */
 const MAX_FILES_PER_LANGUAGE = envInt('BENCH_LIMIT');
 
 /** Filter files by path pattern (default: none) */
 const FILE_FILTER = Deno.env.get('BENCH_FILTER');
 
-/** Number of iterations per benchmark (default: Deno auto) */
-const BENCH_ITERATIONS = envInt('BENCH_ITERATIONS');
+/** Duration per benchmark in ms (default: 5000) */
+const BENCH_DURATION = envInt('BENCH_DURATION') ?? 5000;
 
-/** Number of warmup iterations (default: Deno auto) */
-const BENCH_WARMUP = envInt('BENCH_WARMUP');
+/** Number of warmup iterations (default: 3) */
+const BENCH_WARMUP = envInt('BENCH_WARMUP') ?? 3;
 
 /** Maximum length of error message to display (longer messages are truncated) */
 const MAX_ERROR_MESSAGE_LENGTH = 200;
@@ -47,13 +96,24 @@ const MAX_ERROR_MESSAGE_LENGTH = 200;
 /** Languages to benchmark */
 const LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
 
+/** Baseline file path */
+const BASELINE_PATH = 'benches/deno/baseline.json';
+
 // ============================================================================
 // Setup
 // ============================================================================
 
-console.log('Loading corpus...\n');
-const { files } = await loadCorpus();
+log('Loading corpus...\n');
+const corpusLoader = new DevReposLoader();
+const { files } = await corpusLoader.load(log);
 const byLanguage = groupByLanguage(files);
+
+// Preserve total counts before limiting
+const totalFileCounts = {
+	svelte: byLanguage.svelte.length,
+	typescript: byLanguage.typescript.length,
+	css: byLanguage.css.length,
+};
 
 // Apply file filter and limit
 function limitFiles(files: SourceFile[]): SourceFile[] {
@@ -65,69 +125,127 @@ const svelteFiles = limitFiles(byLanguage.svelte);
 const tsFiles = limitFiles(byLanguage.typescript);
 const cssFiles = limitFiles(byLanguage.css);
 
-console.log(`\nBenchmarking with:`);
-console.log(`  Svelte: ${svelteFiles.length} files`);
-console.log(`  TypeScript: ${tsFiles.length} files`);
-console.log(`  CSS: ${cssFiles.length} files`);
-console.log();
+// Track if corpus is limited
+const isLimited = MAX_FILES_PER_LANGUAGE !== undefined || FILE_FILTER !== undefined;
 
-// Initialize implementations
-const canonical = new CanonicalImplementation();
-const native = new NativeImplementation();
-const wasm = new WasmImplementation();
+// Calculate total bytes per language for throughput metrics
+const bytesByLanguage: Record<Language, number> = {
+	svelte: svelteFiles.reduce((sum, f) => sum + f.bytes, 0),
+	typescript: tsFiles.reduce((sum, f) => sum + f.bytes, 0),
+	css: cssFiles.reduce((sum, f) => sum + f.bytes, 0),
+};
 
-/**
- * Initialize an implementation, logging status
- * @param impl Implementation to initialize
- * @param name Display name
- * @param required Whether initialization failure should throw
- * @returns Whether initialization succeeded
- */
-async function initImplementation(
-	impl: { init(): Promise<void> },
-	name: string,
-	required: boolean,
-): Promise<boolean> {
-	try {
-		await impl.init();
-		console.log(`  ✓ ${name}`);
-		return true;
-	} catch (e) {
-		if (required) {
-			console.error(`  ✗ ${name}: ${e}`);
-			throw e;
-		} else if (SKIP_MISSING_IMPLEMENTATIONS) {
-			console.warn(`  ⚠ ${name}: ${e}`);
-			return false;
-		} else {
-			throw e;
-		}
+/** Format bytes/sec as human-readable throughput */
+function formatThroughput(bytesPerSec: number): string {
+	if (bytesPerSec >= 1_000_000_000) {
+		return `${(bytesPerSec / 1_000_000_000).toFixed(1)} GB/s`;
+	} else if (bytesPerSec >= 1_000_000) {
+		return `${(bytesPerSec / 1_000_000).toFixed(1)} MB/s`;
+	} else if (bytesPerSec >= 1_000) {
+		return `${(bytesPerSec / 1_000).toFixed(1)} KB/s`;
 	}
+	return `${bytesPerSec.toFixed(0)} B/s`;
 }
 
-console.log('Initializing implementations...');
+log(`Benchmarking with:`);
+log(`  Svelte: ${svelteFiles.length} files (${(bytesByLanguage.svelte / 1024).toFixed(0)} KB)`);
+log(`  TypeScript: ${tsFiles.length} files (${(bytesByLanguage.typescript / 1024).toFixed(0)} KB)`);
+log(`  CSS: ${cssFiles.length} files (${(bytesByLanguage.css / 1024).toFixed(0)} KB)`);
+log();
 
-await initImplementation(canonical, 'Canonical (prettier + svelte/compiler)', true);
-const nativeAvailable = await initImplementation(native, 'Native (FFI)', false);
-const wasmAvailable = await initImplementation(wasm, 'WASM', false);
+// Initialize implementations
+const impls = await initImplementations({ logger: log });
 
-console.log();
+// ============================================================================
+// Formatter Validation
+// ============================================================================
+
+// Validate formatters before benchmarking
+{
+	log('Validating formatters...\n');
+
+	const formatters = getFormattersForValidation(impls);
+
+	// Helper to call formatter (sync or async) - returns Promise for uniform handling
+	const callFormatter = (
+		formatter: (typeof formatters)[0],
+		source: string,
+		lang: Language,
+	): Promise<string> => {
+		if (formatter.isAsync) {
+			return formatter.formatAsync!(source, lang);
+		}
+		return Promise.resolve(formatter.format!(source, lang));
+	};
+
+	// Unformatted test content - must be changed by a working formatter
+	const unformatted: Record<Language, string> = {
+		svelte: '<script>const x=1</script>\n<div class="a"   ></div>',
+		typescript: 'const x:number=1;function foo(a:string,b:number){return a+b}',
+		css: '.foo{color:red;display:flex}',
+	};
+
+	let hasErrors = false;
+
+	for (const lang of LANGUAGES) {
+		log(`  ${lang}:`);
+
+		for (const formatter of formatters) {
+			if (!formatter.supportsLanguage(lang)) {
+				log(`    ${formatter.name.padEnd(12)} skipped (unsupported)`);
+				continue;
+			}
+
+			const errors: string[] = [];
+
+			// Test 1: Does it actually format? (output differs from unformatted input)
+			try {
+				const input = unformatted[lang];
+				const output = await callFormatter(formatter, input, lang);
+				if (input === output) {
+					errors.push('no change on unformatted input');
+				}
+			} catch (e) {
+				const msg = e instanceof Error ? e.message : String(e);
+				errors.push(`format error: ${msg.slice(0, 50)}`);
+			}
+
+			// Test 2: Is it idempotent? (format(format(x)) == format(x))
+			try {
+				const input = unformatted[lang];
+				const first = await callFormatter(formatter, input, lang);
+				const second = await callFormatter(formatter, first, lang);
+				if (first !== second) {
+					errors.push('not idempotent');
+				}
+			} catch (e) {
+				const msg = e instanceof Error ? e.message : String(e);
+				errors.push(`idempotent error: ${msg.slice(0, 50)}`);
+			}
+
+			if (errors.length > 0) {
+				hasErrors = true;
+				log(`    ${formatter.name.padEnd(12)} ✗ ${errors.join(', ')}`);
+			} else {
+				log(`    ${formatter.name.padEnd(12)} ✓ formats + idempotent`);
+			}
+		}
+	}
+
+	log('');
+	if (hasErrors) {
+		log('⚠️  Some formatters failed validation. Results may be unreliable.\n');
+	}
+}
 
 // ============================================================================
 // Benchmark Helpers
 // ============================================================================
 
-/** Build Deno.bench options with optional iteration/warmup config */
-function benchOptions(opts: Deno.BenchDefinition): Deno.BenchDefinition {
-	return {
-		...opts,
-		...(BENCH_ITERATIONS !== undefined && { n: BENCH_ITERATIONS }),
-		...(BENCH_WARMUP !== undefined && { warmup: BENCH_WARMUP }),
-	};
-}
-
 // Track skipped files for reporting
 const skippedFiles: Map<string, Map<string, string>> = new Map();
+// Track effective corpus size per benchmark (files actually processed)
+const effectiveCorpusSize: Map<string, { processed: number; total: number }> = new Map();
 
 function recordSkip(benchName: string, filePath: string, error: unknown): void {
 	if (!skippedFiles.has(benchName)) {
@@ -137,516 +255,402 @@ function recordSkip(benchName: string, filePath: string, error: unknown): void {
 	skippedFiles.get(benchName)!.set(filePath, errorMsg);
 }
 
-/** Generic benchmark runner - processes all files with the given function */
-function runBenchmark(
+function recordCorpusSize(benchName: string, processed: number, total: number): void {
+	effectiveCorpusSize.set(benchName, { processed, total });
+}
+
+/** Process all files with the given function, tracking errors and effective corpus size */
+function processCorpus(
 	files: SourceFile[],
 	processFn: (file: SourceFile) => void,
 	benchName: string,
 ): void {
-	const start = performance.now();
+	let processed = 0;
 	for (const file of files) {
 		try {
 			processFn(file);
+			processed++;
 		} catch (e) {
 			recordSkip(benchName, file.path, e);
 		}
 	}
-	recordTiming(benchName, performance.now() - start);
+	recordCorpusSize(benchName, processed, files.length);
 }
 
-/** Async benchmark runner - for implementations that return promises */
-async function runBenchmarkAsync(
+/** Process all files with async function, tracking errors and effective corpus size */
+async function processCorpusAsync(
 	files: SourceFile[],
 	processFn: (file: SourceFile) => Promise<void>,
 	benchName: string,
 ): Promise<void> {
-	const start = performance.now();
+	let processed = 0;
 	for (const file of files) {
 		try {
 			await processFn(file);
+			processed++;
 		} catch (e) {
 			recordSkip(benchName, file.path, e);
 		}
 	}
-	recordTiming(benchName, performance.now() - start);
+	recordCorpusSize(benchName, processed, files.length);
 }
 
-/** Construct benchmark name */
-function benchmarkName(
-	operation: 'parse' | 'format',
-	language: Language,
-	impl: 'canonical' | 'native' | 'wasm',
-): string {
-	return `${operation}/${language}/${impl}`;
-}
+/** Files by language lookup */
+const filesByLanguage: Record<Language, SourceFile[]> = {
+	svelte: svelteFiles,
+	typescript: tsFiles,
+	css: cssFiles,
+};
 
-/** Register parse benchmarks for a language */
-function registerParseBenchmarks(
-	files: SourceFile[],
-	language: Language,
-	implementations: { canonical?: typeof canonical; native?: typeof native; wasm?: typeof wasm },
-): void {
+// ============================================================================
+// Run Benchmarks
+// ============================================================================
+
+const allGroupResults: GroupResults[] = [];
+
+/** Run benchmarks for a specific operation and language */
+async function runBenchmarkGroup(operation: 'parse' | 'format', language: Language): Promise<void> {
+	const files = filesByLanguage[language];
 	if (files.length === 0) return;
 
-	const group = `parse-${language}`;
-	const { canonical, native, wasm } = implementations;
-	let hasBaseline = false;
+	const groupName = `${operation}/${language}`;
+	log(`\n▶ ${groupName}`);
 
-	// Canonical (baseline) - if available
-	if (canonical) {
-		const name = benchmarkName('parse', language, 'canonical');
-		Deno.bench(benchOptions({
-			name,
-			group,
-			baseline: true,
-			fn() {
-				runBenchmark(files, (f) => canonical.parse(f.content, language), name);
-			},
-		}));
-		hasBaseline = true;
-	}
+	const corpusBytes = bytesByLanguage[language];
 
-	// Native (baseline if no canonical)
-	if (native) {
-		const isBaseline = !hasBaseline;
-		const name = benchmarkName('parse', language, 'native');
-
-		Deno.bench(benchOptions({
-			name,
-			group,
-			baseline: isBaseline,
-			fn() {
-				runBenchmark(files, (f) => native.parse(f.content, language), name);
-			},
-		}));
-	}
-
-	// WASM
-	if (wasm) {
-		const name = benchmarkName('parse', language, 'wasm');
-		Deno.bench(benchOptions({
-			name,
-			group,
-			fn() {
-				runBenchmark(files, (f) => wasm.parse(f.content, language), name);
-			},
-		}));
-	}
-}
-
-/** Register internal parse benchmarks (pure parsing, no conversion/serialization) */
-function registerParseInternalBenchmarks(
-	files: SourceFile[],
-	language: Language,
-	implementations: { native?: typeof native; wasm?: typeof wasm },
-): void {
-	if (files.length === 0) return;
-
-	const { native, wasm } = implementations;
-	if (!native && !wasm) return;
-
-	const group = `parse-internal-${language}`;
-
-	// Native (baseline)
-	if (native) {
-		const name = `parse-internal/${language}/native`;
-		Deno.bench(benchOptions({
-			name,
-			group,
-			baseline: true,
-			fn() {
-				runBenchmark(files, (f) => native.parseInternal(f.content, language), name);
-			},
-		}));
-	}
-
-	// WASM
-	if (wasm) {
-		const name = `parse-internal/${language}/wasm`;
-		Deno.bench(benchOptions({
-			name,
-			group,
-			fn() {
-				runBenchmark(files, (f) => wasm.parseInternal(f.content, language), name);
-			},
-		}));
-	}
-}
-
-/** Register format benchmarks for a language */
-function registerFormatBenchmarks(
-	files: SourceFile[],
-	language: Language,
-	implementations: { canonical?: typeof canonical; native?: typeof native; wasm?: typeof wasm },
-): void {
-	if (files.length === 0) return;
-
-	const { canonical, native, wasm } = implementations;
-	if (!canonical) return; // Canonical is required for format benchmarks (baseline)
-
-	const group = `format-${language}`;
-
-	// Canonical (baseline)
-	{
-		const name = benchmarkName('format', language, 'canonical');
-		Deno.bench(benchOptions({
-			name,
-			group,
-			baseline: true,
-			async fn() {
-				await runBenchmarkAsync(
-					files,
-					async (f) => {
-						await canonical.formatAsync(f.content, language);
-					},
-					name,
-				);
-			},
-		}));
-	}
-
-	// Native
-	if (native) {
-		const name = benchmarkName('format', language, 'native');
-		Deno.bench(benchOptions({
-			name,
-			group,
-			fn() {
-				runBenchmark(files, (f) => native.format(f.content, language), name);
-			},
-		}));
-	}
-
-	// WASM
-	if (wasm) {
-		const name = benchmarkName('format', language, 'wasm');
-		Deno.bench(benchOptions({
-			name,
-			group,
-			fn() {
-				runBenchmark(files, (f) => wasm.format(f.content, language), name);
-			},
-		}));
-	}
-}
-
-/** Collect actual benchmark timing data */
-interface BenchmarkTiming {
-	totalTime: number;
-	count: number;
-}
-
-/** Aggregated error info for skip reporting */
-interface FileError {
-	filePath: string;
-	error: string;
-	benchmarks: string[];
-}
-
-const benchmarkTimings = new Map<string, BenchmarkTiming>();
-
-function recordTiming(benchKey: string, timeMs: number): void {
-	const existing = benchmarkTimings.get(benchKey);
-	if (existing) {
-		existing.totalTime += timeMs;
-		existing.count++;
-	} else {
-		benchmarkTimings.set(benchKey, { totalTime: timeMs, count: 1 });
-	}
-}
-
-function getAverageTiming(benchKey: string): number | undefined {
-	const timing = benchmarkTimings.get(benchKey);
-	return timing ? timing.totalTime / timing.count : undefined;
-}
-
-/** Collect all timing values from benchmarks */
-function collectAllTimings(): number[] {
-	const times: number[] = [];
-	for (const lang of LANGUAGES) {
-		const keys = [
-			`parse/${lang}/canonical`,
-			`parse/${lang}/native`,
-			`parse/${lang}/wasm`,
-			`parse-internal/${lang}/native`,
-			`parse-internal/${lang}/wasm`,
-			`format/${lang}/canonical`,
-			`format/${lang}/native`,
-			`format/${lang}/wasm`,
-		];
-		for (const key of keys) {
-			const t = getAverageTiming(key);
-			if (t !== undefined) times.push(t);
-		}
-	}
-	return times;
-}
-
-/** Get canonical parser label for a language */
-function canonicalParserLabel(lang: Language): string {
-	switch (lang) {
-		case 'svelte':
-			return 'svelte/compiler';
-		case 'typescript':
-			return 'acorn-ts';
-		case 'css':
-			return 'svelte/compiler';
-	}
-}
-
-/** Report summary statistics after benchmarks */
-function reportSummary(): void {
-	console.log('=== Benchmark Summary ===\n');
-
-	// Determine time unit based on smallest timing (so all values >= 1 in chosen unit)
-	const allTimes = collectAllTimings();
-	const minTime = allTimes.length > 0 ? Math.min(...allTimes) : 0;
-	const unit = chooseTimeUnit(minTime);
-	const fmt = (ms: number) => formatTimeWithUnit(ms, unit);
-
-	// Parse performance comparison (includes internal timings to show JSON overhead)
-	console.log('Parse Performance:');
-	for (const lang of LANGUAGES) {
-		const canonicalTime = getAverageTiming(`parse/${lang}/canonical`);
-		const nativeTime = getAverageTiming(`parse/${lang}/native`);
-		const nativeInternalTime = getAverageTiming(`parse-internal/${lang}/native`);
-		const wasmTime = getAverageTiming(`parse/${lang}/wasm`);
-		const wasmInternalTime = getAverageTiming(`parse-internal/${lang}/wasm`);
-
-		// Need at least native time to show anything
-		if (!nativeTime) continue;
-
-		const times = [canonicalTime, nativeTime, wasmTime].filter((t): t is number => t !== undefined);
-		const langMaxTime = Math.max(...times);
-		const canonicalLabel = canonicalParserLabel(lang);
-		const baseline = canonicalTime || nativeTime;
-
-		console.log(`\n  ${lang}:`);
-
-		// Canonical (if available) - no comparison, it's the baseline
-		if (canonicalTime) {
-			console.log(
-				`    ${canonicalLabel.padEnd(17)} ${createBar(canonicalTime, langMaxTime)} ${
-					fmt(canonicalTime)
-				}`,
-			);
-		}
-
-		// tsv wasm (with JSON serialization) - compare to canonical or native
-		if (wasmTime) {
-			const ratio = baseline / wasmTime;
-			let comparison: string;
-			if (canonicalTime) {
-				comparison = ratio >= 1
-					? `(${ratio.toFixed(1)}x faster)`
-					: `(${(1 / ratio).toFixed(1)}x slower)`;
-			} else {
-				const nativeRatio = nativeTime / wasmTime;
-				comparison = nativeRatio >= 1
-					? `(${nativeRatio.toFixed(1)}x vs tsv-json)`
-					: `(${(1 / nativeRatio).toFixed(1)}x slower than tsv-json)`;
-			}
-			console.log(
-				`    ${'tsv-wasm-json'.padEnd(17)} ${createBar(wasmTime, langMaxTime)} ${
-					fmt(wasmTime)
-				} ${comparison}`,
-			);
-		}
-
-		// tsv native (with JSON serialization) - compare to canonical
-		if (canonicalTime) {
-			const ratio = canonicalTime / nativeTime;
-			const comparison = ratio >= 1
-				? `(${ratio.toFixed(1)}x faster)`
-				: `(${(1 / ratio).toFixed(1)}x slower)`;
-			console.log(
-				`    ${'tsv-json'.padEnd(17)} ${createBar(nativeTime, langMaxTime)} ${fmt(nativeTime)} ${comparison}`,
-			);
-		} else {
-			console.log(
-				`    ${'tsv-json'.padEnd(17)} ${createBar(nativeTime, langMaxTime)} ${fmt(nativeTime)}`,
-			);
-		}
-
-		// tsv wasm internal (pure parse, no JSON)
-		if (wasmInternalTime && wasmTime) {
-			const jsonOverhead = wasmTime / wasmInternalTime;
-			console.log(
-				`    ${'tsv-wasm-internal'.padEnd(17)} ${createBar(wasmInternalTime, langMaxTime)} ${
-					fmt(wasmInternalTime)
-				} (${jsonOverhead.toFixed(1)}x JSON overhead)`,
-			);
-		}
-
-		// tsv native internal (pure parse, no JSON)
-		if (nativeInternalTime) {
-			const jsonOverhead = nativeTime / nativeInternalTime;
-			console.log(
-				`    ${'tsv-internal'.padEnd(17)} ${createBar(nativeInternalTime, langMaxTime)} ${
-					fmt(nativeInternalTime)
-				} (${jsonOverhead.toFixed(1)}x JSON overhead)`,
-			);
-		}
-	}
-
-	// Format performance comparison
-	console.log('\n\nFormat Performance:');
-	for (const lang of LANGUAGES) {
-		const canonicalTime = getAverageTiming(`format/${lang}/canonical`);
-		const nativeTime = getAverageTiming(`format/${lang}/native`);
-		const wasmTime = getAverageTiming(`format/${lang}/wasm`);
-
-		if (canonicalTime && nativeTime && nativeTime > 0) {
-			const langMaxTime = Math.max(canonicalTime, nativeTime, wasmTime || 0);
-			const nativeSpeedup = canonicalTime / nativeTime;
-			const wasmSpeedup = (wasmTime && wasmTime > 0) ? canonicalTime / wasmTime : 0;
-
-			console.log(`\n  ${lang}:`);
-			console.log(
-				`    ${'prettier'.padEnd(8)} ${createBar(canonicalTime, langMaxTime)} ${
-					fmt(canonicalTime)
-				}`,
-			);
-			console.log(
-				`    ${'tsv'.padEnd(8)} ${createBar(nativeTime, langMaxTime)} ${fmt(nativeTime)} (${
-					nativeSpeedup.toFixed(1)
-				}x faster)`,
-			);
-			if (wasmTime && wasmSpeedup > 0) {
-				console.log(
-					`    ${'tsv-wasm'.padEnd(8)} ${createBar(wasmTime, langMaxTime)} ${fmt(wasmTime)} (${
-						wasmSpeedup.toFixed(1)
-					}x faster)`,
-				);
-			}
-		}
-	}
-
-	// File counts by language
-	console.log('\n\nCorpus:');
-	console.log(`  Svelte:      ${svelteFiles.length} files`);
-	console.log(`  TypeScript:  ${tsFiles.length} files`);
-	console.log(`  CSS:         ${cssFiles.length} files`);
-
-	// Canonical implementation versions
-	console.log('\n\nCanonical Implementations:');
-	console.log(`  svelte/compiler:            ${VERSIONS.svelte}`);
-	console.log(
-		`  acorn + acorn-typescript:   ${VERSIONS.acorn} + ${VERSIONS['@sveltejs/acorn-typescript']}`,
-	);
-	console.log(`  prettier:                   ${VERSIONS.prettier}`);
-	console.log(`  prettier-plugin-svelte:     ${VERSIONS['prettier-plugin-svelte']}`);
-}
-
-/** Report skipped files after benchmarks complete */
-function reportSkippedFiles(): void {
-	if (skippedFiles.size === 0) return;
-
-	// Aggregate errors by file path and error message (nested maps avoid delimiter issues)
-	// Structure: filePath -> error -> benchmarks[]
-	const fileErrorMap = new Map<string, Map<string, string[]>>();
-
-	// Collect all errors, grouping by file path and error message
-	for (const [benchName, filesMap] of skippedFiles) {
-		for (const [filePath, error] of filesMap) {
-			if (!fileErrorMap.has(filePath)) {
-				fileErrorMap.set(filePath, new Map());
-			}
-			const errorMap = fileErrorMap.get(filePath)!;
-			if (!errorMap.has(error)) {
-				errorMap.set(error, []);
-			}
-			errorMap.get(error)!.push(benchName);
-		}
-	}
-
-	// Flatten to array for sorting
-	const allErrors: FileError[] = [];
-	for (const [filePath, errorMap] of fileErrorMap) {
-		for (const [error, benchmarks] of errorMap) {
-			allErrors.push({ filePath, error, benchmarks });
-		}
-	}
-
-	// Sort by number of affected benchmarks (most problematic first), then by file path
-	const sortedErrors = allErrors.sort((a, b) => {
-		const benchDiff = b.benchmarks.length - a.benchmarks.length;
-		return benchDiff !== 0 ? benchDiff : a.filePath.localeCompare(b.filePath);
+	const bench = new Benchmark({
+		duration_ms: BENCH_DURATION,
+		warmup_iterations: BENCH_WARMUP,
+		min_iterations: 3,
+		on_iteration: () => globalThis.gc?.(),
+		on_task_complete: (result, index, total) => {
+			const opsPerSec = result.stats.ops_per_second.toFixed(1);
+			const throughput = formatThroughput(result.stats.ops_per_second * corpusBytes);
+			log(`  [${index + 1}/${total}] ${result.name}: ${opsPerSec} ops/sec (${throughput})`);
+		},
 	});
 
-	// Count skips by language
-	const skipsByLang = { svelte: 0, typescript: 0, css: 0 };
-	for (const { filePath } of sortedErrors) {
-		if (filePath.endsWith('.svelte')) skipsByLang.svelte++;
-		else if (filePath.endsWith('.ts') || filePath.endsWith('.js')) skipsByLang.typescript++;
-		else if (filePath.endsWith('.css')) skipsByLang.css++;
+	// Get all benchmark tasks for this operation/language from the registry
+	const tasks = getBenchmarkTasks(impls, operation, language);
+
+	for (const task of tasks) {
+		if (task.isAsync) {
+			bench.add({
+				name: task.name,
+				fn: async () => {
+					await processCorpusAsync(
+						files,
+						async (f) => {
+							await task.runAsync!(f.content, language);
+						},
+						task.trackingKey,
+					);
+				},
+				async: true,
+			});
+		} else {
+			bench.add(task.name, () => {
+				processCorpus(files, (f) => task.run(f.content, language), task.trackingKey);
+			});
+		}
 	}
 
-	console.log('\n--- Skipped Files ---');
-	console.log(`Total unique file+error combinations: ${sortedErrors.length}`);
-	console.log(`  Svelte:      ${skipsByLang.svelte} files skipped`);
-	console.log(`  TypeScript:  ${skipsByLang.typescript} files skipped`);
-	console.log(`  CSS:         ${skipsByLang.css} files skipped\n`);
+	const results = await bench.run();
+	allGroupResults.push({ name: groupName, results });
 
-	for (const { filePath, error, benchmarks } of sortedErrors) {
-		console.log(filePath);
-		const truncated = error.length > MAX_ERROR_MESSAGE_LENGTH;
-		const displayError = truncated ? error.slice(0, MAX_ERROR_MESSAGE_LENGTH) + '...' : error;
-		console.log(`  Error: ${displayError}`);
-		if (benchmarks.length === 1) {
-			console.log(`  Failed in: ${benchmarks[0]}`);
-		} else {
-			console.log(`  Failed in ${benchmarks.length} benchmarks: ${benchmarks.join(', ')}`);
+	// Show detailed table for each group (not in structured output mode)
+	if (!structuredOutput && results.length > 0) {
+		const baseline = operation === 'format' ? 'prettier' : canonicalParserLabel(language);
+
+		log('');
+		log(
+			bench.table({
+				groups: [
+					{
+						name: groupName,
+						filter: () => true, // all results in this group
+						baseline,
+					},
+				],
+			}),
+		);
+	}
+}
+
+// Run all benchmark groups
+for (const lang of LANGUAGES) {
+	await runBenchmarkGroup('parse', lang);
+	await runBenchmarkGroup('format', lang);
+}
+
+// ============================================================================
+// Baseline Handling
+// ============================================================================
+
+interface BaselineEntry {
+	name: string;
+	group: string;
+	mean_ns: number;
+	p50_ns: number;
+	std_dev_ns: number;
+	ops_per_second: number;
+	sample_size: number;
+}
+
+interface Baseline {
+	version: number;
+	timestamp: string;
+	git_commit: string | null;
+	corpus: {
+		svelte: number;
+		typescript: number;
+		css: number;
+	};
+	entries: BaselineEntry[];
+}
+
+/** Get current git commit hash */
+async function getGitCommit(): Promise<string | null> {
+	try {
+		const cmd = new Deno.Command('git', {
+			args: ['rev-parse', 'HEAD'],
+			stdout: 'piped',
+			stderr: 'null',
+		});
+		const output = await cmd.output();
+		if (output.success) {
+			return new TextDecoder().decode(output.stdout).trim().slice(0, 8);
 		}
-		console.log();
+	} catch {
+		// Ignore
+	}
+	return null;
+}
+
+/** Save current results as baseline */
+async function saveBaseline(): Promise<void> {
+	const entries: BaselineEntry[] = [];
+	for (const group of allGroupResults) {
+		for (const result of group.results) {
+			entries.push({
+				name: result.name,
+				group: group.name,
+				mean_ns: result.stats.mean_ns,
+				p50_ns: result.stats.p50_ns,
+				std_dev_ns: result.stats.std_dev_ns,
+				ops_per_second: result.stats.ops_per_second,
+				sample_size: result.stats.sample_size,
+			});
+		}
+	}
+
+	const baseline: Baseline = {
+		version: 1,
+		timestamp: new Date().toISOString(),
+		git_commit: await getGitCommit(),
+		corpus: {
+			svelte: svelteFiles.length,
+			typescript: tsFiles.length,
+			css: cssFiles.length,
+		},
+		entries,
+	};
+
+	await Deno.writeTextFile(BASELINE_PATH, JSON.stringify(baseline, null, '\t'));
+	log(`\nBaseline saved to ${BASELINE_PATH}`);
+}
+
+/** Load and compare against baseline */
+async function compareBaseline(): Promise<void> {
+	let baseline: Baseline;
+	try {
+		const content = await Deno.readTextFile(BASELINE_PATH);
+		baseline = JSON.parse(content);
+	} catch {
+		console.error(`\nNo baseline found at ${BASELINE_PATH}. Run with --save-baseline first.`);
+		return;
+	}
+
+	log('\n' + '='.repeat(80));
+	log('BASELINE COMPARISON');
+	log('='.repeat(80));
+	log(`\nBaseline from: ${baseline.timestamp}`);
+	if (baseline.git_commit) {
+		log(`Baseline commit: ${baseline.git_commit}`);
+	}
+
+	// Check corpus size match
+	const corpusMatch = baseline.corpus.svelte === svelteFiles.length &&
+		baseline.corpus.typescript === tsFiles.length &&
+		baseline.corpus.css === cssFiles.length;
+
+	if (!corpusMatch) {
+		log(`\n⚠️  Corpus size differs from baseline:`);
+		log(
+			`   Baseline: svelte=${baseline.corpus.svelte}, ts=${baseline.corpus.typescript}, css=${baseline.corpus.css}`,
+		);
+		log(`   Current:  svelte=${svelteFiles.length}, ts=${tsFiles.length}, css=${cssFiles.length}`);
+	}
+
+	// Build lookup map
+	const baselineMap = new Map<string, BaselineEntry>();
+	for (const entry of baseline.entries) {
+		baselineMap.set(`${entry.group}/${entry.name}`, entry);
+	}
+
+	// Compare results
+	const regressions: Array<{
+		name: string;
+		group: string;
+		ratio: number;
+		baseline: number;
+		current: number;
+	}> = [];
+	const improvements: Array<{
+		name: string;
+		group: string;
+		ratio: number;
+		baseline: number;
+		current: number;
+	}> = [];
+
+	for (const group of allGroupResults) {
+		for (const result of group.results) {
+			const key = `${group.name}/${result.name}`;
+			const baselineEntry = baselineMap.get(key);
+			if (!baselineEntry) continue;
+
+			const ratio = result.stats.ops_per_second / baselineEntry.ops_per_second;
+
+			if (ratio < 0.95) {
+				// More than 5% slower
+				regressions.push({
+					name: result.name,
+					group: group.name,
+					ratio,
+					baseline: baselineEntry.ops_per_second,
+					current: result.stats.ops_per_second,
+				});
+			} else if (ratio > 1.05) {
+				// More than 5% faster
+				improvements.push({
+					name: result.name,
+					group: group.name,
+					ratio,
+					baseline: baselineEntry.ops_per_second,
+					current: result.stats.ops_per_second,
+				});
+			}
+		}
+	}
+
+	if (regressions.length > 0) {
+		log('\n❌ Regressions (>5% slower):');
+		for (const r of regressions.sort((a, b) => a.ratio - b.ratio)) {
+			const pct = ((1 - r.ratio) * 100).toFixed(1);
+			log(
+				`   ${r.group}/${r.name}: ${pct}% slower (${r.baseline.toFixed(1)} → ${
+					r.current.toFixed(
+						1,
+					)
+				} ops/sec)`,
+			);
+		}
+	}
+
+	if (improvements.length > 0) {
+		log('\n✅ Improvements (>5% faster):');
+		for (const r of improvements.sort((a, b) => b.ratio - a.ratio)) {
+			const pct = ((r.ratio - 1) * 100).toFixed(1);
+			log(
+				`   ${r.group}/${r.name}: ${pct}% faster (${r.baseline.toFixed(1)} → ${
+					r.current.toFixed(
+						1,
+					)
+				} ops/sec)`,
+			);
+		}
+	}
+
+	if (regressions.length === 0 && improvements.length === 0) {
+		log('\n✓ No significant changes from baseline (within ±5%)');
 	}
 }
 
 // ============================================================================
-// Register Benchmarks
+// Output
 // ============================================================================
 
-// Prepare implementation sets
-const allImplementations = {
-	canonical,
-	...(nativeAvailable && { native }),
-	...(wasmAvailable && { wasm }),
-};
+if (args.json) {
+	// JSON output
+	const output = {
+		timestamp: new Date().toISOString(),
+		corpus: {
+			svelte: svelteFiles.length,
+			typescript: tsFiles.length,
+			css: cssFiles.length,
+		},
+		groups: allGroupResults.map((g) => ({
+			name: g.name,
+			results: g.results.map((r) => ({
+				name: r.name,
+				stats: r.stats,
+			})),
+		})),
+	};
+	console.log(JSON.stringify(output, null, '\t'));
+} else if (args.markdown) {
+	// Markdown output using fuz_util's formatter
+	console.log('# TSV Benchmark Results\n');
+	console.log(`**Date:** ${new Date().toISOString()}\n`);
+	console.log(
+		`**Corpus:** ${svelteFiles.length} Svelte, ${tsFiles.length} TypeScript, ${cssFiles.length} CSS files\n`,
+	);
 
-const nativeWasmImplementations = {
-	...(nativeAvailable && { native }),
-	...(wasmAvailable && { wasm }),
-};
+	for (const group of allGroupResults) {
+		if (group.results.length === 0) continue;
+		console.log(`## ${group.name}\n`);
+		console.log(benchmark_format_markdown(group.results));
+		console.log('');
+	}
+} else {
+	// Standard text output
+	console.log(generateSummaryReport(allGroupResults, LANGUAGES));
 
-// Register benchmarks in logical groups for clearer output
+	const altVersions = getAlternativeVersions(impls);
+	console.log(
+		generateCorpusInfo(
+			{ svelte: svelteFiles.length, typescript: tsFiles.length, css: cssFiles.length },
+			isLimited ? totalFileCounts : undefined,
+			{
+				svelte: VERSIONS.svelte,
+				acorn: VERSIONS.acorn,
+				acornTs: VERSIONS['@sveltejs/acorn-typescript'],
+				prettier: VERSIONS.prettier,
+				prettierSvelte: VERSIONS['prettier-plugin-svelte'],
+				...altVersions,
+			},
+		),
+	);
 
-// Parse benchmarks (with conversion + JSON serialization)
-registerParseBenchmarks(svelteFiles, 'svelte', allImplementations);
-registerParseBenchmarks(tsFiles, 'typescript', allImplementations);
-registerParseBenchmarks(cssFiles, 'css', allImplementations);
+	const effectiveCorpusReport = generateEffectiveCorpusReport(effectiveCorpusSize);
+	if (effectiveCorpusReport) {
+		console.log(effectiveCorpusReport);
+	}
 
-// Internal parse benchmarks (pure parsing, no conversion)
-registerParseInternalBenchmarks(svelteFiles, 'svelte', nativeWasmImplementations);
-registerParseInternalBenchmarks(tsFiles, 'typescript', nativeWasmImplementations);
-registerParseInternalBenchmarks(cssFiles, 'css', nativeWasmImplementations);
+	const skippedReport = generateSkippedFilesReport(skippedFiles, MAX_ERROR_MESSAGE_LENGTH);
+	if (skippedReport) {
+		console.log(skippedReport);
+	}
 
-// Format benchmarks
-registerFormatBenchmarks(svelteFiles, 'svelte', allImplementations);
-registerFormatBenchmarks(tsFiles, 'typescript', allImplementations);
-registerFormatBenchmarks(cssFiles, 'css', allImplementations);
+	console.log('\n' + '='.repeat(80));
+}
 
-// ============================================================================
-// Cleanup & Reporting
-// ============================================================================
+// Handle baseline operations
+if (args.saveBaseline) {
+	await saveBaseline();
+}
 
-// Report summary and skipped files after all benchmarks complete
-// Note: Using 'beforeunload' event (browser API supported by Deno) for reporting.
-// Limitation: May not fire reliably on SIGINT or forced termination, but will
-// work for normal benchmark completion. Deno.bench doesn't provide a cleanup hook.
-globalThis.addEventListener('beforeunload', () => {
-	console.log(); // Add spacing after benchmark tables
-	reportSummary();
-	reportSkippedFiles();
-});
-
-// Process will exit after benchmarks complete, releasing all resources.
+if (args.compareBaseline) {
+	await compareBaseline();
+}

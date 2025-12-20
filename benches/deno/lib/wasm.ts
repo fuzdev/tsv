@@ -6,8 +6,8 @@
 
 import type { Language, TsvImplementation } from './types.ts';
 
-// These will be dynamically imported from the wasm-pack output
-let wasmModule: {
+/** WASM module function signatures */
+interface WasmModule {
 	parse_svelte: (source: string) => unknown;
 	parse_internal_svelte: (source: string) => void;
 	format_svelte: (source: string) => string;
@@ -17,10 +17,58 @@ let wasmModule: {
 	parse_css: (source: string) => unknown;
 	parse_internal_css: (source: string) => void;
 	format_css: (source: string) => string;
-} | null = null;
+}
 
 export class WasmImplementation implements TsvImplementation {
 	name = 'wasm' as const;
+	private _module: WasmModule | null = null;
+
+	/** Languages supported for parsing */
+	static readonly PARSE_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
+
+	/** Languages supported for formatting */
+	static readonly FORMAT_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
+
+	/** Get initialized module or throw */
+	private get module(): WasmModule {
+		if (!this._module) throw new Error('WASM module not initialized');
+		return this._module;
+	}
+
+	/** Check if parsing is supported for this language */
+	supportsParseLanguage(language: Language): boolean {
+		return WasmImplementation.PARSE_LANGUAGES.includes(language);
+	}
+
+	/** Check if formatting is supported for this language */
+	supportsFormatLanguage(language: Language): boolean {
+		return WasmImplementation.FORMAT_LANGUAGES.includes(language);
+	}
+
+	// Lookup tables for WASM functions by language
+	private get parseFns(): Record<Language, (source: string) => unknown> {
+		return {
+			svelte: this.module.parse_svelte,
+			typescript: this.module.parse_typescript,
+			css: this.module.parse_css,
+		};
+	}
+
+	private get parseInternalFns(): Record<Language, (source: string) => void> {
+		return {
+			svelte: this.module.parse_internal_svelte,
+			typescript: this.module.parse_internal_typescript,
+			css: this.module.parse_internal_css,
+		};
+	}
+
+	private get formatFns(): Record<Language, (source: string) => string> {
+		return {
+			svelte: this.module.format_svelte,
+			typescript: this.module.format_typescript,
+			css: this.module.format_css,
+		};
+	}
 
 	async init(): Promise<void> {
 		const wasmPath = new URL(
@@ -45,7 +93,7 @@ export class WasmImplementation implements TsvImplementation {
 			await module.default();
 		}
 
-		wasmModule = {
+		this._module = {
 			parse_svelte: module.parse_svelte,
 			parse_internal_svelte: module.parse_internal_svelte,
 			format_svelte: module.format_svelte,
@@ -59,48 +107,18 @@ export class WasmImplementation implements TsvImplementation {
 	}
 
 	parse(source: string, language: Language): unknown {
-		if (!wasmModule) throw new Error('WASM module not initialized');
-
-		switch (language) {
-			case 'svelte':
-				return wasmModule.parse_svelte(source);
-			case 'typescript':
-				return wasmModule.parse_typescript(source);
-			case 'css':
-				return wasmModule.parse_css(source);
-		}
+		return this.parseFns[language](source);
 	}
 
 	parseInternal(source: string, language: Language): void {
-		if (!wasmModule) throw new Error('WASM module not initialized');
-
-		switch (language) {
-			case 'svelte':
-				wasmModule.parse_internal_svelte(source);
-				break;
-			case 'typescript':
-				wasmModule.parse_internal_typescript(source);
-				break;
-			case 'css':
-				wasmModule.parse_internal_css(source);
-				break;
-		}
+		this.parseInternalFns[language](source);
 	}
 
 	format(source: string, language: Language): string {
-		if (!wasmModule) throw new Error('WASM module not initialized');
-
-		switch (language) {
-			case 'svelte':
-				return wasmModule.format_svelte(source);
-			case 'typescript':
-				return wasmModule.format_typescript(source);
-			case 'css':
-				return wasmModule.format_css(source);
-		}
+		return this.formatFns[language](source);
 	}
 
 	dispose(): void {
-		wasmModule = null;
+		this._module = null;
 	}
 }

@@ -50,6 +50,13 @@ const symbols = {
 	},
 } as const;
 
+type FfiFn = (
+	source: Uint8Array,
+	len: number | bigint,
+	outLen: BigUint64Array,
+) => Deno.PointerValue;
+type LibSymbols = Deno.DynamicLibrary<typeof symbols>['symbols'];
+
 /** Get the native library path based on platform */
 function getLibraryPath(): string {
 	const base = new URL('../../../target/release', import.meta.url).pathname;
@@ -68,9 +75,26 @@ function getLibraryPath(): string {
 
 export class NativeImplementation implements TsvImplementation {
 	name = 'native' as const;
-	private lib: Deno.DynamicLibrary<typeof symbols> | null = null;
+	private _lib: Deno.DynamicLibrary<typeof symbols> | null = null;
 	private encoder = new TextEncoder();
 	private decoder = new TextDecoder();
+
+	/** Languages supported for parsing */
+	static readonly PARSE_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
+
+	/** Languages supported for formatting */
+	static readonly FORMAT_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
+
+	/** Get initialized library or throw */
+	private get lib(): Deno.DynamicLibrary<typeof symbols> {
+		if (!this._lib) throw new Error('Native library not initialized');
+		return this._lib;
+	}
+
+	/** Get symbols with proper typing */
+	private get symbols(): LibSymbols {
+		return this.lib.symbols;
+	}
 
 	async init(): Promise<void> {
 		const libPath = getLibraryPath();
@@ -84,13 +108,10 @@ export class NativeImplementation implements TsvImplementation {
 			);
 		}
 
-		this.lib = Deno.dlopen(libPath, symbols);
+		this._lib = Deno.dlopen(libPath, symbols);
 	}
 
-	// deno-lint-ignore no-explicit-any
-	private callFfi(fn: any, source: string): string {
-		if (!this.lib) throw new Error('Native library not initialized');
-
+	private callFfi(fn: FfiFn, source: string): string {
 		const sourceBytes = this.encoder.encode(source);
 		const outLenBuffer = new BigUint64Array(1);
 
@@ -100,35 +121,74 @@ export class NativeImplementation implements TsvImplementation {
 			throw new Error('FFI function returned null pointer');
 		}
 
-		const resultLen = Number(outLenBuffer[0]);
+		const resultLen = outLenBuffer[0];
 
 		// Read the result
 		const resultView = new Deno.UnsafePointerView(resultPtr);
-		const resultBytes = new Uint8Array(resultLen);
+		const resultBytes = new Uint8Array(Number(resultLen));
 		resultView.copyInto(resultBytes);
 
-		// Free the allocated memory
-		this.lib.symbols.tsv_free(resultPtr, BigInt(resultLen));
+		// Free the allocated memory (keep as bigint throughout)
+		this.symbols.tsv_free(resultPtr, resultLen);
 
 		return this.decoder.decode(resultBytes);
 	}
 
-	parse(source: string, language: Language): unknown {
-		if (!this.lib) throw new Error('Native library not initialized');
-
-		let result: string;
-		switch (language) {
-			case 'svelte':
-				result = this.callFfi(this.lib.symbols.tsv_parse_svelte, source);
-				break;
-			case 'typescript':
-				result = this.callFfi(this.lib.symbols.tsv_parse_typescript, source);
-				break;
-			case 'css':
-				result = this.callFfi(this.lib.symbols.tsv_parse_css, source);
-				break;
+	/** Check FFI result for error and throw if present */
+	private checkError(result: string): void {
+		// Error responses are JSON objects with an "error" key
+		// Check prefix first to avoid JSON.parse overhead on success
+		if (result.length > 0 && result[0] === '{') {
+			let parsed;
+			try {
+				parsed = JSON.parse(result);
+			} catch {
+				// Not valid JSON, not an error response
+				return;
+			}
+			if (parsed.error) {
+				throw new Error(parsed.error);
+			}
 		}
+	}
 
+	/** Check if parsing is supported for this language */
+	supportsParseLanguage(language: Language): boolean {
+		return NativeImplementation.PARSE_LANGUAGES.includes(language);
+	}
+
+	/** Check if formatting is supported for this language */
+	supportsFormatLanguage(language: Language): boolean {
+		return NativeImplementation.FORMAT_LANGUAGES.includes(language);
+	}
+
+	// Lookup tables for FFI functions by language
+	private get parseFns(): Record<Language, FfiFn> {
+		return {
+			svelte: this.symbols.tsv_parse_svelte as FfiFn,
+			typescript: this.symbols.tsv_parse_typescript as FfiFn,
+			css: this.symbols.tsv_parse_css as FfiFn,
+		};
+	}
+
+	private get parseInternalFns(): Record<Language, FfiFn> {
+		return {
+			svelte: this.symbols.tsv_parse_internal_svelte as FfiFn,
+			typescript: this.symbols.tsv_parse_internal_typescript as FfiFn,
+			css: this.symbols.tsv_parse_internal_css as FfiFn,
+		};
+	}
+
+	private get formatFns(): Record<Language, FfiFn> {
+		return {
+			svelte: this.symbols.tsv_format_svelte as FfiFn,
+			typescript: this.symbols.tsv_format_typescript as FfiFn,
+			css: this.symbols.tsv_format_css as FfiFn,
+		};
+	}
+
+	parse(source: string, language: Language): unknown {
+		const result = this.callFfi(this.parseFns[language], source);
 		const parsed = JSON.parse(result);
 		if (parsed.error) {
 			throw new Error(parsed.error);
@@ -137,57 +197,20 @@ export class NativeImplementation implements TsvImplementation {
 	}
 
 	parseInternal(source: string, language: Language): void {
-		if (!this.lib) throw new Error('Native library not initialized');
-
-		let result: string;
-		switch (language) {
-			case 'svelte':
-				result = this.callFfi(this.lib.symbols.tsv_parse_internal_svelte, source);
-				break;
-			case 'typescript':
-				result = this.callFfi(this.lib.symbols.tsv_parse_internal_typescript, source);
-				break;
-			case 'css':
-				result = this.callFfi(this.lib.symbols.tsv_parse_internal_css, source);
-				break;
-		}
-
-		// Check for error (empty string = success)
-		if (result.startsWith('{"error":')) {
-			const parsed = JSON.parse(result);
-			throw new Error(parsed.error);
-		}
+		const result = this.callFfi(this.parseInternalFns[language], source);
+		this.checkError(result);
 	}
 
 	format(source: string, language: Language): string {
-		if (!this.lib) throw new Error('Native library not initialized');
-
-		let result: string;
-		switch (language) {
-			case 'svelte':
-				result = this.callFfi(this.lib.symbols.tsv_format_svelte, source);
-				break;
-			case 'typescript':
-				result = this.callFfi(this.lib.symbols.tsv_format_typescript, source);
-				break;
-			case 'css':
-				result = this.callFfi(this.lib.symbols.tsv_format_css, source);
-				break;
-		}
-
-		// Check for error response
-		if (result.startsWith('{"error":')) {
-			const parsed = JSON.parse(result);
-			throw new Error(parsed.error);
-		}
-
+		const result = this.callFfi(this.formatFns[language], source);
+		this.checkError(result);
 		return result;
 	}
 
 	dispose(): void {
-		if (this.lib) {
-			this.lib.close();
-			this.lib = null;
+		if (this._lib) {
+			this._lib.close();
+			this._lib = null;
 		}
 	}
 }

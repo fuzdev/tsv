@@ -85,12 +85,8 @@ impl<'a> Printer<'a> {
             parts.push(self.build_type_params_doc_for_function_grouped(tp));
         }
 
-        // Function parameters
-        if force_params_break && !decl.params.is_empty() {
-            parts.push(self.build_function_params_doc_force_break(&decl.params));
-        } else {
-            parts.push(self.build_function_params_doc_grouped(&decl.params));
-        }
+        // Function parameters with comment handling
+        parts.push(self.build_function_decl_params_doc(decl, force_params_break));
 
         // Return type annotation
         if let Some(return_type) = &decl.return_type {
@@ -125,71 +121,32 @@ impl<'a> Printer<'a> {
         ]))
     }
 
-    /// Build doc for function params in their own group (independent breaking)
-    fn build_function_params_doc_grouped(&self, params: &[internal::Expression]) -> Doc {
-        if params.is_empty() {
-            return doc::text("()");
-        }
+    /// Build doc for function declaration params with comment handling
+    ///
+    /// Uses shared implementation and wraps in a group for independent breaking.
+    /// `force_break` is used when signature width estimation determines params should break.
+    fn build_function_decl_params_doc(
+        &self,
+        decl: &internal::FunctionDeclaration,
+        force_break: bool,
+    ) -> Doc {
+        let params_start = Some(decl.params_start);
 
-        let param_docs: Vec<_> = params
-            .iter()
-            .map(|param| self.build_expression_doc(param))
-            .collect();
-        let inner_parts = vec![doc::join_doc(param_docs, doc::comma_line())];
+        // Compute trailing comments boundary
+        let trailing_comments_end = if let Some(rt) = &decl.return_type {
+            Some(rt.span.start)
+        } else {
+            Some(decl.body.span.start)
+        };
 
-        // Check if last param is a rest parameter - no trailing comma after rest
-        let has_rest_param = params
-            .last()
-            .is_some_and(|p| matches!(p, internal::Expression::RestElement(_)));
-
-        let mut result = vec![
-            doc::text("("),
-            doc::indent_softline(doc::concat(inner_parts)),
-        ];
-
-        // Trailing comma when broken, unless there's a rest param
-        if !has_rest_param {
-            result.push(doc::trailing_comma());
-        }
-
-        result.push(doc::softline());
-        result.push(doc::text(")"));
-
-        // Wrap in own group for independent breaking
-        doc::group(doc::concat(result))
-    }
-
-    /// Build doc for function params that always break (forced by signature width heuristic)
-    fn build_function_params_doc_force_break(&self, params: &[internal::Expression]) -> Doc {
-        if params.is_empty() {
-            return doc::text("()");
-        }
-
-        let param_docs: Vec<_> = params
-            .iter()
-            .map(|param| self.build_expression_doc(param))
-            .collect();
-        let inner_parts = vec![doc::join_doc(param_docs, doc::comma_hardline())];
-
-        // Check if last param is a rest parameter - no trailing comma after rest
-        let has_rest_param = params
-            .last()
-            .is_some_and(|p| matches!(p, internal::Expression::RestElement(_)));
-
-        let mut result = vec![
-            doc::text("("),
-            doc::indent(doc::concat(vec![doc::hardline(), doc::concat(inner_parts)])),
-        ];
-
-        // Always add trailing comma since we're breaking
-        if !has_rest_param {
-            result.push(doc::text(","));
-        }
-
-        result.push(doc::hardline());
-        result.push(doc::text(")"));
-
-        doc::concat(result)
+        // Use shared implementation with force_break and wrap in group
+        let params_doc = self.build_params_doc_with_comments_ext(
+            &decl.params,
+            params_start,
+            trailing_comments_end,
+            force_break,
+        );
+        doc::group(params_doc)
     }
 
     /// Build a Doc for a function declaration

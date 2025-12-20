@@ -102,7 +102,7 @@ pub async fn parse_svelte(source: &str) -> Result<String, DenoError> {
 pub async fn parse_typescript(source: &str) -> Result<String, DenoError> {
     let result = get_actor()
         .await?
-        .call("acorn-ts-parse", source, None)
+        .call("acorn-typescript-parse", source, None)
         .await?;
 
     result

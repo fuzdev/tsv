@@ -5,6 +5,26 @@
 /** Supported source file languages */
 export type Language = 'svelte' | 'typescript' | 'css';
 
+/** File extensions for each language */
+export const LANGUAGE_EXTENSIONS: Record<Language, string> = {
+	svelte: '.svelte',
+	typescript: '.ts',
+	css: '.css',
+};
+
+/** Prettier parser names for each language */
+export const LANGUAGE_PRETTIER_PARSERS: Record<Language, string> = {
+	svelte: 'svelte',
+	typescript: 'typescript',
+	css: 'css',
+};
+
+/** Extract version from npm specifier (e.g., "npm:prettier@3.7.4" -> "3.7.4") */
+export function extractVersion(specifier: string): string {
+	const match = specifier.match(/@(\d+\.\d+\.\d+)/);
+	return match ? match[1] : 'unknown';
+}
+
 /** A source file loaded into memory for benchmarking */
 export interface SourceFile {
 	/** Absolute path to the file */
@@ -29,57 +49,27 @@ export interface CorpusStats {
 	repos: string[];
 }
 
-/** Implementation being benchmarked */
-export type Implementation = 'canonical' | 'native' | 'wasm';
-
-/** Operation being benchmarked */
-export type Operation = 'parse' | 'format';
-
-/** Result from a single benchmark iteration (for aggregation) */
-export interface BenchmarkResult {
-	implementation: Implementation;
-	operation: Operation;
-	language: Language;
-	/** Average time in nanoseconds */
-	avgNs: number;
-	/** Minimum time in nanoseconds */
-	minNs: number;
-	/** Maximum time in nanoseconds */
-	maxNs: number;
-	/** Number of iterations */
-	iterations: number;
-}
-
-/** Full benchmark report */
-export interface BenchmarkReport {
-	/** ISO timestamp when benchmark was run */
-	timestamp: string;
-	/** Corpus statistics */
-	corpus: CorpusStats;
-	/** Individual benchmark results */
-	results: BenchmarkResult[];
-	/** Computed summary statistics */
-	summary: {
-		/** Native parse speedup vs canonical (e.g., 15.3 means 15.3x faster) */
-		parseSpeedupNative: Record<Language, number>;
-		/** WASM parse speedup vs canonical */
-		parseSpeedupWasm: Record<Language, number>;
-		/** Native format speedup vs canonical */
-		formatSpeedupNative: Record<Language, number>;
-		/** WASM format speedup vs canonical */
-		formatSpeedupWasm: Record<Language, number>;
-	};
-}
+/** Implementation names for benchmarking */
+export type ImplementationName = 'canonical' | 'native' | 'wasm' | 'oxc' | 'biome';
 
 /** Common interface for parser/formatter implementations */
 export interface TsvImplementation {
-	name: Implementation;
+	name: ImplementationName;
 
 	/** Initialize the implementation (load WASM, open FFI library, etc.) */
 	init(): Promise<void>;
 
+	/** Check if parsing is supported for this language */
+	supportsParseLanguage(language: Language): boolean;
+
+	/** Check if formatting is supported for this language */
+	supportsFormatLanguage(language: Language): boolean;
+
 	/** Parse source and return AST (as object or JSON string) */
 	parse(source: string, language: Language): unknown;
+
+	/** Parse source without JSON serialization (native/wasm only, for measuring pure parse speed) */
+	parseInternal?(source: string, language: Language): void;
 
 	/** Format source synchronously (native, wasm) */
 	format?(source: string, language: Language): string;

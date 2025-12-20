@@ -47,7 +47,8 @@ impl<'a> Parser<'a> {
 
         // Parse binding pattern: identifier, array pattern [a, b], or object pattern {a, b}
         // Note: Some keywords can be used as identifiers in variable declarations (e.g., `async`)
-        let id = match self.current_kind() {
+        // For simple identifiers, also handles definite assignment assertion (`!`)
+        let (id, definite) = match self.current_kind() {
             TokenKind::Identifier => {
                 let symbol = self.intern_identifier();
                 self.parse_simple_binding(symbol)?
@@ -71,7 +72,8 @@ impl<'a> Parser<'a> {
                     arr.span = Span::new(arr.span.start, type_annotation.span.end);
                     arr.type_annotation = Some(type_annotation);
                 }
-                pattern
+                // Destructuring patterns don't support definite assignment
+                (pattern, false)
             }
             TokenKind::BraceOpen => {
                 // Object destructuring pattern: {a, b} = obj
@@ -86,7 +88,8 @@ impl<'a> Parser<'a> {
                     obj.span = Span::new(obj.span.start, type_annotation.span.end);
                     obj.type_annotation = Some(type_annotation);
                 }
-                pattern
+                // Destructuring patterns don't support definite assignment
+                (pattern, false)
             }
             _ => {
                 return Err(self.error_expected_found("identifier or destructuring pattern"));
@@ -108,6 +111,7 @@ impl<'a> Parser<'a> {
         Ok(VariableDeclarator {
             id,
             init,
+            definite,
             span: Span::new(id_start as u32, end as u32),
         })
     }
@@ -264,9 +268,17 @@ impl<'a> Parser<'a> {
     ///
     /// Used for variable declarators where the binding is a simple identifier.
     /// Handles both regular identifiers and contextual keywords used as identifiers (e.g., `async`).
-    fn parse_simple_binding(&mut self, symbol: DefaultSymbol) -> Result<Expression, ParseError> {
+    ///
+    /// Returns `(expression, definite)` where `definite` is true if `!` was present.
+    fn parse_simple_binding(
+        &mut self,
+        symbol: DefaultSymbol,
+    ) -> Result<(Expression, bool), ParseError> {
         let (start, end) = self.current_pos();
         self.advance()?;
+
+        // Check for definite assignment assertion: `let x!: Type`
+        let definite = self.eat(TokenKind::Bang);
 
         let type_annotation = if self.check(&TokenKind::Colon) {
             Some(self.parse_type_annotation()?)
@@ -278,12 +290,15 @@ impl<'a> Parser<'a> {
             .as_ref()
             .map_or(end, |ta| ta.span.end_usize());
 
-        Ok(Expression::Identifier(Identifier {
-            name: symbol,
-            optional: false,
-            type_annotation,
-            decorators: None,
-            span: Span::new(start as u32, id_end as u32),
-        }))
+        Ok((
+            Expression::Identifier(Identifier {
+                name: symbol,
+                optional: false,
+                type_annotation,
+                decorators: None,
+                span: Span::new(start as u32, id_end as u32),
+            }),
+            definite,
+        ))
     }
 }

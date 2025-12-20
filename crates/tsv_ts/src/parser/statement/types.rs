@@ -740,6 +740,10 @@ impl<'a> Parser<'a> {
         match self.current_kind() {
             // Keywords that are types, not parameter names
             TokenKind::Keyword(KeywordKind::Typeof) => true,
+            // Type keywords: string, number, boolean, any, void, never, unknown, object, symbol, bigint, null, undefined
+            TokenKind::Keyword(kw) if kw.is_type_keyword() => true,
+            // Constructor types: new () => T
+            TokenKind::Keyword(KeywordKind::New) => true,
             // Non-identifier tokens that start types
             TokenKind::BracketOpen => true, // tuple types
             TokenKind::BraceOpen => true,   // object types
@@ -750,23 +754,29 @@ impl<'a> Parser<'a> {
             TokenKind::String | TokenKind::Number => true,
             // Template literals
             TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => true,
-            // Type operators like keyof, readonly, unique, infer
+            // Type operators like keyof, readonly, unique, infer, and abstract (for constructor types)
             TokenKind::Identifier => {
                 let val = self.current_value();
                 if matches!(val, "keyof" | "unique" | "readonly" | "infer") {
                     return true;
                 }
-                // If an identifier is followed by |, &, [ or extends (not :), it's a type not a param
+                // Abstract constructor types: abstract new () => T
+                if val == "abstract" {
+                    return matches!(self.peek_kind(), TokenKind::Keyword(KeywordKind::New));
+                }
+                // If an identifier is followed by these tokens, it's a type not a param:
                 // (A | B) is a union type, not function params
                 // (A & B) is an intersection type
                 // (A[K]) is an indexed access type
                 // (T extends U ? V : W) is a conditional type in parentheses
+                // (ns.X) is a qualified type reference
                 matches!(
                     self.peek_kind(),
                     TokenKind::Pipe
                         | TokenKind::Ampersand
                         | TokenKind::BracketOpen
                         | TokenKind::Keyword(KeywordKind::Extends)
+                        | TokenKind::Dot
                 )
             }
             _ => false,
@@ -1741,31 +1751,38 @@ impl<'a> Parser<'a> {
         }
 
         // Check for construct signature: `new (): T` or `new <T>(): T`
+        // But NOT when `new` is used as a property name: `{ new: string }`
         if self.check(&TokenKind::Keyword(KeywordKind::New)) {
-            self.advance()?;
-            // Parse optional type parameters: <T>
-            let type_parameters = if self.check(&TokenKind::LessThan) {
-                Some(self.parse_type_parameters()?)
-            } else {
-                None
-            };
-            let params = self.parse_parameter_list()?;
-            let return_type = if self.check(&TokenKind::Colon) {
-                Some(self.parse_type_annotation()?)
-            } else {
-                None
-            };
-            let end = return_type
-                .as_ref()
-                .map_or_else(|| self.current_pos().0 as u32, |rt| rt.span.end);
-            return Ok(TSTypeElement::ConstructSignature(
-                TSConstructSignatureDeclaration {
-                    type_parameters,
-                    params,
-                    return_type,
-                    span: Span::new(start as u32, end),
-                },
-            ));
+            // Peek ahead to distinguish construct signature from property named 'new'
+            // Construct signature: new() or new<T>()
+            // Property: new: or new?
+            if matches!(self.peek_kind(), TokenKind::ParenOpen | TokenKind::LessThan) {
+                self.advance()?;
+                // Parse optional type parameters: <T>
+                let type_parameters = if self.check(&TokenKind::LessThan) {
+                    Some(self.parse_type_parameters()?)
+                } else {
+                    None
+                };
+                let params = self.parse_parameter_list()?;
+                let return_type = if self.check(&TokenKind::Colon) {
+                    Some(self.parse_type_annotation()?)
+                } else {
+                    None
+                };
+                let end = return_type
+                    .as_ref()
+                    .map_or_else(|| self.current_pos().0 as u32, |rt| rt.span.end);
+                return Ok(TSTypeElement::ConstructSignature(
+                    TSConstructSignatureDeclaration {
+                        type_parameters,
+                        params,
+                        return_type,
+                        span: Span::new(start as u32, end),
+                    },
+                ));
+            }
+            // Otherwise fall through - 'new' is a property name
         }
 
         // Check for index signature: `[key: string]: T` vs computed property: `[sym]: T`
@@ -1815,8 +1832,28 @@ impl<'a> Parser<'a> {
             // If not an index signature, fall through to computed property handling below
         }
 
+        // Check for accessor signatures: `get x(): T` or `set x(v: T)`
+        // These are contextual keywords - only treated as get/set when followed by a property name
+        let accessor_kind = if *self.current_kind() == TokenKind::Identifier {
+            let is_get = self.current_value() == "get";
+            let is_set = self.current_value() == "set";
+            if (is_get || is_set) && self.peek_is_property_name() {
+                let kind = if is_get {
+                    MethodKind::Get
+                } else {
+                    MethodKind::Set
+                };
+                self.advance()?; // consume 'get' or 'set'
+                Some(kind)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         // Parse property/method name
-        // Property key: identifier, keyword, or computed [expr]
+        // Property key: identifier, keyword, string literal, number literal, or computed [expr]
         // Keywords are valid property names in type literals: { class: string }
         let (computed, key) = if self.check(&TokenKind::BracketOpen) {
             self.advance()?;
@@ -1834,6 +1871,30 @@ impl<'a> Parser<'a> {
                     Span::new(key_start as u32, key_end as u32),
                 )),
             )
+        } else if self.check(&TokenKind::String) {
+            // String literal key: {'multi-word': number}
+            let (key_start, key_end) = self.current_pos();
+            let (content, quote) = self.extract_string_literal();
+            self.advance()?;
+            (
+                false,
+                Expression::Literal(Literal {
+                    value: LiteralValue::String { content, quote },
+                    span: Span::new(key_start as u32, key_end as u32),
+                }),
+            )
+        } else if self.check(&TokenKind::Number) {
+            // Number literal key: {0: string, 1: number}
+            let (key_start, key_end) = self.current_pos();
+            let value = self.current_value().parse::<f64>().unwrap_or(f64::NAN);
+            self.advance()?;
+            (
+                false,
+                Expression::Literal(Literal {
+                    value: LiteralValue::Number(value),
+                    span: Span::new(key_start as u32, key_end as u32),
+                }),
+            )
         } else {
             return Err(self.error_expected("property name"));
         };
@@ -1841,9 +1902,12 @@ impl<'a> Parser<'a> {
         // Check for optional: ?
         let optional = self.eat(TokenKind::Question);
 
-        // Check for method signature: `()` or `<T>()`
+        // Check for method signature: `()` or `<T>()` or accessor signature
         // Also check for `<` to handle generic methods like `method<T>(x: T): T`
-        if self.check(&TokenKind::ParenOpen) || self.check(&TokenKind::LessThan) {
+        if accessor_kind.is_some()
+            || self.check(&TokenKind::ParenOpen)
+            || self.check(&TokenKind::LessThan)
+        {
             // Parse type parameters if present: `<T>` or `<T, U extends V>`
             let type_parameters = if self.check(&TokenKind::LessThan) {
                 Some(self.parse_type_parameters()?)
@@ -1865,6 +1929,7 @@ impl<'a> Parser<'a> {
                 key,
                 computed,
                 optional,
+                kind: accessor_kind.unwrap_or(MethodKind::Method),
                 type_parameters,
                 params,
                 return_type,
@@ -2260,6 +2325,8 @@ impl<'a> Parser<'a> {
 
         // Check if it's a method (has parentheses)
         if self.check(&TokenKind::ParenOpen) {
+            // Capture paren position before parsing params (for comment detection)
+            let (params_start, _) = self.current_pos();
             let params = self.parse_parameter_list()?;
             let return_type = if self.check(&TokenKind::Colon) {
                 Some(self.parse_type_annotation()?)
@@ -2289,6 +2356,7 @@ impl<'a> Parser<'a> {
                 },
                 generator: false,
                 r#async: false,
+                params_start: params_start as u32,
                 span: Span::new(start as u32, end),
             };
 

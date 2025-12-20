@@ -320,7 +320,10 @@ pub fn diff_to_string(expected: &str, actual: &str, options: &DiffOptions) -> St
 
                 if options.color {
                     let code = color.map_or("", Color::code);
-                    let _ = writeln!(output, "           {code}{sign}{change}{reset}");
+                    let _ = write!(output, "           {code}{sign}{change}{reset}");
+                    if !change.value().ends_with('\n') {
+                        output.push('\n');
+                    }
                 } else {
                     let _ = write!(output, "           {sign}{change}");
                     if !change.value().ends_with('\n') {

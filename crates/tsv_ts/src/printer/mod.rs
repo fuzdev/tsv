@@ -999,6 +999,63 @@ impl<'a> Printer<'a> {
         has_line_comments_in_range(self.comments, start, end)
     }
 
+    /// Find the closing `)` between a start position and end boundary.
+    ///
+    /// Scans the source to find the `)` that closes the params. Returns
+    /// the position AFTER the `)` for use as a boundary.
+    pub(crate) fn find_closing_paren(&self, start: u32, end: u32) -> Option<u32> {
+        let source = self.source.as_bytes();
+        let start = start as usize;
+        let end = end as usize;
+
+        let mut depth = 0;
+        let mut i = start;
+
+        while i < end && i < source.len() {
+            match source[i] {
+                b'(' => depth += 1,
+                b')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        // Found matching `)`, return position after it
+                        return Some((i + 1) as u32);
+                    }
+                }
+                b'"' | b'\'' | b'`' => {
+                    // Skip string literals
+                    let quote = source[i];
+                    i += 1;
+                    while i < end && source[i] != quote {
+                        if source[i] == b'\\' {
+                            i += 1; // Skip escaped char
+                        }
+                        i += 1;
+                    }
+                }
+                b'/' if i + 1 < end => {
+                    // Skip comments
+                    if source[i + 1] == b'/' {
+                        // Line comment - skip to end of line
+                        while i < end && source[i] != b'\n' {
+                            i += 1;
+                        }
+                    } else if source[i + 1] == b'*' {
+                        // Block comment - skip to */
+                        i += 2;
+                        while i + 1 < end && !(source[i] == b'*' && source[i + 1] == b'/') {
+                            i += 1;
+                        }
+                        i += 1; // Skip past */
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+
+        None
+    }
+
     /// Print inline comments between two positions (same-line comments only)
     /// Returns true if any comments were printed
     /// Note: Adds space before each comment, but NOT after (caller handles trailing space)
@@ -1075,6 +1132,51 @@ impl<'a> Printer<'a> {
         end: u32,
     ) -> Doc {
         self.build_comments_between(start, end, CommentSpacing::None)
+    }
+
+    /// Build a Doc for leading line comments (comments that start on their own line)
+    /// Each line comment gets its own hardline before it.
+    /// Returns (comments_doc, has_blank_line) where has_blank_line indicates if there
+    /// was a blank line before the comments/content.
+    pub(crate) fn build_leading_line_comments_doc(
+        &self,
+        prev_end: u32,
+        curr_start: u32,
+    ) -> (Doc, bool) {
+        // Bounds check - prev_end can be past curr_start in edge cases
+        if prev_end >= curr_start {
+            return (doc::concat(vec![]), false);
+        }
+
+        let comments: Vec<_> = comments_in_range(self.comments, prev_end, curr_start).collect();
+        if comments.is_empty() {
+            // Check for blank line even without comments
+            let text_between = &self.source[prev_end as usize..curr_start as usize];
+            let has_blank = text_between.contains("\n\n")
+                || text_between.contains("\n\r\n")
+                || text_between.contains("\r\n\r\n");
+            return (doc::concat(vec![]), has_blank);
+        }
+
+        let mut parts = Vec::new();
+
+        // Check for blank line before first comment
+        let first_comment_start = comments[0].span.start;
+        let text_before_comments = &self.source[prev_end as usize..first_comment_start as usize];
+        let has_blank_line = text_before_comments.contains("\n\n")
+            || text_before_comments.contains("\n\r\n")
+            || text_before_comments.contains("\r\n\r\n");
+
+        for (i, comment) in comments.iter().enumerate() {
+            // Each line comment gets a hardline before it
+            // (always add hardline, even for first comment, since we're in an indented block)
+            if i > 0 {
+                parts.push(doc::hardline());
+            }
+            parts.push(self.build_comment_doc(comment));
+        }
+
+        (doc::concat(parts), has_blank_line)
     }
 
     /// Print comments between two positions (imperative version)

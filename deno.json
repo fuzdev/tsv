@@ -4,7 +4,14 @@
 		"svelte/compiler": "npm:svelte@5.45.8/compiler",
 		"@sveltejs/acorn-typescript": "npm:@sveltejs/acorn-typescript@1.0.8",
 		"prettier": "npm:prettier@3.7.4",
-		"prettier-plugin-svelte": "npm:prettier-plugin-svelte@3.4.0"
+		"prettier-plugin-svelte": "npm:prettier-plugin-svelte@3.4.0",
+		"@biomejs/js-api": "npm:@biomejs/js-api@4.0.0",
+		"@biomejs/wasm-bundler": "npm:@biomejs/wasm-bundler@2.3.10",
+		"oxc-parser": "npm:oxc-parser@0.104.0",
+		"oxfmt": "npm:oxfmt@0.19.0",
+		"@fuzdev/fuz_util": "npm:@fuzdev/fuz_util@0.45.0",
+		"@std/fs": "jsr:@std/fs@1",
+		"@std/path": "jsr:@std/path@1"
 	},
 	"tasks": {
 		"build": "cargo build --workspace",
@@ -28,7 +35,7 @@
 		"fixtures:update:formatted": "cargo run -p tsv_debug --quiet fixtures_update_formatted",
 
 		"bench": "deno task build:ffi && deno task build:wasm && deno task bench:run",
-		"bench:run": "deno bench --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/"
+		"bench:run": "deno run --v8-flags=--expose-gc --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/bench.ts"
 	},
 	"fmt": {
 		"useTabs": true,
