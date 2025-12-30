@@ -277,11 +277,8 @@ impl<'a> Printer<'a> {
                 let prev_operand = &operands[i - 1];
                 let operator = operators[i - 1];
                 let op_str = operator.as_str();
-                let op_pos = self.find_operator_position(
-                    prev_operand.span.end,
-                    operand.span.start,
-                    op_str,
-                );
+                let op_pos =
+                    self.find_operator_position(prev_operand.span.end, operand.span.start, op_str);
 
                 // Comments before the operator (trailing comments of left operand)
                 let comments_before_op =
@@ -389,8 +386,7 @@ impl<'a> Printer<'a> {
         prev_operand_end: u32,
         operand: &ChainOperand,
     ) {
-        let has_line_comment =
-            self.has_line_comments_between(prev_operand_end, operand.span.start);
+        let has_line_comment = self.has_line_comments_between(prev_operand_end, operand.span.start);
 
         if has_line_comment {
             let comment_on_own_line = self.has_newline_before_comment(op_end, operand.span.start);
@@ -398,8 +394,8 @@ impl<'a> Printer<'a> {
             if comment_on_own_line {
                 // Comment is on its own line: `a &&\n// comment\nb`
                 parts.push(doc::hardline());
-                let comments_doc =
-                    self.build_inline_comments_between_doc_no_leading_space(op_end, operand.span.start);
+                let comments_doc = self
+                    .build_inline_comments_between_doc_no_leading_space(op_end, operand.span.start);
                 parts.push(comments_doc);
                 parts.push(doc::hardline());
             } else {

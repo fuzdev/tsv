@@ -380,29 +380,28 @@ impl<'a> Printer<'a> {
 
         // Build the expression doc
         // For binary expressions, use the version with continuation indent
-        let expr_doc =
-            if let tsv_ts::ast::internal::Expression::BinaryExpression(_) = expr {
-                // Binary expressions need continuation indent in attribute context:
-                // first &&
-                //   second &&
-                //   third
-                tsv_ts::build_expression_doc_with_continuation_indent(
-                    expr,
-                    self.source,
-                    Rc::clone(&self.interner),
-                    &self.config,
-                    self.comments,
-                )
-            } else {
-                // Other expressions use normal context
-                tsv_ts::build_expression_doc_with_comments(
-                    expr,
-                    self.source,
-                    Rc::clone(&self.interner),
-                    &self.config,
-                    self.comments,
-                )
-            };
+        let expr_doc = if let tsv_ts::ast::internal::Expression::BinaryExpression(_) = expr {
+            // Binary expressions need continuation indent in attribute context:
+            // first &&
+            //   second &&
+            //   third
+            tsv_ts::build_expression_doc_with_continuation_indent(
+                expr,
+                self.source,
+                Rc::clone(&self.interner),
+                &self.config,
+                self.comments,
+            )
+        } else {
+            // Other expressions use normal context
+            tsv_ts::build_expression_doc_with_comments(
+                expr,
+                self.source,
+                Rc::clone(&self.interner),
+                &self.config,
+                self.comments,
+            )
+        };
 
         // Collect trailing comments
         let mut trailing_comments = Vec::new();

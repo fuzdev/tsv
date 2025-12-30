@@ -57,10 +57,9 @@ export function detectLanguage(path: string): Language | null {
 /** Default exclusion patterns */
 const DEFAULT_EXCLUSIONS = [
 	'.d.ts', // Declaration files
-	'.test.', // Test files
-	'.spec.', // Spec files
 	'/node_modules/',
 	'/.svelte-kit/',
+	'/.gro/',
 	'/build/',
 	'/dist/',
 ];

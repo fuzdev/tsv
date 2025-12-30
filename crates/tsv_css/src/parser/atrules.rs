@@ -48,6 +48,14 @@ fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, 
     {
         parser.skip_whitespace()?;
 
+        // Register comments between condition parts (e.g., `(a) /* comment */ and (b)`)
+        while parser.check(&TokenKind::Comment) {
+            parser.register_current_comment();
+            end_pos = parser.base_offset() + parser.current_end;
+            parser.advance()?;
+            parser.skip_whitespace()?;
+        }
+
         // Check for `and`/`or` connector
         if parser.check(&TokenKind::Identifier) {
             let ident = parser
@@ -62,7 +70,14 @@ fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, 
                     SupportsConnector::Or
                 });
                 parser.advance()?;
+                // Register comments after connector (e.g., `and /* comment */ (b)`)
                 parser.skip_whitespace()?;
+                while parser.check(&TokenKind::Comment) {
+                    parser.register_current_comment();
+                    end_pos = parser.base_offset() + parser.current_end;
+                    parser.advance()?;
+                    parser.skip_whitespace()?;
+                }
                 continue;
             }
         }
@@ -81,6 +96,16 @@ fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, 
                 part_content.push("not".to_string());
                 parser.advance()?;
                 parser.skip_whitespace()?;
+                // Include comments after `not` in content (e.g., `not /* comment */ (...)`)
+                // These go in part_content rather than being registered, since they're
+                // inside the condition part's span
+                while parser.check(&TokenKind::Comment) {
+                    part_content.push(" ".to_string());
+                    part_content.push(parser.current_value().to_string());
+                    end_pos = parser.base_offset() + parser.current_end;
+                    parser.advance()?;
+                    parser.skip_whitespace()?;
+                }
                 part_content.push(" ".to_string());
             }
         }
@@ -298,6 +323,14 @@ fn parse_container_prelude(
     {
         parser.skip_whitespace()?;
 
+        // Register comments between condition parts (e.g., `(a) /* comment */ and (b)`)
+        while parser.check(&TokenKind::Comment) {
+            parser.register_current_comment();
+            end_pos = parser.base_offset() + parser.current_end;
+            parser.advance()?;
+            parser.skip_whitespace()?;
+        }
+
         // Check for `and`/`or` connector
         if parser.check(&TokenKind::Identifier) {
             let ident = parser
@@ -311,7 +344,14 @@ fn parse_container_prelude(
                     SupportsConnector::Or
                 });
                 parser.advance()?;
+                // Register comments after connector (e.g., `and /* comment */ (b)`)
                 parser.skip_whitespace()?;
+                while parser.check(&TokenKind::Comment) {
+                    parser.register_current_comment();
+                    end_pos = parser.base_offset() + parser.current_end;
+                    parser.advance()?;
+                    parser.skip_whitespace()?;
+                }
                 continue;
             }
         }
@@ -330,6 +370,16 @@ fn parse_container_prelude(
                 part_content.push("not".to_string());
                 parser.advance()?;
                 parser.skip_whitespace()?;
+                // Include comments after `not` in content (e.g., `not /* comment */ (...)`)
+                // These go in part_content rather than being registered, since they're
+                // inside the condition part's span
+                while parser.check(&TokenKind::Comment) {
+                    part_content.push(" ".to_string());
+                    part_content.push(parser.current_value().to_string());
+                    end_pos = parser.base_offset() + parser.current_end;
+                    parser.advance()?;
+                    parser.skip_whitespace()?;
+                }
                 part_content.push(" ".to_string());
             }
         }

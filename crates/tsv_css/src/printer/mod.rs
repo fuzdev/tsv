@@ -205,6 +205,13 @@ impl<'a> Printer<'a> {
                 break;
             }
 
+            // Skip comments that are inside previous node's span (e.g., prelude comments in at-rules)
+            // These are handled by the node's own printing logic via comments_in_range()
+            if comment.span.end <= prev_end {
+                *comment_idx += 1;
+                continue;
+            }
+
             let position = classify_comment(comment, prev_end, curr_start, self.source);
 
             // Skip trailing comments (same line as prev node)
@@ -274,6 +281,13 @@ impl<'a> Printer<'a> {
 
         while *comment_idx < self.comments.len() {
             let comment = &self.comments[*comment_idx];
+
+            // Skip comments that are inside previous node's span (e.g., prelude comments in at-rules)
+            // These are handled by the node's own printing logic via comments_in_range()
+            if comment.span.end <= prev_end {
+                *comment_idx += 1;
+                continue;
+            }
 
             // Skip inline comments (same line as last item) - already handled
             if printing::is_same_line(self.source, prev_end, comment.span.start) {

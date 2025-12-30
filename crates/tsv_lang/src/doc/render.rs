@@ -738,4 +738,3 @@ fn indent_str_width(indent: &str, tab_width: usize) -> usize {
         .map(|ch| if ch == '\t' { tab_width } else { 1 })
         .sum()
 }
-

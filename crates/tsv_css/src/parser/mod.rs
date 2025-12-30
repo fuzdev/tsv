@@ -75,6 +75,24 @@ impl<'a> CssParser<'a> {
         self.comments.push(comment);
     }
 
+    /// Register the current token as a comment.
+    /// Assumes current token is a Comment. Extracts content without `/* */` delimiters.
+    pub(crate) fn register_current_comment(&mut self) {
+        debug_assert!(matches!(self.current_kind, TokenKind::Comment));
+        let comment_start = self.base_offset + self.current_start;
+        let comment_end = self.base_offset + self.current_end;
+        // Extract content without /* */ delimiters
+        let content = self.source[self.current_start + 2..self.current_end - 2].to_string();
+        self.add_comment(Comment {
+            content,
+            is_block: true,
+            span: Span {
+                start: comment_start as u32,
+                end: comment_end as u32,
+            },
+        });
+    }
+
     pub(crate) fn advance(&mut self) -> Result<(), ParseError> {
         if let Some(peek) = self.peek_cache.take() {
             self.current_kind = peek.kind;
@@ -269,22 +287,9 @@ impl<'a> CssParser<'a> {
         while !self.check(&TokenKind::Eof) {
             // Handle comments at top level - add to comments Vec
             if matches!(&self.current_kind, TokenKind::Comment) {
-                let comment_start = self.base_offset() + self.current_start;
-                let comment_end = self.base_offset() + self.current_end;
-                // Extract content without /* */ delimiters
-                let content = self.source[self.current_start + 2..self.current_end - 2].to_string();
-
+                self.register_current_comment();
                 self.advance()?;
                 self.skip_whitespace()?;
-
-                self.add_comment(Comment {
-                    content,
-                    is_block: true,
-                    span: Span {
-                        start: comment_start as u32,
-                        end: comment_end as u32,
-                    },
-                });
                 continue;
             }
 

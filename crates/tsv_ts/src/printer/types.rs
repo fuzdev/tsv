@@ -467,10 +467,7 @@ impl<'a> Printer<'a> {
                     let type_doc = self.build_intersection_type_doc(i, false);
                     doc::group(doc::concat(vec![
                         doc::text(":"),
-                        doc::indent(doc::concat(vec![
-                            doc::line(),
-                            type_doc,
-                        ])),
+                        doc::indent(doc::concat(vec![doc::line(), type_doc])),
                     ]))
                 }
                 _ => {
@@ -597,8 +594,7 @@ impl<'a> Printer<'a> {
                                 member_parts.push(doc::if_break(doc::text(";"), doc::text("")));
                             } else {
                                 // Non-last: semicolon always, space only when flat
-                                member_parts
-                                    .push(doc::if_break(doc::text(";"), doc::text("; ")));
+                                member_parts.push(doc::if_break(doc::text(";"), doc::text("; ")));
                             }
                         }
                         parts.push(doc::indent(doc::concat(member_parts)));
@@ -905,11 +901,7 @@ impl<'a> Printer<'a> {
 
         // readonly modifier: `readonly` or `-readonly`
         if let Some(readonly) = m.readonly {
-            body_parts.push(doc::text(if readonly {
-                "readonly "
-            } else {
-                "-readonly "
-            }));
+            body_parts.push(doc::text(if readonly { "readonly " } else { "-readonly " }));
         }
 
         // [K in constraint]

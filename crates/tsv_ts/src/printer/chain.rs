@@ -822,7 +822,9 @@ fn build_member_only_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], p
     // (comma, semicolon) that comes after the chain. Unlike the on_line check
     // which uses fits_with_lookahead (which sees rest_commands), the fill's
     // internal fits check doesn't have access to what comes after the chain.
-    let context = doc::DocContext { trailing_reserve: 1 };
+    let context = doc::DocContext {
+        trailing_reserve: 1,
+    };
     let expanded = doc::concat(vec![
         first_doc,
         doc::indent(doc::with_context(doc::fill(fill_parts), context)),

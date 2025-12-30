@@ -1,6 +1,7 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@std/cli@1": "1.0.25",
     "jsr:@std/fs@1": "1.0.19",
     "jsr:@std/internal@^1.0.10": "1.0.12",
     "jsr:@std/path@1": "1.1.2",
@@ -17,6 +18,9 @@
     "npm:svelte@5.45.8": "5.45.8_acorn@8.15.0"
   },
   "jsr": {
+    "@std/cli@1.0.25": {
+      "integrity": "1f85051b370c97a7a9dfc6ba626e7ed57a91bea8c081597276d1e78d929d8c91"
+    },
     "@std/fs@1.0.19": {
       "integrity": "051968c2b1eae4d2ea9f79a08a3845740ef6af10356aff43d3e2ef11ed09fb06",
       "dependencies": [
@@ -361,6 +365,7 @@
   },
   "workspace": {
     "dependencies": [
+      "jsr:@std/cli@1",
       "jsr:@std/fs@1",
       "jsr:@std/path@1",
       "npm:@biomejs/js-api@4.0.0",

@@ -329,9 +329,11 @@ impl<'a> Printer<'a> {
         let is_wrapped_single_block = self.is_wrapped_single_block(element, attrs_multiline);
 
         // Check if element has non-whitespace content
-        let has_content = element.fragment.nodes.iter().any(|node| {
-            !matches!(node, FragmentNode::Text(t) if t.raw.is_whitespace_only())
-        });
+        let has_content = element
+            .fragment
+            .nodes
+            .iter()
+            .any(|node| !matches!(node, FragmentNode::Text(t) if t.raw.is_whitespace_only()));
 
         // Split closing tag rule: inline elements with content + multiline attrs
         // Block elements never use split closing (Prettier behavior)
@@ -1365,9 +1367,10 @@ impl<'a> Printer<'a> {
         // force multiline formatting with each attr on its own line.
         if any_attr_will_break {
             // Check if this is an inline element with content
-            let has_content = element.fragment.nodes.iter().any(|node| {
-                !matches!(node, FragmentNode::Text(t) if t.raw.is_whitespace_only())
-            });
+            let has_content =
+                element.fragment.nodes.iter().any(
+                    |node| !matches!(node, FragmentNode::Text(t) if t.raw.is_whitespace_only()),
+                );
             let use_internal_break = !is_block && has_content;
 
             self.indent_level += 1;
@@ -1458,8 +1461,7 @@ impl<'a> Printer<'a> {
         // This is when `<tag attrs>{content}</tag` fits but final `>` doesn't
         if can_use_hug_mode
             && !element.fragment.nodes.is_empty()
-            && let Some(content_len) =
-                self.calculate_inline_content_length(&element.fragment.nodes)
+            && let Some(content_len) = self.calculate_inline_content_length(&element.fragment.nodes)
         {
             let closing_no_bracket = format!(">{}</{tag_name}", "x".repeat(content_len));
 
@@ -1535,8 +1537,7 @@ impl<'a> Printer<'a> {
                 // Check attrs at the indent level where they'll be printed (current + 1)
                 // This accounts for the indentation when attrs go to separate lines
                 let attrs_indent = (self.indent_level + 1) * self.config.tab_width;
-                let attrs_available_width =
-                    self.config.print_width.saturating_sub(attrs_indent);
+                let attrs_available_width = self.config.print_width.saturating_sub(attrs_indent);
 
                 let attrs_fit_flat = doc::fits_resolved(
                     &attrs_only_doc,

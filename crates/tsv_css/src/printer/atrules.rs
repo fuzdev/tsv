@@ -6,7 +6,7 @@
 
 use super::Printer;
 use crate::ast::internal;
-use tsv_lang::printing;
+use tsv_lang::{comments_in_range, printing};
 
 /// Convert a supports connector to its string representation
 fn connector_str(conn: internal::SupportsConnector) -> &'static str {
@@ -33,14 +33,16 @@ impl<'a> Printer<'a> {
                         self.write(" ");
                     }
                     // Check if this is the media query part of @import that needs wrapping
-                    if is_import && i == values.len() - 1
-                        && let internal::CssValue::Identifier { name, .. } = value {
-                            // Check if it's a media query (contains "and" or "or")
-                            if name.contains(" and ") || name.contains(" or ") {
-                                self.print_import_media_query(name);
-                                continue;
-                            }
+                    if is_import
+                        && i == values.len() - 1
+                        && let internal::CssValue::Identifier { name, .. } = value
+                    {
+                        // Check if it's a media query (contains "and" or "or")
+                        if name.contains(" and ") || name.contains(" or ") {
+                            self.print_import_media_query(name);
+                            continue;
                         }
+                    }
                     // Use semantic formatting to normalize quotes and spacing
                     self.print_css_value_semantic(value);
                 }
@@ -50,15 +52,22 @@ impl<'a> Printer<'a> {
                 let normalized = self.normalize_comment_spacing(content);
                 self.write(&normalized);
             }
-            internal::PreludeValue::Supports { condition, .. } => {
+            internal::PreludeValue::Supports { condition, span } => {
                 self.write(" ");
-                self.print_condition_query(None, condition, atrule.block.is_some());
+                self.print_condition_query(None, condition, atrule.block.is_some(), Some(*span));
             }
             internal::PreludeValue::Container {
-                name, condition, ..
+                name,
+                condition,
+                span,
             } => {
                 self.write(" ");
-                self.print_condition_query(name.as_deref(), condition, atrule.block.is_some());
+                self.print_condition_query(
+                    name.as_deref(),
+                    condition,
+                    atrule.block.is_some(),
+                    Some(*span),
+                );
             }
             internal::PreludeValue::Media { content, .. } => {
                 self.write(" ");
@@ -313,21 +322,31 @@ impl<'a> Printer<'a> {
         name: Option<&str>,
         condition: &internal::SupportsCondition,
         has_block: bool,
+        prelude_span: Option<tsv_lang::Span>,
     ) {
         use tsv_lang::doc;
 
         // Print optional name prefix (for @container)
-        if let Some(n) = name {
+        let name_end_pos = if let Some(n) = name {
             self.write(n);
             self.write(" ");
-        }
+            // Find where the name ends in source (name length from prelude start)
+            prelude_span.map(|s| s.start + n.len() as u32)
+        } else {
+            prelude_span.map(|s| s.start)
+        };
 
         let parts = &condition.parts;
 
         if parts.len() <= 1 {
-            // Single condition - no wrapping possible
-            for part in parts {
-                self.write(&part.content);
+            // Single condition - emit leading comments, content, and trailing comments
+            if let Some(first_part) = parts.first() {
+                self.write_leading_condition_comments(name_end_pos, first_part.span.start);
+                self.write(&first_part.content);
+                // Print trailing comments after the single part
+                if let Some(span) = prelude_span {
+                    self.write_trailing_condition_comments(first_part.span.end, span.end);
+                }
             }
             return;
         }
@@ -344,50 +363,210 @@ impl<'a> Printer<'a> {
         let fits = doc::fits(&prelude_doc, available, doc::Mode::Flat, &self.config);
 
         if fits {
-            // Print inline
+            // Print inline with comments between parts
             for (i, part) in parts.iter().enumerate() {
                 if i > 0 {
-                    self.write(" ");
+                    self.write_condition_part_with_comments(parts[i - 1].span.end, part);
+                } else {
+                    self.write_leading_condition_comments(name_end_pos, part.span.start);
+                    self.write_connector(part.connector);
+                    self.write(&part.content);
                 }
-                self.write_connector(part.connector);
-                self.write(&part.content);
+            }
+            // Print trailing comments after last part
+            if let (Some(last_part), Some(span)) = (parts.last(), prelude_span) {
+                self.write_trailing_condition_comments(last_part.span.end, span.end);
             }
         } else {
             // Find split point: which part should start line 2
-            // The connector before that part stays on line 1
             let split_idx = self.find_condition_split_index(parts, current_col, suffix_len);
 
-            // Print first line: parts[0..split_idx] with their connectors
+            // Print first line: parts[0..split_idx]
             for (i, part) in parts[..split_idx].iter().enumerate() {
                 if i > 0 {
-                    self.write(" ");
+                    self.write_condition_part_with_comments(parts[i - 1].span.end, part);
+                } else {
+                    self.write_leading_condition_comments(name_end_pos, part.span.start);
+                    self.write_connector(part.connector);
+                    self.write(&part.content);
                 }
-                self.write_connector(part.connector);
-                self.write(&part.content);
             }
 
-            // Print trailing connector from last part on line 1 (if next part has one)
+            // Print trailing connector and continuation line
             if split_idx < parts.len() {
-                if let Some(conn) = parts[split_idx].connector {
+                let prev_end = parts[split_idx - 1].span.end;
+                let split_part = &parts[split_idx];
+                let (before_conn, after_conn) = self.extract_comments_split_by_connector(
+                    prev_end,
+                    split_part.span.start,
+                    split_part.connector,
+                );
+
+                if !before_conn.is_empty() {
+                    self.write(" ");
+                    self.write(&before_conn);
+                }
+
+                if let Some(conn) = split_part.connector {
                     self.write(" ");
                     self.write(connector_str(conn));
                 }
 
-                // Print continuation line(s): remaining parts
+                // Print continuation line
                 self.write("\n");
                 self.indent_level += 1;
                 self.write_indent();
                 self.indent_level -= 1;
 
-                for (i, part) in parts[split_idx..].iter().enumerate() {
-                    if i > 0 {
-                        self.write(" ");
-                        self.write_connector(part.connector);
-                    }
-                    self.write(&part.content);
+                // Comments after connector go on the new line
+                if !after_conn.is_empty() {
+                    self.write(&after_conn);
+                    self.write(" ");
+                }
+
+                self.write(&split_part.content);
+
+                // Print remaining parts
+                for (i, part) in parts[split_idx + 1..].iter().enumerate() {
+                    self.write_condition_part_with_comments(parts[split_idx + i].span.end, part);
+                }
+
+                // Print trailing comments after last part
+                if let (Some(last_part), Some(span)) = (parts.last(), prelude_span) {
+                    self.write_trailing_condition_comments(last_part.span.end, span.end);
                 }
             }
         }
+    }
+
+    /// Write comments that appear before the first condition part
+    fn write_leading_condition_comments(&mut self, start_pos: Option<u32>, part_start: u32) {
+        if let Some(start) = start_pos {
+            let comments: Vec<_> = comments_in_range(self.comments, start, part_start).collect();
+            if !comments.is_empty() {
+                for (i, comment) in comments.iter().enumerate() {
+                    if i > 0 {
+                        self.write(" ");
+                    }
+                    self.write("/*");
+                    self.write(&comment.content);
+                    self.write("*/");
+                }
+                self.write(" ");
+            }
+        }
+    }
+
+    /// Write comments that appear after the last condition part
+    fn write_trailing_condition_comments(&mut self, last_part_end: u32, prelude_end: u32) {
+        let comments: Vec<_> =
+            comments_in_range(self.comments, last_part_end, prelude_end).collect();
+        if !comments.is_empty() {
+            for comment in comments.iter() {
+                self.write(" /*");
+                self.write(&comment.content);
+                self.write("*/");
+            }
+        }
+    }
+
+    /// Write a condition part with its preceding comments and connector
+    fn write_condition_part_with_comments(&mut self, prev_end: u32, part: &internal::SupportsPart) {
+        let (before_conn, after_conn) =
+            self.extract_comments_split_by_connector(prev_end, part.span.start, part.connector);
+
+        if !before_conn.is_empty() {
+            self.write(" ");
+            self.write(&before_conn);
+        }
+        self.write(" ");
+        self.write_connector(part.connector);
+        if !after_conn.is_empty() {
+            self.write(&after_conn);
+            self.write(" ");
+        }
+        self.write(&part.content);
+    }
+
+    /// Extract comments from source range, split around connector keyword
+    ///
+    /// Returns (comments_before_connector, comments_after_connector)
+    /// For `/* a */ and /* b */` returns (`/* a */`, `/* b */`)
+    fn extract_comments_split_by_connector(
+        &self,
+        start: u32,
+        end: u32,
+        connector: Option<internal::SupportsConnector>,
+    ) -> (String, String) {
+        let comments: Vec<_> = comments_in_range(self.comments, start, end).collect();
+
+        if comments.is_empty() {
+            return (String::new(), String::new());
+        }
+
+        // Find the connector keyword position in the source range
+        let connector_keyword = match connector {
+            Some(internal::SupportsConnector::And) => "and",
+            Some(internal::SupportsConnector::Or) => "or",
+            None => {
+                // No connector - all comments go to "before"
+                let mut result = String::new();
+                for (i, comment) in comments.iter().enumerate() {
+                    if i > 0 {
+                        result.push(' ');
+                    }
+                    result.push_str("/*");
+                    result.push_str(&comment.content);
+                    result.push_str("*/");
+                }
+                return (result, String::new());
+            }
+        };
+
+        // Find connector position in source (case-insensitive)
+        let range_text = &self.source[start as usize..end as usize];
+        let range_lower = range_text.to_lowercase();
+        let connector_pos = range_lower
+            .find(&format!(" {connector_keyword} "))
+            .or_else(|| range_lower.find(connector_keyword));
+
+        let connector_abs_pos = match connector_pos {
+            Some(pos) => start + pos as u32,
+            None => {
+                // Connector not found - all comments go to "before"
+                let mut result = String::new();
+                for (i, comment) in comments.iter().enumerate() {
+                    if i > 0 {
+                        result.push(' ');
+                    }
+                    result.push_str("/*");
+                    result.push_str(&comment.content);
+                    result.push_str("*/");
+                }
+                return (result, String::new());
+            }
+        };
+
+        // Split comments based on whether they're before or after the connector
+        let mut before = String::new();
+        let mut after = String::new();
+
+        for comment in comments {
+            let formatted = format!("/*{}*/", comment.content);
+            if comment.span.end <= connector_abs_pos {
+                if !before.is_empty() {
+                    before.push(' ');
+                }
+                before.push_str(&formatted);
+            } else {
+                if !after.is_empty() {
+                    after.push(' ');
+                }
+                after.push_str(&formatted);
+            }
+        }
+
+        (before, after)
     }
 
     /// Write a condition connector (if present) with trailing space

@@ -8,6 +8,9 @@ export type Logger = (...args: unknown[]) => void;
 /** Supported source file languages */
 export type Language = 'svelte' | 'typescript' | 'css';
 
+/** All supported languages as an array */
+export const LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
+
 /** File extensions for each language */
 export const LANGUAGE_EXTENSIONS: Record<Language, string> = {
 	svelte: '.svelte',
