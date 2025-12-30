@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 914,
+		"end": 910,
 		"attributes": [],
 		"children": [
 			{
@@ -299,12 +299,12 @@
 				"prelude": {
 					"type": "SelectorList",
 					"start": 623,
-					"end": 660,
+					"end": 662,
 					"children": [
 						{
 							"type": "ComplexSelector",
 							"start": 623,
-							"end": 660,
+							"end": 662,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -312,19 +312,19 @@
 									"selectors": [
 										{
 											"type": "ClassSelector",
-											"name": "page",
+											"name": "class1",
 											"start": 623,
-											"end": 628
+											"end": 630
 										},
 										{
 											"type": "PseudoElementSelector",
 											"name": "view-transition-group",
-											"start": 628,
-											"end": 651
+											"start": 630,
+											"end": 653
 										}
 									],
 									"start": 623,
-									"end": 660
+									"end": 662
 								}
 							]
 						}
@@ -332,31 +332,31 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 661,
-					"end": 694,
+					"start": 663,
+					"end": 696,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 665,
-							"end": 690,
+							"start": 667,
+							"end": 692,
 							"property": "animation-duration",
 							"value": "0.25s"
 						}
 					]
 				},
 				"start": 623,
-				"end": 694
+				"end": 696
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 727,
+					"start": 729,
 					"end": 783,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 727,
+							"start": 729,
 							"end": 783,
 							"children": [
 								{
@@ -366,8 +366,8 @@
 										{
 											"type": "PseudoElementSelector",
 											"name": "view-transition-group",
-											"start": 727,
-											"end": 750
+											"start": 729,
+											"end": 752
 										},
 										{
 											"type": "PseudoElementSelector",
@@ -376,7 +376,7 @@
 											"end": 780
 										}
 									],
-									"start": 727,
+									"start": 729,
 									"end": 783
 								}
 							]
@@ -397,7 +397,7 @@
 						}
 					]
 				},
-				"start": 727,
+				"start": 729,
 				"end": 802
 			},
 			{
@@ -405,12 +405,12 @@
 				"prelude": {
 					"type": "SelectorList",
 					"start": 830,
-					"end": 875,
+					"end": 871,
 					"children": [
 						{
 							"type": "ComplexSelector",
 							"start": 830,
-							"end": 875,
+							"end": 871,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -418,26 +418,26 @@
 									"selectors": [
 										{
 											"type": "ClassSelector",
-											"name": "animated",
+											"name": "class2",
 											"start": 830,
-											"end": 839
+											"end": 837
 										},
 										{
 											"type": "PseudoClassSelector",
 											"name": "hover",
 											"args": null,
-											"start": 839,
-											"end": 845
+											"start": 837,
+											"end": 843
 										},
 										{
 											"type": "PseudoElementSelector",
 											"name": "view-transition-new",
-											"start": 845,
-											"end": 866
+											"start": 843,
+											"end": 864
 										}
 									],
 									"start": 830,
-									"end": 875
+									"end": 871
 								}
 							]
 						}
@@ -445,32 +445,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 876,
-					"end": 905,
+					"start": 872,
+					"end": 901,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 880,
-							"end": 901,
+							"start": 876,
+							"end": 897,
 							"property": "transform",
 							"value": "scale(1.1)"
 						}
 					]
 				},
 				"start": 830,
-				"end": 905
+				"end": 901
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 906,
-			"styles": "\n\t/* Basic view transition root */\n\t::view-transition {\n\t\tposition: fixed;\n\t\tinset: 0;\n\t}\n\n\t/* View transition group with identifier */\n\t::view-transition-group(root) {\n\t\tanimation-duration: 0.5s;\n\t}\n\n\t/* View transition group with wildcard */\n\t::view-transition-group(*) {\n\t\tanimation-timing-function: ease-in-out;\n\t}\n\n\t/* Image pair for transitions */\n\t::view-transition-image-pair(root) {\n\t\tisolation: isolate;\n\t}\n\n\t/* Old image state */\n\t::view-transition-old(root) {\n\t\tanimation: fade-out 0.3s;\n\t}\n\n\t/* New image state */\n\t::view-transition-new(root) {\n\t\tanimation: fade-in 0.3s;\n\t}\n\n\t/* With type selector */\n\t.page::view-transition-group(content) {\n\t\tanimation-duration: 0.25s;\n\t}\n\n\t/* Nested pseudo-elements */\n\t::view-transition-group(sidebar)::view-transition-old(*) {\n\t\topacity: 0;\n\t}\n\n\t/* With pseudo-class */\n\t.animated:hover::view-transition-new(element) {\n\t\ttransform: scale(1.1);\n\t}\n",
+			"end": 902,
+			"styles": "\n\t/* Basic view transition root */\n\t::view-transition {\n\t\tposition: fixed;\n\t\tinset: 0;\n\t}\n\n\t/* View transition group with identifier */\n\t::view-transition-group(root) {\n\t\tanimation-duration: 0.5s;\n\t}\n\n\t/* View transition group with wildcard */\n\t::view-transition-group(*) {\n\t\tanimation-timing-function: ease-in-out;\n\t}\n\n\t/* Image pair for transitions */\n\t::view-transition-image-pair(root) {\n\t\tisolation: isolate;\n\t}\n\n\t/* Old image state */\n\t::view-transition-old(root) {\n\t\tanimation: fade-out 0.3s;\n\t}\n\n\t/* New image state */\n\t::view-transition-new(root) {\n\t\tanimation: fade-in 0.3s;\n\t}\n\n\t/* With type selector */\n\t.class1::view-transition-group(content) {\n\t\tanimation-duration: 0.25s;\n\t}\n\n\t/* Nested pseudo-elements */\n\t::view-transition-group(name1)::view-transition-old(*) {\n\t\topacity: 0;\n\t}\n\n\t/* With pseudo-class */\n\t.class2:hover::view-transition-new(name2) {\n\t\ttransform: scale(1.1);\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 915,
+	"end": 911,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

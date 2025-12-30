@@ -240,13 +240,13 @@ pub struct BindDirective {
     pub expression_tag_span: Option<Span>,
 }
 
-/// ClassDirective - conditional class (`class:active={isActive}`)
+/// ClassDirective - conditional class (`class:class1={cond}`)
 ///
 /// Applies a class conditionally based on an expression.
-/// When shorthand (`class:active`), an identifier with the same name is auto-generated.
+/// When shorthand (`class:class1`), an identifier with the same name is auto-generated.
 #[derive(Debug, Clone)]
 pub struct ClassDirective {
-    pub name: String,           // Class name: "active", "visible", etc.
+    pub name: String,           // Class name: "class1", "class2", etc.
     pub expression: Expression, // Condition (always present - auto-generated for shorthand)
     pub span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None for shorthand)
@@ -345,6 +345,8 @@ pub struct TransitionDirective {
     pub modifiers: Vec<String>,         // "local", "global"
     pub direction: TransitionDirection, // Which animations to run
     pub span: Span,
+    /// Span of the expression tag `{...}` for comment lookup (None if no expression)
+    pub expression_tag_span: Option<Span>,
 }
 
 /// AnimateDirective - animation (`animate:flip={params}`)
@@ -355,6 +357,8 @@ pub struct AnimateDirective {
     pub name: String,                   // Animation name: "flip", etc.
     pub expression: Option<Expression>, // Animation parameters
     pub span: Span,
+    /// Span of the expression tag `{...}` for comment lookup (None if no expression)
+    pub expression_tag_span: Option<Span>,
 }
 
 /// LetDirective - slot prop (`let:item={localItem}`)
@@ -365,6 +369,8 @@ pub struct LetDirective {
     pub name: String,                   // Slot prop name: "item", "index", etc.
     pub expression: Option<Expression>, // Local binding pattern (Identifier, ArrayPattern, ObjectPattern)
     pub span: Span,
+    /// Span of the expression tag `{...}` for comment lookup (None if no expression)
+    pub expression_tag_span: Option<Span>,
 }
 
 // =============================================================================

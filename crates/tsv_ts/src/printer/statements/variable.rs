@@ -173,6 +173,18 @@ impl<'a> Printer<'a> {
             }
         }
 
+        // For single declarators, we can use doc-based printing for the whole statement
+        // This ensures the semicolon is included in the width calculation
+        if decl.declarations.len() == 1 {
+            let declarator = &decl.declarations[0];
+            if let Some(stmt_doc) = self.try_build_single_declarator_stmt_doc(declarator) {
+                self.write_doc(&stmt_doc);
+                // Handle trailing comments
+                self.print_inline_comments_in_statement(declarator.span.end, decl.span.end);
+                return;
+            }
+        }
+
         // When breaking to multiple lines, multiline objects/arrays get extra indentation
         // Use save/restore pattern for nested multi-declarator safety
         let old_indent_depth = self.declaration_indent_depth;
@@ -417,6 +429,76 @@ impl<'a> Printer<'a> {
             } else {
                 self.print_expression(init);
             }
+        }
+    }
+
+    /// Try to build a doc for a single variable declarator statement (including semicolon)
+    ///
+    /// Returns `Some(doc)` if the declarator needs doc-based wrapping (binary expressions,
+    /// property chains, etc.), `None` otherwise to fall back to direct printing.
+    ///
+    /// This includes the semicolon in the doc so the width calculation is accurate.
+    fn try_build_single_declarator_stmt_doc(
+        &self,
+        declarator: &internal::VariableDeclarator,
+    ) -> Option<doc::Doc> {
+        let init = declarator.init.as_ref()?;
+
+        // Check for comments around the equals sign - use direct printing for those
+        let id_end = declarator.id.span().end;
+        let init_start = init.span().start;
+        let equals_pos = self.find_equals_position(id_end, init_start);
+        if self.has_comments_between(id_end, equals_pos)
+            || self.has_comments_between(equals_pos + 1, init_start)
+        {
+            return None;
+        }
+
+        // Check if RHS is a multiline string (line continuations)
+        let is_multiline_string = is_multiline_string_literal(init, self.source);
+
+        if is_multiline_string {
+            // Multiline strings: mandatory break after `=`
+            let id_doc = self.build_variable_binding_doc(&declarator.id, declarator.definite);
+            let init_doc = wrap_init_doc(self.build_expression_doc(init), init);
+
+            Some(doc::concat(vec![
+                id_doc,
+                doc::text(" ="),
+                doc::indent(doc::concat(vec![doc::hardline(), init_doc])),
+                doc::text(";"),
+            ]))
+        } else if (is_pure_property_chain(init)
+            || is_module_path_fluid_call(init, &self.interner.borrow())
+            || matches!(init, Expression::BinaryExpression(_)))
+            && !self.pattern_should_expand(&declarator.id)
+            && !self.id_has_multiline_type(&declarator.id)
+        {
+            // Property chains, module path calls, and binary expressions: optional break
+            // Include semicolon in the doc so width calculation is accurate
+            let id_doc = self.build_variable_binding_doc(&declarator.id, declarator.definite);
+            let init_doc = wrap_init_doc(self.build_expression_doc(init), init);
+
+            Some(doc::group(doc::concat(vec![
+                id_doc,
+                doc::text(" ="),
+                doc::indent_line(init_doc),
+                doc::text(";"),
+            ])))
+        } else if needs_doc_based_wrapping(init) {
+            // Expressions with internal groups that need width-based evaluation
+            let id_doc = self.build_variable_binding_doc(&declarator.id, declarator.definite);
+            let init_doc = wrap_init_doc(self.build_expression_doc(init), init);
+
+            Some(doc::concat(vec![
+                id_doc,
+                doc::text(" = "),
+                init_doc,
+                doc::text(";"),
+            ]))
+        } else {
+            // Fall back to direct printing
+            None
         }
     }
 }

@@ -149,12 +149,17 @@ pub fn needs_parens(expr: &Expression, ctx: ParenContext) -> bool {
 // =============================================================================
 
 /// Expression statement: `<expr>;`
-/// Object pattern assignments need parens to avoid ambiguity with block statements
+/// Object expressions and object pattern assignments need parens to avoid ambiguity
+/// with block statements. `({...});` not `{...};`
 fn needs_parens_expression_statement(expr: &Expression) -> bool {
     match expr {
+        // Object expression: `({...});` needs parens to avoid being parsed as a block
+        Expression::ObjectExpression(_) => true,
+        // Object pattern assignment: `({a, b} = obj);` needs parens
         Expression::AssignmentExpression(assign) => {
             matches!(assign.left.as_ref(), Expression::ObjectPattern(_))
         }
+        // Sequence: check the first expression
         Expression::SequenceExpression(seq) => seq
             .expressions
             .first()

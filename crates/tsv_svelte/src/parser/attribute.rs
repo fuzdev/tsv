@@ -47,7 +47,7 @@ impl<'a> SvelteParser<'a> {
     /// Supports:
     /// - Standard attributes: `name="value"` or `name={expr}`
     /// - Boolean attributes: `disabled`
-    /// - Directives: `on:click`, `bind:value`, `class:active`, etc.
+    /// - Directives: `on:click`, `bind:value`, `class:class1`, etc.
     /// - Attach tags: `{@attach expr}` (Svelte 5.29+)
     /// - Spread attributes: `{...obj}` (Svelte 3+)
     /// - Shorthand attributes: `{name}` (equivalent to `name={name}`)
@@ -205,6 +205,7 @@ impl<'a> SvelteParser<'a> {
                     modifiers,
                     direction: TransitionDirection::Both,
                     span,
+                    expression_tag_span,
                 }))
             }
             DirectiveType::In => Ok(AttributeNode::TransitionDirective(TransitionDirective {
@@ -213,6 +214,7 @@ impl<'a> SvelteParser<'a> {
                 modifiers,
                 direction: TransitionDirection::In,
                 span,
+                expression_tag_span,
             })),
             DirectiveType::Out => Ok(AttributeNode::TransitionDirective(TransitionDirective {
                 name: directive_name,
@@ -220,16 +222,19 @@ impl<'a> SvelteParser<'a> {
                 modifiers,
                 direction: TransitionDirection::Out,
                 span,
+                expression_tag_span,
             })),
             DirectiveType::Animate => Ok(AttributeNode::AnimateDirective(AnimateDirective {
                 name: directive_name,
                 expression,
                 span,
+                expression_tag_span,
             })),
             DirectiveType::Let => Ok(AttributeNode::LetDirective(LetDirective {
                 name: directive_name,
                 expression,
                 span,
+                expression_tag_span,
             })),
         }
     }
@@ -247,7 +252,7 @@ impl<'a> SvelteParser<'a> {
         Ok((expr_tag.expression, expr_tag.span))
     }
 
-    /// Create an identifier expression for shorthand directives (bind:value, class:active)
+    /// Create an identifier expression for shorthand directives (bind:value, class:class1)
     fn make_shorthand_identifier(&self, name: &str, start: usize, end: usize) -> Expression {
         let symbol = self.interner.borrow_mut().get_or_intern(name);
         Expression::Identifier(Identifier {

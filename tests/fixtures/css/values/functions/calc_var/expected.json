@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 318,
+		"end": 312,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 309,
+					"end": 303,
 					"children": [
 						{
 							"type": "Declaration",
@@ -64,54 +64,54 @@
 						{
 							"type": "Declaration",
 							"start": 123,
-							"end": 144,
+							"end": 141,
 							"property": "color",
-							"value": "var(--primary)"
+							"value": "var(--var1)"
 						},
 						{
 							"type": "Declaration",
-							"start": 148,
-							"end": 175,
+							"start": 145,
+							"end": 169,
 							"property": "color",
-							"value": "var(--primary, blue)"
+							"value": "var(--var1, blue)"
 						},
 						{
 							"type": "Declaration",
-							"start": 179,
-							"end": 219,
+							"start": 173,
+							"end": 213,
 							"property": "color",
 							"value": "var(--a, var(--b, var(--c, red)))"
 						},
 						{
 							"type": "Declaration",
-							"start": 223,
-							"end": 261,
+							"start": 217,
+							"end": 255,
 							"property": "color",
 							"value": "rgb(var(--r) var(--g) var(--b))"
 						},
 						{
 							"type": "Declaration",
-							"start": 265,
-							"end": 305,
+							"start": 259,
+							"end": 299,
 							"property": "transform",
 							"value": "translate(var(--x), var(--y))"
 						}
 					]
 				},
 				"start": 9,
-				"end": 309
+				"end": 303
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 310,
-			"styles": "\n\tdiv {\n\t\twidth: calc(100% - 20px);\n\t\twidth: calc(var(--size) * 2 + 10px);\n\t\twidth: calc(calc(100px + 50px) * 2);\n\t\tcolor: var(--primary);\n\t\tcolor: var(--primary, blue);\n\t\tcolor: var(--a, var(--b, var(--c, red)));\n\t\tcolor: rgb(var(--r) var(--g) var(--b));\n\t\ttransform: translate(var(--x), var(--y));\n\t}\n",
+			"end": 304,
+			"styles": "\n\tdiv {\n\t\twidth: calc(100% - 20px);\n\t\twidth: calc(var(--size) * 2 + 10px);\n\t\twidth: calc(calc(100px + 50px) * 2);\n\t\tcolor: var(--var1);\n\t\tcolor: var(--var1, blue);\n\t\tcolor: var(--a, var(--b, var(--c, red)));\n\t\tcolor: rgb(var(--r) var(--g) var(--b));\n\t\ttransform: translate(var(--x), var(--y));\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 319,
+	"end": 313,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

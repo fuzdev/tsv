@@ -1,17 +1,17 @@
 <style>
-	::part(label) {
+	::part(name1) {
 		color: red;
 	}
 
-	::part(tab) {
+	::part(name2) {
 		background: blue;
 	}
 
-	::part(tab active) {
+	::part(name2 name3) {
 		background: yellow;
 	}
 
-	::part(button primary) {
+	::part(name4 name5) {
 		color: white;
 		background: green;
 	}

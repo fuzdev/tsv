@@ -8,6 +8,14 @@ use super::Printer;
 use crate::ast::internal;
 use tsv_lang::printing;
 
+/// Convert a supports connector to its string representation
+fn connector_str(conn: internal::SupportsConnector) -> &'static str {
+    match conn {
+        internal::SupportsConnector::And => "and",
+        internal::SupportsConnector::Or => "or",
+    }
+}
+
 impl<'a> Printer<'a> {
     /// Format a CSS at-rule (@media, @keyframes, @supports, etc.)
     pub(super) fn print_css_atrule(&mut self, atrule: &internal::CssAtrule) {
@@ -18,10 +26,21 @@ impl<'a> Printer<'a> {
         match &atrule.prelude {
             internal::PreludeValue::Values { values, .. } if !values.is_empty() => {
                 self.write(" ");
+                // Special handling for @import with media query (last value may need wrapping)
+                let is_import = atrule.name == "import";
                 for (i, value) in values.iter().enumerate() {
                     if i > 0 {
                         self.write(" ");
                     }
+                    // Check if this is the media query part of @import that needs wrapping
+                    if is_import && i == values.len() - 1
+                        && let internal::CssValue::Identifier { name, .. } = value {
+                            // Check if it's a media query (contains "and" or "or")
+                            if name.contains(" and ") || name.contains(" or ") {
+                                self.print_import_media_query(name);
+                                continue;
+                            }
+                        }
                     // Use semantic formatting to normalize quotes and spacing
                     self.print_css_value_semantic(value);
                 }
@@ -30,6 +49,20 @@ impl<'a> Printer<'a> {
                 self.write(" ");
                 let normalized = self.normalize_comment_spacing(content);
                 self.write(&normalized);
+            }
+            internal::PreludeValue::Supports { condition, .. } => {
+                self.write(" ");
+                self.print_condition_query(None, condition, atrule.block.is_some());
+            }
+            internal::PreludeValue::Container {
+                name, condition, ..
+            } => {
+                self.write(" ");
+                self.print_condition_query(name.as_deref(), condition, atrule.block.is_some());
+            }
+            internal::PreludeValue::Media { content, .. } => {
+                self.write(" ");
+                self.print_media_prelude(content, atrule.block.is_some());
             }
             internal::PreludeValue::Selectors { root, limit, .. } => {
                 // @scope selector lists: @scope (root) to (limit)
@@ -250,6 +283,227 @@ impl<'a> Printer<'a> {
             internal::CssBlockChild::Declaration(decl) => self.print_css_declaration(decl),
             internal::CssBlockChild::Atrule(atrule) => self.print_css_atrule(atrule),
             internal::CssBlockChild::Comment(comment) => self.print_css_comment(comment),
+        }
+    }
+
+    /// Format @media prelude with line-width wrapping at `and`/`or` boundaries
+    ///
+    /// Unlike @supports/@container, @media uses raw string parsing to preserve comments.
+    /// Wrapping is done by finding `and`/`or` boundaries in the raw string.
+    ///
+    /// ```css
+    /// @media screen and (min-width: 768px) and (max-width: 1024px) and
+    ///     (orientation: landscape) {
+    /// ```
+    fn print_media_prelude(&mut self, content: &str, has_block: bool) {
+        let suffix_len = if has_block { " {".len() } else { 0 };
+        self.print_media_query_with_wrapping(content, suffix_len);
+    }
+
+    /// Format @supports/@container condition with line-width wrapping at `and`/`or` boundaries
+    ///
+    /// The `and`/`or` keyword stays on line 1, with the condition going to line 2.
+    /// Example (wraps at 101 chars):
+    /// ```css
+    /// @supports (display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and
+    ///     (flex: 1aaa) {
+    /// ```
+    fn print_condition_query(
+        &mut self,
+        name: Option<&str>,
+        condition: &internal::SupportsCondition,
+        has_block: bool,
+    ) {
+        use tsv_lang::doc;
+
+        // Print optional name prefix (for @container)
+        if let Some(n) = name {
+            self.write(n);
+            self.write(" ");
+        }
+
+        let parts = &condition.parts;
+
+        if parts.len() <= 1 {
+            // Single condition - no wrapping possible
+            for part in parts {
+                self.write(&part.content);
+            }
+            return;
+        }
+
+        // Build doc to check if it fits on one line
+        let prelude_doc = self.build_condition_doc(parts);
+        let suffix_len = if has_block { " {".len() } else { 0 };
+
+        let current_col = self.current_column();
+        let available = self
+            .config
+            .print_width
+            .saturating_sub(current_col + suffix_len);
+        let fits = doc::fits(&prelude_doc, available, doc::Mode::Flat, &self.config);
+
+        if fits {
+            // Print inline
+            for (i, part) in parts.iter().enumerate() {
+                if i > 0 {
+                    self.write(" ");
+                }
+                self.write_connector(part.connector);
+                self.write(&part.content);
+            }
+        } else {
+            // Find split point: which part should start line 2
+            // The connector before that part stays on line 1
+            let split_idx = self.find_condition_split_index(parts, current_col, suffix_len);
+
+            // Print first line: parts[0..split_idx] with their connectors
+            for (i, part) in parts[..split_idx].iter().enumerate() {
+                if i > 0 {
+                    self.write(" ");
+                }
+                self.write_connector(part.connector);
+                self.write(&part.content);
+            }
+
+            // Print trailing connector from last part on line 1 (if next part has one)
+            if split_idx < parts.len() {
+                if let Some(conn) = parts[split_idx].connector {
+                    self.write(" ");
+                    self.write(connector_str(conn));
+                }
+
+                // Print continuation line(s): remaining parts
+                self.write("\n");
+                self.indent_level += 1;
+                self.write_indent();
+                self.indent_level -= 1;
+
+                for (i, part) in parts[split_idx..].iter().enumerate() {
+                    if i > 0 {
+                        self.write(" ");
+                        self.write_connector(part.connector);
+                    }
+                    self.write(&part.content);
+                }
+            }
+        }
+    }
+
+    /// Write a condition connector (if present) with trailing space
+    fn write_connector(&mut self, connector: Option<internal::SupportsConnector>) {
+        if let Some(conn) = connector {
+            self.write(connector_str(conn));
+            self.write(" ");
+        }
+    }
+
+    /// Find the split index for condition query wrapping
+    ///
+    /// Returns the index of the first part that should go on line 2.
+    fn find_condition_split_index(
+        &self,
+        parts: &[internal::SupportsPart],
+        current_col: usize,
+        suffix_len: usize,
+    ) -> usize {
+        let mut line_width = current_col;
+        let print_width = self.config.print_width;
+
+        for (i, part) in parts.iter().enumerate() {
+            // Width of connector before this part (if any)
+            let space_before = if i > 0 { 1 } else { 0 };
+            let conn_width = if let Some(conn) = part.connector {
+                space_before + connector_str(conn).len() + 1 // " and " or "and "
+            } else {
+                space_before // Just space between parts
+            };
+
+            let part_width = part.content.len();
+
+            // Check if adding this part + suffix exceeds width
+            let projected = line_width + conn_width + part_width + suffix_len;
+
+            if projected > print_width && i > 0 {
+                // Split before this part
+                return i;
+            }
+
+            line_width += conn_width + part_width;
+        }
+
+        parts.len()
+    }
+
+    /// Build a doc representation of condition query for width checking
+    fn build_condition_doc(&self, parts: &[internal::SupportsPart]) -> tsv_lang::doc::Doc {
+        use tsv_lang::doc;
+
+        let mut docs = Vec::new();
+        for (i, part) in parts.iter().enumerate() {
+            if i > 0 {
+                docs.push(doc::text(" "));
+            }
+            if let Some(conn) = part.connector {
+                docs.push(doc::text(connector_str(conn)));
+                docs.push(doc::text(" "));
+            }
+            docs.push(doc::text_owned(part.content.clone()));
+        }
+
+        doc::concat(docs)
+    }
+
+    /// Format @import media query with line-width wrapping at `and`/`or` boundaries
+    ///
+    /// Similar to `print_media_prelude` but for the media query part of @import.
+    /// Wraps at >100 chars (Prettier waits until >102).
+    fn print_import_media_query(&mut self, content: &str) {
+        // @import has no block, suffix is just the semicolon
+        self.print_media_query_with_wrapping(content, 1);
+    }
+
+    /// Shared helper for media query wrapping at `and`/`or` boundaries
+    ///
+    /// Used by both @media prelude and @import media conditions.
+    /// `suffix_len` accounts for trailing content (` {` for @media, `;` for @import).
+    fn print_media_query_with_wrapping(&mut self, content: &str, suffix_len: usize) {
+        let current_col = self.current_column();
+        let total_width = current_col + content.len() + suffix_len;
+
+        if total_width <= self.config.print_width {
+            self.write(content);
+            return;
+        }
+
+        // Find the last `and`/`or` break point that keeps first line under print_width
+        let mut best_break = None;
+
+        for (idx, _) in content.match_indices(" and ") {
+            let break_pos = idx + " and".len();
+            if current_col + break_pos <= self.config.print_width {
+                best_break = Some(break_pos);
+            }
+        }
+
+        for (idx, _) in content.match_indices(" or ") {
+            let break_pos = idx + " or".len();
+            if current_col + break_pos <= self.config.print_width
+                && best_break.is_none_or(|b| break_pos > b)
+            {
+                best_break = Some(break_pos);
+            }
+        }
+
+        if let Some(break_pos) = best_break {
+            self.write(&content[..break_pos]);
+            self.write("\n");
+            self.indent_level += 1;
+            self.write_indent();
+            self.indent_level -= 1;
+            self.write(content[break_pos..].trim_start());
+        } else {
+            self.write(content);
         }
     }
 }

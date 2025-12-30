@@ -2,9 +2,12 @@
 	/* short arithmetic - stays inline */
 	const short = 1 + 2 + 3 + 4 + 5;
 
-	/* moderately long - breaks after =, expression stays inline */
-	const moderate =
-		1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10 + 11 + 12 + 13 + 14 + 15 + 16 + 17 + 18 + 19 + 20;
+	/* 100 chars - stays inline */
+	const a = 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10 + 11 + 12 + 13 + 14 + 15 + 16 + 17 + 18 + 190000;
+
+	/* 101 chars - breaks after = */
+	const b =
+		1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10 + 11 + 12 + 13 + 14 + 15 + 16 + 17 + 18 + 1900000;
 
 	/* very long - breaks after = AND wraps each operand */
 	const verylong =
@@ -34,16 +37,16 @@
 
 	/* long logical - same behavior */
 	const logic =
-		a_long_condition_name ||
-		another_long_condition ||
-		yet_another_condition ||
-		one_more_condition ||
-		final_condition;
+		cond_aaaaaaaaaaaaaaaa ||
+		cond_bbbbbbbbbbbbbbbbb ||
+		cond_cccccccccccccccc ||
+		cond_ddddddddddddd ||
+		cond_eeeeeeeeee;
 
 	/* long comparison chain */
 	const compare =
-		some_value > threshold_one &&
-		some_value < threshold_two &&
-		other_value >= minimum_value &&
-		other_value <= maximum_value;
+		val_aaaaaa > limit_aaaaaa &&
+		val_aaaaaa < limit_bbbbbb &&
+		val_bbbbbbb >= limit_cccccc &&
+		val_bbbbbbb <= limit_dddddd;
 </script>

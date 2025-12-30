@@ -1,1 +1,1 @@
-<svelte:window on:keydown={handler} bind:innerWidth={w} bind:scrollY={y} bind:online />
+<svelte:window on:keydown={fn} bind:innerWidth={w} bind:scrollY={y} bind:online />

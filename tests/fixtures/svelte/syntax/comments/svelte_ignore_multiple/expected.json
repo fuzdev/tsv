@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 128,
+	"end": 123,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -23,7 +23,7 @@
 			{
 				"type": "RegularElement",
 				"start": 94,
-				"end": 127,
+				"end": 122,
 				"name": "div",
 				"name_loc": {
 					"start": {
@@ -41,7 +41,7 @@
 					{
 						"type": "Attribute",
 						"start": 99,
-						"end": 116,
+						"end": 111,
 						"name": "onclick",
 						"name_loc": {
 							"start": {
@@ -58,11 +58,11 @@
 						"value": {
 							"type": "ExpressionTag",
 							"start": 107,
-							"end": 116,
+							"end": 111,
 							"expression": {
 								"type": "Identifier",
 								"start": 108,
-								"end": 115,
+								"end": 110,
 								"loc": {
 									"start": {
 										"line": 2,
@@ -70,10 +70,10 @@
 									},
 									"end": {
 										"line": 2,
-										"column": 21
+										"column": 16
 									}
 								},
-								"name": "handler"
+								"name": "fn"
 							}
 						}
 					}
@@ -83,8 +83,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 117,
-							"end": 121,
+							"start": 112,
+							"end": 116,
 							"raw": "text",
 							"data": "text"
 						}

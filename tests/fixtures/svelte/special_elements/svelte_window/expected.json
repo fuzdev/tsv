@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 88,
+	"end": 83,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,7 +10,7 @@
 			{
 				"type": "SvelteWindow",
 				"start": 0,
-				"end": 87,
+				"end": 82,
 				"name": "svelte:window",
 				"name_loc": {
 					"start": {
@@ -27,7 +27,7 @@
 				"attributes": [
 					{
 						"start": 15,
-						"end": 35,
+						"end": 30,
 						"type": "OnDirective",
 						"name": "keydown",
 						"name_loc": {
@@ -45,7 +45,7 @@
 						"expression": {
 							"type": "Identifier",
 							"start": 27,
-							"end": 34,
+							"end": 29,
 							"loc": {
 								"start": {
 									"line": 1,
@@ -53,42 +53,42 @@
 								},
 								"end": {
 									"line": 1,
-									"column": 34
+									"column": 29
 								}
 							},
-							"name": "handler"
+							"name": "fn"
 						},
 						"modifiers": []
 					},
 					{
-						"start": 36,
-						"end": 55,
+						"start": 31,
+						"end": 50,
 						"type": "BindDirective",
 						"name": "innerWidth",
 						"name_loc": {
 							"start": {
 								"line": 1,
-								"column": 36,
-								"character": 36
+								"column": 31,
+								"character": 31
 							},
 							"end": {
 								"line": 1,
-								"column": 51,
-								"character": 51
+								"column": 46,
+								"character": 46
 							}
 						},
 						"expression": {
 							"type": "Identifier",
-							"start": 53,
-							"end": 54,
+							"start": 48,
+							"end": 49,
 							"loc": {
 								"start": {
 									"line": 1,
-									"column": 53
+									"column": 48
 								},
 								"end": {
 									"line": 1,
-									"column": 54
+									"column": 49
 								}
 							},
 							"name": "w"
@@ -96,34 +96,34 @@
 						"modifiers": []
 					},
 					{
-						"start": 56,
-						"end": 72,
+						"start": 51,
+						"end": 67,
 						"type": "BindDirective",
 						"name": "scrollY",
 						"name_loc": {
 							"start": {
 								"line": 1,
-								"column": 56,
-								"character": 56
+								"column": 51,
+								"character": 51
 							},
 							"end": {
 								"line": 1,
-								"column": 68,
-								"character": 68
+								"column": 63,
+								"character": 63
 							}
 						},
 						"expression": {
 							"type": "Identifier",
-							"start": 70,
-							"end": 71,
+							"start": 65,
+							"end": 66,
 							"loc": {
 								"start": {
 									"line": 1,
-									"column": 70
+									"column": 65
 								},
 								"end": {
 									"line": 1,
-									"column": 71
+									"column": 66
 								}
 							},
 							"name": "y"
@@ -131,25 +131,25 @@
 						"modifiers": []
 					},
 					{
-						"start": 73,
-						"end": 84,
+						"start": 68,
+						"end": 79,
 						"type": "BindDirective",
 						"name": "online",
 						"name_loc": {
 							"start": {
 								"line": 1,
-								"column": 73,
-								"character": 73
+								"column": 68,
+								"character": 68
 							},
 							"end": {
 								"line": 1,
-								"column": 84,
-								"character": 84
+								"column": 79,
+								"character": 79
 							}
 						},
 						"expression": {
-							"start": 78,
-							"end": 84,
+							"start": 73,
+							"end": 79,
 							"type": "Identifier",
 							"name": "online"
 						},

@@ -72,11 +72,11 @@
 	}
 
 	/* Combined with other selectors */
-	table.data td:nth-col( 1 ) {
+	table.class1 td:nth-col( 1 ) {
 		text-align: left;
 	}
 
-	tr.highlight td:nth-col( 2n ) {
+	tr.class2 td:nth-col( 2n ) {
 		background: yellow;
 	}
 

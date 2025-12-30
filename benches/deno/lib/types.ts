@@ -2,6 +2,9 @@
  * Shared types for benchmark infrastructure
  */
 
+/** Logger function type */
+export type Logger = (...args: unknown[]) => void;
+
 /** Supported source file languages */
 export type Language = 'svelte' | 'typescript' | 'css';
 
@@ -50,7 +53,7 @@ export interface CorpusStats {
 }
 
 /** Implementation names for benchmarking */
-export type ImplementationName = 'canonical' | 'native' | 'wasm' | 'oxc' | 'biome';
+export type ImplementationName = 'canonical' | 'native' | 'wasm' | 'oxc' | 'biome-wasm';
 
 /** Common interface for parser/formatter implementations */
 export interface TsvImplementation {

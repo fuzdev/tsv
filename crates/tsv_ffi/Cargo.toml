@@ -2,7 +2,7 @@
 name = "tsv_ffi"
 version.workspace = true
 edition.workspace = true
-description = "TypeScript and Svelte tools - C FFI for benchmarking"
+description = "TypeScript and Svelte tools - C FFI bindings"
 license.workspace = true
 repository.workspace = true
 

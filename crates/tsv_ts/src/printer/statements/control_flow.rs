@@ -34,30 +34,36 @@ impl<'a> Printer<'a> {
     // ========================================================================
 
     pub(super) fn print_if_statement(&mut self, stmt: &internal::IfStatement) {
-        // Check if condition has line comments that require multi-line expansion
-        if self.condition_has_line_comments(&stmt.test) {
-            // Use doc-based printing for proper multi-line handling
-            let test_doc = self.build_expression_doc(&stmt.test);
-            let condition_doc = doc::group(doc::concat(vec![
-                doc::text("if ("),
-                doc::indent_softline(test_doc),
-                doc::softline(),
-                doc::text(")"),
-            ]));
-            self.write_doc_with_margin(&condition_doc);
-        } else {
-            self.write("if (");
-            self.print_expression(&stmt.test);
-            self.write(")");
-        }
+        // Check for comments between consequent and alternate that need special handling
+        let has_if_else_comments = stmt.alternate.as_ref().is_some_and(|alt| {
+            let consequent_end = stmt.consequent.span().end;
+            let alternate_start = alt.span().start;
+            self.has_comments_between(consequent_end, alternate_start)
+        });
 
-        // Print consequent - inline or newline+indent based on statement type
+        if has_if_else_comments {
+            // Use imperative printing for comment handling between } and else
+            self.print_if_statement_imperative(stmt);
+        } else {
+            // Use doc-based printing for proper line-width wrapping
+            let if_doc = self.build_if_statement_with_wrapping_doc(stmt);
+            // Body already includes its own punctuation (semicolon), no extra margin needed
+            self.write_doc(&if_doc);
+        }
+    }
+
+    /// Print if statement imperatively (for cases with comments between } and else)
+    fn print_if_statement_imperative(&mut self, stmt: &internal::IfStatement) {
+        self.write("if (");
+        self.print_expression(&stmt.test);
+        self.write(")");
+
+        // Print consequent
+        let is_block = matches!(stmt.consequent.as_ref(), Statement::BlockStatement(_));
         if is_inline_consequent(&stmt.consequent) {
-            // No space before empty statement: `if (true);` not `if (true) ;`
             if !matches!(stmt.consequent.as_ref(), Statement::EmptyStatement(_)) {
                 self.write(" ");
             }
-            // Empty blocks expand in if context: `if (x) {\n}` not `if (x) {}`
             if let Statement::BlockStatement(block) = stmt.consequent.as_ref() {
                 self.print_block_statement_expand_empty(block);
             } else {
@@ -72,17 +78,12 @@ impl<'a> Printer<'a> {
         }
 
         if let Some(alternate) = &stmt.alternate {
-            // Check for comments between consequent and alternate
-            // These are comments like: `} // comment\nelse {`
             let consequent_end = stmt.consequent.span().end;
             let alternate_start = alternate.span().start;
             let has_comments_between = self.has_comments_between(consequent_end, alternate_start);
 
-            // If consequent is a block, else goes on same line
-            // If consequent is not a block (e.g., single statement), else goes on new line
-            if matches!(stmt.consequent.as_ref(), Statement::BlockStatement(_)) {
+            if is_block {
                 if has_comments_between {
-                    // Print inline comments between } and else
                     self.print_if_else_comments(consequent_end, alternate_start);
                 } else {
                     self.write(" else ");
@@ -92,9 +93,8 @@ impl<'a> Printer<'a> {
                 self.write_indent();
                 self.write("else ");
             }
-            // Print alternate - inline or newline+indent based on statement type
+
             if is_inline_alternate(alternate) {
-                // Empty blocks expand in else context: `else {\n}` not `else {}`
                 if let Statement::BlockStatement(block) = alternate.as_ref() {
                     self.print_block_statement_expand_empty(block);
                 } else {
@@ -107,6 +107,114 @@ impl<'a> Printer<'a> {
                 self.print_statement(alternate);
                 self.indent_level -= 1;
             }
+        }
+    }
+
+    /// Build a doc for an if statement with proper line-width wrapping
+    ///
+    /// Matches Prettier's architecture from estree.js:
+    /// ```js
+    /// group([
+    ///   "if (",
+    ///   group([indent([softline, test]), softline]),  // inner group for condition
+    ///   ")",
+    ///   adjustClause(consequent),  // body handling
+    /// ])
+    /// ```
+    fn build_if_statement_with_wrapping_doc(&self, stmt: &internal::IfStatement) -> doc::Doc {
+        // For binary expressions in conditions, use ungrouped version so parent group controls breaking
+        // This matches Prettier's behavior where operators break together with the condition
+        let test_doc = self.build_condition_doc(&stmt.test);
+
+        let is_block = matches!(stmt.consequent.as_ref(), Statement::BlockStatement(_));
+        let is_empty = matches!(stmt.consequent.as_ref(), Statement::EmptyStatement(_));
+
+        // Condition group: group([indent([softline, test]), softline])
+        // - This group decides whether the condition breaks (operators go to new lines)
+        // - Binary expression is ungrouped, so its lines follow this group's decision
+        // - The outer group (whole if statement) decides whether body goes to new line
+        let condition_group = doc::group(doc::concat(vec![
+            doc::indent(doc::concat(vec![doc::softline(), test_doc])),
+            doc::softline(),
+        ]));
+
+        if is_block {
+            // Block consequent: group(["if (" + condition + ") " + block])
+            // Outer group controls whether the whole if statement breaks
+            let mut parts = vec![doc::text("if ("), condition_group, doc::text(") ")];
+
+            if let Statement::BlockStatement(block) = stmt.consequent.as_ref() {
+                parts.push(self.build_block_statement_expand_empty_doc(block));
+            }
+
+            // Handle else clause
+            if let Some(alternate) = &stmt.alternate {
+                parts.push(doc::text(" else "));
+                if let Statement::BlockStatement(block) = alternate.as_ref() {
+                    parts.push(self.build_block_statement_expand_empty_doc(block));
+                } else if is_inline_alternate(alternate) {
+                    parts.push(self.build_statement_doc(alternate));
+                } else {
+                    parts.push(doc::hardline());
+                    parts.push(doc::indent(self.build_statement_doc(alternate)));
+                }
+            }
+
+            // Outer group for the whole if statement
+            doc::group(doc::concat(parts))
+        } else if is_empty {
+            // Empty statement: `if (cond);`
+            doc::group(doc::concat(vec![
+                doc::text("if ("),
+                condition_group,
+                doc::text(");"),
+            ]))
+        } else {
+            // Non-block consequent: use adjustClause equivalent
+            // Prettier's adjustClause returns: indent([line, clause])
+            // - When flat: line becomes space -> `if (cond) a;`
+            // - When broken: line becomes newline + indent -> `if (cond)\n\ta;`
+            let consequent_doc = self.build_statement_doc(&stmt.consequent);
+            let adjust_clause = doc::indent(doc::concat(vec![doc::line(), consequent_doc]));
+
+            let mut parts = vec![doc::group(doc::concat(vec![
+                doc::text("if ("),
+                condition_group,
+                doc::text(")"),
+                adjust_clause,
+            ]))];
+
+            // Handle else clause for non-block consequent
+            if let Some(alternate) = &stmt.alternate {
+                parts.push(doc::hardline());
+                parts.push(doc::text("else "));
+                if is_inline_alternate(alternate) {
+                    if let Statement::BlockStatement(block) = alternate.as_ref() {
+                        parts.push(self.build_block_statement_expand_empty_doc(block));
+                    } else {
+                        parts.push(self.build_statement_doc(alternate));
+                    }
+                } else {
+                    parts.push(doc::hardline());
+                    parts.push(doc::indent(self.build_statement_doc(alternate)));
+                }
+            }
+
+            doc::concat(parts)
+        }
+    }
+
+    /// Build a doc for a condition expression (if/while/for test)
+    ///
+    /// For binary expressions, uses ungrouped version so parent group controls breaking.
+    /// This ensures all operands break together when the condition exceeds print width.
+    fn build_condition_doc(&self, expr: &internal::Expression) -> doc::Doc {
+        match expr {
+            internal::Expression::BinaryExpression(binary) => {
+                // Use ungrouped version so parent group controls breaking
+                self.build_binary_chain_doc_ungrouped(binary)
+            }
+            _ => self.build_expression_doc(expr),
         }
     }
 
@@ -133,10 +241,6 @@ impl<'a> Printer<'a> {
     }
 
     pub(super) fn print_for_statement(&mut self, stmt: &internal::ForStatement) {
-        // Build the for header as a doc for proper line wrapping
-        let doc = self.build_for_header_doc(stmt);
-        self.write_doc_with_margin(&doc);
-
         // Check for comments between ) and body (Prettier 3.7 #18108)
         // e.g., `for (...) /* comment */ ;`
         let header_end = self.get_for_header_end(stmt);
@@ -144,14 +248,51 @@ impl<'a> Printer<'a> {
         let has_comments = self.has_comments_between(header_end, body_start);
 
         if has_comments {
+            // Handle comments imperatively
+            let header_doc = self.build_for_header_doc(stmt);
+            self.write_doc(&header_doc);
             self.print_inline_comments_between(header_end, body_start);
             // Prettier adds space after comment before empty statement: `/* comment */ ;`
             self.write(" ");
-        } else if !matches!(stmt.body.as_ref(), Statement::EmptyStatement(_)) {
-            // Don't add space before empty statement: `for (...);` not `for (...) ;`
-            self.write(" ");
+            self.print_statement(&stmt.body);
+        } else {
+            // Build complete doc including body for proper width calculation
+            let full_doc = self.build_for_statement_with_body_doc(stmt);
+            self.write_doc(&full_doc);
         }
-        self.print_statement(&stmt.body);
+    }
+
+    /// Build a complete for statement doc including the body
+    ///
+    /// This includes the body in the doc so the width calculation accounts for ` {`.
+    fn build_for_statement_with_body_doc(&self, stmt: &internal::ForStatement) -> doc::Doc {
+        let header_doc = self.build_for_header_doc(stmt);
+        let is_empty = matches!(stmt.body.as_ref(), Statement::EmptyStatement(_));
+        let is_block = matches!(stmt.body.as_ref(), Statement::BlockStatement(_));
+
+        if is_empty {
+            // No space before empty statement: `for (...);`
+            doc::concat(vec![header_doc, self.build_statement_doc(&stmt.body)])
+        } else if is_block {
+            // Block body: `for (...) { ... }`
+            // Note: Unlike for-in/for-of, standard for loops keep empty blocks inline `{}`
+            if let Statement::BlockStatement(block) = stmt.body.as_ref() {
+                doc::concat(vec![
+                    header_doc,
+                    doc::text(" "),
+                    self.build_block_statement_doc(block),
+                ])
+            } else {
+                unreachable!()
+            }
+        } else {
+            // Non-block body: `for (...) stmt;`
+            doc::concat(vec![
+                header_doc,
+                doc::text(" "),
+                self.build_statement_doc(&stmt.body),
+            ])
+        }
     }
 
     /// Get the end position of a for loop header (position after the last non-body element)
@@ -280,61 +421,110 @@ impl<'a> Printer<'a> {
     }
 
     pub(super) fn print_for_in_statement(&mut self, stmt: &internal::ForInStatement) {
-        self.write("for (");
-        self.print_for_in_of_left(&stmt.left);
-        self.write(" in ");
-        self.print_expression(&stmt.right);
-        self.write(") ");
-        // Prettier expands empty blocks for for-in (unlike regular for)
+        // Use doc-based printing for proper width calculation of right-side expressions
+        let full_doc = self.build_for_in_statement_with_body_doc(stmt);
+        self.write_doc(&full_doc);
+    }
+
+    /// Build a complete for-in statement doc including the body
+    fn build_for_in_statement_with_body_doc(&self, stmt: &internal::ForInStatement) -> doc::Doc {
+        let mut parts = vec![
+            doc::text("for ("),
+            self.build_for_in_of_left_doc(&stmt.left),
+            doc::text(" in "),
+            self.build_expression_doc(&stmt.right),
+            doc::text(") "),
+        ];
+
+        // Prettier expands empty blocks for for-in
         if let Statement::BlockStatement(block) = stmt.body.as_ref() {
-            self.print_block_statement_expand_empty(block);
+            parts.push(self.build_block_statement_expand_empty_doc(block));
         } else {
-            self.print_statement(&stmt.body);
+            parts.push(self.build_statement_doc(&stmt.body));
         }
+
+        doc::concat(parts)
     }
 
     pub(super) fn print_for_of_statement(&mut self, stmt: &internal::ForOfStatement) {
-        self.write("for ");
-        if stmt.r#await {
-            self.write("await ");
-        }
-        self.write("(");
-        self.print_for_in_of_left(&stmt.left);
-        self.write(" of ");
-        self.print_expression(&stmt.right);
-        self.write(") ");
-        // Prettier expands empty blocks for for-of (unlike regular for)
-        if let Statement::BlockStatement(block) = stmt.body.as_ref() {
-            self.print_block_statement_expand_empty(block);
-        } else {
-            self.print_statement(&stmt.body);
-        }
+        // Use doc-based printing for proper width calculation of right-side expressions
+        let full_doc = self.build_for_of_statement_with_body_doc(stmt);
+        self.write_doc(&full_doc);
     }
 
-    fn print_for_in_of_left(&mut self, left: &internal::ForInOfLeft) {
-        match left {
-            internal::ForInOfLeft::VariableDeclaration(decl) => {
-                self.write(decl.kind.as_str());
-                self.write(" ");
-                if let Some(declarator) = decl.declarations.first() {
-                    self.print_expression(&declarator.id);
-                }
-            }
-            internal::ForInOfLeft::Pattern(expr) => {
-                self.print_expression(expr);
-            }
+    /// Build a complete for-of statement doc including the body
+    fn build_for_of_statement_with_body_doc(&self, stmt: &internal::ForOfStatement) -> doc::Doc {
+        let mut parts = vec![doc::text("for ")];
+        if stmt.r#await {
+            parts.push(doc::text("await "));
         }
+        parts.push(doc::text("("));
+        parts.push(self.build_for_in_of_left_doc(&stmt.left));
+        parts.push(doc::text(" of "));
+        parts.push(self.build_expression_doc(&stmt.right));
+        parts.push(doc::text(") "));
+
+        // Prettier expands empty blocks for for-of
+        if let Statement::BlockStatement(block) = stmt.body.as_ref() {
+            parts.push(self.build_block_statement_expand_empty_doc(block));
+        } else {
+            parts.push(self.build_statement_doc(&stmt.body));
+        }
+
+        doc::concat(parts)
     }
 
     pub(super) fn print_while_statement(&mut self, stmt: &internal::WhileStatement) {
-        self.write("while (");
-        self.print_expression(&stmt.test);
-        self.write(")");
-        // Don't add space before empty statement: `while (cond);` not `while (cond) ;`
-        if !matches!(stmt.body.as_ref(), Statement::EmptyStatement(_)) {
-            self.write(" ");
+        // Use doc-based printing for proper line-width wrapping
+        let while_doc = self.build_while_statement_with_wrapping_doc(stmt);
+        self.write_doc(&while_doc);
+    }
+
+    /// Build a doc for a while statement with proper line-width wrapping
+    ///
+    /// Matches Prettier's architecture: the condition wraps to multiple lines
+    /// when the `while (condition)` line exceeds print width.
+    fn build_while_statement_with_wrapping_doc(&self, stmt: &internal::WhileStatement) -> doc::Doc {
+        // For binary expressions in condition, use ungrouped version so parent group controls breaking
+        let test_doc = self.build_condition_doc(&stmt.test);
+
+        // Condition group: group([indent([softline, test]), softline])
+        let condition_group = doc::group(doc::concat(vec![
+            doc::indent(doc::concat(vec![doc::softline(), test_doc])),
+            doc::softline(),
+        ]));
+
+        let is_block = matches!(stmt.body.as_ref(), Statement::BlockStatement(_));
+        let is_empty = matches!(stmt.body.as_ref(), Statement::EmptyStatement(_));
+
+        if is_block {
+            // Block body: while (cond) { ... }
+            let mut parts = vec![doc::text("while ("), condition_group, doc::text(") ")];
+            if let Statement::BlockStatement(block) = stmt.body.as_ref() {
+                parts.push(self.build_block_statement_doc(block));
+            }
+            doc::group(doc::concat(parts))
+        } else if is_empty {
+            // Empty statement: while (cond);
+            doc::group(doc::concat(vec![
+                doc::text("while ("),
+                condition_group,
+                doc::text(");"),
+            ]))
+        } else {
+            // Non-block body: use adjustClause equivalent
+            // - When flat: line becomes space -> `while (cond) a;`
+            // - When broken: line becomes newline + indent -> `while (cond)\n\ta;`
+            let body_doc = self.build_statement_doc(&stmt.body);
+            let adjust_clause = doc::indent(doc::concat(vec![doc::line(), body_doc]));
+
+            doc::group(doc::concat(vec![
+                doc::text("while ("),
+                condition_group,
+                doc::text(")"),
+                adjust_clause,
+            ]))
         }
-        self.print_statement(&stmt.body);
     }
 
     pub(super) fn print_do_while_statement(&mut self, stmt: &internal::DoWhileStatement) {
@@ -354,56 +544,91 @@ impl<'a> Printer<'a> {
     }
 
     pub(super) fn print_switch_statement(&mut self, stmt: &internal::SwitchStatement) {
-        self.write("switch (");
-        self.print_expression(&stmt.discriminant);
-        self.write(") {\n");
-        self.indent_level += 1;
-        for case in &stmt.cases {
-            self.print_switch_case(case);
-        }
-        self.indent_level -= 1;
-        self.write_indent();
-        self.write("}");
+        // Use doc-based printing for proper line-width wrapping
+        let switch_doc = self.build_switch_statement_with_wrapping_doc(stmt);
+        self.write_doc(&switch_doc);
     }
 
-    fn print_switch_case(&mut self, case: &internal::SwitchCase) {
-        self.write_indent();
-        if let Some(test) = &case.test {
-            self.write("case ");
-            self.print_expression(test);
-            self.write(":\n");
+    /// Build a doc for a switch statement with proper line-width wrapping
+    ///
+    /// Matches Prettier's architecture: the discriminant wraps to multiple lines
+    /// when the `switch (discriminant) {` line exceeds print width.
+    fn build_switch_statement_with_wrapping_doc(
+        &self,
+        stmt: &internal::SwitchStatement,
+    ) -> doc::Doc {
+        // For binary expressions in discriminant, use ungrouped version so parent group controls breaking
+        let discriminant_doc = self.build_condition_doc(&stmt.discriminant);
+
+        // Condition group: group([indent([softline, discriminant]), softline])
+        // - This group decides whether the discriminant breaks (operators go to new lines)
+        let condition_group = doc::group(doc::concat(vec![
+            doc::indent(doc::concat(vec![doc::softline(), discriminant_doc])),
+            doc::softline(),
+        ]));
+
+        // Build cases - they handle their own internal indentation
+        // Join cases with hardlines
+        let mut case_parts = Vec::new();
+        for (i, case) in stmt.cases.iter().enumerate() {
+            if i > 0 {
+                case_parts.push(doc::hardline());
+            }
+            case_parts.push(self.build_switch_case_doc_inner(case));
+        }
+
+        // Structure: switch (...) { indent([hardline, cases...]) hardline }
+        // The indent wraps the hardline so cases start at +1 indent level
+        // For empty switch, just output {\n}
+        let body_doc = if case_parts.is_empty() {
+            doc::hardline()
         } else {
-            self.write("default:\n");
+            doc::concat(vec![
+                doc::indent(doc::concat(vec![doc::hardline(), doc::concat(case_parts)])),
+                doc::hardline(),
+            ])
+        };
+
+        doc::group(doc::concat(vec![
+            doc::text("switch ("),
+            condition_group,
+            doc::text(") {"),
+            body_doc,
+            doc::text("}"),
+        ]))
+    }
+
+    /// Build a doc for a switch case (without outer indent - that's handled by switch)
+    fn build_switch_case_doc_inner(&self, case: &internal::SwitchCase) -> doc::Doc {
+        let mut parts = Vec::new();
+
+        // case X: or default:
+        if let Some(test) = &case.test {
+            parts.push(doc::text("case "));
+            parts.push(self.build_expression_doc(test));
+            parts.push(doc::text(":"));
+        } else {
+            parts.push(doc::text("default:"));
         }
-        self.indent_level += 1;
+
+        // Consequent statements (indented from case line)
+        // Hardline must be inside the indent so it uses the +1 level
         for stmt in &case.consequent {
-            self.write_indent();
-            self.print_statement(stmt);
-            self.write("\n");
+            parts.push(doc::indent(doc::concat(vec![
+                doc::hardline(),
+                self.build_statement_doc(stmt),
+            ])));
         }
-        self.indent_level -= 1;
+
+        doc::concat(parts)
     }
 
     pub(super) fn print_try_statement(&mut self, stmt: &internal::TryStatement) {
-        self.write("try ");
-        // Try block expands empty: `try {\n}` not `try {}`
-        self.print_block_statement_expand_empty(&stmt.block);
-        if let Some(handler) = &stmt.handler {
-            self.write(" catch");
-            if let Some(param) = &handler.param {
-                self.write(" (");
-                self.print_expression(param);
-                self.write(")");
-            }
-            self.write(" ");
-            // Catch block stays inline: `catch (e) {}`
-            self.print_block_statement(&handler.body);
-        }
-        if let Some(finalizer) = &stmt.finalizer {
-            self.write(" finally ");
-            // Finally block expands empty: `finally {\n}` not `finally {}`
-            self.print_block_statement_expand_empty(finalizer);
-        }
+        // Use doc-based printing for the entire try statement to enable
+        // width-aware wrapping of catch clause type annotations and patterns.
+        // This ensures the `) {}` suffix is included in width calculations.
+        let try_doc = self.build_try_statement_doc(stmt);
+        self.write_doc(&try_doc);
     }
 
     pub(super) fn print_throw_statement(&mut self, stmt: &internal::ThrowStatement) {
@@ -613,7 +838,8 @@ impl<'a> Printer<'a> {
     pub(super) fn build_try_statement_doc(&self, stmt: &internal::TryStatement) -> doc::Doc {
         let mut parts = vec![
             doc::text("try "),
-            self.build_block_statement_doc(&stmt.block),
+            // Try block expands empty: `try {\n}` not `try {}`
+            self.build_block_statement_expand_empty_doc(&stmt.block),
         ];
         if let Some(handler) = &stmt.handler {
             parts.push(doc::text(" catch"));
@@ -623,11 +849,13 @@ impl<'a> Printer<'a> {
                 parts.push(doc::text(")"));
             }
             parts.push(doc::text(" "));
+            // Catch block stays inline: `catch (e) {}`
             parts.push(self.build_block_statement_doc(&handler.body));
         }
         if let Some(finalizer) = &stmt.finalizer {
             parts.push(doc::text(" finally "));
-            parts.push(self.build_block_statement_doc(finalizer));
+            // Finally block expands empty: `finally {\n}` not `finally {}`
+            parts.push(self.build_block_statement_expand_empty_doc(finalizer));
         }
         doc::concat(parts)
     }
@@ -682,28 +910,6 @@ impl<'a> Printer<'a> {
             doc::text(separator),
             self.build_statement_doc(&stmt.body),
         ])
-    }
-
-    /// Check if a condition expression has line comments that require multi-line expansion
-    ///
-    /// Returns true if the expression or any of its binary sub-expressions contain
-    /// line comments between operands.
-    fn condition_has_line_comments(&self, expr: &internal::Expression) -> bool {
-        match expr {
-            internal::Expression::BinaryExpression(binary) => {
-                // Check for line comments between left and right operands
-                let left_end = binary.left.span().end;
-                let right_start = binary.right.span().start;
-                if self.has_line_comments_between(left_end, right_start) {
-                    return true;
-                }
-                // Recursively check sub-expressions
-                self.condition_has_line_comments(&binary.left)
-                    || self.condition_has_line_comments(&binary.right)
-            }
-            // For other expression types, no line comments to check
-            _ => false,
-        }
     }
 
     /// Check if a for statement header has line comments between parts

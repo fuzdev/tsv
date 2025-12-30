@@ -26,6 +26,458 @@ fn is_boolean_operator(parser: &CssParser) -> bool {
     }
 }
 
+/// Parse @supports prelude into structured condition parts
+///
+/// CSS Syntax: `@supports <supports-condition>`
+/// where supports-condition is a combination of `(prop: val)` parts connected by `and`/`or`
+///
+/// Examples:
+/// - `(display: grid)` - single condition
+/// - `(display: grid) and (flex: 1)` - conjunction
+/// - `not (color: red)` - negation
+/// - `(a) and (b) or (c)` - mixed (parsed left-to-right)
+fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, Span), ParseError> {
+    let start = parser.base_offset() + parser.current_start;
+    let mut parts = Vec::new();
+    let mut current_connector: Option<SupportsConnector> = None;
+    let mut end_pos = start;
+
+    while !parser.check(&TokenKind::LeftBrace)
+        && !parser.check(&TokenKind::Semicolon)
+        && !parser.check(&TokenKind::Eof)
+    {
+        parser.skip_whitespace()?;
+
+        // Check for `and`/`or` connector
+        if parser.check(&TokenKind::Identifier) {
+            let ident = parser
+                .current_identifier()
+                .unwrap_or_else(|| parser.current_value());
+
+            if ident == "and" || ident == "or" {
+                // This is a connector between parts
+                current_connector = Some(if ident == "and" {
+                    SupportsConnector::And
+                } else {
+                    SupportsConnector::Or
+                });
+                parser.advance()?;
+                parser.skip_whitespace()?;
+                continue;
+            }
+        }
+
+        // Parse a condition part (may start with `not`, then parenthesized content)
+        let part_start = parser.base_offset() + parser.current_start;
+        let mut part_content = Vec::new();
+        let mut paren_depth: usize = 0;
+
+        // Check for leading `not`
+        if parser.check(&TokenKind::Identifier) {
+            let ident = parser
+                .current_identifier()
+                .unwrap_or_else(|| parser.current_value());
+            if ident == "not" {
+                part_content.push("not".to_string());
+                parser.advance()?;
+                parser.skip_whitespace()?;
+                part_content.push(" ".to_string());
+            }
+        }
+
+        // Check for function-style condition like `selector(:has(...))`
+        if parser.check(&TokenKind::Identifier) {
+            let ident = parser
+                .current_identifier()
+                .unwrap_or_else(|| parser.current_value());
+            // Check if this is a function call (identifier followed by '(')
+            let is_function =
+                parser.source.get(parser.current_end..=parser.current_end) == Some("(");
+            if is_function {
+                // Include the function name
+                part_content.push(ident.to_string());
+                parser.advance()?;
+                // Continue to parse the parenthesized part below
+            }
+        }
+
+        // Now parse the parenthesized condition
+        if !parser.check(&TokenKind::LeftParen) {
+            // Not a valid @supports part - break out
+            break;
+        }
+
+        // Parse until we close all parens and hit whitespace/and/or/brace
+        // Track state for whitespace normalization
+        let mut prev_token_kind: Option<TokenKind> = None;
+        let mut last_non_whitespace_kind: Option<TokenKind> = None;
+
+        while !parser.check(&TokenKind::Eof) {
+            // Track paren depth
+            if parser.check(&TokenKind::LeftParen) {
+                paren_depth += 1;
+            } else if parser.check(&TokenKind::RightParen) {
+                if paren_depth == 0 {
+                    break;
+                }
+                paren_depth -= 1;
+            }
+
+            // Check for end of part (at top level)
+            if paren_depth == 0 && parser.check(&TokenKind::RightParen) {
+                // Include the closing paren
+                part_content.push(")".to_string());
+                end_pos = parser.base_offset() + parser.current_end;
+                parser.advance()?;
+                break;
+            }
+
+            // Handle whitespace normalization
+            if parser.check(&TokenKind::Whitespace) {
+                let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
+                    || matches!(parser.peek(), Ok(TokenKind::RightParen));
+
+                parser.advance()?;
+
+                if skip_whitespace {
+                    continue;
+                }
+                part_content.push(" ".to_string());
+                prev_token_kind = Some(TokenKind::Whitespace);
+                continue;
+            }
+
+            // Get token value
+            let part = match &parser.current_kind {
+                TokenKind::Identifier => parser
+                    .current_identifier()
+                    .unwrap_or_else(|| parser.current_value())
+                    .to_string(),
+                TokenKind::String { quote } => {
+                    let content =
+                        &parser.source()[parser.current_start + 1..parser.current_end - 1];
+                    format!("{quote}{content}{quote}")
+                }
+                TokenKind::Number | TokenKind::Percentage | TokenKind::Dimension { .. } => {
+                    parser.current_value().to_string()
+                }
+                TokenKind::Comment => {
+                    // Include comment and preserve trailing space before next token
+                    parser.current_value().to_string()
+                }
+                _ => parser.current_value().to_string(),
+            };
+
+            // Add space after comment if followed by non-whitespace
+            // (Comments need space before the next token)
+            let is_comment = matches!(parser.current_kind, TokenKind::Comment);
+
+            // Check if this is a boolean operator (and/or/not) inside nested parens
+            let is_bool_op = matches!(&parser.current_kind, TokenKind::Identifier)
+                && matches!(part.as_str(), "and" | "or" | "not");
+
+            // Add space before boolean operators if not preceded by whitespace
+            if is_bool_op && !matches!(prev_token_kind, Some(TokenKind::Whitespace)) {
+                part_content.push(" ".to_string());
+            }
+
+            // Remove trailing whitespace before ':'
+            if matches!(parser.current_kind, TokenKind::Colon) {
+                while part_content.last().is_some_and(|s| s == " ") {
+                    part_content.pop();
+                }
+            }
+
+            part_content.push(part);
+            let current_kind = parser.current_kind.clone();
+            end_pos = parser.base_offset() + parser.current_end;
+            parser.advance()?;
+
+            // Add space after boolean operators
+            if is_bool_op && !parser.check(&TokenKind::Whitespace) {
+                part_content.push(" ".to_string());
+            }
+
+            // Add space after comment if followed by non-whitespace
+            // (e.g., `/* comment */ grid` needs space before `grid`)
+            if is_comment
+                && !parser.check(&TokenKind::Whitespace)
+                && !parser.check(&TokenKind::RightParen)
+            {
+                part_content.push(" ".to_string());
+            }
+
+            // Add space after ':' for property:value pairs
+            if !parser.check(&TokenKind::Whitespace)
+                && matches!(current_kind, TokenKind::Colon)
+                && matches!(
+                    last_non_whitespace_kind,
+                    Some(TokenKind::Identifier)
+                        | Some(TokenKind::Number)
+                        | Some(TokenKind::Dimension { .. })
+                        | Some(TokenKind::Percentage)
+                )
+            {
+                part_content.push(" ".to_string());
+            }
+
+            prev_token_kind = Some(current_kind.clone());
+            if !matches!(current_kind, TokenKind::Whitespace) {
+                last_non_whitespace_kind = Some(current_kind);
+            }
+        }
+
+        // Build the part
+        let content = part_content.join("").trim().to_string();
+        if !content.is_empty() {
+            parts.push(SupportsPart {
+                connector: current_connector.take(),
+                content,
+                span: Span {
+                    start: part_start as u32,
+                    end: end_pos as u32,
+                },
+            });
+        }
+    }
+
+    let span = Span {
+        start: start as u32,
+        end: end_pos as u32,
+    };
+
+    Ok((SupportsCondition { parts }, span))
+}
+
+/// Parse @container prelude into structured condition parts with optional name
+///
+/// CSS Syntax: `@container [<container-name>]? <container-query>`
+/// where container-query is similar to @supports: `(prop: val)` parts connected by `and`/`or`
+///
+/// Examples:
+/// - `(min-width: 100px)` - no name, single condition
+/// - `(min-width: 100px) and (max-width: 200px)` - no name, conjunction
+/// - `sidebar (min-width: 100px)` - named container
+/// - `sidebar (min-width: 100px) and (max-width: 200px)` - named container with conjunction
+fn parse_container_prelude(
+    parser: &mut CssParser,
+) -> Result<(Option<String>, SupportsCondition, Span), ParseError> {
+    let start = parser.base_offset() + parser.current_start;
+
+    // Check for optional container name (identifier before first '(')
+    // Container name is an identifier followed by whitespace then '('
+    // NOT a function call like style(...) where there's no whitespace
+    let container_name = if parser.check(&TokenKind::Identifier) {
+        let ident = parser
+            .current_identifier()
+            .unwrap_or_else(|| parser.current_value())
+            .to_string();
+        // Check if this is actually a name (not 'not' or 'and' or 'or')
+        // Also check it's not a function call (identifier directly followed by '(')
+        let is_function_call =
+            parser.source.get(parser.current_end..=parser.current_end) == Some("(");
+        if !matches!(ident.as_str(), "not" | "and" | "or") && !is_function_call {
+            parser.advance()?;
+            parser.skip_whitespace()?;
+            Some(ident)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // Now parse the condition parts (same logic as @supports)
+    let mut parts = Vec::new();
+    let mut current_connector: Option<SupportsConnector> = None;
+    let mut end_pos = parser.base_offset() + parser.current_start;
+
+    while !parser.check(&TokenKind::LeftBrace)
+        && !parser.check(&TokenKind::Semicolon)
+        && !parser.check(&TokenKind::Eof)
+    {
+        parser.skip_whitespace()?;
+
+        // Check for `and`/`or` connector
+        if parser.check(&TokenKind::Identifier) {
+            let ident = parser
+                .current_identifier()
+                .unwrap_or_else(|| parser.current_value());
+
+            if ident == "and" || ident == "or" {
+                current_connector = Some(if ident == "and" {
+                    SupportsConnector::And
+                } else {
+                    SupportsConnector::Or
+                });
+                parser.advance()?;
+                parser.skip_whitespace()?;
+                continue;
+            }
+        }
+
+        // Parse a condition part (may start with `not`, then parenthesized content)
+        let part_start = parser.base_offset() + parser.current_start;
+        let mut part_content = Vec::new();
+        let mut paren_depth: usize = 0;
+
+        // Check for leading `not`
+        if parser.check(&TokenKind::Identifier) {
+            let ident = parser
+                .current_identifier()
+                .unwrap_or_else(|| parser.current_value());
+            if ident == "not" {
+                part_content.push("not".to_string());
+                parser.advance()?;
+                parser.skip_whitespace()?;
+                part_content.push(" ".to_string());
+            }
+        }
+
+        // Check for function-style condition like `style(--custom: value)`
+        if parser.check(&TokenKind::Identifier) {
+            let ident = parser
+                .current_identifier()
+                .unwrap_or_else(|| parser.current_value());
+            let is_function =
+                parser.source.get(parser.current_end..=parser.current_end) == Some("(");
+            if is_function {
+                part_content.push(ident.to_string());
+                parser.advance()?;
+            }
+        }
+
+        // Now parse the parenthesized condition
+        if !parser.check(&TokenKind::LeftParen) {
+            break;
+        }
+
+        // Parse until we close all parens
+        let mut prev_token_kind: Option<TokenKind> = None;
+        let mut last_non_whitespace_kind: Option<TokenKind> = None;
+
+        while !parser.check(&TokenKind::Eof) {
+            if parser.check(&TokenKind::LeftParen) {
+                paren_depth += 1;
+            } else if parser.check(&TokenKind::RightParen) {
+                if paren_depth == 0 {
+                    break;
+                }
+                paren_depth -= 1;
+            }
+
+            if paren_depth == 0 && parser.check(&TokenKind::RightParen) {
+                part_content.push(")".to_string());
+                end_pos = parser.base_offset() + parser.current_end;
+                parser.advance()?;
+                break;
+            }
+
+            // Handle whitespace normalization
+            if parser.check(&TokenKind::Whitespace) {
+                let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
+                    || matches!(parser.peek(), Ok(TokenKind::RightParen));
+
+                parser.advance()?;
+
+                if skip_whitespace {
+                    continue;
+                }
+                part_content.push(" ".to_string());
+                prev_token_kind = Some(TokenKind::Whitespace);
+                continue;
+            }
+
+            // Get token value
+            let part = match &parser.current_kind {
+                TokenKind::Identifier => parser
+                    .current_identifier()
+                    .unwrap_or_else(|| parser.current_value())
+                    .to_string(),
+                TokenKind::String { quote } => {
+                    let content =
+                        &parser.source()[parser.current_start + 1..parser.current_end - 1];
+                    format!("{quote}{content}{quote}")
+                }
+                TokenKind::Number | TokenKind::Percentage | TokenKind::Dimension { .. } => {
+                    parser.current_value().to_string()
+                }
+                TokenKind::Comment => parser.current_value().to_string(),
+                _ => parser.current_value().to_string(),
+            };
+
+            let is_comment = matches!(parser.current_kind, TokenKind::Comment);
+            let is_bool_op = matches!(&parser.current_kind, TokenKind::Identifier)
+                && matches!(part.as_str(), "and" | "or" | "not");
+
+            if is_bool_op && !matches!(prev_token_kind, Some(TokenKind::Whitespace)) {
+                part_content.push(" ".to_string());
+            }
+
+            // Remove trailing whitespace before ':'
+            if matches!(parser.current_kind, TokenKind::Colon) {
+                while part_content.last().is_some_and(|s| s == " ") {
+                    part_content.pop();
+                }
+            }
+
+            part_content.push(part);
+            let current_kind = parser.current_kind.clone();
+            end_pos = parser.base_offset() + parser.current_end;
+            parser.advance()?;
+
+            if is_bool_op && !parser.check(&TokenKind::Whitespace) {
+                part_content.push(" ".to_string());
+            }
+
+            if is_comment
+                && !parser.check(&TokenKind::Whitespace)
+                && !parser.check(&TokenKind::RightParen)
+            {
+                part_content.push(" ".to_string());
+            }
+
+            // Add space after ':' for property:value pairs
+            if !parser.check(&TokenKind::Whitespace)
+                && matches!(current_kind, TokenKind::Colon)
+                && matches!(
+                    last_non_whitespace_kind,
+                    Some(TokenKind::Identifier)
+                        | Some(TokenKind::Number)
+                        | Some(TokenKind::Dimension { .. })
+                        | Some(TokenKind::Percentage)
+                )
+            {
+                part_content.push(" ".to_string());
+            }
+
+            prev_token_kind = Some(current_kind.clone());
+            if !matches!(current_kind, TokenKind::Whitespace) {
+                last_non_whitespace_kind = Some(current_kind);
+            }
+        }
+
+        let content = part_content.join("").trim().to_string();
+        if !content.is_empty() {
+            parts.push(SupportsPart {
+                connector: current_connector.take(),
+                content,
+                span: Span {
+                    start: part_start as u32,
+                    end: end_pos as u32,
+                },
+            });
+        }
+    }
+
+    let span = Span {
+        start: start as u32,
+        end: end_pos as u32,
+    };
+
+    Ok((container_name, SupportsCondition { parts }, span))
+}
+
 /// Parse @scope prelude into structured selector lists
 ///
 /// CSS Syntax: `@scope (<scope-start>) [to (<scope-end>)]`
@@ -186,31 +638,45 @@ fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span),
                 parser.skip_whitespace()?;
             } else {
                 // Media query - capture the rest as raw identifier/text
-                // Build up remaining tokens until semicolon
+                // Normalize spacing: space around keywords, no space after ( or before ) or :
                 let media_start = (parser.base_offset() + parser.current_start) as u32;
-                let mut media_parts = Vec::new();
+                let mut media_parts: Vec<String> = Vec::new();
+                let mut media_end = media_start;
 
                 while !parser.check(&TokenKind::Semicolon) && !parser.check(&TokenKind::Eof) {
-                    media_parts.push(parser.current_value().to_string());
-                    let media_end = (parser.base_offset() + parser.current_end) as u32;
+                    // Skip whitespace tokens
+                    if parser.check(&TokenKind::Whitespace) {
+                        parser.advance()?;
+                        continue;
+                    }
+
+                    let token_value = parser.current_value().to_string();
+                    media_end = (parser.base_offset() + parser.current_end) as u32;
+
+                    // Determine spacing based on token type
+                    if let Some(last) = media_parts.last() {
+                        // No space after ( or before ) or before :
+                        let needs_space = last != "("
+                            && token_value != ")"
+                            && token_value != ":"
+                            && !last.ends_with('(');
+                        if needs_space {
+                            media_parts.push(" ".to_string());
+                        }
+                    }
+
+                    media_parts.push(token_value);
                     parser.advance()?;
+                }
 
-                    // Store as a single identifier with the complete media query text
-                    if parser.check(&TokenKind::Semicolon) || parser.check(&TokenKind::Eof) {
-                        values.push(CssValue::Identifier {
-                            name: media_parts.join(" "),
-                            span: Span {
-                                start: media_start,
-                                end: media_end,
-                            },
-                        });
-                        break;
-                    }
-
-                    // Add space between tokens
-                    if !parser.check(&TokenKind::Whitespace) {
-                        media_parts.push(" ".to_string());
-                    }
+                if !media_parts.is_empty() {
+                    values.push(CssValue::Identifier {
+                        name: media_parts.concat(),
+                        span: Span {
+                            start: media_start,
+                            end: media_end,
+                        },
+                    });
                 }
                 break;
             }
@@ -454,159 +920,28 @@ pub(crate) fn parse_atrule(
         // Parse @scope prelude as structured selector lists
         let (root, limit, span) = parse_scope_prelude(parser)?;
         PreludeValue::Selectors { root, limit, span }
+    } else if name == "supports" {
+        // Parse @supports prelude as structured conditions (for line-width wrapping)
+        let (condition, span) = parse_supports_prelude(parser)?;
+        PreludeValue::Supports { condition, span }
+    } else if name == "container" {
+        // Parse @container prelude as structured conditions (for line-width wrapping)
+        let (name, condition, span) = parse_container_prelude(parser)?;
+        PreludeValue::Container {
+            name,
+            condition,
+            span,
+        }
+    } else if name == "media" {
+        // Parse @media as raw string to preserve comments
+        // Wrapping is handled in the printer by finding and/or boundaries
+        // See TODO_AST_ARCHITECTURE.md for discussion of moving to CST
+        let (content, span) = parse_raw_prelude_content(parser, false)?;
+        PreludeValue::Media { content, span }
     } else {
-        // Parse as raw string for other at-rules (@media, @keyframes, @supports, etc.)
-        // Add spaces around boolean operators (and, or, not) and after ':' for prettier compatibility
-        let prelude_start = parser.base_offset() + parser.current_start;
-        let mut prelude_parts = Vec::new();
-        let mut prev_token_kind: Option<TokenKind> = None;
-        let mut last_non_whitespace_kind: Option<TokenKind> = None;
-        let mut paren_depth: u32 = 0; // Track parenthesis nesting for selector detection
-
-        // Categorize at-rule by prelude type based on CSS specs:
-        // - Selector list preludes (@scope): Format like CSS selectors (.widget:hover)
-        // - Query preludes (@media, @container, @supports): Format like properties (min-width: 500px)
-        // - No prelude (@font-face, @starting-style): No prelude to normalize
-        // - Identifier preludes (@keyframes, @layer): No colons to worry about
-        //
-        // Spec references:
-        // @scope: ../csswg-drafts/css-cascade-6/Overview.bs:439
-        // @media: ../csswg-drafts/css-conditional-3/Overview.bs:268
-        // @container: ../csswg-drafts/css-conditional-5/Overview.bs:977
-        // @supports: ../csswg-drafts/css-conditional-3/Overview.bs
-        // @starting-style: ../csswg-drafts/css-transitions-2/Overview.bs:215 (NO prelude)
-        let is_selector_list_prelude = matches!(name.as_str(), "scope");
-
-        while !parser.check(&TokenKind::LeftBrace)
-            && !parser.check(&TokenKind::Semicolon)
-            && !parser.check(&TokenKind::Eof)
-        {
-            if parser.check(&TokenKind::Whitespace) {
-                // Skip whitespace in selector list preludes (inside parentheses for @scope):
-                // - After '(' or before ')'
-                // - After ':' (pseudo-classes like :hover) - only for selector list preludes
-                // - Before ',' (selector lists) - only for selector list preludes
-                // - After '[' or before ']' (attribute selectors) - only for selector list preludes
-                // - Before/after '=' (attribute selectors) - only for selector list preludes
-                let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
-                    || matches!(parser.peek(), Ok(TokenKind::RightParen))
-                    || (is_selector_list_prelude
-                        && paren_depth > 0
-                        && matches!(prev_token_kind, Some(TokenKind::Colon)))
-                    || (is_selector_list_prelude
-                        && paren_depth > 0
-                        && matches!(parser.peek(), Ok(TokenKind::Comma)))
-                    || (is_selector_list_prelude
-                        && matches!(prev_token_kind, Some(TokenKind::LeftBracket)))
-                    || (is_selector_list_prelude
-                        && matches!(parser.peek(), Ok(TokenKind::RightBracket)))
-                    || (is_selector_list_prelude
-                        && matches!(prev_token_kind, Some(TokenKind::Equals)))
-                    || (is_selector_list_prelude && matches!(parser.peek(), Ok(TokenKind::Equals)));
-
-                parser.advance()?;
-
-                if skip_whitespace {
-                    continue;
-                }
-                prelude_parts.push(" ".to_string());
-                prev_token_kind = Some(TokenKind::Whitespace);
-                continue;
-            }
-
-            let part = match &parser.current_kind {
-                // Internal AST: use decoded value (spec-compliant)
-                TokenKind::Identifier => parser
-                    .current_identifier()
-                    .unwrap_or_else(|| parser.current_value())
-                    .to_string(),
-                TokenKind::String { quote } => {
-                    let content =
-                        &parser.source()[parser.current_start + 1..parser.current_end - 1];
-                    format!("{quote}{content}{quote}")
-                }
-                TokenKind::Number | TokenKind::Percentage | TokenKind::Dimension { .. } => {
-                    parser.current_value().to_string()
-                }
-                TokenKind::Comment => {
-                    // Include comments in prelude (Svelte includes them in the prelude string)
-                    parser.current_value().to_string()
-                }
-                _ => parser.current_value().to_string(),
-            };
-
-            // Add space before boolean operators (and, or, not) if not preceded by whitespace
-            // Note: @scope preludes are now parsed structurally, so they don't go through this code
-            let is_bool_op = is_boolean_operator(parser);
-
-            if is_bool_op && !matches!(prev_token_kind, Some(TokenKind::Whitespace)) {
-                prelude_parts.push(" ".to_string());
-            }
-
-            // Remove trailing whitespace before ':' (CSS convention: property: value, not property : value)
-            if matches!(parser.current_kind, TokenKind::Colon) {
-                while prelude_parts.last().is_some_and(|s| s == " ") {
-                    prelude_parts.pop();
-                }
-            }
-
-            prelude_parts.push(part);
-
-            let current_kind = parser.current_kind.clone();
-
-            // Track parenthesis depth for selector detection
-            if matches!(current_kind, TokenKind::LeftParen) {
-                paren_depth += 1;
-            } else if matches!(current_kind, TokenKind::RightParen) {
-                paren_depth = paren_depth.saturating_sub(1);
-            }
-
-            parser.advance()?;
-
-            // Add space after boolean operators, commas, or ':' if not followed by whitespace
-            // Note: @scope preludes are now parsed structurally, so they don't go through this code
-            if !parser.check(&TokenKind::Whitespace) {
-                if is_bool_op {
-                    prelude_parts.push(" ".to_string());
-                } else if matches!(current_kind, TokenKind::Comma) {
-                    // Add space after comma in media queries (comma acts as OR)
-                    prelude_parts.push(" ".to_string());
-                } else if matches!(current_kind, TokenKind::Colon) {
-                    // Add space after ':' for property:value pairs (preceded by identifier/number/dimension)
-                    // For selector list preludes (@scope): Don't add space inside parentheses (pseudo-classes like :hover)
-                    // For query preludes (@media, @supports, @container): Always add space (property:value in queries)
-                    // Use last_non_whitespace_kind to check (handles case where whitespace was removed before colon)
-                    let should_add_space = (!is_selector_list_prelude || paren_depth == 0)
-                        && matches!(
-                            last_non_whitespace_kind,
-                            Some(TokenKind::Identifier)
-                                | Some(TokenKind::Number)
-                                | Some(TokenKind::Dimension { .. })
-                                | Some(TokenKind::Percentage)
-                        );
-
-                    if should_add_space {
-                        prelude_parts.push(" ".to_string());
-                    }
-                }
-            }
-
-            prev_token_kind = Some(current_kind.clone());
-            // Track last non-whitespace token for colon spacing logic
-            if !matches!(current_kind, TokenKind::Whitespace) {
-                last_non_whitespace_kind = Some(current_kind);
-            }
-        }
-
-        let content = prelude_parts.join("").trim().to_string();
-        let prelude_end = parser.base_offset() + parser.current_start;
-        PreludeValue::Raw {
-            content,
-            span: Span {
-                start: prelude_start as u32,
-                end: prelude_end as u32,
-            },
-        }
+        // Parse as raw string for other at-rules (@keyframes, etc.)
+        let (content, span) = parse_raw_prelude_content(parser, false)?;
+        PreludeValue::Raw { content, span }
     };
 
     // Parse block (if present)
@@ -640,6 +975,167 @@ pub(crate) fn parse_atrule(
             end,
         },
     })
+}
+
+/// Parse raw prelude content with normalization
+/// Returns (content, span)
+fn parse_raw_prelude_content(
+    parser: &mut CssParser,
+    is_selector_list_prelude: bool,
+) -> Result<(String, Span), ParseError> {
+    // Add spaces around boolean operators (and, or, not) and after ':' for prettier compatibility
+    let prelude_start = parser.base_offset() + parser.current_start;
+    let mut prelude_parts = Vec::new();
+    let mut prev_token_kind: Option<TokenKind> = None;
+    let mut last_non_whitespace_kind: Option<TokenKind> = None;
+    let mut paren_depth: u32 = 0; // Track parenthesis nesting for selector detection
+
+    // Categorize at-rule by prelude type based on CSS specs:
+    // - Selector list preludes (@scope): Format like CSS selectors (.widget:hover)
+    // - Query preludes (@media, @container, @supports): Format like properties (min-width: 500px)
+    // - No prelude (@font-face, @starting-style): No prelude to normalize
+    // - Identifier preludes (@keyframes, @layer): No colons to worry about
+
+    while !parser.check(&TokenKind::LeftBrace)
+        && !parser.check(&TokenKind::Semicolon)
+        && !parser.check(&TokenKind::Eof)
+    {
+        if parser.check(&TokenKind::Whitespace) {
+            // Skip whitespace in selector list preludes (inside parentheses for @scope):
+            // - After '(' or before ')'
+            // - After ':' (pseudo-classes like :hover) - only for selector list preludes
+            // - Before ',' (selector lists) - only for selector list preludes
+            // - After '[' or before ']' (attribute selectors) - only for selector list preludes
+            // - Before/after '=' (attribute selectors) - only for selector list preludes
+            let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
+                || matches!(parser.peek(), Ok(TokenKind::RightParen))
+                || (is_selector_list_prelude
+                    && paren_depth > 0
+                    && matches!(prev_token_kind, Some(TokenKind::Colon)))
+                || (is_selector_list_prelude
+                    && paren_depth > 0
+                    && matches!(parser.peek(), Ok(TokenKind::Comma)))
+                || (is_selector_list_prelude
+                    && matches!(prev_token_kind, Some(TokenKind::LeftBracket)))
+                || (is_selector_list_prelude
+                    && matches!(parser.peek(), Ok(TokenKind::RightBracket)))
+                || (is_selector_list_prelude && matches!(prev_token_kind, Some(TokenKind::Equals)))
+                || (is_selector_list_prelude && matches!(parser.peek(), Ok(TokenKind::Equals)));
+
+            parser.advance()?;
+
+            if skip_whitespace {
+                continue;
+            }
+            prelude_parts.push(" ".to_string());
+            prev_token_kind = Some(TokenKind::Whitespace);
+            continue;
+        }
+
+        let part = match &parser.current_kind {
+            // Internal AST: use decoded value (spec-compliant)
+            TokenKind::Identifier => parser
+                .current_identifier()
+                .unwrap_or_else(|| parser.current_value())
+                .to_string(),
+            TokenKind::String { quote } => {
+                let content = &parser.source()[parser.current_start + 1..parser.current_end - 1];
+                format!("{quote}{content}{quote}")
+            }
+            TokenKind::Number | TokenKind::Percentage | TokenKind::Dimension { .. } => {
+                parser.current_value().to_string()
+            }
+            TokenKind::Comment => {
+                // Include comments in prelude (Svelte includes them in the prelude string)
+                parser.current_value().to_string()
+            }
+            _ => parser.current_value().to_string(),
+        };
+
+        // Add space before boolean operators (and, or, not) or comments if not preceded by space
+        // Note: @scope preludes are now parsed structurally, so they don't go through this code
+        let is_bool_op = is_boolean_operator(parser);
+        let is_comment = matches!(parser.current_kind, TokenKind::Comment);
+
+        // Check if we already have a trailing space (from programmatic insertion or whitespace token)
+        let has_trailing_space = prelude_parts.last().is_some_and(|s| s == " ");
+
+        // Add space before comments or boolean operators if not already preceded by space
+        if (is_comment || is_bool_op) && !has_trailing_space {
+            prelude_parts.push(" ".to_string());
+        }
+
+        // Remove trailing whitespace before ':' or ',' (CSS convention: no space before these)
+        if matches!(parser.current_kind, TokenKind::Colon | TokenKind::Comma) {
+            while prelude_parts.last().is_some_and(|s| s == " ") {
+                prelude_parts.pop();
+            }
+        }
+
+        prelude_parts.push(part);
+
+        let current_kind = parser.current_kind.clone();
+
+        // Track parenthesis depth for selector detection
+        if matches!(current_kind, TokenKind::LeftParen) {
+            paren_depth += 1;
+        } else if matches!(current_kind, TokenKind::RightParen) {
+            paren_depth = paren_depth.saturating_sub(1);
+        }
+
+        parser.advance()?;
+
+        // Add space after boolean operators, comments, commas, or ':' if not followed by whitespace
+        // Note: @scope preludes are now parsed structurally, so they don't go through this code
+        if !parser.check(&TokenKind::Whitespace) {
+            if is_bool_op {
+                prelude_parts.push(" ".to_string());
+            } else if is_comment {
+                // Add space after comment, but not if followed by comma, close paren, or semicolon
+                if !matches!(
+                    parser.current_kind,
+                    TokenKind::Comma | TokenKind::RightParen | TokenKind::Semicolon
+                ) {
+                    prelude_parts.push(" ".to_string());
+                }
+            } else if matches!(current_kind, TokenKind::Comma) {
+                // Add space after comma in media queries (comma acts as OR)
+                prelude_parts.push(" ".to_string());
+            } else if matches!(current_kind, TokenKind::Colon) {
+                // Add space after ':' for property:value pairs (preceded by identifier/number/dimension)
+                // For selector list preludes (@scope): Don't add space inside parentheses (pseudo-classes like :hover)
+                // For query preludes (@media, @supports, @container): Always add space (property:value in queries)
+                // Use last_non_whitespace_kind to check (handles case where whitespace was removed before colon)
+                let should_add_space = (!is_selector_list_prelude || paren_depth == 0)
+                    && matches!(
+                        last_non_whitespace_kind,
+                        Some(TokenKind::Identifier)
+                            | Some(TokenKind::Number)
+                            | Some(TokenKind::Dimension { .. })
+                            | Some(TokenKind::Percentage)
+                    );
+
+                if should_add_space {
+                    prelude_parts.push(" ".to_string());
+                }
+            }
+        }
+
+        prev_token_kind = Some(current_kind.clone());
+        // Track last non-whitespace token for colon spacing logic
+        if !matches!(current_kind, TokenKind::Whitespace) {
+            last_non_whitespace_kind = Some(current_kind);
+        }
+    }
+
+    let content = prelude_parts.join("").trim().to_string();
+    let prelude_end = parser.base_offset() + parser.current_start;
+    let span = Span {
+        start: prelude_start as u32,
+        end: prelude_end as u32,
+    };
+
+    Ok((content, span))
 }
 
 /// Parse an at-rule block: `{ ... }`

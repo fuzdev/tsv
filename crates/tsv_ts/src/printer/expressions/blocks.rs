@@ -136,42 +136,33 @@ impl<'a> Printer<'a> {
         &mut self,
         block: &internal::BlockStatement,
     ) {
-        if block.body.is_empty() {
-            // Check for comments inside empty block
-            let block_start = block.span.start + 1; // After '{'
-            let block_end = block.span.end - 1; // Before '}'
-            let has_inner_comments = self.has_comments_between(block_start, block_end);
-
-            self.write("{\n");
-            self.indent_level += 1;
-            if has_inner_comments {
-                self.print_leading_comments(block_start, block_end, false);
-            }
-            self.indent_level -= 1;
-            self.write_indent();
-            self.write("}");
-            return;
-        }
-
-        // Non-empty blocks use standard printing
-        self.print_block_statement(block);
+        self.print_block_statement_core(block, true);
     }
 
     /// Print a block statement: `{ stmt1; stmt2; }`
     ///
     /// Handles comments between statements similar to print_program.
     pub(in crate::printer) fn print_block_statement(&mut self, block: &internal::BlockStatement) {
+        self.print_block_statement_core(block, false);
+    }
+
+    /// Core implementation for block statement printing
+    ///
+    /// When `expand_empty` is true, empty blocks without comments become `{\n}`.
+    /// When false, they become `{}`.
+    fn print_block_statement_core(&mut self, block: &internal::BlockStatement, expand_empty: bool) {
         if block.body.is_empty() {
             // Check for comments inside empty block
-            // Block span starts after '{' and ends before '}'
             let block_start = block.span.start + 1; // After '{'
             let block_end = block.span.end - 1; // Before '}'
             let has_inner_comments = self.has_comments_between(block_start, block_end);
 
-            if has_inner_comments {
+            if has_inner_comments || expand_empty {
                 self.write("{\n");
                 self.indent_level += 1;
-                self.print_leading_comments(block_start, block_end, false);
+                if has_inner_comments {
+                    self.print_leading_comments(block_start, block_end, false);
+                }
                 self.indent_level -= 1;
                 self.write_indent();
                 self.write("}");
@@ -229,6 +220,28 @@ impl<'a> Printer<'a> {
         &self,
         block: &internal::BlockStatement,
     ) -> Doc {
+        self.build_block_statement_doc_core(block, false)
+    }
+
+    /// Build a Doc for a block statement, expanding empty blocks to `{\n}`
+    ///
+    /// Used in if/else contexts where empty blocks should not stay on one line.
+    pub(in crate::printer) fn build_block_statement_expand_empty_doc(
+        &self,
+        block: &internal::BlockStatement,
+    ) -> Doc {
+        self.build_block_statement_doc_core(block, true)
+    }
+
+    /// Core implementation for block statement doc building
+    ///
+    /// When `expand_empty` is true, empty blocks without comments become `{\n}`.
+    /// When false, they become `{}`.
+    fn build_block_statement_doc_core(
+        &self,
+        block: &internal::BlockStatement,
+        expand_empty: bool,
+    ) -> Doc {
         if block.body.is_empty() {
             // Check for comments inside empty block
             let block_start = block.span.start + 1; // After '{'
@@ -255,7 +268,12 @@ impl<'a> Printer<'a> {
                 ]);
             }
 
-            return doc::text("{}");
+            // Empty block without comments
+            return if expand_empty {
+                doc::concat(vec![doc::text("{"), doc::hardline(), doc::text("}")])
+            } else {
+                doc::text("{}")
+            };
         }
 
         // Build statements with line breaks between them

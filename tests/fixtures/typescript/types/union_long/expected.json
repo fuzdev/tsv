@@ -1,0 +1,1003 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 688,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Union types",
+			"start": 20,
+			"end": 34,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 100 chars exactly - stays inline (at boundary)",
+			"start": 37,
+			"end": 86,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - wraps with leading |",
+			"start": 189,
+			"end": 224,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Intersection types",
+			"start": 348,
+			"end": 369,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 100 chars exactly - stays inline (at boundary)",
+			"start": 372,
+			"end": 421,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - wraps with trailing &",
+			"start": 524,
+			"end": 560,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 37
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 687,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 678,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 34,
+					"column": 0
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 88,
+					"end": 186,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 99
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 93,
+						"end": 94,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 6
+							},
+							"end": {
+								"line": 5,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 97,
+						"end": 185,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 10
+							},
+							"end": {
+								"line": 5,
+								"column": 98
+							}
+						},
+						"types": [
+							{
+								"type": "TSStringKeyword",
+								"start": 97,
+								"end": 103,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 10
+									},
+									"end": {
+										"line": 5,
+										"column": 16
+									}
+								}
+							},
+							{
+								"type": "TSNumberKeyword",
+								"start": 106,
+								"end": 112,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 19
+									},
+									"end": {
+										"line": 5,
+										"column": 25
+									}
+								}
+							},
+							{
+								"type": "TSBooleanKeyword",
+								"start": 115,
+								"end": 122,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 28
+									},
+									"end": {
+										"line": 5,
+										"column": 35
+									}
+								}
+							},
+							{
+								"type": "TSObjectKeyword",
+								"start": 125,
+								"end": 131,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 38
+									},
+									"end": {
+										"line": 5,
+										"column": 44
+									}
+								}
+							},
+							{
+								"type": "TSNullKeyword",
+								"start": 134,
+								"end": 138,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 47
+									},
+									"end": {
+										"line": 5,
+										"column": 51
+									}
+								}
+							},
+							{
+								"type": "TSUndefinedKeyword",
+								"start": 141,
+								"end": 150,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 54
+									},
+									"end": {
+										"line": 5,
+										"column": 63
+									}
+								}
+							},
+							{
+								"type": "TSSymbolKeyword",
+								"start": 153,
+								"end": 159,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 66
+									},
+									"end": {
+										"line": 5,
+										"column": 72
+									}
+								}
+							},
+							{
+								"type": "TSBigIntKeyword",
+								"start": 162,
+								"end": 168,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 75
+									},
+									"end": {
+										"line": 5,
+										"column": 81
+									}
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 171,
+								"end": 185,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 84
+									},
+									"end": {
+										"line": 5,
+										"column": 98
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 171,
+									"end": 185,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 84
+										},
+										"end": {
+											"line": 5,
+											"column": 98
+										}
+									},
+									"name": "neveeeeeeeeeer"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Union types",
+							"start": 20,
+							"end": 34
+						},
+						{
+							"type": "Line",
+							"value": " 100 chars exactly - stays inline (at boundary)",
+							"start": 37,
+							"end": 86
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 226,
+					"end": 345,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 20
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 231,
+						"end": 232,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 237,
+						"end": 344,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 2
+							},
+							"end": {
+								"line": 17,
+								"column": 19
+							}
+						},
+						"types": [
+							{
+								"type": "TSStringKeyword",
+								"start": 239,
+								"end": 245,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 4
+									},
+									"end": {
+										"line": 9,
+										"column": 10
+									}
+								}
+							},
+							{
+								"type": "TSNumberKeyword",
+								"start": 250,
+								"end": 256,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 4
+									},
+									"end": {
+										"line": 10,
+										"column": 10
+									}
+								}
+							},
+							{
+								"type": "TSBooleanKeyword",
+								"start": 261,
+								"end": 268,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 4
+									},
+									"end": {
+										"line": 11,
+										"column": 11
+									}
+								}
+							},
+							{
+								"type": "TSObjectKeyword",
+								"start": 273,
+								"end": 279,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 4
+									},
+									"end": {
+										"line": 12,
+										"column": 10
+									}
+								}
+							},
+							{
+								"type": "TSNullKeyword",
+								"start": 284,
+								"end": 288,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 4
+									},
+									"end": {
+										"line": 13,
+										"column": 8
+									}
+								}
+							},
+							{
+								"type": "TSUndefinedKeyword",
+								"start": 293,
+								"end": 302,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 4
+									},
+									"end": {
+										"line": 14,
+										"column": 13
+									}
+								}
+							},
+							{
+								"type": "TSSymbolKeyword",
+								"start": 307,
+								"end": 313,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 4
+									},
+									"end": {
+										"line": 15,
+										"column": 10
+									}
+								}
+							},
+							{
+								"type": "TSBigIntKeyword",
+								"start": 318,
+								"end": 324,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 4
+									},
+									"end": {
+										"line": 16,
+										"column": 10
+									}
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 329,
+								"end": 344,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 4
+									},
+									"end": {
+										"line": 17,
+										"column": 19
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 329,
+									"end": 344,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 4
+										},
+										"end": {
+											"line": 17,
+											"column": 19
+										}
+									},
+									"name": "neveeeeeeeeeeer"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars - wraps with leading |",
+							"start": 189,
+							"end": 224
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 423,
+					"end": 521,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 99
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 428,
+						"end": 429,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 6
+							},
+							"end": {
+								"line": 22,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 432,
+						"end": 520,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 10
+							},
+							"end": {
+								"line": 22,
+								"column": 98
+							}
+						},
+						"types": [
+							{
+								"type": "TSStringKeyword",
+								"start": 432,
+								"end": 438,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 10
+									},
+									"end": {
+										"line": 22,
+										"column": 16
+									}
+								}
+							},
+							{
+								"type": "TSNumberKeyword",
+								"start": 441,
+								"end": 447,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 19
+									},
+									"end": {
+										"line": 22,
+										"column": 25
+									}
+								}
+							},
+							{
+								"type": "TSBooleanKeyword",
+								"start": 450,
+								"end": 457,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 28
+									},
+									"end": {
+										"line": 22,
+										"column": 35
+									}
+								}
+							},
+							{
+								"type": "TSObjectKeyword",
+								"start": 460,
+								"end": 466,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 38
+									},
+									"end": {
+										"line": 22,
+										"column": 44
+									}
+								}
+							},
+							{
+								"type": "TSNullKeyword",
+								"start": 469,
+								"end": 473,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 47
+									},
+									"end": {
+										"line": 22,
+										"column": 51
+									}
+								}
+							},
+							{
+								"type": "TSUndefinedKeyword",
+								"start": 476,
+								"end": 485,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 54
+									},
+									"end": {
+										"line": 22,
+										"column": 63
+									}
+								}
+							},
+							{
+								"type": "TSSymbolKeyword",
+								"start": 488,
+								"end": 494,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 66
+									},
+									"end": {
+										"line": 22,
+										"column": 72
+									}
+								}
+							},
+							{
+								"type": "TSBigIntKeyword",
+								"start": 497,
+								"end": 503,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 75
+									},
+									"end": {
+										"line": 22,
+										"column": 81
+									}
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 506,
+								"end": 520,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 84
+									},
+									"end": {
+										"line": 22,
+										"column": 98
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 506,
+									"end": 520,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 84
+										},
+										"end": {
+											"line": 22,
+											"column": 98
+										}
+									},
+									"name": "neverrrrrrrrrr"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Intersection types",
+							"start": 348,
+							"end": 369
+						},
+						{
+							"type": "Line",
+							"value": " 100 chars exactly - stays inline (at boundary)",
+							"start": 372,
+							"end": 421
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 562,
+					"end": 677,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 18
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 567,
+						"end": 568,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 6
+							},
+							"end": {
+								"line": 25,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 571,
+						"end": 676,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 10
+							},
+							"end": {
+								"line": 33,
+								"column": 17
+							}
+						},
+						"types": [
+							{
+								"type": "TSStringKeyword",
+								"start": 571,
+								"end": 577,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 10
+									},
+									"end": {
+										"line": 25,
+										"column": 16
+									}
+								}
+							},
+							{
+								"type": "TSNumberKeyword",
+								"start": 582,
+								"end": 588,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 8
+									}
+								}
+							},
+							{
+								"type": "TSBooleanKeyword",
+								"start": 593,
+								"end": 600,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 27,
+										"column": 9
+									}
+								}
+							},
+							{
+								"type": "TSObjectKeyword",
+								"start": 605,
+								"end": 611,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 8
+									}
+								}
+							},
+							{
+								"type": "TSNullKeyword",
+								"start": 616,
+								"end": 620,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 6
+									}
+								}
+							},
+							{
+								"type": "TSUndefinedKeyword",
+								"start": 625,
+								"end": 634,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 2
+									},
+									"end": {
+										"line": 30,
+										"column": 11
+									}
+								}
+							},
+							{
+								"type": "TSSymbolKeyword",
+								"start": 639,
+								"end": 645,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 2
+									},
+									"end": {
+										"line": 31,
+										"column": 8
+									}
+								}
+							},
+							{
+								"type": "TSBigIntKeyword",
+								"start": 650,
+								"end": 656,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 2
+									},
+									"end": {
+										"line": 32,
+										"column": 8
+									}
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 661,
+								"end": 676,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 2
+									},
+									"end": {
+										"line": 33,
+										"column": 17
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 661,
+									"end": 676,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 2
+										},
+										"end": {
+											"line": 33,
+											"column": 17
+										}
+									},
+									"name": "neverrrrrrrrrrr"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars - wraps with trailing &",
+							"start": 524,
+							"end": 560
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -31,17 +31,17 @@
 	}
 
 	/* With type selector */
-	.page::view-transition-group(content) {
+	.class1::view-transition-group(content) {
 		animation-duration: 0.25s;
 	}
 
 	/* Nested pseudo-elements */
-	::view-transition-group(sidebar)::view-transition-old(*) {
+	::view-transition-group(name1)::view-transition-old(*) {
 		opacity: 0;
 	}
 
 	/* With pseudo-class */
-	.animated:hover::view-transition-new(element) {
+	.class2:hover::view-transition-new(name2) {
 		transform: scale(1.1);
 	}
 </style>

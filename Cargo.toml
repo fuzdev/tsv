@@ -10,6 +10,7 @@ members = [
     "crates/tsv_debug",
     "crates/tsv_wasm",
     "crates/tsv_ffi",
+    "crates/tsv_napi",
 ]
 
 [workspace.package]

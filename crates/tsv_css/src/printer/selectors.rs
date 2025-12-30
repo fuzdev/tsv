@@ -55,9 +55,10 @@ impl<'a> Printer<'a> {
         let list_doc = self.build_selector_list_doc(list);
 
         // Check if it fits on one line
-        // For nested selector lists, we use a smaller threshold since they're inside parens
-        // and need to account for the surrounding context
-        let available_width = self.config.print_width.saturating_sub(20); // Conservative threshold
+        // Use current column position (what's already printed: indent + pseudo-class prefix)
+        // and leave room for closing `) {` (3 chars)
+        let current_col = self.current_column();
+        let available_width = self.config.print_width.saturating_sub(current_col + 3);
         let fits = doc::fits(&list_doc, available_width, doc::Mode::Flat, &self.config);
 
         if fits {
@@ -152,9 +153,9 @@ impl<'a> Printer<'a> {
         let selector_doc = self.build_complex_selector_doc(complex);
 
         // Check if it fits on one line
-        // Account for: indent (1 tab = 2 chars) + trailing " {" (2 chars) = 4 chars overhead
+        // Account for: indent + trailing " {" (2 chars)
         // Tab width is counted based on config.tab_width (default: 2)
-        let indent_width = self.indent_level * self.config.tab_width;
+        let indent_width = self.effective_indent() * self.config.tab_width;
         let overhead = indent_width + 2; // " {" or ", "
         let available_width = self.config.print_width.saturating_sub(overhead);
         let fits = doc::fits(

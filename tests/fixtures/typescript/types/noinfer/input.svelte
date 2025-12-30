@@ -11,7 +11,7 @@
 	type Callback<T> = (value: NoInfer<T>) => void;
 
 	// NoInfer nested in complex type
-	type Container<T> = {
+	type Box<T> = {
 		value: T;
 		setter: (val: NoInfer<T>) => void;
 	};

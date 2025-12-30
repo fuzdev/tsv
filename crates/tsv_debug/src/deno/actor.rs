@@ -215,11 +215,32 @@ impl ActorState {
             return Ok(false); // EOF
         }
 
+        // Skip empty lines and non-JSON output (defensive against stdout noise from npm packages)
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            return Ok(true);
+        }
+        if !trimmed.starts_with('{') {
+            // npm packages sometimes write warnings to stdout - log and continue
+            eprintln!("[deno] Unexpected stdout: {trimmed}");
+            return Ok(true);
+        }
+
         let response: WireResponse =
-            serde_json::from_str(&line).map_err(DenoError::ResponseParse)?;
+            serde_json::from_str(trimmed).map_err(DenoError::ResponseParse)?;
+
+        // id: -1 means the sidecar couldn't parse our request (log and continue)
+        if response.id < 0 {
+            eprintln!(
+                "[deno] Malformed request error: {}",
+                response.error.as_deref().unwrap_or("unknown")
+            );
+            return Ok(true);
+        }
 
         // Find and complete the pending request
-        if let Some(tx) = self.pending.remove(&response.id) {
+        #[allow(clippy::cast_sign_loss)]
+        if let Some(tx) = self.pending.remove(&(response.id as u64)) {
             let result = if response.ok {
                 response.output.ok_or(DenoError::MissingOutput)
             } else {

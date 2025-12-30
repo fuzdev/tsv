@@ -57,12 +57,12 @@
 				"prelude": {
 					"type": "SelectorList",
 					"start": 44,
-					"end": 55,
+					"end": 57,
 					"children": [
 						{
 							"type": "ComplexSelector",
 							"start": 44,
-							"end": 55,
+							"end": 57,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -76,7 +76,7 @@
 										}
 									],
 									"start": 44,
-									"end": 55
+									"end": 57
 								}
 							]
 						}
@@ -84,32 +84,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 56,
-					"end": 80,
+					"start": 58,
+					"end": 82,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 60,
-							"end": 76,
+							"start": 62,
+							"end": 78,
 							"property": "background",
 							"value": "blue"
 						}
 					]
 				},
 				"start": 44,
-				"end": 80
+				"end": 82
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 83,
-					"end": 101,
+					"start": 85,
+					"end": 104,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 83,
-							"end": 101,
+							"start": 85,
+							"end": 104,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -118,12 +118,12 @@
 										{
 											"type": "PseudoElementSelector",
 											"name": "part",
-											"start": 83,
-											"end": 89
+											"start": 85,
+											"end": 91
 										}
 									],
-									"start": 83,
-									"end": 101
+									"start": 85,
+									"end": 104
 								}
 							]
 						}
@@ -131,31 +131,31 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 102,
-					"end": 128,
+					"start": 105,
+					"end": 131,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 106,
-							"end": 124,
+							"start": 109,
+							"end": 127,
 							"property": "background",
 							"value": "yellow"
 						}
 					]
 				},
-				"start": 83,
-				"end": 128
+				"start": 85,
+				"end": 131
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 131,
+					"start": 134,
 					"end": 153,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 131,
+							"start": 134,
 							"end": 153,
 							"children": [
 								{
@@ -165,11 +165,11 @@
 										{
 											"type": "PseudoElementSelector",
 											"name": "part",
-											"start": 131,
-											"end": 137
+											"start": 134,
+											"end": 140
 										}
 									],
-									"start": 131,
+									"start": 134,
 									"end": 153
 								}
 							]
@@ -197,14 +197,14 @@
 						}
 					]
 				},
-				"start": 131,
+				"start": 134,
 				"end": 195
 			}
 		],
 		"content": {
 			"start": 7,
 			"end": 196,
-			"styles": "\n\t::part(label) {\n\t\tcolor: red;\n\t}\n\n\t::part(tab) {\n\t\tbackground: blue;\n\t}\n\n\t::part(tab active) {\n\t\tbackground: yellow;\n\t}\n\n\t::part(button primary) {\n\t\tcolor: white;\n\t\tbackground: green;\n\t}\n",
+			"styles": "\n\t::part(name1) {\n\t\tcolor: red;\n\t}\n\n\t::part(name2) {\n\t\tbackground: blue;\n\t}\n\n\t::part(name2 name3) {\n\t\tbackground: yellow;\n\t}\n\n\t::part(name4 name5) {\n\t\tcolor: white;\n\t\tbackground: green;\n\t}\n",
 			"comment": null
 		}
 	},

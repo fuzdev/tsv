@@ -28,8 +28,9 @@ pub mod quotes;
 mod span;
 
 pub use comment::{
-    Comment, comments_after, comments_in_range, find_first_comment_from, has_comments_in_range,
-    has_line_comments_in_range,
+    Comment, CommentPosition, classify_comment, comments_after, comments_in_range,
+    find_first_comment_from, has_comments_in_range, has_line_comments_in_range, leading_comments,
+    trailing_comments,
 };
 pub use config::PrintConfig;
 pub use error::{ErrorContext, ParseError, Result};

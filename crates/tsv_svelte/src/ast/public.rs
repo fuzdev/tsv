@@ -177,7 +177,7 @@ pub struct BindDirective {
     pub expression: Expression,
 }
 
-/// ClassDirective - conditional class (`class:active={isActive}`)
+/// ClassDirective - conditional class (`class:class1={cond}`)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClassDirective {
     #[serde(rename = "type")]

@@ -3,30 +3,30 @@
 		/* var() in calc() */
 		width: calc(
 			var(
-				--base
+				--var1
 			)
 			*
 			2
 		);
 		height: calc(
-			var(--base)
+			var(--var1)
 			*
 			2
 			+
 			10px
 		);
 		margin: calc(
-			var(--spacing)
+			var(--var2)
 			-
 			5px
 		);
 		padding: calc(
 			var(
-				--size1
+				--var3
 			)
 			+
 			var(
-				--size2
+				--var4
 			)
 		);
 
@@ -60,7 +60,7 @@
 		/* var() in functions with fallbacks in calc() */
 		width: calc(
 			var(
-				--width,
+				--w,
 				100%
 			)
 			-
@@ -68,14 +68,14 @@
 		);
 		margin: calc(
 			var(
-				--base,
+				--var1,
 				1rem
 			)
 			*
 			2
 			+
 			var(
-				--offset,
+				--var5,
 				0px
 			)
 		);
@@ -115,14 +115,14 @@
 		/* var() in gradients */
 		background: linear-gradient(
 			var(
-				--direction,
+				--dir,
 				to right
 			),
 			var(
-				--start
+				--a
 			),
 			var(
-				--end
+				--b
 			)
 		);
 	}

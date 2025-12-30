@@ -113,10 +113,27 @@ const lines = Deno.stdin.readable
 	.pipeThrough(new TextLineStream());
 
 for await (const line of lines) {
-	const req: Request = JSON.parse(line);
-	const start = performance.now();
+	// Skip empty lines (defensive against stdin noise)
+	if (line.trim() === '') continue;
 
+	const start = performance.now();
 	let response: Response;
+
+	// Parse request - errors here get a response with id: -1
+	let req: Request;
+	try {
+		req = JSON.parse(line);
+	} catch (err) {
+		response = {
+			id: -1,
+			ok: false,
+			error: `Invalid JSON request: ${err instanceof Error ? err.message : String(err)}`,
+			duration_ms: Math.round(performance.now() - start),
+		};
+		console.log(JSON.stringify(response));
+		continue;
+	}
+
 	try {
 		const output = await dispatch(req.tool, req.content, req.options);
 		response = {

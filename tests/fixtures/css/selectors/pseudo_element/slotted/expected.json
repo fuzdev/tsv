@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 220,
+		"end": 226,
 		"attributes": [],
 		"children": [
 			{
@@ -104,12 +104,12 @@
 				"prelude": {
 					"type": "SelectorList",
 					"start": 80,
-					"end": 95,
+					"end": 98,
 					"children": [
 						{
 							"type": "ComplexSelector",
 							"start": 80,
-							"end": 95,
+							"end": 98,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -123,7 +123,7 @@
 										}
 									],
 									"start": 80,
-									"end": 95
+									"end": 98
 								}
 							]
 						}
@@ -131,32 +131,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 96,
-					"end": 116,
+					"start": 99,
+					"end": 119,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 100,
-							"end": 112,
+							"start": 103,
+							"end": 115,
 							"property": "color",
 							"value": "green"
 						}
 					]
 				},
 				"start": 80,
-				"end": 116
+				"end": 119
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 119,
-					"end": 147,
+					"start": 122,
+					"end": 153,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 119,
-							"end": 147,
+							"start": 122,
+							"end": 153,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -165,12 +165,12 @@
 										{
 											"type": "PseudoElementSelector",
 											"name": "slotted",
-											"start": 119,
-											"end": 128
+											"start": 122,
+											"end": 131
 										}
 									],
-									"start": 119,
-									"end": 147
+									"start": 122,
+									"end": 153
 								}
 							]
 						}
@@ -178,32 +178,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 148,
-					"end": 169,
+					"start": 154,
+					"end": 175,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 152,
-							"end": 165,
+							"start": 158,
+							"end": 171,
 							"property": "color",
 							"value": "yellow"
 						}
 					]
 				},
-				"start": 119,
-				"end": 169
+				"start": 122,
+				"end": 175
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 172,
-					"end": 189,
+					"start": 178,
+					"end": 195,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 172,
-							"end": 189,
+							"start": 178,
+							"end": 195,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -212,12 +212,12 @@
 										{
 											"type": "PseudoElementSelector",
 											"name": "slotted",
-											"start": 172,
-											"end": 181
+											"start": 178,
+											"end": 187
 										}
 									],
-									"start": 172,
-									"end": 189
+									"start": 178,
+									"end": 195
 								}
 							]
 						}
@@ -225,32 +225,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 190,
-					"end": 211,
+					"start": 196,
+					"end": 217,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 194,
-							"end": 207,
+							"start": 200,
+							"end": 213,
 							"property": "color",
 							"value": "purple"
 						}
 					]
 				},
-				"start": 172,
-				"end": 211
+				"start": 178,
+				"end": 217
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 212,
-			"styles": "\n\t::slotted(*) {\n\t\tcolor: red;\n\t}\n\n\t::slotted(div) {\n\t\tcolor: blue;\n\t}\n\n\t::slotted(.foo) {\n\t\tcolor: green;\n\t}\n\n\t::slotted(div.foo#bar:hover) {\n\t\tcolor: yellow;\n\t}\n\n\t::slotted([slot]) {\n\t\tcolor: purple;\n\t}\n",
+			"end": 218,
+			"styles": "\n\t::slotted(*) {\n\t\tcolor: red;\n\t}\n\n\t::slotted(div) {\n\t\tcolor: blue;\n\t}\n\n\t::slotted(.class1) {\n\t\tcolor: green;\n\t}\n\n\t::slotted(div.class1#id1:hover) {\n\t\tcolor: yellow;\n\t}\n\n\t::slotted([slot]) {\n\t\tcolor: purple;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 221,
+	"end": 227,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

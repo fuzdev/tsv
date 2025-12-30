@@ -8,10 +8,9 @@
 import { walk } from '@std/fs/walk';
 import { basename, extname } from '@std/path';
 
-import type { CorpusStats, Language, SourceFile } from './types.ts';
+import type { CorpusStats, Language, Logger, SourceFile } from './types.ts';
 
-/** Logger function type */
-export type Logger = (...args: unknown[]) => void;
+export type { Logger };
 
 /**
  * Interface for loading benchmark corpus from different sources.

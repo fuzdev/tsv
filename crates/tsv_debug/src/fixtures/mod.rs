@@ -18,6 +18,8 @@ pub const EXPECTED_SVELTE_ERROR_JSON: &str = "{\"error\": \"failed to parse\"}\n
 pub enum InputType {
     /// Svelte file (input.svelte) - tests code in Svelte context
     Svelte,
+    /// Svelte TypeScript module (input.svelte.ts) - for runes in module files
+    SvelteTs,
     /// TypeScript file (input.ts) - for file-level features like hashbang
     TypeScript,
     /// CSS file (input.css) - for standalone CSS testing
@@ -29,6 +31,7 @@ impl InputType {
     pub const fn extension(self) -> &'static str {
         match self {
             InputType::Svelte => ".svelte",
+            InputType::SvelteTs => ".svelte.ts",
             InputType::TypeScript => ".ts",
             InputType::Css => ".css",
         }
@@ -38,6 +41,8 @@ impl InputType {
     pub fn prettier_parser(self) -> PrettierParser<'static> {
         match self {
             InputType::Svelte => PrettierParser::Parser("svelte"),
+            // SvelteTs uses filepath-based detection so prettier-plugin-svelte handles it
+            InputType::SvelteTs => PrettierParser::Filepath("file.svelte.ts"),
             InputType::TypeScript => PrettierParser::Parser("typescript"),
             InputType::Css => PrettierParser::Parser("css"),
         }
@@ -61,7 +66,10 @@ pub struct Fixture {
 impl Fixture {
     /// Get the input type for this fixture
     pub fn input_type(&self) -> InputType {
-        if self.input_file.ends_with(".ts") {
+        // Check .svelte.ts before .ts (more specific match first)
+        if self.input_file.ends_with(".svelte.ts") {
+            InputType::SvelteTs
+        } else if self.input_file.ends_with(".ts") {
             InputType::TypeScript
         } else if self.input_file.ends_with(".css") {
             InputType::Css
@@ -95,10 +103,19 @@ impl Fixture {
         self.expected_ours_path().exists()
     }
 
+    /// Check if this fixture is in a svelte divergence directory
+    pub fn is_svelte_divergence(&self) -> bool {
+        self.path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(has_svelte_divergence_suffix)
+    }
+
     /// Get the output_prettier filename (e.g., "output_prettier.svelte")
     pub fn output_prettier_filename(&self) -> &'static str {
         match self.input_type() {
             InputType::Svelte => "output_prettier.svelte",
+            InputType::SvelteTs => "output_prettier.svelte.ts",
             InputType::TypeScript => "output_prettier.ts",
             InputType::Css => "output_prettier.css",
         }
@@ -161,10 +178,12 @@ fn get_subdirectory_names(dir: &Path) -> Vec<String> {
 
 /// Find the input file in a directory, if any
 ///
-/// Prefers input.svelte, falls back to input.ts or input.css.
+/// Prefers input.svelte, falls back to input.svelte.ts, input.ts, or input.css.
 fn find_input_file(dir: &Path) -> Option<&'static str> {
     if dir.join("input.svelte").exists() {
         Some("input.svelte")
+    } else if dir.join("input.svelte.ts").exists() {
+        Some("input.svelte.ts")
     } else if dir.join("input.ts").exists() {
         Some("input.ts")
     } else if dir.join("input.css").exists() {
@@ -210,7 +229,7 @@ fn walk_fixtures_recursive(
                     return Err(format!(
                         "Directory has both input file AND subdirectories: {}\n\
                         Each directory must have EITHER:\n\
-                        - An input file (input.svelte, input.ts, or input.css) making it a fixture, OR\n\
+                        - An input file (input.svelte, input.svelte.ts, input.ts, or input.css) making it a fixture, OR\n\
                         - Subdirectories making it a container\n\
                         \n\
                         Found: {input_file} AND subdirectories: {}\n\
@@ -240,7 +259,7 @@ fn walk_fixtures_recursive(
                     return Err(format!(
                         "Orphan directory (has neither input file nor subdirectories): {}\n\
                         Each directory must have EITHER:\n\
-                        - An input file (input.svelte, input.ts, or input.css) making it a fixture, OR\n\
+                        - An input file (input.svelte, input.svelte.ts, input.ts, or input.css) making it a fixture, OR\n\
                         - Subdirectories making it a container\n\
                         \n\
                         To fix, either:\n\
@@ -798,12 +817,12 @@ pub fn delete_file_if_exists(path: &Path) -> Result<(), String> {
 /// Format content using our formatter
 ///
 /// Determines file type from filepath extension and calls the appropriate formatter.
-/// Supports .svelte, .ts, and .css files.
+/// Supports .svelte, .svelte.ts, .ts, and .css files.
 pub fn format_with_our_formatter(content: &str, filepath: &str) -> Result<String, String> {
-    if filepath.ends_with(".svelte") {
+    if filepath.ends_with(".svelte") && !filepath.ends_with(".svelte.ts") {
         let ast = tsv_svelte::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
         Ok(tsv_svelte::format(&ast, content))
-    } else if filepath.ends_with(".ts") {
+    } else if filepath.ends_with(".svelte.ts") || filepath.ends_with(".ts") {
         let ast = tsv_ts::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
         // For standalone TypeScript files, don't add trailing comma for arrow type params
         // (no Svelte template syntax disambiguation needed)
@@ -824,18 +843,18 @@ pub fn format_with_our_formatter(content: &str, filepath: &str) -> Result<String
 ///
 /// This matches the format used by fixtures_update_parsed, ensuring string-level
 /// comparison catches both semantic and formatting differences.
-/// Supports .svelte and .ts files.
+/// Supports .svelte, .svelte.ts, and .ts files.
 pub fn parse_with_our_parser_to_string(content: &str, filepath: &str) -> Result<String, String> {
     use tsv_cli::json_utils::to_json_with_tabs;
 
-    if filepath.ends_with(".svelte") {
+    if filepath.ends_with(".svelte") && !filepath.ends_with(".svelte.ts") {
         let ast = tsv_svelte::parse(content).map_err(|e| format!("Parse error: {e:?}"))?;
         let public_ast = tsv_svelte::convert_ast(&ast, content);
         let json = to_json_with_tabs(&public_ast)
             .map_err(|e| format!("Failed to serialize AST to JSON: {e}"))?;
         // Add trailing newline to match fixtures_update_parsed format
         Ok(format!("{json}\n"))
-    } else if filepath.ends_with(".ts") {
+    } else if filepath.ends_with(".svelte.ts") || filepath.ends_with(".ts") {
         let ast = tsv_ts::parse(content).map_err(|e| format!("Parse error: {e:?}"))?;
         let public_ast = tsv_ts::convert_ast(&ast, content);
         let json = to_json_with_tabs(&public_ast)

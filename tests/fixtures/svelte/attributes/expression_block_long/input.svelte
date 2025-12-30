@@ -1,26 +1,29 @@
-<!-- Short expression - no wrap -->
-<div onclick={() => fn()}></div>
+<!-- Simple identifier expression -->
 
-<!-- Short expression attr - no wrap -->
-<div data-x={a + b}></div>
+<!-- 100 chars - stays inline (at boundary) -->
+<div data-x={aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}></div>
 
-<!-- Block body - wraps due to hardlines (not width) -->
+<!-- 101 chars - wraps attributes -->
 <div
-	onclick={() => {
-		fn();
-	}}
+	data-x={aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
 ></div>
 
-<!-- Long expression without hardlines - wraps due to width -->
+<!-- Function call expression -->
+
+<!-- 100 chars - stays inline (at boundary) -->
+<div data-x={fn(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)}></div>
+
+<!-- 101 chars - wraps attributes -->
 <div
-	data-computed={veryLongFunctionName(argumentOne, argumentTwo, argumentThree, argumentFour)}
+	data-x={fn(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)}
 ></div>
 
-<!-- Multiple attrs with one having hardlines - all wrap -->
+<!-- Function call with args that wrap internally -->
 <div
-	class="container"
-	onclick={() => {
-		handleClick();
-	}}
-	id="main"
+	data-x={fn(
+		arg0000000000000000,
+		arg1111111111111111,
+		arg2222222222222222,
+		arg3333333333333333333333,
+	)}
 ></div>

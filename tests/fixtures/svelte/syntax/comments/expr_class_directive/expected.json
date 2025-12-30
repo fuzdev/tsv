@@ -29,7 +29,7 @@
 						"start": 5,
 						"end": 32,
 						"type": "ClassDirective",
-						"name": "active",
+						"name": "class1",
 						"name_loc": {
 							"start": {
 								"line": 1,

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 387,
+	"end": 672,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -28,9 +28,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " but member expression stays together (no break within eslint.Rule.RuleModule)",
+			"value": " but member expression stays together (no break within a00000.b0000.c0000000)",
 			"start": 109,
-			"end": 189,
+			"end": 188,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -38,23 +38,55 @@
 				},
 				"end": {
 					"line": 3,
-					"column": 81
+					"column": 80
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " Contrast: Short class stays inline",
-			"start": 303,
-			"end": 340,
+			"value": " 100 chars exactly - stays inline (at boundary)",
+			"start": 191,
+			"end": 240,
 			"loc": {
 				"start": {
-					"line": 7,
+					"line": 5,
 					"column": 1
 				},
 				"end": {
-					"line": 7,
-					"column": 38
+					"line": 5,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - wraps extends to new line",
+			"start": 343,
+			"end": 383,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Contrast: Simple identifier parent - NEVER wraps (Prettier quirk)",
+			"start": 489,
+			"end": 557,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 69
 				}
 			}
 		}
@@ -62,147 +94,147 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 386,
+		"end": 671,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 377,
+			"end": 662,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 9,
+					"line": 14,
 					"column": 0
 				}
 			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
-					"start": 191,
-					"end": 300,
+					"start": 242,
+					"end": 340,
 					"loc": {
 						"start": {
-							"line": 4,
+							"line": 6,
 							"column": 1
 						},
 						"end": {
-							"line": 5,
-							"column": 35
+							"line": 6,
+							"column": 99
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 197,
-						"end": 264,
+						"start": 248,
+						"end": 307,
 						"loc": {
 							"start": {
-								"line": 4,
+								"line": 6,
 								"column": 7
 							},
 							"end": {
-								"line": 4,
-								"column": 74
+								"line": 6,
+								"column": 66
 							}
 						},
-						"name": "ThisIsAnExtremelyLongClassNameThatWillDefinitelyExceedThePrintWidth"
+						"name": "ClassNameThatIsLongEnoughToTriggerWrapping00000000000000000"
 					},
 					"superClass": {
 						"type": "MemberExpression",
-						"start": 275,
-						"end": 297,
+						"start": 316,
+						"end": 337,
 						"loc": {
 							"start": {
-								"line": 5,
-								"column": 10
+								"line": 6,
+								"column": 75
 							},
 							"end": {
-								"line": 5,
-								"column": 32
+								"line": 6,
+								"column": 96
 							}
 						},
 						"object": {
 							"type": "MemberExpression",
-							"start": 275,
-							"end": 286,
+							"start": 316,
+							"end": 328,
 							"loc": {
 								"start": {
-									"line": 5,
-									"column": 10
+									"line": 6,
+									"column": 75
 								},
 								"end": {
-									"line": 5,
-									"column": 21
+									"line": 6,
+									"column": 87
 								}
 							},
 							"object": {
 								"type": "Identifier",
-								"start": 275,
-								"end": 281,
+								"start": 316,
+								"end": 322,
 								"loc": {
 									"start": {
-										"line": 5,
-										"column": 10
+										"line": 6,
+										"column": 75
 									},
 									"end": {
-										"line": 5,
-										"column": 16
+										"line": 6,
+										"column": 81
 									}
 								},
-								"name": "eslint"
+								"name": "a00000"
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 282,
-								"end": 286,
+								"start": 323,
+								"end": 328,
 								"loc": {
 									"start": {
-										"line": 5,
-										"column": 17
+										"line": 6,
+										"column": 82
 									},
 									"end": {
-										"line": 5,
-										"column": 21
+										"line": 6,
+										"column": 87
 									}
 								},
-								"name": "Rule"
+								"name": "b0000"
 							},
 							"computed": false,
 							"optional": false
 						},
 						"property": {
 							"type": "Identifier",
-							"start": 287,
-							"end": 297,
+							"start": 329,
+							"end": 337,
 							"loc": {
 								"start": {
-									"line": 5,
-									"column": 22
+									"line": 6,
+									"column": 88
 								},
 								"end": {
-									"line": 5,
-									"column": 32
+									"line": 6,
+									"column": 96
 								}
 							},
-							"name": "RuleModule"
+							"name": "c0000000"
 						},
 						"computed": false,
 						"optional": false
 					},
 					"body": {
 						"type": "ClassBody",
-						"start": 298,
-						"end": 300,
+						"start": 338,
+						"end": 340,
 						"loc": {
 							"start": {
-								"line": 5,
-								"column": 33
+								"line": 6,
+								"column": 97
 							},
 							"end": {
-								"line": 5,
-								"column": 35
+								"line": 6,
+								"column": 99
 							}
 						},
 						"body": []
@@ -216,136 +248,142 @@
 						},
 						{
 							"type": "Line",
-							"value": " but member expression stays together (no break within eslint.Rule.RuleModule)",
+							"value": " but member expression stays together (no break within a00000.b0000.c0000000)",
 							"start": 109,
-							"end": 189
+							"end": 188
+						},
+						{
+							"type": "Line",
+							"value": " 100 chars exactly - stays inline (at boundary)",
+							"start": 191,
+							"end": 240
 						}
 					]
 				},
 				{
 					"type": "ClassDeclaration",
-					"start": 342,
-					"end": 376,
+					"start": 385,
+					"end": 486,
 					"loc": {
 						"start": {
-							"line": 8,
+							"line": 9,
 							"column": 1
 						},
 						"end": {
-							"line": 8,
-							"column": 35
+							"line": 10,
+							"column": 34
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 348,
-						"end": 353,
+						"start": 391,
+						"end": 451,
 						"loc": {
 							"start": {
-								"line": 8,
+								"line": 9,
 								"column": 7
 							},
 							"end": {
-								"line": 8,
-								"column": 12
+								"line": 9,
+								"column": 67
 							}
 						},
-						"name": "Short"
+						"name": "ClassNameThatIsLongEnoughToTriggerWrapping000000000000000000"
 					},
 					"superClass": {
 						"type": "MemberExpression",
-						"start": 362,
-						"end": 373,
+						"start": 462,
+						"end": 483,
 						"loc": {
 							"start": {
-								"line": 8,
-								"column": 21
+								"line": 10,
+								"column": 10
 							},
 							"end": {
-								"line": 8,
-								"column": 32
+								"line": 10,
+								"column": 31
 							}
 						},
 						"object": {
 							"type": "MemberExpression",
-							"start": 362,
-							"end": 369,
+							"start": 462,
+							"end": 474,
 							"loc": {
 								"start": {
-									"line": 8,
-									"column": 21
+									"line": 10,
+									"column": 10
 								},
 								"end": {
-									"line": 8,
-									"column": 28
+									"line": 10,
+									"column": 22
 								}
 							},
 							"object": {
 								"type": "Identifier",
-								"start": 362,
-								"end": 365,
+								"start": 462,
+								"end": 468,
 								"loc": {
 									"start": {
-										"line": 8,
-										"column": 21
+										"line": 10,
+										"column": 10
 									},
 									"end": {
-										"line": 8,
-										"column": 24
+										"line": 10,
+										"column": 16
 									}
 								},
-								"name": "foo"
+								"name": "a00000"
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 366,
-								"end": 369,
+								"start": 469,
+								"end": 474,
 								"loc": {
 									"start": {
-										"line": 8,
-										"column": 25
+										"line": 10,
+										"column": 17
 									},
 									"end": {
-										"line": 8,
-										"column": 28
+										"line": 10,
+										"column": 22
 									}
 								},
-								"name": "bar"
+								"name": "b0000"
 							},
 							"computed": false,
 							"optional": false
 						},
 						"property": {
 							"type": "Identifier",
-							"start": 370,
-							"end": 373,
+							"start": 475,
+							"end": 483,
 							"loc": {
 								"start": {
-									"line": 8,
-									"column": 29
+									"line": 10,
+									"column": 23
 								},
 								"end": {
-									"line": 8,
-									"column": 32
+									"line": 10,
+									"column": 31
 								}
 							},
-							"name": "baz"
+							"name": "c0000000"
 						},
 						"computed": false,
 						"optional": false
 					},
 					"body": {
 						"type": "ClassBody",
-						"start": 374,
-						"end": 376,
+						"start": 484,
+						"end": 486,
 						"loc": {
 							"start": {
-								"line": 8,
-								"column": 33
+								"line": 10,
+								"column": 32
 							},
 							"end": {
-								"line": 8,
-								"column": 35
+								"line": 10,
+								"column": 34
 							}
 						},
 						"body": []
@@ -353,9 +391,80 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Contrast: Short class stays inline",
-							"start": 303,
-							"end": 340
+							"value": " 101 chars - wraps extends to new line",
+							"start": 343,
+							"end": 383
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 559,
+					"end": 661,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 103
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 565,
+						"end": 638,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 7
+							},
+							"end": {
+								"line": 13,
+								"column": 80
+							}
+						},
+						"name": "VeryLongClassNameThatDefinitelyExceedsOneHundredCharactersEasilyNoProblem"
+					},
+					"superClass": {
+						"type": "Identifier",
+						"start": 647,
+						"end": 658,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 89
+							},
+							"end": {
+								"line": 13,
+								"column": 100
+							}
+						},
+						"name": "ParentClass"
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 659,
+						"end": 661,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 101
+							},
+							"end": {
+								"line": 13,
+								"column": 103
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Contrast: Simple identifier parent - NEVER wraps (Prettier quirk)",
+							"start": 489,
+							"end": 557
 						}
 					]
 				}

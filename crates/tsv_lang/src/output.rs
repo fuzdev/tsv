@@ -43,6 +43,12 @@ impl OutputBuffer {
         }
     }
 
+    /// Check if the buffer ends with a specific character
+    #[inline]
+    pub fn ends_with(&self, ch: char) -> bool {
+        self.buffer.ends_with(ch)
+    }
+
     /// Get the current length of the buffer
     #[inline]
     pub fn len(&self) -> usize {

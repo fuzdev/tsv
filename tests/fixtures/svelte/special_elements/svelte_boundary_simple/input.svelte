@@ -1,1 +1,1 @@
-<svelte:boundary onerror={handler}><div>content</div></svelte:boundary>
+<svelte:boundary onerror={fn}><div>text</div></svelte:boundary>

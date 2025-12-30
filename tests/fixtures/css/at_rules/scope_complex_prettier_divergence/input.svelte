@@ -1,34 +1,34 @@
 <style>
 	/* Basic scoping */
-	@scope (.card) {
+	@scope (.class1) {
 		img {
 			border: 1px solid;
 		}
 	}
 
 	/* Scope with limit */
-	@scope (.card) to (.ignore) {
+	@scope (.class1) to (.class2) {
 		p {
 			color: blue;
 		}
 	}
 
 	/* Named scope root */
-	@scope (#header) {
+	@scope (#id1) {
 		h1 {
 			font-size: 2rem;
 		}
 	}
 
 	/* Scope with multiple selectors */
-	@scope (.card, .panel) {
-		.title {
+	@scope (.class1, .class3) {
+		.class4 {
 			font-weight: bold;
 		}
 	}
 
 	/* Scope with complex limit */
-	@scope (.container) to (.skip, .exclude) {
+	@scope (.class5) to (.class6, .class7) {
 		a {
 			text-decoration: underline;
 		}
@@ -55,19 +55,19 @@
 	}
 
 	/* Scope with pseudo-class */
-	@scope (.widget:hover) {
-		.tooltip {
+	@scope (.class8:hover) {
+		.class9 {
 			display: block;
 		}
 	}
 
 	/* Scope with limit and nested rules */
-	@scope (.main) to (.footer) {
+	@scope (.class10) to (.class11) {
 		section {
 			margin-bottom: 2rem;
 		}
 
-		nav {
+		.class12 {
 			position: sticky;
 		}
 	}

@@ -1,6 +1,6 @@
 <style>
 	/* :is() - matches-any pseudo-class */
-	.class1:is( .active , .focused ) {
+	.class1:is( .class2 , .class3 ) {
 		color: red;
 	}
 
@@ -18,7 +18,7 @@
 	}
 
 	/* :not() - negation pseudo-class */
-	input:not(.disabled,[readonly]) {
+	input:not(.class4,[readonly]) {
 		border: 1px solid green;
 	}
 

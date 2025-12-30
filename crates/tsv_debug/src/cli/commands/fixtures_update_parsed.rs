@@ -201,8 +201,8 @@ async fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult
 
     // Generate expected.json from appropriate parser based on input type
     let json = match fixture.input_type() {
-        InputType::TypeScript => {
-            // TypeScript fixtures use acorn+typescript parser
+        InputType::SvelteTs | InputType::TypeScript => {
+            // TypeScript and SvelteTs fixtures use acorn+typescript parser
             match parse_typescript(&source).await {
                 Ok(json) => ensure_trailing_newline(json),
                 Err(e) => return FixtureResult::Failed(format!("TypeScript parse error: {e}")),
@@ -255,7 +255,9 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
     // Generate expected_ours.json from our parser
     // Parse directly and serialize the struct (not via serde_json::Value) to preserve field order
     // Use appropriate parser based on file type
-    let our_json = if fixture.input_file.ends_with(".ts") {
+    let our_json = if fixture.input_file.ends_with(".svelte.ts")
+        || fixture.input_file.ends_with(".ts")
+    {
         let ast = match tsv_ts::parse(source) {
             Ok(ast) => ast,
             Err(e) => return FixtureResult::Failed(format!("Our parser error: {e:?}")),
@@ -279,25 +281,26 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
     };
 
     // Generate expected_svelte.json from external parser (Svelte or acorn-typescript)
-    let svelte_json = if fixture.input_file.ends_with(".ts") {
-        // For .ts files, use acorn-typescript
-        match parse_typescript(source).await {
-            Ok(json) => ensure_trailing_newline(json),
-            Err(_) => {
-                // Parse failed - use canonical error marker
-                fixtures::EXPECTED_SVELTE_ERROR_JSON.to_string()
+    let svelte_json =
+        if fixture.input_file.ends_with(".svelte.ts") || fixture.input_file.ends_with(".ts") {
+            // For .ts and .svelte.ts files, use acorn-typescript
+            match parse_typescript(source).await {
+                Ok(json) => ensure_trailing_newline(json),
+                Err(_) => {
+                    // Parse failed - use canonical error marker
+                    fixtures::EXPECTED_SVELTE_ERROR_JSON.to_string()
+                }
             }
-        }
-    } else {
-        // For .svelte files, use Svelte's parser
-        match parse_svelte(source).await {
-            Ok(json) => ensure_trailing_newline(json),
-            Err(_) => {
-                // Svelte parse failed - use canonical error marker
-                fixtures::EXPECTED_SVELTE_ERROR_JSON.to_string()
+        } else {
+            // For .svelte files, use Svelte's parser
+            match parse_svelte(source).await {
+                Ok(json) => ensure_trailing_newline(json),
+                Err(_) => {
+                    // Svelte parse failed - use canonical error marker
+                    fixtures::EXPECTED_SVELTE_ERROR_JSON.to_string()
+                }
             }
-        }
-    };
+        };
 
     let expected_ours_path = fixture.expected_ours_path();
     let expected_svelte_path = fixture.expected_svelte_path();

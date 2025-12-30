@@ -5,18 +5,9 @@ use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
-
-/// Check if a byte can start an ASCII identifier
-#[inline]
-fn is_ident_start(b: u8) -> bool {
-    matches!(b, b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'$')
-}
-
-/// Check if a byte can continue an ASCII identifier
-#[inline]
-fn is_ident_continue(b: u8) -> bool {
-    matches!(b, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'$')
-}
+use super::super::scan::{
+    is_identifier_start, parse_number_literal, skip_identifier, skip_whitespace,
+};
 
 impl<'a> Parser<'a> {
     pub(in crate::parser) fn parse_type_annotation(
@@ -206,7 +197,7 @@ impl<'a> Parser<'a> {
                     }
                 } else {
                     // Regular number
-                    let number = super::super::expression::parse_number_literal(raw)
+                    let number = parse_number_literal(raw)
                         .map_err(|_| self.error_msg_at(&format!("Invalid number: {raw}"), start))?;
                     Literal {
                         value: LiteralValue::Number(number),
@@ -252,10 +243,9 @@ impl<'a> Parser<'a> {
                         span: Span::new(num_start as u32, num_end as u32),
                     }
                 } else {
-                    let number =
-                        super::super::expression::parse_number_literal(raw).map_err(|_| {
-                            self.error_msg_at(&format!("Invalid number: {raw}"), num_start)
-                        })?;
+                    let number = parse_number_literal(raw).map_err(|_| {
+                        self.error_msg_at(&format!("Invalid number: {raw}"), num_start)
+                    })?;
                     Literal {
                         value: LiteralValue::Number(number),
                         span: Span::new(num_start as u32, num_end as u32),
@@ -398,28 +388,15 @@ impl<'a> Parser<'a> {
         // Lookahead: check if pattern is `[identifier:`
         // We need to look past the '[', then the identifier, then check for ':'
         let bytes = self.source.as_bytes();
-        let mut pos = self.current_start + 1; // skip '['
-
-        // Skip whitespace
-        while pos < bytes.len() && matches!(bytes[pos], b' ' | b'\t' | b'\n' | b'\r') {
-            pos += 1;
-        }
+        let pos = skip_whitespace(bytes, self.current_start + 1); // skip '[' and whitespace
 
         // Must be followed by an identifier
-        if pos >= bytes.len() || !is_ident_start(bytes[pos]) {
+        if pos >= bytes.len() || !is_identifier_start(bytes[pos]) {
             return false;
         }
 
-        // Skip the identifier
-        pos += 1;
-        while pos < bytes.len() && is_ident_continue(bytes[pos]) {
-            pos += 1;
-        }
-
-        // Skip whitespace
-        while pos < bytes.len() && matches!(bytes[pos], b' ' | b'\t' | b'\n' | b'\r') {
-            pos += 1;
-        }
+        // Skip the identifier and trailing whitespace
+        let pos = skip_whitespace(bytes, skip_identifier(bytes, pos));
 
         // Check for ':'
         pos < bytes.len() && bytes[pos] == b':'

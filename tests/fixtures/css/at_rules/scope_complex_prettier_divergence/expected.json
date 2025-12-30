@@ -2,31 +2,31 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 1105,
+		"end": 1116,
 		"attributes": [],
 		"children": [
 			{
 				"type": "Atrule",
 				"start": 30,
-				"end": 83,
+				"end": 85,
 				"name": "scope",
-				"prelude": "(.card)",
+				"prelude": "(.class1)",
 				"block": {
 					"type": "Block",
-					"start": 45,
-					"end": 83,
+					"start": 47,
+					"end": 85,
 					"children": [
 						{
 							"type": "Rule",
 							"prelude": {
 								"type": "SelectorList",
-								"start": 49,
-								"end": 52,
+								"start": 51,
+								"end": 54,
 								"children": [
 									{
 										"type": "ComplexSelector",
-										"start": 49,
-										"end": 52,
+										"start": 51,
+										"end": 54,
 										"children": [
 											{
 												"type": "RelativeSelector",
@@ -35,12 +35,12 @@
 													{
 														"type": "TypeSelector",
 														"name": "img",
-														"start": 49,
-														"end": 52
+														"start": 51,
+														"end": 54
 													}
 												],
-												"start": 49,
-												"end": 52
+												"start": 51,
+												"end": 54
 											}
 										]
 									}
@@ -48,46 +48,46 @@
 							},
 							"block": {
 								"type": "Block",
-								"start": 53,
-								"end": 80,
+								"start": 55,
+								"end": 82,
 								"children": [
 									{
 										"type": "Declaration",
-										"start": 58,
-										"end": 75,
+										"start": 60,
+										"end": 77,
 										"property": "border",
 										"value": "1px solid"
 									}
 								]
 							},
-							"start": 49,
-							"end": 80
+							"start": 51,
+							"end": 82
 						}
 					]
 				}
 			},
 			{
 				"type": "Atrule",
-				"start": 110,
-				"end": 168,
+				"start": 112,
+				"end": 172,
 				"name": "scope",
-				"prelude": "(.card) to (.ignore)",
+				"prelude": "(.class1) to (.class2)",
 				"block": {
 					"type": "Block",
-					"start": 138,
-					"end": 168,
+					"start": 142,
+					"end": 172,
 					"children": [
 						{
 							"type": "Rule",
 							"prelude": {
 								"type": "SelectorList",
-								"start": 142,
-								"end": 143,
+								"start": 146,
+								"end": 147,
 								"children": [
 									{
 										"type": "ComplexSelector",
-										"start": 142,
-										"end": 143,
+										"start": 146,
+										"end": 147,
 										"children": [
 											{
 												"type": "RelativeSelector",
@@ -96,12 +96,12 @@
 													{
 														"type": "TypeSelector",
 														"name": "p",
-														"start": 142,
-														"end": 143
+														"start": 146,
+														"end": 147
 													}
 												],
-												"start": 142,
-												"end": 143
+												"start": 146,
+												"end": 147
 											}
 										]
 									}
@@ -109,46 +109,46 @@
 							},
 							"block": {
 								"type": "Block",
-								"start": 144,
-								"end": 165,
+								"start": 148,
+								"end": 169,
 								"children": [
 									{
 										"type": "Declaration",
-										"start": 149,
-										"end": 160,
+										"start": 153,
+										"end": 164,
 										"property": "color",
 										"value": "blue"
 									}
 								]
 							},
-							"start": 142,
-							"end": 165
+							"start": 146,
+							"end": 169
 						}
 					]
 				}
 			},
 			{
 				"type": "Atrule",
-				"start": 195,
-				"end": 247,
+				"start": 199,
+				"end": 248,
 				"name": "scope",
-				"prelude": "(#header)",
+				"prelude": "(#id1)",
 				"block": {
 					"type": "Block",
-					"start": 212,
-					"end": 247,
+					"start": 213,
+					"end": 248,
 					"children": [
 						{
 							"type": "Rule",
 							"prelude": {
 								"type": "SelectorList",
-								"start": 216,
-								"end": 218,
+								"start": 217,
+								"end": 219,
 								"children": [
 									{
 										"type": "ComplexSelector",
-										"start": 216,
-										"end": 218,
+										"start": 217,
+										"end": 219,
 										"children": [
 											{
 												"type": "RelativeSelector",
@@ -157,12 +157,12 @@
 													{
 														"type": "TypeSelector",
 														"name": "h1",
-														"start": 216,
-														"end": 218
+														"start": 217,
+														"end": 219
 													}
 												],
-												"start": 216,
-												"end": 218
+												"start": 217,
+												"end": 219
 											}
 										]
 									}
@@ -170,46 +170,46 @@
 							},
 							"block": {
 								"type": "Block",
-								"start": 219,
-								"end": 244,
+								"start": 220,
+								"end": 245,
 								"children": [
 									{
 										"type": "Declaration",
-										"start": 224,
-										"end": 239,
+										"start": 225,
+										"end": 240,
 										"property": "font-size",
 										"value": "2rem"
 									}
 								]
 							},
-							"start": 216,
-							"end": 244
+							"start": 217,
+							"end": 245
 						}
 					]
 				}
 			},
 			{
 				"type": "Atrule",
-				"start": 287,
-				"end": 351,
+				"start": 288,
+				"end": 356,
 				"name": "scope",
-				"prelude": "(.card, .panel)",
+				"prelude": "(.class1, .class3)",
 				"block": {
 					"type": "Block",
-					"start": 310,
-					"end": 351,
+					"start": 314,
+					"end": 356,
 					"children": [
 						{
 							"type": "Rule",
 							"prelude": {
 								"type": "SelectorList",
-								"start": 314,
-								"end": 320,
+								"start": 318,
+								"end": 325,
 								"children": [
 									{
 										"type": "ComplexSelector",
-										"start": 314,
-										"end": 320,
+										"start": 318,
+										"end": 325,
 										"children": [
 											{
 												"type": "RelativeSelector",
@@ -217,13 +217,13 @@
 												"selectors": [
 													{
 														"type": "ClassSelector",
-														"name": "title",
-														"start": 314,
-														"end": 320
+														"name": "class4",
+														"start": 318,
+														"end": 325
 													}
 												],
-												"start": 314,
-												"end": 320
+												"start": 318,
+												"end": 325
 											}
 										]
 									}
@@ -231,46 +231,46 @@
 							},
 							"block": {
 								"type": "Block",
-								"start": 321,
-								"end": 348,
+								"start": 326,
+								"end": 353,
 								"children": [
 									{
 										"type": "Declaration",
-										"start": 326,
-										"end": 343,
+										"start": 331,
+										"end": 348,
 										"property": "font-weight",
 										"value": "bold"
 									}
 								]
 							},
-							"start": 314,
-							"end": 348
+							"start": 318,
+							"end": 353
 						}
 					]
 				}
 			},
 			{
 				"type": "Atrule",
-				"start": 386,
-				"end": 472,
+				"start": 391,
+				"end": 475,
 				"name": "scope",
-				"prelude": "(.container) to (.skip, .exclude)",
+				"prelude": "(.class5) to (.class6, .class7)",
 				"block": {
 					"type": "Block",
-					"start": 427,
-					"end": 472,
+					"start": 430,
+					"end": 475,
 					"children": [
 						{
 							"type": "Rule",
 							"prelude": {
 								"type": "SelectorList",
-								"start": 431,
-								"end": 432,
+								"start": 434,
+								"end": 435,
 								"children": [
 									{
 										"type": "ComplexSelector",
-										"start": 431,
-										"end": 432,
+										"start": 434,
+										"end": 435,
 										"children": [
 											{
 												"type": "RelativeSelector",
@@ -279,12 +279,12 @@
 													{
 														"type": "TypeSelector",
 														"name": "a",
-														"start": 431,
-														"end": 432
+														"start": 434,
+														"end": 435
 													}
 												],
-												"start": 431,
-												"end": 432
+												"start": 434,
+												"end": 435
 											}
 										]
 									}
@@ -292,46 +292,46 @@
 							},
 							"block": {
 								"type": "Block",
-								"start": 433,
-								"end": 469,
+								"start": 436,
+								"end": 472,
 								"children": [
 									{
 										"type": "Declaration",
-										"start": 438,
-										"end": 464,
+										"start": 441,
+										"end": 467,
 										"property": "text-decoration",
 										"value": "underline"
 									}
 								]
 							},
-							"start": 431,
-							"end": 469
+							"start": 434,
+							"end": 472
 						}
 					]
 				}
 			},
 			{
 				"type": "Atrule",
-				"start": 496,
-				"end": 620,
+				"start": 499,
+				"end": 623,
 				"name": "scope",
 				"prelude": "(.outer)",
 				"block": {
 					"type": "Block",
-					"start": 512,
-					"end": 620,
+					"start": 515,
+					"end": 623,
 					"children": [
 						{
 							"type": "Rule",
 							"prelude": {
 								"type": "SelectorList",
-								"start": 516,
-								"end": 530,
+								"start": 519,
+								"end": 533,
 								"children": [
 									{
 										"type": "ComplexSelector",
-										"start": 516,
-										"end": 530,
+										"start": 519,
+										"end": 533,
 										"children": [
 											{
 												"type": "RelativeSelector",
@@ -340,12 +340,12 @@
 													{
 														"type": "ClassSelector",
 														"name": "outer-content",
-														"start": 516,
-														"end": 530
+														"start": 519,
+														"end": 533
 													}
 												],
-												"start": 516,
-												"end": 530
+												"start": 519,
+												"end": 533
 											}
 										]
 									}
@@ -353,43 +353,43 @@
 							},
 							"block": {
 								"type": "Block",
-								"start": 531,
-								"end": 554,
+								"start": 534,
+								"end": 557,
 								"children": [
 									{
 										"type": "Declaration",
-										"start": 536,
-										"end": 549,
+										"start": 539,
+										"end": 552,
 										"property": "padding",
 										"value": "1rem"
 									}
 								]
 							},
-							"start": 516,
-							"end": 554
+							"start": 519,
+							"end": 557
 						},
 						{
 							"type": "Atrule",
-							"start": 558,
-							"end": 617,
+							"start": 561,
+							"end": 620,
 							"name": "scope",
 							"prelude": "(.inner)",
 							"block": {
 								"type": "Block",
-								"start": 574,
-								"end": 617,
+								"start": 577,
+								"end": 620,
 								"children": [
 									{
 										"type": "Rule",
 										"prelude": {
 											"type": "SelectorList",
-											"start": 579,
-											"end": 583,
+											"start": 582,
+											"end": 586,
 											"children": [
 												{
 													"type": "ComplexSelector",
-													"start": 579,
-													"end": 583,
+													"start": 582,
+													"end": 586,
 													"children": [
 														{
 															"type": "RelativeSelector",
@@ -398,12 +398,12 @@
 																{
 																	"type": "TypeSelector",
 																	"name": "span",
-																	"start": 579,
-																	"end": 583
+																	"start": 582,
+																	"end": 586
 																}
 															],
-															"start": 579,
-															"end": 583
+															"start": 582,
+															"end": 586
 														}
 													]
 												}
@@ -411,20 +411,20 @@
 										},
 										"block": {
 											"type": "Block",
-											"start": 584,
-											"end": 613,
+											"start": 587,
+											"end": 616,
 											"children": [
 												{
 													"type": "Declaration",
-													"start": 590,
-													"end": 607,
+													"start": 593,
+													"end": 610,
 													"property": "font-weight",
 													"value": "bold"
 												}
 											]
 										},
-										"start": 579,
-										"end": 613
+										"start": 582,
+										"end": 616
 									}
 								]
 							}
@@ -434,26 +434,26 @@
 			},
 			{
 				"type": "Atrule",
-				"start": 662,
-				"end": 717,
+				"start": 665,
+				"end": 720,
 				"name": "scope",
 				"prelude": "(article > header)",
 				"block": {
 					"type": "Block",
-					"start": 688,
-					"end": 717,
+					"start": 691,
+					"end": 720,
 					"children": [
 						{
 							"type": "Rule",
 							"prelude": {
 								"type": "SelectorList",
-								"start": 692,
-								"end": 694,
+								"start": 695,
+								"end": 697,
 								"children": [
 									{
 										"type": "ComplexSelector",
-										"start": 692,
-										"end": 694,
+										"start": 695,
+										"end": 697,
 										"children": [
 											{
 												"type": "RelativeSelector",
@@ -462,12 +462,12 @@
 													{
 														"type": "TypeSelector",
 														"name": "h2",
-														"start": 692,
-														"end": 694
+														"start": 695,
+														"end": 697
 													}
 												],
-												"start": 692,
-												"end": 694
+												"start": 695,
+												"end": 697
 											}
 										]
 									}
@@ -475,46 +475,46 @@
 							},
 							"block": {
 								"type": "Block",
-								"start": 695,
-								"end": 714,
+								"start": 698,
+								"end": 717,
 								"children": [
 									{
 										"type": "Declaration",
-										"start": 700,
-										"end": 709,
+										"start": 703,
+										"end": 712,
 										"property": "margin",
 										"value": "0"
 									}
 								]
 							},
-							"start": 692,
-							"end": 714
+							"start": 695,
+							"end": 717
 						}
 					]
 				}
 			},
 			{
 				"type": "Atrule",
-				"start": 751,
-				"end": 814,
+				"start": 754,
+				"end": 816,
 				"name": "scope",
-				"prelude": "(.widget:hover)",
+				"prelude": "(.class8:hover)",
 				"block": {
 					"type": "Block",
-					"start": 774,
-					"end": 814,
+					"start": 777,
+					"end": 816,
 					"children": [
 						{
 							"type": "Rule",
 							"prelude": {
 								"type": "SelectorList",
-								"start": 778,
-								"end": 786,
+								"start": 781,
+								"end": 788,
 								"children": [
 									{
 										"type": "ComplexSelector",
-										"start": 778,
-										"end": 786,
+										"start": 781,
+										"end": 788,
 										"children": [
 											{
 												"type": "RelativeSelector",
@@ -522,13 +522,13 @@
 												"selectors": [
 													{
 														"type": "ClassSelector",
-														"name": "tooltip",
-														"start": 778,
-														"end": 786
+														"name": "class9",
+														"start": 781,
+														"end": 788
 													}
 												],
-												"start": 778,
-												"end": 786
+												"start": 781,
+												"end": 788
 											}
 										]
 									}
@@ -536,46 +536,46 @@
 							},
 							"block": {
 								"type": "Block",
-								"start": 787,
-								"end": 811,
+								"start": 789,
+								"end": 813,
 								"children": [
 									{
 										"type": "Declaration",
-										"start": 792,
-										"end": 806,
+										"start": 794,
+										"end": 808,
 										"property": "display",
 										"value": "block"
 									}
 								]
 							},
-							"start": 778,
-							"end": 811
+							"start": 781,
+							"end": 813
 						}
 					]
 				}
 			},
 			{
 				"type": "Atrule",
-				"start": 858,
-				"end": 964,
+				"start": 860,
+				"end": 975,
 				"name": "scope",
-				"prelude": "(.main) to (.footer)",
+				"prelude": "(.class10) to (.class11)",
 				"block": {
 					"type": "Block",
-					"start": 886,
-					"end": 964,
+					"start": 892,
+					"end": 975,
 					"children": [
 						{
 							"type": "Rule",
 							"prelude": {
 								"type": "SelectorList",
-								"start": 890,
-								"end": 897,
+								"start": 896,
+								"end": 903,
 								"children": [
 									{
 										"type": "ComplexSelector",
-										"start": 890,
-										"end": 897,
+										"start": 896,
+										"end": 903,
 										"children": [
 											{
 												"type": "RelativeSelector",
@@ -584,12 +584,12 @@
 													{
 														"type": "TypeSelector",
 														"name": "section",
-														"start": 890,
-														"end": 897
+														"start": 896,
+														"end": 903
 													}
 												],
-												"start": 890,
-												"end": 897
+												"start": 896,
+												"end": 903
 											}
 										]
 									}
@@ -597,46 +597,46 @@
 							},
 							"block": {
 								"type": "Block",
-								"start": 898,
-								"end": 927,
+								"start": 904,
+								"end": 933,
 								"children": [
 									{
 										"type": "Declaration",
-										"start": 903,
-										"end": 922,
+										"start": 909,
+										"end": 928,
 										"property": "margin-bottom",
 										"value": "2rem"
 									}
 								]
 							},
-							"start": 890,
-							"end": 927
+							"start": 896,
+							"end": 933
 						},
 						{
 							"type": "Rule",
 							"prelude": {
 								"type": "SelectorList",
-								"start": 931,
-								"end": 934,
+								"start": 937,
+								"end": 945,
 								"children": [
 									{
 										"type": "ComplexSelector",
-										"start": 931,
-										"end": 934,
+										"start": 937,
+										"end": 945,
 										"children": [
 											{
 												"type": "RelativeSelector",
 												"combinator": null,
 												"selectors": [
 													{
-														"type": "TypeSelector",
-														"name": "nav",
-														"start": 931,
-														"end": 934
+														"type": "ClassSelector",
+														"name": "class12",
+														"start": 937,
+														"end": 945
 													}
 												],
-												"start": 931,
-												"end": 934
+												"start": 937,
+												"end": 945
 											}
 										]
 									}
@@ -644,46 +644,46 @@
 							},
 							"block": {
 								"type": "Block",
-								"start": 935,
-								"end": 961,
+								"start": 946,
+								"end": 972,
 								"children": [
 									{
 										"type": "Declaration",
-										"start": 940,
-										"end": 956,
+										"start": 951,
+										"end": 967,
 										"property": "position",
 										"value": "sticky"
 									}
 								]
 							},
-							"start": 931,
-							"end": 961
+							"start": 937,
+							"end": 972
 						}
 					]
 				}
 			},
 			{
 				"type": "Atrule",
-				"start": 1004,
-				"end": 1096,
+				"start": 1015,
+				"end": 1107,
 				"name": "scope",
 				"prelude": "([data-theme='dark'])",
 				"block": {
 					"type": "Block",
-					"start": 1033,
-					"end": 1096,
+					"start": 1044,
+					"end": 1107,
 					"children": [
 						{
 							"type": "Rule",
 							"prelude": {
 								"type": "SelectorList",
-								"start": 1037,
-								"end": 1048,
+								"start": 1048,
+								"end": 1059,
 								"children": [
 									{
 										"type": "ComplexSelector",
-										"start": 1037,
-										"end": 1048,
+										"start": 1048,
+										"end": 1059,
 										"children": [
 											{
 												"type": "RelativeSelector",
@@ -692,12 +692,12 @@
 													{
 														"type": "ClassSelector",
 														"name": "background",
-														"start": 1037,
-														"end": 1048
+														"start": 1048,
+														"end": 1059
 													}
 												],
-												"start": 1037,
-												"end": 1048
+												"start": 1048,
+												"end": 1059
 											}
 										]
 									}
@@ -705,27 +705,27 @@
 							},
 							"block": {
 								"type": "Block",
-								"start": 1049,
-								"end": 1093,
+								"start": 1060,
+								"end": 1104,
 								"children": [
 									{
 										"type": "Declaration",
-										"start": 1054,
-										"end": 1071,
+										"start": 1065,
+										"end": 1082,
 										"property": "background",
 										"value": "black"
 									},
 									{
 										"type": "Declaration",
-										"start": 1076,
-										"end": 1088,
+										"start": 1087,
+										"end": 1099,
 										"property": "color",
 										"value": "white"
 									}
 								]
 							},
-							"start": 1037,
-							"end": 1093
+							"start": 1048,
+							"end": 1104
 						}
 					]
 				}
@@ -733,14 +733,14 @@
 		],
 		"content": {
 			"start": 7,
-			"end": 1097,
-			"styles": "\n\t/* Basic scoping */\n\t@scope (.card) {\n\t\timg {\n\t\t\tborder: 1px solid;\n\t\t}\n\t}\n\n\t/* Scope with limit */\n\t@scope (.card) to (.ignore) {\n\t\tp {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n\n\t/* Named scope root */\n\t@scope (#header) {\n\t\th1 {\n\t\t\tfont-size: 2rem;\n\t\t}\n\t}\n\n\t/* Scope with multiple selectors */\n\t@scope (.card, .panel) {\n\t\t.title {\n\t\t\tfont-weight: bold;\n\t\t}\n\t}\n\n\t/* Scope with complex limit */\n\t@scope (.container) to (.skip, .exclude) {\n\t\ta {\n\t\t\ttext-decoration: underline;\n\t\t}\n\t}\n\n\t/* Nested scopes */\n\t@scope (.outer) {\n\t\t.outer-content {\n\t\t\tpadding: 1rem;\n\t\t}\n\n\t\t@scope (.inner) {\n\t\t\tspan {\n\t\t\t\tfont-weight: bold;\n\t\t\t}\n\t\t}\n\t}\n\n\t/* Scope with descendant selectors */\n\t@scope (article > header) {\n\t\th2 {\n\t\t\tmargin: 0;\n\t\t}\n\t}\n\n\t/* Scope with pseudo-class */\n\t@scope (.widget:hover) {\n\t\t.tooltip {\n\t\t\tdisplay: block;\n\t\t}\n\t}\n\n\t/* Scope with limit and nested rules */\n\t@scope (.main) to (.footer) {\n\t\tsection {\n\t\t\tmargin-bottom: 2rem;\n\t\t}\n\n\t\tnav {\n\t\t\tposition: sticky;\n\t\t}\n\t}\n\n\t/* Scope with attribute selector */\n\t@scope ([data-theme='dark']) {\n\t\t.background {\n\t\t\tbackground: black;\n\t\t\tcolor: white;\n\t\t}\n\t}\n",
+			"end": 1108,
+			"styles": "\n\t/* Basic scoping */\n\t@scope (.class1) {\n\t\timg {\n\t\t\tborder: 1px solid;\n\t\t}\n\t}\n\n\t/* Scope with limit */\n\t@scope (.class1) to (.class2) {\n\t\tp {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n\n\t/* Named scope root */\n\t@scope (#id1) {\n\t\th1 {\n\t\t\tfont-size: 2rem;\n\t\t}\n\t}\n\n\t/* Scope with multiple selectors */\n\t@scope (.class1, .class3) {\n\t\t.class4 {\n\t\t\tfont-weight: bold;\n\t\t}\n\t}\n\n\t/* Scope with complex limit */\n\t@scope (.class5) to (.class6, .class7) {\n\t\ta {\n\t\t\ttext-decoration: underline;\n\t\t}\n\t}\n\n\t/* Nested scopes */\n\t@scope (.outer) {\n\t\t.outer-content {\n\t\t\tpadding: 1rem;\n\t\t}\n\n\t\t@scope (.inner) {\n\t\t\tspan {\n\t\t\t\tfont-weight: bold;\n\t\t\t}\n\t\t}\n\t}\n\n\t/* Scope with descendant selectors */\n\t@scope (article > header) {\n\t\th2 {\n\t\t\tmargin: 0;\n\t\t}\n\t}\n\n\t/* Scope with pseudo-class */\n\t@scope (.class8:hover) {\n\t\t.class9 {\n\t\t\tdisplay: block;\n\t\t}\n\t}\n\n\t/* Scope with limit and nested rules */\n\t@scope (.class10) to (.class11) {\n\t\tsection {\n\t\t\tmargin-bottom: 2rem;\n\t\t}\n\n\t\t.class12 {\n\t\t\tposition: sticky;\n\t\t}\n\t}\n\n\t/* Scope with attribute selector */\n\t@scope ([data-theme='dark']) {\n\t\t.background {\n\t\t\tbackground: black;\n\t\t\tcolor: white;\n\t\t}\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 1106,
+	"end": 1117,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

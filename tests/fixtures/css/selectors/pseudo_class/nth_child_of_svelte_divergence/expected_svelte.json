@@ -10,12 +10,12 @@
 				"prelude": {
 					"type": "SelectorList",
 					"start": 61,
-					"end": 86,
+					"end": 88,
 					"children": [
 						{
 							"type": "ComplexSelector",
 							"start": 61,
-							"end": 86,
+							"end": 88,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -33,12 +33,12 @@
 											"args": {
 												"type": "SelectorList",
 												"start": 74,
-												"end": 85,
+												"end": 87,
 												"children": [
 													{
 														"type": "ComplexSelector",
 														"start": 74,
-														"end": 85,
+														"end": 87,
 														"children": [
 															{
 																"type": "RelativeSelector",
@@ -52,24 +52,24 @@
 																	},
 																	{
 																		"type": "ClassSelector",
-																		"name": "item",
+																		"name": "class1",
 																		"start": 80,
-																		"end": 85
+																		"end": 87
 																	}
 																],
 																"start": 74,
-																"end": 85
+																"end": 87
 															}
 														]
 													}
 												]
 											},
 											"start": 63,
-											"end": 86
+											"end": 88
 										}
 									],
 									"start": 61,
-									"end": 86
+									"end": 88
 								}
 							]
 						}
@@ -77,32 +77,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 87,
-					"end": 116,
+					"start": 89,
+					"end": 118,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 91,
-							"end": 112,
+							"start": 93,
+							"end": 114,
 							"property": "background",
 							"value": "lightgray"
 						}
 					]
 				},
 				"start": 61,
-				"end": 116
+				"end": 118
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 119,
-					"end": 151,
+					"start": 121,
+					"end": 150,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 119,
-							"end": 151,
+							"start": 121,
+							"end": 150,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -111,21 +111,21 @@
 										{
 											"type": "TypeSelector",
 											"name": "div",
-											"start": 119,
-											"end": 122
+											"start": 121,
+											"end": 124
 										},
 										{
 											"type": "PseudoClassSelector",
 											"name": "nth-child",
 											"args": {
 												"type": "SelectorList",
-												"start": 133,
-												"end": 150,
+												"start": 135,
+												"end": 149,
 												"children": [
 													{
 														"type": "ComplexSelector",
-														"start": 133,
-														"end": 150,
+														"start": 135,
+														"end": 149,
 														"children": [
 															{
 																"type": "RelativeSelector",
@@ -134,29 +134,29 @@
 																	{
 																		"type": "Nth",
 																		"value": "odd of ",
-																		"start": 133,
-																		"end": 140
+																		"start": 135,
+																		"end": 142
 																	},
 																	{
 																		"type": "ClassSelector",
-																		"name": "highlight",
-																		"start": 140,
-																		"end": 150
+																		"name": "class2",
+																		"start": 142,
+																		"end": 149
 																	}
 																],
-																"start": 133,
-																"end": 150
+																"start": 135,
+																"end": 149
 															}
 														]
 													}
 												]
 											},
-											"start": 122,
-											"end": 151
+											"start": 124,
+											"end": 150
 										}
 									],
-									"start": 119,
-									"end": 151
+									"start": 121,
+									"end": 150
 								}
 							]
 						}
@@ -164,32 +164,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 152,
-					"end": 171,
+					"start": 151,
+					"end": 170,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 156,
-							"end": 167,
+							"start": 155,
+							"end": 166,
 							"property": "color",
 							"value": "blue"
 						}
 					]
 				},
-				"start": 119,
-				"end": 171
+				"start": 121,
+				"end": 170
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 174,
-					"end": 205,
+					"start": 173,
+					"end": 204,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 174,
-							"end": 205,
+							"start": 173,
+							"end": 204,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -198,21 +198,21 @@
 										{
 											"type": "TypeSelector",
 											"name": "tr",
-											"start": 174,
-											"end": 176
+											"start": 173,
+											"end": 175
 										},
 										{
 											"type": "PseudoClassSelector",
 											"name": "nth-last-child",
 											"args": {
 												"type": "SelectorList",
-												"start": 192,
-												"end": 204,
+												"start": 191,
+												"end": 203,
 												"children": [
 													{
 														"type": "ComplexSelector",
-														"start": 192,
-														"end": 204,
+														"start": 191,
+														"end": 203,
 														"children": [
 															{
 																"type": "RelativeSelector",
@@ -221,29 +221,29 @@
 																	{
 																		"type": "Nth",
 																		"value": "3 of ",
-																		"start": 192,
-																		"end": 197
+																		"start": 191,
+																		"end": 196
 																	},
 																	{
 																		"type": "ClassSelector",
-																		"name": "active",
-																		"start": 197,
-																		"end": 204
+																		"name": "class3",
+																		"start": 196,
+																		"end": 203
 																	}
 																],
-																"start": 192,
-																"end": 204
+																"start": 191,
+																"end": 203
 															}
 														]
 													}
 												]
 											},
-											"start": 176,
-											"end": 205
+											"start": 175,
+											"end": 204
 										}
 									],
-									"start": 174,
-									"end": 205
+									"start": 173,
+									"end": 204
 								}
 							]
 						}
@@ -251,31 +251,31 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 206,
-					"end": 239,
+					"start": 205,
+					"end": 238,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 210,
-							"end": 235,
+							"start": 209,
+							"end": 234,
 							"property": "border-top",
 							"value": "2px solid red"
 						}
 					]
 				},
-				"start": 174,
-				"end": 239
+				"start": 173,
+				"end": 238
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 277,
+					"start": 276,
 					"end": 322,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 277,
+							"start": 276,
 							"end": 322,
 							"children": [
 								{
@@ -285,20 +285,20 @@
 										{
 											"type": "TypeSelector",
 											"name": "span",
-											"start": 277,
-											"end": 281
+											"start": 276,
+											"end": 280
 										},
 										{
 											"type": "PseudoClassSelector",
 											"name": "nth-child",
 											"args": {
 												"type": "SelectorList",
-												"start": 292,
+												"start": 291,
 												"end": 321,
 												"children": [
 													{
 														"type": "ComplexSelector",
-														"start": 292,
+														"start": 291,
 														"end": 321,
 														"children": [
 															{
@@ -308,53 +308,53 @@
 																	{
 																		"type": "Nth",
 																		"value": "2n + 1 of ",
-																		"start": 292,
-																		"end": 302
+																		"start": 291,
+																		"end": 301
 																	},
 																	{
 																		"type": "TypeSelector",
 																		"name": "div",
-																		"start": 302,
-																		"end": 305
+																		"start": 301,
+																		"end": 304
 																	},
 																	{
 																		"type": "ClassSelector",
-																		"name": "parent",
-																		"start": 305,
-																		"end": 312
+																		"name": "class4",
+																		"start": 304,
+																		"end": 311
 																	}
 																],
-																"start": 292,
-																"end": 312
+																"start": 291,
+																"end": 311
 															},
 															{
 																"type": "RelativeSelector",
 																"combinator": {
 																	"type": "Combinator",
 																	"name": ">",
-																	"start": 313,
-																	"end": 314
+																	"start": 312,
+																	"end": 313
 																},
 																"selectors": [
 																	{
 																		"type": "ClassSelector",
-																		"name": "child",
-																		"start": 315,
+																		"name": "class5",
+																		"start": 314,
 																		"end": 321
 																	}
 																],
-																"start": 313,
+																"start": 312,
 																"end": 321
 															}
 														]
 													}
 												]
 											},
-											"start": 281,
+											"start": 280,
 											"end": 322
 										}
 									],
-									"start": 277,
+									"start": 276,
 									"end": 322
 								}
 							]
@@ -375,14 +375,14 @@
 						}
 					]
 				},
-				"start": 277,
+				"start": 276,
 				"end": 348
 			}
 		],
 		"content": {
 			"start": 7,
 			"end": 349,
-			"styles": "\n\t/* CSS Selectors Level 4: :nth-child(An+B of S) */\n\tli:nth-child(2n of .item) {\n\t\tbackground: lightgray;\n\t}\n\n\tdiv:nth-child(odd of .highlight) {\n\t\tcolor: blue;\n\t}\n\n\ttr:nth-last-child(3 of .active) {\n\t\tborder-top: 2px solid red;\n\t}\n\n\t/* Complex selector after 'of' */\n\tspan:nth-child(2n + 1 of div.parent > .child) {\n\t\tfont-weight: bold;\n\t}\n",
+			"styles": "\n\t/* CSS Selectors Level 4: :nth-child(An+B of S) */\n\tli:nth-child(2n of .class1) {\n\t\tbackground: lightgray;\n\t}\n\n\tdiv:nth-child(odd of .class2) {\n\t\tcolor: blue;\n\t}\n\n\ttr:nth-last-child(3 of .class3) {\n\t\tborder-top: 2px solid red;\n\t}\n\n\t/* Complex selector after 'of' */\n\tspan:nth-child(2n + 1 of div.class4 > .class5) {\n\t\tfont-weight: bold;\n\t}\n",
 			"comment": null
 		}
 	},

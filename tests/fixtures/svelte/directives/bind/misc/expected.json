@@ -1,0 +1,435 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 236,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 56,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 5,
+						"end": 27,
+						"name": "contenteditable",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 5,
+								"character": 5
+							},
+							"end": {
+								"line": 1,
+								"column": 20,
+								"character": 20
+							}
+						},
+						"value": [
+							{
+								"start": 22,
+								"end": 26,
+								"type": "Text",
+								"raw": "true",
+								"data": "true"
+							}
+						]
+					},
+					{
+						"start": 28,
+						"end": 49,
+						"type": "BindDirective",
+						"name": "innerHTML",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 28,
+								"character": 28
+							},
+							"end": {
+								"line": 1,
+								"column": 42,
+								"character": 42
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 44,
+							"end": 48,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 44
+								},
+								"end": {
+									"line": 1,
+									"column": 48
+								}
+							},
+							"name": "html"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 56,
+				"end": 57,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 57,
+				"end": 115,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 58
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 61
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 62,
+						"end": 84,
+						"name": "contenteditable",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 5,
+								"character": 62
+							},
+							"end": {
+								"line": 2,
+								"column": 20,
+								"character": 77
+							}
+						},
+						"value": [
+							{
+								"start": 79,
+								"end": 83,
+								"type": "Text",
+								"raw": "true",
+								"data": "true"
+							}
+						]
+					},
+					{
+						"start": 85,
+						"end": 108,
+						"type": "BindDirective",
+						"name": "textContent",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 28,
+								"character": 85
+							},
+							"end": {
+								"line": 2,
+								"column": 44,
+								"character": 101
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 103,
+							"end": 107,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 46
+								},
+								"end": {
+									"line": 2,
+									"column": 50
+								}
+							},
+							"name": "text"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 115,
+				"end": 116,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 116,
+				"end": 151,
+				"name": "details",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 117
+					},
+					"end": {
+						"line": 3,
+						"column": 8,
+						"character": 124
+					}
+				},
+				"attributes": [
+					{
+						"start": 125,
+						"end": 140,
+						"type": "BindDirective",
+						"name": "open",
+						"name_loc": {
+							"start": {
+								"line": 3,
+								"column": 9,
+								"character": 125
+							},
+							"end": {
+								"line": 3,
+								"column": 18,
+								"character": 134
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 136,
+							"end": 139,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 20
+								},
+								"end": {
+									"line": 3,
+									"column": 23
+								}
+							},
+							"name": "val"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 151,
+				"end": 152,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 152,
+				"end": 184,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 153
+					},
+					"end": {
+						"line": 4,
+						"column": 6,
+						"character": 158
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 159,
+						"end": 170,
+						"name": "type",
+						"name_loc": {
+							"start": {
+								"line": 4,
+								"column": 7,
+								"character": 159
+							},
+							"end": {
+								"line": 4,
+								"column": 11,
+								"character": 163
+							}
+						},
+						"value": [
+							{
+								"start": 165,
+								"end": 169,
+								"type": "Text",
+								"raw": "file",
+								"data": "file"
+							}
+						]
+					},
+					{
+						"start": 171,
+						"end": 181,
+						"type": "BindDirective",
+						"name": "files",
+						"name_loc": {
+							"start": {
+								"line": 4,
+								"column": 19,
+								"character": 171
+							},
+							"end": {
+								"line": 4,
+								"column": 29,
+								"character": 181
+							}
+						},
+						"expression": {
+							"start": 176,
+							"end": 181,
+							"type": "Identifier",
+							"name": "files"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 184,
+				"end": 185,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 185,
+				"end": 235,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 186
+					},
+					"end": {
+						"line": 5,
+						"column": 6,
+						"character": 191
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 192,
+						"end": 207,
+						"name": "type",
+						"name_loc": {
+							"start": {
+								"line": 5,
+								"column": 7,
+								"character": 192
+							},
+							"end": {
+								"line": 5,
+								"column": 11,
+								"character": 196
+							}
+						},
+						"value": [
+							{
+								"start": 198,
+								"end": 206,
+								"type": "Text",
+								"raw": "checkbox",
+								"data": "checkbox"
+							}
+						]
+					},
+					{
+						"start": 208,
+						"end": 232,
+						"type": "BindDirective",
+						"name": "indeterminate",
+						"name_loc": {
+							"start": {
+								"line": 5,
+								"column": 23,
+								"character": 208
+							},
+							"end": {
+								"line": 5,
+								"column": 41,
+								"character": 226
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 228,
+							"end": 231,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 43
+								},
+								"end": {
+									"line": 5,
+									"column": 46
+								}
+							},
+							"name": "val"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

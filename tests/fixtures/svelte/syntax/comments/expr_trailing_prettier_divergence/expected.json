@@ -965,7 +965,7 @@
 						"start": 466,
 						"end": 493,
 						"type": "ClassDirective",
-						"name": "active",
+						"name": "class1",
 						"name_loc": {
 							"start": {
 								"line": 14,

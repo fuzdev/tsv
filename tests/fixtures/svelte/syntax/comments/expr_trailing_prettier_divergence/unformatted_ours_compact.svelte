@@ -11,5 +11,5 @@
 {@html expr/* c */}
 {@const x = expr/* c */}
 <button on:click={fn/* c */}>text</button>
-<div class:active={cond/* c */}></div>
+<div class:class1={cond/* c */}></div>
 <div use:fn={expr/* c */}></div>

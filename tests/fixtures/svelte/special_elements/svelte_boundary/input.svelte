@@ -1,4 +1,4 @@
-<svelte:boundary onerror={handler}>
+<svelte:boundary onerror={fn}>
 	<div>text</div>
 
 	{#snippet pending()}

@@ -1,6 +1,6 @@
 <style>
 	/* With other selectors */
-	div[class~='active']:hover {
+	div[class~='value1']:hover {
 		color: red;
 	}
 
@@ -10,7 +10,7 @@
 	}
 
 	/* In complex selectors */
-	.parent > [data-id^='item-'] {
+	.class1 > [data-id^='val-'] {
 		margin: 10px;
 	}
 

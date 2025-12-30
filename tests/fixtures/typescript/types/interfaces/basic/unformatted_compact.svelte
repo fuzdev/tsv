@@ -11,7 +11,7 @@
 
 	export interface Exported {  prop:string;  }
 
-	interface Callable {  ():void;  count:number;  }
+	interface Callable {  ():void;  n:number;  }
 
 	interface Constructable {  new(x:number):object;  }
 

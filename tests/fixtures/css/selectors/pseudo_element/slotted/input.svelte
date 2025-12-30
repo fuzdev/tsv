@@ -7,11 +7,11 @@
 		color: blue;
 	}
 
-	::slotted(.foo) {
+	::slotted(.class1) {
 		color: green;
 	}
 
-	::slotted(div.foo#bar:hover) {
+	::slotted(div.class1#id1:hover) {
 		color: yellow;
 	}
 

@@ -1,24 +1,14 @@
 {
-	"imports": {
-		"acorn": "npm:acorn@8.15.0",
-		"svelte/compiler": "npm:svelte@5.45.8/compiler",
-		"@sveltejs/acorn-typescript": "npm:@sveltejs/acorn-typescript@1.0.8",
-		"prettier": "npm:prettier@3.7.4",
-		"prettier-plugin-svelte": "npm:prettier-plugin-svelte@3.4.0",
-		"@biomejs/js-api": "npm:@biomejs/js-api@4.0.0",
-		"@biomejs/wasm-bundler": "npm:@biomejs/wasm-bundler@2.3.10",
-		"oxc-parser": "npm:oxc-parser@0.104.0",
-		"oxfmt": "npm:oxfmt@0.19.0",
-		"@fuzdev/fuz_util": "npm:@fuzdev/fuz_util@0.45.0",
-		"@std/fs": "jsr:@std/fs@1",
-		"@std/path": "jsr:@std/path@1"
-	},
 	"tasks": {
 		"build": "cargo build --workspace",
 		"build:release": "cargo build --workspace --release",
+		"build:all": "deno task build:release && deno task build:ffi && deno task build:napi && deno task build:wasm",
 		"build:ffi": "cargo build -p tsv_ffi --release",
-		"build:wasm": "wasm-pack build crates/tsv_wasm --target deno --release",
-		"build:all": "deno task build:release && deno task build:ffi && deno task build:wasm",
+		"build:napi": "cargo build -p tsv_napi --release",
+		"build:wasm": "deno task build:wasm:deno && deno task build:wasm:web && deno task build:wasm:node",
+		"build:wasm:deno": "wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/deno",
+		"build:wasm:web": "wasm-pack build crates/tsv_wasm --target web --release --out-dir pkg/web",
+		"build:wasm:node": "wasm-pack build crates/tsv_wasm --target nodejs --release --out-dir pkg/node",
 		"clean": "cargo clean",
 
 		"dev": "cargo watch -x 'check --workspace' -x 'test --workspace' || echo '⚠️  cargo-watch not installed. Run: cargo install cargo-watch'",
@@ -34,7 +24,7 @@
 		"fixtures:update:parsed": "cargo run -p tsv_debug --quiet fixtures_update_parsed",
 		"fixtures:update:formatted": "cargo run -p tsv_debug --quiet fixtures_update_formatted",
 
-		"bench": "deno task build:ffi && deno task build:wasm && deno task bench:run",
+		"bench": "deno task build:ffi && deno task build:wasm:deno && deno task bench:run",
 		"bench:run": "deno run --v8-flags=--expose-gc --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/bench.ts"
 	},
 	"fmt": {

@@ -1,0 +1,23 @@
+{
+	"imports": {
+		"acorn": "npm:acorn@8.15.0",
+		"svelte": "npm:svelte@5.45.8",
+		"svelte/compiler": "npm:svelte@5.45.8/compiler",
+		"@sveltejs/acorn-typescript": "npm:@sveltejs/acorn-typescript@1.0.8",
+		"prettier": "npm:prettier@3.7.4",
+		"prettier-plugin-svelte": "npm:prettier-plugin-svelte@3.4.0",
+		"@biomejs/js-api": "npm:@biomejs/js-api@4.0.0",
+		"@biomejs/wasm-bundler": "npm:@biomejs/wasm-bundler@2.3.10",
+		"oxc-parser": "npm:oxc-parser@0.104.0",
+		"oxfmt": "npm:oxfmt@0.19.0",
+		"@fuzdev/fuz_util": "npm:@fuzdev/fuz_util@0.45.0",
+		"@std/fs": "jsr:@std/fs@1",
+		"@std/path": "jsr:@std/path@1"
+	},
+	"fmt": {
+		"useTabs": true,
+		"lineWidth": 100,
+		"singleQuote": true,
+		"proseWrap": "preserve"
+	}
+}

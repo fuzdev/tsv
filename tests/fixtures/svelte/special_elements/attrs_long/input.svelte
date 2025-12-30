@@ -1,16 +1,13 @@
-<!-- Short svelte:component - no wrap (63 chars) -->
-<svelte:component this={Comp} prop={value} data-attr="short" />
+<!-- 100 chars - stays inline (at boundary) -->
+<svelte:component this={C} attr="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" />
 
-<!-- Long svelte:component - wraps (102 chars, exceeds 100) -->
+<!-- 101 chars - wraps -->
 <svelte:component
-	this={Comp}
-	data-attr="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	this={C}
+	attr="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 />
 
-<!-- Long svelte:component with children - wraps (101 chars, exceeds 100) -->
-<svelte:component
-	this={Comp}
-	data-attr="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+<!-- With children - hug mode wrapping -->
+<svelte:component this={Comp} data-attr="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	><span>child</span></svelte:component
 >
-	<span>child</span>
-</svelte:component>

@@ -27,7 +27,7 @@
 
 	interface Callable {
 		(): void;
-		count: number;
+		n: number;
 	}
 
 	interface Constructable {

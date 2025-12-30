@@ -7,8 +7,11 @@
 // Svelte template syntax uses `{:else}`, `{#if}`, etc. which look like format args
 #![allow(clippy::literal_string_with_formatting_args)]
 
+use std::rc::Rc;
+
 use super::Printer;
 use crate::ast::internal::{self, Fragment, FragmentNode};
+use tsv_lang::doc;
 
 impl<'a> Printer<'a> {
     // =========================================================================
@@ -55,14 +58,29 @@ impl<'a> Printer<'a> {
 
     /// Format an if block: {#if test}...{:else}...{/if}
     pub(super) fn print_if_block(&mut self, block: &internal::IfBlock) {
-        // Opening tag
-        self.write("{#if ");
-        self.print_ts_expression_with_comments(
+        // For binary expressions (&&, ||), use doc-based formatting for proper wrapping
+        // For other expressions (method chains, etc.), use imperative formatting
+        let is_binary = matches!(
             &block.test,
-            block.opening_tag_span.start,
-            block.opening_tag_span.end,
+            tsv_ts::Expression::BinaryExpression(b) if b.operator.is_logical()
         );
-        self.write("}");
+
+        if is_binary {
+            let (opening_doc, render_config) = self.build_if_opening_doc(block);
+            self.write_doc_with_config(&opening_doc, &render_config);
+        } else {
+            // Non-binary expressions: use original imperative approach
+            // which handles method chains correctly
+            self.write("{#if ");
+            let suffix_width = self.calculate_if_suffix_width(block);
+            self.print_ts_expression_with_suffix_width(
+                &block.test,
+                block.opening_tag_span.start,
+                block.opening_tag_span.end,
+                suffix_width,
+            );
+            self.write("}");
+        }
 
         // Consequent body
         let is_inline = self.format_block_body(&block.consequent);
@@ -74,6 +92,47 @@ impl<'a> Printer<'a> {
 
         // Closing tag
         self.write_closing("{/if}", is_inline);
+    }
+
+    /// Build a doc for the {#if condition} opening tag with width-aware wrapping.
+    ///
+    /// Only called for binary expressions (&&, ||). Returns both the doc and the
+    /// config to use for rendering (with first_line_offset and suffix_width set).
+    ///
+    /// - When fits: `{#if a && b && c}`
+    /// - When breaks: `{#if a &&\n\tb &&\n\tc}` (first operand on same line)
+    fn build_if_opening_doc(&self, block: &internal::IfBlock) -> (doc::Doc, tsv_lang::PrintConfig) {
+        // Calculate first_line_offset and suffix_width for proper line width accounting
+        let current_col = self.buffer.current_column(self.config.tab_width);
+        let first_line_offset = current_col;
+
+        // Calculate suffix_width to account for body and closing tag after the opening tag
+        let suffix_width = self.calculate_if_suffix_width(block).saturating_sub(1);
+
+        // Build condition doc (ungrouped so our group controls breaking)
+        let condition_doc = tsv_ts::build_condition_doc(
+            &block.test,
+            self.source,
+            Rc::clone(&self.interner),
+            &self.config,
+            self.comments,
+        );
+
+        // Wrap in group with indent for wrapped lines
+        let opening_doc = doc::group(doc::concat(vec![
+            doc::text("{#if "),
+            doc::indent(condition_doc),
+            doc::text("}"),
+        ]));
+
+        // Create render config with first_line_offset and suffix_width
+        let render_config = tsv_lang::PrintConfig {
+            first_line_offset,
+            suffix_width,
+            ..self.config
+        };
+
+        (opening_doc, render_config)
     }
 
     /// Print the alternate branch of an if block (recursive for else-if chains)
@@ -93,13 +152,30 @@ impl<'a> Printer<'a> {
             && (else_if.elseif || is_only_if_block)
         {
             // {:else if condition}
-            self.write_continuation("{:else if ", parent_inline);
-            self.print_ts_expression_with_comments(
+            // For binary expressions, use doc-based formatting for proper wrapping
+            // For other expressions (method chains, etc.), use imperative formatting
+            let is_binary = matches!(
                 &else_if.test,
-                else_if.opening_tag_span.start,
-                else_if.opening_tag_span.end,
+                tsv_ts::Expression::BinaryExpression(b) if b.operator.is_logical()
             );
-            self.write("}");
+
+            if is_binary {
+                if !parent_inline {
+                    self.write("\n");
+                    self.write_indent();
+                }
+                let (opening_doc, render_config) = self.build_else_if_opening_doc(else_if);
+                self.write_doc_with_config(&opening_doc, &render_config);
+            } else {
+                // Non-binary: use original imperative approach
+                self.write_continuation("{:else if ", parent_inline);
+                self.print_ts_expression_with_comments(
+                    &else_if.test,
+                    else_if.opening_tag_span.start,
+                    else_if.opening_tag_span.end,
+                );
+                self.write("}");
+            }
 
             let is_inline = self.format_block_body(&else_if.consequent);
 
@@ -115,6 +191,40 @@ impl<'a> Printer<'a> {
         self.format_block_body(alt);
     }
 
+    /// Build a doc for the {:else if condition} tag with width-aware wrapping.
+    ///
+    /// Only called for binary expressions (&&, ||).
+    fn build_else_if_opening_doc(
+        &self,
+        else_if: &internal::IfBlock,
+    ) -> (doc::Doc, tsv_lang::PrintConfig) {
+        let current_col = self.buffer.current_column(self.config.tab_width);
+        let first_line_offset = current_col;
+
+        // Build condition doc (ungrouped so our group controls breaking)
+        let condition_doc = tsv_ts::build_condition_doc(
+            &else_if.test,
+            self.source,
+            Rc::clone(&self.interner),
+            &self.config,
+            self.comments,
+        );
+
+        // Wrap in group with indent for wrapped lines
+        let opening_doc = doc::group(doc::concat(vec![
+            doc::text("{:else if "),
+            doc::indent(condition_doc),
+            doc::text("}"),
+        ]));
+
+        let render_config = tsv_lang::PrintConfig {
+            first_line_offset,
+            ..self.config
+        };
+
+        (opening_doc, render_config)
+    }
+
     // =========================================================================
     // Each block
     // =========================================================================
@@ -124,16 +234,20 @@ impl<'a> Printer<'a> {
         // Opening tag
         self.write("{#each ");
 
+        // Calculate suffix width for width-aware expression wrapping
+        let suffix_width = self.calculate_each_suffix_width(block);
+
         // For collection expression, only look for trailing comments up to before "as"
         // to avoid capturing comments that belong to the key expression
         let expr_comment_end = block
             .context
             .as_ref()
             .map_or(block.opening_tag_span.end, |c| c.span().start);
-        self.print_ts_expression_with_comments(
+        self.print_ts_expression_with_suffix_width(
             &block.expression,
             block.opening_tag_span.start,
             expr_comment_end,
+            suffix_width,
         );
 
         if let Some(context) = &block.context {
@@ -185,10 +299,15 @@ impl<'a> Printer<'a> {
 
         // Opening tag
         self.write("{#await ");
-        self.print_ts_expression_with_comments(
+
+        // Calculate suffix width for width-aware expression wrapping
+        let suffix_width = self.calculate_await_suffix_width(block);
+
+        self.print_ts_expression_with_suffix_width(
             &block.expression,
             block.opening_tag_span.start,
             block.opening_tag_span.end,
+            suffix_width,
         );
 
         // Determine main fragment for inline detection
@@ -260,10 +379,15 @@ impl<'a> Printer<'a> {
     /// Format a key block: {#key expr}...{/key}
     pub(super) fn print_key_block(&mut self, block: &internal::KeyBlock) {
         self.write("{#key ");
-        self.print_ts_expression_with_comments(
+
+        // Calculate suffix width for width-aware expression wrapping
+        let suffix_width = self.calculate_key_suffix_width(block);
+
+        self.print_ts_expression_with_suffix_width(
             &block.expression,
             block.opening_tag_span.start,
             block.opening_tag_span.end,
+            suffix_width,
         );
         self.write("}");
 
@@ -277,29 +401,71 @@ impl<'a> Printer<'a> {
 
     /// Format a snippet block: {#snippet name(params)}...{/snippet}
     pub(super) fn print_snippet_block(&mut self, block: &internal::SnippetBlock) {
-        self.write("{#snippet ");
-        self.write(block.expression.span().extract(self.source));
+        // Build the opening tag with doc-based parameter wrapping
+        let name = block.expression.span().extract(self.source);
 
         // Type parameters (generics)
-        if let Some(ref type_params) = block.type_parameters {
-            self.write("<");
-            self.write(type_params);
-            self.write(">");
-        }
+        let type_params_part = block.type_parameters.as_ref().map_or_else(
+            || doc::text(""),
+            |tp| {
+                doc::concat(vec![
+                    doc::text("<"),
+                    doc::text_owned(tp.clone()),
+                    doc::text(">"),
+                ])
+            },
+        );
 
-        // Parameters
-        self.write("(");
-        if let Some(ref raw_params) = block.raw_parameters {
-            self.write(raw_params);
+        // Parameters - wrap when line exceeds print width
+        // Format each parameter through the TypeScript printer for proper formatting
+        let params_docs: Vec<_> = block.raw_parameters.as_ref().map_or_else(
+            || {
+                block
+                    .parameters
+                    .iter()
+                    .map(|param| {
+                        let formatted = tsv_ts::format_expression(
+                            param,
+                            self.source,
+                            Rc::clone(&self.interner),
+                        );
+                        doc::text_owned(formatted)
+                    })
+                    .collect()
+            },
+            |raw| vec![doc::text_owned(raw.clone())],
+        );
+
+        // Build params doc: empty or comma-separated list (works for 0, 1, or N params)
+        let params_doc = if params_docs.is_empty() {
+            doc::text("")
         } else {
-            for (i, param) in block.parameters.iter().enumerate() {
+            let mut parts = Vec::new();
+            for (i, param_doc) in params_docs.into_iter().enumerate() {
                 if i > 0 {
-                    self.write(", ");
+                    parts.push(doc::text(","));
+                    parts.push(doc::line());
                 }
-                self.print_ts_expression(param);
+                parts.push(param_doc);
             }
-        }
-        self.write(")}");
+            doc::concat(parts)
+        };
+
+        // Build the full opening tag with group for wrapping
+        // When fits: {#snippet name(a, b, c)}
+        // When wraps: {#snippet name(\n\ta,\n\tb,\n\tc,\n)}
+        let opening_doc = doc::group(doc::concat(vec![
+            doc::text("{#snippet "),
+            doc::text_owned(name.to_string()),
+            type_params_part,
+            doc::text("("),
+            doc::indent(doc::concat(vec![doc::softline(), params_doc])),
+            doc::if_break(doc::text(","), doc::text("")),
+            doc::softline(),
+            doc::text(")}"),
+        ]));
+
+        self.write_doc(&opening_doc);
 
         let is_inline = self.format_block_body(&block.body);
         self.write_closing("{/snippet}", is_inline);

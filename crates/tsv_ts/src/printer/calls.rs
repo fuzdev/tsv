@@ -25,16 +25,6 @@ fn chain_has_calls(expr: &internal::Expression) -> bool {
         _ => false,
     }
 }
-
-/// Check if an expression is a logical binary expression
-fn is_logical_expression(expr: &internal::Expression) -> bool {
-    if let internal::Expression::BinaryExpression(binary) = expr {
-        binary.operator.is_logical()
-    } else {
-        false
-    }
-}
-
 /// Check if an argument is a "short" simple value that won't expand
 /// Used to determine if tail args can stay inline after a function callback
 fn is_hopefully_short_arg(expr: &internal::Expression) -> bool {
@@ -571,10 +561,31 @@ impl<'a> Printer<'a> {
                     ]);
                 }
 
+                // Object literal: hug it (object handles its own internal wrapping)
+                // e.g., @decorator({...}) or fn({prop: value})
+                internal::Expression::ObjectExpression(_) => {
+                    return doc::concat(vec![
+                        callee,
+                        doc::text("("),
+                        self.build_expression_doc(&call.arguments[0]),
+                        doc::text(")"),
+                    ]);
+                }
+
+                // Array literal: hug it (array handles its own internal wrapping)
+                internal::Expression::ArrayExpression(_) => {
+                    return doc::concat(vec![
+                        callee,
+                        doc::text("("),
+                        self.build_expression_doc(&call.arguments[0]),
+                        doc::text(")"),
+                    ]);
+                }
+
                 // Expression arrow or block arrow that doesn't fit: wrap with width-aware group
                 internal::Expression::ArrowFunctionExpression(_) => {}
 
-                // Not a function argument
+                // Other arguments: fall through to standard handling
                 _ => {}
             }
 
@@ -704,25 +715,13 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a chain (method chain or member chain) with wrapping
+    ///
+    /// Uses the chain module's grouping and doc building logic for proper
+    /// member chain formatting, including the 3+ calls rule.
     fn build_chain_doc_with_wrapping(&self, expr: &internal::Expression) -> Doc {
-        let segments = self.collect_chain_segments(expr);
-
-        if segments.len() <= 1 {
-            return segments.into_iter().next().unwrap_or_else(|| doc::text(""));
-        }
-
-        // Build chain with optional breaks between segments
-        let mut parts = Vec::new();
-        for (i, segment) in segments.into_iter().enumerate() {
-            if i == 0 {
-                parts.push(segment);
-            } else {
-                // Each subsequent segment can break with indent
-                parts.push(doc::indent_softline(segment));
-            }
-        }
-
-        doc::group(doc::concat(parts))
+        let nodes = chain::linearize_chain(expr);
+        let groups = chain::group_chain_nodes(nodes);
+        chain::build_chain_doc(&groups, self)
     }
 
     /// Print a new expression: `new Date()`, `new Map()`
@@ -735,29 +734,30 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a new expression with argument wrapping
     pub(super) fn build_new_doc_with_wrapping(&self, new_expr: &internal::NewExpression) -> Doc {
-        let callee_doc = self.build_expression_doc(&new_expr.callee);
-
         // Wrap callee in parens if needed (e.g., `new (a || b)()`, `new (a ? b : c)()`)
         let callee = if needs_parens(&new_expr.callee, ParenContext::NewCallee) {
-            // For logical expressions, use a group with softlines so the parens
-            // can break independently when the content is too long:
+            // For binary expressions (including logical), use a group with softlines
+            // so the parens can break independently when the content is too long:
             // new (
-            //     a ||
-            //     b ||
-            //     c
+            //     a || b || c
             // )()
-            if is_logical_expression(&new_expr.callee) {
+            //
+            // Use ungrouped binary doc so the inner expression doesn't have its own
+            // group - the outer group controls whether to break after `(`.
+            if let internal::Expression::BinaryExpression(binary) = &*new_expr.callee {
+                let inner_doc = self.build_binary_chain_doc_ungrouped(binary);
                 doc::group(doc::concat(vec![
                     doc::text("("),
-                    doc::indent_softline(callee_doc),
+                    doc::indent_softline(inner_doc),
                     doc::softline(),
                     doc::text(")"),
                 ]))
             } else {
+                let callee_doc = self.build_expression_doc(&new_expr.callee);
                 doc::parens(callee_doc)
             }
         } else {
-            callee_doc
+            self.build_expression_doc(&new_expr.callee)
         };
 
         // Build type arguments: `<K, V>`
@@ -919,125 +919,6 @@ impl<'a> Printer<'a> {
         };
 
         self.write_doc_with_margin(&doc);
-    }
-
-    /// Collect chain segments from a member/call expression chain
-    ///
-    /// Flattens `a.b.c().d` into segments: [`a`, `.b`, `.c()`, `.d`]
-    fn collect_chain_segments(&self, expr: &internal::Expression) -> Vec<Doc> {
-        let mut segments = Vec::new();
-        self.collect_chain_segments_recursive(expr, &mut segments);
-        segments
-    }
-
-    fn collect_chain_segments_recursive(
-        &self,
-        expr: &internal::Expression,
-        segments: &mut Vec<Doc>,
-    ) {
-        match expr {
-            internal::Expression::MemberExpression(member) => {
-                // Recurse into object first
-                self.collect_chain_segments_recursive(&member.object, segments);
-
-                // Build this segment: `.prop` or `[expr]`
-                let segment = if member.computed {
-                    let prop = self.build_expression_doc(&member.property);
-                    if member.optional {
-                        doc::concat(vec![doc::text("?."), doc::brackets(prop)])
-                    } else {
-                        doc::brackets(prop)
-                    }
-                } else {
-                    let prop = self.build_expression_doc(&member.property);
-                    if member.optional {
-                        doc::concat(vec![doc::text("?."), prop])
-                    } else {
-                        doc::concat(vec![doc::text("."), prop])
-                    }
-                };
-                segments.push(segment);
-            }
-            internal::Expression::CallExpression(call) => {
-                // Recurse into callee first
-                self.collect_chain_segments_recursive(&call.callee, segments);
-
-                // Build this segment: the call arguments `(arg1, arg2)` or `?.(arg1, arg2)`
-                // Use wrapping for the args
-                let open_paren = if call.optional { "?.(" } else { "(" };
-
-                let args_doc = if call.arguments.is_empty() {
-                    doc::text(if call.optional { "?.()" } else { "()" })
-                } else {
-                    let arg_docs: Vec<_> = call
-                        .arguments
-                        .iter()
-                        .map(|arg| self.build_expression_doc(arg))
-                        .collect();
-                    let arg_parts = doc::join_doc(arg_docs, doc::comma_line());
-                    doc::group(doc::concat(vec![
-                        doc::text(open_paren),
-                        doc::indent(doc::concat(vec![
-                            doc::softline(),
-                            arg_parts,
-                            doc::trailing_comma(),
-                        ])),
-                        doc::softline(),
-                        doc::text(")"),
-                    ]))
-                };
-
-                // Append args to the last segment (if any) or create new segment
-                if let Some(last) = segments.pop() {
-                    segments.push(doc::concat(vec![last, args_doc]));
-                } else {
-                    segments.push(args_doc);
-                }
-            }
-            // TSNonNullExpression: `expr!` - continue the chain if it's a member/call chain,
-            // otherwise handle as base with appropriate parentheses
-            internal::Expression::TSNonNullExpression(non_null) => {
-                // Check if inner expression is part of the chain (member or call)
-                match &*non_null.expression {
-                    internal::Expression::MemberExpression(_)
-                    | internal::Expression::CallExpression(_)
-                    | internal::Expression::TSNonNullExpression(_) => {
-                        // Recurse into the chain
-                        self.collect_chain_segments_recursive(&non_null.expression, segments);
-                        // Append `!` to the last segment
-                        if let Some(last) = segments.pop() {
-                            segments.push(doc::concat(vec![last, doc::text("!")]));
-                        }
-                    }
-                    // For expressions that need parens (binary, await, ternary, etc.),
-                    // wrap them and add `!` as a base segment
-                    _ => {
-                        let inner_doc = self.build_expression_doc(&non_null.expression);
-                        if needs_parens(&non_null.expression, ParenContext::NonNull) {
-                            segments.push(doc::concat(vec![
-                                doc::text("("),
-                                inner_doc,
-                                doc::text(")!"),
-                            ]));
-                        } else {
-                            segments.push(doc::concat(vec![inner_doc, doc::text("!")]));
-                        }
-                    }
-                }
-            }
-            // Base case: identifiers, literals, await, etc.
-            _ => {
-                let doc = self.build_expression_doc(expr);
-                // Wrap await expressions in parens for correct precedence in chains
-                // `(await a).b` means member access on await result
-                // `await a.b` means await the member access
-                if matches!(expr, internal::Expression::AwaitExpression(_)) {
-                    segments.push(doc::parens(doc));
-                } else {
-                    segments.push(doc);
-                }
-            }
-        }
     }
 
     /// Print a conditional (ternary) expression: `a ? b : c`

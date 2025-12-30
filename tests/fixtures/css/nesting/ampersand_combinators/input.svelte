@@ -1,5 +1,5 @@
 <style>
-	.container {
+	.class1 {
 		padding: 10px;
 
 		& > .direct-child {

@@ -1,9 +1,9 @@
 <style>
-	.card  {
+	.class1  {
 		padding:  20px;
 		background:  white;
 
-		.header  {
+		.class2  {
 			font-size:  24px;
 
 			&:hover  {
@@ -11,11 +11,11 @@
 			}
 		}
 
-		&  .footer  {
+		&  .class3  {
 			font-size:  12px;
 		}
 
-		&  >  .content  {
+		&  >  .class4  {
 			margin:  10px  0;
 
 			@media  (  min-width:  768px  )  {
@@ -23,7 +23,7 @@
 			}
 		}
 
-		&.active  {
+		&.class5  {
 			border:  2px  solid  blue;
 
 			@supports  (  box-shadow:  0  0  5px  blue  )  {

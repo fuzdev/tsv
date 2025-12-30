@@ -10,7 +10,7 @@
 	type D = ns.A & ns.B;
 
 	// In generics
-	type E = ns.Container<ns.Item>;
+	type E = ns.Box<ns.Item>;
 
 	// As return type
 	function fn(): ns.Result {

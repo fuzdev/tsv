@@ -1,1 +1,1 @@
-<svelte:document  on:scroll={handler}  />
+<svelte:document  on:scroll={fn}  />

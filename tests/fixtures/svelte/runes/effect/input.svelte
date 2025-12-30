@@ -1,12 +1,12 @@
 <script lang="ts">
-	let count = $state(0);
+	let n = $state(0);
 
 	$effect(() => {
-		console.log(count);
+		console.log(n);
 	});
 
 	$effect(() => {
-		console.log(count);
+		console.log(n);
 
 		return () => {
 			console.log('cleanup');
@@ -14,7 +14,7 @@
 	});
 
 	$effect.pre(() => {
-		console.log('pre', count);
+		console.log('pre', n);
 	});
 
 	$effect(() => {
@@ -23,15 +23,15 @@
 		}
 	});
 
-	const cleanup = $effect.root(() => {
+	const fn = $effect.root(() => {
 		$effect(() => {
-			console.log(count);
+			console.log(n);
 		});
 		return () => console.log('cleanup');
 	});
 
 	$effect(() => {
-		const pending = $effect.pending();
-		console.log('pending:', pending);
+		const val = $effect.pending();
+		console.log('pending:', val);
 	});
 </script>

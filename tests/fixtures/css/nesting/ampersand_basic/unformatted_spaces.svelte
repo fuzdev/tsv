@@ -1,12 +1,12 @@
 <style>
-	.parent {
+	.class1 {
 		color:  red;
 
-		&  .child {
+		&  .class2 {
 			color:  blue;
 		}
 
-		&.active {
+		&.class3 {
 			color:  green;
 		}
 

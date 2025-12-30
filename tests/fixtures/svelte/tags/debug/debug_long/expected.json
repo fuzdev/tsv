@@ -2,189 +2,303 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 274,
+	"end": 553,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
 		"nodes": [
 			{
-				"type": "DebugTag",
+				"type": "Comment",
 				"start": 0,
-				"end": 110,
+				"end": 83,
+				"data": " @debug NEVER wraps - stays inline regardless of length (prettier behavior) "
+			},
+			{
+				"type": "Text",
+				"start": 83,
+				"end": 85,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 85,
+				"end": 118,
+				"data": " 100 chars - stays inline "
+			},
+			{
+				"type": "Text",
+				"start": 118,
+				"end": 119,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "DebugTag",
+				"start": 119,
+				"end": 219,
 				"identifiers": [
 					{
 						"type": "Identifier",
-						"start": 8,
-						"end": 31,
+						"start": 127,
+						"end": 148,
 						"loc": {
 							"start": {
-								"line": 1,
+								"line": 4,
 								"column": 8
 							},
 							"end": {
-								"line": 1,
+								"line": 4,
+								"column": 29
+							}
+						},
+						"name": "aaaaaaaaaaaaaaaaaaaaa"
+					},
+					{
+						"type": "Identifier",
+						"start": 150,
+						"end": 171,
+						"loc": {
+							"start": {
+								"line": 4,
 								"column": 31
+							},
+							"end": {
+								"line": 4,
+								"column": 52
 							}
 						},
-						"name": "veryLongVariableNameOne"
+						"name": "bbbbbbbbbbbbbbbbbbbbb"
 					},
 					{
 						"type": "Identifier",
-						"start": 33,
-						"end": 56,
+						"start": 173,
+						"end": 194,
 						"loc": {
 							"start": {
-								"line": 1,
-								"column": 33
+								"line": 4,
+								"column": 54
 							},
 							"end": {
-								"line": 1,
-								"column": 56
+								"line": 4,
+								"column": 75
 							}
 						},
-						"name": "veryLongVariableNameTwo"
+						"name": "ccccccccccccccccccccc"
 					},
 					{
 						"type": "Identifier",
-						"start": 58,
-						"end": 83,
+						"start": 196,
+						"end": 218,
 						"loc": {
 							"start": {
-								"line": 1,
-								"column": 58
+								"line": 4,
+								"column": 77
 							},
 							"end": {
-								"line": 1,
-								"column": 83
+								"line": 4,
+								"column": 99
 							}
 						},
-						"name": "veryLongVariableNameThree"
-					},
-					{
-						"type": "Identifier",
-						"start": 85,
-						"end": 109,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 85
-							},
-							"end": {
-								"line": 1,
-								"column": 109
-							}
-						},
-						"name": "veryLongVariableNameFour"
+						"name": "dddddddddddddddddddddd"
 					}
 				]
 			},
 			{
 				"type": "Text",
-				"start": 110,
-				"end": 112,
+				"start": 219,
+				"end": 221,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
+				"type": "Comment",
+				"start": 221,
+				"end": 285,
+				"data": " 101 chars - still stays inline (no wrapping for @debug) "
+			},
+			{
+				"type": "Text",
+				"start": 285,
+				"end": 286,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
 				"type": "DebugTag",
-				"start": 112,
-				"end": 273,
+				"start": 286,
+				"end": 387,
 				"identifiers": [
 					{
 						"type": "Identifier",
-						"start": 120,
-						"end": 143,
+						"start": 294,
+						"end": 315,
 						"loc": {
 							"start": {
-								"line": 3,
+								"line": 7,
 								"column": 8
 							},
 							"end": {
-								"line": 3,
+								"line": 7,
+								"column": 29
+							}
+						},
+						"name": "aaaaaaaaaaaaaaaaaaaaa"
+					},
+					{
+						"type": "Identifier",
+						"start": 317,
+						"end": 338,
+						"loc": {
+							"start": {
+								"line": 7,
 								"column": 31
+							},
+							"end": {
+								"line": 7,
+								"column": 52
 							}
 						},
-						"name": "veryLongVariableNameOne"
+						"name": "bbbbbbbbbbbbbbbbbbbbb"
 					},
 					{
 						"type": "Identifier",
-						"start": 145,
-						"end": 168,
+						"start": 340,
+						"end": 361,
 						"loc": {
 							"start": {
-								"line": 3,
-								"column": 33
+								"line": 7,
+								"column": 54
 							},
 							"end": {
-								"line": 3,
-								"column": 56
+								"line": 7,
+								"column": 75
 							}
 						},
-						"name": "veryLongVariableNameTwo"
+						"name": "ccccccccccccccccccccc"
 					},
 					{
 						"type": "Identifier",
-						"start": 170,
-						"end": 195,
+						"start": 363,
+						"end": 386,
 						"loc": {
 							"start": {
-								"line": 3,
-								"column": 58
+								"line": 7,
+								"column": 77
 							},
 							"end": {
-								"line": 3,
-								"column": 83
+								"line": 7,
+								"column": 100
 							}
 						},
-						"name": "veryLongVariableNameThree"
+						"name": "ddddddddddddddddddddddd"
+					}
+				]
+			},
+			{
+				"type": "Text",
+				"start": 387,
+				"end": 389,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 389,
+				"end": 428,
+				"data": " Very long - still stays inline "
+			},
+			{
+				"type": "Text",
+				"start": 428,
+				"end": 429,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "DebugTag",
+				"start": 429,
+				"end": 552,
+				"identifiers": [
+					{
+						"type": "Identifier",
+						"start": 437,
+						"end": 458,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 8
+							},
+							"end": {
+								"line": 10,
+								"column": 29
+							}
+						},
+						"name": "aaaaaaaaaaaaaaaaaaaaa"
 					},
 					{
 						"type": "Identifier",
-						"start": 197,
-						"end": 221,
+						"start": 460,
+						"end": 481,
 						"loc": {
 							"start": {
-								"line": 3,
-								"column": 85
+								"line": 10,
+								"column": 31
 							},
 							"end": {
-								"line": 3,
-								"column": 109
+								"line": 10,
+								"column": 52
 							}
 						},
-						"name": "veryLongVariableNameFour"
+						"name": "bbbbbbbbbbbbbbbbbbbbb"
 					},
 					{
 						"type": "Identifier",
-						"start": 223,
-						"end": 247,
+						"start": 483,
+						"end": 504,
 						"loc": {
 							"start": {
-								"line": 3,
-								"column": 111
+								"line": 10,
+								"column": 54
 							},
 							"end": {
-								"line": 3,
-								"column": 135
+								"line": 10,
+								"column": 75
 							}
 						},
-						"name": "veryLongVariableNameFive"
+						"name": "ccccccccccccccccccccc"
 					},
 					{
 						"type": "Identifier",
-						"start": 249,
-						"end": 272,
+						"start": 506,
+						"end": 528,
 						"loc": {
 							"start": {
-								"line": 3,
-								"column": 137
+								"line": 10,
+								"column": 77
 							},
 							"end": {
-								"line": 3,
-								"column": 160
+								"line": 10,
+								"column": 99
 							}
 						},
-						"name": "veryLongVariableNameSix"
+						"name": "dddddddddddddddddddddd"
+					},
+					{
+						"type": "Identifier",
+						"start": 530,
+						"end": 551,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 101
+							},
+							"end": {
+								"line": 10,
+								"column": 122
+							}
+						},
+						"name": "eeeeeeeeeeeeeeeeeeeee"
 					}
 				]
 			}

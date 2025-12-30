@@ -7,15 +7,6 @@
 import { type Language, LANGUAGE_PRETTIER_PARSERS, type TsvImplementation } from './types.ts';
 import type { CanonicalVersions } from './versions.ts';
 
-/** Module-level versions (set by constructor for external access) */
-export let VERSIONS: CanonicalVersions = {
-	prettier: 'unknown',
-	'prettier-plugin-svelte': 'unknown',
-	svelte: 'unknown',
-	acorn: 'unknown',
-	'@sveltejs/acorn-typescript': 'unknown',
-};
-
 /** Prettier module */
 interface PrettierModule {
 	format: (source: string, options: Record<string, unknown>) => Promise<string>;
@@ -26,6 +17,7 @@ type ParserFn = (source: string) => unknown;
 
 export class CanonicalImplementation implements TsvImplementation {
 	name = 'canonical' as const;
+	readonly versions: CanonicalVersions;
 	private _prettier: PrettierModule | null = null;
 
 	/** Languages supported for parsing */
@@ -41,7 +33,7 @@ export class CanonicalImplementation implements TsvImplementation {
 	private _acornTsParser: any = null;
 
 	constructor(versions: CanonicalVersions) {
-		VERSIONS = versions;
+		this.versions = versions;
 	}
 
 	/** Get initialized prettier or throw */

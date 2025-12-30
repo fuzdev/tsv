@@ -1,9 +1,9 @@
 <script>
-	async function fetchData() {
-		return 'data';
+	async function fn() {
+		return 'value';
 	}
 
-	let data = $derived(await fetchData());
+	let val = $derived(await fn());
 </script>
 
-<p>{data}</p>
+<p>{val}</p>

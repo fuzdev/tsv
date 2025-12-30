@@ -85,25 +85,6 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Print an expression in an isolated context.
-    ///
-    /// Similar to `print_expression`, but handles sequence expressions specially:
-    /// they are NOT wrapped in parentheses since the surrounding context
-    /// (like Svelte's `={...}`) already provides the necessary grouping.
-    pub fn print_expression_isolated(&mut self, expression: &Expression) {
-        // Special case: sequence expressions don't need parens in isolated context
-        if let Expression::SequenceExpression(seq) = expression {
-            for (i, expr) in seq.expressions.iter().enumerate() {
-                if i > 0 {
-                    self.write(", ");
-                }
-                self.print_expression(expr);
-            }
-        } else {
-            self.print_expression(expression);
-        }
-    }
-
     /// Build a Doc for an expression (for use in object/array contexts and statements)
     pub(super) fn build_expression_doc(&self, expr: &Expression) -> Doc {
         match expr {

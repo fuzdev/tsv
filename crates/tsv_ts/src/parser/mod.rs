@@ -15,6 +15,7 @@ use tsv_lang::{ParseError, PeekData, Span};
 
 // Import parsing implementations
 mod expression;
+mod scan; // Low-level byte scanning utilities
 mod statement; // Statement parsing (refactored into submodules)
 
 #[allow(clippy::struct_excessive_bools)]
@@ -561,7 +562,7 @@ impl<'a> Parser<'a> {
             Err(ParseError::UnexpectedToken {
                 expected: kind.to_string(),
                 found: self.current_kind.to_string(),
-                position: self.current_start,
+                position: self.current_pos().0,
                 context: None,
             })
         }
@@ -621,7 +622,7 @@ impl<'a> Parser<'a> {
             _ => Err(ParseError::UnexpectedToken {
                 expected: "'>'".to_string(),
                 found: format!("'{}'", self.current_kind),
-                position: self.current_start,
+                position: self.current_pos().0,
                 context: None,
             }),
         }

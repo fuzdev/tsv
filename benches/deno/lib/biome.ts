@@ -15,12 +15,6 @@ import type { BiomeVersions } from './versions.ts';
 import '@biomejs/wasm-bundler';
 import { Biome } from '@biomejs/js-api/bundler';
 
-/** Module-level versions (set by constructor for external access) */
-export let BIOME_VERSIONS: BiomeVersions = {
-	jsApi: 'unknown',
-	wasm: 'unknown',
-};
-
 /**
  * Biome implementation using WASM.
  *
@@ -29,7 +23,8 @@ export let BIOME_VERSIONS: BiomeVersions = {
  * - Parse: Not implemented in benchmarks
  */
 export class BiomeImplementation implements TsvImplementation {
-	name = 'biome' as const;
+	name = 'biome-wasm' as const;
+	readonly versions: BiomeVersions;
 	private _biome: Biome | null = null;
 	private _projectKey: number | null = null;
 
@@ -40,7 +35,7 @@ export class BiomeImplementation implements TsvImplementation {
 	static readonly FORMAT_LANGUAGES: Language[] = ['typescript', 'css'];
 
 	constructor(versions: BiomeVersions) {
-		BIOME_VERSIONS = versions;
+		this.versions = versions;
 	}
 
 	// deno-lint-ignore require-await

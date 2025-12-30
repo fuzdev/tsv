@@ -17,6 +17,21 @@ async fn test_all_fixtures() {
         panic!("Fixtures directory not found: tests/fixtures");
     }
 
+    // Verify Deno sidecar is healthy before running tests
+    // This prevents cascading failures if the sidecar dies during tests
+    if let Err(e) = tsv_debug::deno::check().await {
+        panic!(
+            "Deno sidecar health check failed: {e}\n\n\
+            Hint: {}\n\n\
+            The Deno sidecar is required for fixture validation.\n\
+            All {} fixture tests would fail without it.",
+            e.hint(),
+            fixtures::walk_fixtures(fixtures_dir)
+                .map(|f| f.len())
+                .unwrap_or(0)
+        );
+    }
+
     // Discover all fixtures
     let fixture_list =
         fixtures::walk_fixtures(fixtures_dir).expect("Failed to walk fixtures directory");
@@ -44,6 +59,22 @@ async fn test_all_fixtures() {
 
     // Check for cross-fixture duplicates
     summary.detect_cross_fixture_duplicates();
+
+    // Detect Deno sidecar crash pattern (many "deno actor shut down" errors)
+    let sidecar_failures = summary.count_sidecar_failures();
+    if sidecar_failures > 5 {
+        panic!(
+            "\n\nDeno sidecar crashed during test run!\n\n\
+            {} fixtures failed with 'deno actor shut down' errors.\n\
+            This indicates the Deno process died unexpectedly during validation.\n\n\
+            This is an infrastructure issue, not a fixture issue.\n\
+            Try running the tests again. If this persists, check:\n\
+            - Available memory\n\
+            - Deno version: deno --version\n\
+            - System logs for OOM killer or other process termination\n",
+            sidecar_failures
+        );
+    }
 
     // Get verbose mode from environment
     let verbose = std::env::var("VERBOSE").is_ok() || std::env::var("V").is_ok();

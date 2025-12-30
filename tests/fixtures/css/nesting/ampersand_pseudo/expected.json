@@ -23,7 +23,7 @@
 									"selectors": [
 										{
 											"type": "ClassSelector",
-											"name": "button",
+											"name": "class1",
 											"start": 9,
 											"end": 16
 										}
@@ -270,7 +270,7 @@
 		"content": {
 			"start": 7,
 			"end": 197,
-			"styles": "\n\t.button {\n\t\tbackground: white;\n\n\t\t&:hover {\n\t\t\tbackground: gray;\n\t\t}\n\n\t\t&:focus {\n\t\t\toutline: 2px solid blue;\n\t\t}\n\n\t\t&::before {\n\t\t\tcontent: '>';\n\t\t}\n\n\t\t&::after {\n\t\t\tcontent: '<';\n\t\t}\n\t}\n",
+			"styles": "\n\t.class1 {\n\t\tbackground: white;\n\n\t\t&:hover {\n\t\t\tbackground: gray;\n\t\t}\n\n\t\t&:focus {\n\t\t\toutline: 2px solid blue;\n\t\t}\n\n\t\t&::before {\n\t\t\tcontent: '>';\n\t\t}\n\n\t\t&::after {\n\t\t\tcontent: '<';\n\t\t}\n\t}\n",
 			"comment": null
 		}
 	},

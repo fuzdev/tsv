@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 72,
+	"end": 64,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,7 +10,7 @@
 			{
 				"type": "SvelteBoundary",
 				"start": 0,
-				"end": 71,
+				"end": 63,
 				"name": "svelte:boundary",
 				"name_loc": {
 					"start": {
@@ -28,7 +28,7 @@
 					{
 						"type": "Attribute",
 						"start": 17,
-						"end": 34,
+						"end": 29,
 						"name": "onerror",
 						"name_loc": {
 							"start": {
@@ -45,11 +45,11 @@
 						"value": {
 							"type": "ExpressionTag",
 							"start": 25,
-							"end": 34,
+							"end": 29,
 							"expression": {
 								"type": "Identifier",
 								"start": 26,
-								"end": 33,
+								"end": 28,
 								"loc": {
 									"start": {
 										"line": 1,
@@ -57,10 +57,10 @@
 									},
 									"end": {
 										"line": 1,
-										"column": 33
+										"column": 28
 									}
 								},
-								"name": "handler"
+								"name": "fn"
 							}
 						}
 					}
@@ -70,19 +70,19 @@
 					"nodes": [
 						{
 							"type": "RegularElement",
-							"start": 35,
-							"end": 53,
+							"start": 30,
+							"end": 45,
 							"name": "div",
 							"name_loc": {
 								"start": {
 									"line": 1,
-									"column": 36,
-									"character": 36
+									"column": 31,
+									"character": 31
 								},
 								"end": {
 									"line": 1,
-									"column": 39,
-									"character": 39
+									"column": 34,
+									"character": 34
 								}
 							},
 							"attributes": [],
@@ -91,10 +91,10 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 40,
-										"end": 47,
-										"raw": "content",
-										"data": "content"
+										"start": 35,
+										"end": 39,
+										"raw": "text",
+										"data": "text"
 									}
 								]
 							}

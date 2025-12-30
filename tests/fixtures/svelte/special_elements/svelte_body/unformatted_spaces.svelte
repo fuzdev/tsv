@@ -1,1 +1,1 @@
-<svelte:body  on:mouseenter={handler}  />
+<svelte:body  on:mouseenter={fn}  />

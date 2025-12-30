@@ -1,3 +1,12 @@
+<!-- 100 chars - stays inline (at boundary) -->
+<div attr="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"></div>
+
+<!-- 101 chars - wraps -->
+<div
+	attr="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+></div>
+
+<!-- Multiple attrs - still tests semantic wrapping -->
 <div
 	class="class1 class2"
 	id="id1"

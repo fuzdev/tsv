@@ -9,22 +9,20 @@
  * enabling dynamic discovery and plugin-like architecture.
  */
 
-import type { Language, TsvImplementation } from './types.ts';
-import { CanonicalImplementation, VERSIONS } from './canonical.ts';
+import type { Language, Logger, TsvImplementation } from './types.ts';
+import { CanonicalImplementation } from './canonical.ts';
 import { NativeImplementation } from './ffi.ts';
 import { WasmImplementation } from './wasm.ts';
-import { OXC_VERSIONS, OxcImplementation } from './oxc.ts';
-import { BIOME_VERSIONS, BiomeImplementation } from './biome.ts';
-import { loadAllVersions } from './versions.ts';
+import { OxcImplementation } from './oxc.ts';
+import { BiomeImplementation } from './biome.ts';
+import { type AllVersions, loadAllVersions } from './versions.ts';
 
 export type { TsvImplementation };
-export { BIOME_VERSIONS, OXC_VERSIONS, VERSIONS };
-
-/** Logger function type */
-type Logger = (...args: unknown[]) => void;
 
 /** Result of initializing implementations */
 export interface InitializedImplementations {
+	/** All package versions */
+	versions: AllVersions;
 	/** Canonical implementation (prettier + svelte/compiler) - always available */
 	canonical: CanonicalImplementation;
 	/** Native FFI implementation - undefined if not built */
@@ -145,6 +143,7 @@ export async function initImplementations(
 	logger('');
 
 	return {
+		versions,
 		canonical,
 		native: nativeImpl,
 		wasm: wasmImpl,
@@ -284,7 +283,7 @@ export function getBenchmarkTasks(
 		// Biome formatter
 		if (impls.biome?.supportsFormatLanguage(language)) {
 			tasks.push({
-				name: 'biome',
+				name: 'biome-wasm',
 				trackingKey: `${groupName}/biome`,
 				isAsync: false,
 				run: (source) => impls.biome!.format(source, language),
@@ -364,7 +363,7 @@ export function getFormattersForValidation(impls: InitializedImplementations): F
 	// Biome - sync
 	if (impls.biome) {
 		formatters.push({
-			name: 'biome',
+			name: 'biome-wasm',
 			isAsync: false,
 			format: (source, lang) => impls.biome!.format(source, lang),
 			supportsLanguage: (lang) => impls.biome!.supportsFormatLanguage(lang),
@@ -387,8 +386,8 @@ export interface AlternativeVersions {
  */
 export function getAlternativeVersions(impls: InitializedImplementations): AlternativeVersions {
 	return {
-		oxcParser: impls.oxc ? OXC_VERSIONS['oxc-parser'] : undefined,
-		oxfmt: impls.oxc ? OXC_VERSIONS['oxfmt'] : undefined,
-		biome: impls.biome ? BIOME_VERSIONS.wasm : undefined,
+		oxcParser: impls.oxc?.versions['oxc-parser'],
+		oxfmt: impls.oxc?.versions.oxfmt,
+		biome: impls.biome?.versions.wasm,
 	};
 }

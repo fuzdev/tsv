@@ -312,16 +312,9 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Reserve 1 char for closing `]` to prevent greedy-fill boundary overflow
-        let fill_with_reserve = doc::with_context(
-            doc::fill(parts),
-            doc::DocContext {
-                trailing_reserve: 1,
-            },
-        );
         let inner = doc::concat(vec![
             doc::softline(),
-            fill_with_reserve,
+            doc::fill(parts),
             doc::trailing_comma(),
         ]);
         let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, doc::softline());

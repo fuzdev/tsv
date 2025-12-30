@@ -2,7 +2,10 @@
 // Short new (contrast case)
 new Map();
 
-// Long constructor name
+// 100 chars - stays inline (at boundary)
+new VeryLongConstructorClassName000000000000000000000000000000000000000000000000000000000000000();
+
+// 101 chars - still inline for new expressions (no natural break point)
 new VeryLongConstructorClassName0000000000000000000000000000000000000000000000000000000000000000();
 
 // Long constructor with generic types

@@ -4,8 +4,8 @@
 
 	/* Long chain - exceeds 100 chars, wraps to one call per line */
 	const long = arr
-		.filter((item) => item.active)
-		.map((item) => item.name)
+		.filter((x) => x.val)
+		.map((x) => x.str)
 		.sort((a, b) => a.localeCompare(b))
 		.join(', ');
 </script>

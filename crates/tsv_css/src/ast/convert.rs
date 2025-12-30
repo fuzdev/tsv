@@ -322,7 +322,39 @@ fn convert_prelude_to_string(prelude: &internal::PreludeValue, source: &str) -> 
             // Extract from source for maximum fidelity
             span.extract(source).to_string()
         }
+        internal::PreludeValue::Supports { condition, .. } => condition_to_string(condition),
+        internal::PreludeValue::Container {
+            name, condition, ..
+        } => {
+            let condition_str = condition_to_string(condition);
+            if let Some(container_name) = name {
+                format!("{container_name} {condition_str}")
+            } else {
+                condition_str
+            }
+        }
+        internal::PreludeValue::Media { content, .. } => content.clone(),
     }
+}
+
+/// Convert a SupportsCondition to its string representation
+fn condition_to_string(condition: &internal::SupportsCondition) -> String {
+    condition
+        .parts
+        .iter()
+        .map(|part| {
+            if let Some(connector) = &part.connector {
+                let conn_str = match connector {
+                    internal::SupportsConnector::And => "and",
+                    internal::SupportsConnector::Or => "or",
+                };
+                format!("{conn_str} {}", part.content)
+            } else {
+                part.content.clone()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Convert a CssValue to its string representation (for prelude conversion)

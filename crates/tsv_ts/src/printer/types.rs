@@ -12,7 +12,61 @@ use crate::ast::internal::{
 };
 use tsv_lang::SymbolResolver;
 use tsv_lang::SymbolToU32;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::{self, Doc};
+
+// =============================================================================
+// Helper functions
+// =============================================================================
+
+/// Find the position of a separator character in the source between start and end,
+/// skipping over comments. Returns Some(position) if found, None otherwise.
+fn find_separator_position(source: &str, start: u32, end: u32, separator: u8) -> Option<u32> {
+    let bytes = source.as_bytes();
+    let mut pos = start as usize;
+    let end = end as usize;
+
+    while pos < end {
+        let b = bytes[pos];
+        if b == separator {
+            return Some(pos as u32);
+        }
+        // Skip block comments: /* ... */
+        if b == b'/' && pos + 1 < end && bytes[pos + 1] == b'*' {
+            pos += 2;
+            while pos + 1 < end {
+                if bytes[pos] == b'*' && bytes[pos + 1] == b'/' {
+                    pos += 2;
+                    break;
+                }
+                pos += 1;
+            }
+            continue;
+        }
+        // Skip line comments: // ...
+        if b == b'/' && pos + 1 < end && bytes[pos + 1] == b'/' {
+            pos += 2;
+            while pos < end && bytes[pos] != b'\n' {
+                pos += 1;
+            }
+            continue;
+        }
+        pos += 1;
+    }
+    None
+}
+
+/// Find the position of a `|` pipe character, skipping comments.
+#[inline]
+fn find_pipe_position(source: &str, start: u32, end: u32) -> Option<u32> {
+    find_separator_position(source, start, end, b'|')
+}
+
+/// Find the position of a `&` ampersand character, skipping comments.
+#[inline]
+fn find_ampersand_position(source: &str, start: u32, end: u32) -> Option<u32> {
+    find_separator_position(source, start, end, b'&')
+}
 
 // =============================================================================
 // Type parenthesization helpers
@@ -282,6 +336,8 @@ impl<'a> Printer<'a> {
     ///     VeryLongValueType,
     /// >();
     /// ```
+    ///
+    /// Also preserves comments: `</* a */ T /* b */, U>`
     pub(super) fn build_type_parameter_instantiation_doc(
         &self,
         inst: &internal::TSTypeParameterInstantiation,
@@ -294,12 +350,40 @@ impl<'a> Printer<'a> {
         // The doc printer's look-ahead (fits_with_lookahead) handles the decision
         // of whether to break based on what follows the type params.
         let mut param_parts = Vec::new();
+        let mut prev_end = inst.span.start + 1; // After the opening `<`
+
         for (i, param) in inst.params.iter().enumerate() {
+            let param_start = param.span().start;
+
             if i > 0 {
                 param_parts.push(doc::text(","));
                 param_parts.push(doc::line());
             }
+
+            // Add leading block comments before this type argument
+            for comment in comments_in_range(self.comments, prev_end, param_start) {
+                if comment.is_block {
+                    param_parts.push(doc::text_owned(format!("/*{}*/ ", comment.content)));
+                }
+            }
+
             param_parts.push(self.build_type_doc(param));
+
+            // Add trailing block comments after this type argument
+            let param_end = param.span().end;
+            let next_boundary = if i + 1 < inst.params.len() {
+                inst.params[i + 1].span().start
+            } else {
+                inst.span.end - 1 // Before the closing `>`
+            };
+            for comment in comments_in_range(self.comments, param_end, next_boundary) {
+                if comment.is_block {
+                    param_parts.push(doc::text_owned(format!(" /*{}*/", comment.content)));
+                }
+            }
+
+            // Update prev_end to next_boundary to avoid double-counting comments
+            prev_end = next_boundary;
         }
 
         // Wrap in group with angle brackets and optional breaks
@@ -361,14 +445,69 @@ impl<'a> Printer<'a> {
                 ])
             }
         } else {
-            // Block comments stay inline
-            let comments_doc = self.build_inline_comments_between_doc(colon_end, type_start);
-            doc::concat(vec![
-                doc::text(": "),
-                comments_doc,
-                self.build_type_doc(&annotation.type_annotation),
-            ])
+            // Handle unions/intersections with width-based breaking
+            // Short: `param: Type1 | Type2`
+            // Long: `param:\n\t| Type1\n\t| Type2`
+            //
+            // This pattern matches index signature type annotation handling.
+            // For unions/intersections, wrap in group + indent + line so they break after `:`
+            // and inherit breaking from this context's group.
+            match annotation.type_annotation.as_ref() {
+                TSType::Union(u) => {
+                    let type_doc = self.build_union_type_doc(u, false);
+                    doc::group(doc::concat(vec![
+                        doc::text(":"),
+                        doc::indent(doc::concat(vec![
+                            doc::line(), // space when flat, newline when broken
+                            type_doc,
+                        ])),
+                    ]))
+                }
+                TSType::Intersection(i) => {
+                    let type_doc = self.build_intersection_type_doc(i, false);
+                    doc::group(doc::concat(vec![
+                        doc::text(":"),
+                        doc::indent(doc::concat(vec![
+                            doc::line(),
+                            type_doc,
+                        ])),
+                    ]))
+                }
+                _ => {
+                    // Block comments stay inline for simple types
+                    let comments_doc =
+                        self.build_inline_comments_between_doc(colon_end, type_start);
+                    doc::concat(vec![
+                        doc::text(": "),
+                        comments_doc,
+                        self.build_type_doc(&annotation.type_annotation),
+                    ])
+                }
+            }
         }
+    }
+
+    /// Build type annotation doc with width-aware type argument wrapping.
+    ///
+    /// For `TypeReference<Args>`, uses `build_type_arguments_doc_wrapping` so
+    /// type arguments wrap at width boundary. For other types, delegates to
+    /// `build_type_annotation_doc`.
+    ///
+    /// Returns doc starting with `: ` (the annotation prefix).
+    pub(super) fn build_type_annotation_doc_wrapping(
+        &self,
+        annotation: &internal::TSTypeAnnotation,
+    ) -> Doc {
+        if let TSType::TypeReference(r) = annotation.type_annotation.as_ref()
+            && let Some(type_args) = &r.type_arguments
+        {
+            return doc::concat(vec![
+                doc::text(": "),
+                super::build_entity_name_doc(&r.type_name),
+                self.build_type_arguments_doc_wrapping(type_args),
+            ]);
+        }
+        self.build_type_annotation_doc(annotation)
     }
 
     /// Check if a type annotation has a trailing line comment (between : and type)
@@ -400,34 +539,19 @@ impl<'a> Printer<'a> {
             TSType::TypeReference(r) => {
                 let mut parts = vec![self.build_type_entity_name_doc(&r.type_name)];
                 if let Some(type_args) = &r.type_arguments {
-                    let arg_docs: Vec<_> = type_args
-                        .params
-                        .iter()
-                        .map(|arg| self.build_type_doc(arg))
-                        .collect();
-                    parts.push(doc::text("<"));
-                    parts.push(doc::join(arg_docs, ", "));
-                    parts.push(doc::text(">"));
+                    parts.push(self.build_type_arguments_doc(type_args));
                 }
                 doc::concat(parts)
             }
             TSType::TypeLiteral(t) => {
                 // Check if original was multi-line (newline immediately after opening brace)
                 // This matches prettier's behavior: `{ a: T }` → single-line, `{\n a: T; }` → multi-line
-                let is_single_line = !super::is_type_literal_multiline(self.source, t.span);
+                let source_is_multiline = super::is_type_literal_multiline(self.source, t.span);
 
                 let mut parts = vec![doc::text("{")];
                 if !t.members.is_empty() {
-                    if is_single_line {
-                        // Single-line format: {prop: string; prop2: number} (semicolon separator, no trailing)
-                        let member_docs: Vec<_> = t
-                            .members
-                            .iter()
-                            .map(|m| self.build_type_member_doc_inner(m, false))
-                            .collect();
-                        parts.push(doc::join(member_docs, "; "));
-                    } else {
-                        // Multi-line format with leading comment handling
+                    if source_is_multiline {
+                        // Multi-line format with leading comment handling (forced by source)
                         let mut member_parts = vec![];
                         let mut prev_end = t.span.start + 1; // after opening brace
                         for (i, m) in t.members.iter().enumerate() {
@@ -456,10 +580,34 @@ impl<'a> Printer<'a> {
                         }
                         parts.push(doc::indent(doc::concat(member_parts)));
                         parts.push(doc::hardline());
+                    } else {
+                        // Width-aware format: stays inline if fits, wraps if too long
+                        // Flat: {prop: string; prop2: number}
+                        // Broken: {\n\tprop: string;\n\tprop2: number;\n}
+                        let mut member_parts = vec![];
+                        for (i, m) in t.members.iter().enumerate() {
+                            let is_last = i == t.members.len() - 1;
+
+                            // Add line break before each member (softline for width-aware)
+                            member_parts.push(doc::softline());
+                            member_parts.push(self.build_type_member_doc_inner(m, false));
+
+                            if is_last {
+                                // Last member: semicolon only when broken
+                                member_parts.push(doc::if_break(doc::text(";"), doc::text("")));
+                            } else {
+                                // Non-last: semicolon always, space only when flat
+                                member_parts
+                                    .push(doc::if_break(doc::text(";"), doc::text("; ")));
+                            }
+                        }
+                        parts.push(doc::indent(doc::concat(member_parts)));
+                        parts.push(doc::softline());
                     }
                 }
                 parts.push(doc::text("}"));
-                doc::concat(parts)
+                // Wrap in group for width-aware breaking
+                doc::group(doc::concat(parts))
             }
             TSType::Function(f) => {
                 // Function types use width-aware wrapping similar to arrow functions:
@@ -507,16 +655,33 @@ impl<'a> Printer<'a> {
                 doc::group(doc::concat(parts))
             }
             TSType::Tuple(t) => {
-                let elem_docs: Vec<_> = t
-                    .element_types
-                    .iter()
-                    .map(|elem| self.build_type_doc(elem))
-                    .collect();
-                doc::concat(vec![
+                if t.element_types.is_empty() {
+                    return doc::text("[]");
+                }
+
+                // Build element docs with commas and line breaks
+                let mut parts = Vec::new();
+                for (i, elem) in t.element_types.iter().enumerate() {
+                    if i > 0 {
+                        parts.push(doc::text(","));
+                        parts.push(doc::line());
+                    }
+                    parts.push(self.build_type_doc(elem));
+                }
+
+                // Width-aware breaking: inline if fits, one-per-line if not
+                let inner = doc::concat(vec![
+                    doc::softline(),
+                    doc::concat(parts),
+                    doc::trailing_comma(),
+                ]);
+
+                doc::group(doc::concat(vec![
                     doc::text("["),
-                    doc::join(elem_docs, ", "),
+                    doc::indent(inner),
+                    doc::softline(),
                     doc::text("]"),
-                ])
+                ]))
             }
             // Parenthesized types: just unwrap. Parent contexts (IndexedAccess, Array,
             // TypeOperator) add parens when needed based on the inner type.
@@ -578,14 +743,7 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_type_entity_name_doc(qualifier));
                 }
                 if let Some(type_args) = &i.type_arguments {
-                    let arg_docs: Vec<_> = type_args
-                        .params
-                        .iter()
-                        .map(|arg| self.build_type_doc(arg))
-                        .collect();
-                    parts.push(doc::text("<"));
-                    parts.push(doc::join(arg_docs, ", "));
-                    parts.push(doc::text(">"));
+                    parts.push(self.build_type_arguments_doc(type_args));
                 }
                 doc::concat(parts)
             }
@@ -593,14 +751,7 @@ impl<'a> Printer<'a> {
                 let mut parts = vec![doc::text("typeof ")];
                 parts.push(self.build_type_query_expr_name_doc(&q.expr_name));
                 if let Some(type_args) = &q.type_arguments {
-                    let arg_docs: Vec<_> = type_args
-                        .params
-                        .iter()
-                        .map(|arg| self.build_type_doc(arg))
-                        .collect();
-                    parts.push(doc::text("<"));
-                    parts.push(doc::join(arg_docs, ", "));
-                    parts.push(doc::text(">"));
+                    parts.push(self.build_type_arguments_doc(type_args));
                 }
                 doc::concat(parts)
             }
@@ -736,14 +887,7 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_type_entity_name_doc(qualifier));
                 }
                 if let Some(type_args) = &i.type_arguments {
-                    let arg_docs: Vec<_> = type_args
-                        .params
-                        .iter()
-                        .map(|arg| self.build_type_doc(arg))
-                        .collect();
-                    parts.push(doc::text("<"));
-                    parts.push(doc::join(arg_docs, ", "));
-                    parts.push(doc::text(">"));
+                    parts.push(self.build_type_arguments_doc(type_args));
                 }
                 doc::concat(parts)
             }
@@ -751,51 +895,59 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for mapped type: `{ [K in T]: V }`
+    ///
+    /// Width-aware: stays inline if fits, wraps if too long.
+    /// - Flat: `{[K in keyof T]: T[K]}`
+    /// - Broken: `{\n\t[K in keyof T]: T[K];\n}`
     fn build_mapped_type_doc(&self, m: &internal::TSMappedType) -> Doc {
-        let mut parts = vec![doc::text("{")];
+        // Build the mapping body starting with softline for indent behavior
+        let mut body_parts = vec![doc::softline()];
 
-        // readonly modifier
+        // readonly modifier: `readonly` or `-readonly`
         if let Some(readonly) = m.readonly {
-            if readonly {
-                parts.push(doc::text("readonly "));
+            body_parts.push(doc::text(if readonly {
+                "readonly "
             } else {
-                parts.push(doc::text("-readonly "));
-            }
+                "-readonly "
+            }));
         }
 
         // [K in constraint]
-        parts.push(doc::text("["));
-        parts.push(doc::text_owned(m.type_parameter.name.clone()));
-        parts.push(doc::text(" in "));
-        parts.push(self.build_type_doc(&m.type_parameter.constraint));
+        body_parts.push(doc::text("["));
+        body_parts.push(doc::text_owned(m.type_parameter.name.clone()));
+        body_parts.push(doc::text(" in "));
+        body_parts.push(self.build_type_doc(&m.type_parameter.constraint));
 
-        // as clause
+        // as clause: `as NewKeyType`
         if let Some(name_type) = &m.name_type {
-            parts.push(doc::text(" as "));
-            parts.push(self.build_type_doc(name_type));
+            body_parts.push(doc::text(" as "));
+            body_parts.push(self.build_type_doc(name_type));
         }
 
-        parts.push(doc::text("]"));
+        body_parts.push(doc::text("]"));
 
-        // optional modifier
+        // optional modifier: `?` or `-?`
         if let Some(optional) = m.optional {
-            if optional {
-                parts.push(doc::text("?"));
-            } else {
-                parts.push(doc::text("-?"));
-            }
+            body_parts.push(doc::text(if optional { "?" } else { "-?" }));
         }
 
-        parts.push(doc::text(": "));
+        body_parts.push(doc::text(": "));
 
         // value type
         if let Some(type_ann) = &m.type_annotation {
-            parts.push(self.build_type_doc(type_ann));
+            body_parts.push(self.build_type_doc(type_ann));
         }
 
-        parts.push(doc::text("}"));
+        // Semicolon only when broken (multiline)
+        body_parts.push(doc::if_break(doc::text(";"), doc::text("")));
 
-        doc::concat(parts)
+        // Width-aware structure: group(["{", indent([softline, body...]), softline, "}"])
+        doc::group(doc::concat(vec![
+            doc::text("{"),
+            doc::indent(doc::concat(body_parts)),
+            doc::softline(),
+            doc::text("}"),
+        ]))
     }
 
     /// Build doc for type entity name
@@ -832,10 +984,12 @@ impl<'a> Printer<'a> {
                     parts.push(doc::text("?"));
                 }
                 if let Some(type_ann) = &prop.type_annotation {
+                    // Use width-aware wrapping for TypeReference with type arguments
+                    parts.push(self.build_type_annotation_doc_wrapping(type_ann));
+
                     // For simple types with trailing comments, the doc already includes semicolon
                     let has_trailing_comment =
                         self.type_annotation_has_trailing_comment_doc(type_ann);
-                    parts.push(self.build_type_annotation_doc(type_ann));
                     if with_semicolon && !has_trailing_comment {
                         parts.push(doc::text(";"));
                     }
@@ -1119,7 +1273,11 @@ impl<'a> Printer<'a> {
         //        | T2
         //        | T3
         let mut parts = Vec::new();
+
         for (i, t) in union.types.iter().enumerate() {
+            let type_start = t.span().start;
+            let type_end = t.span().end;
+
             if i > 0 {
                 // Between types: newline + "| " when broken, " | " when flat
                 // Use if_break with line() instead of hardline() to avoid triggering will_break
@@ -1127,11 +1285,58 @@ impl<'a> Printer<'a> {
                     doc::concat(vec![doc::line(), doc::text("| ")]),
                     doc::text(" | "),
                 ));
+
+                // Add leading block comments for this type (after the `|` separator)
+                // Find the `|` position by scanning backwards from type_start
+                let prev_type_end = union.types[i - 1].span().end;
+                let pipe_pos = find_pipe_position(self.source, prev_type_end, type_start);
+                if let Some(pipe_pos) = pipe_pos {
+                    for comment in comments_in_range(self.comments, pipe_pos + 1, type_start) {
+                        if comment.is_block {
+                            parts.push(doc::text_owned(format!("/*{}*/ ", comment.content)));
+                        }
+                    }
+                }
             } else {
                 // First type: "| " when broken, nothing when flat
                 parts.push(doc::if_break(doc::text("| "), doc::text("")));
             }
-            parts.push(self.build_type_doc(t));
+
+            // Function, constructor, and conditional types have lower precedence than union,
+            // so they need parentheses: `T | (() => void)` not `T | () => void`
+            let inner = unwrap_parenthesized(t);
+            if matches!(
+                inner,
+                TSType::Function(_) | TSType::Constructor(_) | TSType::Conditional(_)
+            ) {
+                parts.push(doc::text("("));
+                parts.push(self.build_type_doc(t));
+                parts.push(doc::text(")"));
+            } else {
+                parts.push(self.build_type_doc(t));
+            }
+
+            // Add trailing block comments after this type (before the next `|` separator)
+            if i + 1 < union.types.len() {
+                // Find the `|` position between this type and next
+                let next_type_start = union.types[i + 1].span().start;
+                let pipe_pos = find_pipe_position(self.source, type_end, next_type_start);
+                if let Some(pipe_pos) = pipe_pos {
+                    // Only include comments before the `|`
+                    for comment in comments_in_range(self.comments, type_end, pipe_pos) {
+                        if comment.is_block {
+                            parts.push(doc::text_owned(format!(" /*{}*/", comment.content)));
+                        }
+                    }
+                }
+            } else {
+                // Last type - include all trailing comments up to union span end
+                for comment in comments_in_range(self.comments, type_end, union.span.end) {
+                    if comment.is_block {
+                        parts.push(doc::text_owned(format!(" /*{}*/", comment.content)));
+                    }
+                }
+            }
         }
 
         if wrap_in_group {
@@ -1166,20 +1371,63 @@ impl<'a> Printer<'a> {
         //        B &
         //        C
         let mut parts = Vec::new();
+
         for (i, t) in intersection.types.iter().enumerate() {
+            let type_start = t.span().start;
+            let type_end = t.span().end;
+
             if i > 0 {
                 // After separator: line when broken, space when flat
                 parts.push(doc::line());
+
+                // Add leading block comments for this type (after the `&` separator)
+                let prev_type_end = intersection.types[i - 1].span().end;
+                let amp_pos = find_ampersand_position(self.source, prev_type_end, type_start);
+                if let Some(amp_pos) = amp_pos {
+                    for comment in comments_in_range(self.comments, amp_pos + 1, type_start) {
+                        if comment.is_block {
+                            parts.push(doc::text_owned(format!("/*{}*/ ", comment.content)));
+                        }
+                    }
+                }
             }
-            // Union has lower precedence than intersection, so wrap in parens
+
+            // Union, function, constructor, and conditional have lower precedence, wrap in parens
             let inner = unwrap_parenthesized(t);
-            if matches!(inner, TSType::Union(_)) {
+            if matches!(
+                inner,
+                TSType::Union(_)
+                    | TSType::Function(_)
+                    | TSType::Constructor(_)
+                    | TSType::Conditional(_)
+            ) {
                 parts.push(doc::text("("));
                 parts.push(self.build_type_doc(t));
                 parts.push(doc::text(")"));
             } else {
                 parts.push(self.build_type_doc(t));
             }
+
+            // Add trailing block comments after this type (before the next `&` separator)
+            if i + 1 < intersection.types.len() {
+                let next_type_start = intersection.types[i + 1].span().start;
+                let amp_pos = find_ampersand_position(self.source, type_end, next_type_start);
+                if let Some(amp_pos) = amp_pos {
+                    for comment in comments_in_range(self.comments, type_end, amp_pos) {
+                        if comment.is_block {
+                            parts.push(doc::text_owned(format!(" /*{}*/", comment.content)));
+                        }
+                    }
+                }
+            } else {
+                // Last type - include all trailing comments up to intersection span end
+                for comment in comments_in_range(self.comments, type_end, intersection.span.end) {
+                    if comment.is_block {
+                        parts.push(doc::text_owned(format!(" /*{}*/", comment.content)));
+                    }
+                }
+            }
+
             if i < intersection.types.len() - 1 {
                 // Separator: " &" after each type except the last
                 parts.push(doc::text(" &"));

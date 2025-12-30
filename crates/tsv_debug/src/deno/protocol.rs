@@ -18,7 +18,8 @@ pub struct WireRequest {
 /// Response from the Deno sidecar (JSON-lines over stdout)
 #[derive(Debug, Deserialize)]
 pub struct WireResponse {
-    pub id: u64,
+    /// Request ID. -1 indicates a malformed request error (couldn't parse request JSON)
+    pub id: i64,
     pub ok: bool,
     pub output: Option<Value>,
     pub error: Option<String>,

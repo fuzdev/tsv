@@ -50,7 +50,7 @@ const DISPLAY_ORDER = [
 	'tsv-internal',
 	'tsv-wasm-internal',
 	// Third-party alternatives (alphabetical)
-	'biome',
+	'biome-wasm',
 	'oxc-parser',
 	'oxfmt',
 ];
@@ -340,7 +340,7 @@ export function generateCorpusInfo(
 	const altVersions: string[] = [];
 	if (versions.oxcParser) altVersions.push(`oxc-parser@${versions.oxcParser}`);
 	if (versions.oxfmt) altVersions.push(`oxfmt@${versions.oxfmt}`);
-	if (versions.biome) altVersions.push(`biome@${versions.biome}`);
+	if (versions.biome) altVersions.push(`@biomejs/wasm-bundler@${versions.biome}`);
 
 	if (altVersions.length > 0) {
 		lines.push(`  ${altVersions.join(', ')}`);

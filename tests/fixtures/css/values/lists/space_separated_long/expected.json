@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 559,
+		"end": 649,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 550,
+					"end": 640,
 					"children": [
 						{
 							"type": "Declaration",
@@ -49,34 +49,34 @@
 						},
 						{
 							"type": "Declaration",
-							"start": 217,
-							"end": 353,
+							"start": 307,
+							"end": 443,
 							"property": "transform",
 							"value": "translateX(0px) translateY(1px) rotate(0deg) scale(0) skewX(0deg) skewY(0deg)\n\t\t\tperspective(0px) rotateX(0deg) rotateY(0deg)"
 						},
 						{
 							"type": "Declaration",
-							"start": 435,
-							"end": 546,
+							"start": 525,
+							"end": 636,
 							"property": "filter",
 							"value": "blur(0px) brightness(0) contrast(0) saturate(0) hue-rotate(0deg)\n\t\t\tdrop-shadow(0 0 0 rgba(0, 0, 0, 0))"
 						}
 					]
 				},
 				"start": 9,
-				"end": 550
+				"end": 640
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 551,
-			"styles": "\n\tdiv {\n\t\t/* Short transform chain - stays inline (under 100 chars) */\n\t\ttransform: translateX(10px) rotate(45deg) scale(1.5);\n\t\t/* Long transform chain - exceeds 100 chars, tests space-separated wrapping */\n\t\ttransform: translateX(0px) translateY(1px) rotate(0deg) scale(0) skewX(0deg) skewY(0deg)\n\t\t\tperspective(0px) rotateX(0deg) rotateY(0deg);\n\t\t/* Long filter chain - exceeds 100 chars, tests space-separated wrapping */\n\t\tfilter: blur(0px) brightness(0) contrast(0) saturate(0) hue-rotate(0deg)\n\t\t\tdrop-shadow(0 0 0 rgba(0, 0, 0, 0));\n\t}\n",
+			"end": 641,
+			"styles": "\n\tdiv {\n\t\t/* Short transform chain - stays inline (under 100 chars) */\n\t\ttransform: translateX(10px) rotate(45deg) scale(1.5);\n\t\t/* Long transform chain - exceeds 100 chars, tests space-separated wrapping */\n\t\t/* (100/101 char boundary tested in ../functions/transform_long_prettier_divergence) */\n\t\ttransform: translateX(0px) translateY(1px) rotate(0deg) scale(0) skewX(0deg) skewY(0deg)\n\t\t\tperspective(0px) rotateX(0deg) rotateY(0deg);\n\t\t/* Long filter chain - exceeds 100 chars, tests space-separated wrapping */\n\t\tfilter: blur(0px) brightness(0) contrast(0) saturate(0) hue-rotate(0deg)\n\t\t\tdrop-shadow(0 0 0 rgba(0, 0, 0, 0));\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 560,
+	"end": 650,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

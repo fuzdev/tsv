@@ -56,11 +56,11 @@ const DEFAULT_VERSIONS: AllVersions = {
 /**
  * Load all package versions from deno.json import map.
  *
- * Reads deno.json once and extracts versions for all implementations.
+ * Reads benches/deno/deno.json to extract versions for all implementations.
  */
 export async function loadAllVersions(): Promise<AllVersions> {
 	try {
-		const denoJsonPath = new URL('../../../deno.json', import.meta.url).pathname;
+		const denoJsonPath = new URL('../deno.json', import.meta.url).pathname;
 		const content = await Deno.readTextFile(denoJsonPath);
 		const config = JSON.parse(content);
 		const imports = config.imports || {};
@@ -69,9 +69,11 @@ export async function loadAllVersions(): Promise<AllVersions> {
 			canonical: {
 				prettier: extractVersion(imports['prettier'] || ''),
 				'prettier-plugin-svelte': extractVersion(imports['prettier-plugin-svelte'] || ''),
-				svelte: extractVersion(imports['svelte/compiler'] || imports['svelte'] || ''),
+				svelte: extractVersion(imports['svelte'] || ''),
 				acorn: extractVersion(imports['acorn'] || ''),
-				'@sveltejs/acorn-typescript': extractVersion(imports['@sveltejs/acorn-typescript'] || ''),
+				'@sveltejs/acorn-typescript': extractVersion(
+					imports['@sveltejs/acorn-typescript'] || '',
+				),
 			},
 			oxc: {
 				'oxc-parser': extractVersion(imports['oxc-parser'] || ''),

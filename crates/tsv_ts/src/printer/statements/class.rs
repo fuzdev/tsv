@@ -20,18 +20,12 @@ impl<'a> Printer<'a> {
 
         // Build the header doc (everything before the body)
         let header_doc = self.build_class_header_doc(decl);
-        let base_offset = self.config.base_indent_offset * self.config.tab_width;
-        let current_col = self.current_column() + base_offset;
-        let header_output = {
-            let interner = self.interner.borrow();
-            doc::print_doc_with_indent_resolved(
-                &header_doc,
-                &self.config,
-                current_col,
-                self.indent_level,
-                &*interner,
-            )
-        };
+
+        // suffix_width accounts for body that follows the header:
+        // - Empty body: " {}" = 3 chars
+        // - Non-empty body: " {" = 2 chars (newline after brace not counted)
+        let suffix_width = if decl.body.body.is_empty() { 3 } else { 2 };
+        let header_output = self.render_doc_with_suffix(&header_doc, suffix_width);
         self.write(&header_output);
 
         // Space before body:
@@ -131,16 +125,21 @@ impl<'a> Printer<'a> {
             // Brace goes to new line for multiple heritage
             parts.push(doc::dedent(doc::line()));
         } else if let Some(ext) = extends_doc {
-            // extends only - behavior depends on type params:
+            // extends only - behavior depends on type params and super_class type:
             // - With type params: extends stays inline after `>` (Prettier PR #18094)
-            // - Without type params: extends can break when class name is long (Prettier PR #18325)
+            // - Without type params AND member expression: can break (Prettier PR #18325)
+            // - Without type params AND simple identifier: NEVER breaks (Prettier quirk)
             let has_type_params = decl.type_parameters.is_some();
-            if has_type_params {
-                // Type params present - extends stays inline after `>`
+            let is_member_expression = matches!(
+                decl.super_class.as_deref(),
+                Some(internal::Expression::MemberExpression(_))
+            );
+            if has_type_params || !is_member_expression {
+                // Type params present OR simple identifier parent - stays inline
                 parts.push(doc::text(" "));
                 parts.push(ext);
             } else {
-                // No type params - extends can break to new line when name is long
+                // No type params AND member expression - can break to new line
                 parts.push(doc::indent_line(ext));
             }
         } else if let Some(impl_doc) = implements_doc {
@@ -283,6 +282,9 @@ impl<'a> Printer<'a> {
     }
 
     /// Print a property definition
+    ///
+    /// Uses hybrid approach: prefix printed imperatively, type annotation uses doc-based
+    /// width-aware printing so union/intersection types and generic arguments wrap correctly.
     fn print_property_definition(
         &mut self,
         prop: &internal::PropertyDefinition,
@@ -339,21 +341,39 @@ impl<'a> Printer<'a> {
             internal::PropertyModifier::None => {}
         }
 
-        // Print type annotation if present
-        if let Some(type_annotation) = &prop.type_annotation {
-            self.print_type_annotation(type_annotation);
-        }
-
-        // Print value if present
-        if let Some(value) = &prop.value {
-            self.write(" = ");
-            self.print_expression(value);
-        }
-
+        // Build doc for type annotation + value using width-aware printing
+        // suffix_width accounts for trailing ";" = 1 char
+        let suffix_doc = self.build_property_suffix_doc(prop);
+        let suffix_output = self.render_doc_with_suffix(&suffix_doc, 1);
+        self.write(&suffix_output);
         self.write(";");
     }
 
+    /// Build a Doc for property suffix (type annotation + optional value).
+    ///
+    /// Uses doc-based printing so union/intersection types and generic type
+    /// arguments wrap correctly when line exceeds print_width.
+    fn build_property_suffix_doc(&self, prop: &internal::PropertyDefinition) -> doc::Doc {
+        let mut parts = Vec::new();
+
+        // Type annotation if present - use width-aware wrapping for generic types
+        if let Some(type_annotation) = &prop.type_annotation {
+            parts.push(self.build_type_annotation_doc_wrapping(type_annotation));
+        }
+
+        // Value if present
+        if let Some(value) = &prop.value {
+            parts.push(doc::text(" = "));
+            parts.push(self.build_expression_doc(value));
+        }
+
+        doc::concat(parts)
+    }
+
     /// Print a method definition
+    ///
+    /// Uses hybrid approach: prefix/suffix printed imperatively, signature uses doc-based
+    /// width-aware wrapping so params break when total line length exceeds print_width.
     fn print_method_definition(&mut self, method: &internal::MethodDefinition, is_declare: bool) {
         // Print decorators, each on its own line
         if let Some(decorators) = &method.decorators {
@@ -416,21 +436,24 @@ impl<'a> Printer<'a> {
             self.print_type_parameter_declaration(type_params);
         }
 
-        // Print parameters using doc-based printing (handles comments properly)
-        // Wrap in a group so softlines only break when needed
-        let params_doc = self.build_method_params_doc_ungrouped(&method.value);
-        self.write_doc(&doc::group(params_doc));
+        // Build signature doc (params + return type) using doc-based width-aware wrapping.
+        // The suffix_width accounts for the body that follows (` {}` for empty, ` {` for non-empty).
+        let is_overload_signature = method.value.body.span.start == method.value.body.span.end;
+        let is_bodyless = is_declare || method.r#abstract || is_overload_signature;
+        let suffix_width = if is_bodyless {
+            1 // Just ";"
+        } else if method.value.body.body.is_empty() {
+            3 // " {}"
+        } else {
+            2 // " {"
+        };
 
-        // Print return type annotation if present
-        if let Some(return_type) = &method.value.return_type {
-            self.print_type_annotation(return_type);
-        }
+        let sig_doc = self.build_method_signature_doc(method);
+        let sig_output = self.render_doc_with_suffix(&sig_doc, suffix_width);
+        self.write(&sig_output);
 
         // For declare class, abstract methods, or overload signatures, print semicolon instead of body
-        // Overload signatures have a zero-width dummy body span (start == end), while real
-        // empty bodies `{}` have a real span covering the braces
-        let is_overload_signature = method.value.body.span.start == method.value.body.span.end;
-        if is_declare || method.r#abstract || is_overload_signature {
+        if is_bodyless {
             self.write(";");
         } else {
             self.write(" ");
@@ -447,6 +470,82 @@ impl<'a> Printer<'a> {
             // Print body with outer comments moved inside
             self.print_block_statement_with_outer_comments(&method.value.body, sig_end);
         }
+    }
+
+    /// Build a Doc for method signature (params + return type).
+    ///
+    /// Prefix (modifiers, name, type params) is printed imperatively before this.
+    /// Body is printed separately after. This doc handles width-aware param wrapping.
+    fn build_method_signature_doc(&self, method: &internal::MethodDefinition) -> doc::Doc {
+        let func = &method.value;
+
+        // Estimate if params should be forced to break based on total signature width.
+        // Similar to build_function_signature_doc in function.rs.
+        let force_params_break = if let Some(tp) = &func.type_parameters {
+            // Type params break if: multiple params OR contains multiline content
+            let has_multiple_params = tp.params.len() > 1;
+            let span_str = tp.span.extract(self.source);
+            let is_multiline = span_str.contains('\n');
+            let type_params_will_break = has_multiple_params || is_multiline;
+
+            if type_params_will_break {
+                // Type params break → params get fresh line budget → don't force break
+                false
+            } else {
+                // Estimate total signature width (current column + remaining content)
+                let current_col = self.current_column();
+                let params_width: usize = func
+                    .params
+                    .iter()
+                    .map(|p| (p.span().end - p.span().start) as usize + 2)
+                    .sum();
+                let return_type_width = func
+                    .return_type
+                    .as_ref()
+                    .map_or(0, |rt| (rt.span.end - rt.span.start) as usize);
+                // +4 accounts for parens and spaces: "()" around params, " {}" body
+                let estimated_total = current_col + params_width + return_type_width + 4;
+                estimated_total > self.config.print_width
+            }
+        } else {
+            // No type params - still need to check if signature fits
+            let current_col = self.current_column();
+            let params_width: usize = func
+                .params
+                .iter()
+                .map(|p| (p.span().end - p.span().start) as usize + 2)
+                .sum();
+            let return_type_width = func
+                .return_type
+                .as_ref()
+                .map_or(0, |rt| (rt.span.end - rt.span.start) as usize);
+            let estimated_total = current_col + params_width + return_type_width + 4;
+            estimated_total > self.config.print_width
+        };
+
+        let mut parts = Vec::new();
+
+        // Build params doc with force_break if needed
+        let params_start = Some(func.params_start);
+        let trailing_comments_end = if let Some(rt) = &func.return_type {
+            Some(rt.span.start)
+        } else {
+            Some(func.body.span.start)
+        };
+        let params_doc = self.build_params_doc_with_comments_ext(
+            &func.params,
+            params_start,
+            trailing_comments_end,
+            force_params_break,
+        );
+        parts.push(doc::group(params_doc));
+
+        // Return type annotation
+        if let Some(return_type) = &func.return_type {
+            parts.push(self.build_type_annotation_doc(return_type));
+        }
+
+        doc::concat(parts)
     }
 
     /// Build a Doc for a class declaration
@@ -714,8 +813,13 @@ impl<'a> Printer<'a> {
     }
 
     /// Print a decorator: `@expression`
+    ///
+    /// Uses doc-based printing without margin since decorators don't have
+    /// trailing punctuation on the same line.
     pub(in crate::printer) fn print_decorator(&mut self, decorator: &internal::Decorator) {
         self.write("@");
-        self.print_expression(&decorator.expression);
+        // Use write_doc (no margin) - decorators don't have trailing punctuation
+        let doc = self.build_expression_doc(&decorator.expression);
+        self.write_doc(&doc);
     }
 }

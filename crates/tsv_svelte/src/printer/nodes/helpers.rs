@@ -151,11 +151,30 @@ impl<'a> Printer<'a> {
     ///
     /// This looks up comments from Root.comments that fall within the span range
     /// and prints them before the expression.
+    ///
+    /// For simple expression contexts (tags, simple blocks), suffix_width defaults to 1
+    /// for the closing `}`. For blocks with pattern/body suffixes, use
+    /// `print_ts_expression_with_suffix_width` instead.
     pub fn print_ts_expression_with_comments(
         &mut self,
         expr: &tsv_ts::Expression,
         span_start: u32,
         span_end: u32,
+    ) {
+        // Default suffix_width of 1 for the closing `}`
+        self.print_ts_expression_with_suffix_width(expr, span_start, span_end, 1);
+    }
+
+    /// Format a TypeScript expression with explicit suffix width for width-aware wrapping.
+    ///
+    /// Use this for block expressions where the suffix (pattern, body, closing tag)
+    /// should be accounted for in line width calculations.
+    pub fn print_ts_expression_with_suffix_width(
+        &mut self,
+        expr: &tsv_ts::Expression,
+        span_start: u32,
+        span_end: u32,
+        suffix_width: usize,
     ) {
         // Print any leading comments between the opening brace and the expression
         let expr_start = expr.span().start;
@@ -163,12 +182,25 @@ impl<'a> Printer<'a> {
             self.write_leading_js_comment(comment);
         }
 
-        // Format the expression with comments so nested comments are preserved
-        let formatted = tsv_ts::format_expression_isolated_with_comments(
+        // Calculate first_line_offset for width-aware wrapping
+        // This tells the TypeScript formatter where the expression starts on the line
+        let first_line_offset = self.buffer.current_column(self.config.tab_width);
+        // Pass current indent level so wrapped lines get proper indentation
+        let base_indent_offset = self.indent_level;
+        let config = tsv_lang::PrintConfig {
+            first_line_offset,
+            suffix_width,
+            base_indent_offset,
+            ..Default::default()
+        };
+
+        // Format the expression with context-aware width calculations
+        let formatted = tsv_ts::format_expression_with_config(
             expr,
             self.source(),
             std::rc::Rc::clone(&self.interner),
             self.comments,
+            config,
         );
         self.write(&formatted);
 

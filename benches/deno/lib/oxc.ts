@@ -24,12 +24,6 @@ interface OxfmtModule {
 	) => Promise<{ code: string; errors: unknown[] }>;
 }
 
-/** Module-level versions (set by constructor for external access) */
-export let OXC_VERSIONS: OxcVersions = {
-	'oxc-parser': 'unknown',
-	oxfmt: 'unknown',
-};
-
 /**
  * OXC implementation using oxc-parser and oxfmt.
  *
@@ -39,11 +33,12 @@ export let OXC_VERSIONS: OxcVersions = {
  */
 export class OxcImplementation implements TsvImplementation {
 	name = 'oxc' as const;
+	readonly versions: OxcVersions;
 	private _parser: OxcParserModule | null = null;
 	private _formatter: OxfmtModule | null = null;
 
 	constructor(versions: OxcVersions) {
-		OXC_VERSIONS = versions;
+		this.versions = versions;
 	}
 
 	async init(): Promise<void> {

@@ -1,1 +1,1 @@
-<div class:active={/* c */ cond}></div>
+<div class:class1={/* c */ cond}></div>

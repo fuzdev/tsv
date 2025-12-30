@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 892,
+		"end": 324,
 		"attributes": [],
 		"children": [
 			{
@@ -38,59 +38,38 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 883,
+					"end": 315,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 80,
-							"end": 144,
+							"start": 64,
+							"end": 159,
 							"property": "background",
-							"value": "linear-gradient(to right, #ff0000, #00ff00, #0000ff)"
+							"value": "linear-gradient(0deg, #000 0%, #111 20%, #222 40%, #333 60%, #444 80%, #55555 100%)"
 						},
 						{
 							"type": "Declaration",
-							"start": 212,
-							"end": 356,
+							"start": 190,
+							"end": 311,
 							"property": "background",
-							"value": "linear-gradient(\n\t\t\tto bottom right,\n\t\t\trgba(255, 255, 255, 0.8) 0%,\n\t\t\trgba(0, 0, 0, 0.8) 50%,\n\t\t\trgba(128, 128, 128, 0.8) 100%\n\t\t)"
-						},
-						{
-							"type": "Declaration",
-							"start": 397,
-							"end": 536,
-							"property": "background",
-							"value": "radial-gradient(\n\t\t\tcircle at center,\n\t\t\trgba(255, 0, 0, 0.8) 0%,\n\t\t\trgba(0, 255, 0, 0.8) 50%,\n\t\t\trgba(0, 0, 255, 0.8) 100%\n\t\t)"
-						},
-						{
-							"type": "Declaration",
-							"start": 576,
-							"end": 710,
-							"property": "background",
-							"value": "conic-gradient(\n\t\t\tfrom 45deg at 50% 50%,\n\t\t\tred 0deg,\n\t\t\tyellow 90deg,\n\t\t\tlime 180deg,\n\t\t\tcyan 270deg,\n\t\t\tblue 360deg\n\t\t)"
-						},
-						{
-							"type": "Declaration",
-							"start": 761,
-							"end": 879,
-							"property": "background",
-							"value": "repeating-linear-gradient(\n\t\t\t45deg,\n\t\t\t#606dbc 0px,\n\t\t\t#606dbc 10px,\n\t\t\t#465298 10px,\n\t\t\t#465298 20px\n\t\t)"
+							"value": "linear-gradient(\n\t\t\t0deg,\n\t\t\t#000 0%,\n\t\t\t#111 20%,\n\t\t\t#222 40%,\n\t\t\t#333 60%,\n\t\t\t#444 80%,\n\t\t\t#555555 100%\n\t\t)"
 						}
 					]
 				},
 				"start": 9,
-				"end": 883
+				"end": 315
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 884,
-			"styles": "\n\tdiv {\n\t\t/* short linear-gradient - stays inline (under 100 chars) */\n\t\tbackground: linear-gradient(to right, #ff0000, #00ff00, #0000ff);\n\t\t/* long linear-gradient - wraps (direction + rgba + stops) */\n\t\tbackground: linear-gradient(\n\t\t\tto bottom right,\n\t\t\trgba(255, 255, 255, 0.8) 0%,\n\t\t\trgba(0, 0, 0, 0.8) 50%,\n\t\t\trgba(128, 128, 128, 0.8) 100%\n\t\t);\n\t\t/* long radial-gradient - wraps */\n\t\tbackground: radial-gradient(\n\t\t\tcircle at center,\n\t\t\trgba(255, 0, 0, 0.8) 0%,\n\t\t\trgba(0, 255, 0, 0.8) 50%,\n\t\t\trgba(0, 0, 255, 0.8) 100%\n\t\t);\n\t\t/* long conic-gradient - wraps */\n\t\tbackground: conic-gradient(\n\t\t\tfrom 45deg at 50% 50%,\n\t\t\tred 0deg,\n\t\t\tyellow 90deg,\n\t\t\tlime 180deg,\n\t\t\tcyan 270deg,\n\t\t\tblue 360deg\n\t\t);\n\t\t/* long repeating-linear-gradient - wraps */\n\t\tbackground: repeating-linear-gradient(\n\t\t\t45deg,\n\t\t\t#606dbc 0px,\n\t\t\t#606dbc 10px,\n\t\t\t#465298 10px,\n\t\t\t#465298 20px\n\t\t);\n\t}\n",
+			"end": 316,
+			"styles": "\n\tdiv {\n\t\t/* 100 chars - stays inline (at boundary) */\n\t\tbackground: linear-gradient(0deg, #000 0%, #111 20%, #222 40%, #333 60%, #444 80%, #55555 100%);\n\n\t\t/* 101 chars - wraps */\n\t\tbackground: linear-gradient(\n\t\t\t0deg,\n\t\t\t#000 0%,\n\t\t\t#111 20%,\n\t\t\t#222 40%,\n\t\t\t#333 60%,\n\t\t\t#444 80%,\n\t\t\t#555555 100%\n\t\t);\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 893,
+	"end": 325,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

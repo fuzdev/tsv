@@ -1,11 +1,20 @@
+<!-- Single spread attribute -->
+
+<!-- 100 chars - stays inline (at boundary) -->
+<Comp {...aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} />
+
+<!-- 101 chars - wraps -->
 <Comp
-	{...veryLongPropA}
-	{...veryLongPropB}
-	{...veryLongPropC}
-	{...veryLongPropD}
-	{...veryLongPropE}
+	{...aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
 />
+
+<!-- Multiple spread attributes -->
+
+<!-- 100 chars - stays inline (at boundary) -->
+<Comp {...aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} {...bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb} />
+
+<!-- 101 chars - wraps all attributes -->
 <Comp
-	{...a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.w.x.y.z.aa.bb.cc.dd.ee.ff.gg.hh.ii.jj.kk.ll.mm.nn
-		.oo.pp.qq.rr.ss.tt}
+	{...aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
+	{...bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb}
 />

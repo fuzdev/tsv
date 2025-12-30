@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 131,
+		"end": 129,
 		"attributes": [],
 		"children": [
 			{
@@ -118,12 +118,12 @@
 				"prelude": {
 					"type": "SelectorList",
 					"start": 86,
-					"end": 95,
+					"end": 93,
 					"children": [
 						{
 							"type": "ComplexSelector",
 							"start": 86,
-							"end": 95,
+							"end": 93,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -131,13 +131,13 @@
 									"selectors": [
 										{
 											"type": "ClassSelector",
-											"name": "animated",
+											"name": "class1",
 											"start": 86,
-											"end": 95
+											"end": 93
 										}
 									],
 									"start": 86,
-									"end": 95
+									"end": 93
 								}
 							]
 						}
@@ -145,32 +145,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 96,
-					"end": 122,
+					"start": 94,
+					"end": 120,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 100,
-							"end": 118,
+							"start": 98,
+							"end": 116,
 							"property": "animation",
 							"value": "fade 1s"
 						}
 					]
 				},
 				"start": 86,
-				"end": 122
+				"end": 120
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 123,
-			"styles": "\n\t@keyframes fade {\n\t\tfrom {\n\t\t\topacity: 0;\n\t\t}\n\t\tto {\n\t\t\topacity: 1;\n\t\t}\n\t}\n\n\t.animated {\n\t\tanimation: fade 1s;\n\t}\n",
+			"end": 121,
+			"styles": "\n\t@keyframes fade {\n\t\tfrom {\n\t\t\topacity: 0;\n\t\t}\n\t\tto {\n\t\t\topacity: 1;\n\t\t}\n\t}\n\n\t.class1 {\n\t\tanimation: fade 1s;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 132,
+	"end": 130,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

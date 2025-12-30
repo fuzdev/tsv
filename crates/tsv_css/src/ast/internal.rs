@@ -484,7 +484,8 @@ pub enum Color {
 ///
 /// At-rules have different prelude structures:
 /// - @import: structured values (url, layer, supports, media)
-/// - @media, @supports, @container: raw condition strings
+/// - @supports: structured conditions for line-width wrapping
+/// - @media, @container: raw condition strings
 /// - @keyframes: raw animation name
 #[derive(Debug, Clone)]
 pub enum PreludeValue {
@@ -492,7 +493,7 @@ pub enum PreludeValue {
     /// Example: `url('styles.css') layer(base)` → [Function(url), Function(layer)]
     Values { values: Vec<CssValue>, span: Span },
 
-    /// Raw string (for @media, @keyframes, @supports, etc.)
+    /// Raw string (for @media, @keyframes, etc.)
     /// Example: `screen and (min-width: 768px)`
     Raw { content: String, span: Span },
 
@@ -503,6 +504,59 @@ pub enum PreludeValue {
         limit: Option<SelectorList>,
         span: Span,
     },
+
+    /// @supports condition (structured for line-width wrapping)
+    /// Example: `(display: grid) and (flex: 1)` → parts connected by `and`/`or`
+    Supports {
+        condition: SupportsCondition,
+        span: Span,
+    },
+
+    /// @container query (structured for line-width wrapping)
+    /// Example: `sidebar (min-width: 100px) and (max-width: 200px)`
+    Container {
+        /// Optional container name (e.g., "sidebar")
+        name: Option<String>,
+        /// The condition parts connected by `and`/`or`
+        condition: SupportsCondition,
+        span: Span,
+    },
+
+    /// @media query - uses raw string with printer-side wrapping
+    ///
+    /// Unlike @supports/@container which use structured parsing, @media uses
+    /// raw string parsing to preserve comments. Wrapping is handled in the
+    /// printer by finding `and`/`or` boundaries in the raw string.
+    ///
+    /// See TODO_AST_ARCHITECTURE.md for discussion of moving to CST-based parsing.
+    Media { content: String, span: Span },
+}
+
+/// @supports condition structure for formatting
+///
+/// Allows wrapping at `and`/`or` boundaries while keeping the keyword
+/// on the current line and the condition on the next.
+#[derive(Debug, Clone)]
+pub struct SupportsCondition {
+    /// The condition parts connected by `and`/`or`
+    pub parts: Vec<SupportsPart>,
+}
+
+/// A single part of a @supports condition
+#[derive(Debug, Clone)]
+pub struct SupportsPart {
+    /// The connector before this part (None for first part)
+    pub connector: Option<SupportsConnector>,
+    /// The condition content (e.g., "(display: grid)" or "not (color: red)")
+    pub content: String,
+    pub span: Span,
+}
+
+/// Connector between @supports condition parts
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SupportsConnector {
+    And,
+    Or,
 }
 
 impl PreludeValue {
@@ -511,6 +565,9 @@ impl PreludeValue {
             PreludeValue::Values { span, .. } => *span,
             PreludeValue::Raw { span, .. } => *span,
             PreludeValue::Selectors { span, .. } => *span,
+            PreludeValue::Supports { span, .. } => *span,
+            PreludeValue::Container { span, .. } => *span,
+            PreludeValue::Media { span, .. } => *span,
         }
     }
 
@@ -519,6 +576,11 @@ impl PreludeValue {
             PreludeValue::Values { values, .. } => values.is_empty(),
             PreludeValue::Raw { content, .. } => content.is_empty(),
             PreludeValue::Selectors { root, .. } => root.selectors.is_empty(),
+            PreludeValue::Supports { condition, .. } => condition.parts.is_empty(),
+            PreludeValue::Container {
+                name, condition, ..
+            } => name.is_none() && condition.parts.is_empty(),
+            PreludeValue::Media { content, .. } => content.is_empty(),
         }
     }
 }

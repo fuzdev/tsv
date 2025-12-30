@@ -27,7 +27,7 @@ pub mod source_fidelity;
 mod values;
 
 use crate::ast::internal::{Comment, CssBlockChild, CssNode, CssStyleSheet};
-use tsv_lang::{OutputBuffer, PrintConfig, doc, printing};
+use tsv_lang::{CommentPosition, OutputBuffer, PrintConfig, classify_comment, doc, printing};
 
 /// Printer state for building output
 pub struct Printer<'a> {
@@ -102,6 +102,14 @@ impl<'a> Printer<'a> {
         let col = self.buffer.current_column(self.config.tab_width);
         // Add wrapper indent width so fill calculations account for final indentation
         col + (self.config.base_indent_offset * self.config.tab_width)
+    }
+
+    /// Get the effective indent level for width calculations
+    ///
+    /// Includes base_indent_offset to account for external context (e.g., Svelte wrapper)
+    /// that adds indentation to the final output.
+    pub(crate) fn effective_indent(&self) -> usize {
+        self.indent_level + self.config.base_indent_offset
     }
 
     /// Write a Doc to the buffer, accounting for current column and indent level
@@ -197,8 +205,10 @@ impl<'a> Printer<'a> {
                 break;
             }
 
-            // Skip inline comments (same line as prev node) - those are trailing comments
-            if prev_end > 0 && printing::is_same_line(self.source, prev_end, comment.span.start) {
+            let position = classify_comment(comment, prev_end, curr_start, self.source);
+
+            // Skip trailing comments (same line as prev node)
+            if prev_end > 0 && matches!(position, CommentPosition::Trailing) {
                 *comment_idx += 1;
                 last_end = comment.span.end;
                 continue;

@@ -1,6 +1,6 @@
 <script lang="ts">
-let counter = $state({count: 0});
-let snapshot = $state.snapshot(counter);
-let eager = $state.eager(counter.count);
+let obj = $state({n: 0});
+let snapshot = $state.snapshot(obj);
+let eager = $state.eager(obj.n);
 let raw = $state.raw([1, 2, 3]);
 </script>

@@ -1,5 +1,5 @@
 <style>
-.button{background:white;
+.class1{background:white;
 
 &:hover{background:gray;}
 

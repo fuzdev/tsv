@@ -1,14 +1,21 @@
 <script>
 
 
+	// 100 chars - stays inline
+	a   =   new   (  cond_aaaaaaaaaaaaaaaaaa   ||   cond_bbbbbbbbbbbbbbbbbbb   ||   cond_ccccccccccccccccccccccccc  )(  )  ;
+
+
+	// 101 chars - wraps expression
 	a   =   new   (
 
 
-		a_long_long_long_long_condition   ||
+		cond_aaaaaaaaaaaaaaaaaa   ||
 
-		a_long_long_long_long_condition   ||
 
-		a_long_long_long_long_condition
+		cond_bbbbbbbbbbbbbbbbbbb   ||
+
+
+		cond_cccccccccccccccccccccccccc
 
 
 	)(  )  ;

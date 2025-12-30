@@ -6,9 +6,10 @@
 //
 // Note: Block statements are in blocks.rs as a reusable utility
 
-use super::super::{CommentSpacing, ParenContext, Printer, needs_parens};
+use super::super::{ParenContext, Printer, needs_parens};
 use crate::ast::internal;
 use tsv_lang::doc::{self, Doc};
+use tsv_lang::printing::is_same_line;
 
 /// Check if an expression is directly an object literal (needs parentheses in arrow body)
 /// Only returns true for direct ObjectExpression - TSAsExpression etc. are handled separately
@@ -120,15 +121,8 @@ impl<'a> Printer<'a> {
             sig_parts.push(self.build_arrow_return_type_doc(return_type));
         }
 
-        // Include " =>" in the signature group for width calculation
-        sig_parts.push(doc::text(" =>"));
-
-        // Wrap entire signature in a group
-        parts.push(doc::group(doc::concat(sig_parts)));
-
-        // Calculate signature end position for comment detection
-        // This is the position after which comments belong to the body (between => and body)
-        // We need the position AFTER `)` to avoid re-printing param comments.
+        // Calculate signature end position (after `)` or return type)
+        // This is where comments BEFORE `=>` start
         let sig_end = if let Some(rt) = &arrow.return_type {
             rt.span.end
         } else if let Some(params_start) = arrow.params_start {
@@ -143,22 +137,47 @@ impl<'a> Printer<'a> {
                 .map_or(arrow.span.start, |p| p.span().end)
         };
 
+        // Find the `=>` token position to distinguish:
+        // - Comments between sig_end and `=>` → print BEFORE `=>`
+        // - Comments between `=>` and body → print AFTER `=>`
+        let arrow_pos = self
+            .find_arrow_token(sig_end, arrow.body.span().start)
+            .unwrap_or_else(|| arrow.body.span().start);
+        let arrow_end = arrow_pos + 2; // Position after `=>`
+
+        // Check for comments between signature and `=>` (e.g., `(x) /* c */ =>`)
+        let has_pre_arrow_comments = self.has_comments_between(sig_end, arrow_pos);
+
+        if has_pre_arrow_comments {
+            // Print comments before `=>`
+            for comment in tsv_lang::comments_in_range(self.comments, sig_end, arrow_pos) {
+                sig_parts.push(doc::text(" "));
+                sig_parts.push(self.build_comment_doc(comment));
+            }
+        }
+
+        // Include " =>" in the signature group for width calculation
+        sig_parts.push(doc::text(" =>"));
+
+        // Wrap entire signature in a group
+        parts.push(doc::group(doc::concat(sig_parts)));
+
         // Body - expression bodies can break to new line with indent
         match &arrow.body {
             internal::ArrowFunctionBody::Expression(expr) => {
-                // Check for comments between signature end and body start
+                // Check for comments between `=>` and body start
                 // These are comments like: `() => /* comment */ expr`
                 let body_start = expr.span().start;
-                let has_leading_comments = self.has_comments_between(sig_end, body_start);
+                let has_post_arrow_comments = self.has_comments_between(arrow_end, body_start);
 
                 // Prettier's `shouldPutBodyOnSameLine`: certain expression types stay hugged to =>
                 // Object/array literals and nested arrows don't break after =>
-                let should_hug = !has_leading_comments && should_hug_arrow_body(expr);
+                let should_hug = !has_post_arrow_comments && should_hug_arrow_body(expr);
 
-                if has_leading_comments {
+                if has_post_arrow_comments {
                     // Build body doc with leading comments - always breaks
                     let body_with_comments =
-                        self.build_arrow_body_with_comments_doc(expr, sig_end, body_start);
+                        self.build_arrow_body_with_comments_doc(expr, arrow_end, body_start);
                     parts.push(doc::group(doc::indent(doc::concat(vec![
                         doc::line(),
                         body_with_comments,
@@ -186,14 +205,15 @@ impl<'a> Printer<'a> {
                 // (params) => {
                 //     ...
                 // }
-                // Check for comments between signature end and body start
+                // Check for comments between `=>` and body start
                 let body_start = block.span.start;
-                let has_leading_comments = self.has_comments_between(sig_end, body_start);
+                let has_post_arrow_comments = self.has_comments_between(arrow_end, body_start);
 
-                if has_leading_comments {
+                if has_post_arrow_comments {
                     // Build comments doc
                     let mut comment_parts = Vec::new();
-                    for comment in tsv_lang::comments_in_range(self.comments, sig_end, body_start) {
+                    for comment in tsv_lang::comments_in_range(self.comments, arrow_end, body_start)
+                    {
                         comment_parts.push(doc::text(" "));
                         comment_parts.push(self.build_comment_doc(comment));
                     }
@@ -299,10 +319,15 @@ impl<'a> Printer<'a> {
         let params_start = arrow.params_start;
 
         // Compute trailing comments boundary for params
-        let trailing_comments_end = if let Some(rt) = &arrow.return_type {
-            Some(rt.span.start)
+        // IMPORTANT: Stop at `)` not at return type or body start
+        // Comments between `)` and `=>` are handled separately by the arrow printer
+        let trailing_comments_end = if let Some(ps) = params_start {
+            // Find the closing `)` position
+            let body_start = arrow.body.span().start;
+            self.find_closing_paren(ps, body_start)
         } else {
-            Some(arrow.body.span().start)
+            // No parens - use param end as boundary
+            arrow.params.last().map(|p| p.span().end)
         };
 
         // Delegate to shared implementation
@@ -337,8 +362,6 @@ impl<'a> Printer<'a> {
 
     /// Build doc for trailing same-line comments after a parameter
     fn build_trailing_param_comments(&self, start: u32, end: u32) -> Doc {
-        use tsv_lang::printing::is_same_line;
-
         let mut parts = Vec::new();
 
         for comment in tsv_lang::comments_in_range(self.comments, start, end) {
@@ -519,10 +542,16 @@ impl<'a> Printer<'a> {
         self.print_function_expression_body(func);
     }
 
-    /// Build a Doc for just the function expression signature (params + return type).
+    /// Build a Doc for just the function expression signature (type params, params, return type).
     /// Body is printed separately via imperative printer to preserve comments.
     fn build_function_expression_signature_doc(&self, func: &internal::FunctionExpression) -> Doc {
         let mut sig_parts = Vec::new();
+
+        // Type parameters (TypeScript generics): <T, U>
+        // Use _wrapping version for width-based line breaking
+        if let Some(type_params) = &func.type_parameters {
+            sig_parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
+        }
 
         // Function parameters - NOT in their own group, just softlines
         sig_parts.push(self.build_method_params_doc_ungrouped(func));
@@ -536,7 +565,7 @@ impl<'a> Printer<'a> {
         doc::group(doc::concat(sig_parts))
     }
 
-    /// Build a Doc for function expression body (params, return type, body).
+    /// Build a Doc for function expression body (type params, params, return type, body).
     ///
     /// Used for method shorthand in objects where the key is printed separately.
     /// For standalone function expressions, use `build_function_doc` instead.
@@ -544,19 +573,7 @@ impl<'a> Printer<'a> {
         &self,
         func: &internal::FunctionExpression,
     ) -> Doc {
-        // Build signature parts (will be wrapped in a group)
-        let mut sig_parts = Vec::new();
-
-        // Function parameters - NOT in their own group, just softlines
-        sig_parts.push(self.build_method_params_doc_ungrouped(func));
-
-        // Return type annotation (e.g., `: number`)
-        if let Some(return_type) = &func.return_type {
-            sig_parts.push(self.build_type_annotation_doc(return_type));
-        }
-
-        // Wrap signature in a group for width-aware breaking
-        let sig_doc = doc::group(doc::concat(sig_parts));
+        let sig_doc = self.build_function_expression_signature_doc(func);
 
         // Body - always on same line as signature close
         doc::concat(vec![
@@ -601,21 +618,12 @@ impl<'a> Printer<'a> {
             parts.push(self.build_identifier_doc(id));
         }
 
-        // Type parameters (TypeScript generics)
-        // Always add space before type params if no name: `function <T>` not `function<T>`
-        if let Some(type_params) = &func.type_parameters {
-            if func.id.is_none() {
-                parts.push(doc::text(" "));
-            }
-            parts.push(self.build_type_parameter_declaration_doc(type_params));
-        }
-
-        // Space before params if no name or type params: `function ()`
-        if func.id.is_none() && func.type_parameters.is_none() {
+        // Space before type params or params if no name: `function <T>` or `function ()`
+        if func.id.is_none() {
             parts.push(doc::text(" "));
         }
 
-        // Params, return type, and body
+        // Type params, params, return type, and body (signature_doc handles type params)
         parts.push(self.build_function_doc_body(func));
 
         doc::concat(parts)
@@ -675,6 +683,11 @@ impl<'a> Printer<'a> {
         let has_trailing_line_comment =
             self.has_trailing_line_comment_in_params(params, trailing_comments_end);
 
+        // Check if any leading line comments exist on their own line before params
+        // Line comments on their own line also force break
+        let has_leading_own_line_comment =
+            self.has_leading_own_line_comment_in_params(params, params_start);
+
         // Prettier rule: force break when 2+ params and at least one is TSParameterProperty
         // (has access modifiers like private/public/protected/readonly)
         let should_break_for_param_properties = params.len() > 1
@@ -683,8 +696,10 @@ impl<'a> Printer<'a> {
                 .any(|p| matches!(p, internal::Expression::TSParameterProperty(_)));
 
         // Combined condition for forcing multiline (includes external width-based force)
-        let force_break =
-            force_break_external || has_trailing_line_comment || should_break_for_param_properties;
+        let force_break = force_break_external
+            || has_trailing_line_comment
+            || has_leading_own_line_comment
+            || should_break_for_param_properties;
 
         // Check if last param is a rest parameter - no trailing comma after rest
         let has_rest_param = params
@@ -716,11 +731,8 @@ impl<'a> Printer<'a> {
             }
 
             // Add leading comments for this param
-            inner_parts.push(self.build_comments_between(
-                search_start,
-                param_start,
-                CommentSpacing::Trailing,
-            ));
+            // Use proper line breaks for line comments on their own line
+            inner_parts.push(self.build_leading_param_comments(search_start, param_start));
 
             // Use FunctionParameter context for object patterns
             inner_parts.push(self.build_function_parameter_doc(param));
@@ -765,6 +777,83 @@ impl<'a> Printer<'a> {
         result.push(doc::text(")"));
 
         doc::concat(result)
+    }
+
+    /// Check if any param has a leading line comment on its own line
+    fn has_leading_own_line_comment_in_params(
+        &self,
+        params: &[internal::Expression],
+        params_start: Option<u32>,
+    ) -> bool {
+        for (i, param) in params.iter().enumerate() {
+            let search_start = if i == 0 {
+                params_start.map_or_else(|| param.span().start, |pos| pos + 1)
+            } else {
+                params[i - 1].span().end
+            };
+
+            // Check if there's a line comment on its own line before this param
+            if self.has_own_line_comment_between(search_start, param.span().start) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Check if there's a line comment on its own line between two positions
+    fn has_own_line_comment_between(&self, start: u32, end: u32) -> bool {
+        for comment in tsv_lang::comments_in_range(self.comments, start, end) {
+            // Line comments are always on their own line (they extend to EOL)
+            // Block comments on their own line have a newline before them
+            if !comment.is_block {
+                return true;
+            }
+            // Check if block comment is on its own line (newline before it)
+            if !is_same_line(self.source, start, comment.span.start) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Build doc for leading comments before a parameter
+    /// Handles line comments on their own line with proper hardlines
+    fn build_leading_param_comments(&self, start: u32, end: u32) -> Doc {
+        let comments: Vec<_> = tsv_lang::comments_in_range(self.comments, start, end).collect();
+        if comments.is_empty() {
+            return doc::concat(vec![]);
+        }
+
+        let mut parts = Vec::new();
+
+        for (i, comment) in comments.iter().enumerate() {
+            // Check if comment is on its own line (not same line as previous content)
+            let prev_pos = if i == 0 {
+                start
+            } else {
+                comments[i - 1].span.end
+            };
+            let on_own_line = !is_same_line(self.source, prev_pos, comment.span.start);
+
+            if on_own_line && i > 0 {
+                // Comment on its own line (not first) - add hardline before it
+                parts.push(doc::hardline());
+            }
+            parts.push(self.build_comment_doc(comment));
+        }
+
+        // Check if the param itself is on its own line after the last comment
+        let last_comment_end = comments.last().map_or(start, |c| c.span.end);
+        let param_on_own_line = !is_same_line(self.source, last_comment_end, end);
+
+        if param_on_own_line {
+            parts.push(doc::hardline());
+        } else {
+            // Inline - add space after comment
+            parts.push(doc::text(" "));
+        }
+
+        doc::concat(parts)
     }
 
     /// Print a class expression: `class { }` or `class Foo<T> extends Bar { }`
@@ -829,8 +918,9 @@ impl<'a> Printer<'a> {
         }
 
         // Type parameters (TypeScript generics): class<T>
+        // Use _wrapping version for width-based line breaking
         if let Some(type_params) = &class_expr.type_parameters {
-            parts.push(self.build_type_parameter_declaration_doc(type_params));
+            parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
         }
 
         // Optional extends clause

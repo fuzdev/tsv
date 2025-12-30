@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 565,
+		"end": 557,
 		"attributes": [],
 		"children": [
 			{
@@ -292,12 +292,12 @@
 				"prelude": {
 					"type": "SelectorList",
 					"start": 424,
-					"end": 450,
+					"end": 446,
 					"children": [
 						{
 							"type": "ComplexSelector",
 							"start": 424,
-							"end": 450,
+							"end": 446,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -305,19 +305,19 @@
 									"selectors": [
 										{
 											"type": "ClassSelector",
-											"name": "scrollable",
+											"name": "class1",
 											"start": 424,
-											"end": 435
+											"end": 431
 										},
 										{
 											"type": "PseudoElementSelector",
 											"name": "scroll-marker",
-											"start": 435,
-											"end": 450
+											"start": 431,
+											"end": 446
 										}
 									],
 									"start": 424,
-									"end": 450
+									"end": 446
 								}
 							]
 						}
@@ -325,32 +325,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 451,
-					"end": 469,
+					"start": 447,
+					"end": 465,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 455,
-							"end": 465,
+							"start": 451,
+							"end": 461,
 							"property": "color",
 							"value": "red"
 						}
 					]
 				},
 				"start": 424,
-				"end": 469
+				"end": 465
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 497,
-					"end": 535,
+					"start": 493,
+					"end": 527,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 497,
-							"end": 535,
+							"start": 493,
+							"end": 527,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -358,26 +358,26 @@
 									"selectors": [
 										{
 											"type": "ClassSelector",
-											"name": "scrollable",
-											"start": 497,
-											"end": 508
+											"name": "class1",
+											"start": 493,
+											"end": 500
 										},
 										{
 											"type": "PseudoClassSelector",
 											"name": "hover",
 											"args": null,
-											"start": 508,
-											"end": 514
+											"start": 500,
+											"end": 506
 										},
 										{
 											"type": "PseudoElementSelector",
 											"name": "scroll-marker-group",
-											"start": 514,
-											"end": 535
+											"start": 506,
+											"end": 527
 										}
 									],
-									"start": 497,
-									"end": 535
+									"start": 493,
+									"end": 527
 								}
 							]
 						}
@@ -385,32 +385,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 536,
-					"end": 556,
+					"start": 528,
+					"end": 548,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 540,
-							"end": 552,
+							"start": 532,
+							"end": 544,
 							"property": "opacity",
 							"value": "0.8"
 						}
 					]
 				},
-				"start": 497,
-				"end": 556
+				"start": 493,
+				"end": 548
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 557,
-			"styles": "\n\t/* Scroll marker styling */\n\t::scroll-marker {\n\t\tbackground: blue;\n\t}\n\n\t/* Scroll marker group */\n\t::scroll-marker-group {\n\t\tpadding: 10px;\n\t}\n\n\t/* Scroll button with direction */\n\t::scroll-button(up) {\n\t\tborder-radius: 50%;\n\t}\n\n\t::scroll-button(down) {\n\t\tborder-radius: 50%;\n\t}\n\n\t::scroll-button(left) {\n\t\tborder-radius: 50%;\n\t}\n\n\t::scroll-button(right) {\n\t\tborder-radius: 50%;\n\t}\n\n\t/* Combined with selectors */\n\t.scrollable::scroll-marker {\n\t\tcolor: red;\n\t}\n\n\t/* With pseudo-class */\n\t.scrollable:hover::scroll-marker-group {\n\t\topacity: 0.8;\n\t}\n",
+			"end": 549,
+			"styles": "\n\t/* Scroll marker styling */\n\t::scroll-marker {\n\t\tbackground: blue;\n\t}\n\n\t/* Scroll marker group */\n\t::scroll-marker-group {\n\t\tpadding: 10px;\n\t}\n\n\t/* Scroll button with direction */\n\t::scroll-button(up) {\n\t\tborder-radius: 50%;\n\t}\n\n\t::scroll-button(down) {\n\t\tborder-radius: 50%;\n\t}\n\n\t::scroll-button(left) {\n\t\tborder-radius: 50%;\n\t}\n\n\t::scroll-button(right) {\n\t\tborder-radius: 50%;\n\t}\n\n\t/* Combined with selectors */\n\t.class1::scroll-marker {\n\t\tcolor: red;\n\t}\n\n\t/* With pseudo-class */\n\t.class1:hover::scroll-marker-group {\n\t\topacity: 0.8;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 566,
+	"end": 558,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

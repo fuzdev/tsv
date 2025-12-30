@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 40,
+	"end": 35,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,7 +10,7 @@
 			{
 				"type": "SvelteDocument",
 				"start": 0,
-				"end": 39,
+				"end": 34,
 				"name": "svelte:document",
 				"name_loc": {
 					"start": {
@@ -27,7 +27,7 @@
 				"attributes": [
 					{
 						"start": 17,
-						"end": 36,
+						"end": 31,
 						"type": "OnDirective",
 						"name": "scroll",
 						"name_loc": {
@@ -45,7 +45,7 @@
 						"expression": {
 							"type": "Identifier",
 							"start": 28,
-							"end": 35,
+							"end": 30,
 							"loc": {
 								"start": {
 									"line": 1,
@@ -53,10 +53,10 @@
 								},
 								"end": {
 									"line": 1,
-									"column": 35
+									"column": 30
 								}
 							},
-							"name": "handler"
+							"name": "fn"
 						},
 						"modifiers": []
 					}

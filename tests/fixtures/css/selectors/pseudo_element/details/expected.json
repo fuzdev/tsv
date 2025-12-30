@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 445,
+		"end": 444,
 		"attributes": [],
 		"children": [
 			{
@@ -229,12 +229,12 @@
 				"prelude": {
 					"type": "SelectorList",
 					"start": 383,
-					"end": 399,
+					"end": 398,
 					"children": [
 						{
 							"type": "ComplexSelector",
 							"start": 383,
-							"end": 399,
+							"end": 398,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -242,19 +242,19 @@
 									"selectors": [
 										{
 											"type": "ClassSelector",
-											"name": "content",
+											"name": "class1",
 											"start": 383,
-											"end": 391
+											"end": 390
 										},
 										{
 											"type": "PseudoElementSelector",
 											"name": "column",
-											"start": 391,
-											"end": 399
+											"start": 390,
+											"end": 398
 										}
 									],
 									"start": 383,
-									"end": 399
+									"end": 398
 								}
 							]
 						}
@@ -262,32 +262,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 400,
-					"end": 436,
+					"start": 399,
+					"end": 435,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 404,
-							"end": 432,
+							"start": 403,
+							"end": 431,
 							"property": "border-right",
 							"value": "1px solid gray"
 						}
 					]
 				},
 				"start": 383,
-				"end": 436
+				"end": 435
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 437,
-			"styles": "\n\t/* Details content styling */\n\tdetails::details-content {\n\t\tpadding: 1rem;\n\t}\n\n\t/* Column pseudo-element */\n\t.multi-column::column {\n\t\tbackground: lightgray;\n\t}\n\n\t/* Combined with type selector */\n\tdetails::details-content {\n\t\tmargin: 0.5rem;\n\t}\n\n\t/* With pseudo-class */\n\tdetails:open::details-content {\n\t\tanimation: slide-down 0.3s;\n\t}\n\n\t/* Column with class selector */\n\t.content::column {\n\t\tborder-right: 1px solid gray;\n\t}\n",
+			"end": 436,
+			"styles": "\n\t/* Details content styling */\n\tdetails::details-content {\n\t\tpadding: 1rem;\n\t}\n\n\t/* Column pseudo-element */\n\t.multi-column::column {\n\t\tbackground: lightgray;\n\t}\n\n\t/* Combined with type selector */\n\tdetails::details-content {\n\t\tmargin: 0.5rem;\n\t}\n\n\t/* With pseudo-class */\n\tdetails:open::details-content {\n\t\tanimation: slide-down 0.3s;\n\t}\n\n\t/* Column with class selector */\n\t.class1::column {\n\t\tborder-right: 1px solid gray;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 446,
+	"end": 445,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

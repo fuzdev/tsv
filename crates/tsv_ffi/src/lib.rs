@@ -1,6 +1,7 @@
 //! C FFI bindings for tsv
 //!
-//! Provides parse and format functions with C ABI for benchmarking via Deno FFI.
+//! Provides parse and format functions with C ABI for use from any language
+//! with C FFI support (Deno, Node.js via koffi/ffi-napi, Python ctypes, etc.).
 //!
 //! # Memory Management
 //!

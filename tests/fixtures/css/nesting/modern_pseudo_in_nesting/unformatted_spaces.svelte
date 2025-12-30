@@ -1,5 +1,5 @@
 <style>
-	.card  {
+	.class1  {
 		padding:  1rem;
 
 		/* Modern pseudo-class in nesting */
@@ -14,7 +14,7 @@
 
 		/* At-rule nesting with modern features */
 		@media  (  width  >=  768px  )  {
-			&  >  .title  {
+			&  >  .class2  {
 				font-size:  2rem;
 			}
 		}

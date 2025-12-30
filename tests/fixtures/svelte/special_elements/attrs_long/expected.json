@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 511,
+	"end": 467,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,97 +10,58 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 52,
-				"data": " Short svelte:component - no wrap (63 chars) "
+				"end": 47,
+				"data": " 100 chars - stays inline (at boundary) "
 			},
 			{
 				"type": "Text",
-				"start": 52,
-				"end": 53,
+				"start": 47,
+				"end": 48,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "SvelteComponent",
-				"start": 53,
-				"end": 116,
+				"start": 48,
+				"end": 148,
 				"name": "svelte:component",
 				"name_loc": {
 					"start": {
 						"line": 2,
 						"column": 1,
-						"character": 54
+						"character": 49
 					},
 					"end": {
 						"line": 2,
 						"column": 17,
-						"character": 70
+						"character": 65
 					}
 				},
 				"attributes": [
 					{
 						"type": "Attribute",
-						"start": 83,
-						"end": 95,
-						"name": "prop",
+						"start": 75,
+						"end": 145,
+						"name": "attr",
 						"name_loc": {
 							"start": {
 								"line": 2,
-								"column": 30,
-								"character": 83
+								"column": 27,
+								"character": 75
 							},
 							"end": {
 								"line": 2,
-								"column": 34,
-								"character": 87
-							}
-						},
-						"value": {
-							"type": "ExpressionTag",
-							"start": 88,
-							"end": 95,
-							"expression": {
-								"type": "Identifier",
-								"start": 89,
-								"end": 94,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 36
-									},
-									"end": {
-										"line": 2,
-										"column": 41
-									}
-								},
-								"name": "value"
-							}
-						}
-					},
-					{
-						"type": "Attribute",
-						"start": 96,
-						"end": 113,
-						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 2,
-								"column": 43,
-								"character": 96
-							},
-							"end": {
-								"line": 2,
-								"column": 52,
-								"character": 105
+								"column": 31,
+								"character": 79
 							}
 						},
 						"value": [
 							{
-								"start": 107,
-								"end": 112,
+								"start": 81,
+								"end": 144,
 								"type": "Text",
-								"raw": "short",
-								"data": "short"
+								"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 							}
 						]
 					}
@@ -111,8 +72,8 @@
 				},
 				"expression": {
 					"type": "Identifier",
-					"start": 77,
-					"end": 81,
+					"start": 72,
+					"end": 73,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -120,74 +81,74 @@
 						},
 						"end": {
 							"line": 2,
-							"column": 28
+							"column": 25
 						}
 					},
-					"name": "Comp"
+					"name": "C"
 				}
 			},
 			{
 				"type": "Text",
-				"start": 116,
-				"end": 118,
+				"start": 148,
+				"end": 150,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 118,
-				"end": 181,
-				"data": " Long svelte:component - wraps (102 chars, exceeds 100) "
+				"start": 150,
+				"end": 176,
+				"data": " 101 chars - wraps "
 			},
 			{
 				"type": "Text",
-				"start": 181,
-				"end": 182,
+				"start": 176,
+				"end": 177,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "SvelteComponent",
-				"start": 182,
-				"end": 286,
+				"start": 177,
+				"end": 280,
 				"name": "svelte:component",
 				"name_loc": {
 					"start": {
 						"line": 5,
 						"column": 1,
-						"character": 183
+						"character": 178
 					},
 					"end": {
 						"line": 5,
 						"column": 17,
-						"character": 199
+						"character": 194
 					}
 				},
 				"attributes": [
 					{
 						"type": "Attribute",
-						"start": 214,
-						"end": 283,
-						"name": "data-attr",
+						"start": 206,
+						"end": 277,
+						"name": "attr",
 						"name_loc": {
 							"start": {
 								"line": 7,
 								"column": 1,
-								"character": 214
+								"character": 206
 							},
 							"end": {
 								"line": 7,
-								"column": 10,
-								"character": 223
+								"column": 5,
+								"character": 210
 							}
 						},
 						"value": [
 							{
-								"start": 225,
-								"end": 282,
+								"start": 212,
+								"end": 276,
 								"type": "Text",
-								"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-								"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 							}
 						]
 					}
@@ -198,8 +159,8 @@
 				},
 				"expression": {
 					"type": "Identifier",
-					"start": 207,
-					"end": 211,
+					"start": 202,
+					"end": 203,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -207,71 +168,71 @@
 						},
 						"end": {
 							"line": 6,
-							"column": 11
+							"column": 8
 						}
 					},
-					"name": "Comp"
+					"name": "C"
 				}
 			},
 			{
 				"type": "Text",
-				"start": 286,
-				"end": 288,
+				"start": 280,
+				"end": 282,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 288,
-				"end": 365,
-				"data": " Long svelte:component with children - wraps (101 chars, exceeds 100) "
+				"start": 282,
+				"end": 324,
+				"data": " With children - hug mode wrapping "
 			},
 			{
 				"type": "Text",
-				"start": 365,
-				"end": 366,
+				"start": 324,
+				"end": 325,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "SvelteComponent",
-				"start": 366,
-				"end": 510,
+				"start": 325,
+				"end": 466,
 				"name": "svelte:component",
 				"name_loc": {
 					"start": {
 						"line": 11,
 						"column": 1,
-						"character": 367
+						"character": 326
 					},
 					"end": {
 						"line": 11,
 						"column": 17,
-						"character": 383
+						"character": 342
 					}
 				},
 				"attributes": [
 					{
 						"type": "Attribute",
-						"start": 398,
-						"end": 468,
+						"start": 355,
+						"end": 425,
 						"name": "data-attr",
 						"name_loc": {
 							"start": {
-								"line": 13,
-								"column": 1,
-								"character": 398
+								"line": 11,
+								"column": 30,
+								"character": 355
 							},
 							"end": {
-								"line": 13,
-								"column": 10,
-								"character": 407
+								"line": 11,
+								"column": 39,
+								"character": 364
 							}
 						},
 						"value": [
 							{
-								"start": 409,
-								"end": 467,
+								"start": 366,
+								"end": 424,
 								"type": "Text",
 								"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 								"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -283,27 +244,20 @@
 					"type": "Fragment",
 					"nodes": [
 						{
-							"type": "Text",
-							"start": 470,
-							"end": 472,
-							"raw": "\n\t",
-							"data": "\n\t"
-						},
-						{
 							"type": "RegularElement",
-							"start": 472,
-							"end": 490,
+							"start": 428,
+							"end": 446,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 15,
-									"column": 2,
-									"character": 473
+									"line": 12,
+									"column": 3,
+									"character": 429
 								},
 								"end": {
-									"line": 15,
-									"column": 6,
-									"character": 477
+									"line": 12,
+									"column": 7,
+									"character": 433
 								}
 							},
 							"attributes": [],
@@ -312,35 +266,28 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 478,
-										"end": 483,
+										"start": 434,
+										"end": 439,
 										"raw": "child",
 										"data": "child"
 									}
 								]
 							}
-						},
-						{
-							"type": "Text",
-							"start": 490,
-							"end": 491,
-							"raw": "\n",
-							"data": "\n"
 						}
 					]
 				},
 				"expression": {
 					"type": "Identifier",
-					"start": 391,
-					"end": 395,
+					"start": 349,
+					"end": 353,
 					"loc": {
 						"start": {
-							"line": 12,
-							"column": 7
+							"line": 11,
+							"column": 24
 						},
 						"end": {
-							"line": 12,
-							"column": 11
+							"line": 11,
+							"column": 28
 						}
 					},
 					"name": "Comp"

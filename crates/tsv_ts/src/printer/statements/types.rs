@@ -2,7 +2,7 @@
 
 use super::super::Printer;
 use crate::ast::internal;
-use tsv_lang::{SymbolResolver, SymbolToU32, doc};
+use tsv_lang::{SymbolResolver, SymbolToU32, comments_in_range, doc};
 
 /// Check if a type is "generic" - i.e., has type parameters.
 /// This matches prettier's `isGeneric` function in assignment.js.
@@ -128,7 +128,13 @@ impl<'a> Printer<'a> {
     pub(super) fn print_interface_declaration(&mut self, decl: &internal::TSInterfaceDeclaration) {
         // Build the header doc (everything before the body)
         let header_doc = self.build_interface_header_doc(decl);
-        self.write_doc(&header_doc);
+
+        // suffix_width accounts for body that follows the header:
+        // - Empty body: " {}" = 3 chars
+        // - Non-empty body: " {" = 2 chars
+        let suffix_width = if decl.body.body.is_empty() { 3 } else { 2 };
+        let header_output = self.render_doc_with_suffix(&header_doc, suffix_width);
+        self.write(&header_output);
 
         // Print the body
         self.write(" {");
@@ -289,21 +295,126 @@ impl<'a> Printer<'a> {
         super::super::build_entity_name_doc(name)
     }
 
-    /// Build doc for type arguments: `<T, U>`
-    pub(super) fn build_type_arguments_doc(
+    /// Build doc for type arguments with comment preservation: `</* a */ T /* b */, U>`
+    ///
+    /// Default version: no independent width-based wrapping (parent context controls breaking).
+    /// Use `build_type_arguments_doc_wrapping` when type args should break independently.
+    pub(crate) fn build_type_arguments_doc(
         &self,
         args: &internal::TSTypeParameterInstantiation,
     ) -> doc::Doc {
-        let arg_docs: Vec<_> = args
-            .params
-            .iter()
-            .map(|arg| self.build_type_doc(arg))
-            .collect();
-        doc::concat(vec![
+        if args.params.is_empty() {
+            return doc::text("<>");
+        }
+
+        let mut parts = Vec::new();
+        let mut prev_end = args.span.start + 1; // After the opening `<`
+
+        for (i, param) in args.params.iter().enumerate() {
+            let param_start = param.span().start;
+
+            if i > 0 {
+                parts.push(doc::text(", "));
+            }
+
+            // Add leading block comments before this type argument
+            for comment in comments_in_range(self.comments, prev_end, param_start) {
+                if comment.is_block {
+                    parts.push(doc::text_owned(format!("/*{}*/ ", comment.content)));
+                }
+            }
+
+            parts.push(self.build_type_doc(param));
+
+            // Add trailing block comments after this type argument
+            let param_end = param.span().end;
+            let next_boundary = if i + 1 < args.params.len() {
+                args.params[i + 1].span().start
+            } else {
+                args.span.end - 1 // Before the closing `>`
+            };
+            for comment in comments_in_range(self.comments, param_end, next_boundary) {
+                if comment.is_block {
+                    parts.push(doc::text_owned(format!(" /*{}*/", comment.content)));
+                }
+            }
+
+            // Update prev_end to next_boundary to avoid double-counting comments
+            prev_end = next_boundary;
+        }
+
+        doc::concat(vec![doc::text("<"), doc::concat(parts), doc::text(">")])
+    }
+
+    /// Build doc for type arguments with width-based wrapping support.
+    ///
+    /// Inline: `<T, U, V>`
+    /// Wrapped: `<\n\tT,\n\tU,\n\tV\n>`
+    ///
+    /// Use this when type arguments should break independently of parent context,
+    /// such as in property type annotations.
+    pub(crate) fn build_type_arguments_doc_wrapping(
+        &self,
+        args: &internal::TSTypeParameterInstantiation,
+    ) -> doc::Doc {
+        if args.params.is_empty() {
+            return doc::text("<>");
+        }
+
+        let mut inner_parts = Vec::new();
+        let mut prev_end = args.span.start + 1; // After the opening `<`
+
+        for (i, param) in args.params.iter().enumerate() {
+            let param_start = param.span().start;
+            let is_last = i == args.params.len() - 1;
+
+            // Build parts for this argument
+            let mut arg_parts = Vec::new();
+
+            // Add leading block comments before this type argument
+            for comment in comments_in_range(self.comments, prev_end, param_start) {
+                if comment.is_block {
+                    arg_parts.push(doc::text_owned(format!("/*{}*/ ", comment.content)));
+                }
+            }
+
+            arg_parts.push(self.build_type_doc(param));
+
+            // Add trailing block comments after this type argument
+            let param_end = param.span().end;
+            let next_boundary = if i + 1 < args.params.len() {
+                args.params[i + 1].span().start
+            } else {
+                args.span.end - 1 // Before the closing `>`
+            };
+            for comment in comments_in_range(self.comments, param_end, next_boundary) {
+                if comment.is_block {
+                    arg_parts.push(doc::text_owned(format!(" /*{}*/", comment.content)));
+                }
+            }
+
+            // Update prev_end to next_boundary to avoid double-counting comments
+            prev_end = next_boundary;
+
+            // Add separator before non-first arguments
+            if i > 0 {
+                inner_parts.push(doc::line());
+            }
+            inner_parts.push(doc::concat(arg_parts));
+            // Add comma separator after non-last elements
+            if !is_last {
+                inner_parts.push(doc::text(","));
+            }
+            // Note: type arguments don't get trailing commas (unlike params)
+        }
+
+        // Wrap in group with proper indentation for width-based breaking
+        doc::group(doc::concat(vec![
             doc::text("<"),
-            doc::join(arg_docs, ", "),
+            doc::indent_softline(doc::concat(inner_parts)),
+            doc::softline(),
             doc::text(">"),
-        ])
+        ]))
     }
 
     /// Print a type element (property signature, method signature, etc.)
@@ -326,9 +437,31 @@ impl<'a> Printer<'a> {
                 if let Some(ta) = &p.type_annotation {
                     // For simple types with comments, print_type_annotation includes the semicolon
                     let has_trailing_comment = self.type_annotation_has_trailing_comment(ta);
-                    self.print_type_annotation(ta);
-                    if !has_trailing_comment {
-                        self.write(";");
+
+                    // For TypeReference with type arguments, use doc-based printing for width-aware wrapping
+                    if let internal::TSType::TypeReference(r) = ta.type_annotation.as_ref() {
+                        if let Some(type_args) = &r.type_arguments {
+                            // Build doc: ": TypeName<Args>"
+                            let type_doc = doc::concat(vec![
+                                doc::text(": "),
+                                super::super::build_entity_name_doc(&r.type_name),
+                                self.build_type_arguments_doc_wrapping(type_args),
+                            ]);
+                            // suffix_width = 1 for trailing ";"
+                            let output = self.render_doc_with_suffix(&type_doc, 1);
+                            self.write(&output);
+                            self.write(";");
+                        } else {
+                            self.print_type_annotation(ta);
+                            if !has_trailing_comment {
+                                self.write(";");
+                            }
+                        }
+                    } else {
+                        self.print_type_annotation(ta);
+                        if !has_trailing_comment {
+                            self.write(";");
+                        }
                     }
                 } else {
                     self.write(";");

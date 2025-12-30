@@ -242,32 +242,11 @@ pub fn format_expression_with_indent_and_comments(
     printer.into_string()
 }
 
-/// Format a single TypeScript expression in an isolated context.
+/// Format a single TypeScript expression with comments.
 ///
-/// Similar to `format_expression`, but handles sequence expressions specially:
-/// they are NOT wrapped in parentheses since the surrounding context (like
-/// Svelte's `={...}`) already provides the necessary grouping.
-pub fn format_expression_isolated(
-    expression: &Expression,
-    source: &str,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
-) -> String {
-    let comments = Vec::new();
-    let mut printer = printer::Printer::with_config(
-        interner,
-        source,
-        &comments,
-        tsv_lang::PrintConfig::default(),
-    );
-    printer.print_expression_isolated(expression);
-    printer.into_string()
-}
-
-/// Format a single TypeScript expression in an isolated context with comments.
-///
-/// Like `format_expression_isolated`, but preserves comments that were collected
-/// during parsing. Used for Svelte expression tags that may contain comments.
-pub fn format_expression_isolated_with_comments(
+/// Preserves comments that were collected during parsing.
+/// Used for Svelte expression tags that may contain comments.
+pub fn format_expression_with_comments(
     expression: &Expression,
     source: &str,
     interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
@@ -275,7 +254,24 @@ pub fn format_expression_isolated_with_comments(
 ) -> String {
     let mut printer =
         printer::Printer::with_config(interner, source, comments, tsv_lang::PrintConfig::default());
-    printer.print_expression_isolated(expression);
+    printer.print_expression(expression);
+    printer.into_string()
+}
+
+/// Format a single TypeScript expression with custom print configuration.
+///
+/// Like `format_expression_with_comments`, but accepts a PrintConfig
+/// to control formatting behavior. Use `first_line_offset` to account for
+/// expressions that start mid-line (e.g., `{#each expr as item}`).
+pub fn format_expression_with_config(
+    expression: &Expression,
+    source: &str,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+    comments: &[ast::Comment],
+    config: tsv_lang::PrintConfig,
+) -> String {
+    let mut printer = printer::Printer::with_config(interner, source, comments, config);
+    printer.print_expression(expression);
     printer.into_string()
 }
 
@@ -401,29 +397,10 @@ pub fn build_expression_doc(
     printer.build_expression_doc_public(expression)
 }
 
-/// Build a Doc tree for a TypeScript expression in an isolated context.
+/// Build a Doc for a TypeScript expression with comments.
 ///
-/// Similar to `build_expression_doc`, but handles sequence expressions specially:
-/// they are NOT wrapped in parentheses since the surrounding context (like
-/// Svelte's `={...}`) already provides the necessary grouping.
-///
-/// Use this when the expression is inside braces or other grouping syntax
-/// where the outer delimiter already disambiguates the comma operator.
-pub fn build_expression_doc_isolated(
-    expression: &Expression,
-    source: &str,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
-    config: &tsv_lang::PrintConfig,
-) -> tsv_lang::doc::Doc {
-    let comments = Vec::new();
-    let printer = printer::Printer::with_config(interner, source, &comments, *config);
-    printer.build_expression_doc_isolated_public(expression)
-}
-
-/// Build a Doc for a TypeScript expression in an isolated context, with comments.
-///
-/// Like `build_expression_doc_isolated`, but includes comments collected during parsing.
-pub fn build_expression_doc_isolated_with_comments(
+/// Like `build_expression_doc`, but includes comments collected during parsing.
+pub fn build_expression_doc_with_comments(
     expression: &Expression,
     source: &str,
     interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
@@ -431,7 +408,57 @@ pub fn build_expression_doc_isolated_with_comments(
     comments: &[ast::Comment],
 ) -> tsv_lang::doc::Doc {
     let printer = printer::Printer::with_config(interner, source, comments, *config);
-    printer.build_expression_doc_isolated_public(expression)
+    printer.build_expression_doc_public(expression)
+}
+
+/// Build a Doc for a TypeScript expression with continuation indent for binary expressions.
+///
+/// When a binary expression breaks, continuation lines are indented relative to the first:
+/// ```text
+/// first &&
+///   second &&
+///   third
+/// ```
+///
+/// This is used in attribute contexts (like Svelte's `={...}`) where prettier uses
+/// this specific indentation style for binary expressions.
+pub fn build_expression_doc_with_continuation_indent(
+    expression: &Expression,
+    source: &str,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+    config: &tsv_lang::PrintConfig,
+    comments: &[ast::Comment],
+) -> tsv_lang::doc::Doc {
+    let printer = printer::Printer::with_config(interner, source, comments, *config);
+    printer.build_expression_doc_with_continuation_indent_public(expression)
+}
+
+/// Build a Doc for a condition expression (if/while test) with proper wrapping.
+///
+/// For binary expressions (&&, ||), uses an ungrouped version so the parent group
+/// controls whether the condition breaks to multiple lines. This allows conditions
+/// like `{#if a && b && c}` to wrap when they exceed print width.
+///
+/// # Arguments
+///
+/// * `expression` - The condition expression
+/// * `source` - The source code
+/// * `interner` - Shared string interner
+/// * `config` - Print configuration
+/// * `comments` - Comments from parsing
+///
+/// # Returns
+///
+/// A Doc that can be wrapped by a parent group for width-aware formatting.
+pub fn build_condition_doc(
+    expression: &Expression,
+    source: &str,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+    config: &tsv_lang::PrintConfig,
+    comments: &[ast::Comment],
+) -> tsv_lang::doc::Doc {
+    let printer = printer::Printer::with_config(interner, source, comments, *config);
+    printer.build_condition_doc_public(expression)
 }
 
 // Re-export key types for convenience

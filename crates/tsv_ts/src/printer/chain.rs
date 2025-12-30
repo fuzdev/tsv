@@ -452,6 +452,7 @@ pub trait SymbolLookup {
 /// - Chains with calls: use group-based breaking
 /// - Short chains (≤cutoff groups): simple group with softlines
 /// - Longer chains: conditionalGroup([oneLine, expanded])
+/// - 3+ calls with complex args: force expanded (no width-based decision)
 pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> Doc {
     if groups.is_empty() {
         return doc::text("");
@@ -469,10 +470,15 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
         return build_parenthesized_non_null_chain_doc(groups, printer);
     }
 
-    // Check if this is a member-only chain (no calls)
-    let has_calls = groups
+    // Collect all call nodes in the chain for the 3+ calls rule
+    let call_nodes: Vec<&ChainNode<'a>> = groups
         .iter()
-        .any(|g| g.nodes.iter().any(ChainNode::is_call));
+        .flat_map(|g| g.nodes.iter())
+        .filter(|n| n.is_call())
+        .collect();
+
+    // Check if this is a member-only chain (no calls)
+    let has_calls = !call_nodes.is_empty();
 
     // Prettier's logic (member-chain.js:351-359):
     // If groups.length <= cutoff && !nodeHasComment:
@@ -489,9 +495,15 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
         return build_member_only_chain_doc(groups, printer);
     }
 
+    // Prettier's 3+ calls rule (member-chain.js:400-408):
+    // If there are more than 2 call expressions AND at least one has non-simple arguments
+    // (arrow functions, function expressions), force the expanded layout.
+    let force_expand =
+        call_nodes.len() > 2 && call_nodes.iter().any(|n| call_has_complex_args(n, printer));
+
     // Chains with calls use group-based breaking
     // Short chains: use group with softlines so it can break if needed
-    if groups.len() <= cutoff {
+    if groups.len() <= cutoff && !force_expand {
         // Build: first_group + indent(softline + second_group + ...)
         let first_group_doc = print_group(&groups[0], printer);
 
@@ -519,8 +531,40 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
     // Build expanded variant
     let expanded = build_expanded_doc(groups, should_merge, printer);
 
-    // Use conditionalGroup to let printer decide
-    doc::conditional_group(vec![on_line_doc, expanded])
+    // If force_expand, wrap in group() to force breaks (like prettier's group(expanded))
+    // Otherwise, use conditionalGroup to let printer decide
+    if force_expand {
+        doc::group(expanded)
+    } else {
+        doc::conditional_group(vec![on_line_doc, expanded])
+    }
+}
+
+/// Check if a call node has complex (non-simple) arguments
+///
+/// Complex arguments include arrow functions and function expressions.
+/// Prettier calls these "non-simple" arguments and uses them to determine
+/// if a 3+ call chain should force break.
+fn call_has_complex_args<'a, P: ChainPrinter>(node: &ChainNode<'a>, _printer: &P) -> bool {
+    let ChainNode::Call { expr, .. } = node else {
+        return false;
+    };
+    let Expression::CallExpression(call) = expr else {
+        return false;
+    };
+
+    call.arguments.iter().any(is_complex_argument)
+}
+
+/// Check if an argument is "complex" (non-simple)
+///
+/// Complex arguments are function expressions and arrow functions.
+/// This matches prettier's `isSimpleCallArgument` logic (inverted).
+fn is_complex_argument(expr: &Expression) -> bool {
+    matches!(
+        expr,
+        Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_)
+    )
 }
 
 /// Check if chain starts with "(complex)!" pattern that needs chain-preferring breaks
@@ -751,19 +795,15 @@ fn build_member_only_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], p
     // The fill starts at the position after first_doc and greedily packs.
     // Since fill is inside indent, overflow lines get the extra indent.
 
-    // Build context for both variants to ensure symmetric constraint checking.
-    // Reserve 1 char to prevent packing to exactly printWidth, which could be
-    // exceeded by trailing content (commas, semicolons, brackets).
-    let context = doc::DocContext {
-        trailing_reserve: 1,
-    };
-
-    // Build on_line: everything concatenated flat, wrapped with context
+    // Build on_line: everything concatenated flat
+    // Note: on_line does NOT need trailing_reserve because fits_with_lookahead
+    // already sees trailing content (comma, etc.) in rest_commands with the
+    // correct mode (Break → "," is counted).
     let mut on_line_parts = vec![first_doc.clone()];
     for segment in &segments {
         on_line_parts.push(segment.clone());
     }
-    let on_line = doc::with_context(doc::concat(on_line_parts), context.clone());
+    let on_line = doc::concat(on_line_parts);
 
     // Build fill_parts with softlines between segments
     let mut fill_parts = Vec::new();
@@ -774,9 +814,15 @@ fn build_member_only_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], p
         fill_parts.push(segment.clone());
     }
 
-    // Expanded: first_doc + indent(fill(segments)), with same context
+    // Expanded: first_doc + indent(fill(segments))
     // The fill starts right after first_doc at current position.
     // It packs greedily until overflow, then breaks with indent.
+    //
+    // The fill needs trailing_reserve: 1 to account for trailing punctuation
+    // (comma, semicolon) that comes after the chain. Unlike the on_line check
+    // which uses fits_with_lookahead (which sees rest_commands), the fill's
+    // internal fits check doesn't have access to what comes after the chain.
+    let context = doc::DocContext { trailing_reserve: 1 };
     let expanded = doc::concat(vec![
         first_doc,
         doc::indent(doc::with_context(doc::fill(fill_parts), context)),

@@ -24,13 +24,32 @@ impl<'a> Printer<'a> {
     /// Write a Doc to the output buffer at the current position
     ///
     /// Handles column tracking and indent resolution for proper line wrapping.
-    fn write_doc(&mut self, doc: &Doc) {
+    pub(super) fn write_doc(&mut self, doc: &Doc) {
         let current_col = self.buffer.current_column(self.config.tab_width);
         let output = {
             let interner = self.interner.borrow();
             doc::print_doc_with_indent_resolved(
                 doc,
                 &self.config,
+                current_col,
+                self.indent_level,
+                &*interner,
+            )
+        };
+        self.write(&output);
+    }
+
+    /// Write a Doc to the output buffer with a custom config
+    ///
+    /// Used when the doc needs specific first_line_offset or suffix_width settings
+    /// that differ from the default self.config.
+    pub(super) fn write_doc_with_config(&mut self, doc: &Doc, config: &tsv_lang::PrintConfig) {
+        let current_col = self.buffer.current_column(self.config.tab_width);
+        let output = {
+            let interner = self.interner.borrow();
+            doc::print_doc_with_indent_resolved(
+                doc,
+                config,
                 current_col,
                 self.indent_level,
                 &*interner,
@@ -167,48 +186,45 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a spread attribute: `{...expr}`
     fn build_spread_attribute_doc(&self, spread: &internal::SpreadAttribute) -> Doc {
-        let mut parts = vec![doc::text("{...")];
-
-        // Leading comments (between `{...` and expression)
-        let expr_start = spread.expression.span().start;
-        for comment in tsv_lang::comments_in_range(self.comments, spread.span.start + 4, expr_start)
-        {
-            parts.push(Self::build_leading_js_comment_doc(comment));
-        }
-
-        // Expression doc with any nested comments
-        let expr_doc = tsv_ts::build_expression_doc_isolated_with_comments(
+        self.build_braced_expression_doc(
+            "{...",
             &spread.expression,
-            self.source,
-            Rc::clone(&self.interner),
-            &self.config,
-            self.comments,
-        );
-        parts.push(expr_doc);
-
-        // Trailing comments (between expression and `}`)
-        let expr_end = spread.expression.span().end;
-        for comment in tsv_lang::comments_in_range(self.comments, expr_end, spread.span.end - 1) {
-            parts.push(Self::build_trailing_js_comment_doc(comment));
-        }
-
-        parts.push(doc::text("}"));
-        doc::concat(parts)
+            spread.span.start + 4, // after `{...`
+            spread.span.end,
+        )
     }
 
     /// Build a Doc for an attach tag: `{@attach expr}`
     fn build_attach_tag_doc(&self, tag: &internal::AttachTag) -> Doc {
-        let mut parts = vec![doc::text("{@attach ")];
+        self.build_braced_expression_doc(
+            "{@attach ",
+            &tag.expression,
+            tag.span.start + 9, // after `{@attach `
+            tag.span.end,
+        )
+    }
 
-        // Leading comments (between `{@attach ` and expression)
-        let expr_start = tag.expression.span().start;
-        for comment in tsv_lang::comments_in_range(self.comments, tag.span.start + 9, expr_start) {
+    /// Build a Doc for a braced expression with comments: `prefix expr }`
+    ///
+    /// Handles leading/trailing comments between the prefix/suffix and expression.
+    fn build_braced_expression_doc(
+        &self,
+        prefix: &'static str,
+        expr: &tsv_ts::ast::internal::Expression,
+        comment_start: u32,
+        span_end: u32,
+    ) -> Doc {
+        let mut parts = vec![doc::text(prefix)];
+
+        // Leading comments (between prefix and expression)
+        let expr_start = expr.span().start;
+        for comment in tsv_lang::comments_in_range(self.comments, comment_start, expr_start) {
             parts.push(Self::build_leading_js_comment_doc(comment));
         }
 
         // Expression doc with any nested comments
-        let expr_doc = tsv_ts::build_expression_doc_isolated_with_comments(
-            &tag.expression,
+        let expr_doc = tsv_ts::build_expression_doc_with_comments(
+            expr,
             self.source,
             Rc::clone(&self.interner),
             &self.config,
@@ -217,8 +233,8 @@ impl<'a> Printer<'a> {
         parts.push(expr_doc);
 
         // Trailing comments (between expression and `}`)
-        let expr_end = tag.expression.span().end;
-        for comment in tsv_lang::comments_in_range(self.comments, expr_end, tag.span.end - 1) {
+        let expr_end = expr.span().end;
+        for comment in tsv_lang::comments_in_range(self.comments, expr_end, span_end - 1) {
             parts.push(Self::build_trailing_js_comment_doc(comment));
         }
 
@@ -245,9 +261,11 @@ impl<'a> Printer<'a> {
         let mut parts = vec![doc::text("bind:"), doc::text_owned(d.name.clone())];
         // Only include expression if not shorthand
         if !self.is_identifier_with_name(&d.expression, &d.name) {
-            parts.extend(
-                self.build_expression_doc_parts_with_span(&d.expression, d.expression_tag_span),
-            );
+            // bind: uses {getter, setter} syntax where SequenceExpression is bare (no parens)
+            parts.extend(self.build_expression_doc_parts_with_span_for_bind(
+                &d.expression,
+                d.expression_tag_span,
+            ));
         }
         doc::concat(parts)
     }
@@ -302,7 +320,7 @@ impl<'a> Printer<'a> {
         ];
         parts.extend(self.build_modifiers_doc(&d.modifiers));
         if let Some(expr) = &d.expression {
-            parts.extend(self.build_expression_doc_parts(expr));
+            parts.extend(self.build_expression_doc_parts_with_span(expr, d.expression_tag_span));
         }
         doc::concat(parts)
     }
@@ -311,7 +329,7 @@ impl<'a> Printer<'a> {
     fn build_animate_directive_doc(&self, d: &internal::AnimateDirective) -> Doc {
         let mut parts = vec![doc::text("animate:"), doc::text_owned(d.name.clone())];
         if let Some(expr) = &d.expression {
-            parts.extend(self.build_expression_doc_parts(expr));
+            parts.extend(self.build_expression_doc_parts_with_span(expr, d.expression_tag_span));
         }
         doc::concat(parts)
     }
@@ -320,7 +338,7 @@ impl<'a> Printer<'a> {
     fn build_let_directive_doc(&self, d: &internal::LetDirective) -> Doc {
         let mut parts = vec![doc::text("let:"), doc::text_owned(d.name.clone())];
         if let Some(expr) = &d.expression {
-            parts.extend(self.build_expression_doc_parts(expr));
+            parts.extend(self.build_expression_doc_parts_with_span(expr, d.expression_tag_span));
         }
         doc::concat(parts)
     }
@@ -337,48 +355,156 @@ impl<'a> Printer<'a> {
             .collect()
     }
 
-    /// Build Doc parts for an expression: `={expr}`
-    fn build_expression_doc_parts(&self, expr: &tsv_ts::ast::internal::Expression) -> Vec<Doc> {
-        self.build_expression_doc_parts_with_span(expr, None)
-    }
-
     /// Build Doc parts for an expression with optional span for comment lookup: `={expr}`
+    ///
+    /// When the expression is too long, uses block structure:
+    /// - Flat: `={expr}`
+    /// - Broken: `={\n\t\texpr\n\t}`
+    ///
+    /// For binary expressions, uses continuation indent when broken:
+    /// - Flat: `={a && b && c}`
+    /// - Broken: `={\n\t\ta &&\n\t\t\tb &&\n\t\t\tc\n\t}`
     fn build_expression_doc_parts_with_span(
         &self,
         expr: &tsv_ts::ast::internal::Expression,
         tag_span: Option<tsv_lang::Span>,
     ) -> Vec<Doc> {
-        let mut parts = vec![doc::text("={")];
-
-        // Add leading comments if we have the tag span
+        // Collect leading comments
+        let mut leading_comments = Vec::new();
         if let Some(span) = tag_span {
             let expr_start = expr.span().start;
             for comment in tsv_lang::comments_in_range(self.comments, span.start + 1, expr_start) {
-                parts.push(Self::build_leading_js_comment_doc(comment));
+                leading_comments.push(Self::build_leading_js_comment_doc(comment));
             }
         }
 
-        // Use isolated context since the braces provide grouping (no extra parens for sequences)
-        // Pass comments so nested comments (in call args, binary expressions) are preserved
-        let expr_doc = tsv_ts::build_expression_doc_isolated_with_comments(
-            expr,
-            self.source,
-            Rc::clone(&self.interner),
-            &self.config,
-            self.comments,
-        );
-        parts.push(expr_doc);
+        // Build the expression doc
+        // For binary expressions, use the version with continuation indent
+        let expr_doc =
+            if let tsv_ts::ast::internal::Expression::BinaryExpression(_) = expr {
+                // Binary expressions need continuation indent in attribute context:
+                // first &&
+                //   second &&
+                //   third
+                tsv_ts::build_expression_doc_with_continuation_indent(
+                    expr,
+                    self.source,
+                    Rc::clone(&self.interner),
+                    &self.config,
+                    self.comments,
+                )
+            } else {
+                // Other expressions use normal context
+                tsv_ts::build_expression_doc_with_comments(
+                    expr,
+                    self.source,
+                    Rc::clone(&self.interner),
+                    &self.config,
+                    self.comments,
+                )
+            };
 
-        // Add trailing comments if we have the tag span
+        // Collect trailing comments
+        let mut trailing_comments = Vec::new();
         if let Some(span) = tag_span {
             let expr_end = expr.span().end;
             for comment in tsv_lang::comments_in_range(self.comments, expr_end, span.end - 1) {
-                parts.push(Self::build_trailing_js_comment_doc(comment));
+                trailing_comments.push(Self::build_trailing_js_comment_doc(comment));
             }
         }
 
-        parts.push(doc::text("}"));
-        parts
+        // Build the expression content (leading comments + expr + trailing comments)
+        let mut expr_content = leading_comments;
+        expr_content.push(expr_doc);
+        expr_content.extend(trailing_comments);
+
+        // For expressions with internal group structure, keep them hugged with the braces.
+        // Prettier lets their internal structure handle wrapping.
+        //
+        // Arrow functions:
+        //   Flat: ={() => fn()}
+        //   Broken: ={(() =>\n\t\tfn())}
+        //
+        // Object literals (e.g., transition:fade={{...}}):
+        //   Flat: ={{duration: 300, delay: 100}}
+        //   Broken: ={{\n\t\tduration: 300,\n\t\tdelay: 100,\n\t}}
+        //   Note: ={{ stays together, object properties wrap internally
+        //
+        // Ternary expressions:
+        //   Flat: ={cond ? a : b}
+        //   Broken: ={cond\n\t\t? aLong\n\t\t: bLong}
+        //
+        // Call expressions:
+        //   Flat: ={fn(a, b, c)}
+        //   Broken: ={fn(\n\t\ta,\n\t\tb,\n\t\tc,\n\t)}
+        //
+        // For other expressions, use block structure when broken:
+        //   Flat: ={expr}
+        //   Broken: ={\n\t\texpr\n\t}
+        let is_hugged = matches!(
+            expr,
+            tsv_ts::ast::internal::Expression::ArrowFunctionExpression(_)
+                | tsv_ts::ast::internal::Expression::FunctionExpression(_)
+                | tsv_ts::ast::internal::Expression::ObjectExpression(_)
+                | tsv_ts::ast::internal::Expression::ConditionalExpression(_)
+                | tsv_ts::ast::internal::Expression::CallExpression(_)
+                | tsv_ts::ast::internal::Expression::NewExpression(_)
+                | tsv_ts::ast::internal::Expression::ArrayExpression(_)
+        );
+
+        let inner = if is_hugged {
+            // Hugged: the expression's internal doc handles wrapping
+            doc::concat(vec![
+                doc::text("{"),
+                doc::concat(expr_content),
+                doc::text("}"),
+            ])
+        } else {
+            // Block structure for other expressions
+            doc::group(doc::concat(vec![
+                doc::text("{"),
+                doc::indent(doc::concat(vec![
+                    doc::softline(),
+                    doc::concat(expr_content),
+                ])),
+                doc::softline(),
+                doc::text("}"),
+            ]))
+        };
+
+        vec![doc::text("="), inner]
+    }
+
+    /// Build Doc parts for bind directive expressions: `={expr}`
+    ///
+    /// Same as `build_expression_doc_parts_with_span` but handles the special
+    /// `bind:prop={getter, setter}` syntax where SequenceExpression is printed
+    /// without parentheses (the "function bindings" syntax in Svelte 5.9+).
+    fn build_expression_doc_parts_with_span_for_bind(
+        &self,
+        expr: &tsv_ts::ast::internal::Expression,
+        tag_span: Option<tsv_lang::Span>,
+    ) -> Vec<Doc> {
+        // For SequenceExpression, use the bare (no parens) version for getter/setter syntax
+        if let tsv_ts::ast::internal::Expression::SequenceExpression(seq) = expr {
+            let mut parts = Vec::new();
+            for (i, sub_expr) in seq.expressions.iter().enumerate() {
+                if i > 0 {
+                    parts.push(doc::text(", "));
+                }
+                parts.push(tsv_ts::build_expression_doc_with_comments(
+                    sub_expr,
+                    self.source,
+                    Rc::clone(&self.interner),
+                    &self.config,
+                    self.comments,
+                ));
+            }
+            return vec![doc::text("={"), doc::concat(parts), doc::text("}")];
+        }
+
+        // For other expressions, use the standard method
+        self.build_expression_doc_parts_with_span(expr, tag_span)
     }
 
     /// Build a Doc for an expression tag: `{expr}`
@@ -393,9 +519,9 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Use isolated context since the braces provide grouping (no extra parens for sequences)
+        // Build the expression doc
         // Pass comments so nested comments (in call args, binary expressions) are preserved
-        let expr_doc = tsv_ts::build_expression_doc_isolated_with_comments(
+        let expr_doc = tsv_ts::build_expression_doc_with_comments(
             &tag.expression,
             self.source,
             Rc::clone(&self.interner),

@@ -1,8 +1,11 @@
 <style>
 	div {
-		/* Short font-family list - stays inline (under 100 chars) */
-		font-family: 'Arial', 'Helvetica', sans-serif;
-		/* Long font-family list - exceeds 100 chars, tests comma-separated wrapping */
+		/* 100 chars - stays inline (at boundary) */
+		font-family: 'font00000000000000000', 'font1111111111111', 'font22222222222', 'font33333333333';
+		/* 101 chars - value wraps to next line */
+		font-family:
+			'font00000000000000000', 'font11111111111111', 'font22222222222', 'font33333333333';
+		/* Long font-family list - exceeds 100 chars per line, tests comma-separated wrapping */
 		font-family:
 			'f000000000', 'f111111111', 'f222222222', 'f333333333', 'f444444444', 'f555555555',
 			'f666666666', 'f777777777', 'f888888888', 'f999999999';

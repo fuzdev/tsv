@@ -3,15 +3,15 @@
 		display: block;
 	}
 
-	:host(.active) {
+	:host(.class1) {
 		color: red;
 	}
 
-	:host-context(.dark) {
+	:host-context(.class2) {
 		background: black;
 	}
 
-	:host-context(.dark) .inner {
+	:host-context(.class2) .class3 {
 		color: white;
 	}
 </style>

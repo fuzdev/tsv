@@ -22,10 +22,24 @@ use tsv_lang::SymbolResolver;
 enum SpecialAttrWrapMode {
     /// All attrs + children + closing fit on one line
     Inline,
-    /// Attrs fit at column 0 but not with children; attrs inline, `>` on new line
+    /// Attrs + content fit but final `>` must split: `attrs>{content}</tag\n>`
+    SplitFinalBracket,
+    /// Attrs fit at column 0 but not with children; attrs inline, `>` on new line indented
     Hug,
     /// Attrs don't fit at column 0; each attr on its own line
     FullMultiline,
+    /// Attrs have internal breaks (e.g., arrow body wraps); `>` hugs with `}`, but use split closing
+    InternalBreak,
+}
+
+impl SpecialAttrWrapMode {
+    /// Returns true if attrs stay on the same line (not wrapped to separate lines)
+    fn is_attrs_inline(self) -> bool {
+        matches!(
+            self,
+            Self::Inline | Self::SplitFinalBracket | Self::InternalBreak
+        )
+    }
 }
 
 impl<'a> Printer<'a> {
@@ -57,13 +71,14 @@ impl<'a> Printer<'a> {
             && self.was_self_closing(element);
 
         // Attributes
-        let attrs_multiline = self.print_attributes_with_wrapping(
+        let attr_wrap_mode = self.print_attributes_with_wrapping(
             element,
             &tag_name,
             is_void,
             is_self_closing_component,
             is_block,
         );
+        let attrs_multiline = !attr_wrap_mode.is_attrs_inline();
 
         // Handle void elements
         if is_void {
@@ -98,7 +113,7 @@ impl<'a> Printer<'a> {
                 preserves_ws,
                 hug_start,
                 hug_end,
-                attrs_multiline,
+                attr_wrap_mode,
             );
         } else {
             self.print_normal_mode(
@@ -107,7 +122,7 @@ impl<'a> Printer<'a> {
                 is_block,
                 preserves_ws,
                 multiline,
-                attrs_multiline,
+                attr_wrap_mode,
             );
         }
     }
@@ -150,12 +165,20 @@ impl<'a> Printer<'a> {
         self.write(">");
     }
 
-    /// Write a split closing tag: `</tag\n>` (for hug end pattern)
+    /// Write a split closing tag: `</tag\n\t>` (for hug end pattern, with indent)
     fn write_split_closing_tag(&mut self, tag_name: &str) {
         self.write("</");
         self.write(tag_name);
         self.write("\n");
         self.write_indent();
+        self.write(">");
+    }
+
+    /// Write a split closing tag with bracket at column 0: `</tag\n>`
+    fn write_split_closing_bracket(&mut self, tag_name: &str) {
+        self.write("</");
+        self.write(tag_name);
+        self.write("\n");
         self.write(">");
     }
 
@@ -171,8 +194,9 @@ impl<'a> Printer<'a> {
         preserves_ws: bool,
         hug_start: bool,
         hug_end: bool,
-        attrs_multiline: bool,
+        attr_wrap_mode: SpecialAttrWrapMode,
     ) {
+        let attrs_multiline = attr_wrap_mode != SpecialAttrWrapMode::Inline;
         match (hug_start, hug_end) {
             (true, true) => self.print_hug_both(tag_name, element, preserves_ws, attrs_multiline),
             (true, false) => self.print_hug_start_only(tag_name, element, preserves_ws),
@@ -297,10 +321,76 @@ impl<'a> Printer<'a> {
         is_block: bool,
         preserves_ws: bool,
         multiline: bool,
-        attrs_multiline: bool,
+        attr_wrap_mode: SpecialAttrWrapMode,
     ) {
+        let attrs_multiline = attr_wrap_mode != SpecialAttrWrapMode::Inline;
+
         // Check for special "wrapped attrs + single block child" pattern
         let is_wrapped_single_block = self.is_wrapped_single_block(element, attrs_multiline);
+
+        // Check if element has non-whitespace content
+        let has_content = element.fragment.nodes.iter().any(|node| {
+            !matches!(node, FragmentNode::Text(t) if t.raw.is_whitespace_only())
+        });
+
+        // Split closing tag rule: inline elements with content + multiline attrs
+        // Block elements never use split closing (Prettier behavior)
+        let use_split_closing = !is_block && has_content && attrs_multiline;
+
+        // Handle SplitFinalBracket: attrs + content inline, only final > splits
+        // Pattern: `<tag attrs>{content}</tag\n>`
+        if attr_wrap_mode == SpecialAttrWrapMode::SplitFinalBracket && !multiline {
+            self.write(">");
+            self.print_compact_children(&element.fragment, is_block, preserves_ws);
+            self.write_split_closing_bracket(tag_name);
+            return;
+        }
+
+        // Handle InternalBreak: attrs have internal breaks (like arrow body wraps)
+        // Opening > hugs with closing }
+        if attr_wrap_mode == SpecialAttrWrapMode::InternalBreak && !multiline {
+            self.write(">");
+            self.print_compact_children(&element.fragment, is_block, preserves_ws);
+            if use_split_closing {
+                self.write_split_closing_bracket(tag_name);
+            } else {
+                self.write_closing_tag(tag_name);
+            }
+            return;
+        }
+
+        // Handle Hug/FullMultiline with non-multiline children
+        if (attr_wrap_mode == SpecialAttrWrapMode::Hug
+            || attr_wrap_mode == SpecialAttrWrapMode::FullMultiline)
+            && !multiline
+            && !is_wrapped_single_block
+        {
+            if use_split_closing {
+                // Inline element with content: > indented, content inline, split closing
+                self.write("\n");
+                self.indent_level += 1;
+                self.write_indent();
+                self.write(">");
+
+                self.print_compact_children(&element.fragment, is_block, preserves_ws);
+
+                self.write("</");
+                self.write(tag_name);
+                self.indent_level -= 1;
+                self.write("\n");
+                self.write(">");
+            } else {
+                // Block element or empty: > at base indent, normal closing
+                self.write("\n");
+                self.write_indent();
+                self.write(">");
+
+                self.print_compact_children(&element.fragment, is_block, preserves_ws);
+
+                self.write_closing_tag(tag_name);
+            }
+            return;
+        }
 
         // Opening >
         if attrs_multiline && !is_wrapped_single_block {
@@ -319,8 +409,26 @@ impl<'a> Printer<'a> {
             self.print_multiline_children(&element.fragment.nodes, preserves_ws);
             self.write_closing_tag(tag_name);
         } else {
-            self.print_compact_children(&element.fragment, is_block, preserves_ws);
-            self.write_closing_tag(tag_name);
+            // Check if total element width exceeds print_width - if so, use block mode
+            // This handles cases like: <p>{long expression}</p> → <p>\n\t{expr}\n</p>
+            // Skip for whitespace-preserving elements (pre, textarea, etc.)
+            let use_width_block_mode = !preserves_ws
+                && self.should_use_width_block_mode(&element.fragment.nodes, tag_name);
+
+            if use_width_block_mode {
+                // Element block mode: content on indented line
+                self.write("\n");
+                self.indent_level += 1;
+                self.write_indent();
+                self.print_compact_children(&element.fragment, is_block, preserves_ws);
+                self.indent_level -= 1;
+                self.write("\n");
+                self.write_indent();
+                self.write_closing_tag(tag_name);
+            } else {
+                self.print_compact_children(&element.fragment, is_block, preserves_ws);
+                self.write_closing_tag(tag_name);
+            }
         }
     }
 
@@ -388,6 +496,139 @@ impl<'a> Printer<'a> {
     // =========================================================================
     // Formatting decision helpers
     // =========================================================================
+
+    /// Determine if element should use width-based block mode.
+    ///
+    /// This handles cases where the total element width exceeds print_width,
+    /// even though the content structure would normally be compact.
+    /// Example: `<p>{long expression}</p>` → `<p>\n\t{expr}\n</p>`
+    ///
+    /// Only applies to simple content (text, expressions, comments).
+    /// Elements with nested child elements use other formatting rules.
+    fn should_use_width_block_mode(&self, nodes: &[FragmentNode], tag_name: &str) -> bool {
+        // Only apply to simple content - if there are nested elements, let
+        // the regular formatting rules handle it
+        let has_nested_elements = nodes.iter().any(|n| {
+            matches!(
+                n,
+                FragmentNode::Element(_)
+                    | FragmentNode::SpecialElement(_)
+                    | FragmentNode::IfBlock(_)
+                    | FragmentNode::EachBlock(_)
+                    | FragmentNode::AwaitBlock(_)
+                    | FragmentNode::KeyBlock(_)
+                    | FragmentNode::SnippetBlock(_)
+            )
+        });
+        if has_nested_elements {
+            return false;
+        }
+
+        // Calculate content's flat length
+        // If content has internal breaks (groups that don't fit flat), element needs block mode
+        let Some(content_len) = self.calculate_inline_content_length(nodes) else {
+            return true;
+        };
+
+        // Empty content doesn't need block mode
+        if content_len == 0 {
+            return false;
+        }
+
+        // Calculate remaining width needed: content + </tag>
+        // We already wrote `<tag attrs>` so use current column position
+        let current_col = self.buffer.current_column(self.config.tab_width);
+        let closing_tag_len = 2 + tag_name.len() + 1; // `</tag>`
+        let total_len = current_col + content_len + closing_tag_len;
+
+        // Use block mode if total exceeds print_width
+        total_len > self.config.print_width
+    }
+
+    /// Calculate the length of inline content for fits calculation.
+    /// Returns Some(length) for content that can be measured inline, None for complex content
+    /// that would cause multiline formatting anyway.
+    fn calculate_inline_content_length(&self, nodes: &[FragmentNode]) -> Option<usize> {
+        use tsv_lang::doc;
+
+        // Skip leading/trailing whitespace-only text nodes
+        let non_ws_nodes: Vec<_> = nodes
+            .iter()
+            .filter(|n| !matches!(n, FragmentNode::Text(t) if t.raw.is_whitespace_only()))
+            .collect();
+
+        if non_ws_nodes.is_empty() {
+            return Some(0);
+        }
+
+        // Build docs for content that may have internal breaks (expressions),
+        // and track fixed-width content separately for efficiency
+        let mut content_docs = Vec::new();
+        let mut fixed_width = 0usize;
+        let len = non_ws_nodes.len();
+
+        for (i, node) in non_ws_nodes.iter().enumerate() {
+            let is_first = i == 0;
+            let is_last = i == len - 1;
+
+            match node {
+                FragmentNode::Text(text) => {
+                    // Text content - normalize whitespace (collapse newlines to spaces)
+                    let normalized = self.normalize_whitespace(&text.raw, false);
+                    // Only trim leading/trailing at boundaries, preserve interior spaces
+                    let processed = if is_first && is_last {
+                        normalized.trim()
+                    } else if is_first {
+                        normalized.trim_start()
+                    } else if is_last {
+                        normalized.trim_end()
+                    } else {
+                        &normalized
+                    };
+                    fixed_width += processed.len();
+                }
+                FragmentNode::ExpressionTag(tag) => {
+                    // Expression tags may have internal breaks - build doc for accurate measurement
+                    content_docs.push(self.build_expression_tag_doc(tag));
+                }
+                FragmentNode::Comment(comment) => {
+                    // HTML comment: <!--content-->
+                    fixed_width += 7 + comment.content.len(); // "<!--" + "-->"
+                }
+                // Inline tags - use source span width
+                FragmentNode::HtmlTag(tag) => {
+                    fixed_width += (tag.span.end - tag.span.start) as usize;
+                }
+                FragmentNode::RenderTag(tag) => {
+                    fixed_width += (tag.span.end - tag.span.start) as usize;
+                }
+                FragmentNode::DebugTag(tag) => {
+                    fixed_width += (tag.span.end - tag.span.start) as usize;
+                }
+                FragmentNode::ConstTag(tag) => {
+                    fixed_width += (tag.span.end - tag.span.start) as usize;
+                }
+                // Block structures (if, each, etc.) cause multiline - can't estimate
+                _ => return None,
+            }
+        }
+
+        // If we have expression tags, render their docs to check for breaks
+        if !content_docs.is_empty() {
+            let content_doc = doc::concat(content_docs);
+            let interner = self.interner.borrow();
+            let rendered = doc::print_doc_resolved(&content_doc, &self.config, &*interner);
+
+            // If expressions have newlines, content has internal breaks
+            if rendered.contains('\n') {
+                return None;
+            }
+
+            Some(fixed_width + rendered.len())
+        } else {
+            Some(fixed_width)
+        }
+    }
 
     /// Determine if element children should be formatted multiline
     pub fn should_format_multiline(
@@ -488,15 +729,47 @@ impl<'a> Printer<'a> {
         })
     }
 
-    /// Check if element has "opening newline only" pattern
+    /// Check if element has "opening newline only" pattern.
+    ///
+    /// This pattern applies when:
+    /// - First node is whitespace-only with newline (indentation)
+    /// - Last node is not text (no trailing whitespace)
+    /// - No block children (if/each/await/key blocks)
+    ///
+    /// Block children require proper newlines between them, which print_split_closing
+    /// doesn't provide. For those cases, use standard multiline formatting instead.
     fn has_opening_newline_only(&self, nodes: &[FragmentNode]) -> bool {
         if nodes.is_empty() {
             return false;
         }
+
+        // Must have opening newline
         let has_opening_nl = matches!(nodes.first(), Some(FragmentNode::Text(t))
             if t.raw.is_whitespace_only() && t.raw.contains('\n'));
+        if !has_opening_nl {
+            return false;
+        }
+
+        // Must not have trailing text
         let has_trailing_text = matches!(nodes.last(), Some(FragmentNode::Text(_)));
-        has_opening_nl && !has_trailing_text
+        if has_trailing_text {
+            return false;
+        }
+
+        // Must not have any block children (if/each/await/key blocks, etc.)
+        // print_split_closing doesn't add newlines between children, so block
+        // children would be merged incorrectly. Use standard multiline formatting instead.
+        let has_block_children = nodes.iter().any(|n| {
+            matches!(
+                n,
+                FragmentNode::IfBlock(_)
+                    | FragmentNode::EachBlock(_)
+                    | FragmentNode::AwaitBlock(_)
+                    | FragmentNode::KeyBlock(_)
+                    | FragmentNode::SnippetBlock(_)
+            )
+        });
+        !has_block_children
     }
 
     /// Check if element should hug the start
@@ -632,8 +905,10 @@ impl<'a> Printer<'a> {
                 self.write_indent();
                 self.write(">");
             }
-            SpecialAttrWrapMode::Inline => {
-                // Inline: just `>`
+            SpecialAttrWrapMode::Inline
+            | SpecialAttrWrapMode::SplitFinalBracket
+            | SpecialAttrWrapMode::InternalBreak => {
+                // Inline/SplitFinalBracket/InternalBreak: just `>`
                 self.write(">");
             }
         }
@@ -676,8 +951,10 @@ impl<'a> Printer<'a> {
                 // Full multiline: use standard multiline children formatting
                 self.print_multiline_children(&element.fragment.nodes, false);
             }
-            SpecialAttrWrapMode::Inline => {
-                // Inline: use standard formatting rules
+            SpecialAttrWrapMode::Inline
+            | SpecialAttrWrapMode::SplitFinalBracket
+            | SpecialAttrWrapMode::InternalBreak => {
+                // Inline/SplitFinalBracket/InternalBreak: use standard formatting rules
                 let has_block_children = element.fragment.nodes.iter().any(|n| {
                     matches!(n, FragmentNode::Element(el) if self.is_block_element(el))
                         || matches!(n, FragmentNode::SnippetBlock(_))
@@ -709,7 +986,7 @@ impl<'a> Printer<'a> {
         // Closing tag based on wrap mode
         match wrap_mode {
             SpecialAttrWrapMode::Hug => {
-                // Hug mode: split closing tag (</tag\n>)
+                // Hug mode: split closing tag (</tag\n>) with indent adjustment
                 self.write("</");
                 self.write(tag_name);
                 self.indent_level -= 1;
@@ -717,11 +994,14 @@ impl<'a> Printer<'a> {
                 self.write_indent();
                 self.write(">");
             }
-            SpecialAttrWrapMode::FullMultiline | SpecialAttrWrapMode::Inline => {
-                // Regular closing tag
-                self.write("</");
-                self.write(tag_name);
-                self.write(">");
+            SpecialAttrWrapMode::SplitFinalBracket => {
+                // Split just the final > (no indent adjustment needed)
+                self.write_split_closing_bracket(tag_name);
+            }
+            SpecialAttrWrapMode::FullMultiline
+            | SpecialAttrWrapMode::Inline
+            | SpecialAttrWrapMode::InternalBreak => {
+                self.write_closing_tag(tag_name);
             }
         }
     }
@@ -806,7 +1086,7 @@ impl<'a> Printer<'a> {
 
         // Helper to build `this={expr}` doc
         let build_this_expr_doc = |expr: &Expression| {
-            let expr_doc = tsv_ts::build_expression_doc_isolated_with_comments(
+            let expr_doc = tsv_ts::build_expression_doc_with_comments(
                 expr,
                 self.source,
                 Rc::clone(&self.interner),
@@ -1000,11 +1280,11 @@ impl<'a> Printer<'a> {
                         doc::indent(doc::group(doc::concat(attr_docs_for_hug))),
                     ]));
 
-                    // Use print_width - 1 to match prettier's strict check
-                    // (a line of exactly print_width chars doesn't "fit" for hug mode purposes)
+                    // Check if attr line fits at column 0 (full print_width)
+                    // Prettier uses hug mode when attrs exactly equal print_width
                     let attr_line_fits = doc::fits_resolved(
                         &attr_line_doc,
-                        self.config.print_width.saturating_sub(1),
+                        self.config.print_width,
                         doc::Mode::Flat,
                         &self.config,
                         &*interner,
@@ -1058,11 +1338,11 @@ impl<'a> Printer<'a> {
         is_void: bool,
         is_self_closing_component: bool,
         is_block: bool,
-    ) -> bool {
+    ) -> SpecialAttrWrapMode {
         use tsv_lang::doc;
 
         if element.attributes.is_empty() {
-            return false;
+            return SpecialAttrWrapMode::Inline;
         }
 
         // Build doc for all attributes
@@ -1081,8 +1361,15 @@ impl<'a> Printer<'a> {
         // but becomes a newline in break mode
         attr_docs.push(doc::dedent(doc::softline()));
 
-        // If any attribute will break, force multiline formatting
+        // If any attribute will break (contains hardlines like block bodies),
+        // force multiline formatting with each attr on its own line.
         if any_attr_will_break {
+            // Check if this is an inline element with content
+            let has_content = element.fragment.nodes.iter().any(|node| {
+                !matches!(node, FragmentNode::Text(t) if t.raw.is_whitespace_only())
+            });
+            let use_internal_break = !is_block && has_content;
+
             self.indent_level += 1;
             for attr in &element.attributes {
                 self.write("\n");
@@ -1090,17 +1377,37 @@ impl<'a> Printer<'a> {
                 self.print_attribute_node(attr);
             }
             self.indent_level -= 1;
-            return true;
+
+            // For inline elements with content, > hugs with } (InternalBreak)
+            // For block elements or empty inline, > on own line (FullMultiline)
+            return if use_internal_break {
+                SpecialAttrWrapMode::InternalBreak
+            } else {
+                SpecialAttrWrapMode::FullMultiline
+            };
         }
 
         // Build complete doc for fits calculation
-        // Use the correct closing based on element type
+        // For block elements with content, children go multiline anyway, so only check opening tag
+        // For inline elements, include content estimate for accurate line length checking
         let closing = if is_void || is_self_closing_component {
             " />".to_string()
         } else if element.fragment.nodes.is_empty() {
             format!("></{tag_name}>")
-        } else {
+        } else if is_block {
+            // Block elements: children go multiline, just check opening tag
             ">".to_string()
+        } else {
+            // Inline elements with content: include content in fits check
+            let content_estimate = self.calculate_inline_content_length(&element.fragment.nodes);
+            if let Some(len) = content_estimate {
+                // Content is simple enough to estimate - include it
+                format!(">{}</{tag_name}>", "x".repeat(len))
+            } else {
+                // Complex inline content - use minimal closing
+                // Hug mode check will catch cases where content doesn't fit
+                format!("></{tag_name}>")
+            }
         };
 
         // Check if hug mode is possible (only for inline elements that aren't self-closing)
@@ -1144,12 +1451,150 @@ impl<'a> Printer<'a> {
                 self.write(" ");
                 self.print_attribute_node(attr);
             }
-            false
-        } else {
-            match attr_docs_for_hug {
-                None => {
-                    // Self-closing/void/block elements: no hug mode, go straight to full multiline
-                    drop(interner);
+            return SpecialAttrWrapMode::Inline;
+        }
+
+        // For inline elements with content, check SplitFinalBracket mode
+        // This is when `<tag attrs>{content}</tag` fits but final `>` doesn't
+        if can_use_hug_mode
+            && !element.fragment.nodes.is_empty()
+            && let Some(content_len) =
+                self.calculate_inline_content_length(&element.fragment.nodes)
+        {
+            let closing_no_bracket = format!(">{}</{tag_name}", "x".repeat(content_len));
+
+            let doc_no_final_bracket = doc::group(doc::concat(vec![
+                doc::text("<"),
+                doc::text_owned(tag_name.to_string()),
+                doc::indent(doc::group(doc::concat(
+                    attr_docs_for_hug.clone().unwrap_or_default(),
+                ))),
+                doc::text_owned(closing_no_bracket),
+            ]));
+
+            let fits_without_bracket = doc::fits_resolved(
+                &doc_no_final_bracket,
+                available_width,
+                doc::Mode::Flat,
+                &self.config,
+                &*interner,
+            );
+
+            if fits_without_bracket {
+                // Mode 2: Split only the final >
+                drop(interner);
+                for attr in &element.attributes {
+                    self.write(" ");
+                    self.print_attribute_node(attr);
+                }
+                return SpecialAttrWrapMode::SplitFinalBracket;
+            }
+        }
+
+        // Continue with hug mode checks
+        match attr_docs_for_hug {
+            None => {
+                // Self-closing/void/block elements: no hug mode, go straight to full multiline
+                drop(interner);
+                self.indent_level += 1;
+                for attr in &element.attributes {
+                    self.write("\n");
+                    self.write_indent();
+                    self.print_attribute_node(attr);
+                }
+                self.indent_level -= 1;
+                SpecialAttrWrapMode::FullMultiline
+            }
+            Some(attr_docs_for_hug) => {
+                // Inline elements: check if attr line (without >) fits at column 0
+                // If so, use hug mode. Otherwise, full multiline.
+
+                // Check if the attr content ALONE would break:
+                // Build doc for just the attrs (without tag name)
+                let attrs_only: Vec<_> = attr_docs_for_hug
+                    .iter()
+                    .skip(1) // Skip the first doc::line()
+                    .cloned()
+                    .collect();
+                let attrs_only_doc = doc::group(doc::concat(attrs_only));
+
+                // Build doc for attr line only (tag + attrs, no closing >)
+                let attr_line_doc = doc::group(doc::concat(vec![
+                    doc::text("<"),
+                    doc::text_owned(tag_name.to_string()),
+                    doc::indent(doc::group(doc::concat(attr_docs_for_hug))),
+                ]));
+
+                let attr_line_fits_flat = doc::fits_resolved(
+                    &attr_line_doc,
+                    self.config.print_width,
+                    doc::Mode::Flat,
+                    &self.config,
+                    &*interner,
+                );
+                // Check attrs at the indent level where they'll be printed (current + 1)
+                // This accounts for the indentation when attrs go to separate lines
+                let attrs_indent = (self.indent_level + 1) * self.config.tab_width;
+                let attrs_available_width =
+                    self.config.print_width.saturating_sub(attrs_indent);
+
+                let attrs_fit_flat = doc::fits_resolved(
+                    &attrs_only_doc,
+                    attrs_available_width,
+                    doc::Mode::Flat,
+                    &self.config,
+                    &*interner,
+                );
+
+                // For InternalBreak mode (where > hugs with }), we need to check
+                // that the wrapped content fits with room to spare. If any line
+                // is exactly at print_width, Prettier uses FullMultiline instead.
+                // Render the attr to actually measure max line width.
+                let attrs_have_internal_breaks = if attrs_fit_flat {
+                    false
+                } else {
+                    // Render the attr doc and check max line width
+                    let rendered = doc::print_doc_with_indent_resolved(
+                        &attrs_only_doc,
+                        &self.config,
+                        0,                     // start at column 0
+                        self.indent_level + 1, // attrs are at this indent
+                        &*interner,
+                    );
+                    let max_line_width = rendered
+                        .lines()
+                        .map(|line| {
+                            // Calculate visual width considering tabs
+                            let mut width = 0;
+                            for c in line.chars() {
+                                if c == '\t' {
+                                    width += self.config.tab_width;
+                                } else {
+                                    width += 1;
+                                }
+                            }
+                            width
+                        })
+                        .max()
+                        .unwrap_or(0);
+                    // Only use InternalBreak if ALL lines are < print_width
+                    // (not <=, since exactly at boundary means no room for >)
+                    max_line_width < self.config.print_width
+                };
+
+                drop(interner);
+
+                if attr_line_fits_flat {
+                    // Mode 2: Hug mode - attr line fits at column 0 but total doesn't with indent
+                    // Keep attrs on one line, just put > on new line
+                    for attr in &element.attributes {
+                        self.write(" ");
+                        self.print_attribute_node(attr);
+                    }
+                    SpecialAttrWrapMode::Hug
+                } else if attrs_have_internal_breaks {
+                    // Mode 4: InternalBreak - attrs have internal breaks (e.g., arrow body wraps)
+                    // Attrs on separate lines, but > hugs with closing }
                     self.indent_level += 1;
                     for attr in &element.attributes {
                         self.write("\n");
@@ -1157,48 +1602,18 @@ impl<'a> Printer<'a> {
                         self.print_attribute_node(attr);
                     }
                     self.indent_level -= 1;
-                    true
-                }
-                Some(attr_docs_for_hug) => {
-                    // Inline elements: check if attr line (without >) fits at column 0
-                    // If so, use hug mode. Otherwise, full multiline.
-
-                    // Build doc for attr line only (tag + attrs, no closing >)
-                    let attr_line_doc = doc::group(doc::concat(vec![
-                        doc::text("<"),
-                        doc::text_owned(tag_name.to_string()),
-                        doc::indent(doc::group(doc::concat(attr_docs_for_hug))),
-                    ]));
-
-                    let attr_line_fits = doc::fits_resolved(
-                        &attr_line_doc,
-                        self.config.print_width,
-                        doc::Mode::Flat,
-                        &self.config,
-                        &*interner,
-                    );
-
-                    drop(interner);
-
-                    if attr_line_fits {
-                        // Mode 2: Hug mode - attr line fits at column 0 but total doesn't with indent
-                        // Keep attrs on one line, just put > on new line
-                        for attr in &element.attributes {
-                            self.write(" ");
-                            self.print_attribute_node(attr);
-                        }
-                    } else {
-                        // Mode 3: Full multiline - attr line exceeds at column 0
-                        // Each attr on its own line
-                        self.indent_level += 1;
-                        for attr in &element.attributes {
-                            self.write("\n");
-                            self.write_indent();
-                            self.print_attribute_node(attr);
-                        }
-                        self.indent_level -= 1;
+                    SpecialAttrWrapMode::InternalBreak
+                } else {
+                    // Mode 3: Full multiline - attr line exceeds at column 0 even in break mode
+                    // Each attr on its own line
+                    self.indent_level += 1;
+                    for attr in &element.attributes {
+                        self.write("\n");
+                        self.write_indent();
+                        self.print_attribute_node(attr);
                     }
-                    true
+                    self.indent_level -= 1;
+                    SpecialAttrWrapMode::FullMultiline
                 }
             }
         }

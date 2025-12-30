@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 109,
+	"end": 99,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,12 +13,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 108,
+		"end": 98,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 99,
+			"end": 89,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -145,7 +145,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 32,
-					"end": 64,
+					"end": 62,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -153,14 +153,14 @@
 						},
 						"end": {
 							"line": 3,
-							"column": 33
+							"column": 31
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 38,
-							"end": 63,
+							"end": 61,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -168,7 +168,7 @@
 								},
 								"end": {
 									"line": 3,
-									"column": 32
+									"column": 30
 								}
 							},
 							"id": {
@@ -190,7 +190,7 @@
 							"init": {
 								"type": "ConditionalExpression",
 								"start": 42,
-								"end": 63,
+								"end": 61,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -198,13 +198,13 @@
 									},
 									"end": {
 										"line": 3,
-										"column": 32
+										"column": 30
 									}
 								},
 								"test": {
 									"type": "Identifier",
 									"start": 42,
-									"end": 48,
+									"end": 46,
 									"loc": {
 										"start": {
 											"line": 3,
@@ -212,23 +212,23 @@
 										},
 										"end": {
 											"line": 3,
-											"column": 17
+											"column": 15
 										}
 									},
-									"name": "active"
+									"name": "cond"
 								},
 								"consequent": {
 									"type": "Literal",
-									"start": 51,
-									"end": 56,
+									"start": 49,
+									"end": 54,
 									"loc": {
 										"start": {
 											"line": 3,
-											"column": 20
+											"column": 18
 										},
 										"end": {
 											"line": 3,
-											"column": 25
+											"column": 23
 										}
 									},
 									"value": "yes",
@@ -236,16 +236,16 @@
 								},
 								"alternate": {
 									"type": "Literal",
-									"start": 59,
-									"end": 63,
+									"start": 57,
+									"end": 61,
 									"loc": {
 										"start": {
 											"line": 3,
-											"column": 28
+											"column": 26
 										},
 										"end": {
 											"line": 3,
-											"column": 32
+											"column": 30
 										}
 									},
 									"value": "no",
@@ -258,8 +258,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 66,
-					"end": 98,
+					"start": 64,
+					"end": 88,
 					"loc": {
 						"start": {
 							"line": 4,
@@ -267,14 +267,14 @@
 						},
 						"end": {
 							"line": 4,
-							"column": 33
+							"column": 25
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 72,
-							"end": 97,
+							"start": 70,
+							"end": 87,
 							"loc": {
 								"start": {
 									"line": 4,
@@ -282,13 +282,13 @@
 								},
 								"end": {
 									"line": 4,
-									"column": 32
+									"column": 24
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 72,
-								"end": 73,
+								"start": 70,
+								"end": 71,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -303,8 +303,8 @@
 							},
 							"init": {
 								"type": "ConditionalExpression",
-								"start": 76,
-								"end": 97,
+								"start": 74,
+								"end": 87,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -312,13 +312,13 @@
 									},
 									"end": {
 										"line": 4,
-										"column": 32
+										"column": 24
 									}
 								},
 								"test": {
 									"type": "BinaryExpression",
-									"start": 76,
-									"end": 85,
+									"start": 74,
+									"end": 79,
 									"loc": {
 										"start": {
 											"line": 4,
@@ -326,13 +326,13 @@
 										},
 										"end": {
 											"line": 4,
-											"column": 20
+											"column": 16
 										}
 									},
 									"left": {
 										"type": "Identifier",
-										"start": 76,
-										"end": 81,
+										"start": 74,
+										"end": 75,
 										"loc": {
 											"start": {
 												"line": 4,
@@ -340,24 +340,24 @@
 											},
 											"end": {
 												"line": 4,
-												"column": 16
+												"column": 12
 											}
 										},
-										"name": "count"
+										"name": "n"
 									},
 									"operator": ">",
 									"right": {
 										"type": "Literal",
-										"start": 84,
-										"end": 85,
+										"start": 78,
+										"end": 79,
 										"loc": {
 											"start": {
 												"line": 4,
-												"column": 19
+												"column": 15
 											},
 											"end": {
 												"line": 4,
-												"column": 20
+												"column": 16
 											}
 										},
 										"value": 0,
@@ -366,8 +366,24 @@
 								},
 								"consequent": {
 									"type": "Identifier",
-									"start": 88,
-									"end": 93,
+									"start": 82,
+									"end": 83,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 19
+										},
+										"end": {
+											"line": 4,
+											"column": 20
+										}
+									},
+									"name": "n"
+								},
+								"alternate": {
+									"type": "Literal",
+									"start": 86,
+									"end": 87,
 									"loc": {
 										"start": {
 											"line": 4,
@@ -375,23 +391,7 @@
 										},
 										"end": {
 											"line": 4,
-											"column": 28
-										}
-									},
-									"name": "count"
-								},
-								"alternate": {
-									"type": "Literal",
-									"start": 96,
-									"end": 97,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 31
-										},
-										"end": {
-											"line": 4,
-											"column": 32
+											"column": 24
 										}
 									},
 									"value": 0,

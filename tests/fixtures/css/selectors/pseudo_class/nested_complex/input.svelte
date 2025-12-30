@@ -9,7 +9,7 @@
 	}
 
 	/* All features combined */
-	div:is(.class1, .class2):has(> span):not(.disabled) {
+	div:is(.class1, .class2):has(> span):not(.class3) {
 		padding: 10px;
 	}
 

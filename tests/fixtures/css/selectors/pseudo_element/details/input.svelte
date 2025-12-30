@@ -20,7 +20,7 @@
 	}
 
 	/* Column with class selector */
-	.content::column {
+	.class1::column {
 		border-right: 1px solid gray;
 	}
 </style>

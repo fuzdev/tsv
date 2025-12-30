@@ -40,9 +40,9 @@
 	td:nth-last-col(-n+2){font-weight:bold;}
 
 	/* Combined with other selectors */
-	table.data td:nth-col(1){text-align:left;}
+	table.class1 td:nth-col(1){text-align:left;}
 
-	tr.highlight td:nth-col(2n){background:yellow;}
+	tr.class2 td:nth-col(2n){background:yellow;}
 
 	/* With type selectors */
 	th:nth-col(1){text-align:left;}

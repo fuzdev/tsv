@@ -44,7 +44,7 @@
 
 		(  ) :
 		  void ;
-		count :
+		n :
 		  number ;
 	}
 

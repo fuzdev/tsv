@@ -27,12 +27,12 @@
 	}
 
 	/* Combined with selectors */
-	.scrollable::scroll-marker {
+	.class1::scroll-marker {
 		color: red;
 	}
 
 	/* With pseudo-class */
-	.scrollable:hover::scroll-marker-group {
+	.class1:hover::scroll-marker-group {
 		opacity: 0.8;
 	}
 </style>

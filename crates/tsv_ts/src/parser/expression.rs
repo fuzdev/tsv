@@ -16,6 +16,10 @@ use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 use super::Parser;
+use super::scan::{
+    is_identifier_start, parse_number_literal, skip_block_comment, skip_identifier,
+    skip_line_comment, skip_string_literal, skip_whitespace, skip_whitespace_and_comments,
+};
 
 // =============================================================================
 // Binding Power Constants for Pratt Parser
@@ -36,117 +40,8 @@ const BP_YIELD: u8 = 3;
 const BP_UNARY: u8 = 29;
 
 // =============================================================================
-// Lookahead Scanning Helpers
+// Expression-Specific Lookahead Helpers
 // =============================================================================
-
-/// Skip ASCII whitespace characters in a byte slice, returning new position
-#[inline]
-fn skip_whitespace(bytes: &[u8], mut pos: usize) -> usize {
-    while pos < bytes.len() && matches!(bytes[pos], b' ' | b'\t' | b'\n' | b'\r') {
-        pos += 1;
-    }
-    pos
-}
-
-/// Skip a line comment (// ...), returning position after the newline
-/// Assumes `pos` is at the first `/`
-#[inline]
-fn skip_line_comment(bytes: &[u8], mut pos: usize) -> usize {
-    // Skip //
-    pos += 2;
-    // Read until newline or EOF
-    while pos < bytes.len() && bytes[pos] != b'\n' && bytes[pos] != b'\r' {
-        pos += 1;
-    }
-    pos
-}
-
-/// Skip a block comment (/* ... */), returning position after the closing */
-/// Assumes `pos` is at the first `/`
-#[inline]
-fn skip_block_comment(bytes: &[u8], mut pos: usize) -> usize {
-    // Skip /*
-    pos += 2;
-    while pos + 1 < bytes.len() {
-        if bytes[pos] == b'*' && bytes[pos + 1] == b'/' {
-            return pos + 2;
-        }
-        pos += 1;
-    }
-    pos
-}
-
-/// Skip whitespace and comments, returning new position
-#[inline]
-fn skip_whitespace_and_comments(bytes: &[u8], mut pos: usize) -> usize {
-    loop {
-        let start = pos;
-        pos = skip_whitespace(bytes, pos);
-        // Check for comments
-        if pos + 1 < bytes.len() && bytes[pos] == b'/' {
-            if bytes[pos + 1] == b'/' {
-                pos = skip_line_comment(bytes, pos);
-            } else if bytes[pos + 1] == b'*' {
-                pos = skip_block_comment(bytes, pos);
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
-        // Continue loop to handle whitespace after comment
-        if pos == start {
-            break;
-        }
-    }
-    pos
-}
-
-/// Check if a byte can start an identifier (letter, underscore, dollar sign, or non-ASCII)
-///
-/// Non-ASCII bytes (> 127) are included for lookahead purposes - they're part of multi-byte
-/// UTF-8 sequences that are likely unicode identifier chars. The actual lexer uses proper
-/// `is_xid_start` from `unicode_ident` crate for validation.
-#[inline]
-fn is_identifier_start(b: u8) -> bool {
-    b.is_ascii_alphabetic() || b == b'_' || b == b'$' || b > 127
-}
-
-/// Check if a byte can continue an identifier (alphanumeric, underscore, dollar sign, or non-ASCII)
-///
-/// Non-ASCII bytes (> 127) are included for lookahead purposes - they're part of multi-byte
-/// UTF-8 sequences that are likely unicode identifier chars. The actual lexer uses proper
-/// `is_xid_continue` from `unicode_ident` crate for validation.
-#[inline]
-fn is_identifier_continue(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b > 127
-}
-
-/// Skip an identifier, returning position after the identifier
-/// Assumes `pos` is at the start of an identifier
-#[inline]
-fn skip_identifier(bytes: &[u8], mut pos: usize) -> usize {
-    while pos < bytes.len() && is_identifier_continue(bytes[pos]) {
-        pos += 1;
-    }
-    pos
-}
-
-/// Skip a string literal (single or double quoted), returning position after closing quote
-/// Assumes `pos` is at the opening quote character
-#[inline]
-fn skip_string_literal(bytes: &[u8], mut pos: usize) -> usize {
-    let quote = bytes[pos];
-    pos += 1;
-    while pos < bytes.len() && bytes[pos] != quote {
-        if bytes[pos] == b'\\' && pos + 1 < bytes.len() {
-            pos += 1; // skip escaped char
-        }
-        pos += 1;
-    }
-    // Return position AFTER the closing quote (if found)
-    if pos < bytes.len() { pos + 1 } else { pos }
-}
 
 /// Scan through parentheses and check if followed by `=>`
 ///
@@ -353,6 +248,117 @@ fn scan_angle_brackets(bytes: &[u8], pos: usize) -> usize {
     if depth == 0 { pos } else { 0 }
 }
 
+/// Check if `(` at `pos` starts a function type (not a grouped expression).
+///
+/// Function type patterns:
+/// - `(identifier:` or `(identifier?:` → parameter with type annotation
+/// - `() =>` → no-params function type
+///
+/// Non-function patterns:
+/// - `(expr)` → grouped expression
+/// - `(a, b)` → tuple or call args (without type annotations)
+fn is_function_type_start(bytes: &[u8], pos: usize) -> bool {
+    if pos >= bytes.len() || bytes[pos] != b'(' {
+        return false;
+    }
+
+    let after_paren = skip_whitespace(bytes, pos + 1);
+    if after_paren >= bytes.len() {
+        return false;
+    }
+
+    // `(identifier:` or `(identifier?:` → function type parameter
+    if is_identifier_start(bytes[after_paren]) {
+        let after_id = skip_whitespace(bytes, skip_identifier(bytes, after_paren));
+        if after_id < bytes.len() && matches!(bytes[after_id], b':' | b'?') {
+            return true;
+        }
+    }
+
+    // `() =>` → no-params function type
+    if bytes[after_paren] == b')' {
+        let after_close = skip_whitespace(bytes, after_paren + 1);
+        if after_close + 1 < bytes.len()
+            && bytes[after_close] == b'='
+            && bytes[after_close + 1] == b'>'
+        {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Scan for closing `>` at angle depth 0, tracking all delimiter depths.
+///
+/// Used by `is_type_arguments_start` to verify that a sequence like `<T | U>`
+/// or `<T, (x: number) => void>` is actually type arguments (finds matching `>`).
+///
+/// Returns `true` if a matching `>` is found before hitting an unbalanced
+/// `)`, `]`, `}`, or `;` at depth 0.
+///
+/// Assumes scanning starts AFTER the initial `<` (i.e., angle_depth starts at 1).
+fn scan_for_closing_angle_bracket(bytes: &[u8], mut pos: usize) -> bool {
+    let mut angle_depth: i32 = 1;
+    let mut paren_depth: i32 = 0;
+    let mut bracket_depth: i32 = 0;
+    let mut brace_depth: i32 = 0;
+
+    while pos < bytes.len() {
+        match bytes[pos] {
+            b'<' => angle_depth += 1,
+            b'>' if paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 => {
+                angle_depth -= 1;
+                if angle_depth == 0 {
+                    return true;
+                }
+            }
+            b'(' => paren_depth += 1,
+            b')' => {
+                paren_depth -= 1;
+                if paren_depth < 0 {
+                    return false; // Unbalanced - hit call/group end
+                }
+            }
+            b'[' => bracket_depth += 1,
+            b']' => {
+                bracket_depth -= 1;
+                if bracket_depth < 0 {
+                    return false; // Unbalanced - hit array end
+                }
+            }
+            b'{' => brace_depth += 1,
+            b'}' => {
+                brace_depth -= 1;
+                if brace_depth < 0 {
+                    return false; // Unbalanced - hit block end
+                }
+            }
+            b';' => return false, // Statement end
+            // Skip comments to avoid false matches on `>` inside them
+            b'/' if pos + 1 < bytes.len() => match bytes[pos + 1] {
+                b'/' => {
+                    pos = skip_line_comment(bytes, pos);
+                    continue;
+                }
+                b'*' => {
+                    pos = skip_block_comment(bytes, pos);
+                    continue;
+                }
+                _ => {}
+            },
+            // Skip string literals to avoid false matches on `>` inside them
+            b'"' | b'\'' | b'`' => {
+                pos = skip_string_literal(bytes, pos);
+                continue;
+            }
+            _ => {}
+        }
+        pos += 1;
+    }
+    false
+}
+
 /// Extract content from template head: `content${ → "content"
 #[inline]
 fn extract_template_head_content(raw: &str) -> &str {
@@ -377,42 +383,6 @@ fn extract_template_tail_content(raw: &str) -> &str {
 #[inline]
 fn extract_template_simple_content(raw: &str) -> &str {
     extract_template_tail_content(raw) // Same logic: strip first and last char
-}
-
-/// Parse a JS number literal (hex, binary, octal, scientific, BigInt)
-/// Returns f64 (BigInt suffix 'n' is ignored for value, preserved in raw)
-///
-/// Note: Precision loss for large integers (>2^52) matches JS behavior.
-#[allow(clippy::cast_precision_loss)]
-pub(crate) fn parse_number_literal(raw: &str) -> Result<f64, std::num::ParseFloatError> {
-    // Remove numeric separators
-    let clean: String = raw.chars().filter(|&c| c != '_').collect();
-
-    // Strip BigInt suffix
-    let clean = clean.strip_suffix('n').unwrap_or(&clean);
-
-    if clean.len() >= 2 {
-        let prefix = &clean[..2];
-        let digits = &clean[2..];
-        match prefix {
-            "0x" | "0X" => {
-                // Hex: 0xff
-                return Ok(i64::from_str_radix(digits, 16).unwrap_or(0) as f64);
-            }
-            "0b" | "0B" => {
-                // Binary: 0b1010
-                return Ok(i64::from_str_radix(digits, 2).unwrap_or(0) as f64);
-            }
-            "0o" | "0O" => {
-                // Octal: 0o77
-                return Ok(i64::from_str_radix(digits, 8).unwrap_or(0) as f64);
-            }
-            _ => {}
-        }
-    }
-
-    // Regular decimal (including scientific notation)
-    clean.parse::<f64>()
 }
 
 /// Parsed expression with actual end position tracking
@@ -1450,6 +1420,11 @@ impl<'a> Parser<'a> {
     /// Check if current position starts type arguments: `<Type, ...>`
     ///
     /// Uses lookahead to distinguish from comparison operator.
+    /// Dispatches based on first token after `<`:
+    /// - Type keywords: `<string>`, `<never>`, etc.
+    /// - Identifiers: `<T>`, `<Ns.Type>`, `<T | U>`, `<T, U>`
+    /// - Function types: `<(x: T) => R>`, `<() => R>`
+    /// - Object/tuple/literal types: `<{ a: T }>`, `<[T, U]>`, `<"foo">`
     pub(super) fn is_type_arguments_start(&self) -> bool {
         let bytes = self.source.as_bytes();
         let start = self.current_start;
@@ -1459,152 +1434,125 @@ impl<'a> Parser<'a> {
             return false;
         }
 
-        let pos = skip_whitespace(bytes, start + 1);
+        // Skip whitespace AND comments after '<' - comments can appear before types
+        let pos = skip_whitespace_and_comments(bytes, start + 1);
         if pos >= bytes.len() {
             return false;
         }
 
-        // Check what comes after '<':
-        // - Type keywords (never, string, number, boolean, any, unknown, void, etc.)
-        // - Identifiers followed by valid type patterns
-        // - '(' for function types, '{' for object types, '[' for tuple types
-
-        // Check for type keywords - these are usually type arguments
-        // Exception: `this` followed by `.` is a member expression, not a type
-        // (e.g., `a < this.prop` is comparison, not `a<this.prop>` type instantiation)
-        if self.is_type_keyword_at(bytes, pos) {
-            // Special case for `this` - check if it's followed by `.` (member access)
-            if pos + 4 <= bytes.len() && &bytes[pos..pos + 4] == b"this" {
-                let after_this = skip_whitespace(bytes, pos + 4);
-                if after_this < bytes.len() && bytes[after_this] == b'.' {
-                    // `this.` is a member expression, not a type
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        // Check for identifier - could be type reference
-        if is_identifier_start(bytes[pos]) {
-            // Skip identifier and any qualified parts (e.g., Namespace.Type.SubType)
-            let mut pos = pos;
-            loop {
-                pos = skip_identifier(bytes, pos);
-                pos = skip_whitespace(bytes, pos);
-
-                // If followed by '.', continue scanning qualified name
-                if pos < bytes.len() && bytes[pos] == b'.' {
-                    pos += 1;
-                    pos = skip_whitespace(bytes, pos);
-                    // Must be followed by another identifier
-                    if pos < bytes.len() && is_identifier_start(bytes[pos]) {
-                        continue;
-                    }
-                }
-                break;
-            }
-
-            // After full qualified name, valid type argument patterns:
-            // - '>' closes single type arg: f<T> or f<Ns.T>
-            // - ',' separates type args: f<T, U> (but careful with qualified names!)
-            // - 'extends' is constraint: f<T extends U>
-            // - '[' starts indexed type: f<T[K]> (but NOT array access like arr[0])
-            // - '<' starts nested type args: f<T<U>>
-            // NOT '.' - we already consumed the full qualified name above
-            if pos < bytes.len() {
-                match bytes[pos] {
-                    b'>' | b'<' => return true,
-                    // For ',', scan ahead to verify this is type args:
-                    // `f<T, U>` or `f<Ns.T, U>` - find `>` → type args
-                    // `[a < b, c]` or `fn(a < b.c, d)` - find `]`/`)` → comparison
-                    b',' => {
-                        let mut scan = skip_whitespace(bytes, pos + 1);
-                        let mut depth = 1; // We're inside one `<`
-                        while scan < bytes.len() {
-                            match bytes[scan] {
-                                b'<' => depth += 1,
-                                b'>' => {
-                                    depth -= 1;
-                                    if depth == 0 {
-                                        return true; // Found matching `>`
-                                    }
-                                }
-                                b']' | b')' | b';' => {
-                                    return false; // Hit array/call end or statement end
-                                }
-                                _ => {}
-                            }
-                            scan += 1;
-                        }
+        // Dispatch based on first token after '<'
+        match bytes[pos] {
+            // Type keywords: string, number, boolean, never, any, unknown, void, etc.
+            _ if self.is_type_keyword_at(bytes, pos) => {
+                // Exception: `this.` is member access, not type
+                if bytes[pos..].starts_with(b"this") {
+                    let after_this = skip_whitespace(bytes, pos + 4);
+                    if after_this < bytes.len() && bytes[after_this] == b'.' {
                         return false;
                     }
-                    b'[' => {
-                        // Indexed type `T[K]` vs array access `arr[0]` or `arr[i]`
-                        let inside = skip_whitespace(bytes, pos + 1);
-                        if inside >= bytes.len() {
-                            return false;
-                        }
-                        // `arr[0]` - numeric index is definitely array access
-                        if bytes[inside].is_ascii_digit() {
-                            return false;
-                        }
-                        // `arr[i]` or `T[K]` - check what follows `]`
-                        if is_identifier_start(bytes[inside]) {
-                            let after_id = skip_identifier(bytes, inside);
-                            let after_bracket = skip_whitespace(bytes, after_id);
-                            if after_bracket < bytes.len() && bytes[after_bracket] == b']' {
-                                let after_close = skip_whitespace(bytes, after_bracket + 1);
-                                // Type args: `T[K]>` or `T[K],`
-                                // Array access: `arr[i] <` or `arr[i];`
-                                if after_close < bytes.len()
-                                    && matches!(bytes[after_close], b'>' | b',')
-                                {
-                                    return true;
-                                }
-                                return false;
-                            }
-                        }
-                        // Other patterns (string keys, etc.) - assume type args
-                        return true;
-                    }
-                    b'e' if pos + 7 <= bytes.len() && &bytes[pos..pos + 7] == b"extends" => {
-                        return true;
-                    }
-                    _ => {}
                 }
+                true
+            }
+
+            // Identifier: type reference like `<T>` or `<Ns.Type>`
+            _ if is_identifier_start(bytes[pos]) => {
+                self.check_identifier_type_arg_pattern(bytes, pos)
+            }
+
+            // Function type: `<(x: T) => R>` or `<() => R>`
+            b'(' => is_function_type_start(bytes, pos),
+
+            // Object type `{`, tuple type `[`, string literal types
+            b'{' | b'[' | b'\'' | b'"' => true,
+
+            // Not a recognized type argument start
+            _ => false,
+        }
+    }
+
+    /// Check if identifier at `pos` is followed by valid type argument patterns.
+    ///
+    /// After scanning the full qualified name (e.g., `Ns.Type.Sub`), checks what follows:
+    /// - `>` or `<`: definitely type args
+    /// - `,`, `|`, `&`: scan for matching `>` to confirm type args
+    /// - `[`: disambiguate indexed type vs array access
+    /// - `extends`: type constraint
+    fn check_identifier_type_arg_pattern(&self, bytes: &[u8], pos: usize) -> bool {
+        // Skip identifier and any qualified parts (e.g., Namespace.Type.SubType)
+        let mut pos = pos;
+        loop {
+            pos = skip_identifier(bytes, pos);
+            pos = skip_whitespace_and_comments(bytes, pos);
+
+            // If followed by '.', continue scanning qualified name
+            if pos < bytes.len() && bytes[pos] == b'.' {
+                pos += 1;
+                pos = skip_whitespace_and_comments(bytes, pos);
+                if pos < bytes.len() && is_identifier_start(bytes[pos]) {
+                    continue;
+                }
+            }
+            break;
+        }
+
+        if pos >= bytes.len() {
+            return false;
+        }
+
+        match bytes[pos] {
+            // Definitely type args
+            b'>' | b'<' => true,
+
+            // `||` and `&&` are logical operators, NOT type operators
+            b'|' | b'&' if pos + 1 < bytes.len() && bytes[pos + 1] == bytes[pos] => false,
+
+            // Union/intersection/comma: scan for matching `>` to confirm
+            b',' | b'|' | b'&' => {
+                scan_for_closing_angle_bracket(bytes, skip_whitespace_and_comments(bytes, pos + 1))
+            }
+
+            // Indexed type vs array access: `T[K]` vs `arr[0]`
+            b'[' => self.check_indexed_type_pattern(bytes, pos),
+
+            // Type constraint: `T extends U`
+            b'e' if bytes[pos..].starts_with(b"extends") => true,
+
+            _ => false,
+        }
+    }
+
+    /// Check if `[` at `pos` starts an indexed type (not array access).
+    ///
+    /// - `arr[0]`: numeric index → array access
+    /// - `arr[i]` followed by `<` or `;`: array access
+    /// - `T[K]` followed by `>` or `,`: indexed type
+    fn check_indexed_type_pattern(&self, bytes: &[u8], pos: usize) -> bool {
+        let inside = skip_whitespace(bytes, pos + 1);
+        if inside >= bytes.len() {
+            return false;
+        }
+
+        // Numeric index is definitely array access
+        if bytes[inside].is_ascii_digit() {
+            return false;
+        }
+
+        // Identifier index: check what follows `]`
+        if is_identifier_start(bytes[inside]) {
+            let after_id = skip_identifier(bytes, inside);
+            let after_bracket = skip_whitespace(bytes, after_id);
+            if after_bracket < bytes.len() && bytes[after_bracket] == b']' {
+                let after_close = skip_whitespace(bytes, after_bracket + 1);
+                // Type args end with `>` or continue with `,`
+                if after_close < bytes.len() && matches!(bytes[after_close], b'>' | b',') {
+                    return true;
+                }
+                return false;
             }
         }
 
-        // Check for type literal patterns
-        // Note: We're conservative - bare numbers like `a < 10` are comparisons
-        if bytes[pos] == b'(' {
-            // '(' is ambiguous - could be function type `(arg: T) => R` or expression `(x + y)`
-            // Only treat as type args if it looks like a function type
-            let after_paren = skip_whitespace(bytes, pos + 1);
-            if after_paren >= bytes.len() {
-                return false;
-            }
-            // `(identifier:` or `(identifier?:` → function type parameter
-            if is_identifier_start(bytes[after_paren]) {
-                let after_id = skip_whitespace(bytes, skip_identifier(bytes, after_paren));
-                if after_id < bytes.len() && matches!(bytes[after_id], b':' | b'?') {
-                    return true;
-                }
-            }
-            // `() =>` → no-params function type
-            if bytes[after_paren] == b')' {
-                let after_close = skip_whitespace(bytes, after_paren + 1);
-                if after_close + 1 < bytes.len()
-                    && bytes[after_close] == b'='
-                    && bytes[after_close + 1] == b'>'
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-        // Other type literal starters: object `{`, tuple `[`, string literals
-        matches!(bytes[pos], b'{' | b'[' | b'\'' | b'"')
+        // Other patterns (string keys, complex expressions) - assume type args
+        true
     }
 
     /// Check if position points to a TypeScript type keyword
@@ -1817,8 +1765,12 @@ impl<'a> Parser<'a> {
                     false,
                     false,
                 )
-            } else if self.check(&TokenKind::ParenOpen) || is_async_method || is_generator {
-                // Method shorthand: `{ foo() {} }`, `{ async foo() {} }`, or `{ *gen() {} }`
+            } else if self.check(&TokenKind::ParenOpen)
+                || self.check(&TokenKind::LessThan)
+                || is_async_method
+                || is_generator
+            {
+                // Method shorthand: `{ foo() {} }`, `{ foo<T>() {} }`, `{ async foo() {} }`, or `{ *gen() {} }`
                 let func_expr =
                     self.parse_method_body(key.span().start, is_async_method, is_generator)?;
                 (
@@ -2507,6 +2459,13 @@ impl<'a> Parser<'a> {
         is_async: bool,
         is_generator: bool,
     ) -> Result<FunctionExpression, ParseError> {
+        // Parse optional type parameters: <T, U>
+        let type_parameters = if self.check(&TokenKind::LessThan) {
+            Some(self.parse_type_parameters()?)
+        } else {
+            None
+        };
+
         // Capture paren position before parsing params (for comment detection)
         let (params_start, _) = self.current_pos();
         let params = self.parse_parameter_list()?;
@@ -2522,8 +2481,8 @@ impl<'a> Parser<'a> {
         let end = body.span.end;
 
         Ok(FunctionExpression {
-            id: None,              // Method shorthand has no function name
-            type_parameters: None, // TODO: parse type parameters for object method shorthand
+            id: None, // Method shorthand has no function name
+            type_parameters,
             params,
             return_type,
             body,

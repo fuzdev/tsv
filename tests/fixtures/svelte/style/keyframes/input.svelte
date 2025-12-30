@@ -8,7 +8,7 @@
 		}
 	}
 
-	.animated {
+	.class1 {
 		animation: fade 1s;
 	}
 </style>

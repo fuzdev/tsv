@@ -1,10 +1,14 @@
 /**
  * TSV Benchmark Suite
  *
- * Compares parsing and formatting performance across three implementations:
+ * Compares parsing and formatting performance across implementations.
+ * All benchmarks are single-threaded: files processed sequentially, no parallelism.
+ *
+ * Implementations:
  * - Canonical: prettier + svelte/compiler (JavaScript baseline)
  * - Native: tsv via FFI (Rust, maximum performance)
  * - WASM: tsv compiled to WebAssembly (portable, near-native)
+ * - Alternatives: oxc-parser, oxfmt, biome-wasm (for comparison)
  *
  * Run with: deno task bench:run
  *
@@ -35,7 +39,6 @@ import {
 	getBenchmarkTasks,
 	getFormattersForValidation,
 	initImplementations,
-	VERSIONS,
 } from './lib/implementations.ts';
 import {
 	generateCorpusInfo,
@@ -618,16 +621,17 @@ if (args.json) {
 	console.log(generateSummaryReport(allGroupResults, LANGUAGES));
 
 	const altVersions = getAlternativeVersions(impls);
+	const v = impls.versions.canonical;
 	console.log(
 		generateCorpusInfo(
 			{ svelte: svelteFiles.length, typescript: tsFiles.length, css: cssFiles.length },
 			isLimited ? totalFileCounts : undefined,
 			{
-				svelte: VERSIONS.svelte,
-				acorn: VERSIONS.acorn,
-				acornTs: VERSIONS['@sveltejs/acorn-typescript'],
-				prettier: VERSIONS.prettier,
-				prettierSvelte: VERSIONS['prettier-plugin-svelte'],
+				svelte: v.svelte,
+				acorn: v.acorn,
+				acornTs: v['@sveltejs/acorn-typescript'],
+				prettier: v.prettier,
+				prettierSvelte: v['prettier-plugin-svelte'],
 				...altVersions,
 			},
 		),

@@ -1,11 +1,11 @@
 <script>
 // Array as last arg
-assert .  deepStrictEqual (  linesCollection . getViewLinesIndentGuidesLongLongLongMethodName ( -1 ,  -1 )  ,  [ 1 ]  ) ;
-assert .  deepStrictEqual (  linesCollection . getViewLinesIndentGuidesLongLongLongMethodNam ( -1 ,  -1 )  ,  [ 1 ,  2 ]  ) ;
+a0000 .  b00000000000000 (  obj000000000000 . fn0000000000000000000000000000000000000000000 ( -1 ,  -1 )  ,  [ 1 ]  ) ;
+a0000 .  b00000000000000 (  obj000000000000 . fn000000000000000000000000000000000000000000 ( -1 ,  -1 )  ,  [ 1 ,  2 ]  ) ;
 
 // Array as first arg
-assert .  deepStrictEqual (  [ 1 ]  ,  linesCollection . getViewLinesIndentGuidesLongLongLongMethodName ( -1 ,  -1 )  ) ;
+a0000 .  b00000000000000 (  [ 1 ]  ,  obj000000000000 . fn0000000000000000000000000000000000000000000 ( -1 ,  -1 )  ) ;
 
 // Object mixed with array
-assert .  deepStrictEqual (  { a :  1 ,  b :  2 }  ,  linesCollection . getViewLinesIndentGuidesLongLongLongName ( -1 )  ) ;
+a0000 .  b00000000000000 (  { a :  1 ,  b :  2 }  ,  obj000000000000 . fn00000000000000000000000000000000000000 ( -1 )  ) ;
 </script>

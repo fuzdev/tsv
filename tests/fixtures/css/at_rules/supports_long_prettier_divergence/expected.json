@@ -1,0 +1,270 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 818,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 136,
+				"end": 263,
+				"name": "supports",
+				"prelude": "(display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and (flex: 1aa)",
+				"block": {
+					"type": "Block",
+					"start": 233,
+					"end": 263,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 237,
+								"end": 239,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 237,
+										"end": 239,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "a",
+														"start": 237,
+														"end": 239
+													}
+												],
+												"start": 237,
+												"end": 239
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 240,
+								"end": 260,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 245,
+										"end": 255,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 237,
+							"end": 260
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 316,
+				"end": 447,
+				"name": "supports",
+				"prelude": "(display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and\n\t\t(flex: 1aaa)",
+				"block": {
+					"type": "Block",
+					"start": 416,
+					"end": 447,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 420,
+								"end": 422,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 420,
+										"end": 422,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "b",
+														"start": 420,
+														"end": 422
+													}
+												],
+												"start": 420,
+												"end": 422
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 423,
+								"end": 444,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 428,
+										"end": 439,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 420,
+							"end": 444
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 500,
+				"end": 633,
+				"name": "supports",
+				"prelude": "(display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and\n\t\t(flex: 1aaaa)",
+				"block": {
+					"type": "Block",
+					"start": 601,
+					"end": 633,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 605,
+								"end": 607,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 605,
+										"end": 607,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "c",
+														"start": 605,
+														"end": 607
+													}
+												],
+												"start": 605,
+												"end": 607
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 608,
+								"end": 630,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 613,
+										"end": 625,
+										"property": "color",
+										"value": "green"
+									}
+								]
+							},
+							"start": 605,
+							"end": 630
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 674,
+				"end": 809,
+				"name": "supports",
+				"prelude": "(display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and\n\t\t(flex: 1aaaaa)",
+				"block": {
+					"type": "Block",
+					"start": 776,
+					"end": 809,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 780,
+								"end": 782,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 780,
+										"end": 782,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "d",
+														"start": 780,
+														"end": 782
+													}
+												],
+												"start": 780,
+												"end": 782
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 783,
+								"end": 806,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 788,
+										"end": 801,
+										"property": "color",
+										"value": "yellow"
+									}
+								]
+							},
+							"start": 780,
+							"end": 806
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 810,
+			"styles": "\n\t/* @supports wraps at 101 chars (we wrap at >100, Prettier waits until >102) */\n\n\t/* 100 chars - stays inline (both agree) */\n\t@supports (display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and (flex: 1aa) {\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* 101 chars - we wrap, Prettier stays inline */\n\t@supports (display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and\n\t\t(flex: 1aaa) {\n\t\t.b {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n\n\t/* 102 chars - we wrap, Prettier stays inline */\n\t@supports (display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and\n\t\t(flex: 1aaaa) {\n\t\t.c {\n\t\t\tcolor: green;\n\t\t}\n\t}\n\n\t/* 103 chars - wraps (both agree) */\n\t@supports (display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and\n\t\t(flex: 1aaaaa) {\n\t\t.d {\n\t\t\tcolor: yellow;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 819,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -80,16 +80,26 @@ impl<'a> Printer<'a> {
         match value {
             CssValue::CommaSeparated { values, .. } => {
                 let doc = self.build_list_doc(values, ", ");
-                let context_offset = property.len() + 4; // property + `: ` + `; `
-                let exceeds_width =
-                    !doc::fits_at(&doc, &self.config, self.indent_level, 0, context_offset);
+                let context_offset = property.len() + 3; // property + ": " + ";"
+                let exceeds_width = !doc::fits_at(
+                    &doc,
+                    &self.config,
+                    self.effective_indent(),
+                    0,
+                    context_offset,
+                );
                 (exceeds_width, true)
             }
             CssValue::List { values, .. } => {
                 let doc = self.build_list_doc(values, " ");
-                let context_offset = property.len() + 4; // property + `: ` + `; `
-                let exceeds_width =
-                    !doc::fits_at(&doc, &self.config, self.indent_level, 0, context_offset);
+                let context_offset = property.len() + 3; // property + ": " + ";"
+                let exceeds_width = !doc::fits_at(
+                    &doc,
+                    &self.config,
+                    self.effective_indent(),
+                    0,
+                    context_offset,
+                );
                 (exceeds_width, false)
             }
             _ => (false, false),
@@ -104,7 +114,7 @@ impl<'a> Printer<'a> {
         doc::join(docs, separator)
     }
 
-    /// Check if a function should wrap its arguments
+    /// Check if a function should wrap its arguments (with explicit context offset)
     ///
     /// Prettier wraps ALL multi-arg functions when they exceed print width.
     /// This includes: gradients, polygon(), calc(), clamp(), min(), max(), var(), rgb(), hsl(), etc.
@@ -112,7 +122,14 @@ impl<'a> Printer<'a> {
     /// Single-arg functions (like url('long-path')) never wrap because they have no
     /// natural break points. But functions with space-separated args (like drop-shadow)
     /// CAN wrap because they have multiple logical items.
-    pub(super) fn should_wrap_function(&self, name: &str, args: &[CssValue]) -> bool {
+    ///
+    /// `context_offset` should be: property.len() + 3 (for ": " + ";")
+    fn should_wrap_function_with_offset(
+        &self,
+        name: &str,
+        args: &[CssValue],
+        context_offset: usize,
+    ) -> bool {
         // Check if we have wrappable content:
         // 1. Multiple comma-separated args (linear-gradient, rgb, etc.)
         // 2. Single arg that is a List with multiple space-separated items (drop-shadow)
@@ -126,16 +143,23 @@ impl<'a> Printer<'a> {
 
         // Build doc representation and check if it fits
         let func_doc = self.build_function_doc(name, args);
-
-        // Reserve space for property name (~15 chars estimate) + `: ` + `; `
-        let context_offset = 15 + 4;
         !doc::fits_at(
             &func_doc,
             &self.config,
-            self.indent_level,
+            self.effective_indent(),
             0,
             context_offset,
         )
+    }
+
+    /// Check if a function should wrap its arguments (using estimated context)
+    ///
+    /// Used for nested functions where the exact context isn't known.
+    /// Uses a conservative estimate of 15 chars for property name.
+    pub(super) fn should_wrap_function(&self, name: &str, args: &[CssValue]) -> bool {
+        // Estimate: 15 chars property name + ": " (2) + ";" (1) = 18
+        // Use 19 to be slightly conservative for nested contexts
+        self.should_wrap_function_with_offset(name, args, 19)
     }
 
     /// Build a doc representation of a function for width checking
@@ -158,38 +182,12 @@ impl<'a> Printer<'a> {
 
     /// Build a doc representation of a value for width checking
     ///
-    /// This recursively builds doc representations of nested values.
+    /// Uses normalized string representation (via value_to_string) to ensure
+    /// consistent width calculation regardless of source formatting.
     fn build_value_doc(&self, value: &CssValue) -> doc::Doc {
-        match value {
-            CssValue::Identifier { name, .. } => doc::text_owned(name.to_string()),
-            CssValue::String { content, .. } => {
-                // Approximate string width (with quotes)
-                doc::text_owned(format!("'{content}'"))
-            }
-            CssValue::Dimension { span, .. } => {
-                let raw = span.extract(self.source);
-                doc::text_owned(raw.to_string())
-            }
-            CssValue::Color { span, .. } => {
-                let raw = span.extract(self.source);
-                doc::text_owned(raw.to_string())
-            }
-            CssValue::Function { name, args, .. } => {
-                // Recursively build nested functions
-                let arg_docs: Vec<_> = args.iter().map(|arg| self.build_value_doc(arg)).collect();
-                let args_doc = doc::join(arg_docs, ", ");
-                let parens_doc = doc::parens(args_doc);
-                doc::concat(vec![doc::text_owned(name.to_string()), parens_doc])
-            }
-            CssValue::List { values, .. } => {
-                let docs: Vec<_> = values.iter().map(|v| self.build_value_doc(v)).collect();
-                doc::join_doc(docs, doc::text(" "))
-            }
-            CssValue::CommaSeparated { values, .. } => {
-                let docs: Vec<_> = values.iter().map(|v| self.build_value_doc(v)).collect();
-                doc::join_doc(docs, doc::text(", "))
-            }
-        }
+        // Use value_to_string which normalizes formatting (whitespace, quotes, etc.)
+        // This ensures width calculation is independent of source formatting
+        doc::text_owned(self.value_to_string(value))
     }
 
     /// Format a CSS declaration (property: value;)
@@ -278,6 +276,60 @@ impl<'a> Printer<'a> {
                 }
                 self.write(";\n");
             }
+        } else if let CssValue::Function { name, args, .. } = &decl.value {
+            // Top-level function: calculate proper context offset for wrapping decision
+            // Context = property + ": " + ";" = property.len() + 3
+            let context_offset = decl.property.len() + 3;
+            if self.should_wrap_function_with_offset(name, args, context_offset) {
+                // Wrapped: property: func(\n\targ1,\n\targ2\n);
+                self.write(": ");
+                self.write(name);
+                self.write("(\n");
+                self.indent_level += 1;
+                for (i, arg) in args.iter().enumerate() {
+                    self.write_indent();
+                    // Check if arg is a List that would exceed width - use continuation fill
+                    if let CssValue::List { values, .. } = arg
+                        && self.list_exceeds_width_in_wrapped_function(values)
+                    {
+                        // Use fill with continuation indent for long space-separated lists
+                        let fill_doc = self.build_space_fill_doc_with_continuation(values);
+                        self.write_doc(&fill_doc);
+                    } else {
+                        self.print_nested_value(arg);
+                    }
+                    if i < args.len() - 1 {
+                        self.write(",\n");
+                    }
+                }
+                self.indent_level -= 1;
+                self.write("\n");
+                self.write_indent();
+                self.write(")");
+            } else {
+                // Inline: property: func(arg1, arg2);
+                self.write(": ");
+                self.write(name);
+                self.write("(");
+                // WORKAROUND: url() data URIs contain commas that our parser incorrectly treats as
+                // argument separators. Use no space after commas to preserve data URI format.
+                let is_url = name == "url";
+                for (i, arg) in args.iter().enumerate() {
+                    if i > 0 {
+                        if is_url {
+                            self.write(",");
+                        } else {
+                            self.write(", ");
+                        }
+                    }
+                    self.print_nested_value(arg);
+                }
+                self.write(")");
+            }
+            if important {
+                self.write(" !important");
+            }
+            self.write(";\n");
         } else {
             // All other values: use standard formatting
             // Property with comment: `color /* comment */` → ` : ` → `color /* comment */ : `
@@ -389,12 +441,8 @@ impl<'a> Printer<'a> {
         self.write_doc(&fill_doc);
     }
 
-    /// Build a fill doc for space-separated values
-    ///
-    /// Creates a doc that packs values greedily:
-    /// - In flat mode: `item1 item2 item3`
-    /// - When broken: `item1 item2\n  item3 item4\n  item5`
-    fn build_space_fill_doc(&self, values: &[CssValue]) -> doc::Doc {
+    /// Build fill parts for space-separated values (shared helper)
+    fn build_space_fill_parts(&self, values: &[CssValue]) -> Vec<doc::Doc> {
         let mut parts = Vec::new();
         for (i, val) in values.iter().enumerate() {
             // Use value_to_string for source-fidelity formatting
@@ -404,12 +452,59 @@ impl<'a> Printer<'a> {
                 parts.push(doc::line());
             }
         }
+        parts
+    }
 
-        // Reserve 1 char for trailing semicolon to prevent fill from packing
-        // to exactly printWidth and then exceeding when ';' is added
+    /// Build a fill doc for space-separated values
+    ///
+    /// Creates a doc that packs values greedily:
+    /// - In flat mode: `item1 item2 item3`
+    /// - When broken: `item1 item2\n  item3 item4\n  item5`
+    fn build_space_fill_doc(&self, values: &[CssValue]) -> doc::Doc {
+        let parts = self.build_space_fill_parts(values);
+        // Reserve 1 char for trailing semicolon
         let context = doc::DocContext {
             trailing_reserve: 1,
         };
         doc::with_context(doc::fill(parts), context)
+    }
+
+    /// Build a fill doc with continuation indent for space-separated values inside wrapped functions
+    ///
+    /// When content inside a wrapped function (like calc(), drop-shadow()) exceeds print width,
+    /// Prettier uses continuation indent: first line at current indent, continuations at +1.
+    ///
+    /// Example:
+    /// ```css
+    /// min-width: calc(
+    ///     100% - 20px + ... + 0.001953125px +
+    ///         0.0009765625px
+    /// );
+    /// ```
+    ///
+    /// The `indent(fill(...))` structure achieves this:
+    /// - First content prints inline (no leading newline)
+    /// - When fill breaks, `line()` outputs newline + indent (which is +1 due to `indent` wrapper)
+    fn build_space_fill_doc_with_continuation(&self, values: &[CssValue]) -> doc::Doc {
+        let parts = self.build_space_fill_parts(values);
+        // No trailing reserve: closing paren and semicolon are on their own lines
+        let context = doc::DocContext {
+            trailing_reserve: 0,
+        };
+        // Wrap in indent for continuation indentation
+        doc::indent(doc::with_context(doc::fill(parts), context))
+    }
+
+    /// Check if a List arg inside a wrapped function would exceed width
+    ///
+    /// Used to decide whether to use continuation-based fill printing.
+    fn list_exceeds_width_in_wrapped_function(&self, values: &[CssValue]) -> bool {
+        // Calculate the width of the list if printed inline
+        let list_doc = self.build_list_doc(values, " ");
+
+        // Context: we're already inside the function after "func(\n\t"
+        // The content starts at current indent level, need to check if it exceeds print width
+        // Reserve 2 chars for closing paren and semicolon
+        !doc::fits_at(&list_doc, &self.config, self.effective_indent(), 0, 2)
     }
 }

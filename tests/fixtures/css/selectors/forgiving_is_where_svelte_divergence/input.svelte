@@ -5,12 +5,12 @@
 	}
 
 	/* :where() with syntax error - preserves invalid selector */
-	span:where(.valid, [, .also-valid) {
+	span:where(.class1, [, .class2) {
 		color: blue;
 	}
 
 	/* :is() with pseudo-element - preserved (contextually invalid) */
-	p:is(.text, ::before, .content) {
+	p:is(.class3, ::before, .class4) {
 		margin: 10px;
 	}
 
@@ -25,7 +25,7 @@
 	}
 
 	/* :where() with unknown pseudo-class - kept (syntactically valid) */
-	section:where(.foo, .bar:unknown-pseudo, .baz) {
+	section:where(.class5, .class6:unknown-pseudo, .class7) {
 		border: 1px solid black;
 	}
 </style>
