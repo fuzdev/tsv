@@ -1,0 +1,122 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 220,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 14,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 14,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "card",
+											"start": 9,
+											"end": 14
+										}
+									],
+									"start": 9,
+									"end": 14
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 15,
+					"end": 211,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 19,
+							"end": 32,
+							"property": "padding",
+							"value": "1rem"
+						},
+						{
+							"type": "Atrule",
+							"start": 37,
+							"end": 125,
+							"name": "container",
+							"prelude": "(min-width: 400px)",
+							"block": {
+								"type": "Block",
+								"start": 67,
+								"end": 125,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 72,
+										"end": 85,
+										"property": "display",
+										"value": "grid"
+									},
+									{
+										"type": "Declaration",
+										"start": 90,
+										"end": 120,
+										"property": "grid-template-columns",
+										"value": "1fr 1fr"
+									}
+								]
+							}
+						},
+						{
+							"type": "Atrule",
+							"start": 129,
+							"end": 208,
+							"name": "container",
+							"prelude": "card (min-width: 600px)",
+							"block": {
+								"type": "Block",
+								"start": 164,
+								"end": 208,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 169,
+										"end": 203,
+										"property": "grid-template-columns",
+										"value": "1fr 1fr 1fr"
+									}
+								]
+							}
+						}
+					]
+				},
+				"start": 9,
+				"end": 211
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 212,
+			"styles": "\n\t.card {\n\t\tpadding: 1rem;\n\n\t\t@container (min-width: 400px) {\n\t\t\tdisplay: grid;\n\t\t\tgrid-template-columns: 1fr 1fr;\n\t\t}\n\n\t\t@container card (min-width: 600px) {\n\t\t\tgrid-template-columns: 1fr 1fr 1fr;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 221,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

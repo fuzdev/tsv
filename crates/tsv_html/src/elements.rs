@@ -45,6 +45,7 @@ static BLOCK_ELEMENTS: phf::Set<&'static str> = phf_set! {
     "hr",
     "li",
     "main",
+    "menu",
     "nav",
     "ol",
     "p",

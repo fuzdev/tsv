@@ -6,7 +6,7 @@
 		"svelte/compiler": "npm:svelte@5.45.8/compiler",
 		"@sveltejs/acorn-typescript": "npm:@sveltejs/acorn-typescript@1.0.8",
 		"prettier": "npm:prettier@3.7.4",
-		"prettier-plugin-svelte": "npm:prettier-plugin-svelte@3.4.0",
+		"prettier-plugin-svelte": "npm:prettier-plugin-svelte@3.4.1",
 		"@biomejs/js-api": "npm:@biomejs/js-api@4.0.0",
 		"@biomejs/wasm-bundler": "npm:@biomejs/wasm-bundler@2.3.10",
 		"oxc-parser": "npm:oxc-parser@0.104.0",

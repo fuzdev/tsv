@@ -576,6 +576,15 @@ impl FragmentNode {
             FragmentNode::RenderTag(tag) => tag.span,
         }
     }
+
+    /// Check if this node is whitespace-only text.
+    ///
+    /// Returns true only for Text nodes containing only whitespace characters.
+    /// All other node types return false.
+    #[inline]
+    pub fn is_whitespace_only_text(&self) -> bool {
+        matches!(self, FragmentNode::Text(t) if t.raw.trim().is_empty())
+    }
 }
 
 /// Svelte Element kind - distinguishes HTML elements from components

@@ -6,7 +6,7 @@
 //
 // Note: Block statements are in blocks.rs as a reusable utility
 
-use super::super::{ParenContext, Printer, needs_parens};
+use super::{ParenContext, Printer, needs_parens};
 use crate::ast::internal;
 use tsv_lang::doc::{self, Doc};
 use tsv_lang::printing::is_same_line;
@@ -67,15 +67,6 @@ impl<'a> Printer<'a> {
     /// Print an arrow function expression using doc-based formatting with width-aware wrapping.
     ///
     /// Prettier behavior for arrow functions:
-    /// - If signature fits on one line, keep inline
-    /// - If too long, break type params and/or function params
-    /// - Type params and function params share a group - when one breaks, both break
-    /// - Trailing commas are added when params are broken across lines
-    pub(super) fn print_arrow_function(&mut self, arrow: &internal::ArrowFunctionExpression) {
-        let arrow_doc = self.build_arrow_doc_wrapping(arrow);
-        self.write_doc(&arrow_doc);
-    }
-
     /// Build a Doc for an arrow function with width-aware wrapping.
     ///
     /// Prettier's algorithm (from arrow-function.js and function-parameters.js):
@@ -193,6 +184,10 @@ impl<'a> Printer<'a> {
                     // Short: (x) => x + 1
                     // Long:  (veryLongParams) =>
                     //            veryLongExpr
+                    //
+                    // The body is wrapped in a group so it can make its own fits() decision.
+                    // This allows the arrow body to stay inline even when the parent element
+                    // is in break mode, as long as the body content fits from its position.
                     let body_doc = self.build_arrow_body_doc(expr);
                     parts.push(doc::group(doc::indent(doc::concat(vec![
                         doc::line(),
@@ -459,89 +454,6 @@ impl<'a> Printer<'a> {
         self.build_arrow_doc_wrapping(arrow)
     }
 
-    /// Print a function expression body (params, return type, body): `() { return 1; }`
-    ///
-    /// Used for method shorthand in objects where the key is printed separately.
-    /// For standalone function expressions, use `print_standalone_function_expression` instead.
-    ///
-    /// Uses hybrid approach: doc-based for signature wrapping, imperative for body (preserves comments).
-    pub(in crate::printer) fn print_function_expression_body(
-        &mut self,
-        func: &internal::FunctionExpression,
-    ) {
-        // Build and print signature (params + return type) using doc-based wrapping
-        let sig_doc = self.build_function_expression_signature_doc(func);
-        self.write_doc(&sig_doc);
-
-        // Find the end of the signature to check for dangling comments
-        // (comments between signature and body that should move inside)
-        // We need the position AFTER the closing `)` to avoid re-printing
-        // comments that were already handled by the params printer.
-        let sig_end = if let Some(return_type) = &func.return_type {
-            return_type.span.end
-        } else {
-            // No return type - find the closing `)` by scanning from params_start
-            // to body start. Comments between `)` and `{` should move into body.
-            self.find_closing_paren(func.params_start, func.body.span.start)
-                .unwrap_or(func.body.span.start)
-        };
-
-        // Print body imperatively (preserves comments)
-        self.write(" ");
-        self.print_block_statement_with_outer_comments(&func.body, sig_end);
-    }
-
-    /// Print a standalone function expression: `function() {}` or `function name() {}`
-    ///
-    /// This prints the full function expression including:
-    /// - `async` keyword if present
-    /// - `function` keyword
-    /// - `*` for generators
-    /// - optional name
-    /// - type parameters
-    /// - parameters and return type
-    /// - body
-    pub(in crate::printer) fn print_function_expression(
-        &mut self,
-        func: &internal::FunctionExpression,
-    ) {
-        // Print async keyword if present
-        if func.r#async {
-            self.write("async ");
-        }
-
-        // Print 'function' keyword
-        self.write("function");
-
-        // Print '*' for generators
-        if func.generator {
-            self.write("*");
-        }
-
-        // Print optional function name
-        if let Some(id) = &func.id {
-            self.write(" ");
-            self.print_identifier(id);
-        }
-
-        // Print type parameters (TypeScript generics)
-        // Add space before type params if no name: `function <T>` not `function<T>`
-        if let Some(type_params) = &func.type_parameters {
-            if func.id.is_none() {
-                self.write(" ");
-            }
-            self.print_type_parameter_declaration(type_params);
-        }
-
-        // Add space before params if no name or type params: `function ()`
-        if func.id.is_none() && func.type_parameters.is_none() {
-            self.write(" ");
-        }
-
-        // Print the rest (params, return type, body)
-        self.print_function_expression_body(func);
-    }
-
     /// Build a Doc for just the function expression signature (type params, params, return type).
     /// Body is printed separately via imperative printer to preserve comments.
     fn build_function_expression_signature_doc(&self, func: &internal::FunctionExpression) -> Doc {
@@ -575,11 +487,24 @@ impl<'a> Printer<'a> {
     ) -> Doc {
         let sig_doc = self.build_function_expression_signature_doc(func);
 
+        // Find signature end for outer comment detection
+        let sig_end = if let Some(rt) = &func.return_type {
+            rt.span.end
+        } else if let Some(paren) = self.find_closing_paren(func.params_start, func.body.span.start)
+        {
+            paren
+        } else {
+            func.body.span.start
+        };
+
+        // Check for comments between signature and body (outer comments)
+        let outer_comments = self.build_outer_comments_for_block(sig_end, &func.body);
+
         // Body - always on same line as signature close
         doc::concat(vec![
             sig_doc,
             doc::text(" "),
-            self.build_block_statement_doc(&func.body),
+            self.build_block_statement_with_outer_comments_doc(&func.body, outer_comments),
         ])
     }
 
@@ -854,51 +779,6 @@ impl<'a> Printer<'a> {
         }
 
         doc::concat(parts)
-    }
-
-    /// Print a class expression: `class { }` or `class Foo<T> extends Bar { }`
-    pub(in crate::printer) fn print_class_expression(
-        &mut self,
-        class_expr: &internal::ClassExpression,
-    ) {
-        self.write("class");
-
-        // Print optional class name
-        if let Some(id) = &class_expr.id {
-            self.write(" ");
-            self.print_identifier(id);
-        }
-
-        // Print type parameters (TypeScript generics): class<T>
-        if let Some(type_params) = &class_expr.type_parameters {
-            self.print_type_parameter_declaration(type_params);
-        }
-
-        // Print optional extends clause
-        if let Some(super_class) = &class_expr.super_class {
-            self.write(" extends ");
-            self.print_expression(super_class);
-            // Print type arguments: extends Base<T>
-            if let Some(super_type_params) = &class_expr.super_type_parameters {
-                self.print_type_parameter_instantiation(super_type_params);
-            }
-        }
-
-        // Print optional implements clause - extract from source for simplicity
-        if !class_expr.implements.is_empty() {
-            self.write(" implements ");
-            // Extract implements list from source (between extends and body or between class header and body)
-            let first_impl = &class_expr.implements[0];
-            let last_impl = &class_expr.implements[class_expr.implements.len() - 1];
-            let impl_start = first_impl.span.start_usize();
-            let impl_end = last_impl.span.end_usize();
-            let impl_str = &self.source[impl_start..impl_end];
-            self.write(impl_str);
-        }
-
-        self.write(" ");
-        // Use the shared print_class_body method
-        self.print_class_body(&class_expr.body, false);
     }
 
     /// Build a Doc for a class expression

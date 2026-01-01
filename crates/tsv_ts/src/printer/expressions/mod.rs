@@ -21,68 +21,19 @@ mod patterns;
 
 pub(super) use literals::normalize_number_literal;
 
-use super::{CommentFilter, CommentSpacing, ParenContext, Printer, needs_parens};
+// Re-export for submodules to use `super::X` instead of `super::super::X`
+pub(super) use super::{
+    CommentSpacing, ParenContext, PatternContext, Printer, needs_parens,
+    object_pattern_should_expand,
+};
 use crate::ast::internal::Expression;
 use tsv_lang::doc::{self, Doc};
 
 impl<'a> Printer<'a> {
-    /// Print an expression
+    /// Print an expression using doc-based formatting
     pub fn print_expression(&mut self, expression: &Expression) {
-        // TODO: Inline expression comments are dropped/misplaced
-        // Tracked in: TODO_CHECKLIST_VERIFICATION.md under "TypeScript Failures"
-        // Needs comprehensive fix - see objects.rs comment handling as reference pattern
-        match expression {
-            Expression::Literal(lit) => self.print_literal(lit),
-            Expression::Identifier(id) => self.print_identifier(id),
-            Expression::PrivateIdentifier(pid) => self.print_private_identifier(pid),
-            Expression::ObjectExpression(obj) => self.print_object_expression(obj),
-            Expression::ArrayExpression(arr) => self.print_array_expression(arr),
-            Expression::UnaryExpression(unary) => self.print_unary_expression(unary),
-            Expression::UpdateExpression(update) => self.print_update_expression(update),
-            Expression::BinaryExpression(binary) => self.print_binary_expression(binary),
-            Expression::CallExpression(call) => self.print_call_expression(call),
-            Expression::NewExpression(new_expr) => self.print_new_expression(new_expr),
-            Expression::MemberExpression(member) => self.print_member_expression(member),
-            Expression::ConditionalExpression(cond) => self.print_conditional_expression(cond),
-            Expression::ArrowFunctionExpression(arrow) => self.print_arrow_function(arrow),
-            Expression::FunctionExpression(func) => self.print_function_expression(func),
-            Expression::ClassExpression(class_expr) => self.print_class_expression(class_expr),
-            Expression::SpreadElement(spread) => self.print_spread_element(spread),
-            Expression::TemplateLiteral(template) => self.print_template_literal(template),
-            Expression::TaggedTemplateExpression(tagged) => {
-                self.print_tagged_template_expression(tagged);
-            }
-            Expression::AwaitExpression(await_expr) => self.print_await_expression(await_expr),
-            Expression::YieldExpression(yield_expr) => self.print_yield_expression(yield_expr),
-            Expression::SequenceExpression(seq) => self.print_sequence_expression(seq),
-            Expression::RegexLiteral(regex) => self.print_regex_literal(regex),
-            Expression::Super(_) => self.write("super"),
-            Expression::AssignmentExpression(assign) => self.print_assignment_expression(assign),
-            Expression::ObjectPattern(obj) => self.print_object_pattern(obj),
-            Expression::ArrayPattern(arr) => self.print_array_pattern(arr),
-            Expression::AssignmentPattern(pattern) => self.print_assignment_pattern(pattern),
-            Expression::RestElement(rest) => self.print_rest_element(rest),
-            Expression::TSTypeAssertion(type_assert) => self.print_ts_type_assertion(type_assert),
-            Expression::TSAsExpression(as_expr) => self.print_ts_as_expression(as_expr),
-            Expression::TSSatisfiesExpression(sat_expr) => {
-                self.print_ts_satisfies_expression(sat_expr);
-            }
-            Expression::TSInstantiationExpression(inst_expr) => {
-                self.print_ts_instantiation_expression(inst_expr);
-            }
-            Expression::TSNonNullExpression(non_null_expr) => {
-                self.print_ts_non_null_expression(non_null_expr);
-            }
-            Expression::ImportExpression(import_expr) => {
-                self.print_import_expression(import_expr);
-            }
-            Expression::MetaProperty(meta) => {
-                self.print_meta_property(meta);
-            }
-            Expression::TSParameterProperty(param_prop) => {
-                self.print_ts_parameter_property(param_prop);
-            }
-        }
+        let doc = self.build_expression_doc(expression);
+        self.write_doc(&doc);
     }
 
     /// Build a Doc for an expression (for use in object/array contexts and statements)
@@ -139,24 +90,12 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build a Doc for an expression, forcing pattern expansion for ObjectPattern/ArrayPattern
-    ///
-    /// Used when the caller knows the pattern must expand (e.g., line would overflow).
-    pub(super) fn build_expression_doc_forced_expand(&self, expr: &Expression) -> Doc {
-        match expr {
-            Expression::ObjectPattern(obj) => self.build_object_pattern_doc_expanded(obj),
-            // For other expressions, fall back to normal doc building
-            _ => self.build_expression_doc(expr),
-        }
-    }
-
     /// Build doc for function parameter expression, using FunctionParameter context for patterns
     pub(super) fn build_function_parameter_doc(&self, expr: &Expression) -> Doc {
         match expr {
-            Expression::ObjectPattern(obj) => self.build_object_pattern_doc_with_context(
-                obj,
-                crate::printer::PatternContext::FunctionParameter,
-            ),
+            Expression::ObjectPattern(obj) => {
+                self.build_object_pattern_doc_with_context(obj, PatternContext::FunctionParameter)
+            }
             // For other expressions, use normal doc building
             _ => self.build_expression_doc(expr),
         }
@@ -165,98 +104,6 @@ impl<'a> Printer<'a> {
     // =========================================================================
     // TypeScript Type Assertions
     // =========================================================================
-
-    /// Print a TypeScript angle-bracket type assertion: `<Type>expr`
-    fn print_ts_type_assertion(&mut self, type_assert: &crate::ast::internal::TSTypeAssertion) {
-        self.write("<");
-        self.print_type(&type_assert.type_annotation);
-        self.write(">");
-        self.print_expression(&type_assert.expression);
-    }
-
-    /// Print a TypeScript `as` expression: `expr as Type`
-    ///
-    /// Comment handling (matches Prettier behavior):
-    /// - Comments between expression and `as` keyword → print before `as`
-    /// - Single-line comments between `as` and type → print before `as`
-    /// - Multi-line comments between `as` and type → print after type
-    fn print_ts_as_expression(&mut self, as_expr: &crate::ast::internal::TSAsExpression) {
-        let needs_parens = needs_parens(&as_expr.expression, ParenContext::TypeAssertion);
-        if needs_parens {
-            self.write("(");
-        }
-        self.print_expression(&as_expr.expression);
-        if needs_parens {
-            self.write(")");
-        }
-
-        let expr_end = as_expr.expression.span().end;
-        let type_start = as_expr.type_annotation.span().start;
-
-        // Find the 'as' keyword position in source
-        let source_between = &self.source[expr_end as usize..type_start as usize];
-        let as_pos = source_between
-            .find(" as ")
-            .or_else(|| source_between.find("\nas "))
-            .or_else(|| source_between.find("\tas "))
-            .map_or(expr_end, |p| expr_end + p as u32 + 1);
-
-        // Collect multiline comments after 'as' to print after the type
-        let mut multiline_after_as = Vec::new();
-
-        // Print comments between expression and 'as' keyword (always before 'as')
-        for comment in tsv_lang::comments_in_range(self.comments, expr_end, as_pos) {
-            self.write(" ");
-            self.print_comment(comment);
-        }
-
-        // Handle comments between 'as' and type based on line count
-        for comment in tsv_lang::comments_in_range(self.comments, as_pos, type_start) {
-            if comment.is_block && comment.content.contains('\n') {
-                // Multi-line block comment → save for after type
-                multiline_after_as.push(comment);
-            } else {
-                // Single-line comment → print before 'as'
-                self.write(" ");
-                self.print_comment(comment);
-            }
-        }
-
-        self.write(" as ");
-        self.print_type(&as_expr.type_annotation);
-
-        // Print multiline comments after the type
-        for comment in multiline_after_as {
-            self.write(" ");
-            self.print_comment(comment);
-        }
-    }
-
-    /// Print a TypeScript `satisfies` expression: `expr satisfies Type`
-    ///
-    /// Preserves comments between expression and `satisfies` keyword (Prettier 3.7 #18162):
-    /// `x /* comment */ satisfies T` stays as `x /* comment */ satisfies T`
-    fn print_ts_satisfies_expression(
-        &mut self,
-        sat_expr: &crate::ast::internal::TSSatisfiesExpression,
-    ) {
-        let needs_parens = needs_parens(&sat_expr.expression, ParenContext::TypeAssertion);
-        if needs_parens {
-            self.write("(");
-        }
-        self.print_expression(&sat_expr.expression);
-        if needs_parens {
-            self.write(")");
-        }
-
-        // Print comments between expression and `satisfies` keyword
-        let expr_end = sat_expr.expression.span().end;
-        let type_start = sat_expr.type_annotation.span().start;
-        self.print_inline_comments_between(expr_end, type_start);
-
-        self.write(" satisfies ");
-        self.print_type(&sat_expr.type_annotation);
-    }
 
     /// Build a Doc for a TypeScript angle-bracket type assertion: `<Type>expr`
     fn build_ts_type_assertion_doc(
@@ -274,6 +121,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript `as` expression
     ///
     /// Preserves comments between expression and `as` keyword (Prettier 3.7 #18161)
+    /// Comments between `as` and type are moved to after the type (Prettier normalization)
     fn build_ts_as_doc(&self, as_expr: &crate::ast::internal::TSAsExpression) -> Doc {
         let needs_parens = needs_parens(&as_expr.expression, ParenContext::TypeAssertion);
         let mut parts = Vec::new();
@@ -285,13 +133,25 @@ impl<'a> Printer<'a> {
             parts.push(doc::text(")"));
         }
 
-        // Include comments between expression and `as` keyword
+        // Find the `as` keyword position
         let expr_end = as_expr.expression.span().end;
         let type_start = as_expr.type_annotation.span().start;
-        parts.push(self.build_inline_comments_between_doc(expr_end, type_start));
+        let as_keyword_pos = self.find_keyword_in_range(expr_end, type_start, "as");
+
+        // Comments between expression and `as` keyword → place before ` as`
+        if let Some(as_pos) = as_keyword_pos {
+            parts.push(self.build_inline_comments_between_doc(expr_end, as_pos));
+        }
 
         parts.push(doc::text(" as "));
         parts.push(self.build_type_doc(&as_expr.type_annotation));
+
+        // Comments between `as` keyword and type → place after the type
+        if let Some(as_pos) = as_keyword_pos {
+            let as_end = as_pos + 2; // "as" is 2 chars
+            parts.push(self.build_inline_comments_between_doc(as_end, type_start));
+        }
+
         doc::concat(parts)
     }
 
@@ -322,24 +182,6 @@ impl<'a> Printer<'a> {
         doc::concat(parts)
     }
 
-    /// Print a TypeScript instantiation expression: `f<T>`
-    fn print_ts_instantiation_expression(
-        &mut self,
-        inst_expr: &crate::ast::internal::TSInstantiationExpression,
-    ) {
-        // Arrow functions need parentheses for disambiguation
-        let needs_parens =
-            needs_parens(&inst_expr.expression, ParenContext::InstantiationExpression);
-        if needs_parens {
-            self.write("(");
-        }
-        self.print_expression(&inst_expr.expression);
-        if needs_parens {
-            self.write(")");
-        }
-        self.print_type_parameter_instantiation(&inst_expr.type_arguments);
-    }
-
     /// Build a Doc for a TypeScript instantiation expression
     fn build_ts_instantiation_doc(
         &self,
@@ -357,17 +199,6 @@ impl<'a> Printer<'a> {
         }
         parts.push(self.build_type_parameter_instantiation_doc(&inst_expr.type_arguments));
         doc::concat(parts)
-    }
-
-    /// Print a TypeScript non-null assertion expression: `expr!`
-    ///
-    /// Uses doc IR to support line breaking for long binary expressions inside parens.
-    fn print_ts_non_null_expression(
-        &mut self,
-        non_null_expr: &crate::ast::internal::TSNonNullExpression,
-    ) {
-        let doc = self.build_ts_non_null_doc(non_null_expr);
-        self.write_doc_with_margin(&doc);
     }
 
     /// Build a Doc for a TypeScript non-null assertion expression
@@ -525,47 +356,6 @@ impl<'a> Printer<'a> {
     // Template Literals
     // =========================================================================
 
-    /// Print a template literal: `hello ${name}`
-    pub(super) fn print_template_literal(
-        &mut self,
-        template: &crate::ast::internal::TemplateLiteral,
-    ) {
-        self.write("`");
-
-        for (i, quasi) in template.quasis.iter().enumerate() {
-            // Print the raw template content (preserving escapes)
-            self.write(&quasi.raw);
-
-            // Print interpolation if there's a corresponding expression
-            if i < template.expressions.len() {
-                let expr = &template.expressions[i];
-                self.write("${");
-
-                // Check for comments between ${ and the expression
-                self.print_comments_between_filtered(
-                    quasi.span.end,
-                    expr.span().start,
-                    CommentSpacing::Trailing,
-                    CommentFilter::All,
-                );
-
-                self.print_expression(expr);
-                self.write("}");
-            }
-        }
-
-        self.write("`");
-    }
-
-    /// Print a tagged template expression: tag`content ${expr}`
-    fn print_tagged_template_expression(
-        &mut self,
-        tagged: &crate::ast::internal::TaggedTemplateExpression,
-    ) {
-        self.print_expression(&tagged.tag);
-        self.print_template_literal(&tagged.quasi);
-    }
-
     /// Build a Doc for a template literal
     fn build_template_literal_doc(&self, template: &crate::ast::internal::TemplateLiteral) -> Doc {
         let mut parts = Vec::new();
@@ -606,26 +396,6 @@ impl<'a> Printer<'a> {
             self.build_expression_doc(&tagged.tag),
             self.build_template_literal_doc(&tagged.quasi),
         ])
-    }
-
-    /// Print a TypeScript parameter property: `public x`, `private readonly y`
-    fn print_ts_parameter_property(
-        &mut self,
-        param_prop: &crate::ast::internal::TSParameterProperty,
-    ) {
-        // Print accessibility modifier
-        if let Some(acc) = &param_prop.accessibility {
-            self.write(acc.as_str());
-            self.write(" ");
-        }
-
-        // Print readonly modifier
-        if param_prop.readonly {
-            self.write("readonly ");
-        }
-
-        // Print the parameter (identifier or assignment pattern)
-        self.print_expression(&param_prop.parameter);
     }
 
     /// Build a Doc for a TypeScript parameter property

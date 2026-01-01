@@ -6,7 +6,7 @@
 // to ensure @sveltejs/acorn-typescript uses the same acorn instance
 const VERSIONS = {
 	prettier: '3.7.4',
-	'prettier-plugin-svelte': '3.4.0',
+	'prettier-plugin-svelte': '3.4.1',
 	svelte: '5.45.8',
 	acorn: '8.15.0',
 	'@sveltejs/acorn-typescript': '1.0.8',
@@ -17,7 +17,7 @@ const VERSIONS = {
 // deno-lint-ignore no-import-prefix
 import * as prettier from 'npm:prettier@3.7.4';
 // deno-lint-ignore no-import-prefix
-import prettierPluginSvelte from 'npm:prettier-plugin-svelte@3.4.0';
+import prettierPluginSvelte from 'npm:prettier-plugin-svelte@3.4.1';
 // deno-lint-ignore no-import-prefix
 import { parse as svelteParse } from 'npm:svelte@5.45.8/compiler';
 // deno-lint-ignore no-import-prefix

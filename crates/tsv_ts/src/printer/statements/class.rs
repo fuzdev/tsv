@@ -1,475 +1,36 @@
 // Class declaration printing for TypeScript
 
-use super::super::Printer;
+use super::Printer;
 use crate::ast::internal;
-use tsv_lang::{SymbolResolver, SymbolToU32, doc};
+use tsv_lang::{SymbolResolver, doc};
 
 impl<'a> Printer<'a> {
-    /// Print a class declaration or anonymous class: `class Foo {}` or `class {}`
+    /// Check if class should use "group mode" for heritage clauses
     ///
-    /// Uses doc-based printing with width-aware wrapping for long lines.
-    pub(super) fn print_class_declaration(&mut self, decl: &internal::ClassDeclaration) {
-        // Print decorators, each on its own line
-        if let Some(decorators) = &decl.decorators {
-            for decorator in decorators {
-                self.print_decorator(decorator);
-                self.write("\n");
-                self.write_indent();
-            }
+    /// In group mode, heritage clauses break when the class header group breaks.
+    /// Returns true when:
+    /// 1. Multiple heritage items (extends + implements count > 1)
+    /// 2. Member expression superclass without type arguments
+    fn should_class_group_mode(&self, decl: &internal::ClassDeclaration) -> bool {
+        // Count heritage items
+        let mut count = if decl.super_class.is_some() { 1 } else { 0 };
+        count += decl.implements.len();
+        if count > 1 {
+            return true;
         }
 
-        // Build the header doc (everything before the body)
-        let header_doc = self.build_class_header_doc(decl);
-
-        // suffix_width accounts for body that follows the header:
-        // - Empty body: " {}" = 3 chars
-        // - Non-empty body: " {" = 2 chars (newline after brace not counted)
-        let suffix_width = if decl.body.body.is_empty() { 3 } else { 2 };
-        let header_output = self.render_doc_with_suffix(&header_doc, suffix_width);
-        self.write(&header_output);
-
-        // Space before body:
-        // - Skip if both extends and implements (header ends with dedent(line))
-        // - Skip if implements-only with long type params (header may end with dedent(softline))
-        // For simplicity, just check if header ends with newline
-        let has_extends = decl.super_class.is_some();
-        let has_implements = !decl.implements.is_empty();
-        let both_heritage = has_extends && has_implements;
-        // Check if header output ends with newline (from break mode)
-        let needs_space = !both_heritage && !header_output.ends_with('\n');
-        if needs_space {
-            self.write(" ");
-        }
-        self.print_class_body(&decl.body, decl.declare);
-    }
-
-    /// Build doc for class header (declare, name, type params, extends, implements)
-    ///
-    /// Prettier behavior for classes:
-    /// - If everything fits on one line, keep inline
-    /// - If type params break, put extends/implements on new lines
-    /// - Multiple heritage clauses (extends + implements) each go on their own line
-    /// - Brace goes to new line when heritage clauses are on separate lines
-    fn build_class_header_doc(&self, decl: &internal::ClassDeclaration) -> doc::Doc {
-        let mut parts = Vec::new();
-
-        // declare modifier
-        if decl.declare {
-            parts.push(doc::text("declare "));
+        // Check for member expression superclass without type args
+        if let Some(super_class) = &decl.super_class
+            && decl.super_type_parameters.is_none()
+            && matches!(
+                super_class.as_ref(),
+                internal::Expression::MemberExpression(_)
+            )
+        {
+            return true;
         }
 
-        // abstract modifier
-        if decl.r#abstract {
-            parts.push(doc::text("abstract "));
-        }
-
-        parts.push(doc::text("class"));
-        if let Some(id) = &decl.id {
-            parts.push(doc::text(" "));
-            parts.push(doc::symbol(id.name.to_u32()));
-        }
-
-        let has_extends = decl.super_class.is_some();
-        let has_implements = !decl.implements.is_empty();
-
-        // Type parameters - wrapped in their own group
-        if let Some(type_params) = &decl.type_parameters {
-            parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
-        }
-
-        // Build heritage docs separately first
-        // Prettier PR #18325: For extends clause, use expression_to_string to keep the member
-        // expression together (no breaks within `eslint.Rule.RuleModule`).
-        // The extends keyword can break to a new line, but the expression stays flat.
-        let extends_doc = if let Some(super_class) = &decl.super_class {
-            let mut ext_parts = vec![doc::text("extends ")];
-            // Use expression_to_string for flat output - no breaks in member expression
-            ext_parts.push(doc::text_owned(self.expression_to_string(super_class)));
-            if let Some(type_params) = &decl.super_type_parameters {
-                ext_parts.push(self.build_type_arguments_doc(type_params));
-            }
-            Some(doc::concat(ext_parts))
-        } else {
-            None
-        };
-
-        let implements_doc = if !decl.implements.is_empty() {
-            let mut impl_parts = vec![doc::text("implements ")];
-            for (i, heritage) in decl.implements.iter().enumerate() {
-                if i > 0 {
-                    impl_parts.push(doc::text(", "));
-                }
-                impl_parts.push(self.build_entity_name_doc(&heritage.expression));
-                if let Some(type_args) = &heritage.type_arguments {
-                    impl_parts.push(self.build_type_arguments_doc(type_args));
-                }
-            }
-            Some(doc::concat(impl_parts))
-        } else {
-            None
-        };
-
-        // Add heritage clauses
-        // Prettier PR #18094 behavior:
-        // - extends: stays inline after `>` (even when type params break)
-        // - implements: goes to new line when type params break, with brace on new line
-        // - Multiple heritage (extends + implements): each on separate line, brace on new line
-        if has_extends && has_implements {
-            // Multiple heritage clauses - each on separate line
-            if let Some(ext) = extends_doc {
-                parts.push(doc::indent_line(ext));
-            }
-            if let Some(impl_doc) = implements_doc {
-                parts.push(doc::indent_line(impl_doc));
-            }
-            // Brace goes to new line for multiple heritage
-            parts.push(doc::dedent(doc::line()));
-        } else if let Some(ext) = extends_doc {
-            // extends only - behavior depends on type params and super_class type:
-            // - With type params: extends stays inline after `>` (Prettier PR #18094)
-            // - Without type params AND member expression: can break (Prettier PR #18325)
-            // - Without type params AND simple identifier: NEVER breaks (Prettier quirk)
-            let has_type_params = decl.type_parameters.is_some();
-            let is_member_expression = matches!(
-                decl.super_class.as_deref(),
-                Some(internal::Expression::MemberExpression(_))
-            );
-            if has_type_params || !is_member_expression {
-                // Type params present OR simple identifier parent - stays inline
-                parts.push(doc::text(" "));
-                parts.push(ext);
-            } else {
-                // No type params AND member expression - can break to new line
-                parts.push(doc::indent_line(ext));
-            }
-        } else if let Some(impl_doc) = implements_doc {
-            // implements only - line() becomes space in flat mode
-            parts.push(doc::indent_line(impl_doc));
-            // Brace: use softline which disappears in flat mode, becomes newline in break mode
-            parts.push(doc::dedent(doc::softline()));
-        }
-
-        doc::group(doc::concat(parts))
-    }
-
-    /// Print a class body with blank line preservation
-    /// is_declare: true for declare class (members have no implementation)
-    pub(in crate::printer) fn print_class_body(
-        &mut self,
-        body: &internal::ClassBody,
-        is_declare: bool,
-    ) {
-        if body.body.is_empty() {
-            self.write("{}");
-            return;
-        }
-
-        self.write("{\n");
-        self.indent_level += 1;
-
-        // Start after the opening '{'
-        let mut prev_end = body.span.start + 1;
-
-        for (i, member) in body.body.iter().enumerate() {
-            let is_first = i == 0;
-
-            // Preserve blank lines between class members
-            // Skip if there are comments - they handle their own blank line preservation
-            if !is_first {
-                let has_comments = self.has_comments_between(prev_end, member.span().start);
-                if !has_comments
-                    && tsv_lang::printing::has_blank_line_between(
-                        self.source,
-                        prev_end,
-                        member.span().start,
-                    )
-                {
-                    self.write("\n");
-                }
-            }
-
-            // Print leading comments before this member
-            self.print_block_leading_comments(prev_end, member.span().start, is_first);
-
-            self.write_indent();
-            self.print_class_member(member, is_declare);
-
-            // Print trailing inline comments (on same line after member)
-            // Upper bound: next member's start, or body end for last member
-            let upper_bound = body
-                .body
-                .get(i + 1)
-                .map_or(body.span.end, |next| next.span().start);
-            self.print_class_member_trailing_comments(member.span().end, upper_bound);
-
-            self.write("\n");
-
-            prev_end = member.span().end;
-        }
-
-        self.indent_level -= 1;
-        self.write_indent();
-        self.write("}");
-    }
-
-    /// Print trailing inline comments for a class member
-    /// Handles comments on the same line after the member ends (e.g., `prop: string; // comment`)
-    /// `upper_bound` limits the search to avoid including comments inside the next member
-    fn print_class_member_trailing_comments(&mut self, member_end: u32, upper_bound: u32) {
-        // find_first_comment_from returns index of first comment at or after member_end
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, member_end);
-
-        for comment in &self.comments[first_idx..] {
-            // Only include comments that are:
-            // 1. On the same line as member_end
-            // 2. Before the upper bound (next member's start or body end)
-            if comment.span.start >= upper_bound {
-                break;
-            }
-            if tsv_lang::printing::is_same_line(self.source, member_end, comment.span.start) {
-                self.write(" ");
-                self.print_comment(comment);
-            } else {
-                break;
-            }
-        }
-    }
-
-    /// Print a class member (method, property, or static block)
-    fn print_class_member(&mut self, member: &internal::ClassMember, is_declare: bool) {
-        match member {
-            internal::ClassMember::MethodDefinition(method) => {
-                self.print_method_definition(method, is_declare);
-            }
-            internal::ClassMember::PropertyDefinition(prop) => {
-                self.print_property_definition(prop, is_declare);
-            }
-            internal::ClassMember::StaticBlock(block) => {
-                self.print_static_block(block);
-            }
-            internal::ClassMember::IndexSignature(sig) => {
-                self.print_index_signature(sig);
-            }
-        }
-    }
-
-    /// Print an index signature: `[key: Type]: ValueType;`
-    fn print_index_signature(&mut self, sig: &internal::TSIndexSignature) {
-        if sig.readonly {
-            self.write("readonly ");
-        }
-        self.write("[");
-        for (i, param) in sig.parameters.iter().enumerate() {
-            if i > 0 {
-                self.write(", ");
-            }
-            self.print_identifier(param);
-        }
-        self.write("]");
-        self.print_type_annotation(&sig.type_annotation);
-        self.write(";");
-    }
-
-    /// Print a static initialization block: `static { ... }`
-    fn print_static_block(&mut self, block: &internal::StaticBlock) {
-        self.write("static ");
-        // Create a BlockStatement wrapper to reuse existing printing logic
-        let block_stmt = internal::BlockStatement {
-            body: block.body.clone(),
-            span: block.span,
-        };
-        self.print_block_statement(&block_stmt);
-    }
-
-    /// Print a property definition
-    ///
-    /// Uses hybrid approach: prefix printed imperatively, type annotation uses doc-based
-    /// width-aware printing so union/intersection types and generic arguments wrap correctly.
-    fn print_property_definition(
-        &mut self,
-        prop: &internal::PropertyDefinition,
-        _is_declare: bool,
-    ) {
-        // Print decorators, each on its own line
-        if let Some(decorators) = &prop.decorators {
-            for decorator in decorators {
-                self.print_decorator(decorator);
-                self.write("\n");
-                self.write_indent();
-            }
-        }
-
-        // Print accessibility modifier if applicable
-        if let Some(accessibility) = &prop.accessibility {
-            self.write(accessibility.as_str());
-            self.write(" ");
-        }
-
-        // Print static modifier if applicable
-        if prop.is_static {
-            self.write("static ");
-        }
-
-        // Print abstract modifier if applicable
-        if prop.r#abstract {
-            self.write("abstract ");
-        }
-
-        // Print readonly modifier if applicable
-        if prop.readonly {
-            self.write("readonly ");
-        }
-
-        // Print accessor keyword if applicable (ES decorator proposal)
-        if prop.accessor {
-            self.write("accessor ");
-        }
-
-        // Print key
-        if prop.computed {
-            self.write("[");
-            self.print_expression(&prop.key);
-            self.write("]");
-        } else {
-            self.print_expression(&prop.key);
-        }
-
-        // Print optional marker (?) or definite assignment assertion (!)
-        match prop.modifier {
-            internal::PropertyModifier::Optional => self.write("?"),
-            internal::PropertyModifier::Definite => self.write("!"),
-            internal::PropertyModifier::None => {}
-        }
-
-        // Build doc for type annotation + value using width-aware printing
-        // suffix_width accounts for trailing ";" = 1 char
-        let suffix_doc = self.build_property_suffix_doc(prop);
-        let suffix_output = self.render_doc_with_suffix(&suffix_doc, 1);
-        self.write(&suffix_output);
-        self.write(";");
-    }
-
-    /// Build a Doc for property suffix (type annotation + optional value).
-    ///
-    /// Uses doc-based printing so union/intersection types and generic type
-    /// arguments wrap correctly when line exceeds print_width.
-    fn build_property_suffix_doc(&self, prop: &internal::PropertyDefinition) -> doc::Doc {
-        let mut parts = Vec::new();
-
-        // Type annotation if present - use width-aware wrapping for generic types
-        if let Some(type_annotation) = &prop.type_annotation {
-            parts.push(self.build_type_annotation_doc_wrapping(type_annotation));
-        }
-
-        // Value if present
-        if let Some(value) = &prop.value {
-            parts.push(doc::text(" = "));
-            parts.push(self.build_expression_doc(value));
-        }
-
-        doc::concat(parts)
-    }
-
-    /// Print a method definition
-    ///
-    /// Uses hybrid approach: prefix/suffix printed imperatively, signature uses doc-based
-    /// width-aware wrapping so params break when total line length exceeds print_width.
-    fn print_method_definition(&mut self, method: &internal::MethodDefinition, is_declare: bool) {
-        // Print decorators, each on its own line
-        if let Some(decorators) = &method.decorators {
-            for decorator in decorators {
-                self.print_decorator(decorator);
-                self.write("\n");
-                self.write_indent();
-            }
-        }
-
-        // Print accessibility modifier if applicable
-        if let Some(accessibility) = &method.accessibility {
-            self.write(accessibility.as_str());
-            self.write(" ");
-        }
-
-        // Print static modifier if applicable
-        if method.is_static {
-            self.write("static ");
-        }
-
-        // Print override modifier if applicable
-        if method.r#override {
-            self.write("override ");
-        }
-
-        // Print abstract modifier if applicable
-        if method.r#abstract {
-            self.write("abstract ");
-        }
-
-        // Print async modifier if applicable
-        if method.value.r#async {
-            self.write("async ");
-        }
-
-        // Print generator marker if applicable
-        if method.value.generator {
-            self.write("*");
-        }
-
-        // Print get/set for accessors
-        match method.kind {
-            internal::MethodKind::Get => self.write("get "),
-            internal::MethodKind::Set => self.write("set "),
-            _ => {}
-        }
-
-        // Print key
-        if method.computed {
-            self.write("[");
-            self.print_expression(&method.key);
-            self.write("]");
-        } else {
-            self.print_expression(&method.key);
-        }
-
-        // Print type parameters if present: method<T>()
-        if let Some(type_params) = &method.value.type_parameters {
-            self.print_type_parameter_declaration(type_params);
-        }
-
-        // Build signature doc (params + return type) using doc-based width-aware wrapping.
-        // The suffix_width accounts for the body that follows (` {}` for empty, ` {` for non-empty).
-        let is_overload_signature = method.value.body.span.start == method.value.body.span.end;
-        let is_bodyless = is_declare || method.r#abstract || is_overload_signature;
-        let suffix_width = if is_bodyless {
-            1 // Just ";"
-        } else if method.value.body.body.is_empty() {
-            3 // " {}"
-        } else {
-            2 // " {"
-        };
-
-        let sig_doc = self.build_method_signature_doc(method);
-        let sig_output = self.render_doc_with_suffix(&sig_doc, suffix_width);
-        self.write(&sig_output);
-
-        // For declare class, abstract methods, or overload signatures, print semicolon instead of body
-        if is_bodyless {
-            self.write(";");
-        } else {
-            self.write(" ");
-            // Find the end of the signature to check for dangling comments
-            // (comments between signature and body that should move inside)
-            // We need position AFTER `)` to avoid re-printing param comments.
-            let sig_end = if let Some(return_type) = &method.value.return_type {
-                return_type.span.end
-            } else {
-                // Find closing `)` to get accurate boundary
-                self.find_closing_paren(method.value.params_start, method.value.body.span.start)
-                    .unwrap_or(method.value.body.span.start)
-            };
-            // Print body with outer comments moved inside
-            self.print_block_statement_with_outer_comments(&method.value.body, sig_end);
-        }
+        false
     }
 
     /// Build a Doc for method signature (params + return type).
@@ -549,11 +110,47 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a class declaration
+    #[inline]
     pub(super) fn build_class_declaration_doc(
         &self,
         decl: &internal::ClassDeclaration,
     ) -> doc::Doc {
+        self.build_class_declaration_doc_inner(decl, true)
+    }
+
+    /// Build a Doc for a class declaration without decorators
+    ///
+    /// Used when exporting decorated classes where decorators are printed
+    /// before the export keyword.
+    #[inline]
+    pub(in crate::printer) fn build_class_declaration_without_decorators_doc(
+        &self,
+        decl: &internal::ClassDeclaration,
+    ) -> doc::Doc {
+        self.build_class_declaration_doc_inner(decl, false)
+    }
+
+    /// Core implementation for class declaration doc building
+    ///
+    /// # Arguments
+    ///
+    /// * `decl` - The class declaration to build a doc for
+    /// * `include_decorators` - If true, decorators are included in the output.
+    ///   Set to false when decorators are printed separately (e.g., before `export`).
+    fn build_class_declaration_doc_inner(
+        &self,
+        decl: &internal::ClassDeclaration,
+        include_decorators: bool,
+    ) -> doc::Doc {
+        let group_mode = self.should_class_group_mode(decl);
         let mut parts = vec![];
+
+        // Decorators, each on its own line
+        if include_decorators
+            && let Some(dec_doc) = self.build_decorators_doc(decl.decorators.as_ref())
+        {
+            parts.push(dec_doc);
+        }
 
         // declare modifier
         if decl.declare {
@@ -572,60 +169,239 @@ impl<'a> Printer<'a> {
             parts.push(doc::text_owned(id_str));
         }
 
-        // Type parameters
-        if let Some(type_params) = &decl.type_parameters {
-            parts.push(self.build_type_parameter_declaration_doc(type_params));
-        }
-
-        // Handle extends clause
-        if let Some(super_class) = &decl.super_class {
-            parts.push(doc::text(" extends "));
-            parts.push(self.build_expression_doc(super_class));
+        // Build heritage docs
+        let extends_doc = if let Some(super_class) = &decl.super_class {
+            let mut ext_parts = vec![doc::text("extends ")];
+            ext_parts.push(doc::text_owned(self.expression_to_string(super_class)));
             if let Some(type_args) = &decl.super_type_parameters {
-                parts.push(self.build_type_arguments_doc(type_args));
+                ext_parts.push(self.build_type_arguments_doc(type_args));
             }
-        }
+            Some(doc::concat(ext_parts))
+        } else {
+            None
+        };
 
-        // Handle implements clause
-        if !decl.implements.is_empty() {
-            parts.push(doc::text(" implements "));
-            for (i, impl_item) in decl.implements.iter().enumerate() {
+        let implements_doc = if !decl.implements.is_empty() {
+            let mut impl_parts = vec![doc::text("implements ")];
+            for (i, heritage) in decl.implements.iter().enumerate() {
                 if i > 0 {
-                    parts.push(doc::text(", "));
+                    impl_parts.push(doc::text(", "));
                 }
-                parts.push(self.build_entity_name_doc(&impl_item.expression));
-                if let Some(type_args) = &impl_item.type_arguments {
-                    parts.push(self.build_type_arguments_doc(type_args));
+                impl_parts.push(self.build_entity_name_doc(&heritage.expression));
+                if let Some(type_args) = &heritage.type_arguments {
+                    impl_parts.push(self.build_type_arguments_doc(type_args));
                 }
             }
-        }
+            Some(doc::concat(impl_parts))
+        } else {
+            None
+        };
 
-        parts.push(doc::text(" "));
-        parts.push(self.build_class_body_doc(&decl.body, decl.declare));
+        // Build the header group
+        // The pre-brace line break is inside the group so it's affected by group break
+        // But the body itself is outside (its hardlines don't affect fit check)
+        let header_doc = if group_mode {
+            // Group mode: one unified group - when it breaks, heritage breaks too
+            if let Some(type_params) = &decl.type_parameters {
+                parts.push(self.build_type_parameter_declaration_doc_inline_group(type_params));
+            }
 
-        doc::concat(parts)
+            // Heritage clauses with line breaks
+            let mut heritage_parts = Vec::new();
+            if let Some(ext) = extends_doc {
+                heritage_parts.push(doc::line());
+                heritage_parts.push(ext);
+            }
+            if let Some(impl_doc) = implements_doc {
+                heritage_parts.push(doc::line());
+                heritage_parts.push(impl_doc);
+            }
+            if !heritage_parts.is_empty() {
+                parts.push(doc::indent(doc::concat(heritage_parts)));
+            }
+
+            // Pre-brace behavior depends on body content:
+            // - Empty body: always space (` {}` stays inline)
+            // - Non-empty body: line() becomes space if fits, newline if breaks
+            if decl.body.body.is_empty() {
+                parts.push(doc::text(" "));
+            } else {
+                // dedent so brace is at base indent (not heritage indent)
+                parts.push(doc::dedent(doc::line()));
+            }
+
+            doc::group(doc::concat(parts))
+        } else {
+            // Non-group mode: type params break independently, heritage stays inline
+            if let Some(type_params) = &decl.type_parameters {
+                parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
+            }
+
+            // Heritage clauses stay inline
+            if let Some(ext) = extends_doc {
+                parts.push(doc::text(" "));
+                parts.push(ext);
+            }
+            if let Some(impl_doc) = implements_doc {
+                parts.push(doc::text(" "));
+                parts.push(impl_doc);
+            }
+
+            // Always space before brace in non-group mode
+            parts.push(doc::text(" "));
+
+            doc::concat(parts)
+        };
+
+        // Body is outside the header group (hardlines in body don't affect header fit check)
+        doc::concat(vec![
+            header_doc,
+            self.build_class_body_doc(&decl.body, decl.declare),
+        ])
     }
 
     /// Build a Doc for a class body
+    ///
+    /// Handles comments between members, blank line preservation, and trailing comments.
     pub(in crate::printer) fn build_class_body_doc(
         &self,
         body: &internal::ClassBody,
         _is_ambient: bool,
     ) -> doc::Doc {
         if body.body.is_empty() {
+            // Check for comments inside empty body
+            let body_start = body.span.start + 1; // After '{'
+            let body_end = body.span.end.saturating_sub(1); // Before '}'
+            let has_inner_comments = self.has_comments_between(body_start, body_end);
+
+            if has_inner_comments {
+                let mut comment_parts = Vec::new();
+                for comment in tsv_lang::comments_in_range(self.comments, body_start, body_end) {
+                    comment_parts.push(self.build_comment_doc(comment));
+                    if !comment.is_block {
+                        comment_parts.push(doc::hardline());
+                    }
+                }
+                return doc::concat(vec![
+                    doc::text("{"),
+                    doc::indent(doc::concat(vec![
+                        doc::hardline(),
+                        doc::concat(comment_parts),
+                    ])),
+                    doc::hardline(),
+                    doc::text("}"),
+                ]);
+            }
+
             return doc::text("{}");
         }
 
-        // Build member docs joined by hardlines
+        // Build member docs with comments and blank line preservation
         let mut member_parts = Vec::new();
+        let mut prev_end = body.span.start + 1; // Start after '{'
+
         for (i, member) in body.body.iter().enumerate() {
-            if i > 0 {
+            let member_start = member.span().start;
+            let is_first = i == 0;
+
+            // Check for comments between previous position and this member
+            // Filter out trailing same-line comments from the previous member
+            let all_comments: Vec<_> =
+                tsv_lang::comments_in_range(self.comments, prev_end, member_start).collect();
+            let comments: Vec<_> = if !is_first {
+                all_comments
+                    .iter()
+                    .filter(|c| {
+                        !tsv_lang::printing::is_same_line(self.source, prev_end, c.span.start)
+                    })
+                    .copied()
+                    .collect()
+            } else {
+                all_comments
+            };
+
+            // For non-first members, determine if we need blank line preservation
+            // We either add: hardline (no blank) or literalline + hardline (blank line)
+            if !is_first {
+                let check_pos = if comments.is_empty() {
+                    member_start
+                } else {
+                    comments[0].span.start
+                };
+                if tsv_lang::printing::has_blank_line_between(self.source, prev_end, check_pos) {
+                    // Blank line before first comment or member
+                    member_parts.push(doc::literalline());
+                }
                 member_parts.push(doc::hardline());
             }
+
+            // Process comments before this member
+            let mut last_pos = prev_end;
+            for (j, comment) in comments.iter().enumerate() {
+                // For subsequent comments, check for blank lines between them
+                if j > 0
+                    && tsv_lang::printing::has_blank_line_between(
+                        self.source,
+                        last_pos,
+                        comment.span.start,
+                    )
+                {
+                    member_parts.push(doc::literalline());
+                    member_parts.push(doc::hardline());
+                }
+
+                member_parts.push(self.build_comment_doc(comment));
+                if !comment.is_block {
+                    // Line comments need a hardline after
+                    member_parts.push(doc::hardline());
+                } else if !tsv_lang::printing::is_same_line(
+                    self.source,
+                    comment.span.end,
+                    member_start,
+                ) {
+                    // Block comment on its own line - hardline after
+                    member_parts.push(doc::hardline());
+                } else {
+                    // Block comment on same line as member - space before
+                    member_parts.push(doc::text(" "));
+                }
+                last_pos = comment.span.end;
+            }
+
+            // Check for blank line after last comment (before member)
+            if !comments.is_empty()
+                && tsv_lang::printing::has_blank_line_between(self.source, last_pos, member_start)
+            {
+                member_parts.push(doc::literalline());
+                member_parts.push(doc::hardline());
+            }
+
             member_parts.push(self.build_class_member_doc(member));
+
+            // Handle trailing inline comments on same line after member
+            let upper_bound = body
+                .body
+                .get(i + 1)
+                .map_or(body.span.end, |next| next.span().start);
+            for comment in
+                tsv_lang::comments_in_range(self.comments, member.span().end, upper_bound)
+            {
+                if tsv_lang::printing::is_same_line(
+                    self.source,
+                    member.span().end,
+                    comment.span.start,
+                ) {
+                    member_parts.push(doc::text(" "));
+                    member_parts.push(self.build_comment_doc(comment));
+                } else {
+                    break;
+                }
+            }
+
+            prev_end = member.span().end;
         }
 
-        // Wrap body content in indent (like build_interface_declaration_doc)
+        // Wrap body content in indent
         doc::concat(vec![
             doc::text("{"),
             doc::indent(doc::concat(vec![
@@ -690,14 +466,9 @@ impl<'a> Printer<'a> {
     fn build_property_definition_doc(&self, prop: &internal::PropertyDefinition) -> doc::Doc {
         let mut parts = vec![];
 
-        // Static modifier
-        if prop.is_static {
-            parts.push(doc::text("static "));
-        }
-
-        // Abstract modifier
-        if prop.r#abstract {
-            parts.push(doc::text("abstract "));
+        // Decorators
+        if let Some(dec_doc) = self.build_decorators_doc(prop.decorators.as_ref()) {
+            parts.push(dec_doc);
         }
 
         // Accessibility modifier
@@ -709,9 +480,24 @@ impl<'a> Printer<'a> {
             }
         }
 
+        // Static modifier
+        if prop.is_static {
+            parts.push(doc::text("static "));
+        }
+
+        // Abstract modifier
+        if prop.r#abstract {
+            parts.push(doc::text("abstract "));
+        }
+
         // Readonly modifier
         if prop.readonly {
             parts.push(doc::text("readonly "));
+        }
+
+        // Accessor keyword
+        if prop.accessor {
+            parts.push(doc::text("accessor "));
         }
 
         // Key
@@ -723,10 +509,16 @@ impl<'a> Printer<'a> {
             parts.push(self.build_expression_doc(&prop.key));
         }
 
-        // Type annotation
+        // Optional/definite modifier after key
+        match prop.modifier {
+            internal::PropertyModifier::Optional => parts.push(doc::text("?")),
+            internal::PropertyModifier::Definite => parts.push(doc::text("!")),
+            internal::PropertyModifier::None => {}
+        }
+
+        // Type annotation - use width-aware wrapping for generics and union types
         if let Some(type_ann) = &prop.type_annotation {
-            parts.push(doc::text(": "));
-            parts.push(self.build_type_doc(&type_ann.type_annotation));
+            parts.push(self.build_type_annotation_doc_wrapping(type_ann));
         }
 
         // Value if present
@@ -743,6 +535,17 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a method definition
     fn build_method_definition_doc(&self, method: &internal::MethodDefinition) -> doc::Doc {
         let mut parts = vec![];
+
+        // Decorators
+        if let Some(dec_doc) = self.build_decorators_doc(method.decorators.as_ref()) {
+            parts.push(dec_doc);
+        }
+
+        // Accessibility modifier
+        if let Some(accessibility) = &method.accessibility {
+            parts.push(doc::text(accessibility.as_str()));
+            parts.push(doc::text(" "));
+        }
 
         // Static modifier
         if method.is_static {
@@ -790,36 +593,37 @@ impl<'a> Printer<'a> {
             parts.push(self.build_type_parameter_declaration_doc(type_params));
         }
 
-        // Parameters (can be Identifier, ArrayPattern, ObjectPattern, AssignmentPattern)
-        let param_docs: Vec<_> = method
-            .value
-            .params
-            .iter()
-            .map(|param| self.build_expression_doc(param))
-            .collect();
-        parts.push(doc::text("("));
-        parts.push(doc::join(param_docs, ", "));
+        // Parameters and return type - use the signature builder
+        parts.push(self.build_method_signature_doc(method));
 
-        // For abstract methods, use semicolon instead of body
-        if method.r#abstract {
-            parts.push(doc::text(");"));
+        // Overload signatures have empty body (start == end)
+        let is_overload_signature = method.value.body.span.start == method.value.body.span.end;
+
+        // For abstract methods or overload signatures, use semicolon instead of body
+        if method.r#abstract || is_overload_signature {
+            parts.push(doc::text(";"));
         } else {
-            parts.push(doc::text(") "));
-            // Body
-            parts.push(self.build_block_statement_doc(&method.value.body));
+            parts.push(doc::text(" "));
+            // Check for comments between signature and body (outer comments)
+            // These need to be moved inside the block body
+            let sig_end = if let Some(rt) = &method.value.return_type {
+                rt.span.end
+            } else if let Some(paren) =
+                self.find_closing_paren(method.value.params_start, method.value.body.span.start)
+            {
+                paren
+            } else {
+                method.value.body.span.start
+            };
+            let outer_comments = self.build_outer_comments_for_block(sig_end, &method.value.body);
+            parts.push(
+                self.build_block_statement_with_outer_comments_doc(
+                    &method.value.body,
+                    outer_comments,
+                ),
+            );
         }
 
         doc::concat(parts)
-    }
-
-    /// Print a decorator: `@expression`
-    ///
-    /// Uses doc-based printing without margin since decorators don't have
-    /// trailing punctuation on the same line.
-    pub(in crate::printer) fn print_decorator(&mut self, decorator: &internal::Decorator) {
-        self.write("@");
-        // Use write_doc (no margin) - decorators don't have trailing punctuation
-        let doc = self.build_expression_doc(&decorator.expression);
-        self.write_doc(&doc);
     }
 }

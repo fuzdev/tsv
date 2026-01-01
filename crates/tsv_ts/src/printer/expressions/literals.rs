@@ -8,7 +8,7 @@
 // - Regex literals
 // - Spread elements
 
-use super::super::Printer;
+use super::Printer;
 use crate::ast::internal::{self, LiteralValue};
 use tsv_lang::SymbolResolver;
 use tsv_lang::doc::{self, Doc};
@@ -85,45 +85,6 @@ pub fn sort_regex_flags(flags: &str) -> String {
 }
 
 impl<'a> Printer<'a> {
-    /// Print a literal value
-    pub(in crate::printer) fn print_literal(&mut self, literal: &internal::Literal) {
-        match &literal.value {
-            LiteralValue::Number(_) => {
-                // Extract raw literal and normalize it
-                let raw = literal.span.extract(self.source);
-                let normalized = normalize_number_literal(raw);
-                self.write(&normalized);
-            }
-            LiteralValue::String { content: _, quote } => {
-                // Extract raw literal from source (preserves escape sequences)
-                let raw_literal = literal.span.extract(self.source);
-
-                // Extract content without surrounding quotes
-                let raw_content = &raw_literal[1..raw_literal.len() - 1];
-
-                // Format using shared utility (handles quote selection and escaping)
-                let formatted =
-                    format_string_literal(raw_content, *quote, StringFormatOptions::default());
-
-                self.write(&formatted);
-            }
-            LiteralValue::BigInt(_) => {
-                // Extract raw literal and normalize it (lowercases hex digits)
-                let raw = literal.span.extract(self.source);
-                self.write(&normalize_number_literal(raw));
-            }
-            LiteralValue::Boolean(b) => {
-                self.write(if *b { "true" } else { "false" });
-            }
-            LiteralValue::Null => {
-                self.write("null");
-            }
-            LiteralValue::Undefined => {
-                self.write("undefined");
-            }
-        }
-    }
-
     /// Build a Doc for a literal
     pub(in crate::printer) fn build_literal_doc(&self, literal: &internal::Literal) -> Doc {
         match &literal.value {
@@ -148,42 +109,6 @@ impl<'a> Printer<'a> {
             LiteralValue::Null => doc::text("null"),
             LiteralValue::Undefined => doc::text("undefined"),
         }
-    }
-
-    /// Print an identifier
-    pub(in crate::printer) fn print_identifier(&mut self, identifier: &internal::Identifier) {
-        // Print decorators (for parameter decorators)
-        if let Some(decorators) = &identifier.decorators {
-            for decorator in decorators {
-                self.write("@");
-                self.print_expression(&decorator.expression);
-                self.write(" ");
-            }
-        }
-
-        // Resolve symbol from interner using centralized helper
-        let name = self.resolve_symbol(identifier.name);
-        self.write(&name);
-
-        // Handle optional marker (e.g., `a?` in `function fn(a?: number) {}`)
-        if identifier.optional {
-            self.write("?");
-        }
-
-        // Handle type annotations
-        if let Some(type_annotation) = &identifier.type_annotation {
-            self.print_type_annotation(type_annotation);
-        }
-    }
-
-    /// Print a private identifier: `#name`
-    pub(in crate::printer) fn print_private_identifier(
-        &mut self,
-        pid: &internal::PrivateIdentifier,
-    ) {
-        self.write("#");
-        let name = self.resolve_symbol(pid.name);
-        self.write(&name);
     }
 
     /// Build a Doc for a private identifier
@@ -226,15 +151,6 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Print a regex literal: /pattern/flags
-    /// Flags are sorted alphabetically to match prettier's output.
-    pub(super) fn print_regex_literal(&mut self, regex: &internal::RegexLiteral) {
-        self.write("/");
-        self.write(&regex.pattern);
-        self.write("/");
-        self.write(&sort_regex_flags(&regex.flags));
-    }
-
     /// Build a Doc for a regex literal
     /// Flags are sorted alphabetically to match prettier's output.
     pub(super) fn build_regex_doc(&self, regex: &internal::RegexLiteral) -> Doc {
@@ -243,12 +159,6 @@ impl<'a> Printer<'a> {
             regex.pattern,
             sort_regex_flags(&regex.flags)
         ))
-    }
-
-    /// Print a spread element
-    pub(super) fn print_spread_element(&mut self, spread: &internal::SpreadElement) {
-        self.write("...");
-        self.print_expression(&spread.argument);
     }
 
     /// Build a Doc for a spread element

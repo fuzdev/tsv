@@ -1,12 +1,8 @@
-// Element and content classification for Svelte formatting
+// Element classification for Svelte formatting
 //
-// Provides utilities to classify elements by their rendering characteristics
-// and query properties of template content.
+// Provides utilities to classify elements by their rendering characteristics.
 //
 // Organization:
-// - element.rs: Element type checks (inline, block, void)
-// - whitespace.rs: Whitespace preservation rules
-// - content.rs: Fragment content analysis
+// - element.rs: Element type checks (block, void)
 
-pub mod content;
 pub mod element;

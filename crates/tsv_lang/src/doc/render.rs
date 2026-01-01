@@ -242,18 +242,15 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     };
                     let effective_width = config.print_width.saturating_sub(suffix);
                     let remaining_width = effective_width.saturating_sub(*pos) as isize;
-                    let chosen_mode = if fits_with_lookahead(
+                    let fits = fits_with_lookahead(
                         contents,
                         Mode::Flat,
                         &commands,
                         remaining_width,
                         config,
                         resolver,
-                    ) {
-                        Mode::Flat
-                    } else {
-                        Mode::Break
-                    };
+                    );
+                    let chosen_mode = if fits { Mode::Flat } else { Mode::Break };
                     commands.push(Command {
                         indent: cmd.indent,
                         mode: chosen_mode,

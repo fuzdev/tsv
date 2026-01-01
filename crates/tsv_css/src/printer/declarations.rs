@@ -110,7 +110,7 @@ impl<'a> Printer<'a> {
     ///
     /// Consolidates comma-separated and space-separated list building.
     fn build_list_doc(&self, values: &[CssValue], separator: &'static str) -> doc::Doc {
-        let docs: Vec<_> = values.iter().map(|v| self.build_value_doc(v)).collect();
+        let docs: Vec<_> = values.iter().map(|v| self.build_css_value_doc(v)).collect();
         doc::join(docs, separator)
     }
 
@@ -173,21 +173,14 @@ impl<'a> Printer<'a> {
         let is_url = name == "url";
         let separator = if is_url { "," } else { ", " };
 
-        let arg_docs: Vec<_> = args.iter().map(|arg| self.build_value_doc(arg)).collect();
+        let arg_docs: Vec<_> = args
+            .iter()
+            .map(|arg| self.build_css_value_doc(arg))
+            .collect();
         let args_doc = doc::join(arg_docs, separator);
         let parens_doc = doc::parens(args_doc);
 
         doc::concat(vec![doc::text_owned(name.to_string()), parens_doc])
-    }
-
-    /// Build a doc representation of a value for width checking
-    ///
-    /// Uses normalized string representation (via value_to_string) to ensure
-    /// consistent width calculation regardless of source formatting.
-    fn build_value_doc(&self, value: &CssValue) -> doc::Doc {
-        // Use value_to_string which normalizes formatting (whitespace, quotes, etc.)
-        // This ensures width calculation is independent of source formatting
-        doc::text_owned(self.value_to_string(value))
     }
 
     /// Format a CSS declaration (property: value;)
@@ -403,8 +396,7 @@ impl<'a> Printer<'a> {
     fn build_comma_fill_doc(&self, values: &[CssValue]) -> doc::Doc {
         let mut parts = Vec::new();
         for (i, val) in values.iter().enumerate() {
-            // Use value_to_string for source-fidelity formatting
-            parts.push(doc::text_owned(self.value_to_string(val)));
+            parts.push(self.build_css_value_doc(val));
             if i < values.len() - 1 {
                 // Separator: ", " in flat mode, ",\n" when broken
                 parts.push(doc::concat(vec![doc::text(","), doc::line()]));
@@ -445,8 +437,7 @@ impl<'a> Printer<'a> {
     fn build_space_fill_parts(&self, values: &[CssValue]) -> Vec<doc::Doc> {
         let mut parts = Vec::new();
         for (i, val) in values.iter().enumerate() {
-            // Use value_to_string for source-fidelity formatting
-            parts.push(doc::text_owned(self.value_to_string(val)));
+            parts.push(self.build_css_value_doc(val));
             if i < values.len() - 1 {
                 // Separator: " " in flat mode, "\n" when broken
                 parts.push(doc::line());

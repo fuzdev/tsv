@@ -95,14 +95,24 @@ pub fn choose_layout(right_expr: &Expression, context: &LayoutContext) -> Assign
 /// These values should never have a break between key: and value because they
 /// expand internally. `key: { ... }` NOT `key:\n{ ... }`
 fn is_self_expanding_value(expr: &Expression) -> bool {
-    matches!(
-        expr,
+    match expr {
         Expression::ObjectExpression(_)
-            | Expression::ArrayExpression(_)
-            | Expression::FunctionExpression(_)
-            | Expression::ArrowFunctionExpression(_)
-            | Expression::ClassExpression(_)
-    )
+        | Expression::ArrayExpression(_)
+        | Expression::FunctionExpression(_)
+        | Expression::ArrowFunctionExpression(_)
+        | Expression::ClassExpression(_) => true,
+
+        // Call expressions with function/object/array/class arguments also self-expand
+        // e.g., `x = fork(() => { ... })` - the function body handles its own expansion
+        Expression::CallExpression(call) => call.arguments.iter().any(is_self_expanding_value),
+
+        // New expressions with function/object/array/class arguments
+        Expression::NewExpression(new_expr) => {
+            new_expr.arguments.iter().any(is_self_expanding_value)
+        }
+
+        _ => false,
+    }
 }
 
 /// Check if we should break after the operator for this expression

@@ -190,6 +190,29 @@ impl<'a> Printer<'a> {
     pub fn into_string(self) -> String {
         self.buffer.into_string()
     }
+
+    /// Render a doc immediately at current buffer position
+    ///
+    /// This is the foundation for doc-first formatting. Instead of using
+    /// imperative printing, callers build a Doc and render it in one step.
+    ///
+    /// The doc is rendered starting at the current column position with
+    /// the current indent level, so it seamlessly integrates with any
+    /// preceding output.
+    pub(crate) fn render_doc_immediate(&mut self, doc: &tsv_lang::doc::Doc) {
+        let col = self.buffer.current_column(self.config.tab_width);
+        let output = {
+            let interner = self.interner.borrow();
+            tsv_lang::doc::print_doc_with_indent_resolved(
+                doc,
+                &self.config,
+                col,
+                self.indent_level,
+                &*interner,
+            )
+        };
+        self.write(&output);
+    }
 }
 
 /// Format a Svelte AST back to source code
@@ -581,35 +604,6 @@ impl<'a> Printer<'a> {
                     state.after_block();
                 }
             }
-        }
-    }
-
-    /// Format a single fragment node (dispatch to specific type)
-    ///
-    /// # Parameters
-    /// - `parent_is_block`: Whether the parent element is a block element (affects text trimming)
-    /// - `parent_preserves_ws`: Whether the parent element preserves whitespace (like `<pre>`)
-    pub(crate) fn print_fragment_node(
-        &mut self,
-        node: &FragmentNode,
-        parent_is_block: bool,
-        parent_preserves_ws: bool,
-    ) {
-        match node {
-            FragmentNode::Element(element) => self.print_element(element),
-            FragmentNode::Text(text) => self.print_text(text, parent_is_block, parent_preserves_ws),
-            FragmentNode::ExpressionTag(tag) => self.print_expression_tag(tag),
-            FragmentNode::Comment(comment) => self.print_comment(comment),
-            FragmentNode::IfBlock(block) => self.print_if_block(block),
-            FragmentNode::EachBlock(block) => self.print_each_block(block),
-            FragmentNode::AwaitBlock(block) => self.print_await_block(block),
-            FragmentNode::KeyBlock(block) => self.print_key_block(block),
-            FragmentNode::SnippetBlock(block) => self.print_snippet_block(block),
-            FragmentNode::HtmlTag(tag) => self.print_html_tag(tag),
-            FragmentNode::ConstTag(tag) => self.print_const_tag(tag),
-            FragmentNode::DebugTag(tag) => self.print_debug_tag(tag),
-            FragmentNode::RenderTag(tag) => self.print_render_tag(tag),
-            FragmentNode::SpecialElement(elem) => self.print_special_element(elem),
         }
     }
 

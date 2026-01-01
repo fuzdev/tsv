@@ -1462,8 +1462,12 @@ impl<'a> Parser<'a> {
             // Function type: `<(x: T) => R>` or `<() => R>`
             b'(' => is_function_type_start(bytes, pos),
 
-            // Object type `{`, tuple type `[`, string literal types
-            b'{' | b'[' | b'\'' | b'"' => true,
+            // Object type `{`, tuple type `[`, string/template literal types
+            b'{' | b'[' | b'\'' | b'"' | b'`' => true,
+
+            // Numeric literal types: `<42>`, `<-1>`
+            // Must check what follows the number to distinguish from `x < 42`
+            b'0'..=b'9' | b'-' => self.check_numeric_type_arg_pattern(bytes, pos),
 
             // Not a recognized type argument start
             _ => false,
@@ -1555,6 +1559,61 @@ impl<'a> Parser<'a> {
         true
     }
 
+    /// Check if numeric literal at `pos` is a type argument, not a comparison.
+    ///
+    /// - `fn<42>()`: after `42` we see `>` → type args
+    /// - `x < 42`: after `42` we see `;` or operator → comparison
+    fn check_numeric_type_arg_pattern(&self, bytes: &[u8], mut pos: usize) -> bool {
+        // Skip optional minus sign
+        if pos < bytes.len() && bytes[pos] == b'-' {
+            pos += 1;
+            pos = skip_whitespace(bytes, pos);
+        }
+
+        // Must have at least one digit
+        if pos >= bytes.len() || !bytes[pos].is_ascii_digit() {
+            return false;
+        }
+
+        // Skip the numeric literal (simplified: just skip digits, dots, hex chars, etc.)
+        while pos < bytes.len() {
+            match bytes[pos] {
+                b'0'..=b'9' | b'.' | b'x' | b'X' | b'a'..=b'f' | b'A'..=b'F' | b'_' | b'n' => {
+                    pos += 1;
+                    // Handle exponent sign: after 'e' or 'E', skip optional +/-
+                    if matches!(bytes[pos - 1], b'e' | b'E')
+                        && pos < bytes.len()
+                        && matches!(bytes[pos], b'+' | b'-')
+                    {
+                        pos += 1;
+                    }
+                }
+                _ => break,
+            }
+        }
+
+        pos = skip_whitespace_and_comments(bytes, pos);
+        if pos >= bytes.len() {
+            return false;
+        }
+
+        // Check what follows the number
+        match bytes[pos] {
+            // Definitely type args
+            b'>' => true,
+            // More type params
+            b',' => {
+                scan_for_closing_angle_bracket(bytes, skip_whitespace_and_comments(bytes, pos + 1))
+            }
+            // Union/intersection (but not || or &&)
+            b'|' | b'&' if pos + 1 < bytes.len() && bytes[pos + 1] != bytes[pos] => {
+                scan_for_closing_angle_bracket(bytes, skip_whitespace_and_comments(bytes, pos + 1))
+            }
+            // Anything else (semicolon, operators, etc.) - not type args
+            _ => false,
+        }
+    }
+
     /// Check if position points to a TypeScript type keyword
     fn is_type_keyword_at(&self, bytes: &[u8], pos: usize) -> bool {
         const TYPE_KEYWORDS: &[&[u8]] = &[
@@ -1573,6 +1632,12 @@ impl<'a> Parser<'a> {
             b"this",
             b"true",
             b"false",
+            // Type operators that can start a type
+            b"typeof",
+            b"keyof",
+            b"infer",
+            b"readonly",
+            b"unique",
         ];
 
         for kw in TYPE_KEYWORDS {

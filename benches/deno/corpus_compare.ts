@@ -24,6 +24,7 @@ interface Args {
 	verbose?: boolean;
 	diff?: boolean;
 	'diff-limit'?: number;
+	'exit-on-first'?: boolean;
 	help?: boolean;
 }
 
@@ -60,6 +61,7 @@ Options:
   --verbose         Show each file as it's processed
   --diff            Show unified diffs for mismatches
   --diff-limit <n>  Max diffs to show (default: 5)
+  --exit-on-first   Stop after finding the first mismatch or error
   --help            Show this help message
 
 Examples:
@@ -67,13 +69,14 @@ Examples:
   deno task corpus:compare ~/dev/my-project --filter svelte
   deno task corpus:compare ~/dev/my-project --limit 50 --verbose
   deno task corpus:compare ~/dev/my-project --diff --diff-limit 3
+  deno task corpus:compare ~/dev/my-project --exit-on-first --diff
 `);
 }
 
 async function main(): Promise<void> {
 	const args = parseArgs(Deno.args, {
 		string: ['filter'],
-		boolean: ['verbose', 'help', 'diff'],
+		boolean: ['verbose', 'help', 'diff', 'exit-on-first'],
 		alias: { h: 'help', v: 'verbose', f: 'filter', l: 'limit', d: 'diff' },
 	}) as Args;
 
@@ -103,6 +106,7 @@ async function main(): Promise<void> {
 	const verbose = args.verbose ?? false;
 	const showDiff = args.diff ?? false;
 	const diffLimit = args['diff-limit'] ? Number(args['diff-limit']) : 5;
+	const exitOnFirst = args['exit-on-first'] ?? false;
 
 	console.log(`Comparing: ${resolvedPath}`);
 	if (filterLang) console.log(`Filter: ${filterLang} only`);
@@ -174,6 +178,7 @@ async function main(): Promise<void> {
 				console.log(`  ${file.path}`);
 			}
 
+			let shouldExit = false;
 			try {
 				// Format with both
 				const ours = native.format(file.content, lang);
@@ -185,14 +190,37 @@ async function main(): Promise<void> {
 				} else {
 					langStats.differ++;
 					langResults.push({ file, status: 'differ', ours, prettier });
+					if (exitOnFirst) {
+						console.log(`\nFirst mismatch: ${relPath(file.path, resolvedPath)}`);
+						if (showDiff) {
+							console.log('─'.repeat(70));
+							const diff = diffLines(prettier, ours);
+							for (const line of formatDiffForTerminal(diff)) {
+								console.log(line);
+							}
+						}
+						shouldExit = true;
+					}
 				}
 			} catch (e) {
 				langStats.errors++;
+				const errorMsg = e instanceof Error ? e.message : String(e);
 				langResults.push({
 					file,
 					status: 'error',
-					error: e instanceof Error ? e.message : String(e),
+					error: errorMsg,
 				});
+				if (exitOnFirst) {
+					console.log(`\nFirst error: ${relPath(file.path, resolvedPath)}`);
+					console.log(`  ${errorMsg}`);
+					shouldExit = true;
+				}
+			}
+
+			if (shouldExit) {
+				canonical.dispose();
+				native.dispose();
+				return;
 			}
 		}
 	}

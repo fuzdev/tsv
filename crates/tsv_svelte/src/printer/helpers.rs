@@ -43,15 +43,43 @@ pub(super) fn is_inside_template_literal(line: &str, was_inside: bool) -> bool {
 }
 
 impl<'a> Printer<'a> {
-    /// Check if a fragment's content is inline (no newlines in source)
+    /// Check if a fragment's content is inline (huggable at both ends).
+    ///
+    /// Returns true if there's no leading or trailing whitespace around content,
+    /// allowing content to be hugged to control flow tags like `{#if cond}<Comp/>{/if}`.
+    ///
+    /// This differs from checking for newlines because we want to hug content
+    /// even if the content itself is multiline (e.g., component with wrapping attrs).
     pub(super) fn is_inline_fragment(&self, fragment: &Fragment) -> bool {
-        let (Some(first), Some(last)) = (fragment.nodes.first(), fragment.nodes.last()) else {
+        // Empty fragment is inline
+        if fragment.nodes.is_empty() {
             return true;
-        };
-        let first_start = first.span().start_usize();
-        let last_end = last.span().end_usize();
-        let content = &self.source[first_start..last_end];
-        !content.contains('\n')
+        }
+
+        // Check for leading whitespace:
+        // - First node is whitespace-only text, OR
+        // - First node is text that STARTS with whitespace (e.g., "\n\t\tx")
+        let has_leading_ws = fragment.nodes.first().is_some_and(|n| {
+            if let FragmentNode::Text(t) = n {
+                t.raw.starts_with(|c: char| c.is_whitespace())
+            } else {
+                false
+            }
+        });
+
+        // Check for trailing whitespace:
+        // - Last node is whitespace-only text, OR
+        // - Last node is text that ENDS with whitespace (e.g., "x\n\t")
+        let has_trailing_ws = fragment.nodes.last().is_some_and(|n| {
+            if let FragmentNode::Text(t) = n {
+                t.raw.ends_with(|c: char| c.is_whitespace())
+            } else {
+                false
+            }
+        });
+
+        // Inline if no leading AND no trailing whitespace
+        !has_leading_ws && !has_trailing_ws
     }
 
     // =========================================================================
@@ -240,49 +268,5 @@ impl<'a> Printer<'a> {
         // Trim leading/trailing whitespace from the estimate
         let content = &self.source[start..end];
         content.trim().len()
-    }
-
-    /// Print children inline (no newlines added)
-    pub(super) fn print_inline_children(&mut self, fragment: &Fragment) {
-        for node in &fragment.nodes {
-            match node {
-                FragmentNode::Text(text) => {
-                    // For inline, preserve trimmed text
-                    let trimmed = text.raw.trim();
-                    if !trimmed.is_empty() {
-                        self.write(trimmed);
-                    }
-                }
-                _ => {
-                    self.print_fragment_node(node, false, false);
-                }
-            }
-        }
-    }
-
-    /// Helper to print children of a block with proper indentation
-    pub(super) fn print_block_children(&mut self, fragment: &Fragment) {
-        // For now, just print each child on a new line with indentation
-        if fragment.nodes.is_empty() {
-            return;
-        }
-        self.indent_level += 1;
-        for node in &fragment.nodes {
-            match node {
-                FragmentNode::Text(text) => {
-                    if !text.raw.trim().is_empty() {
-                        self.write("\n");
-                        self.write_indent();
-                        self.write(text.raw.trim());
-                    }
-                }
-                _ => {
-                    self.write("\n");
-                    self.write_indent();
-                    self.print_fragment_node(node, true, false);
-                }
-            }
-        }
-        self.indent_level -= 1;
     }
 }

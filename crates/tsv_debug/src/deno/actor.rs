@@ -226,8 +226,15 @@ impl ActorState {
             return Ok(true);
         }
 
-        let response: WireResponse =
-            serde_json::from_str(trimmed).map_err(DenoError::ResponseParse)?;
+        let response: WireResponse = match serde_json::from_str(trimmed) {
+            Ok(r) => r,
+            Err(e) => {
+                // Log the actual content that failed to parse for debugging
+                eprintln!("[deno] Failed to parse response: {e}");
+                eprintln!("[deno] Raw content ({} bytes): {trimmed:?}", trimmed.len());
+                return Err(DenoError::ResponseParse(e));
+            }
+        };
 
         // id: -1 means the sidecar couldn't parse our request (log and continue)
         if response.id < 0 {

@@ -18,47 +18,6 @@ use tsv_lang::doc::{self, Doc};
 
 impl<'a> Printer<'a> {
     // =========================================================================
-    // Doc writing helper
-    // =========================================================================
-
-    /// Write a Doc to the output buffer at the current position
-    ///
-    /// Handles column tracking and indent resolution for proper line wrapping.
-    pub(super) fn write_doc(&mut self, doc: &Doc) {
-        let current_col = self.buffer.current_column(self.config.tab_width);
-        let output = {
-            let interner = self.interner.borrow();
-            doc::print_doc_with_indent_resolved(
-                doc,
-                &self.config,
-                current_col,
-                self.indent_level,
-                &*interner,
-            )
-        };
-        self.write(&output);
-    }
-
-    /// Write a Doc to the output buffer with a custom config
-    ///
-    /// Used when the doc needs specific first_line_offset or suffix_width settings
-    /// that differ from the default self.config.
-    pub(super) fn write_doc_with_config(&mut self, doc: &Doc, config: &tsv_lang::PrintConfig) {
-        let current_col = self.buffer.current_column(self.config.tab_width);
-        let output = {
-            let interner = self.interner.borrow();
-            doc::print_doc_with_indent_resolved(
-                doc,
-                config,
-                current_col,
-                self.indent_level,
-                &*interner,
-            )
-        };
-        self.write(&output);
-    }
-
-    // =========================================================================
     // JS Comment Doc builders
     // =========================================================================
 
@@ -66,7 +25,7 @@ impl<'a> Printer<'a> {
     ///
     /// Block comments: `/*content*/ ` (with trailing space)
     /// Line comments: `// content\n` (with hardline)
-    fn build_leading_js_comment_doc(comment: &tsv_lang::Comment) -> Doc {
+    pub(super) fn build_leading_js_comment_doc(comment: &tsv_lang::Comment) -> Doc {
         if comment.is_block {
             doc::concat(vec![
                 doc::text("/*"),
@@ -86,7 +45,7 @@ impl<'a> Printer<'a> {
     ///
     /// Block comments: ` /*content*/` (with leading space)
     /// Line comments: ` // content` (with leading space, no hardline)
-    fn build_trailing_js_comment_doc(comment: &tsv_lang::Comment) -> Doc {
+    pub(super) fn build_trailing_js_comment_doc(comment: &tsv_lang::Comment) -> Doc {
         if comment.is_block {
             doc::concat(vec![
                 doc::text(" /*"),
@@ -110,7 +69,7 @@ impl<'a> Printer<'a> {
     /// All formatting goes through the Doc IR for consistency.
     pub(super) fn print_attribute_node(&mut self, node: &internal::AttributeNode) {
         let doc = self.build_attribute_node_doc(node);
-        self.write_doc(&doc);
+        self.render_doc_immediate(&doc);
     }
 
     /// Build a Doc for an attribute node (used for line wrapping calculations)
@@ -479,6 +438,17 @@ impl<'a> Printer<'a> {
     /// Same as `build_expression_doc_parts_with_span` but handles the special
     /// `bind:prop={getter, setter}` syntax where SequenceExpression is printed
     /// without parentheses (the "function bindings" syntax in Svelte 5.9+).
+    ///
+    /// When the sequence contains multiline expressions (e.g., arrow with block body),
+    /// formats as:
+    /// ```svelte
+    /// bind:value={
+    ///     () => a,
+    ///     (v) => {
+    ///         a = v;
+    ///     }
+    /// }
+    /// ```
     fn build_expression_doc_parts_with_span_for_bind(
         &self,
         expr: &tsv_ts::ast::internal::Expression,
@@ -486,20 +456,43 @@ impl<'a> Printer<'a> {
     ) -> Vec<Doc> {
         // For SequenceExpression, use the bare (no parens) version for getter/setter syntax
         if let tsv_ts::ast::internal::Expression::SequenceExpression(seq) = expr {
-            let mut parts = Vec::new();
-            for (i, sub_expr) in seq.expressions.iter().enumerate() {
-                if i > 0 {
-                    parts.push(doc::text(", "));
-                }
-                parts.push(tsv_ts::build_expression_doc_with_comments(
-                    sub_expr,
-                    self.source,
-                    Rc::clone(&self.interner),
-                    &self.config,
-                    self.comments,
-                ));
-            }
-            return vec![doc::text("={"), doc::concat(parts), doc::text("}")];
+            let len = seq.expressions.len();
+
+            // Build items: each expression with trailing comma (except last)
+            let items: Vec<Doc> = seq
+                .expressions
+                .iter()
+                .enumerate()
+                .map(|(i, sub_expr)| {
+                    let expr_doc = tsv_ts::build_expression_doc_with_comments(
+                        sub_expr,
+                        self.source,
+                        Rc::clone(&self.interner),
+                        &self.config,
+                        self.comments,
+                    );
+                    if i < len - 1 {
+                        doc::concat(vec![expr_doc, doc::text(",")])
+                    } else {
+                        expr_doc
+                    }
+                })
+                .collect();
+
+            // Join with line() - becomes " " when flat, "\n" when broken
+            let items_doc = doc::join_doc(items, doc::line());
+
+            // Use group/indent structure that expands when content is multiline:
+            // Flat: ={getter, setter}
+            // Broken: ={\n\tgetter,\n\tsetter\n}
+            let inner = doc::group(doc::concat(vec![
+                doc::text("{"),
+                doc::indent(doc::concat(vec![doc::softline(), items_doc])),
+                doc::softline(),
+                doc::text("}"),
+            ]));
+
+            return vec![doc::text("="), inner];
         }
 
         // For other expressions, use the standard method
@@ -519,14 +512,29 @@ impl<'a> Printer<'a> {
         }
 
         // Build the expression doc
-        // Pass comments so nested comments (in call args, binary expressions) are preserved
-        let expr_doc = tsv_ts::build_expression_doc_with_comments(
-            &tag.expression,
-            self.source,
-            Rc::clone(&self.interner),
-            &self.config,
-            self.comments,
-        );
+        // For binary expressions, use continuation indent so wrapped lines are indented
+        // relative to the opening `{`:
+        //   {condA &&
+        //     condB &&
+        //     condC}
+        let expr_doc =
+            if let tsv_ts::ast::internal::Expression::BinaryExpression(_) = &tag.expression {
+                tsv_ts::build_expression_doc_with_continuation_indent(
+                    &tag.expression,
+                    self.source,
+                    Rc::clone(&self.interner),
+                    &self.config,
+                    self.comments,
+                )
+            } else {
+                tsv_ts::build_expression_doc_with_comments(
+                    &tag.expression,
+                    self.source,
+                    Rc::clone(&self.interner),
+                    &self.config,
+                    self.comments,
+                )
+            };
         parts.push(expr_doc);
 
         // Add trailing comments between expression and closing brace

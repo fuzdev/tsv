@@ -13,23 +13,6 @@ use tsv_html as html;
 use tsv_lang::SymbolResolver;
 
 impl<'a> Printer<'a> {
-    /// Check if element is inline (phrasing content)
-    ///
-    /// Adapter that resolves the element's tag name and calls the pure
-    /// language-level classification function.
-    ///
-    /// Components are treated as inline to preserve surrounding whitespace.
-    pub(crate) fn is_inline_element(&self, element: &internal::Element) -> bool {
-        // Components are always treated as inline
-        use crate::ast::internal::ElementKind;
-        if element.kind == ElementKind::Component {
-            return true;
-        }
-
-        let tag_name = self.resolve_symbol(element.name);
-        html::is_inline_element(&tag_name)
-    }
-
     /// Check if element is block (flow content)
     ///
     /// Adapter that resolves the element's tag name and calls the pure

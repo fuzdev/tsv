@@ -5,9 +5,16 @@
 // - Complex selectors (with combinators)
 // - Relative selectors (simple selector chains)
 // - Simple selectors (type, class, id, pseudo-class, pseudo-element, etc.)
+//
+// ## Architecture
+//
+// This module uses a doc-first approach where all formatting logic lives in
+// `build_*_doc()` methods. The `print_*` methods use these doc builders and
+// handle wrapping decisions.
 
 use super::Printer;
 use crate::ast::internal;
+use tsv_lang::doc;
 
 impl<'a> Printer<'a> {
     /// Normalize spacing around comments in selector source text
@@ -37,8 +44,6 @@ impl<'a> Printer<'a> {
     /// For short lists: prints inline (e.g., `:is(.a, .b)`)
     /// For long lists: wraps each selector on its own line with indentation
     pub(super) fn print_selector_list_nested(&mut self, list: &internal::SelectorList) {
-        use tsv_lang::doc;
-
         if list.selectors.is_empty() {
             return;
         }
@@ -141,8 +146,6 @@ impl<'a> Printer<'a> {
     /// - If selector fits on one line: print inline
     /// - If too long: break at combinators with indentation
     pub(super) fn print_complex_selector(&mut self, complex: &internal::ComplexSelector) {
-        use tsv_lang::doc;
-
         // Single selector part - always print inline
         if complex.children.len() == 1 {
             self.print_relative_selector_internal(&complex.children[0], true, false);
@@ -191,9 +194,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc representation of a selector list for width checking
-    fn build_selector_list_doc(&self, list: &internal::SelectorList) -> tsv_lang::doc::Doc {
-        use tsv_lang::doc;
-
+    pub(crate) fn build_selector_list_doc(&self, list: &internal::SelectorList) -> doc::Doc {
         let docs: Vec<_> = list
             .selectors
             .iter()
@@ -203,58 +204,41 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc representation of a complex selector for width checking
-    fn build_complex_selector_doc(
-        &self,
-        complex: &internal::ComplexSelector,
-    ) -> tsv_lang::doc::Doc {
-        use tsv_lang::doc;
-
-        let mut parts = Vec::new();
-
-        for (i, relative) in complex.children.iter().enumerate() {
-            let is_first = i == 0;
-
-            // Add combinator if present (uses static strings to avoid allocation)
-            if let Some(combinator) = &relative.combinator {
-                let combinator_text: &'static str = match (combinator, is_first) {
-                    (internal::Combinator::Descendant, true) => "",
-                    (internal::Combinator::Descendant, false) => " ",
-                    (internal::Combinator::Child, true) => "> ",
-                    (internal::Combinator::Child, false) => " > ",
-                    (internal::Combinator::NextSibling, true) => "+ ",
-                    (internal::Combinator::NextSibling, false) => " + ",
-                    (internal::Combinator::SubsequentSibling, true) => "~ ",
-                    (internal::Combinator::SubsequentSibling, false) => " ~ ",
-                    (internal::Combinator::Column, true) => "|| ",
-                    (internal::Combinator::Column, false) => " || ",
-                };
-                if !combinator_text.is_empty() {
-                    parts.push(doc::text(combinator_text));
-                }
-            }
-
-            // Add simple selectors
-            for simple in &relative.selectors {
-                parts.push(doc::text_owned(self.simple_selector_to_string(simple)));
-            }
-        }
-
-        doc::concat(parts)
+    fn build_complex_selector_doc(&self, complex: &internal::ComplexSelector) -> doc::Doc {
+        let docs: Vec<_> = complex
+            .children
+            .iter()
+            .enumerate()
+            .map(|(i, relative)| self.build_relative_selector_doc(relative, i == 0))
+            .collect();
+        doc::concat(docs)
     }
 
-    /// Convert a simple selector to a string for doc building
-    fn simple_selector_to_string(&self, simple: &internal::SimpleSelector) -> String {
+    // ========================================================================
+    // Doc Builders - all formatting logic expressed as doc IR
+    // ========================================================================
+
+    /// Build a doc for a simple selector
+    ///
+    /// Uses source extraction where possible to preserve escapes.
+    pub(crate) fn build_simple_selector_doc(&self, simple: &internal::SimpleSelector) -> doc::Doc {
         match simple {
-            internal::SimpleSelector::Type { span, .. } => span.extract(self.source).to_string(),
+            internal::SimpleSelector::Type { span, .. } => {
+                doc::text_owned(span.extract(self.source).to_string())
+            }
             internal::SimpleSelector::Universal { namespace, .. } => {
                 if let Some(ns) = namespace {
-                    format!("{ns}|*")
+                    doc::text_owned(format!("{ns}|*"))
                 } else {
-                    "*".to_string()
+                    doc::text("*")
                 }
             }
-            internal::SimpleSelector::Class { span, .. } => span.extract(self.source).to_string(),
-            internal::SimpleSelector::Id { span, .. } => span.extract(self.source).to_string(),
+            internal::SimpleSelector::Class { span, .. } => {
+                doc::text_owned(span.extract(self.source).to_string())
+            }
+            internal::SimpleSelector::Id { span, .. } => {
+                doc::text_owned(span.extract(self.source).to_string())
+            }
             internal::SimpleSelector::Attribute {
                 namespace,
                 name,
@@ -282,21 +266,58 @@ impl<'a> Printer<'a> {
                     result.push_str(f);
                 }
                 result.push(']');
-                result
+                doc::text_owned(result)
             }
             internal::SimpleSelector::PseudoClass { span, .. } => {
-                // For width calculation, extract from source to get accurate length
-                // This includes the pseudo-class name and all its arguments
-                span.extract(self.source).to_string()
+                // Extract from source to get accurate representation
+                doc::text_owned(span.extract(self.source).to_string())
             }
             internal::SimpleSelector::PseudoElement { span, .. } => {
-                // For width calculation, extract from source to get accurate length
-                span.extract(self.source).to_string()
+                doc::text_owned(span.extract(self.source).to_string())
             }
-            internal::SimpleSelector::Nesting { .. } => "&".to_string(),
-            internal::SimpleSelector::Percentage { value, .. } => format!("{value}%"),
-            internal::SimpleSelector::Invalid { raw, .. } => raw.to_string(),
+            internal::SimpleSelector::Nesting { .. } => doc::text("&"),
+            internal::SimpleSelector::Percentage { value, .. } => {
+                doc::text_owned(format!("{value}%"))
+            }
+            internal::SimpleSelector::Invalid { raw, .. } => doc::text_owned(raw.to_string()),
         }
+    }
+
+    /// Build a doc for a relative selector
+    ///
+    /// A relative selector is a combinator followed by simple selectors.
+    fn build_relative_selector_doc(
+        &self,
+        relative: &internal::RelativeSelector,
+        is_first: bool,
+    ) -> doc::Doc {
+        let mut parts = Vec::new();
+
+        // Add combinator if present
+        if let Some(combinator) = &relative.combinator {
+            let combinator_text: &'static str = match (combinator, is_first) {
+                (internal::Combinator::Descendant, true) => "",
+                (internal::Combinator::Descendant, false) => " ",
+                (internal::Combinator::Child, true) => "> ",
+                (internal::Combinator::Child, false) => " > ",
+                (internal::Combinator::NextSibling, true) => "+ ",
+                (internal::Combinator::NextSibling, false) => " + ",
+                (internal::Combinator::SubsequentSibling, true) => "~ ",
+                (internal::Combinator::SubsequentSibling, false) => " ~ ",
+                (internal::Combinator::Column, true) => "|| ",
+                (internal::Combinator::Column, false) => " || ",
+            };
+            if !combinator_text.is_empty() {
+                parts.push(doc::text(combinator_text));
+            }
+        }
+
+        // Add simple selectors
+        for simple in &relative.selectors {
+            parts.push(self.build_simple_selector_doc(simple));
+        }
+
+        doc::concat(parts)
     }
 
     /// Internal helper to format a relative selector with context

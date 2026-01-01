@@ -1,0 +1,119 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 41,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Component",
+				"start": 0,
+				"end": 40,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 5,
+						"character": 5
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 7,
+						"end": 37,
+						"name": "items",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 1,
+								"character": 7
+							},
+							"end": {
+								"line": 2,
+								"column": 6,
+								"character": 12
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 13,
+							"end": 37,
+							"expression": {
+								"type": "ArrayExpression",
+								"start": 14,
+								"end": 36,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 8
+									},
+									"end": {
+										"line": 5,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 31,
+										"end": 32,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 3
+											}
+										},
+										"name": "a",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " comment",
+												"start": 18,
+												"end": 28
+											}
+										]
+									}
+								]
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 18,
+			"end": 28,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 12
+				}
+			}
+		}
+	]
+}

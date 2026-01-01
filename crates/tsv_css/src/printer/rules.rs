@@ -6,6 +6,12 @@
 //! - Blank line preservation between declarations
 //!
 //! Declaration and value printing are handled by separate modules.
+//!
+//! ## Architecture
+//!
+//! This module uses doc builders where practical. The complex block child
+//! handling with inline comments and blank line preservation is still
+//! imperative for clarity.
 
 use super::Printer;
 use crate::ast::internal;

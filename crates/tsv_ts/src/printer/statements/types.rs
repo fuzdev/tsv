@@ -1,8 +1,8 @@
 // Type-related statement printing for TypeScript
 
-use super::super::Printer;
+use super::{Printer, build_entity_name_doc};
 use crate::ast::internal;
-use tsv_lang::{SymbolResolver, SymbolToU32, comments_in_range, doc};
+use tsv_lang::{SymbolToU32, comments_in_range, doc};
 
 /// Check if a type is "generic" - i.e., has type parameters.
 /// This matches prettier's `isGeneric` function in assignment.js.
@@ -22,14 +22,6 @@ fn should_break_before_conditional_type(conditional: &internal::TSConditionalTyp
 }
 
 impl<'a> Printer<'a> {
-    /// Print a type alias declaration: `type X = T` or `type X<T> = T[]`
-    ///
-    /// Uses doc-based printing with width-aware wrapping for union/intersection types.
-    pub(super) fn print_type_alias_declaration(&mut self, decl: &internal::TSTypeAliasDeclaration) {
-        let decl_doc = self.build_type_alias_declaration_doc(decl);
-        self.write_doc(&decl_doc);
-    }
-
     /// Build a doc for type alias declaration with proper line breaking
     ///
     /// For union types that don't fit on one line:
@@ -112,120 +104,71 @@ impl<'a> Printer<'a> {
         doc::concat(parts)
     }
 
-    /// Print a return statement: `return expr;` or `return;`
-    pub(super) fn print_return_statement(&mut self, ret: &internal::ReturnStatement) {
-        self.write("return");
-        if let Some(arg) = &ret.argument {
-            self.write(" ");
-            self.print_expression(arg);
-        }
-        self.write(";");
-    }
-
-    /// Print an interface declaration: `interface Foo { ... }` or `interface Foo<T> { ... }`
-    ///
-    /// Uses doc-based printing with width-aware wrapping for long lines.
-    pub(super) fn print_interface_declaration(&mut self, decl: &internal::TSInterfaceDeclaration) {
-        // Build the header doc (everything before the body)
-        let header_doc = self.build_interface_header_doc(decl);
-
-        // suffix_width accounts for body that follows the header:
-        // - Empty body: " {}" = 3 chars
-        // - Non-empty body: " {" = 2 chars
-        let suffix_width = if decl.body.body.is_empty() { 3 } else { 2 };
-        let header_output = self.render_doc_with_suffix(&header_doc, suffix_width);
-        self.write(&header_output);
-
-        // Print the body
-        self.write(" {");
-        if !decl.body.body.is_empty() {
-            self.write("\n");
-            self.indent_level += 1;
-            for member in &decl.body.body {
-                self.write_indent();
-                self.print_type_element(member);
-                self.write("\n");
-            }
-            self.indent_level -= 1;
-            self.write_indent();
-        }
-        self.write("}");
-    }
-
-    /// Build doc for interface header (name, type params, extends clause)
-    ///
-    /// Prettier behavior:
-    /// - If everything fits on one line, keep inline
-    /// - If type params need to break, put extends on new line with extra indent
-    fn build_interface_header_doc(&self, decl: &internal::TSInterfaceDeclaration) -> doc::Doc {
-        let mut parts = vec![doc::text("interface ")];
-        parts.push(doc::symbol(decl.id.name.to_u32()));
-
-        let has_type_params = decl.type_parameters.is_some();
-        let has_extends = !decl.extends.is_empty();
-
-        // Type parameters - wrapped in their own group so they can stay flat
-        // even if the outer declaration group breaks
-        if let Some(type_params) = &decl.type_parameters {
-            parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
-        }
-
-        // Extends clause
-        if has_extends {
-            // Build heritage list
-            let mut heritage_parts = Vec::new();
-            for (i, heritage) in decl.extends.iter().enumerate() {
-                if i > 0 {
-                    heritage_parts.push(doc::text(", "));
-                }
-                heritage_parts.push(self.build_entity_name_doc(&heritage.expression));
-                if let Some(type_args) = &heritage.type_arguments {
-                    heritage_parts.push(self.build_type_arguments_doc(type_args));
-                }
-            }
-
-            if has_type_params {
-                // When type params are present, extends may break to new line
-                // Use line() (not hardline) so will_break() doesn't force breaking
-                parts.push(doc::indent(doc::concat(vec![
-                    doc::line(), // Becomes space in flat mode, newline in break mode
-                    doc::text("extends "),
-                    doc::concat(heritage_parts),
-                ])));
-            } else {
-                // No type params - extends stays inline
-                parts.push(doc::text(" extends "));
-                parts.push(doc::concat(heritage_parts));
-            }
-        }
-
-        // Wrap everything in a group so if_break works correctly
-        doc::group(doc::concat(parts))
-    }
-
     /// Build doc for interface declaration
+    ///
+    /// Uses group mode when extends has multiple items - heritage breaks when group breaks.
     pub(super) fn build_interface_declaration_doc(
         &self,
         decl: &internal::TSInterfaceDeclaration,
     ) -> doc::Doc {
-        let mut parts = vec![doc::text("interface ")];
-        parts.push(doc::symbol(decl.id.name.to_u32()));
-        if let Some(type_params) = &decl.type_parameters {
-            parts.push(self.build_type_parameter_declaration_doc(type_params));
-        }
+        // Group mode: multiple extends items
+        let group_mode = decl.extends.len() > 1;
 
-        // Extends clause
-        if !decl.extends.is_empty() {
-            parts.push(doc::text(" extends "));
+        let mut header_parts = vec![doc::text("interface ")];
+        header_parts.push(doc::symbol(decl.id.name.to_u32()));
+
+        // Build extends doc
+        let extends_doc = if !decl.extends.is_empty() {
             let heritage_docs: Vec<_> = decl
                 .extends
                 .iter()
-                .map(|heritage| self.build_entity_name_doc(&heritage.expression))
+                .map(|heritage| {
+                    let mut h_parts = vec![self.build_entity_name_doc(&heritage.expression)];
+                    if let Some(type_args) = &heritage.type_arguments {
+                        h_parts.push(self.build_type_arguments_doc(type_args));
+                    }
+                    doc::concat(h_parts)
+                })
                 .collect();
-            parts.push(doc::join(heritage_docs, ", "));
-        }
+            Some(doc::concat(vec![
+                doc::text("extends "),
+                doc::join(heritage_docs, ", "),
+            ]))
+        } else {
+            None
+        };
 
-        parts.push(doc::text(" {"));
+        // Build the header group (without body - body has hardlines that would force breaking)
+        let header_doc = if group_mode {
+            // Group mode: one unified group - when it breaks, extends breaks too
+            if let Some(type_params) = &decl.type_parameters {
+                header_parts
+                    .push(self.build_type_parameter_declaration_doc_inline_group(type_params));
+            }
+
+            // Extends clause with line break
+            if let Some(ext_doc) = extends_doc {
+                header_parts.push(doc::indent(doc::concat(vec![doc::line(), ext_doc])));
+            }
+
+            doc::group(doc::concat(header_parts))
+        } else {
+            // Non-group mode: type params break independently, extends stays inline
+            if let Some(type_params) = &decl.type_parameters {
+                header_parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
+            }
+
+            // Extends clause stays inline
+            if let Some(ext_doc) = extends_doc {
+                header_parts.push(doc::text(" "));
+                header_parts.push(ext_doc);
+            }
+
+            doc::concat(header_parts)
+        };
+
+        // Build body separately (outside the header group)
+        let mut parts = vec![header_doc, doc::text(" {")];
         if !decl.body.body.is_empty() {
             parts.push(doc::indent(doc::concat(vec![
                 doc::hardline(),
@@ -236,15 +179,6 @@ impl<'a> Printer<'a> {
         parts.push(doc::text("}"));
 
         doc::concat(parts)
-    }
-
-    /// Print a declare function: `declare function foo(): void` or `declare function foo<T>(): T`
-    ///
-    /// Uses doc-based printing with width-aware wrapping for long type parameter lists.
-    pub(super) fn print_declare_function(&mut self, decl: &internal::TSDeclareFunction) {
-        // Build the full declaration as a doc
-        let decl_doc = self.build_declare_function_doc(decl);
-        self.write_doc(&decl_doc);
     }
 
     /// Build doc for declare function with wrapping support for type parameters
@@ -292,7 +226,7 @@ impl<'a> Printer<'a> {
     /// Build doc for entity name
     pub(super) fn build_entity_name_doc(&self, name: &internal::TSEntityName) -> doc::Doc {
         // Delegate to standalone function - doesn't need printer state
-        super::super::build_entity_name_doc(name)
+        build_entity_name_doc(name)
     }
 
     /// Build doc for type arguments with comment preservation: `</* a */ T /* b */, U>`
@@ -417,152 +351,6 @@ impl<'a> Printer<'a> {
         ]))
     }
 
-    /// Print a type element (property signature, method signature, etc.)
-    fn print_type_element(&mut self, elem: &internal::TSTypeElement) {
-        match elem {
-            internal::TSTypeElement::PropertySignature(p) => {
-                if p.readonly {
-                    self.write("readonly ");
-                }
-                if p.computed {
-                    self.write("[");
-                    self.print_expression(&p.key);
-                    self.write("]");
-                } else {
-                    self.print_expression(&p.key);
-                }
-                if p.optional {
-                    self.write("?");
-                }
-                if let Some(ta) = &p.type_annotation {
-                    // For simple types with comments, print_type_annotation includes the semicolon
-                    let has_trailing_comment = self.type_annotation_has_trailing_comment(ta);
-
-                    // For TypeReference with type arguments, use doc-based printing for width-aware wrapping
-                    if let internal::TSType::TypeReference(r) = ta.type_annotation.as_ref() {
-                        if let Some(type_args) = &r.type_arguments {
-                            // Build doc: ": TypeName<Args>"
-                            let type_doc = doc::concat(vec![
-                                doc::text(": "),
-                                super::super::build_entity_name_doc(&r.type_name),
-                                self.build_type_arguments_doc_wrapping(type_args),
-                            ]);
-                            // suffix_width = 1 for trailing ";"
-                            let output = self.render_doc_with_suffix(&type_doc, 1);
-                            self.write(&output);
-                            self.write(";");
-                        } else {
-                            self.print_type_annotation(ta);
-                            if !has_trailing_comment {
-                                self.write(";");
-                            }
-                        }
-                    } else {
-                        self.print_type_annotation(ta);
-                        if !has_trailing_comment {
-                            self.write(";");
-                        }
-                    }
-                } else {
-                    self.write(";");
-                }
-            }
-            internal::TSTypeElement::MethodSignature(m) => {
-                // Print accessor keyword for get/set signatures
-                match m.kind {
-                    internal::MethodKind::Get => self.write("get "),
-                    internal::MethodKind::Set => self.write("set "),
-                    _ => {}
-                }
-                if m.computed {
-                    self.write("[");
-                    self.print_expression(&m.key);
-                    self.write("]");
-                } else {
-                    self.print_expression(&m.key);
-                }
-                if m.optional {
-                    self.write("?");
-                }
-                // Print type parameters if present: `<T>` or `<T, U>`
-                if let Some(type_params) = &m.type_parameters {
-                    self.print_type_parameter_declaration(type_params);
-                }
-                self.write("(");
-                for (i, param) in m.params.iter().enumerate() {
-                    if i > 0 {
-                        self.write(", ");
-                    }
-                    self.print_expression(param);
-                }
-                self.write(")");
-                if let Some(rt) = &m.return_type {
-                    self.print_type_annotation(rt);
-                }
-                self.write(";");
-            }
-            internal::TSTypeElement::CallSignature(c) => {
-                // Print type parameters if present: `<T>` or `<T, U>`
-                if let Some(type_params) = &c.type_parameters {
-                    self.print_type_parameter_declaration(type_params);
-                }
-                self.write("(");
-                for (i, param) in c.params.iter().enumerate() {
-                    if i > 0 {
-                        self.write(", ");
-                    }
-                    self.print_expression(param);
-                }
-                self.write(")");
-                if let Some(rt) = &c.return_type {
-                    self.print_type_annotation(rt);
-                }
-                self.write(";");
-            }
-            internal::TSTypeElement::ConstructSignature(c) => {
-                self.write("new ");
-                // Print type parameters if present: `<T>` or `<T, U>`
-                if let Some(type_params) = &c.type_parameters {
-                    self.print_type_parameter_declaration(type_params);
-                }
-                self.write("(");
-                for (i, param) in c.params.iter().enumerate() {
-                    if i > 0 {
-                        self.write(", ");
-                    }
-                    self.print_expression(param);
-                }
-                self.write(")");
-                if let Some(rt) = &c.return_type {
-                    self.print_type_annotation(rt);
-                }
-                self.write(";");
-            }
-            internal::TSTypeElement::IndexSignature(idx_sig) => {
-                if idx_sig.readonly {
-                    self.write("readonly ");
-                }
-                self.write("[");
-                // Print parameter name and its type (for index signatures, the type is in the parameter)
-                for (i, param) in idx_sig.parameters.iter().enumerate() {
-                    if i > 0 {
-                        self.write(", ");
-                    }
-                    // Just print the identifier name
-                    let name = self.resolve_symbol(param.name).to_string();
-                    self.write(&name);
-                    // Print the parameter's type annotation
-                    if let Some(ta) = &param.type_annotation {
-                        self.print_type_annotation(ta);
-                    }
-                }
-                self.write("]");
-                self.print_type_annotation(&idx_sig.type_annotation);
-                self.write(";");
-            }
-        }
-    }
-
     /// Build doc for type elements
     fn build_type_elements_doc(&self, members: &[internal::TSTypeElement]) -> doc::Doc {
         let mut parts = Vec::new();
@@ -583,13 +371,20 @@ impl<'a> Printer<'a> {
                 if p.readonly {
                     parts.push(doc::text("readonly "));
                 }
-                parts.push(self.build_expression_doc(&p.key));
+                // Handle computed property keys: [key]: type
+                if p.computed {
+                    parts.push(doc::text("["));
+                    parts.push(self.build_expression_doc(&p.key));
+                    parts.push(doc::text("]"));
+                } else {
+                    parts.push(self.build_expression_doc(&p.key));
+                }
                 if p.optional {
                     parts.push(doc::text("?"));
                 }
                 if let Some(ta) = &p.type_annotation {
-                    parts.push(doc::text(": "));
-                    parts.push(self.build_type_doc(&ta.type_annotation));
+                    // Use width-aware wrapping for generic type arguments
+                    parts.push(self.build_type_annotation_doc_wrapping(ta));
                 }
                 parts.push(doc::text(";"));
                 doc::concat(parts)
@@ -602,7 +397,14 @@ impl<'a> Printer<'a> {
                     internal::MethodKind::Set => parts.push(doc::text("set ")),
                     _ => {}
                 }
-                parts.push(self.build_expression_doc(&m.key));
+                // Handle computed method keys: [key](): type
+                if m.computed {
+                    parts.push(doc::text("["));
+                    parts.push(self.build_expression_doc(&m.key));
+                    parts.push(doc::text("]"));
+                } else {
+                    parts.push(self.build_expression_doc(&m.key));
+                }
                 if m.optional {
                     parts.push(doc::text("?"));
                 }
@@ -626,12 +428,19 @@ impl<'a> Printer<'a> {
                 doc::concat(parts)
             }
             internal::TSTypeElement::CallSignature(c) => {
+                let mut parts = Vec::new();
+                // Type parameters: `<T>` or `<T, U>`
+                if let Some(type_params) = &c.type_parameters {
+                    parts.push(self.build_type_parameter_declaration_doc(type_params));
+                }
                 let param_docs: Vec<_> = c
                     .params
                     .iter()
                     .map(|param| self.build_expression_doc(param))
                     .collect();
-                let mut parts = vec![doc::text("("), doc::join(param_docs, ", "), doc::text(")")];
+                parts.push(doc::text("("));
+                parts.push(doc::join(param_docs, ", "));
+                parts.push(doc::text(")"));
                 if let Some(rt) = &c.return_type {
                     parts.push(doc::text(": "));
                     parts.push(self.build_type_doc(&rt.type_annotation));
@@ -640,16 +449,19 @@ impl<'a> Printer<'a> {
                 doc::concat(parts)
             }
             internal::TSTypeElement::ConstructSignature(c) => {
+                let mut parts = vec![doc::text("new ")];
+                // Type parameters: `<T>` or `<T, U>`
+                if let Some(type_params) = &c.type_parameters {
+                    parts.push(self.build_type_parameter_declaration_doc(type_params));
+                }
                 let param_docs: Vec<_> = c
                     .params
                     .iter()
                     .map(|param| self.build_expression_doc(param))
                     .collect();
-                let mut parts = vec![
-                    doc::text("new ("),
-                    doc::join(param_docs, ", "),
-                    doc::text(")"),
-                ];
+                parts.push(doc::text("("));
+                parts.push(doc::join(param_docs, ", "));
+                parts.push(doc::text(")"));
                 if let Some(rt) = &c.return_type {
                     parts.push(doc::text(": "));
                     parts.push(self.build_type_doc(&rt.type_annotation));
@@ -683,15 +495,6 @@ impl<'a> Printer<'a> {
 
     /// Print an enum declaration: `enum Foo { A, B }` or `const enum Foo { A = 1 }`
     ///
-    /// Prettier formats enums with:
-    /// - Each member on its own line
-    /// - Trailing comma after the last member
-    /// - Indented members
-    pub(super) fn print_enum_declaration(&mut self, decl: &internal::TSEnumDeclaration) {
-        let decl_doc = self.build_enum_declaration_doc(decl);
-        self.write_doc(&decl_doc);
-    }
-
     /// Build doc for enum declaration
     ///
     /// Prettier format:
@@ -772,12 +575,6 @@ impl<'a> Printer<'a> {
         } else {
             id_doc
         }
-    }
-
-    /// Print a namespace/module declaration
-    pub(super) fn print_module_declaration(&mut self, decl: &internal::TSModuleDeclaration) {
-        let decl_doc = self.build_module_declaration_doc(decl);
-        self.write_doc(&decl_doc);
     }
 
     /// Build doc for namespace/module declaration

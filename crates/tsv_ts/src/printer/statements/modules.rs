@@ -1,111 +1,10 @@
 // Module statement printing for TypeScript (import and export)
 
-use super::super::Printer;
+use super::{Printer, build_entity_name_doc};
 use crate::ast::internal;
 use tsv_lang::{SymbolResolver, SymbolToU32, doc};
 
 impl<'a> Printer<'a> {
-    /// Print an export named declaration
-    ///
-    /// Uses doc builder with width-based wrapping for specifiers.
-    pub(super) fn print_export_named_declaration(
-        &mut self,
-        decl: &internal::ExportNamedDeclaration,
-    ) {
-        let export_keyword = match decl.export_kind {
-            internal::ExportKind::Value => "export ",
-            internal::ExportKind::Type => "export type ",
-        };
-        if let Some(declaration) = &decl.declaration {
-            // For decorated classes, print decorators before export keyword
-            if let internal::Statement::ClassDeclaration(class_decl) = declaration.as_ref()
-                && let Some(decorators) = &class_decl.decorators
-            {
-                for decorator in decorators {
-                    self.print_decorator(decorator);
-                    self.write("\n");
-                    self.write_indent();
-                }
-                // Print export keyword and class without decorators (already printed above)
-                self.write(export_keyword);
-                let mut class_without_decorators = class_decl.clone();
-                class_without_decorators.decorators = None;
-                self.print_class_declaration(&class_without_decorators);
-                return;
-            }
-
-            // export const x = 1; - use direct printing for declarations
-            self.write(export_keyword);
-            self.print_statement(declaration);
-        } else {
-            // export { x, y as z } or export { x } from "y" - use doc builder
-            let doc = self.build_export_named_declaration_doc(decl);
-            self.write_doc(&doc);
-        }
-    }
-
-    /// Print an export default declaration
-    pub(super) fn print_export_default_declaration(
-        &mut self,
-        decl: &internal::ExportDefaultDeclaration,
-    ) {
-        // For decorated classes, print decorators before export keyword
-        if let internal::ExportDefaultValue::ClassDeclaration(class) = &decl.declaration
-            && let Some(decorators) = &class.decorators
-        {
-            for decorator in decorators {
-                self.print_decorator(decorator);
-                self.write("\n");
-                self.write_indent();
-            }
-            // Print export default and class without decorators
-            self.write("export default ");
-            let mut class_without_decorators = class.as_ref().clone();
-            class_without_decorators.decorators = None;
-            self.print_class_declaration(&class_without_decorators);
-            return;
-        }
-
-        self.write("export default ");
-        match &decl.declaration {
-            internal::ExportDefaultValue::Expression(expr) => {
-                self.print_expression(expr);
-                self.write(";");
-            }
-            internal::ExportDefaultValue::FunctionDeclaration(func) => {
-                self.print_function_declaration(func);
-            }
-            internal::ExportDefaultValue::TSDeclareFunction(func) => {
-                self.print_declare_function(func);
-            }
-            internal::ExportDefaultValue::ClassDeclaration(class) => {
-                self.print_class_declaration(class);
-            }
-        }
-    }
-
-    /// Print an export all declaration
-    pub(super) fn print_export_all_declaration(&mut self, decl: &internal::ExportAllDeclaration) {
-        match decl.export_kind {
-            internal::ExportKind::Value => self.write("export *"),
-            internal::ExportKind::Type => self.write("export type *"),
-        }
-        if let Some(exported) = &decl.exported {
-            self.write(" as ");
-            self.write(&self.resolve_symbol(exported.name));
-        }
-        self.write(" from ");
-        self.print_literal(&decl.source);
-        self.write(";");
-    }
-
-    /// Print a TypeScript export assignment: `export = value;`
-    pub(super) fn print_export_assignment(&mut self, decl: &internal::TSExportAssignment) {
-        self.write("export = ");
-        self.print_expression(&decl.expression);
-        self.write(";");
-    }
-
     /// Build a Doc for a TypeScript export assignment
     pub(super) fn build_export_assignment_doc(
         &self,
@@ -131,6 +30,16 @@ impl<'a> Printer<'a> {
             internal::ExportKind::Type => "export type ",
         };
         if let Some(declaration) = &decl.declaration {
+            // For decorated classes, decorators come before export keyword
+            if let internal::Statement::ClassDeclaration(class) = declaration.as_ref()
+                && let Some(dec_doc) = self.build_decorators_doc(class.decorators.as_ref())
+            {
+                return doc::concat(vec![
+                    dec_doc,
+                    doc::text(export_keyword),
+                    self.build_class_declaration_without_decorators_doc(class),
+                ]);
+            }
             doc::concat(vec![
                 doc::text(export_keyword),
                 self.build_statement_doc(declaration),
@@ -194,6 +103,17 @@ impl<'a> Printer<'a> {
         &self,
         decl: &internal::ExportDefaultDeclaration,
     ) -> doc::Doc {
+        // For decorated classes, decorators come before export keyword
+        if let internal::ExportDefaultValue::ClassDeclaration(class) = &decl.declaration
+            && let Some(dec_doc) = self.build_decorators_doc(class.decorators.as_ref())
+        {
+            return doc::concat(vec![
+                dec_doc,
+                doc::text("export default "),
+                self.build_class_declaration_without_decorators_doc(class),
+            ]);
+        }
+
         let value_doc = match &decl.declaration {
             internal::ExportDefaultValue::Expression(expr) => {
                 doc::concat(vec![self.build_expression_doc(expr), doc::text(";")])
@@ -250,14 +170,6 @@ impl<'a> Printer<'a> {
         } else {
             false
         }
-    }
-
-    /// Print an import declaration
-    ///
-    /// Uses doc builder with width-based wrapping for named specifiers.
-    pub(super) fn print_import_declaration(&mut self, decl: &internal::ImportDeclaration) {
-        let doc = self.build_import_declaration_doc(decl);
-        self.write_doc(&doc);
     }
 
     /// Build a Doc for an import declaration
@@ -402,15 +314,6 @@ impl<'a> Printer<'a> {
         doc::group(doc::concat(parts))
     }
 
-    /// Print `import x = require("y")` or `import x = A.B`
-    pub(super) fn print_import_equals_declaration(
-        &mut self,
-        decl: &internal::TSImportEqualsDeclaration,
-    ) {
-        let doc = self.build_import_equals_declaration_doc(decl);
-        self.write_doc(&doc);
-    }
-
     /// Build doc for `import x = require("y")` or `import x = A.B`
     pub(super) fn build_import_equals_declaration_doc(
         &self,
@@ -486,7 +389,7 @@ impl<'a> Printer<'a> {
                 }
             }
             internal::TSModuleReference::EntityName(entity_name) => {
-                parts.push(super::super::build_entity_name_doc(entity_name));
+                parts.push(build_entity_name_doc(entity_name));
             }
         }
 

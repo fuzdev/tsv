@@ -15,81 +15,19 @@ mod modules;
 mod types;
 mod variable;
 
-use super::{ParenContext, Printer, needs_parens};
+// Re-export for submodules to use `super::Printer` instead of `super::super::Printer`
+pub(super) use super::{Printer, build_entity_name_doc};
+
+use super::{ParenContext, needs_parens};
 use crate::ast::internal::{self, Statement};
 use tsv_lang::doc;
 
 impl<'a> Printer<'a> {
-    /// Print a statement
-    pub(super) fn print_statement(&mut self, statement: &Statement) {
-        match statement {
-            Statement::ExpressionStatement(stmt) => self.print_expression_statement(stmt),
-            Statement::VariableDeclaration(decl) => self.print_variable_declaration(decl),
-            Statement::TSTypeAliasDeclaration(decl) => self.print_type_alias_declaration(decl),
-            Statement::ReturnStatement(ret) => self.print_return_statement(ret),
-            Statement::BlockStatement(block) => self.print_block_statement(block),
-            Statement::FunctionDeclaration(decl) => self.print_function_declaration(decl),
-            Statement::ClassDeclaration(decl) => self.print_class_declaration(decl),
-            Statement::ExportNamedDeclaration(decl) => self.print_export_named_declaration(decl),
-            Statement::ExportDefaultDeclaration(decl) => {
-                self.print_export_default_declaration(decl);
-            }
-            Statement::ExportAllDeclaration(decl) => self.print_export_all_declaration(decl),
-            Statement::TSExportAssignment(decl) => self.print_export_assignment(decl),
-            Statement::ImportDeclaration(decl) => self.print_import_declaration(decl),
-            Statement::TSImportEqualsDeclaration(decl) => {
-                self.print_import_equals_declaration(decl);
-            }
-            // Control flow statements
-            Statement::IfStatement(stmt) => self.print_if_statement(stmt),
-            Statement::ForStatement(stmt) => self.print_for_statement(stmt),
-            Statement::ForInStatement(stmt) => self.print_for_in_statement(stmt),
-            Statement::ForOfStatement(stmt) => self.print_for_of_statement(stmt),
-            Statement::WhileStatement(stmt) => self.print_while_statement(stmt),
-            Statement::DoWhileStatement(stmt) => self.print_do_while_statement(stmt),
-            Statement::SwitchStatement(stmt) => self.print_switch_statement(stmt),
-            Statement::TryStatement(stmt) => self.print_try_statement(stmt),
-            Statement::ThrowStatement(stmt) => self.print_throw_statement(stmt),
-            Statement::BreakStatement(stmt) => self.print_break_statement(stmt),
-            Statement::ContinueStatement(stmt) => self.print_continue_statement(stmt),
-            Statement::LabeledStatement(stmt) => self.print_labeled_statement(stmt),
-            Statement::EmptyStatement(_) => self.write(";"),
-            Statement::TSInterfaceDeclaration(decl) => self.print_interface_declaration(decl),
-            Statement::TSDeclareFunction(decl) => self.print_declare_function(decl),
-            Statement::TSEnumDeclaration(decl) => self.print_enum_declaration(decl),
-            Statement::TSModuleDeclaration(decl) => self.print_module_declaration(decl),
-        }
-    }
-
     /// Build a Doc for a statement
     pub(super) fn build_statement_doc(&self, statement: &Statement) -> doc::Doc {
         match statement {
-            Statement::ExpressionStatement(stmt) => {
-                let expr_doc = self.build_expression_doc(&stmt.expression);
-                doc::concat(vec![expr_doc, doc::text(";")])
-            }
-            Statement::VariableDeclaration(decl) => {
-                // Simple doc build for variable declarations
-                let keyword = decl.kind.as_str();
-                let mut parts = vec![doc::text(keyword), doc::text(" ")];
-
-                for (i, declarator) in decl.declarations.iter().enumerate() {
-                    if i > 0 {
-                        parts.push(doc::text(","));
-                        parts.push(doc::hardline());
-                        parts.push(doc::text(self.config.indent));
-                    }
-                    // id can be Identifier, ArrayPattern, or ObjectPattern
-                    parts.push(self.build_expression_doc(&declarator.id));
-                    if let Some(init) = &declarator.init {
-                        parts.push(doc::text(" = "));
-                        parts.push(self.build_expression_doc(init));
-                    }
-                }
-
-                parts.push(doc::text(";"));
-                doc::concat(parts)
-            }
+            Statement::ExpressionStatement(stmt) => self.build_expression_statement_doc(stmt),
+            Statement::VariableDeclaration(decl) => self.build_variable_declaration_doc(decl),
             Statement::TSTypeAliasDeclaration(decl) => self.build_type_alias_declaration_doc(decl),
             Statement::ReturnStatement(ret) => {
                 let mut parts = vec![doc::text("return")];
@@ -136,39 +74,8 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Print an expression statement (expression followed by semicolon)
-    fn print_expression_statement(&mut self, stmt: &internal::ExpressionStatement) {
-        // Object pattern assignments need parentheses to avoid ambiguity with block statements
-        // e.g., `({a, b} = obj);` not `{a, b} = obj;`
-        let needs_parens = needs_parens(&stmt.expression, ParenContext::ExpressionStatement);
-
-        if needs_parens {
-            self.write("(");
-        }
-        self.print_expression(&stmt.expression);
-        if needs_parens {
-            self.write(")");
-        }
-
-        // For expression statements, prettier keeps comments BEFORE the semicolon.
-        // This differs from variable declarations which move comments after the semicolon.
-        // Example: `1 as const /* comment */;` stays as `1 as const /* comment */;`
-        let expr_end = stmt.expression.span().end;
-        // Find where the semicolon is (it's the last character of the statement)
-        // Comments between expression end and statement end (excluding semicolon) go before
-        let semicolon_pos = stmt.span.end.saturating_sub(1);
-        if self.has_comments_between(expr_end, semicolon_pos) {
-            self.print_inline_comments_between(expr_end, semicolon_pos);
-        }
-
-        self.write(";");
-
-        // Print trailing comments after the semicolon (on same line only)
-        self.print_trailing_same_line_comments(stmt.span.end);
-    }
-
     /// Print trailing comments on the same line after a position
-    fn print_trailing_same_line_comments(&mut self, after_pos: u32) {
+    pub(super) fn print_trailing_same_line_comments(&mut self, after_pos: u32) {
         let first_idx = tsv_lang::find_first_comment_from(self.comments, after_pos);
         for comment in &self.comments[first_idx..] {
             if tsv_lang::printing::is_same_line(self.source, after_pos, comment.span.start) {
@@ -178,5 +85,33 @@ impl<'a> Printer<'a> {
                 break;
             }
         }
+    }
+
+    /// Build a Doc for an expression statement
+    ///
+    /// Handles parentheses for object patterns and comments before semicolon.
+    fn build_expression_statement_doc(&self, stmt: &internal::ExpressionStatement) -> doc::Doc {
+        let needs_parens = needs_parens(&stmt.expression, ParenContext::ExpressionStatement);
+
+        let mut parts = Vec::new();
+
+        if needs_parens {
+            parts.push(doc::text("("));
+        }
+        parts.push(self.build_expression_doc(&stmt.expression));
+        if needs_parens {
+            parts.push(doc::text(")"));
+        }
+
+        // Handle comments before semicolon
+        // Prettier keeps comments BEFORE the semicolon in expression statements
+        let expr_end = stmt.expression.span().end;
+        let semicolon_pos = stmt.span.end.saturating_sub(1);
+        if self.has_comments_between(expr_end, semicolon_pos) {
+            parts.push(self.build_inline_comments_between_doc(expr_end, semicolon_pos));
+        }
+
+        parts.push(doc::text(";"));
+        doc::concat(parts)
     }
 }

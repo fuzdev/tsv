@@ -356,22 +356,7 @@ impl<'a> Printer<'a> {
     ///     [1, 2],
     /// )
     /// ```
-    pub(super) fn print_call_expression(&mut self, call: &internal::CallExpression) {
-        // Check if this is a true chain (callee contains calls, like `a().b()`)
-        // vs a simple method call (callee is just member access, like `obj.method()`)
-        let is_true_chain = chain_has_calls(&call.callee);
-
-        let doc = if is_true_chain {
-            // True chain like `arr.filter().map()` - use chain wrapping
-            self.build_chain_doc_with_wrapping(&internal::Expression::CallExpression(call.clone()))
-        } else {
-            // Simple call or simple method call - wrap args, keep callee together
-            self.build_call_doc_with_wrapping(call)
-        };
-
-        self.write_doc_with_margin(&doc);
-    }
-
+    ///
     /// Build a Doc for a call expression with argument wrapping (not chain-aware)
     pub(super) fn build_call_doc_with_wrapping(&self, call: &internal::CallExpression) -> Doc {
         let callee_doc = self.build_expression_doc(&call.callee);
@@ -724,14 +709,6 @@ impl<'a> Printer<'a> {
         chain::build_chain_doc(&groups, self)
     }
 
-    /// Print a new expression: `new Date()`, `new Map()`
-    ///
-    /// For constructor calls, wraps args when they exceed print_width.
-    pub(super) fn print_new_expression(&mut self, new_expr: &internal::NewExpression) {
-        let doc = self.build_new_doc_with_wrapping(new_expr);
-        self.write_doc_with_margin(&doc);
-    }
-
     /// Build a Doc for a new expression with argument wrapping
     pub(super) fn build_new_doc_with_wrapping(&self, new_expr: &internal::NewExpression) -> Doc {
         // Wrap callee in parens if needed (e.g., `new (a || b)()`, `new (a ? b : c)()`)
@@ -900,43 +877,6 @@ impl<'a> Printer<'a> {
         self.build_new_doc_with_wrapping(new_expr)
     }
 
-    /// Print a member expression: `obj.prop`, `arr[0]`
-    ///
-    /// For method chains (containing calls), wraps with leading `.` before method calls.
-    /// For property-only chains, uses greedy line packing with `fill()`.
-    pub(super) fn print_member_expression(&mut self, member: &internal::MemberExpression) {
-        // Check if this chain contains any calls (method chain vs property chain)
-        let has_calls = chain_has_calls(&internal::Expression::MemberExpression(member.clone()));
-
-        let doc = if has_calls {
-            // Method chain - use chain wrapping
-            self.build_chain_doc_with_wrapping(&internal::Expression::MemberExpression(
-                member.clone(),
-            ))
-        } else {
-            // Property chain - use member doc with fill() for greedy wrapping
-            self.build_member_doc(member)
-        };
-
-        self.write_doc_with_margin(&doc);
-    }
-
-    /// Print a conditional (ternary) expression: `a ? b : c`
-    ///
-    /// When the line exceeds print_width, wraps to:
-    /// ```javascript
-    /// longCondition
-    ///     ? consequent
-    ///     : alternate
-    /// ```
-    ///
-    /// Also wraps nested conditionals in the consequent position with parentheses
-    /// for readability: `a ? (b ? c : d) : e`.
-    pub(super) fn print_conditional_expression(&mut self, cond: &internal::ConditionalExpression) {
-        let doc = self.build_conditional_doc_with_wrapping(cond);
-        self.write_doc_with_margin(&doc);
-    }
-
     /// Build a Doc for a conditional expression with wrapping support
     pub(super) fn build_conditional_doc_with_wrapping(
         &self,
@@ -994,10 +934,20 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a call expression (for nested contexts)
     ///
-    /// Delegates to `build_call_doc_with_wrapping` to ensure multiline content
-    /// triggers proper expansion even in nested contexts.
+    /// Checks for chain patterns (like `a().b().c()`) and uses chain module
+    /// for proper member chain formatting.
     pub(super) fn build_call_doc(&self, call: &internal::CallExpression) -> Doc {
-        self.build_call_doc_with_wrapping(call)
+        // Check if this is a true chain (callee contains calls, like `a().b()`)
+        // vs a simple method call (callee is just member access, like `obj.method()`)
+        let is_true_chain = chain_has_calls(&call.callee);
+
+        if is_true_chain {
+            // True chain like `arr.filter().map()` - use chain wrapping
+            self.build_chain_doc_with_wrapping(&internal::Expression::CallExpression(call.clone()))
+        } else {
+            // Simple call or simple method call - wrap args, keep callee together
+            self.build_call_doc_with_wrapping(call)
+        }
     }
 
     /// Build a Doc for a member expression with optional breaking at dots
@@ -1017,12 +967,6 @@ impl<'a> Printer<'a> {
     // =========================================================================
     // Import Expression
     // =========================================================================
-
-    /// Print a dynamic import expression: `import('module')`
-    pub(super) fn print_import_expression(&mut self, import_expr: &internal::ImportExpression) {
-        let doc = self.build_import_expression_doc(import_expr);
-        self.write_doc_with_margin(&doc);
-    }
 
     /// Build a Doc for a dynamic import expression: `import('module')` or `import('module', options)`
     ///
@@ -1064,13 +1008,6 @@ impl<'a> Printer<'a> {
                 doc::text(")"),
             ]))
         }
-    }
-
-    /// Print a meta property: `import.meta`, `new.target`
-    pub(super) fn print_meta_property(&mut self, meta: &internal::MetaProperty) {
-        let meta_name = self.resolve_symbol(meta.meta.name);
-        let prop_name = self.resolve_symbol(meta.property.name);
-        self.write(&format!("{meta_name}.{prop_name}"));
     }
 
     /// Build a Doc for a meta property: `import.meta`, `new.target`

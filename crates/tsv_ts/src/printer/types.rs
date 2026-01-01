@@ -123,112 +123,6 @@ fn type_needs_parens_for_prefix_operator(ts_type: &TSType) -> bool {
 }
 
 impl<'a> Printer<'a> {
-    /// Print a TypeScript type annotation (e.g., `: number`)
-    ///
-    /// Handles comments between the colon and the type.
-    /// For simple types with line comments, the comment is moved to after the type.
-    /// For union/intersection types, the comment stays before and the type is indented.
-    pub(super) fn print_type_annotation(&mut self, annotation: &internal::TSTypeAnnotation) {
-        // Check for comments between `:` and the type
-        let colon_end = annotation.span.start + 1; // After the `:`
-        let type_start = annotation.type_annotation.span().start;
-
-        // Check if there's a line comment between : and the type
-        if self.has_line_comments_between(colon_end, type_start) {
-            // Check if type is union (gets indented) or intersection (stays at same level)
-            let is_union = matches!(&*annotation.type_annotation, TSType::Union(_));
-            let is_intersection = matches!(&*annotation.type_annotation, TSType::Intersection(_));
-
-            if is_union {
-                // Line comment stays before union, type on new INDENTED line
-                self.write(":");
-                self.print_inline_comments_between(colon_end, type_start);
-                self.write("\n");
-                self.indent_level += 1;
-                self.write_indent();
-                self.print_type(&annotation.type_annotation);
-                self.indent_level -= 1;
-            } else if is_intersection {
-                // Line comment stays before intersection, type on new line (NOT indented)
-                self.write(":");
-                self.print_inline_comments_between(colon_end, type_start);
-                self.write("\n");
-                self.write_indent();
-                self.print_type(&annotation.type_annotation);
-            } else {
-                // Simple type: comment moves to after the type (prettier 3.7 behavior)
-                self.write(": ");
-                self.print_type(&annotation.type_annotation);
-                self.write(";");
-                self.print_inline_comments_between(colon_end, type_start);
-            }
-        } else {
-            // Block comments stay inline (if any)
-            self.write(": ");
-            self.print_inline_comments_between(colon_end, type_start);
-            self.print_type(&annotation.type_annotation);
-        }
-    }
-
-    /// Check if a type annotation has a trailing line comment (between : and type)
-    /// that should be moved after the type for simple types.
-    ///
-    /// Used by callers to know when NOT to print a trailing semicolon
-    /// (because print_type_annotation already printed it).
-    pub(super) fn type_annotation_has_trailing_comment(
-        &self,
-        annotation: &internal::TSTypeAnnotation,
-    ) -> bool {
-        let colon_end = annotation.span.start + 1;
-        let type_start = annotation.type_annotation.span().start;
-        // Simple types (not union/intersection) have the comment moved to after the type,
-        // which includes the semicolon
-        self.has_line_comments_between(colon_end, type_start)
-            && !matches!(
-                &*annotation.type_annotation,
-                TSType::Union(_) | TSType::Intersection(_)
-            )
-    }
-
-    /// Print type parameter declaration: `<T, U extends V = W>`
-    pub(super) fn print_type_parameter_declaration(&mut self, decl: &TSTypeParameterDeclaration) {
-        self.write("<");
-        for (i, param) in decl.params.iter().enumerate() {
-            if i > 0 {
-                self.write(", ");
-            }
-            self.print_type_parameter(param);
-        }
-        self.write(">");
-    }
-
-    /// Print a single type parameter: `T`, `T extends U`, or `T extends U = V`
-    /// With optional modifiers: `const T`, `in T`, `out T`, `in out T`
-    fn print_type_parameter(&mut self, param: &TSTypeParameter) {
-        // Print modifiers in order: const, in, out
-        if param.is_const {
-            self.write("const ");
-        }
-        if param.is_in {
-            self.write("in ");
-        }
-        if param.is_out {
-            self.write("out ");
-        }
-
-        self.print_identifier(&param.name);
-
-        if let Some(constraint) = &param.constraint {
-            self.write(" extends ");
-            self.print_type(constraint);
-        }
-
-        if let Some(default) = &param.default {
-            self.write(" = ");
-            self.print_type(default);
-        }
-    }
-
     /// Build doc for type parameter declaration: `<T, U extends V = W>`
     /// Non-wrapping version - always inline
     pub(super) fn build_type_parameter_declaration_doc(
@@ -281,6 +175,16 @@ impl<'a> Printer<'a> {
         ])
     }
 
+    /// Build doc for type parameter declaration without independent group
+    /// Used when type params should break with the parent group (e.g., class header group mode)
+    #[inline]
+    pub(super) fn build_type_parameter_declaration_doc_inline_group(
+        &self,
+        decl: &TSTypeParameterDeclaration,
+    ) -> Doc {
+        self.build_type_parameter_declaration_doc_inner(decl)
+    }
+
     /// Build doc for a single type parameter
     /// With optional modifiers: `const T`, `in T`, `out T`, `in out T`
     pub(super) fn build_type_parameter_doc(&self, param: &TSTypeParameter) -> Doc {
@@ -310,21 +214,6 @@ impl<'a> Printer<'a> {
         }
 
         doc::concat(parts)
-    }
-
-    /// Print type parameter instantiation (type arguments): `<T, U>`
-    pub(super) fn print_type_parameter_instantiation(
-        &mut self,
-        inst: &internal::TSTypeParameterInstantiation,
-    ) {
-        self.write("<");
-        for (i, param) in inst.params.iter().enumerate() {
-            if i > 0 {
-                self.write(", ");
-            }
-            self.print_type(param);
-        }
-        self.write(">");
     }
 
     /// Build doc for type parameter instantiation (type arguments): `<T, U>`
@@ -421,8 +310,11 @@ impl<'a> Printer<'a> {
                 doc::concat(vec![
                     doc::text(":"),
                     comments_doc,
-                    doc::hardline(),
-                    doc::indent(self.build_type_doc(&annotation.type_annotation)),
+                    // Wrap hardline inside indent so the line break is at the indented level
+                    doc::indent(doc::concat(vec![
+                        doc::hardline(),
+                        self.build_type_doc(&annotation.type_annotation),
+                    ])),
                 ])
             } else if is_intersection {
                 // Line comment stays before intersection, type on new line (NOT indented)
@@ -487,14 +379,32 @@ impl<'a> Printer<'a> {
     /// Build type annotation doc with width-aware type argument wrapping.
     ///
     /// For `TypeReference<Args>`, uses `build_type_arguments_doc_wrapping` so
-    /// type arguments wrap at width boundary. For other types, delegates to
-    /// `build_type_annotation_doc`.
+    /// type arguments wrap at width boundary.
+    ///
+    /// For Union types, uses break-after-colon layout:
+    /// ```text
+    /// property:
+    ///     | string
+    ///     | number;
+    /// ```
+    ///
+    /// For other types, delegates to `build_type_annotation_doc`.
     ///
     /// Returns doc starting with `: ` (the annotation prefix).
     pub(super) fn build_type_annotation_doc_wrapping(
         &self,
         annotation: &internal::TSTypeAnnotation,
     ) -> Doc {
+        // First check for line comments between `:` and the type.
+        // If there are comments, fall back to build_type_annotation_doc which handles them properly.
+        let colon_end = annotation.span.start + 1; // After the `:`
+        let type_start = annotation.type_annotation.span().start;
+        if self.has_line_comments_between(colon_end, type_start) {
+            return self.build_type_annotation_doc(annotation);
+        }
+
+        // Handle TypeReference with type arguments - use wrapping version
+        // The type_args group handles its own breaking decision
         if let TSType::TypeReference(r) = annotation.type_annotation.as_ref()
             && let Some(type_args) = &r.type_arguments
         {
@@ -504,6 +414,18 @@ impl<'a> Printer<'a> {
                 self.build_type_arguments_doc_wrapping(type_args),
             ]);
         }
+
+        // Handle Union types - break after colon with indent when long
+        // For union types in property annotations, always use the break-after-colon
+        // structure when the union would overflow. The union doc is built without
+        // its own group (wrap_in_group=false), and we wrap it in a group with indent.
+        if let TSType::Union(u) = annotation.type_annotation.as_ref() {
+            let type_doc = self.build_union_type_doc(u, false);
+            // group(indent([line, union_doc])) - when this group breaks, union goes to new line
+            let union_group = doc::group(doc::indent(doc::concat(vec![doc::line(), type_doc])));
+            return doc::concat(vec![doc::text(":"), union_group]);
+        }
+
         self.build_type_annotation_doc(annotation)
     }
 
@@ -1433,476 +1355,6 @@ impl<'a> Printer<'a> {
             // Inherit breaking from parent group
             doc::concat(parts)
         }
-    }
-
-    /// Print a TypeScript type expression
-    pub(super) fn print_type(&mut self, ts_type: &TSType) {
-        match ts_type {
-            TSType::Keyword(kw) => self.write(kw.kind.as_str()),
-            TSType::Literal(lit) => self.print_literal_type(lit),
-            TSType::Array(arr) => {
-                self.print_type(&arr.element_type);
-                self.write("[]");
-            }
-            TSType::Union(u) => {
-                for (i, t) in u.types.iter().enumerate() {
-                    if i > 0 {
-                        self.write(" | ");
-                    }
-                    self.print_type(t);
-                }
-            }
-            TSType::Intersection(i) => {
-                for (idx, t) in i.types.iter().enumerate() {
-                    if idx > 0 {
-                        self.write(" & ");
-                    }
-                    self.print_type(t);
-                }
-            }
-            TSType::TypeReference(r) => {
-                self.print_type_entity_name(&r.type_name);
-                if let Some(type_args) = &r.type_arguments {
-                    self.write("<");
-                    for (i, arg) in type_args.params.iter().enumerate() {
-                        if i > 0 {
-                            self.write(", ");
-                        }
-                        self.print_type(arg);
-                    }
-                    self.write(">");
-                }
-            }
-            TSType::TypeLiteral(t) => {
-                // Check if original was multi-line (newline immediately after opening brace)
-                // This matches prettier's behavior: `{ a: T }` → single-line, `{\n a: T; }` → multi-line
-                let source_text = t.span.extract(self.source);
-                let after_brace = source_text.strip_prefix('{').unwrap_or("");
-                let is_single_line = !after_brace.starts_with('\n')
-                    && !after_brace.starts_with("\r\n")
-                    && !after_brace.trim_start_matches(' ').starts_with('\n');
-
-                self.write("{");
-                if !t.members.is_empty() {
-                    if is_single_line {
-                        // Single-line format: {prop: string; prop2: number} (semicolon separator, no trailing)
-                        for (i, m) in t.members.iter().enumerate() {
-                            if i > 0 {
-                                self.write("; ");
-                            }
-                            self.print_type_member_inline(m);
-                        }
-                    } else {
-                        // Multi-line format
-                        self.indent_level += 1;
-                        let mut prev_end = t.span.start + 1; // after opening brace
-                        for (i, m) in t.members.iter().enumerate() {
-                            let is_first = i == 0;
-                            // Print leading comments (including blank line preservation)
-                            self.print_block_leading_comments(prev_end, m.span().start, is_first);
-                            self.write_indent();
-                            self.print_type_member(m);
-                            self.write("\n");
-                            prev_end = m.span().end;
-                        }
-                        self.indent_level -= 1;
-                        self.write_indent();
-                    }
-                }
-                self.write("}");
-            }
-            TSType::Function(f) => {
-                // Print type parameters if present: <T, U>
-                if let Some(type_params) = &f.type_parameters {
-                    self.print_type_parameter_declaration(type_params);
-                }
-                self.write("(");
-                for (i, p) in f.params.iter().enumerate() {
-                    if i > 0 {
-                        self.write(", ");
-                    }
-                    self.print_expression(p);
-                }
-                self.write(") => ");
-                self.print_type(&f.return_type.type_annotation);
-            }
-            TSType::Constructor(c) => {
-                // Print 'abstract' if present
-                if c.abstract_ {
-                    self.write("abstract ");
-                }
-                // Print 'new'
-                self.write("new ");
-                // Print type parameters if present: <T, U>
-                if let Some(type_params) = &c.type_parameters {
-                    self.print_type_parameter_declaration(type_params);
-                }
-                self.write("(");
-                for (i, p) in c.params.iter().enumerate() {
-                    if i > 0 {
-                        self.write(", ");
-                    }
-                    self.print_expression(p);
-                }
-                self.write(") => ");
-                self.print_type(&c.return_type.type_annotation);
-            }
-            TSType::Tuple(t) => {
-                self.write("[");
-                for (i, elem) in t.element_types.iter().enumerate() {
-                    if i > 0 {
-                        self.write(", ");
-                    }
-                    self.print_type(elem);
-                }
-                self.write("]");
-            }
-            TSType::Parenthesized(p) => {
-                self.write("(");
-                self.print_type(&p.type_annotation);
-                self.write(")");
-            }
-            TSType::TypePredicate(p) => {
-                if p.asserts {
-                    self.write("asserts ");
-                }
-                self.print_identifier(&p.parameter_name);
-                if let Some(type_ann) = &p.type_annotation {
-                    self.write(" is ");
-                    self.print_type(type_ann);
-                }
-            }
-            TSType::Conditional(c) => {
-                self.print_type(&c.check_type);
-                self.write(" extends ");
-                self.print_type(&c.extends_type);
-                self.write(" ? ");
-                self.print_type(&c.true_type);
-                self.write(" : ");
-                self.print_type(&c.false_type);
-            }
-            TSType::Mapped(m) => self.print_mapped_type(m),
-            TSType::TypeOperator(o) => {
-                self.write(o.operator.as_str());
-                self.write(" ");
-                self.print_type(&o.type_annotation);
-            }
-            TSType::Import(i) => {
-                self.write("import(");
-                self.print_literal(&i.argument);
-                // Import type options
-                if let Some(options) = &i.options {
-                    self.write(", ");
-                    self.print_expression(options);
-                }
-                self.write(")");
-                if let Some(qualifier) = &i.qualifier {
-                    self.write(".");
-                    self.print_type_entity_name(qualifier);
-                }
-                if let Some(type_args) = &i.type_arguments {
-                    self.write("<");
-                    for (j, arg) in type_args.params.iter().enumerate() {
-                        if j > 0 {
-                            self.write(", ");
-                        }
-                        self.print_type(arg);
-                    }
-                    self.write(">");
-                }
-            }
-            TSType::TypeQuery(q) => {
-                self.write("typeof ");
-                self.print_type_query_expr_name(&q.expr_name);
-                if let Some(type_args) = &q.type_arguments {
-                    self.write("<");
-                    for (j, arg) in type_args.params.iter().enumerate() {
-                        if j > 0 {
-                            self.write(", ");
-                        }
-                        self.print_type(arg);
-                    }
-                    self.write(">");
-                }
-            }
-            TSType::IndexedAccess(i) => {
-                self.print_type(&i.object_type);
-                self.write("[");
-                self.print_type(&i.index_type);
-                self.write("]");
-            }
-            TSType::Rest(r) => {
-                self.write("...");
-                self.print_type(&r.type_annotation);
-            }
-            TSType::Optional(o) => {
-                self.print_type(&o.type_annotation);
-                self.write("?");
-            }
-            TSType::NamedTupleMember(n) => {
-                self.write(&self.resolve_symbol(n.label.name));
-                if n.optional {
-                    self.write("?");
-                }
-                self.write(": ");
-                self.print_type(&n.element_type);
-            }
-            TSType::Infer(i) => {
-                self.write("infer ");
-                self.write(&self.resolve_symbol(i.type_parameter.name.name));
-            }
-        }
-    }
-
-    /// Print type query expression name
-    fn print_type_query_expr_name(&mut self, expr_name: &internal::TSTypeQueryExprName) {
-        match expr_name {
-            internal::TSTypeQueryExprName::EntityName(entity) => {
-                self.print_type_entity_name(entity);
-            }
-            internal::TSTypeQueryExprName::Import(i) => {
-                self.write("import(");
-                self.print_literal(&i.argument);
-                self.write(")");
-                if let Some(qualifier) = &i.qualifier {
-                    self.write(".");
-                    self.print_type_entity_name(qualifier);
-                }
-                if let Some(type_args) = &i.type_arguments {
-                    self.write("<");
-                    for (j, arg) in type_args.params.iter().enumerate() {
-                        if j > 0 {
-                            self.write(", ");
-                        }
-                        self.print_type(arg);
-                    }
-                    self.write(">");
-                }
-            }
-        }
-    }
-
-    /// Print mapped type: `{ [K in T]: V }`
-    fn print_mapped_type(&mut self, m: &internal::TSMappedType) {
-        self.write("{");
-
-        // readonly modifier
-        if let Some(readonly) = m.readonly {
-            if readonly {
-                self.write("readonly ");
-            } else {
-                self.write("-readonly ");
-            }
-        }
-
-        // [K in constraint]
-        self.write("[");
-        self.write(&m.type_parameter.name);
-        self.write(" in ");
-        self.print_type(&m.type_parameter.constraint);
-
-        // as clause
-        if let Some(name_type) = &m.name_type {
-            self.write(" as ");
-            self.print_type(name_type);
-        }
-
-        self.write("]");
-
-        // optional modifier
-        if let Some(optional) = m.optional {
-            if optional {
-                self.write("?");
-            } else {
-                self.write("-?");
-            }
-        }
-
-        self.write(": ");
-
-        // value type
-        if let Some(type_ann) = &m.type_annotation {
-            self.print_type(type_ann);
-        }
-
-        self.write("}");
-    }
-
-    /// Print type entity name
-    fn print_type_entity_name(&mut self, name: &internal::TSEntityName) {
-        match name {
-            internal::TSEntityName::Identifier(id) => self.print_identifier(id),
-            internal::TSEntityName::QualifiedName(qn) => {
-                self.print_type_entity_name(&qn.left);
-                self.write(".");
-                self.print_identifier(&qn.right);
-            }
-        }
-    }
-
-    /// Print type member with proper AST-based formatting (with trailing semicolon)
-    fn print_type_member(&mut self, member: &internal::TSTypeElement) {
-        self.print_type_member_inner(member, true);
-    }
-
-    /// Print type member inline (without trailing semicolon, for single-line object types)
-    fn print_type_member_inline(&mut self, member: &internal::TSTypeElement) {
-        self.print_type_member_inner(member, false);
-    }
-
-    /// Print type member with optional trailing semicolon
-    fn print_type_member_inner(&mut self, member: &internal::TSTypeElement, with_semicolon: bool) {
-        match member {
-            internal::TSTypeElement::PropertySignature(prop) => {
-                if prop.readonly {
-                    self.write("readonly ");
-                }
-                if prop.computed {
-                    self.write("[");
-                    self.print_expression(&prop.key);
-                    self.write("]");
-                } else {
-                    self.print_expression(&prop.key);
-                }
-                if prop.optional {
-                    self.write("?");
-                }
-                if let Some(type_ann) = &prop.type_annotation {
-                    self.print_type_annotation(type_ann);
-                }
-                if with_semicolon {
-                    self.write(";");
-                }
-            }
-            internal::TSTypeElement::MethodSignature(method) => {
-                // Print accessor keyword for get/set signatures
-                match method.kind {
-                    internal::MethodKind::Get => self.write("get "),
-                    internal::MethodKind::Set => self.write("set "),
-                    _ => {}
-                }
-                if method.computed {
-                    self.write("[");
-                    self.print_expression(&method.key);
-                    self.write("]");
-                } else {
-                    self.print_expression(&method.key);
-                }
-                if method.optional {
-                    self.write("?");
-                }
-                // Print type parameters if present: `<T>` or `<T, U>`
-                if let Some(type_params) = &method.type_parameters {
-                    self.print_type_parameter_declaration(type_params);
-                }
-                self.write("(");
-                for (i, param) in method.params.iter().enumerate() {
-                    if i > 0 {
-                        self.write(", ");
-                    }
-                    self.print_expression(param);
-                }
-                self.write(")");
-                if let Some(return_type) = &method.return_type {
-                    self.print_type_annotation(return_type);
-                }
-                if with_semicolon {
-                    self.write(";");
-                }
-            }
-            internal::TSTypeElement::CallSignature(call) => {
-                self.write("(");
-                for (i, param) in call.params.iter().enumerate() {
-                    if i > 0 {
-                        self.write(", ");
-                    }
-                    self.print_expression(param);
-                }
-                self.write(")");
-                if let Some(return_type) = &call.return_type {
-                    self.print_type_annotation(return_type);
-                }
-                if with_semicolon {
-                    self.write(";");
-                }
-            }
-            internal::TSTypeElement::ConstructSignature(ctor) => {
-                self.write("new (");
-                for (i, param) in ctor.params.iter().enumerate() {
-                    if i > 0 {
-                        self.write(", ");
-                    }
-                    self.print_expression(param);
-                }
-                self.write(")");
-                if let Some(return_type) = &ctor.return_type {
-                    self.print_type_annotation(return_type);
-                }
-                if with_semicolon {
-                    self.write(";");
-                }
-            }
-            internal::TSTypeElement::IndexSignature(idx) => {
-                if idx.readonly {
-                    self.write("readonly ");
-                }
-                self.write("[");
-                for (i, param) in idx.parameters.iter().enumerate() {
-                    if i > 0 {
-                        self.write(", ");
-                    }
-                    // print_identifier already prints type annotations, so we just call it
-                    self.print_identifier(param);
-                }
-                self.write("]");
-                self.print_type_annotation(&idx.type_annotation);
-                if with_semicolon {
-                    self.write(";");
-                }
-            }
-        }
-    }
-
-    /// Print a TypeScript literal type (template literal types, etc.)
-    fn print_literal_type(&mut self, lit: &TSLiteralType) {
-        match lit {
-            TSLiteralType::TemplateLiteral(template) => {
-                self.print_template_literal_type(template);
-            }
-            TSLiteralType::String(literal) => {
-                self.print_literal(literal);
-            }
-            TSLiteralType::Number(literal) => {
-                self.print_literal(literal);
-            }
-            TSLiteralType::BigInt(literal) => {
-                self.print_literal(literal);
-            }
-            TSLiteralType::UnaryExpression(unary) => {
-                // For negative number types like `-1`
-                self.write(unary.operator.as_str());
-                self.print_expression(&unary.argument);
-            }
-        }
-    }
-
-    /// Print a template literal type: `hello ${string} world`
-    fn print_template_literal_type(&mut self, template: &TemplateLiteralType) {
-        self.write("`");
-
-        for (i, quasi) in template.quasis.iter().enumerate() {
-            // Print the raw template content (preserving escapes)
-            self.write(&quasi.raw);
-
-            // Print type interpolation if there's a corresponding type
-            if i < template.types.len() {
-                self.write("${");
-                self.print_type(&template.types[i]);
-                self.write("}");
-            }
-        }
-
-        self.write("`");
     }
 
     /// Convert a type annotation to a string (for inline building)

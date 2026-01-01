@@ -1,0 +1,551 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 294,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 69,
+				"data": " Multiline getter/setter bindings: when setter has block body "
+			},
+			{
+				"type": "Text",
+				"start": 69,
+				"end": 71,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 71,
+				"end": 113,
+				"data": " Block body setter - expands fully "
+			},
+			{
+				"type": "Text",
+				"start": 113,
+				"end": 114,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 114,
+				"end": 175,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 115
+					},
+					"end": {
+						"line": 4,
+						"column": 5,
+						"character": 119
+					}
+				},
+				"attributes": [
+					{
+						"start": 121,
+						"end": 172,
+						"type": "BindDirective",
+						"name": "value",
+						"name_loc": {
+							"start": {
+								"line": 5,
+								"column": 1,
+								"character": 121
+							},
+							"end": {
+								"line": 5,
+								"column": 11,
+								"character": 131
+							}
+						},
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 136,
+							"end": 169,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 9,
+									"column": 3
+								}
+							},
+							"expressions": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 136,
+									"end": 143,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 9
+										}
+									},
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "Identifier",
+										"start": 142,
+										"end": 143,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 8
+											},
+											"end": {
+												"line": 6,
+												"column": 9
+											}
+										},
+										"name": "a"
+									}
+								},
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 147,
+									"end": 169,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 3
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 148,
+											"end": 149,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 3
+												},
+												"end": {
+													"line": 7,
+													"column": 4
+												}
+											},
+											"name": "v"
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 154,
+										"end": 169,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 9
+											},
+											"end": {
+												"line": 9,
+												"column": 3
+											}
+										},
+										"body": [
+											{
+												"type": "ExpressionStatement",
+												"start": 159,
+												"end": 165,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 3
+													},
+													"end": {
+														"line": 8,
+														"column": 9
+													}
+												},
+												"expression": {
+													"type": "AssignmentExpression",
+													"start": 159,
+													"end": 164,
+													"loc": {
+														"start": {
+															"line": 8,
+															"column": 3
+														},
+														"end": {
+															"line": 8,
+															"column": 8
+														}
+													},
+													"operator": "=",
+													"left": {
+														"type": "Identifier",
+														"start": 159,
+														"end": 160,
+														"loc": {
+															"start": {
+																"line": 8,
+																"column": 3
+															},
+															"end": {
+																"line": 8,
+																"column": 4
+															}
+														},
+														"name": "a"
+													},
+													"right": {
+														"type": "Identifier",
+														"start": 163,
+														"end": 164,
+														"loc": {
+															"start": {
+																"line": 8,
+																"column": 7
+															},
+															"end": {
+																"line": 8,
+																"column": 8
+															}
+														},
+														"name": "v"
+													}
+												}
+											}
+										]
+									}
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 175,
+				"end": 177,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 177,
+				"end": 215,
+				"data": " Multiple statements in setter "
+			},
+			{
+				"type": "Text",
+				"start": 215,
+				"end": 216,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 216,
+				"end": 293,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 217
+					},
+					"end": {
+						"line": 14,
+						"column": 5,
+						"character": 221
+					}
+				},
+				"attributes": [
+					{
+						"start": 223,
+						"end": 290,
+						"type": "BindDirective",
+						"name": "value",
+						"name_loc": {
+							"start": {
+								"line": 15,
+								"column": 1,
+								"character": 223
+							},
+							"end": {
+								"line": 15,
+								"column": 11,
+								"character": 233
+							}
+						},
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 238,
+							"end": 287,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 2
+								},
+								"end": {
+									"line": 20,
+									"column": 3
+								}
+							},
+							"expressions": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 238,
+									"end": 245,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 9
+										}
+									},
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "Identifier",
+										"start": 244,
+										"end": 245,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 8
+											},
+											"end": {
+												"line": 16,
+												"column": 9
+											}
+										},
+										"name": "b"
+									}
+								},
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 249,
+									"end": 287,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 2
+										},
+										"end": {
+											"line": 20,
+											"column": 3
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 250,
+											"end": 251,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 3
+												},
+												"end": {
+													"line": 17,
+													"column": 4
+												}
+											},
+											"name": "v"
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 256,
+										"end": 287,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 9
+											},
+											"end": {
+												"line": 20,
+												"column": 3
+											}
+										},
+										"body": [
+											{
+												"type": "ExpressionStatement",
+												"start": 261,
+												"end": 273,
+												"loc": {
+													"start": {
+														"line": 18,
+														"column": 3
+													},
+													"end": {
+														"line": 18,
+														"column": 15
+													}
+												},
+												"expression": {
+													"type": "CallExpression",
+													"start": 261,
+													"end": 272,
+													"loc": {
+														"start": {
+															"line": 18,
+															"column": 3
+														},
+														"end": {
+															"line": 18,
+															"column": 14
+														}
+													},
+													"callee": {
+														"type": "Identifier",
+														"start": 261,
+														"end": 269,
+														"loc": {
+															"start": {
+																"line": 18,
+																"column": 3
+															},
+															"end": {
+																"line": 18,
+																"column": 11
+															}
+														},
+														"name": "validate"
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 270,
+															"end": 271,
+															"loc": {
+																"start": {
+																	"line": 18,
+																	"column": 12
+																},
+																"end": {
+																	"line": 18,
+																	"column": 13
+																}
+															},
+															"name": "v"
+														}
+													],
+													"optional": false
+												}
+											},
+											{
+												"type": "ExpressionStatement",
+												"start": 277,
+												"end": 283,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 3
+													},
+													"end": {
+														"line": 19,
+														"column": 9
+													}
+												},
+												"expression": {
+													"type": "AssignmentExpression",
+													"start": 277,
+													"end": 282,
+													"loc": {
+														"start": {
+															"line": 19,
+															"column": 3
+														},
+														"end": {
+															"line": 19,
+															"column": 8
+														}
+													},
+													"operator": "=",
+													"left": {
+														"type": "Identifier",
+														"start": 277,
+														"end": 278,
+														"loc": {
+															"start": {
+																"line": 19,
+																"column": 3
+															},
+															"end": {
+																"line": 19,
+																"column": 4
+															}
+														},
+														"name": "b"
+													},
+													"right": {
+														"type": "Identifier",
+														"start": 281,
+														"end": 282,
+														"loc": {
+															"start": {
+																"line": 19,
+																"column": 7
+															},
+															"end": {
+																"line": 19,
+																"column": 8
+															}
+														},
+														"name": "v"
+													}
+												}
+											}
+										]
+									}
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

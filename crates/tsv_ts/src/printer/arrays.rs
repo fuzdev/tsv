@@ -13,214 +13,42 @@ use tsv_lang::doc::{self, Doc};
 use tsv_lang::printing::is_same_line;
 
 impl<'a> Printer<'a> {
-    /// Print an array expression: `[1, 2, 3]`
-    pub(super) fn print_array_expression(&mut self, arr: &internal::ArrayExpression) {
+    /// Build a Doc for an array with proper wrapping behavior
+    pub(super) fn build_array_doc_with_wrapping(&self, arr: &internal::ArrayExpression) -> Doc {
         if arr.elements.is_empty() {
             // Check for comments inside empty array
-            let has_comments = self.has_comments_between(arr.span.start, arr.span.end);
-            if has_comments {
-                self.print_empty_array_with_comments(arr);
-            } else {
-                self.write("[]");
+            let has_inner_comments =
+                self.has_comments_between(arr.span.start + 1, arr.span.end - 1);
+            if has_inner_comments {
+                // Build array with comments inside
+                let mut comment_parts = Vec::new();
+                for comment in
+                    comments_in_range(self.comments, arr.span.start + 1, arr.span.end - 1)
+                {
+                    comment_parts.push(self.build_comment_doc(comment));
+                    if !comment.is_block {
+                        comment_parts.push(doc::hardline());
+                    }
+                }
+                return doc::concat(vec![
+                    doc::text("["),
+                    doc::indent(doc::concat(vec![
+                        doc::hardline(),
+                        doc::concat(comment_parts),
+                    ])),
+                    doc::hardline(),
+                    doc::text("]"),
+                ]);
             }
-            return;
+            return doc::text("[]");
         }
 
         // Check for line comments in the array (force expansion - can't be inline)
         let has_line_comments = self.has_line_comments_between(arr.span.start, arr.span.end);
 
         if has_line_comments {
-            // Use comment-aware printing path (always expands)
-            self.print_array_expression_with_comments(arr);
-        } else {
-            // Build doc for width-based wrapping (handles block comments inline)
-            let doc = self.build_array_doc_with_wrapping(arr);
-            self.write_doc_with_margin(&doc);
-        }
-    }
-
-    /// Print an empty array that contains only comments
-    ///
-    /// Uses binary search to find comments: O(log n + k)
-    fn print_empty_array_with_comments(&mut self, arr: &internal::ArrayExpression) {
-        let (content_start, content_end) = super::content_bounds(arr.span);
-        self.print_empty_container_with_comments("[", "]", content_start, content_end);
-    }
-
-    /// Print an array expression with comments
-    ///
-    /// Arrays with comments are always expanded to multiline with one element per line.
-    fn print_array_expression_with_comments(&mut self, arr: &internal::ArrayExpression) {
-        self.write("[");
-
-        if !arr.elements.is_empty() {
-            self.write("\n");
-            self.indent_level += self.container_indent_increment();
-
-            let mut prev_end = arr.span.start + 1; // After opening bracket
-
-            for (i, elem) in arr.elements.iter().enumerate() {
-                let elem_start = if let Some(e) = elem {
-                    e.span().start
-                } else {
-                    // For elision (holes), use next element's start or closing bracket
-                    if i + 1 < arr.elements.len() {
-                        if let Some(next) = &arr.elements[i + 1] {
-                            next.span().start
-                        } else {
-                            arr.span.end - 1
-                        }
-                    } else {
-                        arr.span.end - 1
-                    }
-                };
-
-                // Print leading comments before this element
-                let is_first = i == 0;
-                let had_same_line_comment =
-                    self.print_array_leading_comments(prev_end, elem_start, is_first);
-
-                if !had_same_line_comment {
-                    self.write_indent();
-                }
-
-                // Print element (or nothing for elision)
-                if let Some(e) = elem {
-                    self.print_expression(e);
-                }
-
-                // Get element end position
-                let elem_end = if let Some(e) = elem {
-                    e.span().end
-                } else {
-                    elem_start
-                };
-
-                // Determine the boundary for trailing comments (next element start or closing bracket)
-                let next_boundary = if i + 1 < arr.elements.len() {
-                    if let Some(next) = &arr.elements[i + 1] {
-                        next.span().start
-                    } else {
-                        // Next element is a hole - find the following non-hole element
-                        arr.elements[i + 1..]
-                            .iter()
-                            .find_map(|e| e.as_ref().map(|e| e.span().start))
-                            .unwrap_or(arr.span.end - 1)
-                    }
-                } else {
-                    arr.span.end - 1 // Before closing bracket
-                };
-
-                // Print trailing inline comments (block comments before comma, line comments after)
-                // Only consider comments between this element and the next element/closing bracket
-                // Uses binary search: O(log n + k)
-                let mut has_line_comment = false;
-                for comment in comments_in_range(self.comments, elem_end, next_boundary) {
-                    if is_same_line(self.source, elem_end, comment.span.start) {
-                        if comment.is_block {
-                            self.write(" ");
-                            self.print_comment(comment);
-                        } else {
-                            has_line_comment = true;
-                        }
-                    }
-                }
-
-                self.write(",");
-
-                // Print line comments after comma
-                if has_line_comment {
-                    for comment in comments_in_range(self.comments, elem_end, next_boundary) {
-                        if is_same_line(self.source, elem_end, comment.span.start)
-                            && !comment.is_block
-                        {
-                            self.write(" ");
-                            self.print_comment(comment);
-                        }
-                    }
-                }
-
-                self.write("\n");
-                prev_end = if let Some(e) = elem {
-                    e.span().end
-                } else {
-                    elem_start
-                };
-            }
-
-            // Print any final comments before closing bracket
-            self.print_leading_comments(prev_end, arr.span.end, false);
-
-            self.write_container_closing_indent();
-        }
-
-        self.write("]");
-    }
-
-    /// Print leading comments before an array element
-    ///
-    /// Similar to print_object_leading_comments but for arrays.
-    /// Returns true if a same-line leading comment was printed.
-    ///
-    /// Uses binary search to find comments: O(log n + k)
-    fn print_array_leading_comments(
-        &mut self,
-        prev_end: u32,
-        curr_start: u32,
-        is_first: bool,
-    ) -> bool {
-        let mut last_comment_end = prev_end;
-        let mut printed_same_line = false;
-
-        for comment in comments_in_range(self.comments, prev_end, curr_start) {
-            // Skip trailing comments from previous element
-            if !is_first && is_same_line(self.source, prev_end, comment.span.start) {
-                continue;
-            }
-
-            // Same-line leading comment
-            if is_same_line(self.source, comment.span.end, curr_start) {
-                self.write_indent();
-                self.print_comment(comment);
-                self.write(" ");
-                last_comment_end = comment.span.end;
-                printed_same_line = true;
-                continue;
-            }
-
-            // Comment on its own line
-            if comment.span.start > last_comment_end
-                && tsv_lang::printing::has_blank_line_between(
-                    self.source,
-                    last_comment_end,
-                    comment.span.start,
-                )
-            {
-                self.write("\n");
-            }
-
-            self.write_indent();
-            self.print_comment(comment);
-            self.write("\n");
-
-            last_comment_end = comment.span.end;
-        }
-
-        // Check for blank line after last comment
-        if last_comment_end > prev_end
-            && last_comment_end < curr_start
-            && tsv_lang::printing::has_blank_line_between(self.source, last_comment_end, curr_start)
-        {
-            self.write("\n");
-        }
-
-        printed_same_line
-    }
-
-    /// Build a Doc for an array with proper wrapping behavior
-    pub(super) fn build_array_doc_with_wrapping(&self, arr: &internal::ArrayExpression) -> Doc {
-        if arr.elements.is_empty() {
-            return doc::text("[]");
+            // Use comment-aware doc building path (always expands with hardlines)
+            return self.build_array_doc_with_line_comments(arr);
         }
 
         // Check if any element has multiline content (e.g., line continuation strings)
@@ -293,13 +121,10 @@ impl<'a> Printer<'a> {
             }
 
             // Add trailing block comments (after this element, before next element)
-            let next_boundary = if i + 1 < arr.elements.len() {
-                arr.elements[i + 1]
-                    .as_ref()
-                    .map_or(arr.span.end - 1, |e| e.span().start)
-            } else {
-                arr.span.end - 1
-            };
+            let next_boundary = arr.elements[i + 1..]
+                .iter()
+                .find_map(|e| e.as_ref().map(|e| e.span().start))
+                .unwrap_or(arr.span.end - 1);
 
             for comment in comments_in_range(self.comments, elem_end, next_boundary) {
                 if comment.is_block {
@@ -359,13 +184,10 @@ impl<'a> Printer<'a> {
 
             // Add trailing block comments (after this element, before next element)
             // Comments between elements are treated as trailing comments of the previous element
-            let next_boundary = if i + 1 < arr.elements.len() {
-                arr.elements[i + 1]
-                    .as_ref()
-                    .map_or(arr.span.end - 1, |e| e.span().start)
-            } else {
-                arr.span.end - 1
-            };
+            let next_boundary = arr.elements[i + 1..]
+                .iter()
+                .find_map(|e| e.as_ref().map(|e| e.span().start))
+                .unwrap_or(arr.span.end - 1);
 
             for comment in comments_in_range(self.comments, elem_end, next_boundary) {
                 if comment.is_block {
@@ -419,6 +241,99 @@ impl<'a> Printer<'a> {
         }
 
         let inner = doc::concat(vec![doc::hardline(), doc::concat(parts), doc::text(",")]);
+        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, doc::hardline());
+
+        doc::concat(vec![
+            doc::text("["),
+            indented_content,
+            closing_line,
+            doc::text("]"),
+        ])
+    }
+
+    /// Build a Doc for an array with line comments (forced expansion)
+    ///
+    /// Arrays with line comments always expand to multiline because line comments
+    /// cannot appear on the same line as subsequent content.
+    fn build_array_doc_with_line_comments(&self, arr: &internal::ArrayExpression) -> Doc {
+        let mut parts = Vec::new();
+        let mut prev_end = arr.span.start + 1; // After opening bracket
+
+        for (i, elem) in arr.elements.iter().enumerate() {
+            let (elem_start, elem_end) = elem.as_ref().map_or_else(
+                || {
+                    // Elision: use next element's start or closing bracket
+                    let pos = arr.elements[i + 1..]
+                        .iter()
+                        .find_map(|e| e.as_ref().map(|e| e.span().start))
+                        .unwrap_or(arr.span.end - 1);
+                    (pos, pos)
+                },
+                |e| (e.span().start, e.span().end),
+            );
+
+            // Add leading comments before this element
+            for comment in comments_in_range(self.comments, prev_end, elem_start) {
+                // Skip comments that are trailing on the previous line
+                if i > 0 && is_same_line(self.source, prev_end, comment.span.start) {
+                    continue;
+                }
+                parts.push(self.build_comment_doc(comment));
+                // Line comments always need hardline after
+                // Block comments: hardline if NOT on same line as element, space otherwise
+                if !comment.is_block || !is_same_line(self.source, comment.span.end, elem_start) {
+                    parts.push(doc::hardline());
+                } else {
+                    parts.push(doc::text(" "));
+                }
+            }
+
+            // Add element (or nothing for elision)
+            if let Some(e) = elem {
+                parts.push(self.build_expression_doc(e));
+            }
+
+            // Boundary for trailing comments: next element or closing bracket
+            let next_boundary = arr.elements[i + 1..]
+                .iter()
+                .find_map(|e| e.as_ref().map(|e| e.span().start))
+                .unwrap_or(arr.span.end - 1);
+
+            // Collect same-line trailing comments (block before comma, line after)
+            let trailing: Vec<_> = comments_in_range(self.comments, elem_end, next_boundary)
+                .filter(|c| is_same_line(self.source, elem_end, c.span.start))
+                .collect();
+
+            // Block comments go before comma
+            for comment in trailing.iter().filter(|c| c.is_block) {
+                parts.push(doc::text(" "));
+                parts.push(self.build_comment_doc(comment));
+            }
+
+            parts.push(doc::text(","));
+
+            // Line comments go after comma
+            for comment in trailing.iter().filter(|c| !c.is_block) {
+                parts.push(doc::text(" "));
+                parts.push(self.build_comment_doc(comment));
+            }
+
+            if i < arr.elements.len() - 1 {
+                parts.push(doc::hardline());
+            }
+
+            prev_end = elem_end;
+        }
+
+        // Add any final comments before closing bracket
+        for comment in comments_in_range(self.comments, prev_end, arr.span.end - 1) {
+            if !is_same_line(self.source, prev_end, comment.span.start) {
+                parts.push(doc::hardline());
+                parts.push(self.build_comment_doc(comment));
+            }
+        }
+
+        let inner = doc::concat(vec![doc::hardline(), doc::concat(parts)]);
         let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, doc::hardline());
 
         doc::concat(vec![

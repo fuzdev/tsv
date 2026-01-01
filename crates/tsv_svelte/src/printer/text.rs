@@ -5,13 +5,11 @@
 // - Inline context: preserve single space at boundaries
 // - Pre elements: preserve exactly as-is
 
-use crate::ast::internal;
 use crate::printer::Printer;
 
 // Helper trait for text analysis
 pub trait TextAnalysis {
     fn is_whitespace_only(&self) -> bool;
-    fn has_content(&self) -> bool;
     fn count_newlines(&self) -> usize;
     fn has_blank_line(&self) -> bool;
 
@@ -29,11 +27,6 @@ impl TextAnalysis for str {
     /// Check if string contains only whitespace
     fn is_whitespace_only(&self) -> bool {
         self.trim().is_empty()
-    }
-
-    /// Check if string has non-whitespace content
-    fn has_content(&self) -> bool {
-        !self.trim().is_empty()
     }
 
     /// Count newlines in the string
@@ -87,32 +80,6 @@ impl TextAnalysis for str {
 }
 
 impl<'a> Printer<'a> {
-    /// Format a Text node
-    ///
-    /// # Parameters
-    /// - `parent_is_block`: Whether the parent element is a block element
-    ///   - `true`: trim text completely (block context)
-    ///   - `false`: preserve single space at boundaries (inline context)
-    /// - `parent_preserves_ws`: Whether the parent preserves whitespace (like `<pre>`)
-    pub(super) fn print_text(
-        &mut self,
-        text: &internal::Text,
-        parent_is_block: bool,
-        parent_preserves_ws: bool,
-    ) {
-        // If parent preserves whitespace (like <pre>), write text exactly as-is
-        if parent_preserves_ws {
-            self.write(&text.raw);
-            return;
-        }
-
-        // Otherwise, normalize whitespace (collapse to single space, trim based on context)
-        let normalized = self.normalize_whitespace(&text.raw, parent_is_block);
-
-        // TODO: Handle entity escaping (&nbsp;, &lt;, etc.)
-        self.write(&normalized);
-    }
-
     /// Check if text has leading whitespace
     ///
     /// Returns true if the first character is whitespace.

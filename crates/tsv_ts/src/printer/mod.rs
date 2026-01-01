@@ -35,7 +35,7 @@ mod types;
 pub(crate) use needs_parens::{ParenContext, needs_parens};
 
 use crate::ast::internal;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use string_interner::DefaultStringInterner;
 use tsv_lang::{
@@ -63,19 +63,6 @@ pub(crate) enum CommentFilter {
     All,
     /// Only include block comments (/* */)
     BlockOnly,
-}
-
-/// Get the content bounds inside a delimited span (e.g., `[...]`, `{...}`, `(...)`)
-///
-/// For a span covering `[a, b, c]`:
-/// - `span.start` points to `[`
-/// - `span.end` points to position after `]`
-/// - Returns `(span.start + 1, span.end - 1)` = positions of content area
-///
-/// Useful for finding comments inside containers when the content might be empty.
-#[inline]
-pub(crate) fn content_bounds(span: tsv_lang::Span) -> (u32, u32) {
-    (span.start + 1, span.end - 1)
 }
 
 /// Skip over a string literal or comment starting at position `i`.
@@ -115,65 +102,6 @@ fn skip_string_or_comment(source: &[u8], i: usize, end: usize) -> Option<usize> 
             }
         }
         _ => None,
-    }
-}
-
-/// Check if an expression contains a logical binary expression at its core
-///
-/// Used to detect expressions like `!!(a || b)` or `new (a || b)()` that need
-/// doc-based width wrapping for the logical chain inside.
-pub(crate) fn contains_logical_expression(expr: &internal::Expression) -> bool {
-    match expr {
-        internal::Expression::BinaryExpression(binary) => {
-            matches!(
-                binary.operator,
-                internal::BinaryOperator::PipePipe
-                    | internal::BinaryOperator::AmpersandAmpersand
-                    | internal::BinaryOperator::QuestionQuestion
-            )
-        }
-        internal::Expression::UnaryExpression(unary) => {
-            contains_logical_expression(&unary.argument)
-        }
-        internal::Expression::NewExpression(new_expr) => {
-            contains_logical_expression(&new_expr.callee)
-        }
-        _ => false,
-    }
-}
-
-/// Check if an expression needs doc-based printing for width-based wrapping
-///
-/// Expressions that need doc-based printing include:
-/// - Unary expressions containing logical expressions (like `!!(a || b)`)
-/// - New expressions with logical callees (like `new (a || b)()`)
-/// - Class expressions with type parameters (like `class Foo<T, U> {}`)
-/// - Function expressions with type parameters (like `function <T>() {}`)
-///
-/// These expressions have internal groups that need the doc system to
-/// evaluate whether they should break based on line width.
-pub(crate) fn needs_doc_based_wrapping(expr: &internal::Expression) -> bool {
-    match expr {
-        // Unary with logical inside: !(a || b), !!(a || b)
-        internal::Expression::UnaryExpression(unary) => {
-            contains_logical_expression(&unary.argument)
-        }
-        // New with logical callee: new (a || b)()
-        internal::Expression::NewExpression(new_expr) => {
-            // Check if callee needs parens AND is a logical expression
-            matches!(
-                new_expr.callee.as_ref(),
-                internal::Expression::BinaryExpression(_)
-                    | internal::Expression::ConditionalExpression(_)
-                    | internal::Expression::AssignmentExpression(_)
-                    | internal::Expression::SequenceExpression(_)
-            ) && contains_logical_expression(&new_expr.callee)
-        }
-        // Class expressions with type parameters need doc-based wrapping for width calculation
-        internal::Expression::ClassExpression(class_expr) => class_expr.type_parameters.is_some(),
-        // Function expressions with type parameters need doc-based wrapping for width calculation
-        internal::Expression::FunctionExpression(func_expr) => func_expr.type_parameters.is_some(),
-        _ => false,
     }
 }
 
@@ -547,7 +475,8 @@ pub struct Printer<'a> {
     pub(crate) comments: &'a [internal::Comment],
     /// Extra indent depth for declaration contexts (0 normally, 1+ in multi-declarator)
     /// When > 0, multiline objects/arrays get extra indentation
-    pub(crate) declaration_indent_depth: usize,
+    /// Uses Cell for interior mutability so doc builders (&self) can set this
+    pub(crate) declaration_indent_depth: Cell<usize>,
 }
 
 impl<'a> Printer<'a> {
@@ -565,7 +494,7 @@ impl<'a> Printer<'a> {
             interner,
             source,
             comments,
-            declaration_indent_depth: 0,
+            declaration_indent_depth: Cell::new(0),
         }
     }
 
@@ -585,7 +514,7 @@ impl<'a> Printer<'a> {
     /// - If `first_line_offset > 0`: expression is embedded inline (e.g., Svelte block), use it directly
     /// - If `first_line_offset == 0`: standalone block (e.g., `<script>`), use `base_indent_offset * tab_width`
     ///
-    /// Use `write_doc_with_margin` for expressions where trailing punctuation
+    /// Use `write_doc` for expression statements where the semicolon
     /// (like semicolons) should be considered in width calculations.
     pub(crate) fn write_doc(&mut self, d: &Doc) {
         // Calculate offset to account for outer context in width calculations
@@ -612,76 +541,6 @@ impl<'a> Printer<'a> {
             )
         };
         self.write(&output);
-    }
-
-    /// Write a Doc to the buffer with +1 margin for trailing punctuation
-    ///
-    /// Use this for expressions followed by semicolons, commas, or other punctuation
-    /// that should be accounted for in width calculations.
-    ///
-    /// Note: When `suffix_width > 0` (e.g., Svelte block expressions), the suffix
-    /// already accounts for trailing content, so no +1 margin is added.
-    pub(crate) fn write_doc_with_margin(&mut self, d: &Doc) {
-        // Calculate offset to account for outer context in width calculations
-        let context_offset = if self.config.first_line_offset > 0 {
-            // Inline embedded expression: first_line_offset includes visual width of outer indent
-            if self.current_column() == 0 {
-                self.config.first_line_offset
-            } else {
-                0
-            }
-        } else {
-            // Standalone block: account for outer indent not visible in our buffer
-            self.config.base_indent_offset * self.config.tab_width
-        };
-        // Only add +1 margin when suffix_width isn't set (standalone expression context)
-        // When suffix_width > 0, the suffix already accounts for trailing content
-        let margin = if self.config.suffix_width > 0 { 0 } else { 1 };
-        let current_col = self.current_column() + context_offset + margin;
-        let output = {
-            let interner = self.interner.borrow();
-            doc::print_doc_with_indent_resolved(
-                d,
-                &self.config,
-                current_col,
-                self.indent_level,
-                &*interner,
-            )
-        };
-        self.write(&output);
-    }
-
-    /// Render a Doc with a specific suffix width, returning the output string
-    ///
-    /// Use this when the doc will be followed by known trailing content on the same line.
-    /// The suffix_width reduces the effective line width for breaking decisions.
-    ///
-    /// Example: Class/interface headers followed by ` {}` or ` {`
-    ///
-    /// Returns the rendered output for inspection (e.g., to check if it ends with newline).
-    pub(crate) fn render_doc_with_suffix(&self, d: &Doc, suffix_width: usize) -> String {
-        let context_offset = if self.config.first_line_offset > 0 {
-            if self.current_column() == 0 {
-                self.config.first_line_offset
-            } else {
-                0
-            }
-        } else {
-            self.config.base_indent_offset * self.config.tab_width
-        };
-        let current_col = self.current_column() + context_offset;
-        let render_config = PrintConfig {
-            suffix_width,
-            ..self.config
-        };
-        let interner = self.interner.borrow();
-        doc::print_doc_with_indent_resolved(
-            d,
-            &render_config,
-            current_col,
-            self.indent_level,
-            &*interner,
-        )
     }
 
     /// Write indentation based on current indent level
@@ -716,51 +575,11 @@ impl<'a> Printer<'a> {
     ///     b = 2;
     /// ```
     pub(crate) fn wrap_with_decl_indent(&self, inner: Doc, closing_line: Doc) -> (Doc, Doc) {
-        if self.declaration_indent_depth > 0 {
+        if self.declaration_indent_depth.get() > 0 {
             (doc::indent(doc::indent(inner)), doc::indent(closing_line))
         } else {
             (doc::indent(inner), closing_line)
         }
-    }
-
-    /// Get the total indent increment for container contents (1 + declaration depth)
-    pub(crate) fn container_indent_increment(&self) -> usize {
-        1 + self.declaration_indent_depth
-    }
-
-    /// Write closing indent for container (handles declaration_indent_depth)
-    ///
-    /// Decrements indent by 1, writes the indent, then decrements by declaration_indent_depth.
-    /// Used before writing closing bracket/brace.
-    pub(crate) fn write_container_closing_indent(&mut self) {
-        self.indent_level -= 1;
-        self.write_indent();
-        self.indent_level -= self.declaration_indent_depth;
-    }
-
-    /// Print an empty container (object or array) that contains only comments
-    ///
-    /// Common pattern for `{/* comment */}` → `{\n\t/* comment */\n}`
-    pub(crate) fn print_empty_container_with_comments(
-        &mut self,
-        open: &str,
-        close: &str,
-        inner_start: u32,
-        inner_end: u32,
-    ) {
-        self.write(open);
-        self.write("\n");
-        self.indent_level += self.container_indent_increment();
-
-        // Print all comments inside the container
-        for comment in comments_in_range(self.comments, inner_start, inner_end) {
-            self.write_indent();
-            self.print_comment(comment);
-            self.write("\n");
-        }
-
-        self.write_container_closing_indent();
-        self.write(close);
     }
 
     /// Build a Doc for an expression (public wrapper for doc-based formatting)
@@ -964,7 +783,11 @@ impl<'a> Printer<'a> {
             let is_first = !has_output;
             self.print_leading_comments(prev_end, statement.span().start, is_first);
 
-            self.print_statement(statement);
+            let doc = self.build_statement_doc(statement);
+            self.write_doc(&doc);
+
+            // Print trailing same-line comments after the statement
+            self.print_trailing_same_line_comments(statement.span().end);
 
             prev_end = statement.span().end;
             has_output = true;
@@ -1081,38 +904,6 @@ impl<'a> Printer<'a> {
         printed_any
     }
 
-    /// Print inline comments in statement (handles comments before and after semicolon)
-    ///
-    /// Matches prettier's behavior: comments before semicolon are moved to after it.
-    /// Example: `const x = 1 /* comment */;` → `const x = 1; /* comment */`
-    ///
-    /// Uses binary search to find starting point: O(log n + k)
-    pub(crate) fn print_inline_comments_in_statement(&mut self, expr_end: u32, stmt_end: u32) {
-        // Use binary search to skip comments before expr_end
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, expr_end);
-
-        let mut has_comments = false;
-        for comment in &self.comments[first_idx..] {
-            // Print comments that are either:
-            // 1. Between expression end and statement end (before semicolon), OR
-            // 2. After statement end but on the same line (after semicolon)
-            let in_range = comment.span.start >= expr_end && comment.span.end <= stmt_end;
-            let same_line_after = comment.span.start >= stmt_end
-                && printing::is_same_line(self.source, stmt_end, comment.span.start);
-
-            if in_range || same_line_after {
-                if !has_comments {
-                    self.write(" ");
-                    has_comments = true;
-                }
-                self.print_comment(comment);
-            } else if comment.span.start > stmt_end {
-                // Stop once we're past stmt_end and no longer on same line
-                break;
-            }
-        }
-    }
-
     /// Find the position of `=` character in the source between two positions
     pub(crate) fn find_equals_position(&self, start: u32, end: u32) -> u32 {
         let start = start as usize;
@@ -1192,19 +983,36 @@ impl<'a> Printer<'a> {
         None
     }
 
-    /// Print inline comments between two positions (same-line comments only)
-    /// Returns true if any comments were printed
-    /// Note: Adds space before each comment, but NOT after (caller handles trailing space)
+    /// Find a keyword between a start position and end boundary.
     ///
-    /// Uses binary search to find starting point: O(log n + k)
-    pub(crate) fn print_inline_comments_between(&mut self, start: u32, end: u32) -> bool {
-        let mut printed_any = false;
-        for comment in comments_in_range(self.comments, start, end) {
-            self.write(" ");
-            self.print_comment(comment);
-            printed_any = true;
+    /// Returns the position of the first character of the keyword if found.
+    /// Skips over comments and strings. Checks for word boundaries (keyword
+    /// must not be part of a larger identifier).
+    pub(crate) fn find_keyword_in_range(&self, start: u32, end: u32, keyword: &str) -> Option<u32> {
+        let source = self.source.as_bytes();
+        let kw_bytes = keyword.as_bytes();
+        let end = end as usize;
+        let kw_len = kw_bytes.len();
+        let mut i = start as usize;
+
+        while i + kw_len <= end && i + kw_len <= source.len() {
+            // Check for keyword match
+            if &source[i..i + kw_len] == kw_bytes {
+                // Check word boundaries (not part of larger identifier)
+                let before_ok =
+                    i == 0 || !source[i - 1].is_ascii_alphanumeric() && source[i - 1] != b'_';
+                let after_ok = i + kw_len >= source.len()
+                    || !source[i + kw_len].is_ascii_alphanumeric() && source[i + kw_len] != b'_';
+                if before_ok && after_ok {
+                    return Some(i as u32);
+                }
+            }
+            if let Some(skip) = skip_string_or_comment(source, i, end) {
+                i = skip;
+            }
+            i += 1;
         }
-        printed_any
+        None
     }
 
     /// Build a Doc for inline comments between two positions with specified spacing and filter
@@ -1315,36 +1123,6 @@ impl<'a> Printer<'a> {
         (doc::concat(parts), has_blank_line)
     }
 
-    /// Print comments between two positions (imperative version)
-    ///
-    /// Directly writes to the output buffer instead of returning a Doc.
-    pub(crate) fn print_comments_between_filtered(
-        &mut self,
-        start: u32,
-        end: u32,
-        spacing: CommentSpacing,
-        filter: CommentFilter,
-    ) {
-        for comment in comments_in_range(self.comments, start, end) {
-            if matches!(filter, CommentFilter::BlockOnly) && !comment.is_block {
-                continue;
-            }
-            match spacing {
-                CommentSpacing::Leading => {
-                    self.write(" ");
-                    self.print_comment(comment);
-                }
-                CommentSpacing::Trailing => {
-                    self.print_comment(comment);
-                    self.write(" ");
-                }
-                CommentSpacing::None => {
-                    self.print_comment(comment);
-                }
-            }
-        }
-    }
-
     /// Check if there's a newline between start position and the first comment in the range
     ///
     /// Returns true if there's at least one comment in the range and a newline
@@ -1359,6 +1137,27 @@ impl<'a> Printer<'a> {
             return between.contains('\n');
         }
         false
+    }
+
+    /// Build a Doc for a list of decorators, each on its own line
+    ///
+    /// Returns None if there are no decorators.
+    /// Each decorator is formatted as `@expression` followed by hardline.
+    pub(crate) fn build_decorators_doc(
+        &self,
+        decorators: Option<&Vec<internal::Decorator>>,
+    ) -> Option<Doc> {
+        let decorators = decorators?;
+        if decorators.is_empty() {
+            return None;
+        }
+        let mut parts = Vec::new();
+        for decorator in decorators {
+            parts.push(doc::text("@"));
+            parts.push(self.build_expression_doc(&decorator.expression));
+            parts.push(doc::hardline());
+        }
+        Some(doc::concat(parts))
     }
 
     /// Build a Doc for a single comment
@@ -1393,146 +1192,6 @@ impl<'a> Printer<'a> {
         } else {
             // Line comment: // content
             doc::text_owned(format!("//{}", comment.content))
-        }
-    }
-
-    /// Print leading comments for a variable declarator (no leading space)
-    /// Returns true if any comments were printed
-    /// Used for comments between declarators: `const a = 1, /* comment */ b = 2`
-    ///
-    /// Uses binary search to find starting point: O(log n + k)
-    pub(crate) fn print_leading_comments_for_declarator(&mut self, start: u32, end: u32) -> bool {
-        let mut printed_any = false;
-        for comment in comments_in_range(self.comments, start, end) {
-            self.print_comment(comment);
-            printed_any = true;
-        }
-        printed_any
-    }
-
-    /// Print leading comments before an object property
-    ///
-    /// Different from `print_leading_comments` because it handles same-line leading comments
-    /// (like `{/* comment */ a: 1}`), but still skips trailing comments from the previous property.
-    ///
-    /// - `prev_end`: Position after the previous property's value (or opening brace for first property)
-    /// - `curr_start`: Position of the current property's key
-    /// - `is_first_prop`: True if this is the first property (prev_end is opening brace position)
-    ///
-    /// Returns true if a same-line leading comment was printed (caller should skip its indent).
-    /// For comments on their own line, prints with proper indentation and newline.
-    /// Uses binary search to find starting point: O(log n + k)
-    pub(crate) fn print_object_leading_comments(
-        &mut self,
-        prev_end: u32,
-        curr_start: u32,
-        is_first_prop: bool,
-    ) -> bool {
-        let mut last_comment_end = prev_end;
-        let mut printed_same_line = false;
-
-        for comment in comments_in_range(self.comments, prev_end, curr_start) {
-            let position = classify_comment(comment, prev_end, curr_start, self.source);
-
-            // Skip trailing comments EXCEPT for first property (after `{`)
-            if !is_first_prop && matches!(position, CommentPosition::Trailing) {
-                continue;
-            }
-
-            // Handle inline leading comments (same line as property)
-            if matches!(position, CommentPosition::LeadingInline)
-                || (is_first_prop
-                    && matches!(position, CommentPosition::Trailing)
-                    && printing::is_same_line(self.source, comment.span.end, curr_start))
-            {
-                self.write_indent();
-                self.print_comment(comment);
-                self.write(" ");
-                last_comment_end = comment.span.end;
-                printed_same_line = true;
-                continue;
-            }
-
-            // Comment on its own line: check for blank lines
-            if comment.span.start > last_comment_end
-                && printing::has_blank_line_between(
-                    self.source,
-                    last_comment_end,
-                    comment.span.start,
-                )
-            {
-                self.write("\n");
-            }
-
-            self.write_indent();
-            self.print_comment(comment);
-            self.write("\n");
-
-            last_comment_end = comment.span.end;
-        }
-
-        // Check for blank line after the last comment before the property
-        if last_comment_end > prev_end
-            && last_comment_end < curr_start
-            && printing::has_blank_line_between(self.source, last_comment_end, curr_start)
-        {
-            self.write("\n");
-        }
-
-        printed_same_line
-    }
-
-    /// Print leading comments before a statement in a block
-    ///
-    /// Similar to print_leading_comments but handles the first statement specially:
-    /// for the first statement, same-line comments after `{` are leading comments,
-    /// not trailing comments from a previous statement.
-    ///
-    /// - `prev_end`: Position after the previous statement (or opening brace for first statement)
-    /// - `curr_start`: Position of the current statement
-    /// - `is_first`: True if this is the first statement (prev_end is after opening brace)
-    ///
-    /// Uses binary search to find starting point: O(log n + k)
-    pub(crate) fn print_block_leading_comments(
-        &mut self,
-        prev_end: u32,
-        curr_start: u32,
-        is_first: bool,
-    ) {
-        let mut last_comment_end = prev_end;
-
-        for comment in comments_in_range(self.comments, prev_end, curr_start) {
-            let position = classify_comment(comment, prev_end, curr_start, self.source);
-
-            // Skip trailing comments EXCEPT for first statement (after `{`)
-            if !is_first && matches!(position, CommentPosition::Trailing) {
-                continue;
-            }
-
-            // Check for blank lines before this comment
-            if comment.span.start > last_comment_end
-                && printing::has_blank_line_between(
-                    self.source,
-                    last_comment_end,
-                    comment.span.start,
-                )
-            {
-                self.write("\n");
-            }
-
-            self.write_indent();
-            self.print_comment(comment);
-            self.write("\n");
-
-            last_comment_end = comment.span.end;
-        }
-
-        // Check for blank line after the last comment before the statement
-        if last_comment_end > prev_end
-            && last_comment_end < curr_start
-            && printing::has_blank_line_between(self.source, last_comment_end, curr_start)
-        {
-            self.write("\n");
         }
     }
 }

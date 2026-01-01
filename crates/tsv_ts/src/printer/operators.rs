@@ -36,62 +36,6 @@ struct OperatorPosition {
 }
 
 impl<'a> Printer<'a> {
-    /// Print an update expression: `++x`, `x++`, `--x`, `x--`
-    pub(super) fn print_update_expression(&mut self, update: &internal::UpdateExpression) {
-        if update.prefix {
-            // Prefix: ++x, --x
-            self.write(update.operator.as_str());
-            self.print_expression(&update.argument);
-        } else {
-            // Postfix: x++, x--
-            self.print_expression(&update.argument);
-            self.write(update.operator.as_str());
-        }
-    }
-
-    /// Print a unary expression: `-x`, `+x`, `!(a && b)`, `typeof x`, `void 0`
-    pub(super) fn print_unary_expression(&mut self, unary: &internal::UnaryExpression) {
-        self.write(unary.operator.as_str());
-
-        // Keyword operators need a space before the operand
-        if unary.operator.is_keyword_operator() {
-            self.write(" ");
-        }
-
-        // Add parens around binary/logical expressions since unary has higher precedence
-        // e.g., !(a && b) must keep parens, otherwise becomes !a && b (different meaning)
-        if needs_parens(&unary.argument, ParenContext::UnaryArgument) {
-            self.write("(");
-            self.print_expression(&unary.argument);
-            self.write(")");
-        } else {
-            self.print_expression(&unary.argument);
-        }
-    }
-
-    /// Print a binary expression: `a + b`, `x && y`
-    ///
-    /// Uses doc-based printing for width-aware wrapping. When the expression
-    /// exceeds print width, breaks after operators:
-    /// ```text
-    /// a &&
-    ///   b &&
-    ///   c
-    /// ```
-    ///
-    /// In inline embedded contexts (e.g., Svelte template expressions `{...}`),
-    /// continuation lines get extra indentation to align with the outer context.
-    pub(super) fn print_binary_expression(&mut self, binary: &internal::BinaryExpression) {
-        // Use continuation indent in inline embedded contexts (first_line_offset > 0)
-        // This ensures wrapped lines get proper indentation in Svelte template expressions
-        let doc = if self.config.first_line_offset > 0 {
-            self.build_binary_chain_doc_with_continuation_indent(binary)
-        } else {
-            self.build_binary_chain_doc(binary)
-        };
-        self.write_doc_with_margin(&doc);
-    }
-
     /// Build a Doc for an update expression
     pub(super) fn build_update_doc(&self, update: &internal::UpdateExpression) -> Doc {
         let argument_doc = self.build_expression_doc(&update.argument);
@@ -166,10 +110,18 @@ impl<'a> Printer<'a> {
     /// c
     /// ```
     ///
+    /// In inline embedded contexts (e.g., Svelte template expressions `{...}`),
+    /// continuation lines get extra indentation to align with the outer context.
+    ///
     /// See: prettier/src/language-js/print/binaryish.js
     pub(super) fn build_binary_doc(&self, binary: &internal::BinaryExpression) -> Doc {
-        // Use chain-based wrapping for all binary operators
-        self.build_binary_chain_doc(binary)
+        // Use continuation indent in inline embedded contexts (first_line_offset > 0)
+        // This ensures wrapped lines get proper indentation in Svelte template expressions
+        if self.config.first_line_offset > 0 {
+            self.build_binary_chain_doc_with_continuation_indent(binary)
+        } else {
+            self.build_binary_chain_doc(binary)
+        }
     }
 
     /// Build a doc for a chain of binary operators with line wrapping support
@@ -257,47 +209,89 @@ impl<'a> Printer<'a> {
 
     /// Build a flat binary chain (Grouped or Ungrouped style)
     ///
+    /// Matches Prettier's binaryish.js structure (lines 169-178):
+    /// - First operand + first operator at base indent
+    /// - Rest wrapped in indent() for continuation indent when broken
+    ///
     /// When flat: "first + second + third"
     /// When broken:
     /// "first +
-    /// second +
-    /// third"
+    ///     second +
+    ///     third"
     fn build_binary_chain_flat(
         &self,
         operands: &[ChainOperand],
         operators: &[BinaryOperator],
         style: BinaryChainStyle,
     ) -> Doc {
-        let mut parts = Vec::new();
+        if operands.is_empty() {
+            return doc::text("");
+        }
 
-        for (i, operand) in operands.iter().enumerate() {
-            if i == 0 {
-                parts.push(operand.doc.clone());
-            } else {
-                let prev_operand = &operands[i - 1];
-                let operator = operators[i - 1];
-                let op_str = operator.as_str();
-                let op_pos =
-                    self.find_operator_position(prev_operand.span.end, operand.span.start, op_str);
+        if operands.len() == 1 {
+            return operands[0].doc.clone();
+        }
 
-                // Comments before the operator (trailing comments of left operand)
-                let comments_before_op =
-                    self.build_inline_comments_between_doc(prev_operand.span.end, op_pos.start);
-                parts.push(comments_before_op);
+        // First operand stays at base indent
+        let mut head_parts = vec![operands[0].doc.clone()];
 
-                // Operator at end of previous line
-                parts.push(doc::text(" "));
-                parts.push(doc::text(op_str));
+        // Add first operator to head (stays at base indent with first operand)
+        let first_op = operators[0];
+        let first_op_str = first_op.as_str();
+        let first_op_pos =
+            self.find_operator_position(operands[0].span.end, operands[1].span.start, first_op_str);
 
-                // Handle comments after operator and line breaks
-                self.append_post_operator_parts(
-                    &mut parts,
-                    op_pos.end,
-                    prev_operand.span.end,
-                    operand,
+        // Comments before first operator
+        let comments_before_first_op =
+            self.build_inline_comments_between_doc(operands[0].span.end, first_op_pos.start);
+        head_parts.push(comments_before_first_op);
+        head_parts.push(doc::text(" "));
+        head_parts.push(doc::text(first_op_str));
+
+        // Build continuation parts (will be wrapped in indent)
+        let mut continuation_parts = Vec::new();
+
+        for i in 1..operands.len() {
+            let operand = &operands[i];
+            let prev_operand = &operands[i - 1];
+            let operator = operators[i - 1];
+            let op_str = operator.as_str();
+            let op_pos =
+                self.find_operator_position(prev_operand.span.end, operand.span.start, op_str);
+
+            // Add line break and operand
+            self.append_post_operator_parts(
+                &mut continuation_parts,
+                op_pos.end,
+                prev_operand.span.end,
+                operand,
+            );
+
+            // Add next operator (if not last operand)
+            if i < operands.len() - 1 {
+                let next_op = operators[i];
+                let next_op_str = next_op.as_str();
+                let next_op_pos = self.find_operator_position(
+                    operand.span.end,
+                    operands[i + 1].span.start,
+                    next_op_str,
                 );
+
+                // Comments before next operator
+                let comments_before_next_op =
+                    self.build_inline_comments_between_doc(operand.span.end, next_op_pos.start);
+                continuation_parts.push(comments_before_next_op);
+                continuation_parts.push(doc::text(" "));
+                continuation_parts.push(doc::text(next_op_str));
             }
         }
+
+        // Combine: head + continuation
+        // NO internal continuation indent for binary expressions - the parent context (assignment,
+        // enum member, etc.) provides the indent wrapper. This matches Prettier's binaryish.js
+        // where `shouldIndentIfInlining` cases return `group(parts)` without internal indent.
+        let mut parts = head_parts;
+        parts.append(&mut continuation_parts);
 
         match style {
             BinaryChainStyle::Grouped => doc::group(doc::concat(parts)),
@@ -492,20 +486,6 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Print an await expression: `await promise`
-    pub(super) fn print_await_expression(&mut self, await_expr: &internal::AwaitExpression) {
-        self.write("await ");
-
-        // Add parens around binary expressions since await has higher precedence
-        if needs_parens(&await_expr.argument, ParenContext::AwaitArgument) {
-            self.write("(");
-            self.print_expression(&await_expr.argument);
-            self.write(")");
-        } else {
-            self.print_expression(&await_expr.argument);
-        }
-    }
-
     /// Build a Doc for an await expression
     pub(super) fn build_await_doc(&self, await_expr: &internal::AwaitExpression) -> Doc {
         let argument_doc = if needs_parens(&await_expr.argument, ParenContext::AwaitArgument) {
@@ -519,23 +499,6 @@ impl<'a> Printer<'a> {
         };
 
         doc::concat(vec![doc::text("await "), argument_doc])
-    }
-
-    /// Print a yield expression: `yield`, `yield value`, or `yield* iterable`
-    pub(super) fn print_yield_expression(&mut self, yield_expr: &internal::YieldExpression) {
-        if yield_expr.delegate {
-            self.write("yield*");
-            if let Some(ref arg) = yield_expr.argument {
-                self.write(" ");
-                self.print_expression(arg);
-            }
-        } else {
-            self.write("yield");
-            if let Some(ref arg) = yield_expr.argument {
-                self.write(" ");
-                self.print_expression(arg);
-            }
-        }
     }
 
     /// Build a Doc for a yield expression
@@ -554,21 +517,6 @@ impl<'a> Printer<'a> {
         }
 
         doc::concat(parts)
-    }
-
-    /// Print a sequence expression: `(a, b, c)`
-    ///
-    /// Sequence expressions are always wrapped in parentheses to avoid
-    /// ambiguity with comma separators in declarations, function calls, etc.
-    pub(super) fn print_sequence_expression(&mut self, seq: &internal::SequenceExpression) {
-        self.write("(");
-        for (i, expr) in seq.expressions.iter().enumerate() {
-            if i > 0 {
-                self.write(", ");
-            }
-            self.print_expression(expr);
-        }
-        self.write(")");
     }
 
     /// Build a Doc for a sequence expression

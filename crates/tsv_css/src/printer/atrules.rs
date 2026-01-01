@@ -3,10 +3,15 @@
 // Handles formatting of:
 // - At-rules (@media, @keyframes, @supports, @import, @layer, @font-face, etc.)
 // - At-rule blocks and their children (rules, declarations, nested at-rules)
+//
+// ## Architecture
+//
+// This module uses doc builders for width-based decisions (e.g., condition query
+// wrapping). The complex prelude and block handling remains imperative for clarity.
 
 use super::Printer;
 use crate::ast::internal;
-use tsv_lang::{comments_in_range, printing};
+use tsv_lang::{comments_in_range, doc, printing};
 
 /// Convert a supports connector to its string representation
 fn connector_str(conn: internal::SupportsConnector) -> &'static str {
@@ -43,8 +48,8 @@ impl<'a> Printer<'a> {
                             continue;
                         }
                     }
-                    // Use semantic formatting to normalize quotes and spacing
-                    self.print_css_value_semantic(value);
+                    // Use doc-based formatting to normalize quotes and spacing
+                    self.print_nested_value(value);
                 }
             }
             internal::PreludeValue::Raw { content, .. } if !content.is_empty() => {
@@ -324,8 +329,6 @@ impl<'a> Printer<'a> {
         has_block: bool,
         prelude_span: Option<tsv_lang::Span>,
     ) {
-        use tsv_lang::doc;
-
         // Print optional name prefix (for @container)
         let name_end_pos = if let Some(n) = name {
             self.write(n);
@@ -615,9 +618,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc representation of condition query for width checking
-    fn build_condition_doc(&self, parts: &[internal::SupportsPart]) -> tsv_lang::doc::Doc {
-        use tsv_lang::doc;
-
+    fn build_condition_doc(&self, parts: &[internal::SupportsPart]) -> doc::Doc {
         let mut docs = Vec::new();
         for (i, part) in parts.iter().enumerate() {
             if i > 0 {
