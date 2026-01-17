@@ -15,6 +15,7 @@ use tsv_lang::{ParseError, PeekData, Span};
 
 // Import parsing implementations
 mod expression;
+mod expression_lookahead; // Arrow function and type argument disambiguation
 mod scan; // Low-level byte scanning utilities
 mod statement; // Statement parsing (refactored into submodules)
 

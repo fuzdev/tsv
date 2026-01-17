@@ -1,7 +1,7 @@
 //! WebAssembly bindings for tsv
 //!
 //! Provides parse and format functions for Svelte, TypeScript, and CSS
-//! that can be called from JavaScript/TypeScript via WebAssembly.
+//! that can be called from TypeScript/JS via WebAssembly.
 
 use wasm_bindgen::prelude::*;
 

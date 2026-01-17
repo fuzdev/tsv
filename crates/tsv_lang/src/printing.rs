@@ -392,6 +392,27 @@ pub fn strip_comment_indentation(source: &str, content: &str, comment_start: u32
     result
 }
 
+/// Calculate the visual width of a string, treating tabs as `tab_width` columns.
+///
+/// This is useful for calculating line lengths when tabs may be present.
+/// Each tab character contributes `tab_width` to the total, while all other
+/// characters contribute 1.
+///
+/// # Example
+/// ```
+/// use tsv_lang::printing::visual_width;
+///
+/// assert_eq!(visual_width("hello", 2), 5);
+/// assert_eq!(visual_width("\thello", 2), 7); // tab (2) + "hello" (5)
+/// assert_eq!(visual_width("\thello", 4), 9); // tab (4) + "hello" (5)
+/// ```
+#[inline]
+pub fn visual_width(s: &str, tab_width: usize) -> usize {
+    s.chars()
+        .map(|c| if c == '\t' { tab_width } else { 1 })
+        .sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

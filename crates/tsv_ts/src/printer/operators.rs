@@ -8,6 +8,7 @@ use super::{ParenContext, Printer, needs_parens};
 use crate::ast::internal::{self, BinaryOperator, Expression};
 use tsv_lang::Span;
 use tsv_lang::doc::{self, Doc};
+use tsv_lang::printing;
 
 /// Holds information about an operand in a binary expression chain
 /// Used to track position information for comment placement
@@ -176,6 +177,27 @@ impl<'a> Printer<'a> {
         self.build_binary_chain_doc_core(binary, BinaryChainStyle::ContinuationIndent)
     }
 
+    /// Build binary chain with continuation indent WITHOUT group wrapper
+    ///
+    /// Use this when the caller controls grouping (e.g., chain printing context).
+    /// Handles comments between operands correctly.
+    pub(super) fn build_binary_chain_parts_with_continuation_indent(
+        &self,
+        binary: &internal::BinaryExpression,
+    ) -> Doc {
+        // Collect all operands (with spans) and operators in the chain
+        let mut operands: Vec<ChainOperand> = Vec::new();
+        let mut operators = Vec::new();
+        self.collect_binary_chain_with_spans(binary, &mut operands, &mut operators);
+
+        if operands.len() <= 1 {
+            // Single operand, shouldn't happen but handle gracefully
+            return self.build_expression_doc(&binary.left);
+        }
+
+        self.build_binary_chain_continuation_indent_parts(&operands, &operators)
+    }
+
     /// Core implementation for binary chain doc building
     ///
     /// Handles three styles:
@@ -207,6 +229,82 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Common logic for building binary chain (shared by flat and continuation indent styles)
+    ///
+    /// Returns (head_parts, continuation_parts) where head includes first operand + operator.
+    fn build_binary_chain_parts(
+        &self,
+        operands: &[ChainOperand],
+        operators: &[BinaryOperator],
+    ) -> (Vec<Doc>, Vec<Doc>) {
+        if operands.is_empty() || operands.len() == 1 {
+            // Edge cases handled by callers
+            return (Vec::new(), Vec::new());
+        }
+
+        // For 2-operand binaries with non-logical operators, use space (no break)
+        // to prevent ugly breaks like `typeof x ===\n  'string'`.
+        // Logical operators (&&, ||) and longer chains use line() to allow breaking.
+        let first_op = operators.first().copied().unwrap_or(BinaryOperator::Plus);
+        let allow_breaks = operands.len() > 2 || first_op.is_logical();
+
+        // First operand + first operator (stays at base indent)
+        let mut head_parts = vec![operands[0].doc.clone()];
+
+        let first_op = operators[0];
+        let first_op_str = first_op.as_str();
+        let first_op_pos =
+            self.find_operator_position(operands[0].span.end, operands[1].span.start, first_op_str);
+
+        // Comments before first operator
+        let comments_before_first_op =
+            self.build_inline_comments_between_doc(operands[0].span.end, first_op_pos.start);
+        head_parts.push(comments_before_first_op);
+        head_parts.push(doc::text(" "));
+        head_parts.push(doc::text(first_op_str));
+
+        // Build continuation parts
+        let mut continuation_parts = Vec::new();
+
+        for i in 1..operands.len() {
+            let operand = &operands[i];
+            let prev_operand = &operands[i - 1];
+            let operator = operators[i - 1];
+            let op_str = operator.as_str();
+            let op_pos =
+                self.find_operator_position(prev_operand.span.end, operand.span.start, op_str);
+
+            // Add line break and operand
+            self.append_post_operator_parts(
+                &mut continuation_parts,
+                op_pos.end,
+                prev_operand.span.end,
+                operand,
+                allow_breaks,
+            );
+
+            // Add next operator (if not last operand)
+            if i < operands.len() - 1 {
+                let next_op = operators[i];
+                let next_op_str = next_op.as_str();
+                let next_op_pos = self.find_operator_position(
+                    operand.span.end,
+                    operands[i + 1].span.start,
+                    next_op_str,
+                );
+
+                // Comments before next operator
+                let comments_before_next_op =
+                    self.build_inline_comments_between_doc(operand.span.end, next_op_pos.start);
+                continuation_parts.push(comments_before_next_op);
+                continuation_parts.push(doc::text(" "));
+                continuation_parts.push(doc::text(next_op_str));
+            }
+        }
+
+        (head_parts, continuation_parts)
+    }
+
     /// Build a flat binary chain (Grouped or Ungrouped style)
     ///
     /// Matches Prettier's binaryish.js structure (lines 169-178):
@@ -232,70 +330,17 @@ impl<'a> Printer<'a> {
             return operands[0].doc.clone();
         }
 
-        // First operand stays at base indent
-        let mut head_parts = vec![operands[0].doc.clone()];
+        let (mut head_parts, continuation_parts) =
+            self.build_binary_chain_parts(operands, operators);
 
-        // Add first operator to head (stays at base indent with first operand)
-        let first_op = operators[0];
-        let first_op_str = first_op.as_str();
-        let first_op_pos =
-            self.find_operator_position(operands[0].span.end, operands[1].span.start, first_op_str);
-
-        // Comments before first operator
-        let comments_before_first_op =
-            self.build_inline_comments_between_doc(operands[0].span.end, first_op_pos.start);
-        head_parts.push(comments_before_first_op);
-        head_parts.push(doc::text(" "));
-        head_parts.push(doc::text(first_op_str));
-
-        // Build continuation parts (will be wrapped in indent)
-        let mut continuation_parts = Vec::new();
-
-        for i in 1..operands.len() {
-            let operand = &operands[i];
-            let prev_operand = &operands[i - 1];
-            let operator = operators[i - 1];
-            let op_str = operator.as_str();
-            let op_pos =
-                self.find_operator_position(prev_operand.span.end, operand.span.start, op_str);
-
-            // Add line break and operand
-            self.append_post_operator_parts(
-                &mut continuation_parts,
-                op_pos.end,
-                prev_operand.span.end,
-                operand,
-            );
-
-            // Add next operator (if not last operand)
-            if i < operands.len() - 1 {
-                let next_op = operators[i];
-                let next_op_str = next_op.as_str();
-                let next_op_pos = self.find_operator_position(
-                    operand.span.end,
-                    operands[i + 1].span.start,
-                    next_op_str,
-                );
-
-                // Comments before next operator
-                let comments_before_next_op =
-                    self.build_inline_comments_between_doc(operand.span.end, next_op_pos.start);
-                continuation_parts.push(comments_before_next_op);
-                continuation_parts.push(doc::text(" "));
-                continuation_parts.push(doc::text(next_op_str));
-            }
-        }
-
-        // Combine: head + continuation
-        // NO internal continuation indent for binary expressions - the parent context (assignment,
-        // enum member, etc.) provides the indent wrapper. This matches Prettier's binaryish.js
-        // where `shouldIndentIfInlining` cases return `group(parts)` without internal indent.
-        let mut parts = head_parts;
-        parts.append(&mut continuation_parts);
+        // Combine: head + continuation (NO internal indent)
+        // The parent context (assignment, etc.) provides the indent wrapper.
+        // Nested binaries inside parens get their own indent via build_binary_chain_doc_with_continuation_indent.
+        head_parts.extend(continuation_parts);
 
         match style {
-            BinaryChainStyle::Grouped => doc::group(doc::concat(parts)),
-            _ => doc::concat(parts),
+            BinaryChainStyle::Grouped => doc::group(doc::concat(head_parts)),
+            _ => doc::concat(head_parts),
         }
     }
 
@@ -311,100 +356,95 @@ impl<'a> Printer<'a> {
         operands: &[ChainOperand],
         operators: &[BinaryOperator],
     ) -> Doc {
-        // First operand + first operator (stays at base indent)
-        let mut first_parts = vec![operands[0].doc.clone()];
+        doc::group(self.build_binary_chain_continuation_indent_parts(operands, operators))
+    }
 
-        let first_op = operators[0];
-        let first_op_str = first_op.as_str();
-        let first_op_pos =
-            self.find_operator_position(operands[0].span.end, operands[1].span.start, first_op_str);
-
-        // Comments before first operator
-        let comments_before_op =
-            self.build_inline_comments_between_doc(operands[0].span.end, first_op_pos.start);
-        first_parts.push(comments_before_op);
-        first_parts.push(doc::text(" "));
-        first_parts.push(doc::text(first_op_str));
-
-        // Build continuation parts (will be indented)
-        let mut continuation_parts = Vec::new();
-
-        for i in 1..operands.len() {
-            let operand = &operands[i];
-            let prev_operand = &operands[i - 1];
-            let operator = operators[i - 1];
-            let op_str = operator.as_str();
-            let op_pos =
-                self.find_operator_position(prev_operand.span.end, operand.span.start, op_str);
-
-            // Handle comments after operator and line breaks
-            self.append_post_operator_parts(
-                &mut continuation_parts,
-                op_pos.end,
-                prev_operand.span.end,
-                operand,
-            );
-
-            // Add operator after this operand (if not the last)
-            if i < operands.len() - 1 {
-                let next_op = operators[i];
-                let next_op_str = next_op.as_str();
-                let next_op_pos = self.find_operator_position(
-                    operand.span.end,
-                    operands[i + 1].span.start,
-                    next_op_str,
-                );
-
-                let next_comments =
-                    self.build_inline_comments_between_doc(operand.span.end, next_op_pos.start);
-                continuation_parts.push(next_comments);
-                continuation_parts.push(doc::text(" "));
-                continuation_parts.push(doc::text(next_op_str));
-            }
-        }
+    /// Build binary chain continuation indent parts WITHOUT group wrapper
+    ///
+    /// Returns the concat of first_parts + indent(continuation_parts) without
+    /// wrapping in a group. Use this when the caller controls grouping.
+    fn build_binary_chain_continuation_indent_parts(
+        &self,
+        operands: &[ChainOperand],
+        operators: &[BinaryOperator],
+    ) -> Doc {
+        let (first_parts, continuation_parts) = self.build_binary_chain_parts(operands, operators);
 
         // Combine: first_parts + indent(continuation_parts)
-        doc::group(doc::concat(vec![
+        doc::concat(vec![
             doc::concat(first_parts),
             doc::indent(doc::concat(continuation_parts)),
-        ]))
+        ])
     }
 
     /// Append post-operator parts (comments and line breaks) to a parts vector
     ///
     /// Handles line comments vs block comments appropriately.
+    /// When `allow_breaks` is true, uses `line()` (space when flat, newline when broken).
+    ///
+    /// Handles multiple consecutive comments by preserving their line structure:
+    /// - `a && // comment1\n// comment2\nb` keeps each comment on its own line
     fn append_post_operator_parts(
         &self,
         parts: &mut Vec<Doc>,
         op_end: u32,
-        prev_operand_end: u32,
+        _prev_operand_end: u32,
         operand: &ChainOperand,
+        allow_breaks: bool,
     ) {
-        let has_line_comment = self.has_line_comments_between(prev_operand_end, operand.span.start);
+        // Collect all comments in the range between operator and next operand
+        let comments: Vec<_> =
+            tsv_lang::comments_in_range(self.comments, op_end, operand.span.start).collect();
 
-        if has_line_comment {
-            let comment_on_own_line = self.has_newline_before_comment(op_end, operand.span.start);
-
-            if comment_on_own_line {
-                // Comment is on its own line: `a &&\n// comment\nb`
-                parts.push(doc::hardline());
-                let comments_doc = self
-                    .build_inline_comments_between_doc_no_leading_space(op_end, operand.span.start);
-                parts.push(comments_doc);
-                parts.push(doc::hardline());
+        if comments.is_empty() {
+            // No comments - simple case
+            if allow_breaks {
+                parts.push(doc::line());
             } else {
-                // Comment after operator: `a && // comment\nb`
-                let comments_doc =
-                    self.build_inline_comments_between_doc(op_end, operand.span.start);
-                parts.push(comments_doc);
-                parts.push(doc::hardline());
+                parts.push(doc::text(" "));
             }
-        } else {
-            // Block comments or no comments
+            parts.push(operand.doc.clone());
+            return;
+        }
+
+        // Check if any comment is a line comment
+        let has_line_comment = comments.iter().any(|c| !c.is_block);
+
+        if !has_line_comment {
+            // Only block comments - join them inline
             let comments_doc = self.build_inline_comments_between_doc(op_end, operand.span.start);
             parts.push(comments_doc);
-            parts.push(doc::line());
+            if allow_breaks {
+                parts.push(doc::line());
+            } else {
+                parts.push(doc::text(" "));
+            }
+            parts.push(operand.doc.clone());
+            return;
         }
+
+        // Has line comments - need to preserve line structure
+        // Process each comment individually to maintain proper line breaks
+        let mut pos = op_end;
+        for (i, comment) in comments.iter().enumerate() {
+            let is_first = i == 0;
+            let has_newline_before =
+                printing::has_newline_between(self.source, pos, comment.span.start);
+
+            if is_first && !has_newline_before {
+                // First comment on same line as operator: `a && // comment`
+                parts.push(doc::text(" "));
+                parts.push(self.build_comment_doc(comment));
+            } else {
+                // Comment on its own line
+                parts.push(doc::hardline());
+                parts.push(self.build_comment_doc(comment));
+            }
+            pos = comment.span.end;
+        }
+
+        // Add final hardline before operand (since we have line comments)
+        parts.push(doc::hardline());
         parts.push(operand.doc.clone());
     }
 
@@ -432,7 +472,7 @@ impl<'a> Printer<'a> {
     /// Collect all operands (with spans) and operators from a chain of binary expressions
     ///
     /// Uses `should_flatten()` to determine which operators can be chained together.
-    /// Left-associative: recursively flattens left side, keeps right operand as-is.
+    /// Flattens both left and right sides when operators are compatible (e.g., `&&`, `||`).
     fn collect_binary_chain_with_spans(
         &self,
         expr: &internal::BinaryExpression,
@@ -459,7 +499,19 @@ impl<'a> Printer<'a> {
         // Add current operator
         operators.push(expr.operator);
 
-        // Add right operand (don't flatten right side - left-associative)
+        // Also flatten right side for truly associative operators (removes redundant parens)
+        // e.g., `a && (b && c)` becomes `a && b && c`
+        // Only logical operators are truly associative; arithmetic preserves right-side parens
+        if let Expression::BinaryExpression(right_binary) = &*expr.right
+            && expr.operator.can_flatten_with(right_binary.operator)
+            && expr.operator.is_logical()
+            && right_binary.operator.is_logical()
+        {
+            self.collect_binary_chain_with_spans(right_binary, operands, operators);
+            return;
+        }
+
+        // Right operand can't be flattened - add as-is
         operands.push(ChainOperand {
             doc: self.build_binary_operand_doc(&expr.right, expr.operator, true),
             span: expr.right.span(),
@@ -467,7 +519,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build operand with parens if needed for clarity
-    fn build_binary_operand_doc(
+    pub(super) fn build_binary_operand_doc(
         &self,
         operand: &Expression,
         parent_op: BinaryOperator,
@@ -478,11 +530,19 @@ impl<'a> Printer<'a> {
         } else {
             ParenContext::BinaryLeft { parent_op }
         };
-        let operand_doc = self.build_expression_doc(operand);
+
+        // For binary expressions that need parens, use continuation indent so that
+        // when the inner binary breaks, its continuation lines are indented.
+        // This gives: `(first &&\n\t\tsecond)` not `(first &&\n\tsecond)`
         if needs_parens(operand, ctx) {
+            if let Expression::BinaryExpression(inner_binary) = operand {
+                let inner_doc = self.build_binary_chain_doc_with_continuation_indent(inner_binary);
+                return doc::parens(inner_doc);
+            }
+            let operand_doc = self.build_expression_doc(operand);
             doc::parens(operand_doc)
         } else {
-            operand_doc
+            self.build_expression_doc(operand)
         }
     }
 
@@ -527,7 +587,14 @@ impl<'a> Printer<'a> {
             if i > 0 {
                 parts.push(doc::text(", "));
             }
-            parts.push(self.build_expression_doc(expr));
+            // Assignment expressions in sequences need individual parens
+            let expr_doc = self.build_expression_doc(expr);
+            let expr_doc = if matches!(expr, Expression::AssignmentExpression(_)) {
+                doc::parens(expr_doc)
+            } else {
+                expr_doc
+            };
+            parts.push(expr_doc);
         }
         parts.push(doc::text(")"));
         doc::concat(parts)

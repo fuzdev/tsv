@@ -4,6 +4,7 @@ use crate::{deno, subprocess};
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
 use tsv_cli::cli::input::{Input, ParserType};
+use tsv_cli::json_utils::to_json_with_tabs;
 
 /// canonical_parse command - parse using canonical external parsers
 /// (Svelte's official parser, acorn+typescript, or our CSS parser)
@@ -55,8 +56,14 @@ async fn run(input: &Input, parser_type: ParserType) -> error::Result<String> {
     let content = input.content();
 
     match parser_type {
-        ParserType::Svelte => Ok(deno::parse_svelte(content).await?),
-        ParserType::TypeScript => Ok(deno::parse_typescript(content).await?),
+        ParserType::Svelte => {
+            let ast = deno::parse_svelte(content).await?;
+            Ok(format!("{}\n", to_json_with_tabs(&ast)?))
+        }
+        ParserType::TypeScript => {
+            let ast = deno::parse_typescript(content).await?;
+            Ok(format!("{}\n", to_json_with_tabs(&ast)?))
+        }
         ParserType::Css => {
             // CSS uses our Rust parser (no external canonical parser available)
             parse_css_with_rust(content)

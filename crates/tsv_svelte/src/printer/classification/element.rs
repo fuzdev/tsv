@@ -8,6 +8,7 @@
 // and can be reused by other tools (linter, type-checker, language server).
 
 use crate::ast::internal;
+use crate::ast::internal::ElementKind;
 use crate::printer::Printer;
 use tsv_html as html;
 use tsv_lang::SymbolResolver;
@@ -25,7 +26,6 @@ impl<'a> Printer<'a> {
     /// on separate lines. Empty `<script>`/`<style>` remain inline.
     pub(crate) fn is_block_element(&self, element: &internal::Element) -> bool {
         // Components are treated as inline, not block
-        use crate::ast::internal::ElementKind;
         if element.kind == ElementKind::Component {
             return false;
         }

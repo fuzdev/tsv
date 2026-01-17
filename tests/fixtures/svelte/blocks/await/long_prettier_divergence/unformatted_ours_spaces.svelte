@@ -1,14 +1,17 @@
 <div>
-	<!-- Long arrow body: prettier doesn't wrap, we do -->
-	{#await a  .  filter(
-		(  item  )   =>
-			item.a   &&   item.b   &&   item.c   &&   item.d   &&   item.e   &&   item.f   &&   item.g   &&   item.h   &&   item.i  ,
-	)   then   item}{item}{/await}
+	<!-- 100 chars - stays inline (at boundary, both agree) -->
+	{#await  getData(  aaaaaaaaaaaaaaaaaaa ,  bbbbbbbbbbbbbbbbbbb ,  cccccccccccccccccccc  )  then  r}{r}{/await}
 
-	<!-- Long function args: prettier doesn't wrap, we do (109 chars) -->
+	<!-- 101 chars - args wrap (divergence: Prettier keeps inline) -->
 	{#await  getData(
 		aaaaaaaaaaaaaaaaaaa ,
 		bbbbbbbbbbbbbbbbbbb ,
-		ccccccccccccccccccc ,
-	)  then  result}{result}{/await}
+		ccccccccccccccccccccc ,
+	)  then  r}{r}{/await}
+
+	<!-- Long filter with arrow body (divergence: call breaks open) -->
+	{#await  a . filter(
+		( item )  =>
+			item . a  &&  item . b  &&  item . c  &&  item . d  &&  item . e  &&  item . f  &&  item . g  &&  item . h  &&  item . i ,
+	)  then  item}{item}{/await}
 </div>

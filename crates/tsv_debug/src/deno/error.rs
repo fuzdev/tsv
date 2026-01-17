@@ -49,6 +49,10 @@ pub enum DenoError {
     /// Actor shutdown
     #[error("deno actor shut down")]
     ActorShutdown,
+
+    /// Request timed out
+    #[error("deno sidecar timed out after {seconds}s")]
+    Timeout { seconds: u64 },
 }
 
 impl DenoError {
@@ -59,6 +63,7 @@ impl DenoError {
             Self::DenoNotFound => "Install Deno: curl -fsSL https://deno.land/install.sh | sh",
             Self::ProcessSpawn(_) => "Check that 'deno' is in your PATH",
             Self::SidecarCrashed => "This may be a bug in the sidecar script",
+            Self::Timeout { .. } => "The sidecar may be stuck processing a request",
             _ => "",
         }
     }

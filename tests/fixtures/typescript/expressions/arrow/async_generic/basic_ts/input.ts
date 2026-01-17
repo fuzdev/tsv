@@ -1,5 +1,6 @@
 // Async generic arrow functions in pure TypeScript
 // No trailing comma needed for single type params (no Svelte template syntax disambiguation)
+// See basic/input.svelte for Svelte version (trailing comma required)
 
 // Basic - single type param, no constraint
 const basic = async <T>() => {};

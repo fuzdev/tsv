@@ -616,7 +616,7 @@ impl<'a> Parser<'a> {
         Ok(result)
     }
 
-    /// Parse type arguments: `<T, U>`
+    /// Parse type arguments: `<T, U>` (trailing comma allowed, but cannot be empty)
     pub(in crate::parser) fn parse_type_arguments(
         &mut self,
     ) -> Result<TSTypeParameterInstantiation, ParseError> {
@@ -627,8 +627,17 @@ impl<'a> Parser<'a> {
         if !self.check_greater_than_in_type() {
             params.push(self.parse_type()?);
             while self.eat(TokenKind::Comma) {
+                // Allow trailing comma - check for closing > before parsing another type
+                if self.check_greater_than_in_type() {
+                    break;
+                }
                 params.push(self.parse_type()?);
             }
+        }
+
+        // Type argument list cannot be empty
+        if params.is_empty() {
+            return Err(self.error_msg("Type argument list cannot be empty"));
         }
 
         let (_, end) = self.current_pos();

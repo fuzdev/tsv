@@ -2,7 +2,10 @@
 
 use super::super::{internal, public};
 use super::types::convert_declare_function;
-use super::{convert_expression, convert_identifier, create_location};
+use super::{
+    convert_block_statement, convert_class_declaration, convert_expression, convert_identifier,
+    convert_type_annotation, convert_type_parameter_declaration, create_location,
+};
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
 
@@ -176,7 +179,7 @@ pub(in crate::ast) fn convert_export_default_value(
             ))
         }
         internal::ExportDefaultValue::ClassDeclaration(class) => {
-            public::ExportDefaultValue::ClassDeclaration(convert_class_declaration(
+            public::ExportDefaultValue::ClassDeclaration(convert_class_declaration_local(
                 class, source, loc, interner, offset,
             ))
         }
@@ -227,10 +230,6 @@ fn convert_function_to_public(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::FunctionDeclaration {
-    use super::{
-        convert_block_statement, convert_type_annotation, convert_type_parameter_declaration,
-    };
-
     public::FunctionDeclaration {
         node_type: "FunctionDeclaration".to_string(),
         start: func.span.start,
@@ -261,15 +260,13 @@ fn convert_function_to_public(
 }
 
 // Helper for export default class conversion
-fn convert_class_declaration(
+fn convert_class_declaration_local(
     class: &internal::ClassDeclaration,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::ClassDeclaration {
-    use super::convert_class_declaration;
-
     // Delegate to the main converter in declarations.rs
     convert_class_declaration(class, source, loc, interner, offset)
 }

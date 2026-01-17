@@ -488,6 +488,47 @@ pub fn build_condition_doc(
     printer.build_condition_doc_public(expression)
 }
 
+/// Build a Doc tree for a TypeScript program
+///
+/// Returns a Doc that can be wrapped with `indent()` and rendered.
+/// Used when embedding TypeScript in other formats like Svelte's `<script>`.
+///
+/// # Arguments
+///
+/// * `program` - The TypeScript AST to format
+/// * `source` - The original source code
+/// * `config` - Print configuration (use `base_indent_offset` to account for outer context)
+///
+/// # Example
+///
+/// ```rust,ignore
+/// // Format TypeScript embedded in Svelte <script>
+/// let config = tsv_lang::PrintConfig {
+///     base_indent_offset: 1, // Account for Svelte wrapper indent
+///     ..Default::default()
+/// };
+/// let script_doc = tsv_ts::build_program_doc(&program, source, config);
+///
+/// // Wrap with indent and render
+/// let indented = tsv_lang::doc::indent(script_doc);
+/// let output = tsv_lang::doc::print_doc_with_indent_resolved(
+///     &indented, &config, 0, 0, &*interner.borrow()
+/// );
+/// ```
+pub fn build_program_doc(
+    program: &Program,
+    source: &str,
+    config: tsv_lang::PrintConfig,
+) -> tsv_lang::doc::Doc {
+    let printer = printer::Printer::with_config(
+        Rc::clone(&program.interner),
+        source,
+        &program.comments,
+        config,
+    );
+    printer.build_program_doc(program)
+}
+
 // Re-export key types for convenience
 pub use ast::internal::{
     ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression, AssignmentExpression,

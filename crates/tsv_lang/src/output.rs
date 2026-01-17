@@ -3,6 +3,8 @@
 // Provides zero-cost abstractions for building formatted output across all language printers.
 // These types are designed to be inlined by the compiler for zero runtime overhead.
 
+use crate::printing::visual_width;
+
 /// Output buffer for building formatted strings
 ///
 /// A thin wrapper around String that provides a consistent API for all printers.
@@ -62,7 +64,10 @@ impl OutputBuffer {
     }
 
     /// Consume the buffer and return the formatted string
-    #[inline]
+    ///
+    /// This simply extracts the buffer contents. Whitespace stripping is handled by the
+    /// doc rendering layer (`doc::print_doc*()` functions), not here. This keeps the
+    /// buffer as a simple string builder without formatting responsibilities.
     pub fn into_string(self) -> String {
         self.buffer
     }
@@ -78,10 +83,7 @@ impl OutputBuffer {
         let line_start = last_newline.map_or(0, |pos| pos + 1);
         let line = &self.buffer[line_start..];
 
-        // Count column width, treating tabs as tab_width
-        line.chars()
-            .map(|ch| if ch == '\t' { tab_width } else { 1 })
-            .sum()
+        visual_width(line, tab_width)
     }
 }
 

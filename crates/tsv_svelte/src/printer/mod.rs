@@ -162,7 +162,7 @@ impl<'a> Printer<'a> {
         config: PrintConfig,
     ) -> Self {
         Self {
-            buffer: OutputBuffer::new(),
+            buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
             config,
             source,
@@ -187,6 +187,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Get the formatted output
+    ///
+    /// Simply extracts the buffer. Whitespace stripping is handled by the doc rendering layer:
+    /// - Normal elements: rendered with `print_doc_with_indent_resolved()` which strips
+    /// - Whitespace-sensitive elements: rendered with `print_doc_with_indent_resolved_preserve_whitespace()` which preserves
     pub fn into_string(self) -> String {
         self.buffer.into_string()
     }
@@ -199,11 +203,16 @@ impl<'a> Printer<'a> {
     /// The doc is rendered starting at the current column position with
     /// the current indent level, so it seamlessly integrates with any
     /// preceding output.
+    ///
+    /// Always uses the preserve-whitespace variant because the doc tree may contain
+    /// whitespace-sensitive elements (<pre>, <textarea>) whose trailing whitespace
+    /// must be preserved. Normal elements have trailing whitespace stripped during
+    /// doc building, not rendering.
     pub(crate) fn render_doc_immediate(&mut self, doc: &tsv_lang::doc::Doc) {
         let col = self.buffer.current_column(self.config.tab_width);
         let output = {
             let interner = self.interner.borrow();
-            tsv_lang::doc::print_doc_with_indent_resolved(
+            tsv_lang::doc::print_doc_with_indent_resolved_preserve_whitespace(
                 doc,
                 &self.config,
                 col,
@@ -376,10 +385,8 @@ impl<'a> Printer<'a> {
                             PendingWhitespace::Space
                         };
                         state.pending_ws.upgrade(ws_type);
-                        // Whitespace-only text clears block status so subsequent inline doesn't get newline
-                        if state.prev_kind == PrevNodeKind::Block {
-                            state.prev_kind = PrevNodeKind::Inline;
-                        }
+                        // Keep prev_kind as-is: block followed by inline always needs newline
+                        // (Prettier behavior: <div>block</div><span> becomes two lines)
                         // continue to next iteration for whitespace-only nodes
                     } else {
                         // Text with content - analyze whitespace using TextAnalysis trait
@@ -456,9 +463,11 @@ impl<'a> Printer<'a> {
                             PendingWhitespace::AlreadyHandled => {}
                             PendingWhitespace::Space => {
                                 // Space before block → newline
+                                // Space after block before inline → newline (prettier always separates)
                                 // Space after comment before component → newline (prettier behavior)
                                 // Otherwise → preserve space
                                 if is_block
+                                    || state.prev_kind == PrevNodeKind::Block
                                     || (state.prev_kind == PrevNodeKind::Comment && !is_inline_html)
                                 {
                                     self.write("\n");

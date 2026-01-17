@@ -585,6 +585,15 @@ impl FragmentNode {
     pub fn is_whitespace_only_text(&self) -> bool {
         matches!(self, FragmentNode::Text(t) if t.raw.trim().is_empty())
     }
+
+    /// Check if this node is a whitespace-only text containing at least one newline.
+    ///
+    /// Used to detect source line breaks at element boundaries (hug mode pattern).
+    /// Returns false for non-Text nodes or Text without newlines.
+    #[inline]
+    pub fn is_boundary_break(&self) -> bool {
+        matches!(self, FragmentNode::Text(t) if t.raw.trim().is_empty() && t.raw.contains('\n'))
+    }
 }
 
 /// Svelte Element kind - distinguishes HTML elements from components
@@ -657,6 +666,25 @@ pub enum AttributeNode {
     TransitionDirective(TransitionDirective),
     AnimateDirective(AnimateDirective),
     LetDirective(LetDirective),
+}
+
+impl AttributeNode {
+    /// Get the span of this attribute node
+    pub fn span(&self) -> Span {
+        match self {
+            AttributeNode::Attribute(a) => a.span,
+            AttributeNode::SpreadAttribute(s) => s.span,
+            AttributeNode::AttachTag(t) => t.span,
+            AttributeNode::OnDirective(d) => d.span,
+            AttributeNode::BindDirective(d) => d.span,
+            AttributeNode::ClassDirective(d) => d.span,
+            AttributeNode::StyleDirective(d) => d.span,
+            AttributeNode::UseDirective(d) => d.span,
+            AttributeNode::TransitionDirective(d) => d.span,
+            AttributeNode::AnimateDirective(d) => d.span,
+            AttributeNode::LetDirective(d) => d.span,
+        }
+    }
 }
 
 /// Svelte Attribute value part

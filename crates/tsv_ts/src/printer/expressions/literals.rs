@@ -10,9 +10,25 @@
 
 use super::Printer;
 use crate::ast::internal::{self, LiteralValue};
-use tsv_lang::SymbolResolver;
+use tsv_lang::SymbolToU32;
 use tsv_lang::doc::{self, Doc};
 use tsv_lang::printing::{StringFormatOptions, format_string_literal};
+
+/// Format a string literal from the AST to its printed form.
+///
+/// Extracts the raw string from source, strips quotes, and formats it
+/// according to the literal's quote style.
+pub(crate) fn format_string_literal_from_ast(literal: &internal::Literal, source: &str) -> String {
+    let raw_literal = literal.span.extract(source);
+    let raw_content = &raw_literal[1..raw_literal.len() - 1];
+
+    let quote = match &literal.value {
+        LiteralValue::String { quote, .. } => *quote,
+        _ => unreachable!("format_string_literal_from_ast called on non-string literal"),
+    };
+
+    format_string_literal(raw_content, quote, StringFormatOptions::default())
+}
 
 /// Normalize a number literal to match Prettier's output format.
 ///
@@ -93,12 +109,8 @@ impl<'a> Printer<'a> {
                 let raw = literal.span.extract(self.source);
                 doc::text_owned(normalize_number_literal(raw))
             }
-            LiteralValue::String { content: _, quote } => {
-                let raw_literal = literal.span.extract(self.source);
-                let raw_content = &raw_literal[1..raw_literal.len() - 1];
-                let formatted =
-                    format_string_literal(raw_content, *quote, StringFormatOptions::default());
-                doc::text_owned(formatted)
+            LiteralValue::String { .. } => {
+                doc::text_owned(format_string_literal_from_ast(literal, self.source))
             }
             LiteralValue::BigInt(_) => {
                 // Extract raw literal and normalize it (lowercases hex digits)
@@ -113,12 +125,27 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a private identifier
     pub(super) fn build_private_identifier_doc(&self, pid: &internal::PrivateIdentifier) -> Doc {
-        let name = self.resolve_symbol(pid.name);
-        doc::concat(vec![doc::text("#"), doc::text_owned(name)])
+        doc::concat(vec![doc::text("#"), doc::symbol(pid.name.to_u32())])
     }
 
     /// Build a Doc for an identifier
     pub(in crate::printer) fn build_identifier_doc(&self, id: &internal::Identifier) -> Doc {
+        self.build_identifier_doc_inner(id, false)
+    }
+
+    /// Build a Doc for an identifier with wrapping type arguments.
+    ///
+    /// Used in variable declarations where TypeReference type arguments should
+    /// break internally (e.g., `let x: Map<LongA, LongB>` breaks inside `<>`).
+    pub(in crate::printer) fn build_identifier_doc_with_wrapping_type(
+        &self,
+        id: &internal::Identifier,
+    ) -> Doc {
+        self.build_identifier_doc_inner(id, true)
+    }
+
+    /// Inner implementation for identifier doc building.
+    fn build_identifier_doc_inner(&self, id: &internal::Identifier, wrap_type_args: bool) -> Doc {
         let mut parts = Vec::new();
 
         // Handle decorators (for parameter decorators)
@@ -131,8 +158,7 @@ impl<'a> Printer<'a> {
         }
 
         // Add identifier name
-        let name = self.resolve_symbol(id.name);
-        parts.push(doc::text_owned(name));
+        parts.push(doc::symbol(id.name.to_u32()));
 
         // Handle optional marker (e.g., `a?` in `function fn(a?: number) {}`)
         if id.optional {
@@ -141,7 +167,11 @@ impl<'a> Printer<'a> {
 
         // Handle type annotations
         if let Some(type_annotation) = &id.type_annotation {
-            parts.push(self.build_type_annotation_doc(type_annotation));
+            if wrap_type_args {
+                parts.push(self.build_type_annotation_doc_wrapping(type_annotation));
+            } else {
+                parts.push(self.build_type_annotation_doc(type_annotation));
+            }
         }
 
         // Optimize for common case: single part (just the name)
@@ -163,9 +193,14 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a spread element
     pub(in crate::printer) fn build_spread_doc(&self, spread: &internal::SpreadElement) -> Doc {
-        doc::concat(vec![
-            doc::text("..."),
-            self.build_expression_doc(&spread.argument),
-        ])
+        let needs_parens =
+            super::needs_parens(&spread.argument, super::ParenContext::SpreadArgument);
+        let arg_doc = self.build_expression_doc(&spread.argument);
+
+        if needs_parens {
+            doc::concat(vec![doc::text("...("), arg_doc, doc::text(")")])
+        } else {
+            doc::concat(vec![doc::text("..."), arg_doc])
+        }
     }
 }

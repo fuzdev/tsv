@@ -89,17 +89,17 @@ async function dispatch(
 		}
 
 		case 'svelte-parse': {
-			const ast = svelteParse(content, { modern: true });
-			return JSON.stringify(ast, jsonReplacer, '\t');
+			// Return AST object directly - Rust will serialize with tabs
+			return svelteParse(content, { modern: true });
 		}
 
 		case 'acorn-typescript-parse': {
-			const ast = ParserWithTS.parse(content, {
+			// Return AST object directly - Rust will serialize with tabs
+			return ParserWithTS.parse(content, {
 				sourceType: 'module',
 				ecmaVersion: 2025,
 				locations: true,
 			});
-			return JSON.stringify(ast, jsonReplacer, '\t');
 		}
 
 		default:
@@ -130,7 +130,7 @@ for await (const line of lines) {
 			error: `Invalid JSON request: ${err instanceof Error ? err.message : String(err)}`,
 			duration_ms: Math.round(performance.now() - start),
 		};
-		console.log(JSON.stringify(response));
+		console.log(JSON.stringify(response, jsonReplacer));
 		continue;
 	}
 
@@ -151,5 +151,6 @@ for await (const line of lines) {
 		};
 	}
 
-	console.log(JSON.stringify(response));
+	// Use jsonReplacer to handle BigInt values in AST output
+	console.log(JSON.stringify(response, jsonReplacer));
 }

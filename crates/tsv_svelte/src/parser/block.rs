@@ -4,6 +4,7 @@
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
+use crate::parser::element::ParsedElement;
 use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;
@@ -69,19 +70,23 @@ impl<'a> SvelteParser<'a> {
         // Scan to find closing } and extract content
         let (expr_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
 
-        // Extract the expression (skip "if " or "else if " prefix)
+        // Extract the expression (skip "if " or "else if " prefix, handling variable whitespace)
         let expr_str = if is_elseif {
-            expr_content
-                .strip_prefix("else if ")
-                .or_else(|| expr_content.strip_prefix("else if"))
+            // {:else if expr} - skip "else", whitespace, "if", whitespace
+            let after_else = expr_content
+                .strip_prefix("else")
                 .unwrap_or(expr_content)
-                .trim()
+                .trim_start();
+            after_else
+                .strip_prefix("if")
+                .unwrap_or(after_else)
+                .trim_start()
         } else {
+            // {#if expr} - skip "if", whitespace
             expr_content
-                .strip_prefix("if ")
-                .or_else(|| expr_content.strip_prefix("if"))
+                .strip_prefix("if")
                 .unwrap_or(expr_content)
-                .trim()
+                .trim_start()
         };
 
         // Parse the test expression (with comments)
@@ -107,8 +112,14 @@ impl<'a> SvelteParser<'a> {
                 .find(|c: char| !c.is_alphabetic() && c != ' ')
                 .unwrap_or(remaining.len());
             let keyword = remaining[..keyword_end].trim();
+            // Normalize whitespace: "else  if" -> "else if"
+            let keyword_normalized: String = keyword
+                .split_whitespace()
+                .take(2)
+                .collect::<Vec<_>>()
+                .join(" ");
 
-            if keyword.starts_with("else if") {
+            if keyword_normalized == "else if" {
                 // {:else if} - parse as nested if block
                 let elseif_start = self.current_start;
                 let elseif_block = self.parse_if_block_inner(elseif_start, true)?;
@@ -128,10 +139,23 @@ impl<'a> SvelteParser<'a> {
             None
         };
 
-        // Expect closing {/if}
-        let end = if self.check(TokenKind::BlockClose) {
+        // Determine end position
+        // For {:else if}, the nested IfBlock already consumed {/if}, so use its end position
+        // For all other cases (no alternate, {:else}, {:else}{#if}), consume {/if} ourselves
+        let elseif_end = alternate.as_ref().and_then(|alt| {
+            if let Some(FragmentNode::IfBlock(inner)) = alt.nodes.first()
+                && inner.elseif
+            {
+                return Some(inner.span.end as usize);
+            }
+            None
+        });
+
+        let end = if let Some(end_pos) = elseif_end {
+            end_pos
+        } else if self.check(TokenKind::BlockClose) {
             let close_tag_start = self.current_end;
-            let (_, after_close) = self.scan_block_tag_content(close_tag_start)?; // consume "if}"
+            let (_, after_close) = self.scan_block_tag_content(close_tag_start)?;
             after_close
         } else {
             self.current_start
@@ -1218,7 +1242,6 @@ impl<'a> SvelteParser<'a> {
                 if self.is_next_token(TokenKind::Slash)? {
                     break;
                 }
-                use crate::parser::element::ParsedElement;
                 match self.parse_element_or_special(false)? {
                     ParsedElement::Element(elem) => {
                         last_end = elem.span.end_usize();

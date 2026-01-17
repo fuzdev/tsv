@@ -18,6 +18,7 @@
 
 use super::internal;
 use crate::escapes;
+use crate::printer::source_fidelity;
 
 /// Split a declaration source into property and value, matching Svelte's quirky behavior.
 ///
@@ -163,8 +164,6 @@ fn convert_pseudo_class_args(args: &internal::PseudoClassArgs) -> serde_json::Va
 /// Trade-off: cleaner JSON vs increased AST memory usage (Sprint 1 removed raw values).
 #[allow(dead_code)]
 fn format_css_value_for_json(value: &internal::CssValue) -> String {
-    use crate::printer::source_fidelity;
-
     match value {
         internal::CssValue::Identifier { name, .. } => {
             source_fidelity::format_identifier_value(name)

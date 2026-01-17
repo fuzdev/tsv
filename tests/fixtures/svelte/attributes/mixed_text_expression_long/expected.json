@@ -1,0 +1,613 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 477,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 53,
+				"data": " Short - no wrapping needed (under 100 chars) "
+			},
+			{
+				"type": "Text",
+				"start": 53,
+				"end": 54,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 54,
+				"end": 111,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 55
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 58
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 59,
+						"end": 104,
+						"name": "title",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 5,
+								"character": 59
+							},
+							"end": {
+								"line": 2,
+								"column": 10,
+								"character": 64
+							}
+						},
+						"value": [
+							{
+								"start": 66,
+								"end": 78,
+								"type": "Text",
+								"raw": "prefix text ",
+								"data": "prefix text "
+							},
+							{
+								"type": "ExpressionTag",
+								"start": 78,
+								"end": 96,
+								"expression": {
+									"type": "LogicalExpression",
+									"start": 79,
+									"end": 95,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 25
+										},
+										"end": {
+											"line": 2,
+											"column": 41
+										}
+									},
+									"left": {
+										"type": "MemberExpression",
+										"start": 79,
+										"end": 85,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 25
+											},
+											"end": {
+												"line": 2,
+												"column": 31
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 79,
+											"end": 80,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 25
+												},
+												"end": {
+													"line": 2,
+													"column": 26
+												}
+											},
+											"name": "a"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 81,
+											"end": 85,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 27
+												},
+												"end": {
+													"line": 2,
+													"column": 31
+												}
+											},
+											"name": "prop"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"operator": "||",
+									"right": {
+										"type": "MemberExpression",
+										"start": 89,
+										"end": 95,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 35
+											},
+											"end": {
+												"line": 2,
+												"column": 41
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 89,
+											"end": 90,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 35
+												},
+												"end": {
+													"line": 2,
+													"column": 36
+												}
+											},
+											"name": "b"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 91,
+											"end": 95,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 37
+												},
+												"end": {
+													"line": 2,
+													"column": 41
+												}
+											},
+											"name": "prop"
+										},
+										"computed": false,
+										"optional": false
+									}
+								}
+							},
+							{
+								"start": 96,
+								"end": 103,
+								"type": "Text",
+								"raw": " suffix",
+								"data": " suffix"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 111,
+				"end": 113,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 113,
+				"end": 168,
+				"data": " Long logical - wraps at || (exceeds 100 chars) "
+			},
+			{
+				"type": "Text",
+				"start": 168,
+				"end": 169,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 169,
+				"end": 284,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 170
+					},
+					"end": {
+						"line": 5,
+						"column": 4,
+						"character": 173
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 175,
+						"end": 276,
+						"name": "title",
+						"name_loc": {
+							"start": {
+								"line": 6,
+								"column": 1,
+								"character": 175
+							},
+							"end": {
+								"line": 6,
+								"column": 6,
+								"character": 180
+							}
+						},
+						"value": [
+							{
+								"start": 182,
+								"end": 233,
+								"type": "Text",
+								"raw": "prefix text that is very long to reach print width ",
+								"data": "prefix text that is very long to reach print width "
+							},
+							{
+								"type": "ExpressionTag",
+								"start": 233,
+								"end": 263,
+								"expression": {
+									"type": "LogicalExpression",
+									"start": 234,
+									"end": 262,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 60
+										},
+										"end": {
+											"line": 7,
+											"column": 13
+										}
+									},
+									"left": {
+										"type": "MemberExpression",
+										"start": 234,
+										"end": 245,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 60
+											},
+											"end": {
+												"line": 6,
+												"column": 71
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 234,
+											"end": 235,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 60
+												},
+												"end": {
+													"line": 6,
+													"column": 61
+												}
+											},
+											"name": "a"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 236,
+											"end": 245,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 62
+												},
+												"end": {
+													"line": 6,
+													"column": 71
+												}
+											},
+											"name": "prop_name"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"operator": "||",
+									"right": {
+										"type": "MemberExpression",
+										"start": 251,
+										"end": 262,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 13
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 251,
+											"end": 252,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 2
+												},
+												"end": {
+													"line": 7,
+													"column": 3
+												}
+											},
+											"name": "b"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 253,
+											"end": 262,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 4
+												},
+												"end": {
+													"line": 7,
+													"column": 13
+												}
+											},
+											"name": "prop_name"
+										},
+										"computed": false,
+										"optional": false
+									}
+								}
+							},
+							{
+								"start": 263,
+								"end": 275,
+								"type": "Text",
+								"raw": " suffix text",
+								"data": " suffix text"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 284,
+				"end": 286,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 286,
+				"end": 346,
+				"data": " Long ternary - wraps at ? and : (exceeds 100 chars) "
+			},
+			{
+				"type": "Text",
+				"start": 346,
+				"end": 347,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 347,
+				"end": 476,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 348
+					},
+					"end": {
+						"line": 11,
+						"column": 4,
+						"character": 351
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 353,
+						"end": 468,
+						"name": "title",
+						"name_loc": {
+							"start": {
+								"line": 12,
+								"column": 1,
+								"character": 353
+							},
+							"end": {
+								"line": 12,
+								"column": 6,
+								"character": 358
+							}
+						},
+						"value": [
+							{
+								"start": 360,
+								"end": 407,
+								"type": "Text",
+								"raw": "prefix text reaching print width boundary with ",
+								"data": "prefix text reaching print width boundary with "
+							},
+							{
+								"type": "ExpressionTag",
+								"start": 407,
+								"end": 455,
+								"expression": {
+									"type": "ConditionalExpression",
+									"start": 408,
+									"end": 454,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 56
+										},
+										"end": {
+											"line": 14,
+											"column": 20
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 408,
+										"end": 412,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 56
+											},
+											"end": {
+												"line": 12,
+												"column": 60
+											}
+										},
+										"name": "cond"
+									},
+									"consequent": {
+										"type": "MemberExpression",
+										"start": 417,
+										"end": 433,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 4
+											},
+											"end": {
+												"line": 13,
+												"column": 20
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 417,
+											"end": 418,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 4
+												},
+												"end": {
+													"line": 13,
+													"column": 5
+												}
+											},
+											"name": "a"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 419,
+											"end": 433,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 6
+												},
+												"end": {
+													"line": 13,
+													"column": 20
+												}
+											},
+											"name": "prop_name_long"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"alternate": {
+										"type": "MemberExpression",
+										"start": 438,
+										"end": 454,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 4
+											},
+											"end": {
+												"line": 14,
+												"column": 20
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 438,
+											"end": 439,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 4
+												},
+												"end": {
+													"line": 14,
+													"column": 5
+												}
+											},
+											"name": "b"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 440,
+											"end": 454,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 6
+												},
+												"end": {
+													"line": 14,
+													"column": 20
+												}
+											},
+											"name": "prop_name_long"
+										},
+										"computed": false,
+										"optional": false
+									}
+								}
+							},
+							{
+								"start": 455,
+								"end": 467,
+								"type": "Text",
+								"raw": " more suffix",
+								"data": " more suffix"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

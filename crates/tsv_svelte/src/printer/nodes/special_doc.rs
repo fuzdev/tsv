@@ -10,7 +10,6 @@ use std::rc::Rc;
 
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
-use crate::printer::text::TextAnalysis;
 use tsv_lang::doc::{self, Doc};
 
 impl<'a> Printer<'a> {
@@ -149,12 +148,16 @@ impl<'a> Printer<'a> {
                     })));
 
         // Check for source multiline layout
-        let source_has_leading_break = element.fragment.nodes.first().is_some_and(|n| {
-            matches!(n, FragmentNode::Text(t) if t.raw.is_whitespace_only() && t.raw.contains('\n'))
-        });
-        let source_has_trailing_break = element.fragment.nodes.last().is_some_and(|n| {
-            matches!(n, FragmentNode::Text(t) if t.raw.is_whitespace_only() && t.raw.contains('\n'))
-        });
+        let source_has_leading_break = element
+            .fragment
+            .nodes
+            .first()
+            .is_some_and(FragmentNode::is_boundary_break);
+        let source_has_trailing_break = element
+            .fragment
+            .nodes
+            .last()
+            .is_some_and(FragmentNode::is_boundary_break);
 
         // Determine if multiline formatting is needed
         // svelte:boundary WITHOUT snippets stays inline (even with block children)
@@ -165,10 +168,11 @@ impl<'a> Printer<'a> {
                 || is_boundary_with_snippets);
 
         // Build children doc based on formatting mode
+        // Special elements are block-level, so always trim boundaries
         let children_doc = if needs_multiline {
             self.build_nodes_doc_multiline(&element.fragment.nodes)
         } else if is_simple_content {
-            self.build_nodes_doc_trimmed(&element.fragment.nodes)
+            self.build_nodes_doc_trimmed(&element.fragment.nodes, true)
         } else {
             self.build_fragment_doc(&element.fragment)
         };

@@ -42,33 +42,80 @@ impl<'a> Printer<'a> {
         block: &internal::BlockStatement,
         expand_empty: bool,
     ) -> Doc {
-        if block.body.is_empty() {
-            // Check for comments inside empty block
-            let block_start = block.span.start + 1; // After '{'
-            let block_end = block.span.end - 1; // Before '}'
-            let has_inner_comments = self.has_comments_between(block_start, block_end);
+        // Reset is_expression_statement when entering a block body.
+        // This ensures chains inside function bodies don't incorrectly inherit
+        // the expression statement context from their parent call (e.g., fn(() => { ... })).
+        let prev_is_expr_stmt = self.is_expression_statement.get();
+        self.is_expression_statement.set(false);
 
-            if has_inner_comments {
-                let mut comment_parts = Vec::new();
-                for comment in tsv_lang::comments_in_range(self.comments, block_start, block_end) {
-                    comment_parts.push(self.build_comment_doc(comment));
-                    if !comment.is_block {
-                        // Line comments need a hardline after
-                        comment_parts.push(doc::hardline());
+        let result = self.build_block_statement_doc_inner(block, expand_empty);
+
+        self.is_expression_statement.set(prev_is_expr_stmt);
+        result
+    }
+
+    fn build_block_statement_doc_inner(
+        &self,
+        block: &internal::BlockStatement,
+        expand_empty: bool,
+    ) -> Doc {
+        self.build_block_body_doc(block, expand_empty, Vec::new())
+    }
+
+    /// Build inner comments doc for empty block
+    fn build_inner_comments_for_empty_block(&self, block: &internal::BlockStatement) -> Vec<Doc> {
+        let block_start = block.span.start + 1; // After '{'
+        let block_end = block.span.end - 1; // Before '}'
+        let mut comment_parts = Vec::new();
+        for comment in tsv_lang::comments_in_range(self.comments, block_start, block_end) {
+            comment_parts.push(self.build_comment_doc(comment));
+            if !comment.is_block {
+                // Line comments need a hardline after
+                comment_parts.push(doc::hardline());
+            }
+        }
+        comment_parts
+    }
+
+    /// Build a Doc for a block body with optional leading content
+    ///
+    /// This is the unified implementation for block statement doc building.
+    /// The `leading_content` is prepended to the body (used for outer comments).
+    fn build_block_body_doc(
+        &self,
+        block: &internal::BlockStatement,
+        expand_empty: bool,
+        leading_content: Vec<Doc>,
+    ) -> Doc {
+        let has_leading = !leading_content.is_empty();
+        let block_start = block.span.start + 1; // After '{'
+        let block_end = block.span.end - 1; // Before '}'
+
+        if block.body.is_empty() {
+            let inner_comments = self.build_inner_comments_for_empty_block(block);
+            let has_inner_comments = !inner_comments.is_empty();
+
+            if has_leading || has_inner_comments {
+                // Block with comments (outer and/or inner)
+                let mut all_content = leading_content;
+                if has_inner_comments {
+                    if has_leading {
+                        all_content.push(doc::hardline());
                     }
+                    all_content.extend(inner_comments);
                 }
                 return doc::concat(vec![
                     doc::text("{"),
                     doc::indent(doc::concat(vec![
                         doc::hardline(),
-                        doc::concat(comment_parts),
+                        doc::concat(all_content),
                     ])),
                     doc::hardline(),
                     doc::text("}"),
                 ]);
             }
 
-            // Empty block without comments
+            // Empty block without any comments
             return if expand_empty {
                 doc::concat(vec![doc::text("{"), doc::hardline(), doc::text("}")])
             } else {
@@ -79,88 +126,98 @@ impl<'a> Printer<'a> {
         // Build statements with line breaks between them
         // Preserve blank lines and comments from source
         let mut body_parts = Vec::new();
-        let mut prev_end = block.span.start + 1; // Start after '{'
+
+        // Add leading content first (outer comments when present)
+        if has_leading {
+            body_parts.extend(leading_content);
+        }
+
+        let mut prev_end = block_start;
         let mut prev_stmt_end: Option<u32> = None;
 
         for (i, stmt) in block.body.iter().enumerate() {
             let stmt_start = stmt.span().start;
+            let is_first = i == 0;
 
-            // Check for comments between previous position and this statement
-            // But skip trailing same-line comments from the previous statement
-            let comments: Vec<_> =
-                tsv_lang::comments_in_range(self.comments, prev_end, stmt_start).collect();
-            let leading_comments: Vec<_> = if let Some(prev_stmt) = prev_stmt_end {
-                comments
-                    .iter()
-                    .filter(|c| {
-                        !tsv_lang::printing::is_same_line(self.source, prev_stmt, c.span.start)
-                    })
-                    .copied()
-                    .collect()
-            } else {
-                comments.clone()
-            };
-            let has_leading_comments = !leading_comments.is_empty();
+            // Collect leading comments (skip trailing same-line from previous statement)
+            let leading_comments =
+                self.collect_leading_comments(prev_end, stmt_start, prev_stmt_end);
 
-            if i > 0 {
-                // Check for blank lines between statements (when no leading comments)
-                if !has_leading_comments
-                    && tsv_lang::printing::has_blank_line_between(self.source, prev_end, stmt_start)
+            // Handle blank lines and separators
+            if is_first && has_leading {
+                // First statement after leading content - always need separator
+                body_parts.push(doc::hardline());
+            } else if !is_first {
+                // Check for blank lines between statements
+                let blank_line_check_end = if !leading_comments.is_empty() {
+                    leading_comments[0].span.start
+                } else {
+                    stmt_start
+                };
+                if !self.in_template_interpolation.get()
+                    && tsv_lang::printing::has_blank_line_between(
+                        self.source,
+                        prev_end,
+                        blank_line_check_end,
+                    )
                 {
-                    // Blank line: literalline (no indent) + hardline (with indent for next stmt)
                     body_parts.push(doc::literalline());
                 }
                 body_parts.push(doc::hardline());
             }
 
-            // Print leading comments before this statement (excluding trailing same-line from previous)
-            for comment in &leading_comments {
-                body_parts.push(self.build_comment_doc(comment));
-                // Line comments need a hardline after
-                // Block comments on their own line get a hardline, block comments on same line as statement get a space
-                if !comment.is_block {
-                    body_parts.push(doc::hardline());
-                } else if !tsv_lang::printing::is_same_line(
-                    self.source,
-                    comment.span.end,
-                    stmt_start,
-                ) {
-                    // Block comment not on same line as statement - add hardline
-                    body_parts.push(doc::hardline());
-                } else {
-                    // Block comment on same line as statement - add space
-                    body_parts.push(doc::text(" "));
-                }
-            }
+            // Print leading comments before this statement (with blank line preservation)
+            body_parts.extend(
+                self.build_leading_comments_with_blank_lines(&leading_comments, stmt_start),
+            );
 
             body_parts.push(self.build_statement_doc(stmt));
 
             // Handle trailing same-line comments after this statement
             let stmt_end = stmt.span().end;
-            for comment in tsv_lang::comments_in_range(
-                self.comments,
-                stmt_end,
-                block.span.end - 1, // Before '}'
-            ) {
-                if tsv_lang::printing::is_same_line(self.source, stmt_end, comment.span.start) {
-                    body_parts.push(doc::text(" "));
-                    body_parts.push(self.build_comment_doc(comment));
-                } else {
-                    break; // Only same-line comments
-                }
-            }
+            body_parts.extend(self.build_trailing_same_line_comment_docs(stmt_end, block_end));
 
-            prev_end = stmt.span().end;
+            prev_end = stmt_end;
             prev_stmt_end = Some(stmt_end);
         }
 
-        // Structure: `{` + indent(hardline + statements) + hardline + `}`
+        // Handle trailing comments after the last statement (on their own line)
+        if let Some(last_stmt_end) = prev_stmt_end {
+            for comment in tsv_lang::comments_in_range(self.comments, last_stmt_end, block_end) {
+                if tsv_lang::printing::is_same_line(self.source, last_stmt_end, comment.span.start)
+                {
+                    continue; // Skip same-line comments (already handled above)
+                }
+                body_parts.push(doc::hardline());
+                body_parts.push(self.build_comment_doc(comment));
+            }
+        }
+
         doc::concat(vec![
             doc::text("{"),
             doc::indent(doc::concat(vec![doc::hardline(), doc::concat(body_parts)])),
             doc::hardline(),
             doc::text("}"),
         ])
+    }
+
+    /// Collect leading comments for a statement, filtering out trailing same-line from previous
+    fn collect_leading_comments(
+        &self,
+        prev_end: u32,
+        stmt_start: u32,
+        prev_stmt_end: Option<u32>,
+    ) -> Vec<&internal::Comment> {
+        let comments: Vec<_> =
+            tsv_lang::comments_in_range(self.comments, prev_end, stmt_start).collect();
+        if let Some(prev_stmt) = prev_stmt_end {
+            comments
+                .into_iter()
+                .filter(|c| !tsv_lang::printing::is_same_line(self.source, prev_stmt, c.span.start))
+                .collect()
+        } else {
+            comments
+        }
     }
 
     /// Collect outer comments to be moved inside a block
@@ -177,12 +234,9 @@ impl<'a> Printer<'a> {
         sig_end: u32,
         block: &internal::BlockStatement,
     ) -> Vec<Doc> {
-        let block_open = block.span.start;
-        let mut comments = Vec::new();
-        for comment in tsv_lang::comments_in_range(self.comments, sig_end, block_open) {
-            comments.push(self.build_comment_doc(comment));
-        }
-        comments
+        tsv_lang::comments_in_range(self.comments, sig_end, block.span.start)
+            .map(|c| self.build_comment_doc(c))
+            .collect()
     }
 
     /// Build a Doc for a block statement with outer comments moved inside
@@ -195,118 +249,20 @@ impl<'a> Printer<'a> {
         outer_comments: Vec<Doc>,
     ) -> Doc {
         if outer_comments.is_empty() {
-            // No outer comments, use regular doc
             return self.build_block_statement_doc(block);
         }
 
-        // Build outer comments as leading content in block body
-        let mut comment_parts = Vec::new();
+        // Build outer comments as leading content
+        let mut leading_content = Vec::new();
         for (i, comment_doc) in outer_comments.into_iter().enumerate() {
             if i > 0 {
-                comment_parts.push(doc::hardline());
+                leading_content.push(doc::hardline());
             }
-            comment_parts.push(comment_doc);
+            leading_content.push(comment_doc);
         }
 
-        if block.body.is_empty() {
-            // Empty block with only outer comments
-            let block_start = block.span.start + 1;
-            let block_end = block.span.end - 1;
-            let has_inner_comments = self.has_comments_between(block_start, block_end);
-
-            if has_inner_comments {
-                // Also include inner comments
-                for comment in tsv_lang::comments_in_range(self.comments, block_start, block_end) {
-                    comment_parts.push(doc::hardline());
-                    comment_parts.push(self.build_comment_doc(comment));
-                }
-            }
-
-            return doc::concat(vec![
-                doc::text("{"),
-                doc::indent(doc::concat(vec![
-                    doc::hardline(),
-                    doc::concat(comment_parts),
-                ])),
-                doc::hardline(),
-                doc::text("}"),
-            ]);
-        }
-
-        // Block has statements - build body with outer comments first
-        let mut body_parts = Vec::new();
-
-        // Outer comments first
-        body_parts.push(doc::concat(comment_parts));
-
-        // Then regular statements
-        let mut prev_end = block.span.start + 1;
-        let mut prev_stmt_end: Option<u32> = None;
-
-        for (i, stmt) in block.body.iter().enumerate() {
-            let stmt_start = stmt.span().start;
-            let is_first = i == 0;
-
-            // For all statements (including first), add hardline before
-            // (outer comments already present, so always need a separator)
-            if !is_first
-                && tsv_lang::printing::has_blank_line_between(self.source, prev_end, stmt_start)
-            {
-                body_parts.push(doc::literalline());
-            }
-            body_parts.push(doc::hardline());
-
-            // Handle leading comments (skip trailing same-line from previous)
-            let comments: Vec<_> =
-                tsv_lang::comments_in_range(self.comments, prev_end, stmt_start).collect();
-            let leading_comments: Vec<_> = if let Some(prev_stmt) = prev_stmt_end {
-                comments
-                    .iter()
-                    .filter(|c| {
-                        !tsv_lang::printing::is_same_line(self.source, prev_stmt, c.span.start)
-                    })
-                    .copied()
-                    .collect()
-            } else {
-                comments.clone()
-            };
-
-            for comment in &leading_comments {
-                body_parts.push(self.build_comment_doc(comment));
-                if !comment.is_block
-                    || !tsv_lang::printing::is_same_line(self.source, comment.span.end, stmt_start)
-                {
-                    body_parts.push(doc::hardline());
-                } else {
-                    body_parts.push(doc::text(" "));
-                }
-            }
-
-            // Statement itself
-            let stmt_doc = self.build_statement_doc(stmt);
-            body_parts.push(stmt_doc);
-
-            // Trailing same-line comments
-            let stmt_end = stmt.span().end;
-            for comment in tsv_lang::comments_in_range(self.comments, stmt_end, block.span.end - 1)
-            {
-                if tsv_lang::printing::is_same_line(self.source, stmt_end, comment.span.start) {
-                    body_parts.push(doc::text(" "));
-                    body_parts.push(self.build_comment_doc(comment));
-                } else {
-                    break;
-                }
-            }
-
-            prev_end = stmt.span().end;
-            prev_stmt_end = Some(stmt_end);
-        }
-
-        doc::concat(vec![
-            doc::text("{"),
-            doc::indent(doc::concat(vec![doc::hardline(), doc::concat(body_parts)])),
-            doc::hardline(),
-            doc::text("}"),
-        ])
+        // Use unified body builder with leading content
+        // Note: expand_empty=false because outer comments will expand the block anyway
+        self.build_block_body_doc(block, false, leading_content)
     }
 }

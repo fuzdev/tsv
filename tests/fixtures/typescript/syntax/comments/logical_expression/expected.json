@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 308,
+	"end": 529,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -105,24 +105,104 @@
 					"column": 29
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " Comment in call argument (must preserve multiline structure)",
+			"start": 300,
+			"end": 363,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 379,
+			"end": 389,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 3
+				},
+				"end": {
+					"line": 25,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Multiple consecutive line comments (must stay on separate lines)",
+			"start": 402,
+			"end": 469,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment1",
+			"start": 482,
+			"end": 493,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 7
+				},
+				"end": {
+					"line": 31,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment2",
+			"start": 497,
+			"end": 508,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 3
+				},
+				"end": {
+					"line": 32,
+					"column": 14
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 307,
+		"end": 528,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 298,
+			"end": 519,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 21,
+					"line": 35,
 					"column": 0
 				}
 			},
@@ -757,6 +837,238 @@
 							"value": " Inline block comment between operands",
 							"start": 224,
 							"end": 264
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 365,
+					"end": 399,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 365,
+						"end": 398,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 1
+							},
+							"end": {
+								"line": 27,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 365,
+							"end": 367,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 1
+								},
+								"end": {
+									"line": 23,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "LogicalExpression",
+								"start": 371,
+								"end": 394,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 4
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 371,
+									"end": 372,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 2
+										},
+										"end": {
+											"line": 24,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"operator": "&&",
+								"right": {
+									"type": "Identifier",
+									"start": 393,
+									"end": 394,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 3
+										},
+										"end": {
+											"line": 26,
+											"column": 4
+										}
+									},
+									"name": "b",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " comment",
+											"start": 379,
+											"end": 389
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Comment in call argument (must preserve multiline structure)",
+							"start": 300,
+							"end": 363
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 471,
+					"end": 518,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 471,
+						"end": 517,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 1
+							},
+							"end": {
+								"line": 34,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 471,
+							"end": 473,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 1
+								},
+								"end": {
+									"line": 30,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "LogicalExpression",
+								"start": 477,
+								"end": 513,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 2
+									},
+									"end": {
+										"line": 33,
+										"column": 4
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 477,
+									"end": 478,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 2
+										},
+										"end": {
+											"line": 31,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"operator": "&&",
+								"right": {
+									"type": "Identifier",
+									"start": 512,
+									"end": 513,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 3
+										},
+										"end": {
+											"line": 33,
+											"column": 4
+										}
+									},
+									"name": "b",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " comment1",
+											"start": 482,
+											"end": 493
+										},
+										{
+											"type": "Line",
+											"value": " comment2",
+											"start": 497,
+											"end": 508
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multiple consecutive line comments (must stay on separate lines)",
+							"start": 402,
+							"end": 469
 						}
 					]
 				}

@@ -6,13 +6,17 @@
 
 use crate::ast::internal;
 use crate::printer::Printer;
-use crate::printer::helpers::is_inside_template_literal;
+use tsv_lang::doc;
 
 impl<'a> Printer<'a> {
     /// Format a Script tag
     ///
     /// Formats both regular `<script>` and `<script context="module">` tags.
     /// The TypeScript content is formatted using the TypeScript printer with indentation.
+    ///
+    /// Uses Doc-based integration instead of string post-processing. The Doc system
+    /// naturally handles template literals correctly: `indent(doc)` only affects `Line` docs
+    /// (hardline, softline, line), not newlines inside `text()` which output as-is.
     pub(super) fn print_script(&mut self, script: &internal::Script) {
         // Opening tag
         self.write("<script");
@@ -25,73 +29,42 @@ impl<'a> Printer<'a> {
 
         self.write(">\n");
 
-        // Format TypeScript content with indentation
-        // Use the TypeScript printer from tsv_ts crate
-        // IMPORTANT: TypeScript AST was parsed with base_offset, so spans are absolute
-        // positions in the full Svelte source. Pass the full source for correct slicing.
-        // Use base_indent_offset=1 to account for the Svelte wrapper indent (width calculations)
-        let config = tsv_lang::PrintConfig {
-            base_indent_offset: 1,
-            ..Default::default()
-        };
-        let formatted_content = tsv_ts::format_with_config(&script.content, self.source(), config);
+        // Build Doc for script content
+        // Width calculations are handled by:
+        // - start_column for the first line
+        // - start_indent_level for subsequent lines after hardline
+        // Note: We use default config (base_indent_offset=0) for accurate width calculations.
+        // Template indent fallback (when source has no whitespace) is handled separately
+        // in the TypeScript printer with a hardcoded default of 1 for Svelte context.
+        let config = tsv_lang::PrintConfig::default();
+        let script_doc = tsv_ts::build_program_doc(&script.content, self.source(), config);
 
-        // Indent each line - trim trailing newline first to avoid extra blank lines
-        // IMPORTANT: Don't add indentation to:
-        // 1. String continuation lines (backslash + newline)
-        // 2. Lines inside template literals (they're part of the template content)
-        // 3. Multi-line block comment continuation lines (prettier preserves original spacing)
-        // These must be preserved exactly as they are.
-        let content_trimmed = formatted_content.trim_end_matches('\n');
-        self.indent_level += 1;
-        let mut is_continuation_line = false;
-        let mut in_template_literal = false;
-        let mut in_multiline_comment = false;
-        for line in content_trimmed.lines() {
-            let trimmed = line.trim_start();
+        // Render with indent
+        // The Doc system naturally handles template literals: text() newlines are NOT indented
+        // We render at indent_level=1 so hardlines produce proper indentation
+        // The first line needs manual indentation since there's no hardline before it
+        //
+        // start_column = tab_width (2) to account for the initial indent we'll add
+        // start_indent_level = 1 to account for the Svelte wrapper indent
+        let interner = script.content.interner.borrow();
+        let output = doc::print_doc_with_indent_resolved(
+            &script_doc,
+            &config,
+            config.tab_width, // start column = 1 tab's visual width
+            1,                // start indent level = 1 (accounts for Svelte wrapper)
+            &*interner,
+        );
 
-            // Check if this is a comment line that should NOT be indented:
-            // - We're inside a multi-line comment
-            // - The line starts at column 0 (no leading whitespace)
-            // - This includes closing `*/` lines that start at column 0
-            // This preserves prettier's behavior where comment lines at column 0 stay at column 0
-            // NOTE: Check this BEFORE updating in_multiline_comment state
-            let is_unindented_comment_line = in_multiline_comment && line == trimmed;
-
-            // Track if we're inside a multi-line comment
-            // A multi-line comment starts when we see /* without a matching */ on the same line
-            // Note: This is a simplified check that doesn't handle nested comments
-            // or comments inside strings/templates, but works for typical cases
-            if !in_template_literal && trimmed.contains("/*") && !trimmed.contains("*/") {
-                in_multiline_comment = true;
-            } else if in_multiline_comment && trimmed.contains("*/") {
-                in_multiline_comment = false;
-            }
-
-            // Don't indent:
-            // - Blank lines
-            // - Continuation lines inside strings
-            // - Lines that are inside template literals (actual newlines in template content)
-            // - Multi-line block comment lines that start at column 0 (no leading whitespace)
-            let should_indent = !line.is_empty()
-                && !is_continuation_line
-                && !in_template_literal
-                && !is_unindented_comment_line;
-            if should_indent {
-                self.write_indent();
-            }
-            self.write(line);
-            self.write("\n");
-
-            // Check if this line ends with a line continuation (backslash at end)
-            // If so, the next line is a continuation and should NOT be indented
-            is_continuation_line = tsv_lang::printing::is_line_continuation_ending(line);
-
-            // Track template literal state by counting unescaped backticks
-            // Lines inside multi-line template literals should not be indented
-            in_template_literal = is_inside_template_literal(line, in_template_literal);
+        // Only write content if there is any (skip indent for empty scripts)
+        // The output always ends with a hardline (\n), so non-empty content is at least "\n"
+        // For empty content (just comments or empty body), output is just "\n"
+        if !output.trim().is_empty() {
+            // Write first line's indent manually (doc only indents after hardlines)
+            self.indent_level += 1;
+            self.write_indent();
+            self.indent_level -= 1;
+            self.write(&output);
         }
-        self.indent_level -= 1;
 
         // Closing tag
         self.write("</script>\n");

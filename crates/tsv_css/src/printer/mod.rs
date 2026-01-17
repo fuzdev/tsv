@@ -26,8 +26,19 @@ mod selectors;
 pub mod source_fidelity;
 mod values;
 
-use crate::ast::internal::{Comment, CssBlockChild, CssNode, CssStyleSheet};
+use crate::ast::internal::{Comment, CssBlockChild, CssNode, CssStyleSheet, CssValue};
 use tsv_lang::{CommentPosition, OutputBuffer, PrintConfig, classify_comment, doc, printing};
+
+/// Check if function args have wrappable content (break points)
+///
+/// Returns true if:
+/// 1. Multiple comma-separated args (linear-gradient, rgb, etc.)
+/// 2. Single arg that is a List with multiple space-separated items (drop-shadow)
+pub(crate) fn has_wrappable_args(args: &[CssValue]) -> bool {
+    args.len() >= 2
+        || (args.len() == 1
+            && matches!(&args[0], CssValue::List { values, .. } if values.len() >= 2))
+}
 
 /// Printer state for building output
 pub struct Printer<'a> {
@@ -52,7 +63,7 @@ impl<'a> Printer<'a> {
     /// Create a new printer with the given config
     pub fn with_config(source: &'a str, comments: &'a [Comment], config: PrintConfig) -> Self {
         Self {
-            buffer: OutputBuffer::new(),
+            buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
             config,
             source,
@@ -110,6 +121,13 @@ impl<'a> Printer<'a> {
     /// that adds indentation to the final output.
     pub(crate) fn effective_indent(&self) -> usize {
         self.indent_level + self.config.base_indent_offset
+    }
+
+    /// Get the visual width of current indentation in characters
+    ///
+    /// Converts indent level to actual character width based on tab_width.
+    pub(crate) fn indent_width(&self) -> usize {
+        self.effective_indent() * self.config.tab_width
     }
 
     /// Write a Doc to the buffer, accounting for current column and indent level

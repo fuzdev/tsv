@@ -7,13 +7,14 @@ use crate::deno::{PrettierParser, parse_svelte, parse_typescript, run_prettier};
 use crate::diff;
 use crate::fixtures::{
     self, Fixture, InputType, discover_invalid_variants, discover_prettier_quirk_variants,
-    discover_unformatted_ours_variants, discover_unformatted_variants,
-    has_prettier_divergence_suffix, has_svelte_divergence_suffix, read_file,
+    discover_unformatted_ours_variants, discover_unformatted_variants, discover_unknown_files,
+    has_svelte_divergence_suffix, read_file,
 };
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
+use tsv_cli::json_utils::to_json_with_tabs;
 
 /// Validation error with self-describing names
 ///
@@ -124,6 +125,10 @@ pub enum ValidationError {
     InvalidSyntaxParsedByAcorn(String),
     #[error("{0} parsed successfully by our CSS parser (should fail)")]
     InvalidSyntaxParsedByOurCss(String),
+
+    // Unknown files
+    #[error("Unknown file: {0}")]
+    UnknownFile(String),
 }
 
 impl ValidationError {
@@ -194,7 +199,7 @@ impl ValidationError {
                 "Remove duplicate files (identical content)"
             }
             Self::RedundantUnformattedMatchesQuirk(_, _) => {
-                "Remove redundant file (already covered by prettier_quirk_*.svelte)"
+                "Remove redundant file (already covered by prettier_quirk_*)"
             }
             Self::InvalidSyntaxParsedByOurs(_) => {
                 "Our parser is too permissive - it accepts syntax that the canonical parser rejects. Fix the parser."
@@ -207,6 +212,9 @@ impl ValidationError {
             }
             Self::InvalidSyntaxParsedByOurCss(_) => {
                 "Our CSS parser is too permissive - it accepts invalid syntax. Fix the parser."
+            }
+            Self::UnknownFile(_) => {
+                "Remove or rename the file. Check for typos (e.g., 'unformated' vs 'unformatted')."
             }
         }
     }
@@ -259,6 +267,8 @@ impl ValidationError {
             | Self::InvalidSyntaxParsedBySvelte(_)
             | Self::InvalidSyntaxParsedByAcorn(_)
             | Self::InvalidSyntaxParsedByOurCss(_) => "InvalidSyntax",
+
+            Self::UnknownFile(_) => "Structure",
         }
     }
 }
@@ -383,6 +393,13 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
         result.add_error(ValidationError::StructureValidationFailed(e));
         return result; // Stop early if structure is invalid
     }
+
+    // Check for unknown files (catches typos like "unformated_*.svelte")
+    let unknown_files = discover_unknown_files(fixture);
+    for unknown_file in unknown_files {
+        result.add_error(ValidationError::UnknownFile(unknown_file));
+    }
+
     result.add_success(ValidationSuccess::StructureValid(16));
 
     // Read input file
@@ -406,7 +423,6 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
         .and_then(|n| n.to_str())
         .unwrap_or("");
     let is_svelte_divergence_dir = has_svelte_divergence_suffix(dir_name);
-    let is_prettier_divergence_dir = has_prettier_divergence_suffix(dir_name);
     let input_type = fixture.input_type();
     let input_ext = input_type.extension();
 
@@ -440,7 +456,7 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
     // F2, F3: Prettier freshness and baseline (Svelte and SvelteTs)
     // TypeScript/CSS fixtures don't use prettier-svelte plugin
     if input_type == InputType::Svelte || input_type == InputType::SvelteTs {
-        validate_formatter_prettier(&mut result, fixture, &input, is_prettier_divergence_dir).await;
+        validate_formatter_prettier(&mut result, fixture, &input).await;
 
         // N1, N3: Prettier normalization (Svelte and SvelteTs)
         validate_normalization_prettier(&mut result, fixture, &input, input_ext).await;
@@ -476,7 +492,6 @@ fn validate_parser_ours(result: &mut FixtureValidation, fixture: &Fixture, input
         Ok(actual) => {
             if actual != expected {
                 result.add_error(ValidationError::ParserExpectedOursOutdated);
-                diff::print_diff("expected_ours.json diff", &expected, &actual);
             } else {
                 result.add_success(ValidationSuccess::ParserExpectedOursMatches);
             }
@@ -502,10 +517,14 @@ fn validate_formatter_idempotent(
         Ok(formatted) => {
             if formatted != *input {
                 result.add_error(ValidationError::FormatterInputNotIdempotent);
-                diff::print_diff(
-                    &format!("{} idempotency diff", fixture.input_file),
-                    input,
+                diff::print_diff_with_options(
+                    &format!(
+                        "idempotency: {}/{}",
+                        fixture.relative_path, fixture.input_file
+                    ),
                     &formatted,
+                    input,
+                    &diff::DiffOptions::idempotency(),
                 );
                 false
             } else {
@@ -535,9 +554,8 @@ fn validate_normalization_ours(
     let fixture_dir = &fixture.path;
     let mut total_variants = 0;
 
-    // N2: prettier_quirk_*.svelte → input.svelte (our formatter)
-    // Note: prettier_quirk files are Svelte-only, always use .svelte
-    let prettier_quirk_variants = discover_prettier_quirk_variants(fixture_dir);
+    // N2: prettier_quirk_* → input file (our formatter)
+    let prettier_quirk_variants = discover_prettier_quirk_variants(fixture_dir, input_ext);
     result.prettier_quirk_count = prettier_quirk_variants.len();
     let mut quirk_contents: HashMap<String, Vec<String>> = HashMap::new();
 
@@ -553,13 +571,18 @@ fn validate_normalization_ours(
             .or_default()
             .push(quirk_name.clone());
 
-        match fixtures::format_with_our_formatter(&quirk_content, "temp.svelte") {
+        match fixtures::format_with_our_formatter(&quirk_content, quirk_name) {
             Ok(formatted) => {
                 if formatted != *input {
                     result.add_error(ValidationError::NormalizationPrettierQuirkNotNormalized(
                         quirk_name.clone(),
                     ));
-                    diff::print_diff(&format!("{quirk_name} normalization"), input, &formatted);
+                    diff::print_diff_with_options(
+                        &format!("normalization: {}/{}", fixture.relative_path, quirk_name),
+                        &formatted,
+                        input,
+                        &diff::DiffOptions::idempotency(),
+                    );
                 } else {
                     total_variants += 1;
                 }
@@ -604,7 +627,12 @@ fn validate_normalization_ours(
                     result.add_error(ValidationError::NormalizationUnformattedNotNormalized(
                         variant_name.clone(),
                     ));
-                    diff::print_diff(&format!("{variant_name} normalization"), input, &formatted);
+                    diff::print_diff_with_options(
+                        &format!("normalization: {}/{}", fixture.relative_path, variant_name),
+                        &formatted,
+                        input,
+                        &diff::DiffOptions::idempotency(),
+                    );
                 } else {
                     total_variants += 1;
                 }
@@ -656,7 +684,12 @@ fn validate_normalization_ours(
                     result.add_error(ValidationError::NormalizationUnformattedOursNotNormalized(
                         variant_name.clone(),
                     ));
-                    diff::print_diff(&format!("{variant_name} normalization"), input, &formatted);
+                    diff::print_diff_with_options(
+                        &format!("normalization: {}/{}", fixture.relative_path, variant_name),
+                        &formatted,
+                        input,
+                        &diff::DiffOptions::idempotency(),
+                    );
                 } else {
                     total_variants += 1;
                 }
@@ -722,12 +755,19 @@ async fn validate_parser_external(
         };
 
         match parse_typescript(input).await {
-            Ok(ts_ast_str) => {
-                let ts_ast_normalized = tsv_cli::json_utils::ensure_trailing_newline(ts_ast_str);
+            Ok(ts_ast) => {
+                let ts_ast_json = match to_json_with_tabs(&ts_ast) {
+                    Ok(json) => format!("{json}\n"),
+                    Err(e) => {
+                        result.add_error(ValidationError::ParserError(format!(
+                            "Failed to serialize TypeScript AST: {e}"
+                        )));
+                        return;
+                    }
+                };
 
-                if *expected_str != ts_ast_normalized {
+                if *expected_str != ts_ast_json {
                     result.add_error(ValidationError::ParserExpectedJsonOutdated);
-                    diff::print_diff("expected.json diff", expected_str, &ts_ast_normalized);
                 } else {
                     result.add_success(ValidationSuccess::ParserExpectedJsonMatches);
                 }
@@ -743,20 +783,26 @@ async fn validate_parser_external(
 
     // Svelte fixtures use Svelte's parser
     match parse_svelte(input).await {
-        Ok(svelte_ast_str) => {
+        Ok(svelte_ast) => {
             if expected_svelte_failure {
                 result.add_error(ValidationError::ParserExpectedSvelteOutdated);
                 return;
             }
 
-            let svelte_ast_normalized =
-                tsv_cli::json_utils::ensure_trailing_newline(svelte_ast_str);
+            let svelte_ast_json = match to_json_with_tabs(&svelte_ast) {
+                Ok(json) => format!("{json}\n"),
+                Err(e) => {
+                    result.add_error(ValidationError::ParserError(format!(
+                        "Failed to serialize Svelte AST: {e}"
+                    )));
+                    return;
+                }
+            };
 
             // P1: Check expected.json (only if not in svelte divergence dir)
             if let Some(expected_str) = &expected_content {
-                if *expected_str != svelte_ast_normalized {
+                if *expected_str != svelte_ast_json {
                     result.add_error(ValidationError::ParserExpectedJsonOutdated);
-                    diff::print_diff("expected.json diff", expected_str, &svelte_ast_normalized);
                 } else {
                     result.add_success(ValidationSuccess::ParserExpectedJsonMatches);
                 }
@@ -764,13 +810,8 @@ async fn validate_parser_external(
 
             // P3: Check expected_svelte.json
             if let Some(expected_svelte_str) = &expected_svelte_content {
-                if !expected_svelte_failure && *expected_svelte_str != svelte_ast_normalized {
+                if !expected_svelte_failure && *expected_svelte_str != svelte_ast_json {
                     result.add_error(ValidationError::ParserExpectedSvelteOutdated);
-                    diff::print_diff(
-                        "expected_svelte.json diff",
-                        expected_svelte_str,
-                        &svelte_ast_normalized,
-                    );
                 } else if !expected_svelte_failure {
                     result.add_success(ValidationSuccess::ParserExpectedSvelteMatches);
                 }
@@ -792,7 +833,6 @@ async fn validate_formatter_prettier(
     result: &mut FixtureValidation,
     fixture: &Fixture,
     input: &str,
-    is_prettier_divergence_dir: bool,
 ) {
     let output_prettier_path = fixture.output_prettier_path();
     let output_prettier_filename = fixture.output_prettier_filename();
@@ -810,27 +850,34 @@ async fn validate_formatter_prettier(
         if let Ok(expected_prettier) = read_file(&output_prettier_path) {
             if expected_prettier != formatted {
                 result.add_error(ValidationError::FormatterOutputPrettierOutdated);
-                diff::print_diff(
-                    &format!("{output_prettier_filename} diff"),
+                diff::print_diff_with_options(
+                    &format!("outdated: {}/{}", fixture.relative_path, output_prettier_filename),
                     &expected_prettier,
                     &formatted,
+                    &diff::DiffOptions::freshness(),
                 );
             } else {
                 result.add_success(ValidationSuccess::FormatterMatchesPrettier);
             }
         }
-    } else if !is_prettier_divergence_dir {
-        // F3: No output_prettier file but input differs from prettier (not in divergence dir)
+    } else {
+        // F3: No output_prettier file - prettier(input) must equal input
+        // This applies to ALL directories (including _prettier_divergence)
         if formatted != *input {
             result.add_error(ValidationError::FormatterInputDiffersFromPrettier);
-            diff::print_diff("input vs prettier", input, &formatted);
+            diff::print_diff_with_options(
+                &format!("prettier mismatch: {}/{}", fixture.relative_path, fixture.input_file),
+                input,
+                &formatted,
+                &diff::DiffOptions::input_vs_prettier(),
+            );
         } else {
             result.add_success(ValidationSuccess::FormatterMatchesPrettier);
         }
     }
 }
 
-/// N1, N3: Validate prettier normalization behavior (Svelte only)
+/// N1, N3: Validate prettier normalization behavior
 async fn validate_normalization_prettier(
     result: &mut FixtureValidation,
     fixture: &Fixture,
@@ -838,25 +885,27 @@ async fn validate_normalization_prettier(
     input_ext: &str,
 ) {
     let fixture_dir = &fixture.path;
+    let prettier_parser = fixture.input_type().prettier_parser();
 
-    // N1: prettier(prettier_quirk_*.svelte) == prettier_quirk_*.svelte
-    let prettier_quirk_variants = discover_prettier_quirk_variants(fixture_dir);
+    // N1: prettier(prettier_quirk_*) == prettier_quirk_* (prettier preserves its stable variants)
+    let prettier_quirk_variants = discover_prettier_quirk_variants(fixture_dir, input_ext);
     for quirk_name in &prettier_quirk_variants {
         let quirk_path = fixture_dir.join(quirk_name);
         let Ok(quirk_content) = read_file(&quirk_path) else {
             continue;
         };
 
-        match run_prettier(&quirk_content, PrettierParser::Parser("svelte")).await {
+        match run_prettier(&quirk_content, prettier_parser).await {
             Ok(formatted) => {
                 if formatted != quirk_content {
                     result.add_error(ValidationError::NormalizationPrettierQuirkNotPreserved(
                         quirk_name.clone(),
                     ));
-                    diff::print_diff(
-                        &format!("{quirk_name} prettier preservation"),
+                    diff::print_diff_with_options(
+                        &format!("quirk not preserved: {}/{}", fixture.relative_path, quirk_name),
                         &quirk_content,
                         &formatted,
+                        &diff::DiffOptions::prettier_behavior(),
                     );
                 }
             }
@@ -892,10 +941,11 @@ async fn validate_normalization_prettier(
                     result.add_error(ValidationError::NormalizationUnformattedPrettierMismatch(
                         variant_name.clone(),
                     ));
-                    diff::print_diff(
-                        &format!("{variant_name} prettier normalization"),
+                    diff::print_diff_with_options(
+                        &format!("prettier normalization: {}/{}", fixture.relative_path, variant_name),
                         input,
                         &formatted,
+                        &diff::DiffOptions::prettier_behavior(),
                     );
                 }
             }
@@ -1063,7 +1113,24 @@ impl ValidationSummary {
             .filter(|r| {
                 r.errors.iter().any(|e| {
                     matches!(e, ValidationError::FormatterError(msg) | ValidationError::ParserError(msg)
-                        if msg.contains("deno actor shut down") || msg.contains("sidecar"))
+                        if msg.contains("deno actor shut down") || msg.contains("sidecar crashed"))
+                })
+            })
+            .count()
+    }
+
+    /// Count fixtures that failed due to Deno sidecar timeout
+    ///
+    /// A high count indicates the sidecar is hanging on certain inputs,
+    /// possibly due to a bug in prettier/acorn or resource exhaustion.
+    #[allow(dead_code)]
+    pub fn count_timeout_failures(&self) -> usize {
+        self.results
+            .iter()
+            .filter(|r| {
+                r.errors.iter().any(|e| {
+                    matches!(e, ValidationError::FormatterError(msg) | ValidationError::ParserError(msg)
+                        if msg.contains("timed out"))
                 })
             })
             .count()

@@ -5,6 +5,8 @@
 // This module is organized by concern to support future expansion:
 //
 // - **mod.rs** (this file): Core Printer struct and program printing orchestration
+// - **analysis.rs**: Pure AST analysis functions (no Printer state needed)
+// - **comments.rs**: Comment handling (printing, doc building, filtering)
 // - **statements/**: Statement printing (declarations, control flow, modules, etc.)
 // - **expressions/**: Expression printing (dispatchers, literals, functions, patterns, templates)
 // - **types.rs**: Type annotation printing (TypeScript-specific type syntax)
@@ -20,444 +22,47 @@
 // 2. **Preserve Semantics**: Never change TypeScript semantics
 // 3. **Modularity**: Each module has single responsibility for future maintainability
 
+mod analysis;
 mod arrays;
 mod assignment;
 mod calls;
 mod chain;
+mod comments;
+mod conditional;
 mod expression_stringifier;
 mod expressions;
 mod needs_parens;
+mod new_expression;
 mod objects;
 mod operators;
 mod statements;
+mod type_stringifier;
 mod types;
+mod utils;
 
+pub(crate) use analysis::{
+    PatternContext, build_entity_name_doc, conditional_needs_fluid_layout, has_multiline_content,
+    is_brace_block_multiline, is_module_path_fluid_call, is_multiline_string_literal,
+    is_plain_require_call, is_pure_property_chain, object_pattern_should_expand,
+    template_literal_has_newlines,
+};
+pub(crate) use assignment::{
+    is_poorly_breakable_chain, is_self_expanding_value, is_simple_self_expanding,
+};
+pub(crate) use comments::{CommentFilter, CommentSpacing};
 pub(crate) use needs_parens::{ParenContext, needs_parens};
+pub(crate) use types::{intersection_has_huggable_last_type, unwrap_parenthesized};
 
 use crate::ast::internal;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use string_interner::DefaultStringInterner;
 use tsv_lang::{
-    CommentPosition, OutputBuffer, PrintConfig, SymbolResolver, SymbolToU32, classify_comment,
-    comments_after, comments_in_range,
+    CommentPosition, OutputBuffer, PrintConfig, SymbolResolver, classify_comment, comments_after,
+    comments_in_range,
     doc::{self, Doc},
     has_comments_in_range, has_line_comments_in_range, printing,
 };
-
-/// Spacing style for comments in doc building
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum CommentSpacing {
-    /// Space before comment: ` /* c */`
-    Leading,
-    /// Space after comment: `/* c */ `
-    Trailing,
-    /// No spacing: `/* c */`
-    None,
-}
-
-/// Filter for which comment types to include
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum CommentFilter {
-    /// Include all comments (block and line)
-    All,
-    /// Only include block comments (/* */)
-    BlockOnly,
-}
-
-/// Skip over a string literal or comment starting at position `i`.
-///
-/// Returns `Some(end_pos)` where `end_pos` is the last character of the skipped
-/// content (caller should then `i += 1`), or `None` if not at a string/comment.
-fn skip_string_or_comment(source: &[u8], i: usize, end: usize) -> Option<usize> {
-    match source[i] {
-        b'"' | b'\'' | b'`' => {
-            let quote = source[i];
-            let mut j = i + 1;
-            while j < end && source[j] != quote {
-                if source[j] == b'\\' {
-                    j += 1;
-                }
-                j += 1;
-            }
-            Some(j)
-        }
-        b'/' if i + 1 < end => {
-            if source[i + 1] == b'/' {
-                // Line comment - skip to end of line
-                let mut j = i;
-                while j < end && source[j] != b'\n' {
-                    j += 1;
-                }
-                Some(j)
-            } else if source[i + 1] == b'*' {
-                // Block comment - skip to */
-                let mut j = i + 2;
-                while j + 1 < end && !(source[j] == b'*' && source[j + 1] == b'/') {
-                    j += 1;
-                }
-                Some(j + 1)
-            } else {
-                None
-            }
-        }
-        _ => None,
-    }
-}
-
-/// Check if an expression is a module path call that should use fluid assignment wrapping
-/// (break after `=` if too long, keeping the call together).
-///
-/// Patterns:
-/// - `require.resolve(stringLiteral)`
-/// - `await import(stringLiteral)`
-pub(crate) fn is_module_path_fluid_call(
-    expr: &internal::Expression,
-    interner: &DefaultStringInterner,
-) -> bool {
-    // Check for `await import(string)`
-    if let internal::Expression::AwaitExpression(await_expr) = expr
-        && let internal::Expression::ImportExpression(import_expr) = await_expr.argument.as_ref()
-    {
-        let is_string_arg = matches!(
-            import_expr.source.as_ref(),
-            internal::Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. })
-        );
-        return is_string_arg;
-    }
-
-    let internal::Expression::CallExpression(call) = expr else {
-        return false;
-    };
-
-    // Must have exactly 1 argument that is a string literal
-    if call.arguments.len() != 1 {
-        return false;
-    }
-    let is_string_arg = matches!(
-        &call.arguments[0],
-        internal::Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. })
-    );
-    if !is_string_arg {
-        return false;
-    }
-
-    // Check for `require.resolve()`
-    if let internal::Expression::MemberExpression(member) = call.callee.as_ref()
-        && !member.computed
-        && !member.optional
-        && let internal::Expression::Identifier(resolve_id) = member.property.as_ref()
-        && interner.resolve(resolve_id.name) == Some("resolve")
-        && let internal::Expression::Identifier(require_id) = member.object.as_ref()
-        && interner.resolve(require_id.name) == Some("require")
-    {
-        return true;
-    }
-
-    false
-}
-
-/// Check if an expression is a pure property chain (member expressions without calls)
-///
-/// Pure property chains like `obj.a.b.c` or `obj!.a!.b!` should use fluid assignment wrapping
-/// (break after `=` if doesn't fit). Expressions containing calls, objects,
-/// arrays, or ternaries handle their own wrapping internally.
-pub(crate) fn is_pure_property_chain(expr: &internal::Expression) -> bool {
-    match expr {
-        // A member expression is a property chain if its object is also a pure chain
-        internal::Expression::MemberExpression(member) => is_pure_property_chain(&member.object),
-        // TSNonNullExpression is transparent - recurse through it
-        internal::Expression::TSNonNullExpression(non_null) => {
-            is_pure_property_chain(&non_null.expression)
-        }
-        // Base case: identifiers are valid chain roots
-        internal::Expression::Identifier(_) => true,
-        // Everything else (calls, objects, arrays, ternaries, etc.) is NOT a pure chain
-        _ => false,
-    }
-}
-
-/// Check if an expression is a multiline string literal (contains line continuations).
-///
-/// Strings with `\<newline>` need fluid layout because:
-/// 1. They span multiple lines in source
-/// 2. Prettier always wraps the declaration for these
-pub(crate) fn is_multiline_string_literal(expr: &internal::Expression, source: &str) -> bool {
-    if let internal::Expression::Literal(lit) = expr
-        && let internal::LiteralValue::String { .. } = &lit.value
-    {
-        let raw = lit.span.extract(source);
-        // Check for line continuation: backslash followed by newline
-        raw.contains("\\\n") || raw.contains("\\\r")
-    } else {
-        false
-    }
-}
-
-/// Check if a type literal was written as multiline in source
-///
-/// Detects newline immediately after opening brace: `{\n  ...}` vs `{ ... }`
-/// Used for both formatting decisions and skip-fluid-layout checks.
-pub(crate) fn is_type_literal_multiline(source: &str, span: tsv_lang::Span) -> bool {
-    let source_text = span.extract(source);
-    let after_brace = source_text.strip_prefix('{').unwrap_or("");
-    after_brace.starts_with('\n')
-        || after_brace.starts_with("\r\n")
-        || after_brace.trim_start_matches(' ').starts_with('\n')
-}
-
-/// Context for object pattern expansion decisions
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum PatternContext {
-    /// Pattern in function parameter position
-    FunctionParameter,
-    /// Pattern in standalone context (variable declaration, assignment)
-    Standalone,
-}
-
-/// Check if an expression contains multiline string literals at any depth
-/// Check if an object pattern should expand (print across multiple lines).
-///
-/// Prettier expands object patterns when any property has a nested pattern
-/// (ObjectPattern or ArrayPattern) as its value. This is different from the
-/// multiline content rule used for object expressions.
-///
-/// Prettier expands based on nesting depth and context:
-/// - In function parameters: depth 3+ expands (e.g., {a: {b}} stays, {a: {b: {c}}} expands)
-/// - In standalone contexts: depth 2+ expands (e.g., {a: {b}} expands)
-pub(crate) fn object_pattern_should_expand(
-    obj: &internal::ObjectPattern,
-    context: PatternContext,
-) -> bool {
-    let depth = pattern_nesting_depth(obj);
-    match context {
-        PatternContext::FunctionParameter => depth >= 3,
-        PatternContext::Standalone => depth >= 2,
-    }
-}
-
-/// Calculate the maximum nesting depth of an object pattern
-/// Depth 1 = simple pattern like {a}
-/// Depth 2 = one level of nesting like {a: {b}}
-/// Depth 3 = two levels of nesting like {a: {b: {c}}}
-fn pattern_nesting_depth(obj: &internal::ObjectPattern) -> usize {
-    let mut max_depth = 1;
-
-    for prop in &obj.properties {
-        match prop {
-            internal::ObjectPatternProperty::Property(p) => {
-                let nested_depth = match &p.value {
-                    internal::Expression::ObjectPattern(nested_obj) => {
-                        1 + pattern_nesting_depth(nested_obj)
-                    }
-                    internal::Expression::ArrayPattern(nested_arr) => {
-                        1 + array_pattern_nesting_depth(nested_arr)
-                    }
-                    internal::Expression::AssignmentPattern(ap) => match ap.left.as_ref() {
-                        internal::Expression::ObjectPattern(nested_obj) => {
-                            1 + pattern_nesting_depth(nested_obj)
-                        }
-                        internal::Expression::ArrayPattern(nested_arr) => {
-                            1 + array_pattern_nesting_depth(nested_arr)
-                        }
-                        _ => 1,
-                    },
-                    _ => 1,
-                };
-                max_depth = max_depth.max(nested_depth);
-            }
-            internal::ObjectPatternProperty::RestElement(_) => {}
-        }
-    }
-
-    max_depth
-}
-
-/// Calculate the maximum nesting depth of an array pattern
-fn array_pattern_nesting_depth(arr: &internal::ArrayPattern) -> usize {
-    let mut max_depth = 1;
-
-    for elem in arr.elements.iter().flatten() {
-        let nested_depth = match elem {
-            internal::Expression::ObjectPattern(nested_obj) => {
-                1 + pattern_nesting_depth(nested_obj)
-            }
-            internal::Expression::ArrayPattern(nested_arr) => {
-                1 + array_pattern_nesting_depth(nested_arr)
-            }
-            internal::Expression::AssignmentPattern(ap) => match ap.left.as_ref() {
-                internal::Expression::ObjectPattern(nested_obj) => {
-                    1 + pattern_nesting_depth(nested_obj)
-                }
-                internal::Expression::ArrayPattern(nested_arr) => {
-                    1 + array_pattern_nesting_depth(nested_arr)
-                }
-                _ => 1,
-            },
-            _ => 1,
-        };
-        max_depth = max_depth.max(nested_depth);
-    }
-
-    max_depth
-}
-
-///
-/// Recursively traverses nested structures (arrays, objects, calls) to find
-/// multiline strings. Prettier expands ALL containing structures when a multiline
-/// string is found anywhere in the tree.
-pub(crate) fn has_multiline_content(expr: &internal::Expression, source: &str) -> bool {
-    match expr {
-        internal::Expression::Literal(_) => is_multiline_string_literal(expr, source),
-        internal::Expression::ArrayExpression(arr) => arr
-            .elements
-            .iter()
-            .flatten()
-            .any(|elem| has_multiline_content(elem, source)),
-        internal::Expression::ObjectExpression(obj) => {
-            obj.properties.iter().any(|prop| match prop {
-                internal::ObjectProperty::Property(p) => has_multiline_content(&p.value, source),
-                internal::ObjectProperty::SpreadElement(s) => {
-                    has_multiline_content(&s.argument, source)
-                }
-            })
-        }
-        internal::Expression::CallExpression(call) => call
-            .arguments
-            .iter()
-            .any(|arg| has_multiline_content(arg, source)),
-        internal::Expression::NewExpression(new_expr) => new_expr
-            .arguments
-            .iter()
-            .any(|arg| has_multiline_content(arg, source)),
-        internal::Expression::UnaryExpression(unary) => {
-            has_multiline_content(&unary.argument, source)
-        }
-        internal::Expression::UpdateExpression(update) => {
-            has_multiline_content(&update.argument, source)
-        }
-        internal::Expression::BinaryExpression(binary) => {
-            has_multiline_content(&binary.left, source)
-                || has_multiline_content(&binary.right, source)
-        }
-        internal::Expression::ConditionalExpression(cond) => {
-            has_multiline_content(&cond.test, source)
-                || has_multiline_content(&cond.consequent, source)
-                || has_multiline_content(&cond.alternate, source)
-        }
-        internal::Expression::MemberExpression(member) => {
-            has_multiline_content(&member.object, source)
-        }
-        internal::Expression::ArrowFunctionExpression(arrow) => match &arrow.body {
-            internal::ArrowFunctionBody::Expression(expr) => has_multiline_content(expr, source),
-            internal::ArrowFunctionBody::BlockStatement(_) => false,
-        },
-        internal::Expression::SpreadElement(spread) => {
-            has_multiline_content(&spread.argument, source)
-        }
-        internal::Expression::Identifier(_) => false,
-        // Private identifiers are just #name, no multiline content
-        internal::Expression::PrivateIdentifier(_) => false,
-        internal::Expression::TemplateLiteral(template) => {
-            // Template literals with actual newlines in their content are multiline
-            template.quasis.iter().any(|q| q.raw.contains('\n'))
-                || template
-                    .expressions
-                    .iter()
-                    .any(|e| has_multiline_content(e, source))
-        }
-        internal::Expression::TaggedTemplateExpression(tagged) => {
-            has_multiline_content(&tagged.tag, source)
-                || tagged.quasi.quasis.iter().any(|q| q.raw.contains('\n'))
-                || tagged
-                    .quasi
-                    .expressions
-                    .iter()
-                    .any(|e| has_multiline_content(e, source))
-        }
-        // Function and class expressions don't contribute to multiline content detection
-        // They have their own block formatting
-        internal::Expression::FunctionExpression(_) => false,
-        internal::Expression::ClassExpression(_) => false,
-        internal::Expression::AwaitExpression(await_expr) => {
-            has_multiline_content(&await_expr.argument, source)
-        }
-        internal::Expression::YieldExpression(yield_expr) => yield_expr
-            .argument
-            .as_ref()
-            .is_some_and(|arg| has_multiline_content(arg, source)),
-        internal::Expression::SequenceExpression(seq) => seq
-            .expressions
-            .iter()
-            .any(|e| has_multiline_content(e, source)),
-        // Regex literals don't have multiline content
-        internal::Expression::RegexLiteral(_) => false,
-        // Super is just a keyword, no multiline content
-        internal::Expression::Super(_) => false,
-        // Assignment expression: check both sides
-        internal::Expression::AssignmentExpression(assign) => {
-            has_multiline_content(&assign.left, source)
-                || has_multiline_content(&assign.right, source)
-        }
-        // Patterns: check their contents
-        internal::Expression::ObjectPattern(obj) => obj.properties.iter().any(|prop| match prop {
-            internal::ObjectPatternProperty::Property(p) => has_multiline_content(&p.value, source),
-            internal::ObjectPatternProperty::RestElement(r) => {
-                has_multiline_content(&r.argument, source)
-            }
-        }),
-        internal::Expression::ArrayPattern(arr) => arr
-            .elements
-            .iter()
-            .flatten()
-            .any(|elem| has_multiline_content(elem, source)),
-        internal::Expression::AssignmentPattern(pattern) => {
-            has_multiline_content(&pattern.left, source)
-                || has_multiline_content(&pattern.right, source)
-        }
-        internal::Expression::RestElement(rest) => has_multiline_content(&rest.argument, source),
-        // Type assertion expressions: check the inner expression
-        internal::Expression::TSTypeAssertion(type_assert) => {
-            has_multiline_content(&type_assert.expression, source)
-        }
-        internal::Expression::TSAsExpression(as_expr) => {
-            has_multiline_content(&as_expr.expression, source)
-        }
-        internal::Expression::TSSatisfiesExpression(sat_expr) => {
-            has_multiline_content(&sat_expr.expression, source)
-        }
-        internal::Expression::TSInstantiationExpression(inst_expr) => {
-            has_multiline_content(&inst_expr.expression, source)
-        }
-        internal::Expression::TSNonNullExpression(non_null_expr) => {
-            has_multiline_content(&non_null_expr.expression, source)
-        }
-        internal::Expression::ImportExpression(import_expr) => {
-            has_multiline_content(&import_expr.source, source)
-        }
-        // Meta properties (import.meta, new.target) are never multiline
-        internal::Expression::MetaProperty(_) => false,
-        // Parameter properties don't contain multiline content
-        internal::Expression::TSParameterProperty(_) => false,
-    }
-}
-
-/// Build doc for TSEntityName (qualified names like `A.B.C`)
-///
-/// This is a standalone function since it doesn't need printer state -
-/// it only uses `doc::symbol()` for deferred symbol resolution.
-pub(crate) fn build_entity_name_doc(name: &internal::TSEntityName) -> Doc {
-    use tsv_lang::doc;
-
-    match name {
-        internal::TSEntityName::Identifier(id) => doc::symbol(id.name.to_u32()),
-        internal::TSEntityName::QualifiedName(qn) => doc::concat(vec![
-            build_entity_name_doc(&qn.left),
-            doc::text("."),
-            doc::symbol(qn.right.name.to_u32()),
-        ]),
-    }
-}
 
 /// Printer state for building output
 pub struct Printer<'a> {
@@ -477,6 +82,22 @@ pub struct Printer<'a> {
     /// When > 0, multiline objects/arrays get extra indentation
     /// Uses Cell for interior mutability so doc builders (&self) can set this
     pub(crate) declaration_indent_depth: Cell<usize>,
+    /// Whether we're currently inside an expression statement (for chain merging decisions)
+    /// Uses Cell for interior mutability so doc builders (&self) can set this
+    pub(crate) is_expression_statement: Cell<bool>,
+    /// Whether we're in a top-level assignment context (ExpressionStatement or VariableDeclaration)
+    /// Used for assignment chain detection - assignments at top level use regular grouped layout,
+    /// only nested assignments (where parent is another assignment) use chain formatting
+    /// Uses Cell for interior mutability so doc builders (&self) can set this
+    pub(crate) in_top_level_assignment: Cell<bool>,
+    /// Whether to force chain expressions to expand (break at every method call)
+    /// Set when inside template expressions with original breaks, where the chain
+    /// would exceed print width if kept flat.
+    pub(crate) force_chain_expand: Cell<bool>,
+    /// Whether we're inside a template literal interpolation (${ ... })
+    /// Used to collapse blank lines - in template interpolations, blank lines are
+    /// normalized to single line breaks rather than preserved.
+    pub(crate) in_template_interpolation: Cell<bool>,
 }
 
 impl<'a> Printer<'a> {
@@ -488,13 +109,17 @@ impl<'a> Printer<'a> {
         config: PrintConfig,
     ) -> Self {
         Self {
-            buffer: OutputBuffer::new(),
+            buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
             config,
             interner,
             source,
             comments,
             declaration_indent_depth: Cell::new(0),
+            is_expression_statement: Cell::new(false),
+            in_top_level_assignment: Cell::new(false),
+            force_chain_expand: Cell::new(false),
+            in_template_interpolation: Cell::new(false),
         }
     }
 
@@ -561,6 +186,20 @@ impl<'a> Printer<'a> {
     /// Get the current column position (for doc-builder width calculations)
     pub(crate) fn current_column(&self) -> usize {
         self.buffer.current_column(self.config.tab_width)
+    }
+
+    /// Render a Doc to a flat string with effectively infinite width.
+    ///
+    /// Used when we need to prevent a doc from breaking internally,
+    /// such as expressions inside template literal interpolations.
+    pub(crate) fn render_doc_flat(&self, d: &Doc) -> String {
+        // Use MAX/2 instead of MAX to avoid potential overflow in width calculations
+        let flat_config = PrintConfig {
+            print_width: usize::MAX / 2,
+            ..self.config
+        };
+        let interner = self.interner.borrow();
+        doc::print_doc_resolved(d, &flat_config, &*interner)
     }
 
     /// Wrap content and closing line with declaration indent depth handling
@@ -630,104 +269,246 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Check if a pattern expression should expand (print across multiple lines)
-    #[allow(clippy::only_used_in_recursion)]
-    pub(crate) fn pattern_should_expand(&self, expr: &internal::Expression) -> bool {
-        match expr {
-            internal::Expression::ObjectPattern(obj) => {
-                object_pattern_should_expand(obj, PatternContext::Standalone)
-            }
-            internal::Expression::ArrayPattern(_) => false, // Array patterns don't expand based on nesting
-            internal::Expression::AssignmentPattern(ap) => self.pattern_should_expand(&ap.left),
-            _ => false,
-        }
-    }
-
-    /// Check if an identifier has a multiline type annotation (type literal with newlines)
+    /// Check if identifier has a complex type annotation (nested generics)
     ///
-    /// Used to skip fluid layout in variable declarations when the LHS has a
-    /// multiline type, since group-based wrapping would cause unwanted breaks.
-    pub(crate) fn id_has_multiline_type(&self, expr: &internal::Expression) -> bool {
-        // Extract type annotation from any binding pattern
+    /// Corresponds to prettier's `hasComplexTypeAnnotation`:
+    /// - Type reference with >1 type parameters
+    /// - At least one type param has nested generics OR is a conditional type
+    ///
+    /// Example: `Map<string, Array<number>>` - Map has 2 params, second has nested generic
+    pub(crate) fn id_has_complex_type_annotation(&self, expr: &internal::Expression) -> bool {
         let type_ann = match expr {
             internal::Expression::Identifier(id) => id.type_annotation.as_ref(),
             internal::Expression::ObjectPattern(obj) => obj.type_annotation.as_ref(),
             internal::Expression::ArrayPattern(arr) => arr.type_annotation.as_ref(),
             _ => None,
         };
-        type_ann.is_some_and(|ann| self.type_has_multiline_literal(&ann.type_annotation))
+
+        type_ann.is_some_and(|ann| self.type_has_complex_annotation(&ann.type_annotation))
     }
 
-    /// Check if a type contains a multiline type literal (object type with newlines)
-    fn type_has_multiline_literal(&self, ts_type: &internal::TSType) -> bool {
+    /// Check if a type has complex nested type parameters
+    fn type_has_complex_annotation(&self, ts_type: &internal::TSType) -> bool {
         match ts_type {
-            internal::TSType::TypeLiteral(t) => is_type_literal_multiline(self.source, t.span),
-            // Recursively check nested types
-            internal::TSType::Union(u) => {
-                u.types.iter().any(|t| self.type_has_multiline_literal(t))
+            internal::TSType::TypeReference(type_ref) => {
+                // Must have >1 type argument
+                let type_args = match &type_ref.type_arguments {
+                    Some(args) => &args.params,
+                    None => return false,
+                };
+
+                if type_args.len() <= 1 {
+                    return false;
+                }
+
+                // At least one arg must have nested generics or be a conditional type
+                type_args
+                    .iter()
+                    .any(|param| self.type_has_nested_generics(param))
             }
-            internal::TSType::Intersection(i) => {
-                i.types.iter().any(|t| self.type_has_multiline_literal(t))
-            }
-            internal::TSType::Array(a) => self.type_has_multiline_literal(&a.element_type),
             _ => false,
         }
     }
 
-    /// Print a TypeScript comment
-    pub(crate) fn print_comment(&mut self, comment: &internal::Comment) {
-        if comment.is_block {
-            // Block comment: /* content */
-            self.write("/*");
-
-            // Check if multi-line - if so, strip and re-apply indentation
-            if comment.content.contains('\n') {
-                let stripped = printing::strip_comment_indentation(
-                    self.source,
-                    &comment.content,
-                    comment.span.start,
-                );
-                let lines: Vec<&str> = stripped.split('\n').collect();
-
-                // Prettier adds a space before */ when:
-                // 1. There are exactly 2 lines (just newline between /* and */)
-                // 2. The closing line is empty
-                // For 3+ lines, there's content or blank lines to preserve, so no space is added
-                let last_line = lines.last().unwrap_or(&"");
-                let add_closing_space = lines.len() == 2 && last_line.is_empty();
-
-                for (i, line) in lines.iter().enumerate() {
-                    let is_last = i == lines.len() - 1;
-                    if i > 0 {
-                        // Add newline and indentation for subsequent lines
-                        // Skip indentation for empty closing line when adding space
-                        self.write("\n");
-                        if !(is_last && add_closing_space) {
-                            self.write_indent();
-                        }
-                    }
-                    self.write(line);
-                }
-
-                // Add space before */ for empty closing line (prettier behavior)
-                if add_closing_space {
-                    self.write(" ");
-                }
-            } else {
-                // Single-line block comment
-                self.write(&comment.content);
+    /// Check if a type has nested type parameters or is a conditional type
+    fn type_has_nested_generics(&self, ts_type: &internal::TSType) -> bool {
+        match ts_type {
+            internal::TSType::TypeReference(type_ref) => {
+                // Has type arguments means nested generics
+                type_ref.type_arguments.is_some()
             }
-
-            self.write("*/");
-        } else if comment.span.start == 0 && comment.content.starts_with("#!") {
-            // Hashbang comment: #!/usr/bin/env node (no // prefix)
-            // Content already includes the #! prefix
-            self.write(&comment.content);
-        } else {
-            // Line comment: // content (no closing delimiter)
-            self.write("//");
-            self.write(&comment.content);
+            internal::TSType::Conditional(_) => true,
+            _ => false,
         }
+    }
+
+    /// Check if a type alias has complex type parameters
+    ///
+    /// Corresponds to prettier's `isComplexTypeAliasParams`:
+    /// - >1 type parameter
+    /// - At least one has a constraint or default value
+    ///
+    /// Example: `type Foo<T extends string, U = number> = ...`
+    pub(crate) fn type_alias_has_complex_params(
+        &self,
+        type_params: Option<&internal::TSTypeParameterDeclaration>,
+    ) -> bool {
+        let params = match type_params {
+            Some(p) => &p.params,
+            None => return false,
+        };
+
+        if params.len() <= 1 {
+            return false;
+        }
+
+        // At least one param has a constraint or default
+        params
+            .iter()
+            .any(|param| param.constraint.is_some() || param.default.is_some())
+    }
+
+    /// Check if identifier has complex destructuring pattern
+    ///
+    /// Corresponds to prettier's `isComplexDestructuring`:
+    /// - ObjectPattern with >2 properties
+    /// - At least one property has a default value OR is not shorthand
+    ///
+    /// Example: `const { a, b = 1, c } = obj` - 3 properties, one has default
+    pub(crate) fn id_has_complex_destructuring(&self, expr: &internal::Expression) -> bool {
+        let internal::Expression::ObjectPattern(obj) = expr else {
+            return false;
+        };
+
+        if obj.properties.len() <= 2 {
+            return false;
+        }
+
+        // At least one property has a default value or is not shorthand
+        obj.properties.iter().any(|prop| {
+            match prop {
+                internal::ObjectPatternProperty::Property(p) => {
+                    // Has default if value is AssignmentPattern
+                    let has_default = matches!(p.value, internal::Expression::AssignmentPattern(_));
+                    // Not shorthand if key != value
+                    let not_shorthand = !p.shorthand;
+                    has_default || not_shorthand
+                }
+                internal::ObjectPatternProperty::RestElement(_) => false,
+            }
+        })
+    }
+
+    /// Find the position of `=` character in the source between two positions
+    pub(crate) fn find_equals_position(&self, start: u32, end: u32) -> u32 {
+        let start = start as usize;
+        let end = end as usize;
+        let slice = &self.source[start..end];
+
+        if let Some(offset) = slice.find('=') {
+            (start + offset) as u32
+        } else {
+            // Fallback: return midpoint if `=` not found
+            usize::midpoint(start, end) as u32
+        }
+    }
+
+    /// Check if there are comments between two positions (read-only check)
+    ///
+    /// Uses binary search: O(log n)
+    pub(crate) fn has_comments_between(&self, start: u32, end: u32) -> bool {
+        has_comments_in_range(self.comments, start, end)
+    }
+
+    /// Check if there are line comments (// style) between two positions
+    ///
+    /// Uses binary search: O(log n + k) where k is comments in range
+    pub(crate) fn has_line_comments_between(&self, start: u32, end: u32) -> bool {
+        has_line_comments_in_range(self.comments, start, end)
+    }
+
+    /// Find the closing `)` between a start position and end boundary.
+    ///
+    /// Scans the source to find the `)` that closes the params. Returns
+    /// the position AFTER the `)` for use as a boundary.
+    pub(crate) fn find_closing_paren(&self, start: u32, end: u32) -> Option<u32> {
+        let source = self.source.as_bytes();
+        let end = end as usize;
+        let mut depth = 0;
+        let mut i = start as usize;
+
+        while i < end && i < source.len() {
+            match source[i] {
+                b'(' => depth += 1,
+                b')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some((i + 1) as u32);
+                    }
+                }
+                _ => {
+                    if let Some(skip) = analysis::skip_string_or_comment(source, i, end) {
+                        i = skip;
+                    }
+                }
+            }
+            i += 1;
+        }
+        None
+    }
+
+    /// Find the `=>` token between a start position and end boundary.
+    ///
+    /// Scans the source to find `=>`. Returns the position OF the `=` character
+    /// (the start of the arrow token). Skips over comments and strings.
+    pub(crate) fn find_arrow_token(&self, start: u32, end: u32) -> Option<u32> {
+        let source = self.source.as_bytes();
+        let end = end as usize;
+        let mut i = start as usize;
+
+        while i + 1 < end && i + 1 < source.len() {
+            if source[i] == b'=' && source[i + 1] == b'>' {
+                return Some(i as u32);
+            }
+            if let Some(skip) = analysis::skip_string_or_comment(source, i, end) {
+                i = skip;
+            }
+            i += 1;
+        }
+        None
+    }
+
+    /// Find a keyword between a start position and end boundary.
+    ///
+    /// Returns the position of the first character of the keyword if found.
+    /// Skips over comments and strings. Checks for word boundaries (keyword
+    /// must not be part of a larger identifier).
+    pub(crate) fn find_keyword_in_range(&self, start: u32, end: u32, keyword: &str) -> Option<u32> {
+        let source = self.source.as_bytes();
+        let kw_bytes = keyword.as_bytes();
+        let end = end as usize;
+        let kw_len = kw_bytes.len();
+        let mut i = start as usize;
+
+        while i + kw_len <= end && i + kw_len <= source.len() {
+            // Check for keyword match
+            if &source[i..i + kw_len] == kw_bytes {
+                // Check word boundaries (not part of larger identifier)
+                let before_ok =
+                    i == 0 || !source[i - 1].is_ascii_alphanumeric() && source[i - 1] != b'_';
+                let after_ok = i + kw_len >= source.len()
+                    || !source[i + kw_len].is_ascii_alphanumeric() && source[i + kw_len] != b'_';
+                if before_ok && after_ok {
+                    return Some(i as u32);
+                }
+            }
+            if let Some(skip) = analysis::skip_string_or_comment(source, i, end) {
+                i = skip;
+            }
+            i += 1;
+        }
+        None
+    }
+
+    /// Build a Doc for a list of decorators, each on its own line
+    ///
+    /// Returns None if there are no decorators.
+    /// Each decorator is formatted as `@expression` followed by hardline.
+    pub(crate) fn build_decorators_doc(
+        &self,
+        decorators: Option<&Vec<internal::Decorator>>,
+    ) -> Option<Doc> {
+        let decorators = decorators?;
+        if decorators.is_empty() {
+            return None;
+        }
+        let mut parts = Vec::new();
+        for decorator in decorators {
+            parts.push(doc::text("@"));
+            parts.push(self.build_expression_doc(&decorator.expression));
+            parts.push(doc::hardline());
+        }
+        Some(doc::concat(parts))
     }
 
     /// Print a TypeScript program
@@ -839,16 +620,128 @@ impl<'a> Printer<'a> {
             is_first_comment = false;
         }
     }
+}
 
-    /// Print leading comments (comments between prev_end and curr_start)
-    /// Returns true if any comments were printed
+/// Check if a doc is effectively empty (empty text or empty concat)
+fn is_empty_doc(d: &Doc) -> bool {
+    match d {
+        Doc::Text(text) => text.try_as_str().is_some_and(str::is_empty),
+        Doc::Concat(docs) => docs.is_empty() || docs.iter().all(is_empty_doc),
+        _ => false,
+    }
+}
+
+impl<'a> Printer<'a> {
+    /// Build a Doc tree for a TypeScript program
     ///
-    /// - `prev_end`: Position after the previous statement (or 0 for first statement)
-    /// - `curr_start`: Position of the current statement
-    /// - `is_first`: True if this is the first statement (prev_end is start of file)
+    /// Returns a Doc that can be wrapped with `indent()` and rendered.
+    /// Used when embedding TypeScript in other formats like Svelte's `<script>`.
     ///
-    /// Uses binary search to find starting point: O(log n + k)
-    fn print_leading_comments(&mut self, prev_end: u32, curr_start: u32, is_first: bool) -> bool {
+    /// The Doc structure preserves:
+    /// - Statement separation with hardline
+    /// - Blank line preservation between statements using literalline
+    /// - Leading comments with proper spacing
+    /// - Trailing same-line comments using line_suffix
+    /// - Program trailing comments after the last statement
+    pub fn build_program_doc(&self, program: &internal::Program) -> Doc {
+        let mut parts = Vec::new();
+        let mut prev_end = 0u32;
+        let mut has_output = false;
+
+        for statement in program.body.iter() {
+            // Skip standalone EmptyStatements but preserve blank lines and comments around them
+            if matches!(statement, internal::Statement::EmptyStatement(_)) {
+                // Force non-inline: since we're skipping the semicolon, any "inline" comments
+                // (on same line as the semicolon) have nothing to be inline with
+                let comments_doc =
+                    self.build_leading_comments_doc(prev_end, statement.span().end, !has_output, true);
+                if !is_empty_doc(&comments_doc) {
+                    if has_output {
+                        // Check for blank line before the first comment (same as regular statements)
+                        let first_comment_start = comments_in_range(self.comments, prev_end, statement.span().end)
+                            .next()
+                            .map(|c| c.span.start);
+                        let check_end = first_comment_start.unwrap_or_else(|| statement.span().end);
+
+                        if printing::has_blank_line_between(self.source, prev_end, check_end) {
+                            parts.push(doc::literalline()); // Blank line at column 0
+                        }
+                        parts.push(doc::hardline()); // Separator with indent
+                    }
+                    parts.push(comments_doc);
+                    has_output = true;
+                }
+                prev_end = statement.span().end;
+                continue;
+            }
+
+            // Separator between statements
+            if has_output {
+                // Check for blank line before the next item:
+                // - If there are comments, check before the first comment
+                // - If no comments, check before the statement
+                let first_comment_start = comments_in_range(self.comments, prev_end, statement.span().start)
+                    .next()
+                    .map(|c| c.span.start);
+                let check_end = first_comment_start.unwrap_or_else(|| statement.span().start);
+
+                if printing::has_blank_line_between(self.source, prev_end, check_end) {
+                    parts.push(doc::literalline()); // Blank line at column 0
+                }
+
+                parts.push(doc::hardline()); // Separator with indent
+            }
+
+            // Leading comments (allow inline comments since statement will be printed)
+            let leading_doc =
+                self.build_leading_comments_doc(prev_end, statement.span().start, !has_output, false);
+            if !is_empty_doc(&leading_doc) {
+                parts.push(leading_doc);
+            }
+
+            // Statement
+            parts.push(self.build_statement_doc(statement));
+
+            // Trailing same-line comments
+            let trailing_docs = self.build_trailing_same_line_comments_doc(statement.span().end);
+            parts.extend(trailing_docs);
+
+            // Update prev_end to be after any trailing same-line comments
+            // This ensures blank line detection works correctly
+            prev_end = self.find_end_with_trailing_comments(statement.span().end);
+            has_output = true;
+        }
+
+        // Trailing program comments
+        let trailing_comments_doc = self.build_program_trailing_comments_doc(prev_end);
+        parts.extend(trailing_comments_doc);
+
+        // Trailing newline
+        parts.push(doc::hardline());
+
+        doc::concat(parts)
+    }
+
+    /// Build doc for leading comments between prev_end and curr_start
+    ///
+    /// Returns a Doc containing all leading comments with proper blank line handling.
+    /// Returns empty doc if no comments.
+    ///
+    /// Structure: Each comment is output WITHOUT a trailing hardline.
+    /// Separators (hardline or literalline+hardline) are added BEFORE each subsequent
+    /// comment and AFTER the last comment (to separate from the statement).
+    ///
+    /// When `force_non_inline` is true, all comments are treated as non-inline (own line).
+    /// This is used for empty statements that will be skipped - their inline comments
+    /// have nothing to be inline with.
+    fn build_leading_comments_doc(
+        &self,
+        prev_end: u32,
+        curr_start: u32,
+        is_first: bool,
+        force_non_inline: bool,
+    ) -> Doc {
+        let mut parts = Vec::new();
         let mut last_comment_end = prev_end;
         let mut printed_any = false;
 
@@ -857,342 +750,147 @@ impl<'a> Printer<'a> {
 
             // Skip trailing comments EXCEPT for first statement (file start)
             if !is_first && matches!(position, CommentPosition::Trailing) {
-                continue;
-            }
-
-            // Handle inline leading comments (same line as statement)
-            if matches!(position, CommentPosition::LeadingInline) {
-                self.write_indent();
-                self.print_comment(comment);
-                self.write(" ");
-                printed_any = true;
                 last_comment_end = comment.span.end;
                 continue;
             }
 
-            // Comment on its own line: check for blank lines
-            // Skip blank line preservation at the very start of the program
-            // (before the first comment/statement). Prettier removes leading blank lines.
-            let is_program_start = is_first && !printed_any;
-            if !is_program_start
+            // Handle inline leading comments (same line as statement)
+            // These stay on the same line, so DON'T set printed_any (no separator needed)
+            // Skip this behavior when force_non_inline is true (e.g., empty statements being skipped)
+            if !force_non_inline && matches!(position, CommentPosition::LeadingInline) {
+                parts.push(self.build_comment_doc(comment));
+                parts.push(doc::text(" "));
+                // DON'T set printed_any - inline comments don't need separators
+                last_comment_end = comment.span.end;
+                continue;
+            }
+
+            // Comment on its own line: check for blank lines BETWEEN comments
+            // Note: blank line before FIRST comment is handled by the parent (build_program_doc)
+            // We only handle blank lines between subsequent comments here
+            let has_blank_before = printed_any
                 && comment.span.start > last_comment_end
                 && printing::has_blank_line_between(
                     self.source,
                     last_comment_end,
                     comment.span.start,
-                )
-            {
-                self.write("\n");
+                );
+
+            // Add separator BEFORE this comment (first comment has no separator - parent's hardline handles it)
+            if has_blank_before {
+                parts.push(doc::literalline()); // Blank line at column 0
+                parts.push(doc::hardline()); // Indent for this comment
+            } else if printed_any {
+                parts.push(doc::hardline()); // Separator from previous comment
             }
 
-            self.write_indent();
-            self.print_comment(comment);
-            self.write("\n");
+            parts.push(self.build_comment_doc(comment));
+            // NO hardline after comment - let post-loop or next iteration handle it
 
             last_comment_end = comment.span.end;
             printed_any = true;
         }
 
-        // Check if there's a blank line after the last comment and before curr_start
-        if printed_any
-            && last_comment_end < curr_start
-            && printing::has_blank_line_between(self.source, last_comment_end, curr_start)
-        {
-            self.write("\n");
+        // After all comments: add separator for the statement (if one follows)
+        // Skip this when force_non_inline is true - that means the statement is being skipped
+        // and there's nothing for the separator to separate from
+        if printed_any && !force_non_inline {
+            // Check if there's a blank line after the last comment
+            let has_blank_after = last_comment_end < curr_start
+                && printing::has_blank_line_between(self.source, last_comment_end, curr_start);
+
+            if has_blank_after {
+                parts.push(doc::literalline()); // Blank line at column 0
+            }
+            parts.push(doc::hardline()); // Indent for statement
         }
 
-        printed_any
-    }
-
-    /// Find the position of `=` character in the source between two positions
-    pub(crate) fn find_equals_position(&self, start: u32, end: u32) -> u32 {
-        let start = start as usize;
-        let end = end as usize;
-        let slice = &self.source[start..end];
-
-        if let Some(offset) = slice.find('=') {
-            (start + offset) as u32
-        } else {
-            // Fallback: return midpoint if `=` not found
-            usize::midpoint(start, end) as u32
-        }
-    }
-
-    /// Check if there are comments between two positions (read-only check)
-    ///
-    /// Uses binary search: O(log n)
-    pub(crate) fn has_comments_between(&self, start: u32, end: u32) -> bool {
-        has_comments_in_range(self.comments, start, end)
-    }
-
-    /// Check if there are line comments (// style) between two positions
-    ///
-    /// Uses binary search: O(log n + k) where k is comments in range
-    pub(crate) fn has_line_comments_between(&self, start: u32, end: u32) -> bool {
-        has_line_comments_in_range(self.comments, start, end)
-    }
-
-    /// Find the closing `)` between a start position and end boundary.
-    ///
-    /// Scans the source to find the `)` that closes the params. Returns
-    /// the position AFTER the `)` for use as a boundary.
-    pub(crate) fn find_closing_paren(&self, start: u32, end: u32) -> Option<u32> {
-        let source = self.source.as_bytes();
-        let end = end as usize;
-        let mut depth = 0;
-        let mut i = start as usize;
-
-        while i < end && i < source.len() {
-            match source[i] {
-                b'(' => depth += 1,
-                b')' => {
-                    depth -= 1;
-                    if depth == 0 {
-                        return Some((i + 1) as u32);
-                    }
-                }
-                _ => {
-                    if let Some(skip) = skip_string_or_comment(source, i, end) {
-                        i = skip;
-                    }
-                }
-            }
-            i += 1;
-        }
-        None
-    }
-
-    /// Find the `=>` token between a start position and end boundary.
-    ///
-    /// Scans the source to find `=>`. Returns the position OF the `=` character
-    /// (the start of the arrow token). Skips over comments and strings.
-    pub(crate) fn find_arrow_token(&self, start: u32, end: u32) -> Option<u32> {
-        let source = self.source.as_bytes();
-        let end = end as usize;
-        let mut i = start as usize;
-
-        while i + 1 < end && i + 1 < source.len() {
-            if source[i] == b'=' && source[i + 1] == b'>' {
-                return Some(i as u32);
-            }
-            if let Some(skip) = skip_string_or_comment(source, i, end) {
-                i = skip;
-            }
-            i += 1;
-        }
-        None
-    }
-
-    /// Find a keyword between a start position and end boundary.
-    ///
-    /// Returns the position of the first character of the keyword if found.
-    /// Skips over comments and strings. Checks for word boundaries (keyword
-    /// must not be part of a larger identifier).
-    pub(crate) fn find_keyword_in_range(&self, start: u32, end: u32, keyword: &str) -> Option<u32> {
-        let source = self.source.as_bytes();
-        let kw_bytes = keyword.as_bytes();
-        let end = end as usize;
-        let kw_len = kw_bytes.len();
-        let mut i = start as usize;
-
-        while i + kw_len <= end && i + kw_len <= source.len() {
-            // Check for keyword match
-            if &source[i..i + kw_len] == kw_bytes {
-                // Check word boundaries (not part of larger identifier)
-                let before_ok =
-                    i == 0 || !source[i - 1].is_ascii_alphanumeric() && source[i - 1] != b'_';
-                let after_ok = i + kw_len >= source.len()
-                    || !source[i + kw_len].is_ascii_alphanumeric() && source[i + kw_len] != b'_';
-                if before_ok && after_ok {
-                    return Some(i as u32);
-                }
-            }
-            if let Some(skip) = skip_string_or_comment(source, i, end) {
-                i = skip;
-            }
-            i += 1;
-        }
-        None
-    }
-
-    /// Build a Doc for inline comments between two positions with specified spacing and filter
-    ///
-    /// Returns a Doc containing all comments in the range with the specified spacing.
-    /// Returns empty concat if no comments found.
-    ///
-    /// Uses binary search to find starting point: O(log n + k)
-    pub(crate) fn build_comments_between(
-        &self,
-        start: u32,
-        end: u32,
-        spacing: CommentSpacing,
-    ) -> Doc {
-        self.build_comments_between_filtered(start, end, spacing, CommentFilter::All)
-    }
-
-    /// Build a Doc for inline comments with filtering
-    pub(crate) fn build_comments_between_filtered(
-        &self,
-        start: u32,
-        end: u32,
-        spacing: CommentSpacing,
-        filter: CommentFilter,
-    ) -> Doc {
-        let mut parts = Vec::new();
-        for comment in comments_in_range(self.comments, start, end) {
-            // Apply filter
-            if matches!(filter, CommentFilter::BlockOnly) && !comment.is_block {
-                continue;
-            }
-
-            match spacing {
-                CommentSpacing::Leading => {
-                    parts.push(doc::text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                }
-                CommentSpacing::Trailing => {
-                    parts.push(self.build_comment_doc(comment));
-                    parts.push(doc::text(" "));
-                }
-                CommentSpacing::None => {
-                    parts.push(self.build_comment_doc(comment));
-                }
-            }
-        }
         doc::concat(parts)
     }
 
-    /// Build a Doc for inline comments between two positions (leading space)
-    #[inline]
-    pub(crate) fn build_inline_comments_between_doc(&self, start: u32, end: u32) -> Doc {
-        self.build_comments_between(start, end, CommentSpacing::Leading)
-    }
-
-    /// Build a Doc for inline comments between two positions (no spaces)
-    #[inline]
-    pub(crate) fn build_inline_comments_between_doc_no_leading_space(
-        &self,
-        start: u32,
-        end: u32,
-    ) -> Doc {
-        self.build_comments_between(start, end, CommentSpacing::None)
-    }
-
-    /// Build a Doc for leading line comments (comments that start on their own line)
-    /// Each line comment gets its own hardline before it.
-    /// Returns (comments_doc, has_blank_line) where has_blank_line indicates if there
-    /// was a blank line before the comments/content.
-    pub(crate) fn build_leading_line_comments_doc(
-        &self,
-        prev_end: u32,
-        curr_start: u32,
-    ) -> (Doc, bool) {
-        // Bounds check - prev_end can be past curr_start in edge cases
-        if prev_end >= curr_start {
-            return (doc::concat(vec![]), false);
-        }
-
-        let comments: Vec<_> = comments_in_range(self.comments, prev_end, curr_start).collect();
-        if comments.is_empty() {
-            // Check for blank line even without comments
-            let text_between = &self.source[prev_end as usize..curr_start as usize];
-            let has_blank = text_between.contains("\n\n")
-                || text_between.contains("\n\r\n")
-                || text_between.contains("\r\n\r\n");
-            return (doc::concat(vec![]), has_blank);
-        }
-
-        let mut parts = Vec::new();
-
-        // Check for blank line before first comment
-        let first_comment_start = comments[0].span.start;
-        let text_before_comments = &self.source[prev_end as usize..first_comment_start as usize];
-        let has_blank_line = text_before_comments.contains("\n\n")
-            || text_before_comments.contains("\n\r\n")
-            || text_before_comments.contains("\r\n\r\n");
-
-        for (i, comment) in comments.iter().enumerate() {
-            // Each line comment gets a hardline before it
-            // (always add hardline, even for first comment, since we're in an indented block)
-            if i > 0 {
-                parts.push(doc::hardline());
-            }
-            parts.push(self.build_comment_doc(comment));
-        }
-
-        (doc::concat(parts), has_blank_line)
-    }
-
-    /// Check if there's a newline between start position and the first comment in the range
+    /// Build docs for trailing same-line comments after a node
     ///
-    /// Returns true if there's at least one comment in the range and a newline
-    /// exists between `start` and the first comment's start position.
-    pub(crate) fn has_newline_before_comment(&self, start: u32, end: u32) -> bool {
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, start);
-        if let Some(comment) = self.comments.get(first_idx)
-            && comment.span.end <= end
-        {
-            // Check if there's a newline between start and comment start
-            let between = &self.source[start as usize..comment.span.start_usize()];
-            return between.contains('\n');
-        }
-        false
-    }
+    /// Returns a Vec of docs to append to the current parts.
+    fn build_trailing_same_line_comments_doc(&self, after_pos: u32) -> Vec<Doc> {
+        let first_idx = tsv_lang::find_first_comment_from(self.comments, after_pos);
+        let mut docs = Vec::new();
 
-    /// Build a Doc for a list of decorators, each on its own line
-    ///
-    /// Returns None if there are no decorators.
-    /// Each decorator is formatted as `@expression` followed by hardline.
-    pub(crate) fn build_decorators_doc(
-        &self,
-        decorators: Option<&Vec<internal::Decorator>>,
-    ) -> Option<Doc> {
-        let decorators = decorators?;
-        if decorators.is_empty() {
-            return None;
-        }
-        let mut parts = Vec::new();
-        for decorator in decorators {
-            parts.push(doc::text("@"));
-            parts.push(self.build_expression_doc(&decorator.expression));
-            parts.push(doc::hardline());
-        }
-        Some(doc::concat(parts))
-    }
-
-    /// Build a Doc for a single comment
-    ///
-    /// For multi-line block comments, uses literalline to preserve original structure
-    /// without adding indentation to continuation lines.
-    pub(crate) fn build_comment_doc(&self, comment: &internal::Comment) -> Doc {
-        if comment.is_block {
-            // Block comment: /* content */
-            if comment.content.contains('\n') {
-                // Multi-line block comment - preserve original structure
-                // Prettier keeps continuation lines at their original position relative to column 0
-                let lines: Vec<&str> = comment.content.split('\n').collect();
-                let mut line_docs = Vec::new();
-                for (i, line) in lines.iter().enumerate() {
-                    if i > 0 {
-                        // Use literalline to avoid adding indentation
-                        line_docs.push(doc::literalline());
-                    }
-                    if i == 0 {
-                        line_docs.push(doc::text_owned(format!("/*{line}")));
-                    } else {
-                        line_docs.push(doc::text_owned((*line).to_string()));
-                    }
+        for comment in &self.comments[first_idx..] {
+            if printing::is_same_line(self.source, after_pos, comment.span.start) {
+                if comment.is_block {
+                    // Block comments are inline, affect width
+                    docs.push(doc::text(" "));
+                    docs.push(self.build_comment_doc(comment));
+                } else {
+                    // Line comments go in line_suffix, don't affect width
+                    docs.push(doc::line_suffix(doc::concat(vec![
+                        doc::text(" "),
+                        self.build_comment_doc(comment),
+                    ])));
                 }
-                line_docs.push(doc::text("*/"));
-                doc::concat(line_docs)
             } else {
-                // Single-line block comment
-                doc::text_owned(format!("/*{}*/", comment.content))
+                break;
             }
-        } else {
-            // Line comment: // content
-            doc::text_owned(format!("//{}", comment.content))
         }
+        docs
+    }
+
+    /// Find the end position including any trailing same-line comments
+    ///
+    /// Used to correctly detect blank lines - need to check from after trailing
+    /// comments, not just after the statement.
+    fn find_end_with_trailing_comments(&self, after_pos: u32) -> u32 {
+        let first_idx = tsv_lang::find_first_comment_from(self.comments, after_pos);
+        let mut end = after_pos;
+
+        for comment in &self.comments[first_idx..] {
+            if printing::is_same_line(self.source, after_pos, comment.span.start) {
+                end = comment.span.end;
+            } else {
+                break;
+            }
+        }
+        end
+    }
+
+    /// Build docs for trailing comments at the end of the program
+    ///
+    /// Handles comments that appear after all statements but before end of file.
+    fn build_program_trailing_comments_doc(&self, prev_end: u32) -> Vec<Doc> {
+        let mut docs = Vec::new();
+        let mut last_comment_end = prev_end;
+        let mut is_first_comment = true;
+
+        for comment in comments_after(self.comments, prev_end) {
+            // Skip comments on same line as prev_end - those are inline trailing comments
+            // already handled by build_trailing_same_line_comments_doc
+            // BUT: When prev_end == 0 (no statements), there's no previous statement to be
+            // trailing from, so comments at position 0 should NOT be skipped.
+            if prev_end > 0 && printing::is_same_line(self.source, prev_end, comment.span.start) {
+                last_comment_end = comment.span.end;
+                continue;
+            }
+
+            // For comments-only files (no statements), don't add leading newline for first comment
+            if prev_end > 0 || !is_first_comment {
+                // Blank line before this comment (add literalline BEFORE hardline)
+                if printing::has_blank_line_between(
+                    self.source,
+                    last_comment_end,
+                    comment.span.start,
+                ) {
+                    docs.push(doc::literalline());
+                }
+
+                docs.push(doc::hardline());
+            }
+
+            docs.push(self.build_comment_doc(comment));
+            last_comment_end = comment.span.end;
+            is_first_comment = false;
+        }
+
+        docs
     }
 }
 

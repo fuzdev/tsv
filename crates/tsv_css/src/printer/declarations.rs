@@ -6,32 +6,29 @@
 //! - Width-based wrapping for long lists
 //! - Doc building for width calculations
 
-use super::{Printer, source_fidelity};
+use super::{Printer, has_wrappable_args, source_fidelity};
 use crate::ast::internal::{self, CssValue};
 use tsv_lang::doc;
 
 impl<'a> Printer<'a> {
+    /// Write the declaration ending: optional !important and semicolon with newline
+    #[inline]
+    fn write_declaration_end(&mut self, important: bool) {
+        if important {
+            self.write(" !important");
+        }
+        self.write(";\n");
+    }
+
     /// Check if any value in a list requires one-per-line formatting
     ///
-    /// Returns true if any value is:
-    /// - A space-separated list (box-shadow, text-shadow, etc.)
-    /// - A function that would wrap (linear-gradient, polygon, etc.)
+    /// This matches Prettier's `shouldBreakList` which checks:
+    /// `node.groups.some((node) => node.type === "value-comma_group")`
     ///
-    /// This is the "one bad apple" rule - if one item needs its own line, all do.
+    /// Returns true if any value is a space-separated list (box-shadow, text-shadow, etc.)
+    /// Functions are NOT checked here - they use doc-based wrapping with group/softline.
     fn any_value_needs_own_line(&self, values: &[CssValue]) -> bool {
-        values.iter().any(|v| {
-            // Space-separated list
-            if matches!(v, CssValue::List { .. }) {
-                return true;
-            }
-            // Function that would wrap
-            if let CssValue::Function { name, args, .. } = v
-                && self.should_wrap_function(name, args)
-            {
-                return true;
-            }
-            false
-        })
+        values.iter().any(|v| matches!(v, CssValue::List { .. }))
     }
 
     fn should_use_multiline(&self, decl: &internal::CssDeclaration) -> bool {
@@ -72,12 +69,11 @@ impl<'a> Printer<'a> {
     ///
     /// Returns (needs_wrapping, is_comma_separated)
     fn should_wrap_value_width_based(&self, value: &CssValue, property: &str) -> (bool, bool) {
-        // Custom properties never wrap width-based
-        if property.starts_with("--") {
-            return (false, false);
-        }
+        let is_custom_property = property.starts_with("--");
 
         match value {
+            // Custom properties don't use comma-separated width wrapping
+            CssValue::CommaSeparated { .. } if is_custom_property => (false, false),
             CssValue::CommaSeparated { values, .. } => {
                 let doc = self.build_list_doc(values, ", ");
                 let context_offset = property.len() + 3; // property + ": " + ";"
@@ -130,19 +126,22 @@ impl<'a> Printer<'a> {
         args: &[CssValue],
         context_offset: usize,
     ) -> bool {
-        // Check if we have wrappable content:
-        // 1. Multiple comma-separated args (linear-gradient, rgb, etc.)
-        // 2. Single arg that is a List with multiple space-separated items (drop-shadow)
-        let has_wrappable_content = args.len() >= 2
-            || (args.len() == 1
-                && matches!(&args[0], CssValue::List { values, .. } if values.len() >= 2));
-
-        if !has_wrappable_content {
+        if !has_wrappable_args(args) {
             return false;
         }
 
-        // Build doc representation and check if it fits
-        let func_doc = self.build_function_doc(name, args);
+        // Build inline doc representation for width checking
+        // url() uses comma without space; others use ", "
+        let separator = if name == "url" { "," } else { ", " };
+        let arg_docs: Vec<_> = args
+            .iter()
+            .map(|arg| self.build_css_value_doc(arg))
+            .collect();
+        let func_doc = doc::concat(vec![
+            doc::text_owned(name.to_string()),
+            doc::parens(doc::join(arg_docs, separator)),
+        ]);
+
         !doc::fits_at(
             &func_doc,
             &self.config,
@@ -152,192 +151,197 @@ impl<'a> Printer<'a> {
         )
     }
 
-    /// Check if a function should wrap its arguments (using estimated context)
-    ///
-    /// Used for nested functions where the exact context isn't known.
-    /// Uses a conservative estimate of 15 chars for property name.
-    pub(super) fn should_wrap_function(&self, name: &str, args: &[CssValue]) -> bool {
-        // Estimate: 15 chars property name + ": " (2) + ";" (1) = 18
-        // Use 19 to be slightly conservative for nested contexts
-        self.should_wrap_function_with_offset(name, args, 19)
-    }
-
-    /// Build a doc representation of a function for width checking
-    ///
-    /// This builds a doc tree representing the function as it would appear inline,
-    /// which is then used with `fits()` to check if it exceeds the print width.
-    fn build_function_doc(&self, name: &str, args: &[CssValue]) -> doc::Doc {
-        // WORKAROUND: url() data URIs contain commas that our parser incorrectly treats as
-        // argument separators (e.g., "url(data:image/png;base64,ABC)" is parsed as 2 args).
-        // Use no space after commas for url() to preserve the original data URI format.
-        let is_url = name == "url";
-        let separator = if is_url { "," } else { ", " };
-
-        let arg_docs: Vec<_> = args
-            .iter()
-            .map(|arg| self.build_css_value_doc(arg))
-            .collect();
-        let args_doc = doc::join(arg_docs, separator);
-        let parens_doc = doc::parens(args_doc);
-
-        doc::concat(vec![doc::text_owned(name.to_string()), parens_doc])
-    }
-
     /// Format a CSS declaration (property: value;)
     pub(super) fn print_css_declaration(&mut self, decl: &internal::CssDeclaration) {
         self.write_indent();
 
         // Extract property name from source to preserve escape sequences
-        // See: docs/SVELTE_COMPATIBILITY.md (CSS Quirks section)
         let decl_source = decl.span.extract(self.source);
         let property_normalized = source_fidelity::extract_property_name(decl_source);
-
-        // Write property name (normalized with spaces around comments)
         self.write(&property_normalized);
 
-        // Helper to write the declaration ending (!important if needed, then semicolon)
-        let important = decl.important;
-
-        // Check if property needs multiline formatting (structure-based)
+        // Dispatch to appropriate handler based on value type and formatting needs
         if self.should_use_multiline(decl) {
-            self.write(":\n");
-            self.indent_level += 1;
-            self.print_css_value_multiline(&decl.value);
-            self.indent_level -= 1;
-            if important {
-                self.write(" !important");
-            }
-            self.write(";\n");
-        // Check if value needs width-based wrapping
+            self.print_decl_multiline(decl);
         } else if let (true, is_comma) =
             self.should_wrap_value_width_based(&decl.value, &decl.property)
         {
-            // Width-based wrapping
-            if is_comma {
-                // Comma-separated: property:\n\titem1, item2
-                self.write(":\n");
-                self.indent_level += 1;
-                self.print_comma_list_wrapped(&decl.value);
-                self.indent_level -= 1;
-            } else {
-                // Space-separated: property: item1 item2\n\titem3
-                self.write(": ");
-                self.indent_level += 1;
-                // First line already has property name + ": " consumed
-                let first_line_offset = decl.property.len() + 2; // property + ": "
-                self.print_space_list_wrapped(&decl.value, first_line_offset);
-                self.indent_level -= 1;
-            }
-            if important {
-                self.write(" !important");
-            }
-            self.write(";\n");
+            self.print_decl_width_wrapped(decl, is_comma);
+        } else if let CssValue::Function { name, args, span } = &decl.value {
+            self.print_decl_function(decl, decl_source, name, args, *span);
         } else if self.has_value_comments_in_decl(decl) {
-            // Value has comments - extract from source to preserve them
-            if let Some(normalized) = source_fidelity::extract_value_with_comments(decl_source) {
-                self.write(": ");
-                self.write(&normalized);
-                if important {
-                    self.write(" !important");
-                }
-                self.write(";\n");
-            } else {
-                // Fallback: shouldn't happen
-                self.write(": ");
-                self.write(decl_source);
-                if important {
-                    self.write(" !important");
-                }
-                self.write(";\n");
-            }
+            self.print_decl_with_comments(decl, decl_source);
         } else if let CssValue::String { quote, .. } = &decl.value {
-            // String values: extract from source to preserve escapes
-            if let Some(formatted) = source_fidelity::extract_string_value(decl_source, *quote) {
-                self.write(": ");
-                self.write(&formatted);
-                if important {
-                    self.write(" !important");
-                }
-                self.write(";\n");
-            } else {
-                // Fallback: use semantic formatting
-                self.write(": ");
-                let formatted = source_fidelity::format_string_value("", *quote);
-                self.write(&formatted);
-                if important {
-                    self.write(" !important");
-                }
-                self.write(";\n");
-            }
-        } else if let CssValue::Function { name, args, .. } = &decl.value {
-            // Top-level function: calculate proper context offset for wrapping decision
-            // Context = property + ": " + ";" = property.len() + 3
-            let context_offset = decl.property.len() + 3;
-            if self.should_wrap_function_with_offset(name, args, context_offset) {
-                // Wrapped: property: func(\n\targ1,\n\targ2\n);
-                self.write(": ");
-                self.write(name);
-                self.write("(\n");
-                self.indent_level += 1;
-                for (i, arg) in args.iter().enumerate() {
-                    self.write_indent();
-                    // Check if arg is a List that would exceed width - use continuation fill
-                    if let CssValue::List { values, .. } = arg
-                        && self.list_exceeds_width_in_wrapped_function(values)
-                    {
-                        // Use fill with continuation indent for long space-separated lists
-                        let fill_doc = self.build_space_fill_doc_with_continuation(values);
-                        self.write_doc(&fill_doc);
-                    } else {
-                        self.print_nested_value(arg);
-                    }
-                    if i < args.len() - 1 {
-                        self.write(",\n");
-                    }
-                }
-                self.indent_level -= 1;
-                self.write("\n");
-                self.write_indent();
-                self.write(")");
-            } else {
-                // Inline: property: func(arg1, arg2);
-                self.write(": ");
-                self.write(name);
-                self.write("(");
-                // WORKAROUND: url() data URIs contain commas that our parser incorrectly treats as
-                // argument separators. Use no space after commas to preserve data URI format.
-                let is_url = name == "url";
-                for (i, arg) in args.iter().enumerate() {
-                    if i > 0 {
-                        if is_url {
-                            self.write(",");
-                        } else {
-                            self.write(", ");
-                        }
-                    }
-                    self.print_nested_value(arg);
-                }
-                self.write(")");
-            }
-            if important {
-                self.write(" !important");
-            }
-            self.write(";\n");
+            self.print_decl_string(decl, decl_source, *quote);
         } else {
-            // All other values: use standard formatting
-            // Property with comment: `color /* comment */` → ` : ` → `color /* comment */ : `
-            // Property without comment: `color` → `: ` → `color: `
-            if property_normalized.contains("/*") {
-                self.write(" : ");
-            } else {
-                self.write(": ");
-            }
-            self.print_css_value(&decl.value);
-            if important {
-                self.write(" !important");
-            }
-            self.write(";\n");
+            self.print_decl_default(decl, &property_normalized);
         }
+    }
+
+    /// Print declaration with multiline formatting (structure-based)
+    fn print_decl_multiline(&mut self, decl: &internal::CssDeclaration) {
+        self.write(":\n");
+        self.indent_level += 1;
+        self.print_css_value_multiline(&decl.value);
+        self.indent_level -= 1;
+        self.write_declaration_end(decl.important);
+    }
+
+    /// Print declaration with width-based wrapping
+    fn print_decl_width_wrapped(&mut self, decl: &internal::CssDeclaration, is_comma: bool) {
+        if is_comma {
+            // Comma-separated: property:\n\titem1, item2
+            self.write(":\n");
+            self.indent_level += 1;
+            self.print_comma_list_wrapped(&decl.value);
+            self.indent_level -= 1;
+        } else {
+            // Space-separated: property: item1 item2\n\titem3
+            self.write(": ");
+            self.indent_level += 1;
+            self.print_space_list_wrapped(&decl.value);
+            self.indent_level -= 1;
+        }
+        self.write_declaration_end(decl.important);
+    }
+
+    /// Print declaration with function value
+    fn print_decl_function(
+        &mut self,
+        decl: &internal::CssDeclaration,
+        decl_source: &str,
+        name: &str,
+        args: &[CssValue],
+        span: tsv_lang::Span,
+    ) {
+        let has_comments = self.has_value_comments_in_decl(decl);
+        let needs_wrap = self.function_needs_wrapping(decl, has_comments, name, args, span);
+
+        if needs_wrap {
+            self.print_wrapped_function(decl, has_comments, name, args);
+        } else {
+            self.print_inline_function(decl_source, has_comments, &decl.value);
+        }
+        self.write_declaration_end(decl.important);
+    }
+
+    /// Check if a function needs wrapping
+    fn function_needs_wrapping(
+        &self,
+        decl: &internal::CssDeclaration,
+        has_comments: bool,
+        name: &str,
+        args: &[CssValue],
+        span: tsv_lang::Span,
+    ) -> bool {
+        if has_comments {
+            // Use NORMALIZED source length for accurate width
+            let func_source = span.extract(self.source);
+            let normalized = source_fidelity::normalize_value_spacing(func_source);
+            let inline_len = decl.property.len() + 2 + normalized.len() + 1;
+            self.indent_width() + inline_len > self.config.print_width
+        } else {
+            let context_offset = decl.property.len() + 3;
+            self.should_wrap_function_with_offset(name, args, context_offset)
+        }
+    }
+
+    /// Print wrapped function: func(\n\targ1,\n\targ2\n)
+    fn print_wrapped_function(
+        &mut self,
+        decl: &internal::CssDeclaration,
+        has_comments: bool,
+        name: &str,
+        args: &[CssValue],
+    ) {
+        self.write(": ");
+        self.write(name);
+        self.write("(\n");
+        self.indent_level += 1;
+
+        if has_comments {
+            self.print_function_args_from_source(decl, name, args);
+        } else {
+            self.print_function_args_semantic_wrapped(args);
+        }
+
+        self.indent_level -= 1;
+        self.write("\n");
+        self.write_indent();
+        self.write(")");
+    }
+
+    /// Print function args with semantic formatting and wrapping
+    fn print_function_args_semantic_wrapped(&mut self, args: &[CssValue]) {
+        for (i, arg) in args.iter().enumerate() {
+            self.write_indent();
+            if let CssValue::List { values, .. } = arg
+                && self.space_list_exceeds_width(values, 2)
+            {
+                self.indent_level += 1;
+                let fill_doc = self.build_space_fill_doc(values, 0);
+                self.write_doc(&fill_doc);
+                self.indent_level -= 1;
+            } else {
+                self.print_nested_value(arg);
+            }
+            if i < args.len() - 1 {
+                self.write(",\n");
+            }
+        }
+    }
+
+    /// Print inline function (no wrapping)
+    fn print_inline_function(&mut self, decl_source: &str, has_comments: bool, value: &CssValue) {
+        self.write(": ");
+        if has_comments
+            && let Some(normalized) = source_fidelity::extract_value_with_comments(decl_source)
+        {
+            self.write(&normalized);
+        } else {
+            self.print_css_value(value);
+        }
+    }
+
+    /// Print declaration with comments in value (non-function)
+    fn print_decl_with_comments(&mut self, decl: &internal::CssDeclaration, decl_source: &str) {
+        self.write(": ");
+        if let Some(normalized) = source_fidelity::extract_value_with_comments(decl_source) {
+            self.write(&normalized);
+        } else {
+            self.write(decl_source);
+        }
+        self.write_declaration_end(decl.important);
+    }
+
+    /// Print declaration with string value
+    fn print_decl_string(
+        &mut self,
+        decl: &internal::CssDeclaration,
+        decl_source: &str,
+        quote: char,
+    ) {
+        self.write(": ");
+        if let Some(formatted) = source_fidelity::extract_string_value(decl_source, quote) {
+            self.write(&formatted);
+        } else {
+            let formatted = source_fidelity::format_string_value("", quote);
+            self.write(&formatted);
+        }
+        self.write_declaration_end(decl.important);
+    }
+
+    /// Print declaration with default formatting
+    fn print_decl_default(&mut self, decl: &internal::CssDeclaration, property: &str) {
+        // Property with comment: `color /* comment */` → ` : `
+        // Property without comment: `color` → `: `
+        if property.contains("/*") {
+            self.write(" : ");
+        } else {
+            self.write(": ");
+        }
+        self.print_css_value(&decl.value);
+        self.write_declaration_end(decl.important);
     }
 
     /// Format a CSS value on multiple lines with greedy packing
@@ -358,7 +362,23 @@ impl<'a> Printer<'a> {
             // True one-per-line for shadow-like properties and wrappable functions
             for (i, val) in values.iter().enumerate() {
                 self.write_indent();
-                self.print_nested_value(val);
+                // Check if value is a List that exceeds width - use continuation fill
+                // Reserve 1 char for trailing comma
+                if let CssValue::List {
+                    values: list_values,
+                    ..
+                } = val
+                    && self.space_list_exceeds_width(list_values, 1)
+                {
+                    // Use fill doc for long space-separated lists
+                    // Increment indent for continuation lines
+                    self.indent_level += 1;
+                    let fill_doc = self.build_space_fill_doc(list_values, 1);
+                    self.write_doc(&fill_doc);
+                    self.indent_level -= 1;
+                } else {
+                    self.print_nested_value(val);
+                }
                 if i < values.len() - 1 {
                     self.write(",\n");
                 }
@@ -407,6 +427,7 @@ impl<'a> Printer<'a> {
         // to exactly printWidth and then exceeding when ';' is added
         let context = doc::DocContext {
             trailing_reserve: 1,
+            base_indent_override: None,
         };
         doc::with_context(doc::fill(parts), context)
     }
@@ -417,17 +438,15 @@ impl<'a> Printer<'a> {
     /// Uses doc::fill() for greedy packing (pack as many items per line as fit).
     /// Pattern: property: item1 item2\n\titem3;
     /// Note: First line stays inline with property, subsequent lines are indented
-    ///
-    /// The `_first_line_offset` parameter is no longer needed - write_doc() automatically
-    /// uses current_column() which accounts for the property name already written.
-    fn print_space_list_wrapped(&mut self, value: &CssValue, _first_line_offset: usize) {
+    fn print_space_list_wrapped(&mut self, value: &CssValue) {
         let CssValue::List { values, .. } = value else {
             self.print_nested_value(value);
             return;
         };
 
         // Build fill doc with space/line separators
-        let fill_doc = self.build_space_fill_doc(values);
+        // Reserve 1 char for trailing semicolon
+        let fill_doc = self.build_space_fill_doc(values, 1);
 
         // First line is inline (no indent), write_doc uses current_column for width calc
         self.write_doc(&fill_doc);
@@ -435,11 +454,10 @@ impl<'a> Printer<'a> {
 
     /// Build fill parts for space-separated values (shared helper)
     fn build_space_fill_parts(&self, values: &[CssValue]) -> Vec<doc::Doc> {
-        let mut parts = Vec::new();
+        let mut parts = Vec::with_capacity(values.len() * 2);
         for (i, val) in values.iter().enumerate() {
             parts.push(self.build_css_value_doc(val));
             if i < values.len() - 1 {
-                // Separator: " " in flat mode, "\n" when broken
                 parts.push(doc::line());
             }
         }
@@ -451,51 +469,149 @@ impl<'a> Printer<'a> {
     /// Creates a doc that packs values greedily:
     /// - In flat mode: `item1 item2 item3`
     /// - When broken: `item1 item2\n  item3 item4\n  item5`
-    fn build_space_fill_doc(&self, values: &[CssValue]) -> doc::Doc {
+    ///
+    /// `trailing_reserve` accounts for characters after the list (comma, semicolon).
+    fn build_space_fill_doc(&self, values: &[CssValue], trailing_reserve: usize) -> doc::Doc {
         let parts = self.build_space_fill_parts(values);
-        // Reserve 1 char for trailing semicolon
         let context = doc::DocContext {
-            trailing_reserve: 1,
+            trailing_reserve,
+            base_indent_override: None,
         };
         doc::with_context(doc::fill(parts), context)
     }
 
-    /// Build a fill doc with continuation indent for space-separated values inside wrapped functions
-    ///
-    /// When content inside a wrapped function (like calc(), drop-shadow()) exceeds print width,
-    /// Prettier uses continuation indent: first line at current indent, continuations at +1.
-    ///
-    /// Example:
-    /// ```css
-    /// min-width: calc(
-    ///     100% - 20px + ... + 0.001953125px +
-    ///         0.0009765625px
-    /// );
-    /// ```
-    ///
-    /// The `indent(fill(...))` structure achieves this:
-    /// - First content prints inline (no leading newline)
-    /// - When fill breaks, `line()` outputs newline + indent (which is +1 due to `indent` wrapper)
-    fn build_space_fill_doc_with_continuation(&self, values: &[CssValue]) -> doc::Doc {
-        let parts = self.build_space_fill_parts(values);
-        // No trailing reserve: closing paren and semicolon are on their own lines
-        let context = doc::DocContext {
-            trailing_reserve: 0,
-        };
-        // Wrap in indent for continuation indentation
-        doc::indent(doc::with_context(doc::fill(parts), context))
-    }
-
-    /// Check if a List arg inside a wrapped function would exceed width
+    /// Check if a space-separated list would exceed width when printed inline
     ///
     /// Used to decide whether to use continuation-based fill printing.
-    fn list_exceeds_width_in_wrapped_function(&self, values: &[CssValue]) -> bool {
-        // Calculate the width of the list if printed inline
+    /// `trailing_reserve` accounts for characters after the list (comma, paren, semicolon).
+    fn space_list_exceeds_width(&self, values: &[CssValue], trailing_reserve: usize) -> bool {
         let list_doc = self.build_list_doc(values, " ");
+        !doc::fits_at(
+            &list_doc,
+            &self.config,
+            self.effective_indent(),
+            0,
+            trailing_reserve,
+        )
+    }
 
-        // Context: we're already inside the function after "func(\n\t"
-        // The content starts at current indent level, need to check if it exceeds print width
-        // Reserve 2 chars for closing paren and semicolon
-        !doc::fits_at(&list_doc, &self.config, self.effective_indent(), 0, 2)
+    /// Print function arguments from source, preserving comments
+    ///
+    /// Used when a function has comments in its arguments and needs wrapping.
+    /// Extracts each argument from the source string to preserve comments.
+    fn print_function_args_from_source(
+        &mut self,
+        decl: &internal::CssDeclaration,
+        func_name: &str,
+        args: &[CssValue],
+    ) {
+        let decl_source = decl.span.extract(self.source);
+
+        // Extract function args content from source, or fall back to semantic printing
+        let Some(args_content) = source_fidelity::extract_function_args(decl_source, func_name)
+        else {
+            self.print_function_args_semantic(args);
+            return;
+        };
+
+        // Split by top-level commas and print each normalized arg
+        let arg_strs = source_fidelity::split_args_by_comma(args_content);
+        for (i, arg_str) in arg_strs.iter().enumerate() {
+            self.write_indent();
+            let normalized = source_fidelity::normalize_value_spacing(arg_str);
+
+            // Check if this arg has space-separated values that would exceed width
+            // Split by top-level spaces (not inside parens) to get individual values
+            let space_parts = source_fidelity::split_by_space_preserving_parens(&normalized);
+            if space_parts.len() > 1 && self.arg_string_exceeds_width(&normalized) {
+                // Use fill wrapping with continuation indent
+                self.print_space_separated_with_fill(&space_parts);
+            } else {
+                self.write(&normalized);
+            }
+
+            if i < arg_strs.len() - 1 {
+                self.write(",\n");
+            }
+        }
+    }
+
+    /// Check if an arg string would exceed width when printed at current position
+    fn arg_string_exceeds_width(&self, arg: &str) -> bool {
+        self.indent_width() + arg.len() > self.config.print_width
+    }
+
+    /// Print space-separated values with fill wrapping
+    ///
+    /// Uses continuation indent for wrapped lines. When the first part is a comment
+    /// that fills the line, the comment is printed separately at base indent, then
+    /// the value parts use continuation indent.
+    fn print_space_separated_with_fill(&mut self, parts: &[&str]) {
+        if parts.len() < 2 {
+            if let Some(part) = parts.first() {
+                self.write(part);
+            }
+            return;
+        }
+
+        // Check if first part is a comment that fills the line
+        let first_is_comment = parts[0].trim().starts_with("/*");
+        let first_len = parts[0].len();
+        let second_len = parts[1].len();
+        let first_fills_line =
+            self.indent_width() + first_len + 1 + second_len > self.config.print_width;
+
+        // When comment fills line: print it separately, then handle values with continuation
+        let (value_parts, use_continuation) =
+            if first_is_comment && first_fills_line && parts.len() > 2 {
+                self.write(parts[0]);
+                self.write("\n");
+                self.write_indent();
+
+                // Check if value parts need continuation indent
+                let val1_len = parts[1].len();
+                let val2_len = parts[2].len();
+                let needs_wrap =
+                    self.indent_width() + val1_len + 1 + val2_len > self.config.print_width;
+                (&parts[1..], needs_wrap)
+            } else {
+                // Normal case: check if first two items fit together
+                let both_fit =
+                    self.indent_width() + first_len + 1 + second_len <= self.config.print_width;
+                (parts, both_fit)
+            };
+
+        // Build and write fill doc
+        let fill_doc = doc::fill(Self::build_fill_parts_from_strings(value_parts));
+        if use_continuation {
+            self.indent_level += 1;
+        }
+        self.write_doc(&fill_doc);
+        if use_continuation {
+            self.indent_level -= 1;
+        }
+    }
+
+    /// Build fill doc parts from string slices
+    fn build_fill_parts_from_strings(parts: &[&str]) -> Vec<doc::Doc> {
+        let mut doc_parts = Vec::with_capacity(parts.len() * 2);
+        for (i, part) in parts.iter().enumerate() {
+            doc_parts.push(doc::text_owned((*part).to_string()));
+            if i < parts.len() - 1 {
+                doc_parts.push(doc::line());
+            }
+        }
+        doc_parts
+    }
+
+    /// Print function arguments semantically (fallback when source extraction fails)
+    fn print_function_args_semantic(&mut self, args: &[CssValue]) {
+        for (i, arg) in args.iter().enumerate() {
+            self.write_indent();
+            self.print_nested_value(arg);
+            if i < args.len() - 1 {
+                self.write(",\n");
+            }
+        }
     }
 }

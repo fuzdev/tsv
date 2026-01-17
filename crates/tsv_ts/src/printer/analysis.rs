@@ -1,0 +1,471 @@
+// Pure AST analysis functions for TypeScript printer
+//
+// These functions analyze AST structures without needing Printer state.
+// They determine formatting decisions like whether expressions need
+// special handling, wrapping, or expansion.
+
+use crate::ast::internal;
+use string_interner::DefaultStringInterner;
+use tsv_lang::SymbolToU32;
+use tsv_lang::doc::{self, Doc};
+
+/// Skip over a string literal or comment starting at position `i`.
+///
+/// Returns `Some(end_pos)` where `end_pos` is the last character of the skipped
+/// content (caller should then `i += 1`), or `None` if not at a string/comment.
+pub(crate) fn skip_string_or_comment(source: &[u8], i: usize, end: usize) -> Option<usize> {
+    match source[i] {
+        b'"' | b'\'' | b'`' => {
+            let quote = source[i];
+            let mut j = i + 1;
+            while j < end && source[j] != quote {
+                if source[j] == b'\\' {
+                    j += 1;
+                }
+                j += 1;
+            }
+            Some(j)
+        }
+        b'/' if i + 1 < end => {
+            if source[i + 1] == b'/' {
+                // Line comment - skip to end of line
+                let mut j = i;
+                while j < end && source[j] != b'\n' {
+                    j += 1;
+                }
+                Some(j)
+            } else if source[i + 1] == b'*' {
+                // Block comment - skip to */
+                let mut j = i + 2;
+                while j + 1 < end && !(source[j] == b'*' && source[j + 1] == b'/') {
+                    j += 1;
+                }
+                Some(j + 1)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Check if an expression is a module path call that should use fluid assignment wrapping
+/// (break after `=` if too long, keeping the call together).
+///
+/// Patterns:
+/// - `require.resolve(stringLiteral)`
+/// - `await import(stringLiteral)`
+pub(crate) fn is_module_path_fluid_call(
+    expr: &internal::Expression,
+    interner: &DefaultStringInterner,
+) -> bool {
+    // Check for `await import(string)`
+    if let internal::Expression::AwaitExpression(await_expr) = expr
+        && let internal::Expression::ImportExpression(import_expr) = await_expr.argument.as_ref()
+    {
+        let is_string_arg = matches!(
+            import_expr.source.as_ref(),
+            internal::Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. })
+        );
+        return is_string_arg;
+    }
+
+    let internal::Expression::CallExpression(call) = expr else {
+        return false;
+    };
+
+    // Must have exactly 1 argument that is a string literal
+    if call.arguments.len() != 1 {
+        return false;
+    }
+    let is_string_arg = matches!(
+        &call.arguments[0],
+        internal::Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. })
+    );
+    if !is_string_arg {
+        return false;
+    }
+
+    // Check for `require.resolve()`
+    if let internal::Expression::MemberExpression(member) = call.callee.as_ref()
+        && !member.computed
+        && !member.optional
+        && let internal::Expression::Identifier(resolve_id) = member.property.as_ref()
+        && interner.resolve(resolve_id.name) == Some("resolve")
+        && let internal::Expression::Identifier(require_id) = member.object.as_ref()
+        && interner.resolve(require_id.name) == Some("require")
+    {
+        return true;
+    }
+
+    false
+}
+
+/// Check if expression is a plain require() call
+///
+/// Plain require() calls with string arguments should never break
+/// (prettier keeps them on one line even when exceeding print width)
+pub(crate) fn is_plain_require_call(
+    expr: &internal::Expression,
+    interner: &DefaultStringInterner,
+) -> bool {
+    let internal::Expression::CallExpression(call) = expr else {
+        return false;
+    };
+
+    // Must have exactly 1 argument that is a string literal
+    if call.arguments.len() != 1 {
+        return false;
+    }
+    let is_string_arg = matches!(
+        &call.arguments[0],
+        internal::Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. })
+    );
+    if !is_string_arg {
+        return false;
+    }
+
+    // Check for plain `require()` - callee is just "require" identifier
+    matches!(
+        call.callee.as_ref(),
+        internal::Expression::Identifier(id) if interner.resolve(id.name) == Some("require")
+    )
+}
+
+/// Check if an expression is a pure property chain (member expressions without calls)
+///
+/// Pure property chains like `obj.a.b.c` or `obj!.a!.b!` should use fluid assignment wrapping
+/// (break after `=` if doesn't fit). Expressions containing calls, objects,
+/// arrays, or ternaries handle their own wrapping internally.
+pub(crate) fn is_pure_property_chain(expr: &internal::Expression) -> bool {
+    match expr {
+        // A member expression is a property chain if its object is also a pure chain
+        internal::Expression::MemberExpression(member) => is_pure_property_chain(&member.object),
+        // TSNonNullExpression is transparent - recurse through it
+        internal::Expression::TSNonNullExpression(non_null) => {
+            is_pure_property_chain(&non_null.expression)
+        }
+        // Base case: identifiers are valid chain roots
+        internal::Expression::Identifier(_) => true,
+        // Everything else (calls, objects, arrays, ternaries, etc.) is NOT a pure chain
+        _ => false,
+    }
+}
+
+/// Check if a ConditionalExpression needs fluid layout for variable assignment.
+///
+/// Prettier uses "break-after-operator" layout when the ternary's test expression
+/// is binaryish (BinaryExpression or LogicalExpression). This causes the pattern:
+/// ```typescript
+/// const value =
+///     condition === 'value'
+///         ? consequent
+///         : alternate;
+/// ```
+///
+/// For simple identifiers in the test, normal layout is used:
+/// ```typescript
+/// const long = aaaaaaaaaaaaaaaa
+///     ? consequent
+///     : alternate;
+/// ```
+pub(crate) fn conditional_needs_fluid_layout(expr: &internal::Expression) -> bool {
+    if let internal::Expression::ConditionalExpression(cond) = expr {
+        // Check if test is binaryish (BinaryExpression includes logical operators like &&, ||)
+        matches!(
+            cond.test.as_ref(),
+            internal::Expression::BinaryExpression(_)
+        )
+    } else {
+        false
+    }
+}
+
+/// Check if an expression is a multiline string literal (contains line continuations).
+///
+/// Strings with `\<newline>` need fluid layout because:
+/// 1. They span multiple lines in source
+/// 2. Prettier always wraps the declaration for these
+pub(crate) fn is_multiline_string_literal(expr: &internal::Expression, source: &str) -> bool {
+    if let internal::Expression::Literal(lit) = expr
+        && let internal::LiteralValue::String { .. } = &lit.value
+    {
+        let raw = lit.span.extract(source);
+        // Check for line continuation: backslash followed by newline
+        raw.contains("\\\n") || raw.contains("\\\r")
+    } else {
+        false
+    }
+}
+
+/// Check if a brace-delimited block was written as multiline in source
+///
+/// Detects newline immediately after opening brace: `{\n  ...}` vs `{ ... }`
+/// Used for type literals, mapped types, and other brace-delimited constructs.
+pub(crate) fn is_brace_block_multiline(source: &str, span: tsv_lang::Span) -> bool {
+    let source_text = span.extract(source);
+    let after_brace = source_text.strip_prefix('{').unwrap_or("");
+    after_brace.starts_with('\n')
+        || after_brace.starts_with("\r\n")
+        || after_brace.trim_start_matches(' ').starts_with('\n')
+}
+
+/// Context for object pattern expansion decisions
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PatternContext {
+    /// Pattern in function parameter position
+    FunctionParameter,
+    /// Pattern in standalone context (variable declaration, assignment)
+    Standalone,
+}
+
+/// Check if an object pattern should expand (print across multiple lines).
+///
+/// Prettier expands object patterns when any property has a nested pattern
+/// (ObjectPattern or ArrayPattern) as its value. This is different from the
+/// multiline content rule used for object expressions.
+///
+/// Prettier expands based on nesting depth and context:
+/// - In function parameters: depth 3+ expands (e.g., {a: {b}} stays, {a: {b: {c}}} expands)
+/// - In standalone contexts: depth 2+ expands (e.g., {a: {b}} expands)
+pub(crate) fn object_pattern_should_expand(
+    obj: &internal::ObjectPattern,
+    context: PatternContext,
+) -> bool {
+    let depth = pattern_nesting_depth(obj);
+    match context {
+        PatternContext::FunctionParameter => depth >= 3,
+        PatternContext::Standalone => depth >= 2,
+    }
+}
+
+/// Calculate the maximum nesting depth of an object pattern
+/// Depth 1 = simple pattern like {a}
+/// Depth 2 = one level of nesting like {a: {b}}
+/// Depth 3 = two levels of nesting like {a: {b: {c}}}
+fn pattern_nesting_depth(obj: &internal::ObjectPattern) -> usize {
+    let mut max_depth = 1;
+
+    for prop in &obj.properties {
+        match prop {
+            internal::ObjectPatternProperty::Property(p) => {
+                let nested_depth = match &p.value {
+                    internal::Expression::ObjectPattern(nested_obj) => {
+                        1 + pattern_nesting_depth(nested_obj)
+                    }
+                    internal::Expression::ArrayPattern(nested_arr) => {
+                        1 + array_pattern_nesting_depth(nested_arr)
+                    }
+                    internal::Expression::AssignmentPattern(ap) => match ap.left.as_ref() {
+                        internal::Expression::ObjectPattern(nested_obj) => {
+                            1 + pattern_nesting_depth(nested_obj)
+                        }
+                        internal::Expression::ArrayPattern(nested_arr) => {
+                            1 + array_pattern_nesting_depth(nested_arr)
+                        }
+                        _ => 1,
+                    },
+                    _ => 1,
+                };
+                max_depth = max_depth.max(nested_depth);
+            }
+            internal::ObjectPatternProperty::RestElement(_) => {}
+        }
+    }
+
+    max_depth
+}
+
+/// Calculate the maximum nesting depth of an array pattern
+fn array_pattern_nesting_depth(arr: &internal::ArrayPattern) -> usize {
+    let mut max_depth = 1;
+
+    for elem in arr.elements.iter().flatten() {
+        let nested_depth = match elem {
+            internal::Expression::ObjectPattern(nested_obj) => {
+                1 + pattern_nesting_depth(nested_obj)
+            }
+            internal::Expression::ArrayPattern(nested_arr) => {
+                1 + array_pattern_nesting_depth(nested_arr)
+            }
+            internal::Expression::AssignmentPattern(ap) => match ap.left.as_ref() {
+                internal::Expression::ObjectPattern(nested_obj) => {
+                    1 + pattern_nesting_depth(nested_obj)
+                }
+                internal::Expression::ArrayPattern(nested_arr) => {
+                    1 + array_pattern_nesting_depth(nested_arr)
+                }
+                _ => 1,
+            },
+            _ => 1,
+        };
+        max_depth = max_depth.max(nested_depth);
+    }
+
+    max_depth
+}
+
+/// Check if a template literal contains newlines in its content
+///
+/// Matches Prettier's `templateLiteralHasNewLines` function
+pub(crate) fn template_literal_has_newlines(template: &internal::TemplateLiteral) -> bool {
+    template.quasis.iter().any(|q| q.raw.contains('\n'))
+}
+
+/// Check if an expression contains multiline content (e.g., line continuation strings)
+///
+/// Recursively traverses nested structures (arrays, objects, calls) to find
+/// multiline strings. Prettier expands ALL containing structures when a multiline
+/// string is found anywhere in the tree.
+pub(crate) fn has_multiline_content(expr: &internal::Expression, source: &str) -> bool {
+    match expr {
+        internal::Expression::Literal(_) => is_multiline_string_literal(expr, source),
+        internal::Expression::ArrayExpression(arr) => arr
+            .elements
+            .iter()
+            .flatten()
+            .any(|elem| has_multiline_content(elem, source)),
+        internal::Expression::ObjectExpression(obj) => {
+            obj.properties.iter().any(|prop| match prop {
+                internal::ObjectProperty::Property(p) => has_multiline_content(&p.value, source),
+                internal::ObjectProperty::SpreadElement(s) => {
+                    has_multiline_content(&s.argument, source)
+                }
+            })
+        }
+        internal::Expression::CallExpression(call) => call
+            .arguments
+            .iter()
+            .any(|arg| has_multiline_content(arg, source)),
+        internal::Expression::NewExpression(new_expr) => new_expr
+            .arguments
+            .iter()
+            .any(|arg| has_multiline_content(arg, source)),
+        internal::Expression::UnaryExpression(unary) => {
+            has_multiline_content(&unary.argument, source)
+        }
+        internal::Expression::UpdateExpression(update) => {
+            has_multiline_content(&update.argument, source)
+        }
+        internal::Expression::BinaryExpression(binary) => {
+            has_multiline_content(&binary.left, source)
+                || has_multiline_content(&binary.right, source)
+        }
+        internal::Expression::ConditionalExpression(cond) => {
+            has_multiline_content(&cond.test, source)
+                || has_multiline_content(&cond.consequent, source)
+                || has_multiline_content(&cond.alternate, source)
+        }
+        internal::Expression::MemberExpression(member) => {
+            has_multiline_content(&member.object, source)
+        }
+        internal::Expression::ArrowFunctionExpression(arrow) => match &arrow.body {
+            internal::ArrowFunctionBody::Expression(expr) => has_multiline_content(expr, source),
+            internal::ArrowFunctionBody::BlockStatement(_) => false,
+        },
+        internal::Expression::SpreadElement(spread) => {
+            has_multiline_content(&spread.argument, source)
+        }
+        internal::Expression::Identifier(_) => false,
+        // Private identifiers are just #name, no multiline content
+        internal::Expression::PrivateIdentifier(_) => false,
+        internal::Expression::TemplateLiteral(template) => {
+            // Template literals themselves don't count as "multiline content" even if they
+            // contain newlines - Prettier keeps them inline. Only their interpolated expressions
+            // are checked for multiline content.
+            template
+                .expressions
+                .iter()
+                .any(|e| has_multiline_content(e, source))
+        }
+        internal::Expression::TaggedTemplateExpression(tagged) => {
+            // Tagged template literals are also kept inline by Prettier, even with newlines
+            // Check tag and interpolated expressions for multiline content
+            has_multiline_content(&tagged.tag, source)
+                || tagged
+                    .quasi
+                    .expressions
+                    .iter()
+                    .any(|e| has_multiline_content(e, source))
+        }
+        // Function and class expressions don't contribute to multiline content detection
+        // They have their own block formatting
+        internal::Expression::FunctionExpression(_) => false,
+        internal::Expression::ClassExpression(_) => false,
+        internal::Expression::AwaitExpression(await_expr) => {
+            has_multiline_content(&await_expr.argument, source)
+        }
+        internal::Expression::YieldExpression(yield_expr) => yield_expr
+            .argument
+            .as_ref()
+            .is_some_and(|arg| has_multiline_content(arg, source)),
+        internal::Expression::SequenceExpression(seq) => seq
+            .expressions
+            .iter()
+            .any(|e| has_multiline_content(e, source)),
+        // Regex literals don't have multiline content
+        internal::Expression::RegexLiteral(_) => false,
+        // Super is just a keyword, no multiline content
+        internal::Expression::Super(_) => false,
+        // Assignment expression: check both sides
+        internal::Expression::AssignmentExpression(assign) => {
+            has_multiline_content(&assign.left, source)
+                || has_multiline_content(&assign.right, source)
+        }
+        // Patterns: check their contents
+        internal::Expression::ObjectPattern(obj) => obj.properties.iter().any(|prop| match prop {
+            internal::ObjectPatternProperty::Property(p) => has_multiline_content(&p.value, source),
+            internal::ObjectPatternProperty::RestElement(r) => {
+                has_multiline_content(&r.argument, source)
+            }
+        }),
+        internal::Expression::ArrayPattern(arr) => arr
+            .elements
+            .iter()
+            .flatten()
+            .any(|elem| has_multiline_content(elem, source)),
+        internal::Expression::AssignmentPattern(pattern) => {
+            has_multiline_content(&pattern.left, source)
+                || has_multiline_content(&pattern.right, source)
+        }
+        internal::Expression::RestElement(rest) => has_multiline_content(&rest.argument, source),
+        // Type assertion expressions: check the inner expression
+        internal::Expression::TSTypeAssertion(type_assert) => {
+            has_multiline_content(&type_assert.expression, source)
+        }
+        internal::Expression::TSAsExpression(as_expr) => {
+            has_multiline_content(&as_expr.expression, source)
+        }
+        internal::Expression::TSSatisfiesExpression(sat_expr) => {
+            has_multiline_content(&sat_expr.expression, source)
+        }
+        internal::Expression::TSInstantiationExpression(inst_expr) => {
+            has_multiline_content(&inst_expr.expression, source)
+        }
+        internal::Expression::TSNonNullExpression(non_null_expr) => {
+            has_multiline_content(&non_null_expr.expression, source)
+        }
+        internal::Expression::ImportExpression(import_expr) => {
+            has_multiline_content(&import_expr.source, source)
+        }
+        // Meta properties (import.meta, new.target) are never multiline
+        internal::Expression::MetaProperty(_) => false,
+        // Parameter properties don't contain multiline content
+        internal::Expression::TSParameterProperty(_) => false,
+    }
+}
+
+/// Build doc for TSEntityName (qualified names like `A.B.C`)
+///
+/// This is a standalone function since it doesn't need printer state -
+/// it only uses `doc::symbol()` for deferred symbol resolution.
+pub(crate) fn build_entity_name_doc(name: &internal::TSEntityName) -> Doc {
+    match name {
+        internal::TSEntityName::Identifier(id) => doc::symbol(id.name.to_u32()),
+        internal::TSEntityName::QualifiedName(qn) => doc::concat(vec![
+            build_entity_name_doc(&qn.left),
+            doc::text("."),
+            doc::symbol(qn.right.name.to_u32()),
+        ]),
+    }
+}

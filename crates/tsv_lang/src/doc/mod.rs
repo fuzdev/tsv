@@ -78,18 +78,19 @@ mod types;
 // Re-export all public items
 
 // Types
-pub use types::{Doc, DocContext, DocText, Mode, TextResolver};
+pub use types::{Doc, DocContext, DocText, GroupId, LineKind, Mode, TextResolver};
 
 // Builders
 pub use builders::{
-    concat, conditional_group, dedent, fill, group, hardline, if_break, indent, line, literalline,
-    softline, symbol, text, text_owned, with_context,
+    align, break_parent, concat, conditional_group, dedent, empty, fill, group, group_with_id,
+    hardline, if_break, indent, indent_if_break, line, line_suffix, line_suffix_boundary,
+    literalline, softline, symbol, text, text_owned, with_base_indent_override, with_context,
 };
 
 // Helpers
 pub use helpers::{
-    braces, brackets, comma_hardline, comma_line, indent_line, indent_softline, join, join_doc,
-    join_trailing, parens, trailing_comma, will_break, wrap,
+    apply_indent_levels, braces, brackets, can_break, comma_hardline, comma_line, indent_line,
+    indent_softline, join, join_doc, join_trailing, parens, trailing_comma, will_break, wrap,
 };
 
 // Fits
@@ -99,6 +100,7 @@ pub use fits::{available_width, fits, fits_at, fits_resolved};
 pub use render::{
     print_doc, print_doc_at_column, print_doc_at_column_resolved, print_doc_resolved,
     print_doc_with_indent, print_doc_with_indent_resolved,
+    print_doc_with_indent_resolved_preserve_whitespace,
 };
 
 #[cfg(test)]
@@ -485,15 +487,15 @@ mod tests {
     }
 
     #[test]
-    fn test_fill_wraps_last_item_at_102_chars() {
+    fn test_fill_wraps_last_item_at_101_chars() {
         // Reproduce the CSS animation-name bug:
-        // When the line reaches exactly 102 chars (printWidth + 2), the last item
+        // When the line reaches exactly 101 chars (printWidth + 1), the last item
         // should wrap to a new line, but it's staying on the same line.
         //
         // Structure: indent (6 chars) + items with commas
-        // Items: "a0000000000, a1111111111, ... a5555555555, " = ~84 chars
-        // Last item: "a6666666666666666" = 16 chars
-        // Total: 6 + 84 + 16 = 106 chars → should wrap
+        // Items: "a0000000000, a1111111111, ... a5555555555, " = 78 chars
+        // Last item: "a6666666666666666" = 17 chars
+        // Total: 6 + 78 + 17 = 101 chars → should wrap
 
         let items = vec![
             "a0000000000",
@@ -806,6 +808,68 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(print_doc(&doc, &config), "a\n  b");
+    }
+
+    /// Test documenting Doc size constraints.
+    ///
+    /// # Current State (32 bytes)
+    /// Doc is 32 bytes after optimizing Group's expanded_states field:
+    /// - Largest payload: Vec<Doc> at 24 bytes (Concat, Fill, Text variants)
+    /// - Enum discriminant: 1 byte
+    /// - Padding to 8-byte alignment: 7 bytes
+    /// - Total: 32 bytes
+    ///
+    /// # Previous State (40 bytes)
+    /// Before optimization, Group's `expanded_states: Option<Vec<Doc>>` (24 bytes)
+    /// made Group the largest variant at 33 bytes → 40 bytes with padding.
+    ///
+    /// # Optimization Applied
+    /// Changed `expanded_states: Option<Vec<Doc>>` → `expanded_states: Option<Box<Vec<Doc>>>`
+    /// - Option<Box<Vec<Doc>>> is only 8 bytes (pointer or null)
+    /// - Group is now 17 bytes → 24 with padding
+    /// - Doc enum shrunk from 40 → 32 bytes (20% reduction)
+    ///
+    /// # Why Not 24 Bytes?
+    /// The enum discriminant + padding adds 8 bytes to the largest 24-byte payload.
+    /// Rust's enum layout: max(variant_payloads) + discriminant + padding.
+    ///
+    /// # Why SmallVec Doesn't Work for Concat
+    /// SmallVec<[Doc; N]> stores N×32 bytes inline. Even SmallVec<[Doc; 1]> would be
+    /// larger than the current Doc, bloating ALL variants.
+    #[test]
+    fn doc_size_constraints() {
+        use super::types::Command;
+        use smallvec::SmallVec;
+        use std::mem::size_of;
+
+        // Current sizes after optimization
+        assert_eq!(
+            size_of::<Doc>(),
+            32,
+            "Doc size changed - review doc_size_constraints test"
+        );
+        assert_eq!(size_of::<Vec<Doc>>(), 24); // Largest payload (Concat, Fill)
+        assert_eq!(size_of::<Box<Doc>>(), 8);
+        assert_eq!(size_of::<Option<Box<Vec<Doc>>>>(), 8); // Optimized expanded_states
+
+        // SmallVec analysis - still not viable even at 32 bytes
+        assert_eq!(size_of::<SmallVec<[Doc; 4]>>(), 144); // 4×32 + overhead
+        assert!(size_of::<SmallVec<[Doc; 1]>>() > size_of::<Doc>());
+
+        // Command stack analysis (for potential SmallVec optimization)
+        // Command { indent, mode, doc, base_indent_override } = 40 bytes
+        //   - indent: usize (8), mode: Mode (1 + 7 padding), doc: &Doc (8),
+        //   - base_indent_override: Option<usize> (16)
+        //
+        // SmallVec viability for command stack:
+        // - SmallVec<[Command; 16]> = 656 bytes on stack, avoids heap for depth ≤16
+        // - Typical doc depth: 10-20 (functions, nested expressions)
+        // - Trade-off: 656 bytes stack vs heap allocation
+        //
+        // Verdict: Less viable now with larger Command size. The heap allocation
+        // for Vec is amortized across the entire render.
+        assert_eq!(size_of::<Command>(), 40);
+        assert_eq!(size_of::<SmallVec<[Command; 16]>>(), 656);
     }
 
     #[test]

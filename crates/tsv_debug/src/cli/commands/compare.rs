@@ -1,5 +1,5 @@
 use crate::cli::input_parser;
-use crate::diff::{ColorChoice, DiffOptions};
+use crate::diff::{Color, ColorChoice, DiffOptions, diff_to_string};
 use crate::error;
 use crate::{deno, subprocess};
 use tsv_cli::cli::args::Args;
@@ -17,6 +17,7 @@ impl Command for CompareCommand {
     fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
         // Parse flags
         let quiet = args.flag("quiet");
+        let verbose = args.flag("verbose") || args.flag("v");
         let json_output = args.flag("json");
         let color_choice = if let Some(color_str) = args.option("color") {
             Some(color_str.parse()?)
@@ -31,6 +32,7 @@ impl Command for CompareCommand {
             input,
             parser_type,
             quiet,
+            verbose,
             json_output,
             color_choice,
         }))
@@ -38,7 +40,9 @@ impl Command for CompareCommand {
 
     fn usage(&self) -> Vec<String> {
         vec![
-            "compare <file>                                  Compare formatter output with prettier for file"
+            "compare <file>                                  Compare formatter output with prettier (shows diff only)"
+                .to_string(),
+            "compare --verbose <file>                        Show full input, ours, prettier, and diff"
                 .to_string(),
             "compare --content <string> --parser <type>      Compare formatter output (requires --parser svelte|typescript|css)"
                 .to_string(),
@@ -59,6 +63,7 @@ struct CompareExecutable {
     input: Input,
     parser_type: ParserType,
     quiet: bool,
+    verbose: bool,
     json_output: bool,
     color_choice: Option<ColorChoice>,
 }
@@ -70,6 +75,7 @@ impl Executable for CompareExecutable {
             &self.input,
             self.parser_type,
             self.quiet,
+            self.verbose,
             self.json_output,
             self.color_choice,
         ));
@@ -84,6 +90,7 @@ async fn run(
     input: &Input,
     parser_type: ParserType,
     quiet: bool,
+    verbose: bool,
     json_output: bool,
     color_choice: Option<ColorChoice>,
 ) -> i32 {
@@ -94,7 +101,7 @@ async fn run(
         ParserType::Css => "css",
     };
 
-    if !quiet {
+    if verbose {
         println!("=== Input ===");
         println!("{content}");
         println!();
@@ -103,7 +110,7 @@ async fn run(
     // Run our formatter
     let our_output = match run_our_formatter(content, parser_name) {
         Ok(output) => {
-            if !quiet {
+            if verbose {
                 println!("=== Our Formatter ===");
                 println!("{output}");
                 println!();
@@ -111,11 +118,11 @@ async fn run(
             Some(output)
         }
         Err(err) => {
-            if !quiet {
+            if verbose {
                 eprintln!("=== Our Formatter ===");
             }
             eprintln!("Error running our formatter: {err}");
-            if !quiet {
+            if verbose {
                 println!();
             }
             return 1;
@@ -125,7 +132,7 @@ async fn run(
     // Run prettier
     let prettier_output = match run_prettier(content, parser_name).await {
         Ok(output) => {
-            if !quiet {
+            if verbose {
                 println!("=== Prettier ===");
                 println!("{output}");
                 println!();
@@ -133,7 +140,7 @@ async fn run(
             Some(output)
         }
         Err(err) => {
-            if !quiet {
+            if verbose {
                 eprintln!("=== Prettier ===");
             }
             eprintln!("Error running prettier: {err}");
@@ -141,7 +148,7 @@ async fn run(
             if !hint.is_empty() {
                 eprintln!("hint: {hint}");
             }
-            if !quiet {
+            if verbose {
                 println!();
             }
             return 1;
@@ -184,7 +191,7 @@ async fn run(
             return 0;
         }
 
-        // In normal mode, always show the comparison
+        // Default mode: always show the comparison result (diff only)
         let mut options = DiffOptions::compare();
         if let Some(choice) = color_choice {
             options = options.with_color_choice(choice);
@@ -203,8 +210,6 @@ fn print_comparison_with_options(
     prettier_output: &str,
     options: &DiffOptions,
 ) {
-    use crate::diff::{Color, diff_to_string};
-
     let cyan = Color::Cyan.code();
     let reset = Color::reset();
 

@@ -11,7 +11,7 @@ use super::{
     convert_while_statement, create_location,
 };
 use string_interner::DefaultStringInterner;
-use tsv_lang::LocationTracker;
+use tsv_lang::{InfallibleResolve, LocationTracker};
 
 /// Main statement conversion dispatcher
 pub(in crate::ast) fn convert_statement(
@@ -387,8 +387,6 @@ pub(in crate::ast) fn convert_identifier(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::Identifier {
-    use tsv_lang::InfallibleResolve;
-
     public::Identifier {
         node_type: "Identifier".to_string(),
         start: id.span.start,
@@ -463,8 +461,6 @@ fn convert_entity_name(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::TSEntityName {
-    use tsv_lang::InfallibleResolve;
-
     match name {
         internal::TSEntityName::Identifier(id) => {
             public::TSEntityName::Identifier(public::Identifier {

@@ -14,6 +14,10 @@ use tempfile::NamedTempFile;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio::sync::{mpsc, oneshot};
+use tokio::time::{Duration, timeout};
+
+/// Timeout for reading a response from the sidecar (5 seconds)
+const READ_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Embedded sidecar script
 const SIDECAR_SCRIPT: &str = include_str!("sidecar.ts");
@@ -205,10 +209,11 @@ impl ActorState {
     /// Returns false on EOF (sidecar crashed)
     async fn read_response(&mut self) -> Result<bool, DenoError> {
         let mut line = String::new();
-        let bytes_read = self
-            .stdout
-            .read_line(&mut line)
+        let bytes_read = timeout(READ_TIMEOUT, self.stdout.read_line(&mut line))
             .await
+            .map_err(|_| DenoError::Timeout {
+                seconds: READ_TIMEOUT.as_secs(),
+            })?
             .map_err(DenoError::Communication)?;
 
         if bytes_read == 0 {
@@ -301,17 +306,22 @@ async fn run_actor(mut state: ActorState, mut rx: mpsc::Receiver<ActorCommand>) 
                 }
             }
 
-            // Read responses from sidecar
-            result = state.read_response() => {
+            // Read responses from sidecar (only when requests are pending)
+            result = state.read_response(), if !state.pending.is_empty() => {
                 match result {
                     Ok(true) => {} // Response handled
                     Ok(false) => {
-                        eprintln!("deno sidecar process exited unexpectedly");
+                        eprintln!("deno sidecar process exited unexpectedly ({} requests pending)", state.pending.len());
                         state.fail_all_pending(|| DenoError::SidecarCrashed);
                         break;
                     }
+                    Err(DenoError::Timeout { .. }) => {
+                        eprintln!("deno sidecar timed out ({} requests pending)", state.pending.len());
+                        state.fail_all_pending(|| DenoError::Timeout { seconds: READ_TIMEOUT.as_secs() });
+                        break;
+                    }
                     Err(e) => {
-                        eprintln!("Error reading from deno sidecar: {e}");
+                        eprintln!("Error reading from deno sidecar: {e} ({} requests pending)", state.pending.len());
                         state.fail_all_pending(|| DenoError::SidecarCrashed);
                         break;
                     }

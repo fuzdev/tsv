@@ -73,20 +73,15 @@ pub async fn run_prettier(content: &str, parser: PrettierParser<'_>) -> Result<S
 /// * `source` - The Svelte source code
 ///
 /// # Returns
-/// JSON AST as a string
+/// AST as a JSON Value (caller serializes with desired formatting)
 ///
 /// # Errors
 /// Returns an error if Deno is not available or parsing fails.
-pub async fn parse_svelte(source: &str) -> Result<String, DenoError> {
-    let result = get_actor()
+pub async fn parse_svelte(source: &str) -> Result<serde_json::Value, DenoError> {
+    get_actor()
         .await?
         .call("svelte-parse", source, None)
-        .await?;
-
-    result
-        .as_str()
-        .map(ToString::to_string)
-        .ok_or(DenoError::MissingOutput)
+        .await
 }
 
 /// Parse TypeScript source code using acorn with TypeScript plugin
@@ -95,20 +90,15 @@ pub async fn parse_svelte(source: &str) -> Result<String, DenoError> {
 /// * `source` - The TypeScript source code
 ///
 /// # Returns
-/// JSON AST as a string
+/// AST as a JSON Value (caller serializes with desired formatting)
 ///
 /// # Errors
 /// Returns an error if Deno is not available or parsing fails.
-pub async fn parse_typescript(source: &str) -> Result<String, DenoError> {
-    let result = get_actor()
+pub async fn parse_typescript(source: &str) -> Result<serde_json::Value, DenoError> {
+    get_actor()
         .await?
         .call("acorn-typescript-parse", source, None)
-        .await?;
-
-    result
-        .as_str()
-        .map(ToString::to_string)
-        .ok_or(DenoError::MissingOutput)
+        .await
 }
 
 /// Version information from the Deno sidecar
@@ -188,12 +178,12 @@ mod tests {
         let result = parse_svelte("<div>hello</div>").await;
         assert!(result.is_ok(), "parse_svelte failed: {result:?}");
         let ast = result.unwrap();
-        assert!(ast.contains("\"type\": \"Root\""));
+        assert_eq!(ast.get("type").and_then(|v| v.as_str()), Some("Root"));
 
         // Test typescript parser
         let result = parse_typescript("const x: number = 1;").await;
         assert!(result.is_ok(), "parse_typescript failed: {result:?}");
         let ast = result.unwrap();
-        assert!(ast.contains("\"type\": \"Program\""));
+        assert_eq!(ast.get("type").and_then(|v| v.as_str()), Some("Program"));
     }
 }

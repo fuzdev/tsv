@@ -20,7 +20,8 @@ impl<'a> SvelteParser<'a> {
         self.advance()?;
 
         // Parse attributes (e.g., lang="scss")
-        let attributes = self.parse_attributes()?;
+        // Use literal parsing - style attributes don't have expression syntax
+        let attributes = self.parse_attributes_literal()?;
 
         // Verify we're at > and save position for content start
         if !self.check(TokenKind::RightAngle) {

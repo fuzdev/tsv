@@ -2,19 +2,15 @@
 
 use super::Printer;
 use crate::ast::internal;
-use tsv_lang::SymbolResolver;
+use tsv_lang::SymbolToU32;
 use tsv_lang::doc::{self, Doc};
 
 impl<'a> Printer<'a> {
-    /// Build doc for function declaration params with comment handling
+    /// Build doc for function signature (params + return type) with comment handling.
     ///
-    /// Uses shared implementation and wraps in a group for independent breaking.
-    /// `force_break` is used when signature width estimation determines params should break.
-    fn build_function_decl_params_doc(
-        &self,
-        decl: &internal::FunctionDeclaration,
-        force_break: bool,
-    ) -> Doc {
+    /// Returns a single group containing both params and return type.
+    /// This ensures params break BEFORE return type when signature exceeds width.
+    fn build_function_signature_doc(&self, decl: &internal::FunctionDeclaration) -> Doc {
         let params_start = Some(decl.params_start);
 
         // Compute trailing comments boundary
@@ -24,14 +20,24 @@ impl<'a> Printer<'a> {
             Some(decl.body.span.start)
         };
 
-        // Use shared implementation with force_break and wrap in group
+        // Build params doc without wrapping in a group
         let params_doc = self.build_params_doc_with_comments_ext(
             &decl.params,
             params_start,
             trailing_comments_end,
-            force_break,
+            false,
         );
-        doc::group(params_doc)
+
+        let mut sig_parts = vec![params_doc];
+
+        // Return type annotation
+        if let Some(return_type) = &decl.return_type {
+            sig_parts.push(self.build_type_annotation_doc_for_return_type(return_type));
+        }
+
+        // Single outer group for entire signature (params + return type).
+        // When this group breaks, params' softlines become newlines while return type stays flat.
+        doc::group(doc::concat(sig_parts))
     }
 
     /// Build a Doc for a function declaration
@@ -48,9 +54,8 @@ impl<'a> Printer<'a> {
             parts.push(doc::text("*"));
         }
         if let Some(id) = &decl.id {
-            let id_str = self.resolve_symbol(id.name);
             parts.push(doc::text(" "));
-            parts.push(doc::text_owned(id_str));
+            parts.push(doc::symbol(id.name.to_u32()));
         } else {
             // Prettier adds a space before () for anonymous functions
             parts.push(doc::text(" "));
@@ -59,13 +64,9 @@ impl<'a> Printer<'a> {
         if let Some(type_params) = &decl.type_parameters {
             parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
         }
-        // Build params with comment handling
-        parts.push(self.build_function_decl_params_doc(decl, false));
 
-        // Return type annotation (e.g., `: number`)
-        if let Some(return_type) = &decl.return_type {
-            parts.push(self.build_type_annotation_doc(return_type));
-        }
+        // Signature (params + return type) in a single group
+        parts.push(self.build_function_signature_doc(decl));
 
         parts.push(doc::text(" "));
         parts.push(self.build_block_statement_doc(&decl.body));

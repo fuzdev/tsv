@@ -1,7 +1,7 @@
 //! Helper functions for building and analyzing Doc trees
 
-use super::builders::{concat, if_break, indent, text};
-use super::types::Doc;
+use super::builders::{concat, empty, hardline, if_break, indent, line, softline, text};
+use super::types::{Doc, LineKind};
 
 // =============================================================================
 // Analysis Utilities
@@ -17,12 +17,67 @@ use super::types::Doc;
 pub fn will_break(doc: &Doc) -> bool {
     match doc {
         Doc::Text(_) => false,
-        Doc::Line { hard, literal, .. } => *hard || *literal,
+        Doc::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
         Doc::Indent(inner) | Doc::Dedent(inner) => will_break(inner),
+        Doc::Align { contents, .. } => will_break(contents),
+        Doc::IndentIfBreak { contents, .. } => will_break(contents),
         Doc::Group { contents, .. } => will_break(contents),
         Doc::IfBreak { break_doc, .. } => will_break(break_doc),
         Doc::Concat(docs) | Doc::Fill(docs) => docs.iter().any(will_break),
         Doc::WithContext { doc, .. } => will_break(doc),
+        // LineSuffix content doesn't affect breaking decisions
+        Doc::LineSuffix(_) => false,
+        Doc::LineSuffixBoundary => false,
+        // BreakParent forces the group to break
+        Doc::BreakParent => true,
+    }
+}
+
+/// Check if a doc can break (contains any line elements)
+///
+/// This is used for assignment layout decisions: if the left-hand side can break,
+/// we may need different formatting for the right-hand side.
+///
+/// Returns true if the doc contains any Line elements (soft, hard, or literal).
+/// This matches Prettier's `canBreak()` utility which searches for DOC_TYPE_LINE.
+///
+/// # Example
+/// ```ignore
+/// let id_doc = self.build_expression_doc(&declarator.id);
+/// let can_break_left = can_break(&id_doc);
+/// if can_break_left && is_arrow_function(init) {
+///     // Use break-lhs layout
+/// }
+/// ```
+pub fn can_break(doc: &Doc) -> bool {
+    match doc {
+        // Any Line element means the doc can break
+        Doc::Line(_) => true,
+        // Recurse into containers
+        Doc::Indent(inner) | Doc::Dedent(inner) => can_break(inner),
+        Doc::Align { contents, .. } => can_break(contents),
+        Doc::IndentIfBreak { contents, .. } => can_break(contents),
+        Doc::Group {
+            contents,
+            expanded_states,
+            ..
+        } => {
+            can_break(contents)
+                || expanded_states
+                    .as_ref()
+                    .is_some_and(|states| states.iter().any(can_break))
+        }
+        Doc::IfBreak {
+            break_doc,
+            flat_doc,
+        } => can_break(break_doc) || can_break(flat_doc),
+        Doc::Concat(docs) | Doc::Fill(docs) => docs.iter().any(can_break),
+        Doc::WithContext { doc, .. } => can_break(doc),
+        Doc::LineSuffix(inner) => can_break(inner),
+        // Text and boundaries can't break
+        Doc::Text(_) | Doc::LineSuffixBoundary => false,
+        // BreakParent forces breaking
+        Doc::BreakParent => true,
     }
 }
 
@@ -42,7 +97,7 @@ pub fn will_break(doc: &Doc) -> bool {
 /// ```
 pub fn join(docs: Vec<Doc>, separator: &'static str) -> Doc {
     if docs.is_empty() {
-        return concat(vec![]);
+        return empty();
     }
     let mut parts = Vec::with_capacity(docs.len() * 2 - 1);
     for (i, doc) in docs.into_iter().enumerate() {
@@ -70,7 +125,7 @@ pub fn join(docs: Vec<Doc>, separator: &'static str) -> Doc {
 /// ```
 pub fn join_doc(docs: Vec<Doc>, separator: Doc) -> Doc {
     if docs.is_empty() {
-        return concat(vec![]);
+        return empty();
     }
     let mut parts = Vec::with_capacity(docs.len() * 2 - 1);
     for (i, doc) in docs.into_iter().enumerate() {
@@ -98,7 +153,7 @@ pub fn join_doc(docs: Vec<Doc>, separator: Doc) -> Doc {
 /// ```
 pub fn join_trailing(docs: Vec<Doc>, separator: Doc) -> Doc {
     if docs.is_empty() {
-        return concat(vec![]);
+        return empty();
     }
     let mut parts = Vec::with_capacity(docs.len() * 2);
     for (i, doc) in docs.into_iter().enumerate() {
@@ -193,7 +248,6 @@ pub fn braces(inner: Doc) -> Doc {
 /// ```
 #[inline]
 pub fn indent_line(inner: Doc) -> Doc {
-    use super::builders::line;
     indent(concat(vec![line(), inner]))
 }
 
@@ -211,7 +265,6 @@ pub fn indent_line(inner: Doc) -> Doc {
 /// ```
 #[inline]
 pub fn indent_softline(inner: Doc) -> Doc {
-    use super::builders::softline;
     indent(concat(vec![softline(), inner]))
 }
 
@@ -233,7 +286,6 @@ pub fn indent_softline(inner: Doc) -> Doc {
 /// ```
 #[inline]
 pub fn comma_line() -> Doc {
-    use super::builders::line;
     concat(vec![text(","), line()])
 }
 
@@ -250,7 +302,6 @@ pub fn comma_line() -> Doc {
 /// ```
 #[inline]
 pub fn comma_hardline() -> Doc {
-    use super::builders::hardline;
     concat(vec![text(","), hardline()])
 }
 
@@ -269,4 +320,28 @@ pub fn comma_hardline() -> Doc {
 #[inline]
 pub fn trailing_comma() -> Doc {
     if_break(text(","), text(""))
+}
+
+// =============================================================================
+// Multi-Level Indent
+// =============================================================================
+
+/// Apply N levels of indentation to a doc.
+///
+/// This wraps the inner doc in N nested `indent()` calls, useful when you need
+/// to programmatically determine the indent depth at runtime.
+///
+/// # Example
+/// ```ignore
+/// // Indent by 3 levels
+/// let doc = apply_indent_levels(text("content"), 3);
+/// // Equivalent to: indent(indent(indent(text("content"))))
+/// ```
+#[inline]
+pub fn apply_indent_levels(inner: Doc, levels: usize) -> Doc {
+    let mut result = inner;
+    for _ in 0..levels {
+        result = indent(result);
+    }
+    result
 }

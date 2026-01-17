@@ -24,7 +24,8 @@ impl<'a> SvelteParser<'a> {
         self.advance()?;
 
         // Parse attributes (e.g., lang="ts")
-        let attributes = self.parse_attributes()?;
+        // Use literal parsing - script attributes don't have expression syntax
+        let attributes = self.parse_attributes_literal()?;
 
         // Verify we're at > and save position for content start
         if !self.check(TokenKind::RightAngle) {

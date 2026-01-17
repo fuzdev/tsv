@@ -14,59 +14,25 @@
 //! The main entry point is `build_css_value_doc()`, which dispatches to
 //! specialized doc builders for each value type.
 
-use super::{Printer, source_fidelity};
+use super::{Printer, has_wrappable_args, source_fidelity};
 use crate::ast::internal::CssValue;
 use tsv_lang::{Span, doc};
 
 impl<'a> Printer<'a> {
-    /// Format a nested value (function arg, list item)
-    ///
-    /// Uses the doc builder for most values. Functions are handled specially
-    /// to check if they need wrapping (when they exceed print width).
-    pub(super) fn print_nested_value(&mut self, value: &CssValue) {
-        // Functions need special handling for wrapping
-        if let CssValue::Function { name, args, .. } = value {
-            self.print_function_value(name, args);
-            return;
-        }
-        // All other values use doc builder
-        let doc = self.build_css_value_doc(value);
-        self.write_doc(&doc);
-    }
-
-    /// Print a CSS function value with optional wrapping
-    ///
-    /// Wraps function arguments when they exceed print width.
-    fn print_function_value(&mut self, name: &str, args: &[CssValue]) {
-        if self.should_wrap_function(name, args) {
-            // Wrap function arguments
-            self.write(name);
-            self.write("(\n");
-            self.indent_level += 1;
-            for (i, arg) in args.iter().enumerate() {
-                self.write_indent();
-                self.print_nested_value(arg);
-                if i < args.len() - 1 {
-                    self.write(",\n");
-                }
-            }
-            self.indent_level -= 1;
-            self.write("\n");
-            self.write_indent();
-            self.write(")");
-        } else {
-            // Inline function (no wrapping)
-            let doc = self.build_value_function_doc(name, args, Span::new(0, 0));
-            self.write_doc(&doc);
-        }
-    }
-
-    /// Format a CSS value (right-hand side of declaration)
+    /// Format a CSS value
     ///
     /// Uses the doc builder which handles source fidelity and proper formatting.
     pub(super) fn print_css_value(&mut self, value: &CssValue) {
         let doc = self.build_css_value_doc(value);
         self.write_doc(&doc);
+    }
+
+    /// Format a nested value (function arg, list item)
+    ///
+    /// Alias for `print_css_value` - kept for semantic clarity in call sites.
+    #[inline]
+    pub(super) fn print_nested_value(&mut self, value: &CssValue) {
+        self.print_css_value(value);
     }
 
     // ========================================================================
@@ -107,87 +73,13 @@ impl<'a> Printer<'a> {
             if !raw.is_empty() {
                 // Normalize whitespace for parenthesized expressions
                 // (e.g., "(  100%  -  40px  )" → "(100% - 40px)")
-                let normalized = Self::normalize_whitespace(raw);
+                let normalized = source_fidelity::normalize_css_whitespace(raw);
                 return doc::text_owned(normalized);
             }
         }
         // Fallback: semantic formatting
         let formatted = source_fidelity::format_identifier_value(name);
         doc::text_owned(formatted)
-    }
-
-    /// Normalize whitespace in extracted source text
-    ///
-    /// Single-pass normalization that:
-    /// - Collapses consecutive whitespace to single spaces
-    /// - Removes spaces after opening parentheses: `( expr` → `(expr`
-    /// - Removes spaces before closing parentheses: `expr )` → `expr)`
-    /// - Preserves all whitespace inside quoted strings
-    ///
-    /// This matches prettier's normalization behavior for calc() and other functions.
-    fn normalize_whitespace(s: &str) -> String {
-        let mut result = String::with_capacity(s.len());
-        let mut chars = s.chars().peekable();
-        let mut in_string = false;
-        let mut string_delim = '\0';
-        let mut prev_was_whitespace = false;
-
-        while let Some(ch) = chars.next() {
-            match ch {
-                // String delimiter handling
-                '\'' | '"' if !in_string => {
-                    in_string = true;
-                    string_delim = ch;
-                    result.push(ch);
-                    prev_was_whitespace = false;
-                }
-                c if in_string && c == string_delim => {
-                    in_string = false;
-                    result.push(ch);
-                    prev_was_whitespace = false;
-                }
-                _ if in_string => {
-                    // Inside string - preserve everything
-                    result.push(ch);
-                    prev_was_whitespace = false;
-                }
-                // Opening paren - skip following whitespace
-                '(' if !in_string => {
-                    result.push(ch);
-                    // Skip all following whitespace
-                    while let Some(&next) = chars.peek() {
-                        if next.is_whitespace() {
-                            chars.next();
-                        } else {
-                            break;
-                        }
-                    }
-                    prev_was_whitespace = false;
-                }
-                // Closing paren - remove trailing whitespace
-                ')' if !in_string => {
-                    while result.ends_with(|c: char| c.is_whitespace()) {
-                        result.pop();
-                    }
-                    result.push(ch);
-                    prev_was_whitespace = false;
-                }
-                // Whitespace - collapse consecutive
-                ' ' | '\n' | '\t' | '\r' if !in_string => {
-                    if !prev_was_whitespace {
-                        result.push(' ');
-                        prev_was_whitespace = true;
-                    }
-                }
-                // Regular character
-                _ => {
-                    result.push(ch);
-                    prev_was_whitespace = false;
-                }
-            }
-        }
-
-        result.trim().to_string()
     }
 
     /// Build a doc for a string value
@@ -218,10 +110,14 @@ impl<'a> Printer<'a> {
         doc::text_owned(formatted)
     }
 
-    /// Build a doc for a function value (inline)
+    /// Build a doc for a function value with automatic wrapping
     ///
-    /// Note: This builds the inline representation. Wrapped functions are
-    /// handled by the declaration printer which adds newlines and indentation.
+    /// Uses proper doc structure with group/softline/indent so the renderer
+    /// decides wrapping based on actual line position (like Prettier).
+    ///
+    /// - Multi-arg functions: wrap each arg on its own line when exceeds width
+    /// - Single-arg List (e.g., drop-shadow): wrap on space separators
+    /// - Single-arg non-List (e.g., url): never wraps
     fn build_value_function_doc(&self, name: &str, args: &[CssValue], span: Span) -> doc::Doc {
         // For functions with no parsed args (like supports()), extract from source
         if args.is_empty() && span.end_usize() <= self.source.len() {
@@ -231,21 +127,61 @@ impl<'a> Printer<'a> {
 
         // WORKAROUND: url() data URIs contain commas that our parser incorrectly treats as
         // argument separators. Use no space after commas to preserve data URI format.
+        // url() also never wraps since it has no natural break points.
         let is_url = name == "url";
-        let separator = if is_url { "," } else { ", " };
+        if is_url {
+            let arg_docs: Vec<_> = args
+                .iter()
+                .map(|arg| self.build_css_value_doc(arg))
+                .collect();
+            return doc::concat(vec![
+                doc::text_owned(name.to_string()),
+                doc::text("("),
+                doc::join(arg_docs, ","),
+                doc::text(")"),
+            ]);
+        }
 
-        let arg_docs: Vec<_> = args
-            .iter()
-            .map(|arg| self.build_css_value_doc(arg))
-            .collect();
-        let args_doc = doc::join(arg_docs, separator);
+        if !has_wrappable_args(args) {
+            // Single simple arg - inline only, no break points
+            let arg_docs: Vec<_> = args
+                .iter()
+                .map(|arg| self.build_css_value_doc(arg))
+                .collect();
+            return doc::concat(vec![
+                doc::text_owned(name.to_string()),
+                doc::text("("),
+                doc::join(arg_docs, ", "),
+                doc::text(")"),
+            ]);
+        }
 
-        doc::concat(vec![
+        // Build with group/softline structure for automatic wrapping
+        // Structure: name(
+        //   arg1,
+        //   arg2,
+        //   arg3
+        // )
+        // When flat: name(arg1, arg2, arg3)
+        let mut inner_parts = Vec::new();
+        for (i, arg) in args.iter().enumerate() {
+            inner_parts.push(self.build_css_value_doc(arg));
+            if i < args.len() - 1 {
+                inner_parts.push(doc::text(","));
+                inner_parts.push(doc::line()); // space when flat, newline when broken
+            }
+        }
+
+        doc::group(doc::concat(vec![
             doc::text_owned(name.to_string()),
             doc::text("("),
-            args_doc,
+            doc::indent(doc::concat(vec![
+                doc::softline(), // nothing when flat, newline when broken
+                doc::concat(inner_parts),
+            ])),
+            doc::softline(), // nothing when flat, newline when broken
             doc::text(")"),
-        ])
+        ]))
     }
 
     /// Build a doc for space-separated values

@@ -1,8 +1,8 @@
 /**
  * OXC implementation wrappers (oxc-parser + oxfmt)
  *
- * oxc-parser: Fast TypeScript/JavaScript parser
- * oxfmt: Fast TypeScript/JavaScript/CSS formatter
+ * oxc-parser: Fast TypeScript/JS parser
+ * oxfmt: Fast TypeScript/JS/CSS formatter
  *
  * Note: Neither supports Svelte files.
  */

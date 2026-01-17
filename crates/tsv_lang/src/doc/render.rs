@@ -1,16 +1,126 @@
 //! Rendering algorithm for converting Doc trees to formatted strings
 
 use crate::PrintConfig;
+use std::collections::HashMap;
 
-use super::fits::{fits_multi, fits_with_lookahead, string_width};
+use super::fits::{fits_multi, fits_with_lookahead, update_pos_for_text};
 use super::helpers::will_break;
-use super::types::{Command, Doc, DocContext, Mode, TextResolver, resolve_text};
+use super::types::{Command, Doc, DocContext, GroupId, LineKind, Mode, TextResolver, resolve_text};
+
+/// Strip trailing whitespace from each line (matches Prettier's behavior)
+fn strip_trailing_whitespace(s: String) -> String {
+    // Fast path: if no trailing whitespace exists, return as-is
+    let has_trailing_ws = s.lines().any(|line| {
+        let trimmed = line.trim_end();
+        trimmed.len() != line.len()
+    });
+    if !has_trailing_ws {
+        return s;
+    }
+
+    // Build result directly without intermediate Vec allocation
+    let mut result = String::with_capacity(s.len());
+    for (i, line) in s.lines().enumerate() {
+        if i > 0 {
+            result.push('\n');
+        }
+        result.push_str(line.trim_end());
+    }
+    if s.ends_with('\n') {
+        result.push('\n');
+    }
+    result
+}
+
+// =============================================================================
+// Shared rendering helpers
+// =============================================================================
+
+/// Render text content and update position
+#[inline]
+fn render_text<R: TextResolver + ?Sized>(
+    text: &super::types::DocText,
+    output: &mut String,
+    pos: &mut usize,
+    tab_width: usize,
+    resolver: Option<&R>,
+) {
+    let s = resolve_text(text, resolver);
+    output.push_str(s);
+    update_pos_for_text(pos, s, tab_width);
+}
+
+/// Render a line break (shared logic for all rendering contexts)
+///
+/// Handles the line break itself and indentation. Does NOT flush line suffix -
+/// that must be done by the caller before calling this if needed.
+#[inline]
+fn render_line_break(
+    kind: LineKind,
+    mode: Mode,
+    indent_level: usize,
+    base_indent_override: Option<usize>,
+    output: &mut String,
+    pos: &mut usize,
+    config: &PrintConfig,
+) -> bool {
+    let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
+    if mode == Mode::Break || is_hard {
+        output.push('\n');
+        if kind == LineKind::Literal {
+            // Literal line: just newline, no indentation (for blank lines)
+            *pos = 0;
+        } else {
+            // Normal line: newline + indentation
+            write_indentation(output, indent_level, config);
+            *pos = line_start_column(indent_level, config, base_indent_override);
+        }
+        true // Did break
+    } else {
+        // Flat mode: soft line disappears, normal line becomes space
+        if kind == LineKind::Normal {
+            output.push(' ');
+            *pos += 1;
+        }
+        false // Did not break
+    }
+}
+
+/// Flush pending line suffix content
+///
+/// Renders all buffered suffix commands and clears the buffer.
+fn flush_line_suffix<R: TextResolver + ?Sized>(
+    line_suffix: &mut Vec<Command>,
+    output: &mut String,
+    pos: &mut usize,
+    config: &PrintConfig,
+    resolver: Option<&R>,
+) {
+    if line_suffix.is_empty() {
+        return;
+    }
+    // Process suffix content (reverse to get correct order)
+    // Use None for suffix_buffer to avoid infinite recursion
+    for suffix_cmd in std::mem::take(line_suffix).into_iter().rev() {
+        render_single_doc_inner(
+            suffix_cmd.doc,
+            output,
+            pos,
+            suffix_cmd.indent,
+            suffix_cmd.mode,
+            config,
+            resolver,
+            None, // No suffix collection when rendering suffix content
+            None, // No base indent override
+        );
+    }
+}
 
 /// Convert a Doc tree to a formatted string (starting at column 0)
 ///
 /// Note: This function does not support Symbol text. Use `print_doc_resolved` for docs with symbols.
 pub fn print_doc(doc: &Doc, config: &PrintConfig) -> String {
-    print_doc_at_column(doc, config, 0)
+    strip_trailing_whitespace(print_doc_at_column(doc, config, 0))
 }
 
 /// Convert a Doc tree to a formatted string with symbol resolution
@@ -19,7 +129,7 @@ pub fn print_doc_resolved<R: TextResolver + ?Sized>(
     config: &PrintConfig,
     resolver: &R,
 ) -> String {
-    print_doc_with_indent_resolved(doc, config, 0, 0, resolver)
+    strip_trailing_whitespace(print_doc_with_indent_resolved(doc, config, 0, 0, resolver))
 }
 
 /// Convert a Doc tree to a formatted string, starting at a specific column
@@ -29,7 +139,7 @@ pub fn print_doc_resolved<R: TextResolver + ?Sized>(
 ///
 /// Note: This function does not support Symbol text. Use `print_doc_at_column_resolved` for docs with symbols.
 pub fn print_doc_at_column(doc: &Doc, config: &PrintConfig, start_column: usize) -> String {
-    print_doc_with_indent(doc, config, start_column, 0)
+    strip_trailing_whitespace(print_doc_with_indent(doc, config, start_column, 0))
 }
 
 /// Convert a Doc tree to a formatted string, starting at a specific column, with symbol resolution
@@ -39,7 +149,13 @@ pub fn print_doc_at_column_resolved<R: TextResolver + ?Sized>(
     start_column: usize,
     resolver: &R,
 ) -> String {
-    print_doc_with_indent_resolved(doc, config, start_column, 0, resolver)
+    strip_trailing_whitespace(print_doc_with_indent_resolved(
+        doc,
+        config,
+        start_column,
+        0,
+        resolver,
+    ))
 }
 
 /// Convert a Doc tree to a formatted string with both column and indent level specified
@@ -54,7 +170,8 @@ pub fn print_doc_with_indent(
     start_column: usize,
     start_indent_level: usize,
 ) -> String {
-    let mut output = String::new();
+    // Pre-allocate to avoid early reallocations; most formatted output exceeds 256 chars
+    let mut output = String::with_capacity(256);
     let mut pos: usize = start_column;
 
     // Use command-stack-based rendering with look-ahead (no resolver)
@@ -67,7 +184,7 @@ pub fn print_doc_with_indent(
         None,
     );
 
-    output
+    strip_trailing_whitespace(output)
 }
 
 /// Convert a Doc tree to a formatted string with column, indent level, and symbol resolution
@@ -78,7 +195,7 @@ pub fn print_doc_with_indent_resolved<R: TextResolver + ?Sized>(
     start_indent_level: usize,
     resolver: &R,
 ) -> String {
-    let mut output = String::new();
+    let mut output = String::with_capacity(256);
     let mut pos: usize = start_column;
 
     // Use command-stack-based rendering with look-ahead
@@ -91,7 +208,73 @@ pub fn print_doc_with_indent_resolved<R: TextResolver + ?Sized>(
         Some(resolver),
     );
 
+    strip_trailing_whitespace(output)
+}
+
+/// Convert a Doc tree to a formatted string with column, indent level, and symbol resolution,
+/// preserving trailing whitespace (for HTML <pre>, <textarea>, etc.)
+///
+/// Same as `print_doc_with_indent_resolved` but skips trailing whitespace stripping.
+/// Use this for whitespace-sensitive contexts like HTML <pre> elements where trailing
+/// spaces and tabs are semantically significant.
+pub fn print_doc_with_indent_resolved_preserve_whitespace<R: TextResolver + ?Sized>(
+    doc: &Doc,
+    config: &PrintConfig,
+    start_column: usize,
+    start_indent_level: usize,
+    resolver: &R,
+) -> String {
+    let mut output = String::with_capacity(256);
+    let mut pos: usize = start_column;
+
+    // Use command-stack-based rendering with look-ahead
+    render_doc_iterative(
+        doc,
+        &mut output,
+        &mut pos,
+        start_indent_level,
+        config,
+        Some(resolver),
+    );
+
+    // Return output WITHOUT stripping trailing whitespace
     output
+}
+
+/// Process an IndentIfBreak node by checking group mode and returning the appropriate command
+///
+/// This helper deduplicates the IndentIfBreak logic used in all rendering functions.
+/// Matches Prettier's indentIfBreak handling (printer.js lines 459-482).
+///
+/// `group_mode_map` is optional - when None (e.g., in Fill rendering), defaults to Flat mode.
+#[inline]
+fn process_indent_if_break<'a>(
+    contents: &'a Doc,
+    group_id: GroupId,
+    negate: bool,
+    group_mode_map: Option<&HashMap<GroupId, Mode>>,
+    cmd: &Command<'a>,
+) -> Command<'a> {
+    // Check if the referenced group broke (default to Flat if not tracked or no map)
+    let group_mode = group_mode_map
+        .and_then(|map| map.get(&group_id).copied())
+        .unwrap_or(Mode::Flat);
+
+    // Determine if we should indent based on group mode and negate flag
+    let should_indent = if negate {
+        // Negate: indent if group stayed flat
+        group_mode == Mode::Flat
+    } else {
+        // Normal: indent if group broke
+        group_mode == Mode::Break
+    };
+
+    // Return command with conditional indentation
+    if should_indent {
+        cmd.indented(contents)
+    } else {
+        cmd.with_doc(contents)
+    }
 }
 
 /// Command-stack-based rendering implementation with look-ahead.
@@ -112,73 +295,75 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
         indent: start_indent_level,
         mode: Mode::Break,
         doc,
+        base_indent_override: None,
     }];
+
+    // Buffer for LineSuffix content - flushed before line breaks
+    let mut line_suffix: Vec<Command> = Vec::new();
+
+    // Track which groups broke (for indentIfBreak)
+    // Matches Prettier's groupModeMap (printer.js line 460)
+    let mut group_mode_map: HashMap<GroupId, Mode> = HashMap::new();
 
     while let Some(cmd) = commands.pop() {
         match cmd.doc {
             Doc::Text(t) => {
-                let s = resolve_text(t, resolver);
-                output.push_str(s);
-                *pos += string_width(s);
+                render_text(t, output, pos, config.tab_width, resolver);
             }
 
-            Doc::Line {
-                hard,
-                soft,
-                literal,
-            } => {
-                if cmd.mode == Mode::Break || *hard {
-                    // Break: emit newline
-                    output.push('\n');
-                    if *literal {
-                        // Literal line: just newline, no indentation (for blank lines)
-                        *pos = 0;
-                    } else {
-                        // Normal line: newline + indentation
-                        write_indentation(output, cmd.indent, config);
-                        // Account for base_indent_offset (e.g., Svelte wrapper indentation)
-                        let base_indent = config.base_indent_offset * config.tab_width;
-                        *pos = indent_width(cmd.indent, config) + base_indent;
-                    }
-                } else {
-                    // Flat mode: soft line disappears, regular line becomes space
-                    if !*soft {
-                        output.push(' ');
-                        *pos += 1;
-                    }
+            Doc::Line(kind) => {
+                let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
+                if cmd.mode == Mode::Break || is_hard {
+                    flush_line_suffix(&mut line_suffix, output, pos, config, resolver);
                 }
+                render_line_break(
+                    *kind,
+                    cmd.mode,
+                    cmd.indent,
+                    cmd.base_indent_override,
+                    output,
+                    pos,
+                    config,
+                );
             }
 
             Doc::Indent(inner) => {
-                commands.push(Command {
-                    indent: cmd.indent + 1,
-                    mode: cmd.mode,
-                    doc: inner,
-                });
+                commands.push(cmd.indented(inner));
             }
 
             Doc::Dedent(inner) => {
-                commands.push(Command {
-                    indent: cmd.indent.saturating_sub(1),
-                    mode: cmd.mode,
-                    doc: inner,
-                });
+                commands.push(cmd.dedented(inner));
+            }
+
+            Doc::Align { n, contents } => {
+                commands.push(cmd.with_indent(*n, contents));
             }
 
             Doc::Group {
                 contents,
                 expanded_states,
+                id,
             } => {
-                // If contents will definitely break (contains hardline), use break mode
-                if will_break(contents) {
-                    commands.push(Command {
-                        indent: cmd.indent,
-                        mode: Mode::Break,
-                        doc: contents,
-                    });
-                } else if let Some(states) = expanded_states {
+                // CRITICAL: Check expanded_states BEFORE will_break()
+                //
+                // Conditional groups (e.g., call expressions with trailing arrow functions)
+                // intentionally contain hardlines in state[0] but still need the fits() check
+                // to decide between states. If we checked will_break() first, we'd skip the
+                // fits() check and always use break mode, breaking the conditional logic.
+                //
+                // Example: fn('long...', (x) => { body })
+                // - state[0]: inline args, arrow body has hardlines
+                // - state[1]: break all args
+                // We need to check if state[0] fits before falling back to state[1].
+                if let Some(states) = expanded_states {
                     // conditionalGroup: try each state until one fits
-                    // This is prettier's expandedStates algorithm (printer.js:288-333)
+                    // This is prettier's expandedStates algorithm (printer.js:269-333)
+                    //
+                    // Prettier's logic:
+                    // 1. Try contents (state[0]) in flat mode with fits() check
+                    // 2. If it fits → use it
+                    // 3. If it doesn't fit → try states[1..n] until one fits
+                    // 4. If none fit → use last state in break mode
                     //
                     // Only apply suffix_width when we're still on the "first line" of the expression
                     // (pos >= first_line_offset). Once we've broken to a new line (pos is reset to
@@ -191,46 +376,69 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     let effective_width = config.print_width.saturating_sub(suffix);
                     let remaining_width = effective_width.saturating_sub(*pos) as isize;
 
-                    // Try each state in flat mode until one fits
-                    let mut found = false;
-                    for (i, state) in states.iter().enumerate() {
-                        if i == states.len() - 1 {
-                            // Last state: use in break mode
-                            commands.push(Command {
-                                indent: cmd.indent,
-                                mode: Mode::Break,
-                                doc: state,
-                            });
-                            found = true;
-                            break;
-                        }
-                        let state_fits = fits_with_lookahead(
-                            state,
-                            Mode::Flat,
-                            &commands,
-                            remaining_width,
-                            config,
-                            resolver,
-                        );
+                    // Step 1: Try state[0] (contents) in flat mode
+                    let contents_fit = fits_with_lookahead(
+                        contents,
+                        Mode::Flat,
+                        &commands,
+                        remaining_width,
+                        config,
+                        resolver,
+                    );
 
-                        if state_fits {
-                            commands.push(Command {
-                                indent: cmd.indent,
-                                mode: Mode::Flat,
-                                doc: state,
-                            });
-                            found = true;
-                            break;
+                    let mut chosen_mode: Mode = Mode::Break; // Default
+
+                    if contents_fit {
+                        // State[0] fits → use it
+                        chosen_mode = Mode::Flat;
+                        commands.push(cmd.with_mode(chosen_mode, contents));
+                    } else {
+                        // contents (state[0]) doesn't fit → try remaining states
+                        // Note: expanded_states now contains [state1, state2, ...] (state0 is in contents)
+                        let mut found = false;
+                        for i in 0..states.len() {
+                            if i == states.len() - 1 {
+                                // Last state: use in break mode
+                                chosen_mode = Mode::Break;
+                                commands.push(cmd.with_mode(Mode::Break, &states[i]));
+                                found = true;
+                                break;
+                            }
+                            let state_fits = fits_with_lookahead(
+                                &states[i],
+                                Mode::Flat,
+                                &commands,
+                                remaining_width,
+                                config,
+                                resolver,
+                            );
+
+                            if state_fits {
+                                chosen_mode = Mode::Flat;
+                                commands.push(cmd.with_mode(Mode::Flat, &states[i]));
+                                found = true;
+                                break;
+                            }
+                        }
+
+                        // No remaining state fit: use last state in break mode (or contents if no states)
+                        if !found {
+                            chosen_mode = Mode::Break;
+                            commands.push(cmd.with_mode(Mode::Break, states.last().unwrap_or(contents)));
                         }
                     }
 
-                    // Shouldn't happen if states is non-empty, but handle gracefully
-                    if !found {
-                        commands.push(Command {
-                            indent: cmd.indent,
-                            mode: Mode::Break,
-                            doc: contents,
-                        });
+                    // Track this group's mode for indentIfBreak (Prettier printer.js line 344)
+                    if let Some(group_id) = id {
+                        group_mode_map.insert(*group_id, chosen_mode);
+                    }
+                } else if will_break(contents) {
+                    // If contents will definitely break (contains hardline), use break mode
+                    let chosen_mode = Mode::Break;
+                    commands.push(cmd.with_mode(chosen_mode, contents));
+                    // Track this group's mode for indentIfBreak
+                    if let Some(group_id) = id {
+                        group_mode_map.insert(*group_id, chosen_mode);
                     }
                 } else {
                     // Regular group: check if content fits - WITH LOOK-AHEAD
@@ -251,11 +459,11 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         resolver,
                     );
                     let chosen_mode = if fits { Mode::Flat } else { Mode::Break };
-                    commands.push(Command {
-                        indent: cmd.indent,
-                        mode: chosen_mode,
-                        doc: contents,
-                    });
+                    commands.push(cmd.with_mode(chosen_mode, contents));
+                    // Track this group's mode for indentIfBreak
+                    if let Some(group_id) = id {
+                        group_mode_map.insert(*group_id, chosen_mode);
+                    }
                 }
             }
 
@@ -268,21 +476,28 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 } else {
                     flat_doc
                 };
-                commands.push(Command {
-                    indent: cmd.indent,
-                    mode: cmd.mode,
-                    doc: chosen,
-                });
+                commands.push(cmd.with_doc(chosen));
+            }
+
+            Doc::IndentIfBreak {
+                contents,
+                group_id,
+                negate,
+            } => {
+                // Process using helper - matches Prettier printer.js lines 459-482
+                commands.push(process_indent_if_break(
+                    contents,
+                    *group_id,
+                    *negate,
+                    Some(&group_mode_map),
+                    &cmd,
+                ));
             }
 
             Doc::Concat(docs) => {
                 // Push in reverse order (stack is LIFO)
                 for doc in docs.iter().rev() {
-                    commands.push(Command {
-                        indent: cmd.indent,
-                        mode: cmd.mode,
-                        doc,
-                    });
+                    commands.push(cmd.with_doc(doc));
                 }
             }
 
@@ -301,6 +516,10 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
 
             Doc::WithContext { doc, context } => {
                 // Extract context and apply to inner doc
+                // Merge override: context's override takes precedence, else inherit from parent
+                let merged_override = context
+                    .base_indent_override
+                    .or(cmd.base_indent_override);
                 match doc.as_ref() {
                     Doc::Fill(parts) => {
                         // Apply context when rendering fill
@@ -309,18 +528,30 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         );
                     }
                     _ => {
-                        // For non-fill docs, just unwrap and continue
-                        // (context only affects Fill rendering currently)
-                        commands.push(Command {
-                            indent: cmd.indent,
-                            mode: cmd.mode,
-                            doc: doc.as_ref(),
-                        });
+                        // For non-fill docs, propagate the override
+                        commands.push(cmd.with_base_override(merged_override, doc.as_ref()));
                     }
                 }
             }
+
+            Doc::LineSuffix(inner) => {
+                // Buffer this content to be printed at end of line
+                line_suffix.push(cmd.with_doc(inner));
+            }
+
+            Doc::LineSuffixBoundary => {
+                flush_line_suffix(&mut line_suffix, output, pos, config, resolver);
+            }
+
+            Doc::BreakParent => {
+                // BreakParent is a marker for fits() - no-op during rendering
+                // The breaking decision was already made in fits()
+            }
         }
     }
+
+    // Flush any remaining line suffix content at end of document
+    flush_line_suffix(&mut line_suffix, output, pos, config, resolver);
 }
 
 /// Render a fill doc using greedy line packing (iterative version)
@@ -339,9 +570,14 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
         let remaining = config.print_width.saturating_sub(*pos);
         let content = &parts[offset];
 
-        // Check if current content fits in flat mode
-        // Apply trailing_reserve to prevent packing to exactly printWidth
-        let available = remaining.saturating_sub(context.trailing_reserve);
+        // Apply trailing_reserve only to final segments (last or second-to-last).
+        // Intermediate segments pack greedily to print_width.
+        let is_final_segment = offset + 2 >= parts.len();
+        let available = if is_final_segment {
+            remaining.saturating_sub(context.trailing_reserve)
+        } else {
+            remaining
+        };
         let content_fits = fits_with_lookahead(
             content,
             Mode::Flat,
@@ -353,32 +589,26 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
 
         // Case 1: Last item - render it (break to new line if it doesn't fit)
         if offset + 1 >= parts.len() {
-            if content_fits {
-                render_single_doc(
-                    content,
-                    output,
-                    pos,
-                    indent_level,
-                    Mode::Flat,
-                    config,
-                    resolver,
-                );
-            } else {
-                // Doesn't fit - break to new line first
-                output.push('\n');
-                write_indentation(output, indent_level, config);
-                let base_indent = config.base_indent_offset * config.tab_width;
-                *pos = indent_width(indent_level, config) + base_indent;
-                render_single_doc(
-                    content,
-                    output,
-                    pos,
-                    indent_level,
-                    Mode::Flat,
-                    config,
-                    resolver,
-                );
+            // Break to new line first if needed (unless already at line start)
+            if !content_fits {
+                let line_start_pos =
+                    line_start_column(indent_level, config, context.base_indent_override);
+                if *pos != line_start_pos {
+                    output.push('\n');
+                    write_indentation(output, indent_level, config);
+                    *pos = line_start_pos;
+                }
             }
+            render_single_doc(
+                content,
+                output,
+                pos,
+                indent_level,
+                Mode::Flat,
+                config,
+                resolver,
+                context.base_indent_override,
+            );
             break;
         }
 
@@ -394,6 +624,7 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 Mode::Flat,
                 config,
                 resolver,
+                context.base_indent_override,
             );
             let sep_mode = if content_fits {
                 Mode::Flat
@@ -408,6 +639,7 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 sep_mode,
                 config,
                 resolver,
+                context.base_indent_override,
             );
             break;
         }
@@ -415,7 +647,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
         // Case 3: Full three-way decision
         let next_content = &parts[offset + 2];
         // Check if content + separator + next_content all fit
-        // Use the same available width as content_fits check
         let both_fit = fits_multi(
             &[content, separator, next_content],
             available,
@@ -434,6 +665,7 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 Mode::Flat,
                 config,
                 resolver,
+                context.base_indent_override,
             );
             render_single_doc(
                 separator,
@@ -443,6 +675,7 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 Mode::Flat,
                 config,
                 resolver,
+                context.base_indent_override,
             );
         } else if content_fits {
             // First fits, next doesn't: render content flat, break after
@@ -454,6 +687,7 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 Mode::Flat,
                 config,
                 resolver,
+                context.base_indent_override,
             );
             render_single_doc(
                 separator,
@@ -463,27 +697,100 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 Mode::Break,
                 config,
                 resolver,
+                context.base_indent_override,
             );
         } else {
-            // Neither fits: render content break, separator break
-            render_single_doc(
-                content,
-                output,
-                pos,
-                indent_level,
-                Mode::Break,
-                config,
-                resolver,
-            );
-            render_single_doc(
-                separator,
-                output,
-                pos,
-                indent_level,
-                Mode::Break,
-                config,
-                resolver,
-            );
+            // Neither fits at current position.
+            // Check if content would fit at line start after breaking.
+            let line_start_pos =
+                line_start_column(indent_level, config, context.base_indent_override);
+            let at_line_start = *pos == line_start_pos;
+
+            if !at_line_start {
+                // Check if content fits after breaking to new line
+                let remaining_at_start = config.print_width.saturating_sub(line_start_pos);
+                let content_fits_at_start = fits_with_lookahead(
+                    content,
+                    Mode::Flat,
+                    &[],
+                    remaining_at_start as isize,
+                    config,
+                    resolver,
+                );
+
+                // Break to new line
+                output.push('\n');
+                write_indentation(output, indent_level, config);
+                *pos = line_start_pos;
+
+                if content_fits_at_start {
+                    // Content fits at line start - render flat
+                    render_single_doc(
+                        content,
+                        output,
+                        pos,
+                        indent_level,
+                        Mode::Flat,
+                        config,
+                        resolver,
+                        context.base_indent_override,
+                    );
+                    render_single_doc(
+                        separator,
+                        output,
+                        pos,
+                        indent_level,
+                        Mode::Break,
+                        config,
+                        resolver,
+                        context.base_indent_override,
+                    );
+                } else {
+                    // Content still doesn't fit - render in break mode
+                    render_single_doc(
+                        content,
+                        output,
+                        pos,
+                        indent_level,
+                        Mode::Break,
+                        config,
+                        resolver,
+                        context.base_indent_override,
+                    );
+                    render_single_doc(
+                        separator,
+                        output,
+                        pos,
+                        indent_level,
+                        Mode::Break,
+                        config,
+                        resolver,
+                        context.base_indent_override,
+                    );
+                }
+            } else {
+                // Already at line start, content doesn't fit - render in break mode
+                render_single_doc(
+                    content,
+                    output,
+                    pos,
+                    indent_level,
+                    Mode::Break,
+                    config,
+                    resolver,
+                    context.base_indent_override,
+                );
+                render_single_doc(
+                    separator,
+                    output,
+                    pos,
+                    indent_level,
+                    Mode::Break,
+                    config,
+                    resolver,
+                    context.base_indent_override,
+                );
+            }
         }
 
         offset += 2;
@@ -491,6 +798,9 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
 }
 
 /// Render a single doc with specified mode (helper for Fill)
+///
+/// This is a thin wrapper around `render_single_doc_inner` that manages the suffix buffer.
+#[allow(clippy::too_many_arguments)]
 fn render_single_doc<R: TextResolver + ?Sized>(
     doc: &Doc,
     output: &mut String,
@@ -499,73 +809,106 @@ fn render_single_doc<R: TextResolver + ?Sized>(
     mode: Mode,
     config: &PrintConfig,
     resolver: Option<&R>,
+    base_indent_override: Option<usize>,
 ) {
-    // Use a small command stack for this single doc
+    let mut line_suffix: Vec<Command> = Vec::new();
+    render_single_doc_inner(
+        doc,
+        output,
+        pos,
+        indent_level,
+        mode,
+        config,
+        resolver,
+        Some(&mut line_suffix),
+        base_indent_override,
+    );
+    // Flush remaining suffix content
+    flush_line_suffix(&mut line_suffix, output, pos, config, resolver);
+}
+
+/// Unified single-doc renderer with optional suffix handling
+///
+/// When `suffix_buffer` is Some, collects LineSuffix content and flushes on hard lines.
+/// When `suffix_buffer` is None, renders LineSuffix content directly (used for suffix rendering
+/// to avoid infinite recursion).
+///
+/// Group handling also differs:
+/// - With suffix buffer: full fits-checking for break decisions
+/// - Without suffix buffer: simplified pass-through (for suffix content)
+#[allow(clippy::too_many_arguments)]
+fn render_single_doc_inner<'a, R: TextResolver + ?Sized>(
+    doc: &'a Doc,
+    output: &mut String,
+    pos: &mut usize,
+    indent_level: usize,
+    mode: Mode,
+    config: &PrintConfig,
+    resolver: Option<&R>,
+    suffix_buffer: Option<&mut Vec<Command<'a>>>,
+    base_indent_override: Option<usize>,
+) {
     let mut commands: Vec<Command> = vec![Command {
         indent: indent_level,
         mode,
         doc,
+        base_indent_override,
     }];
+
+    // Track whether we're doing full suffix handling
+    let tracking_suffix = suffix_buffer.is_some();
+
+    // Unwrap the suffix buffer for use in the loop (or create a dummy that won't be used)
+    let mut dummy_suffix: Vec<Command> = Vec::new();
+    let line_suffix = suffix_buffer.unwrap_or(&mut dummy_suffix);
 
     while let Some(cmd) = commands.pop() {
         match cmd.doc {
             Doc::Text(t) => {
-                let s = resolve_text(t, resolver);
-                output.push_str(s);
-                *pos += string_width(s);
+                render_text(t, output, pos, config.tab_width, resolver);
             }
 
-            Doc::Line {
-                hard,
-                soft,
-                literal,
-            } => {
-                if cmd.mode == Mode::Break || *hard {
-                    output.push('\n');
-                    if *literal {
-                        *pos = 0;
-                    } else {
-                        write_indentation(output, cmd.indent, config);
-                        let base_indent = config.base_indent_offset * config.tab_width;
-                        *pos = indent_width(cmd.indent, config) + base_indent;
+            Doc::Line(kind) => {
+                // Flush suffix before hard lines only when tracking suffixes
+                if tracking_suffix {
+                    let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
+                    if cmd.mode == Mode::Break || is_hard {
+                        flush_line_suffix(line_suffix, output, pos, config, resolver);
                     }
-                } else if !*soft {
-                    output.push(' ');
-                    *pos += 1;
                 }
+                render_line_break(
+                    *kind,
+                    cmd.mode,
+                    cmd.indent,
+                    cmd.base_indent_override,
+                    output,
+                    pos,
+                    config,
+                );
             }
 
             Doc::Indent(inner) => {
-                commands.push(Command {
-                    indent: cmd.indent + 1,
-                    mode: cmd.mode,
-                    doc: inner,
-                });
+                commands.push(cmd.indented(inner));
             }
 
             Doc::Dedent(inner) => {
-                commands.push(Command {
-                    indent: cmd.indent.saturating_sub(1),
-                    mode: cmd.mode,
-                    doc: inner,
-                });
+                commands.push(cmd.dedented(inner));
+            }
+
+            Doc::Align { n, contents } => {
+                commands.push(cmd.with_indent(*n, contents));
             }
 
             Doc::Group {
                 contents,
                 expanded_states,
+                id: _,
             } => {
-                // Within Fill, groups still make their own decisions
-                // but we pass the outer mode context
-                if will_break(contents) {
-                    commands.push(Command {
-                        indent: cmd.indent,
-                        mode: Mode::Break,
-                        doc: contents,
-                    });
+                if !tracking_suffix {
+                    // Simplified Group handling for suffix content - just pass through
+                    commands.push(cmd.with_doc(contents));
                 } else if let Some(states) = expanded_states {
-                    // conditionalGroup within Fill - try each state
-                    // Only apply suffix_width on the "first line" of the expression.
+                    // conditionalGroup within Fill - try contents first, then remaining states
                     let suffix = if *pos >= config.first_line_offset {
                         config.suffix_width
                     } else {
@@ -573,43 +916,51 @@ fn render_single_doc<R: TextResolver + ?Sized>(
                     };
                     let effective_width = config.print_width.saturating_sub(suffix);
                     let remaining = effective_width.saturating_sub(*pos) as isize;
-                    let mut found = false;
-                    for (i, state) in states.iter().enumerate() {
-                        if i == states.len() - 1 {
-                            commands.push(Command {
-                                indent: cmd.indent,
-                                mode: Mode::Break,
-                                doc: state,
-                            });
-                            found = true;
-                            break;
+
+                    // Step 1: Try contents (state0) first
+                    if fits_with_lookahead(
+                        contents,
+                        Mode::Flat,
+                        &commands,
+                        remaining,
+                        config,
+                        resolver,
+                    ) {
+                        commands.push(cmd.with_mode(Mode::Flat, contents));
+                    } else {
+                        // Step 2: Try remaining states
+                        let mut found = false;
+                        for (i, state) in states.iter().enumerate() {
+                            if i == states.len() - 1 {
+                                // Last state: use in break mode
+                                commands.push(cmd.with_mode(Mode::Break, state));
+                                found = true;
+                                break;
+                            }
+                            if fits_with_lookahead(
+                                state,
+                                Mode::Flat,
+                                &commands,
+                                remaining,
+                                config,
+                                resolver,
+                            ) {
+                                commands.push(cmd.with_mode(Mode::Flat, state));
+                                found = true;
+                                break;
+                            }
                         }
-                        if fits_with_lookahead(
-                            state,
-                            Mode::Flat,
-                            &commands,
-                            remaining,
-                            config,
-                            resolver,
-                        ) {
-                            commands.push(Command {
-                                indent: cmd.indent,
-                                mode: Mode::Flat,
-                                doc: state,
-                            });
-                            found = true;
-                            break;
+                        // Fallback: use last state in break mode (or contents if states is empty)
+                        if !found {
+                            let fallback_doc: &Doc = states.last().unwrap_or(contents);
+                            commands.push(cmd.with_mode(Mode::Break, fallback_doc));
                         }
                     }
-                    if !found {
-                        commands.push(Command {
-                            indent: cmd.indent,
-                            mode: Mode::Break,
-                            doc: contents,
-                        });
-                    }
+                } else if will_break(contents) {
+                    // If contents will definitely break (contains hardline), use break mode
+                    commands.push(cmd.with_mode(Mode::Break, contents));
                 } else {
-                    // Only apply suffix_width on the "first line" of the expression.
+                    // Regular group: check if content fits
                     let suffix = if *pos >= config.first_line_offset {
                         config.suffix_width
                     } else {
@@ -629,11 +980,7 @@ fn render_single_doc<R: TextResolver + ?Sized>(
                     } else {
                         Mode::Break
                     };
-                    commands.push(Command {
-                        indent: cmd.indent,
-                        mode: chosen_mode,
-                        doc: contents,
-                    });
+                    commands.push(cmd.with_mode(chosen_mode, contents));
                 }
             }
 
@@ -646,25 +993,31 @@ fn render_single_doc<R: TextResolver + ?Sized>(
                 } else {
                     flat_doc
                 };
-                commands.push(Command {
-                    indent: cmd.indent,
-                    mode: cmd.mode,
-                    doc: chosen,
-                });
+                commands.push(cmd.with_doc(chosen));
+            }
+
+            Doc::IndentIfBreak {
+                contents,
+                group_id,
+                negate,
+            } => {
+                // No group tracking in Fill/suffix, defaults to Flat
+                commands.push(process_indent_if_break(
+                    contents,
+                    *group_id,
+                    *negate,
+                    None,
+                    &cmd,
+                ));
             }
 
             Doc::Concat(docs) => {
                 for doc in docs.iter().rev() {
-                    commands.push(Command {
-                        indent: cmd.indent,
-                        mode: cmd.mode,
-                        doc,
-                    });
+                    commands.push(cmd.with_doc(doc));
                 }
             }
 
             Doc::Fill(parts) => {
-                // Nested fill - recurse with default context
                 render_fill_iterative(
                     parts,
                     output,
@@ -678,22 +1031,48 @@ fn render_single_doc<R: TextResolver + ?Sized>(
 
             Doc::WithContext { doc, context } => {
                 // Extract context and apply to inner doc
-                match doc.as_ref() {
-                    Doc::Fill(parts) => {
-                        // Apply context when rendering fill
-                        render_fill_iterative(
-                            parts, output, pos, cmd.indent, config, context, resolver,
-                        );
+                if tracking_suffix {
+                    // Full handling: special case for Fill
+                    match doc.as_ref() {
+                        Doc::Fill(parts) => {
+                            render_fill_iterative(
+                                parts, output, pos, cmd.indent, config, context, resolver,
+                            );
+                        }
+                        _ => {
+                            let merged_override = context
+                                .base_indent_override
+                                .or(cmd.base_indent_override);
+                            commands.push(cmd.with_base_override(merged_override, doc.as_ref()));
+                        }
                     }
-                    _ => {
-                        // For non-fill docs, just unwrap and continue
-                        commands.push(Command {
-                            indent: cmd.indent,
-                            mode: cmd.mode,
-                            doc: doc.as_ref(),
-                        });
-                    }
+                } else {
+                    // Simplified: just merge override
+                    let merged_override = context
+                        .base_indent_override
+                        .or(cmd.base_indent_override);
+                    commands.push(cmd.with_base_override(merged_override, doc.as_ref()));
                 }
+            }
+
+            Doc::LineSuffix(inner) => {
+                if tracking_suffix {
+                    line_suffix.push(cmd.with_doc(inner));
+                } else {
+                    // In suffix rendering, just render the content directly
+                    commands.push(cmd.with_doc(inner));
+                }
+            }
+
+            Doc::LineSuffixBoundary => {
+                if tracking_suffix {
+                    flush_line_suffix(line_suffix, output, pos, config, resolver);
+                }
+                // No-op when not tracking suffix
+            }
+
+            Doc::BreakParent => {
+                // No-op during rendering
             }
         }
     }
@@ -726,6 +1105,19 @@ fn write_indentation(output: &mut String, level: usize, config: &PrintConfig) {
 /// Calculate width of indentation
 fn indent_width(level: usize, config: &PrintConfig) -> usize {
     level * indent_str_width(config.indent, config.tab_width)
+}
+
+/// Calculate column position at line start (indent + base offset)
+///
+/// The `base_override` parameter allows overriding `config.base_indent_offset` for specific
+/// contexts (e.g., template expressions where the wrapper won't add its usual indentation).
+fn line_start_column(
+    indent_level: usize,
+    config: &PrintConfig,
+    base_override: Option<usize>,
+) -> usize {
+    let base = base_override.unwrap_or(config.base_indent_offset);
+    indent_width(indent_level, config) + base * config.tab_width
 }
 
 /// Calculate visual width of indentation string

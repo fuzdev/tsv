@@ -4,6 +4,22 @@
  * Uses LCS (Longest Common Subsequence) algorithm to compute diffs.
  */
 
+/** Number of digits needed to display `n` (minimum 1) */
+function digitWidth(n: number): number {
+	return n === 0 ? 1 : Math.floor(Math.log10(n)) + 1;
+}
+
+/** Default tab width for visual width calculations (matches prettier) */
+const TAB_WIDTH = 2;
+
+/** Only show line widths when they exceed this threshold */
+const LINE_WIDTH_THRESHOLD = 90;
+
+/** Expand tabs to spaces for consistent display */
+function expandTabs(line: string, tabWidth: number = TAB_WIDTH): string {
+	return line.replace(/\t/g, ' '.repeat(tabWidth));
+}
+
 /** Line diff result */
 export interface DiffLine {
 	type: 'same' | 'add' | 'remove';
@@ -86,20 +102,100 @@ function computeLCS(a: string[], b: string[]): string[] {
 }
 
 /**
+ * Filter diff to only include lines within N lines of context around changes.
+ *
+ * @param diff - The full diff lines
+ * @param contextLines - Number of context lines to show around changes (default: 3)
+ * @returns Filtered diff with ellipsis markers for skipped regions
+ */
+export function filterDiffContext(diff: DiffLine[], contextLines = 3): DiffLine[] {
+	if (diff.length === 0) return [];
+
+	// Find indices of all changed lines
+	const changedIndices: number[] = [];
+	for (let i = 0; i < diff.length; i++) {
+		if (diff[i].type !== 'same') {
+			changedIndices.push(i);
+		}
+	}
+
+	if (changedIndices.length === 0) return [];
+
+	// Build set of indices to include (changed lines + context)
+	const includeIndices = new Set<number>();
+	for (const idx of changedIndices) {
+		for (
+			let i = Math.max(0, idx - contextLines);
+			i <= Math.min(diff.length - 1, idx + contextLines);
+			i++
+		) {
+			includeIndices.add(i);
+		}
+	}
+
+	// Build result with ellipsis markers for gaps
+	const result: DiffLine[] = [];
+	let lastIncluded = -1;
+
+	for (let i = 0; i < diff.length; i++) {
+		if (includeIndices.has(i)) {
+			// Add ellipsis if there's a gap
+			if (lastIncluded >= 0 && i > lastIncluded + 1) {
+				result.push({ type: 'same', line: '...' });
+			}
+			result.push(diff[i]);
+			lastIncluded = i;
+		}
+	}
+
+	return result;
+}
+
+/**
  * Format a diff for terminal output with colors.
+ *
+ * Shows line lengths for changed lines exceeding threshold as right-aligned suffix.
  *
  * @param diff - The diff lines to format
  * @param useColor - Whether to use ANSI color codes (default: true)
  * @returns Formatted string lines
  */
 export function formatDiffForTerminal(diff: DiffLine[], useColor = true): string[] {
-	return diff.map((d) => {
-		const prefix = d.type === 'add' ? '+' : d.type === 'remove' ? '-' : ' ';
-		if (!useColor) {
-			return `${prefix}${d.line}`;
+	// Expand tabs for consistent display, then find max width among lines exceeding threshold
+	const expandedLines = diff.map((d) => ({
+		...d,
+		expanded: expandTabs(d.line),
+	}));
+
+	let maxWidth = 0;
+	for (const d of expandedLines) {
+		if (d.type !== 'same' && d.expanded.length > LINE_WIDTH_THRESHOLD) {
+			maxWidth = Math.max(maxWidth, d.expanded.length);
 		}
-		const color = d.type === 'add' ? '\x1b[32m' : d.type === 'remove' ? '\x1b[31m' : '';
-		const reset = d.type === 'same' ? '' : '\x1b[0m';
-		return `${color}${prefix}${d.line}${reset}`;
+	}
+	const numWidth = digitWidth(maxWidth);
+
+	return expandedLines.map((d) => {
+		const prefix = d.type === 'add' ? '+' : d.type === 'remove' ? '-' : ' ';
+		const width = d.expanded.length;
+
+		if (d.type === 'same') {
+			// Unchanged lines: no width suffix
+			return ` ${d.expanded}`;
+		}
+
+		// Changed lines: show width only if exceeds threshold
+		const color = useColor ? (d.type === 'add' ? '\x1b[32m' : '\x1b[31m') : '';
+		const reset = useColor ? '\x1b[0m' : '';
+
+		if (width > LINE_WIDTH_THRESHOLD) {
+			// Pad to max width + 2 spaces, then right-aligned width
+			const padding = maxWidth - width + 2;
+			const widthStr = String(width).padStart(numWidth, ' ');
+			return `${color}${prefix}${d.expanded}${' '.repeat(padding)}${widthStr}${reset}`;
+		}
+
+		// No width suffix for lines at or below threshold
+		return `${color}${prefix}${d.expanded}${reset}`;
 	});
 }

@@ -2,7 +2,7 @@
 
 use super::{Printer, build_entity_name_doc};
 use crate::ast::internal;
-use tsv_lang::{SymbolResolver, SymbolToU32, doc};
+use tsv_lang::{SymbolToU32, doc};
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript export assignment
@@ -66,23 +66,32 @@ impl<'a> Printer<'a> {
                         if !is_type_export && spec.export_kind == internal::ExportKind::Type {
                             spec_parts.push(doc::text("type "));
                         }
-                        let local = self.resolve_symbol(spec.local.name);
-                        let exported = self.resolve_symbol(spec.exported.name);
-                        if local == exported {
-                            spec_parts.push(doc::text_owned(local));
+                        let local_sym = spec.local.name.to_u32();
+                        let exported_sym = spec.exported.name.to_u32();
+                        if local_sym == exported_sym {
+                            spec_parts.push(doc::symbol(local_sym));
                         } else {
-                            spec_parts.push(doc::text_owned(local));
+                            spec_parts.push(doc::symbol(local_sym));
                             spec_parts.push(doc::text(" as "));
-                            spec_parts.push(doc::text_owned(exported));
+                            spec_parts.push(doc::symbol(exported_sym));
                         }
                         doc::concat(spec_parts)
                     })
                     .collect();
                 let spec_parts = doc::join_trailing(spec_docs, doc::comma_line());
 
+                // Check for trailing comments after last specifier (before closing brace)
+                // e.g., `export {a /*, b*/}`
+                let last_spec_end = decl.specifiers.last().map_or(0, |s| s.span.end);
+                // Find the boundary - either the source literal or the end of declaration
+                let comment_boundary = decl.source.as_ref().map_or(decl.span.end, |s| s.span.start);
+                let trailing_comments_doc =
+                    self.build_inline_comments_between_doc(last_spec_end, comment_boundary);
+
                 // Build the braces content (will be wrapped in outer group)
                 parts.push(doc::text("{"));
                 parts.push(doc::indent(doc::concat(vec![doc::softline(), spec_parts])));
+                parts.push(trailing_comments_doc);
                 parts.push(doc::softline());
                 parts.push(doc::text("}"));
             }
@@ -191,14 +200,14 @@ impl<'a> Printer<'a> {
         let mut has_named = false;
         let mut has_namespace = false;
         let mut named_specs = Vec::new();
-        let mut default_name = String::new();
-        let mut namespace_name = String::new();
+        let mut default_sym = 0u32;
+        let mut namespace_sym = 0u32;
 
         for spec in &decl.specifiers {
             match spec {
                 internal::ImportSpecifier::Default(default_spec) => {
                     has_default = true;
-                    default_name = self.resolve_symbol(default_spec.local.name);
+                    default_sym = default_spec.local.name.to_u32();
                 }
                 internal::ImportSpecifier::Named(named_spec) => {
                     has_named = true;
@@ -206,7 +215,7 @@ impl<'a> Printer<'a> {
                 }
                 internal::ImportSpecifier::Namespace(ns_spec) => {
                     has_namespace = true;
-                    namespace_name = self.resolve_symbol(ns_spec.local.name);
+                    namespace_sym = ns_spec.local.name.to_u32();
                 }
             }
         }
@@ -221,7 +230,7 @@ impl<'a> Printer<'a> {
 
         // Add default import
         if has_default {
-            parts.push(doc::text_owned(default_name));
+            parts.push(doc::symbol(default_sym));
         }
 
         // Add namespace import
@@ -230,7 +239,7 @@ impl<'a> Printer<'a> {
                 parts.push(doc::text(", "));
             }
             parts.push(doc::text("* as "));
-            parts.push(doc::text_owned(namespace_name));
+            parts.push(doc::symbol(namespace_sym));
         }
 
         // Build named specifiers with group wrapping (or empty braces if source had them)
@@ -253,23 +262,30 @@ impl<'a> Printer<'a> {
                         if !is_type_import && named_spec.import_kind == internal::ImportKind::Type {
                             parts.push(doc::text("type "));
                         }
-                        let imported = self.resolve_symbol(named_spec.imported.name);
-                        let local = self.resolve_symbol(named_spec.local.name);
-                        if imported == local {
-                            parts.push(doc::text_owned(imported));
+                        let imported_sym = named_spec.imported.name.to_u32();
+                        let local_sym = named_spec.local.name.to_u32();
+                        if imported_sym == local_sym {
+                            parts.push(doc::symbol(imported_sym));
                         } else {
-                            parts.push(doc::text_owned(imported));
+                            parts.push(doc::symbol(imported_sym));
                             parts.push(doc::text(" as "));
-                            parts.push(doc::text_owned(local));
+                            parts.push(doc::symbol(local_sym));
                         }
                         doc::concat(parts)
                     })
                     .collect();
                 let spec_parts = doc::join_trailing(spec_docs, doc::comma_line());
 
+                // Check for trailing comments after last specifier (before closing brace)
+                // e.g., `import {a /*, b*/} from 'x'`
+                let last_spec_end = named_specs.last().map_or(0, |s| s.span.end);
+                let trailing_comments_doc =
+                    self.build_inline_comments_between_doc(last_spec_end, decl.source.span.start);
+
                 // Build the braces content (will be wrapped in outer group)
                 parts.push(doc::text("{"));
                 parts.push(doc::indent(doc::concat(vec![doc::softline(), spec_parts])));
+                parts.push(trailing_comments_doc);
                 parts.push(doc::softline());
                 parts.push(doc::text("}"));
             }
@@ -291,9 +307,8 @@ impl<'a> Printer<'a> {
                 .attributes
                 .iter()
                 .map(|attr| {
-                    let key = self.resolve_symbol(attr.key.name);
                     doc::concat(vec![
-                        doc::text_owned(key),
+                        doc::symbol(attr.key.name.to_u32()),
                         doc::text(": "),
                         self.build_literal_doc(&attr.value),
                     ])
@@ -335,7 +350,7 @@ impl<'a> Printer<'a> {
         }
 
         // identifier
-        parts.push(doc::text_owned(self.resolve_symbol(decl.id.name)));
+        parts.push(doc::symbol(decl.id.name.to_u32()));
 
         // = sign
         parts.push(doc::text(" = "));

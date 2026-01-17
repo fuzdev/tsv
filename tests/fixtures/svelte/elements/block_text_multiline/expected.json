@@ -1,0 +1,147 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 343,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 54,
+				"data": " Multi-line text content preserves line breaks "
+			},
+			{
+				"type": "Text",
+				"start": 54,
+				"end": 55,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 55,
+				"end": 176,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 56
+					},
+					"end": {
+						"line": 2,
+						"column": 2,
+						"character": 57
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 58,
+							"end": 172,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14 text15\n\ttext16 text17.\n",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14 text15\n\ttext16 text17.\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 176,
+				"end": 178,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 178,
+				"end": 206,
+				"data": " Multiple paragraphs "
+			},
+			{
+				"type": "Text",
+				"start": 206,
+				"end": 207,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 207,
+				"end": 342,
+				"name": "aside",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 208
+					},
+					"end": {
+						"line": 8,
+						"column": 6,
+						"character": 213
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 214,
+							"end": 216,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 216,
+							"end": 333,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 9,
+									"column": 2,
+									"character": 217
+								},
+								"end": {
+									"line": 9,
+									"column": 3,
+									"character": 218
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 219,
+										"end": 329,
+										"raw": "\n\t\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14 text15\n\t\ttext16.\n\t",
+										"data": "\n\t\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14 text15\n\t\ttext16.\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 333,
+							"end": 334,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

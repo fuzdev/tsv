@@ -1,9 +1,10 @@
 use crate::deno::{parse_svelte, parse_typescript};
 use crate::fixtures;
+use crate::fixtures::InputType;
 use std::path::Path;
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
-use tsv_cli::json_utils::{ensure_trailing_newline, to_json_with_tabs};
+use tsv_cli::json_utils::to_json_with_tabs;
 
 /// fixtures-update-parsed command - regenerate expected.json (or expected_ours.json + expected_svelte.json) files
 pub struct FixturesUpdateParsedCommand;
@@ -197,14 +198,19 @@ async fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult
         return generate_divergence_fixture(fixture, &source).await;
     }
 
-    use crate::fixtures::InputType;
-
     // Generate expected.json from appropriate parser based on input type
     let json = match fixture.input_type() {
         InputType::SvelteTs | InputType::TypeScript => {
             // TypeScript and SvelteTs fixtures use acorn+typescript parser
             match parse_typescript(&source).await {
-                Ok(json) => ensure_trailing_newline(json),
+                Ok(ast) => match to_json_with_tabs(&ast) {
+                    Ok(json) => format!("{json}\n"),
+                    Err(e) => {
+                        return FixtureResult::Failed(format!(
+                            "Failed to serialize TypeScript AST: {e}"
+                        ))
+                    }
+                },
                 Err(e) => return FixtureResult::Failed(format!("TypeScript parse error: {e}")),
             }
         }
@@ -225,7 +231,12 @@ async fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult
         InputType::Svelte => {
             // Svelte fixtures use Svelte's parser
             match parse_svelte(&source).await {
-                Ok(json) => ensure_trailing_newline(json),
+                Ok(ast) => match to_json_with_tabs(&ast) {
+                    Ok(json) => format!("{json}\n"),
+                    Err(e) => {
+                        return FixtureResult::Failed(format!("Failed to serialize Svelte AST: {e}"))
+                    }
+                },
                 Err(e) => return FixtureResult::Failed(format!("Svelte parse error: {e}")),
             }
         }
@@ -285,7 +296,14 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
         if fixture.input_file.ends_with(".svelte.ts") || fixture.input_file.ends_with(".ts") {
             // For .ts and .svelte.ts files, use acorn-typescript
             match parse_typescript(source).await {
-                Ok(json) => ensure_trailing_newline(json),
+                Ok(ast) => match to_json_with_tabs(&ast) {
+                    Ok(json) => format!("{json}\n"),
+                    Err(e) => {
+                        return FixtureResult::Failed(format!(
+                            "Failed to serialize TypeScript AST: {e}"
+                        ))
+                    }
+                },
                 Err(_) => {
                     // Parse failed - use canonical error marker
                     fixtures::EXPECTED_SVELTE_ERROR_JSON.to_string()
@@ -294,7 +312,14 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
         } else {
             // For .svelte files, use Svelte's parser
             match parse_svelte(source).await {
-                Ok(json) => ensure_trailing_newline(json),
+                Ok(ast) => match to_json_with_tabs(&ast) {
+                    Ok(json) => format!("{json}\n"),
+                    Err(e) => {
+                        return FixtureResult::Failed(format!(
+                            "Failed to serialize Svelte AST: {e}"
+                        ))
+                    }
+                },
                 Err(_) => {
                     // Svelte parse failed - use canonical error marker
                     fixtures::EXPECTED_SVELTE_ERROR_JSON.to_string()

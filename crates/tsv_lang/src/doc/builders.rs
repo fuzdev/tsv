@@ -1,6 +1,6 @@
 //! Builder functions for constructing Doc trees
 
-use super::types::{Doc, DocContext, DocText};
+use super::types::{Doc, DocContext, DocText, GroupId, LineKind};
 
 /// Create a text doc from a static string (zero allocation)
 ///
@@ -21,6 +21,15 @@ pub fn text_owned(s: String) -> Doc {
     Doc::Text(DocText::Owned(s))
 }
 
+/// Create an empty doc that produces no output
+///
+/// Use this when a function must return a Doc but has nothing to emit.
+/// Zero allocation - uses a static empty string.
+#[inline]
+pub fn empty() -> Doc {
+    Doc::Text(DocText::Static(""))
+}
+
 /// Create a text doc from a symbol ID (deferred resolution)
 ///
 /// Use this for interned identifiers and other strings that come from
@@ -33,41 +42,29 @@ pub fn symbol(id: u32) -> Doc {
     Doc::Text(DocText::Symbol(id))
 }
 
-/// Create a soft line break (space if fits, newline if doesn't)
+/// Create a normal line break (space if fits, newline if doesn't)
+#[inline]
 pub fn line() -> Doc {
-    Doc::Line {
-        hard: false,
-        soft: false,
-        literal: false,
-    }
+    Doc::Line(LineKind::Normal)
 }
 
 /// Create a soft line that disappears in flat mode (no space)
+#[inline]
 pub fn softline() -> Doc {
-    Doc::Line {
-        hard: false,
-        soft: true,
-        literal: false,
-    }
+    Doc::Line(LineKind::Soft)
 }
 
 /// Create a hard line break (always breaks, never becomes a space)
+#[inline]
 pub fn hardline() -> Doc {
-    Doc::Line {
-        hard: true,
-        soft: false,
-        literal: false,
-    }
+    Doc::Line(LineKind::Hard)
 }
 
 /// Create a literal line break (just newline, no indentation)
 /// Used for blank line preservation where we want an empty line
+#[inline]
 pub fn literalline() -> Doc {
-    Doc::Line {
-        hard: true,
-        soft: false,
-        literal: true,
-    }
+    Doc::Line(LineKind::Literal)
 }
 
 /// Create a group (try to fit on one line, break all if doesn't fit)
@@ -75,6 +72,27 @@ pub fn group(doc: Doc) -> Doc {
     Doc::Group {
         contents: Box::new(doc),
         expanded_states: None,
+        id: None,
+    }
+}
+
+/// Create a group with an ID for tracking whether it broke
+///
+/// The ID allows `indent_if_break()` to check if this specific group broke,
+/// enabling deferred indentation decisions. Matches Prettier's `group(doc, { id })`.
+///
+/// Example (Fluid assignment):
+/// ```ignore
+/// group_with_id(
+///     concat(vec![left, text(" ="), indent(line())]),
+///     GroupId::Assignment
+/// )
+/// ```
+pub fn group_with_id(doc: Doc, id: GroupId) -> Doc {
+    Doc::Group {
+        contents: Box::new(doc),
+        expanded_states: None,
+        id: Some(id),
     }
 }
 
@@ -94,14 +112,18 @@ pub fn group(doc: Doc) -> Doc {
 ///     concat(vec![base, indent(concat(vec![hardline(), text(".method1"), hardline(), text(".method2")]))]),
 /// ])
 /// ```
-pub fn conditional_group(states: Vec<Doc>) -> Doc {
+pub fn conditional_group(mut states: Vec<Doc>) -> Doc {
     assert!(
         !states.is_empty(),
         "conditional_group requires at least one state"
     );
+    // Move first state to contents, keep rest in expanded_states
+    // This avoids cloning states[0] - it now lives only in contents
+    let first = states.remove(0);
     Doc::Group {
-        contents: Box::new(states[0].clone()),
-        expanded_states: Some(states),
+        contents: Box::new(first),
+        expanded_states: Some(Box::new(states)), // Now contains states[1..]
+        id: None,
     }
 }
 
@@ -115,11 +137,53 @@ pub fn dedent(doc: Doc) -> Doc {
     Doc::Dedent(Box::new(doc))
 }
 
+/// Set absolute indentation level for doc
+///
+/// Unlike `indent`/`dedent` which are relative, `align` sets the indent to an
+/// absolute value. Used for template literal interpolations where content must
+/// be indented to match the template's visual position regardless of nesting.
+pub fn align(n: usize, doc: Doc) -> Doc {
+    Doc::Align {
+        n,
+        contents: Box::new(doc),
+    }
+}
+
 /// Conditional rendering based on parent group breaking
 pub fn if_break(break_doc: Doc, flat_doc: Doc) -> Doc {
     Doc::IfBreak {
         break_doc: Box::new(break_doc),
         flat_doc: Box::new(flat_doc),
+    }
+}
+
+/// Conditionally indent based on whether a specific group broke
+///
+/// Optimized version of `if_break(indent(doc), doc)` that checks a specific
+/// group ID instead of the immediate parent. Matches Prettier's `indentIfBreak`.
+///
+/// - If group[id] broke: applies indent to contents
+/// - If group[id] stayed flat: renders contents without indent
+/// - If negate=true: reverses the logic
+///
+/// This enables deferred indentation - the decision is made after we know
+/// whether the referenced group broke during rendering.
+///
+/// Example (Fluid assignment):
+/// ```ignore
+/// group(concat(vec![
+///     group(left),
+///     text(" ="),
+///     group_with_id(indent(line()), GroupId::Assignment),  // Marker group
+///     line_suffix_boundary(),
+///     indent_if_break(right, GroupId::Assignment, false),  // Checks marker
+/// ]))
+/// ```
+pub fn indent_if_break(doc: Doc, group_id: GroupId, negate: bool) -> Doc {
+    Doc::IndentIfBreak {
+        contents: Box::new(doc),
+        group_id,
+        negate,
     }
 }
 
@@ -162,4 +226,69 @@ pub fn with_context(doc: Doc, context: DocContext) -> Doc {
         doc: Box::new(doc),
         context,
     }
+}
+
+/// Wrap a doc with a base indent override
+///
+/// This overrides `config.base_indent_offset` for position calculations within
+/// this doc subtree. Used for template expression content where the wrapper
+/// (e.g., Svelte's script post-processor) won't add its usual indentation.
+///
+/// Example:
+/// ```ignore
+/// // Template expression content - Svelte won't add +1 indent
+/// with_base_indent_override(expression_doc, 0)
+/// ```
+pub fn with_base_indent_override(doc: Doc, base_offset: usize) -> Doc {
+    Doc::WithContext {
+        doc: Box::new(doc),
+        context: DocContext {
+            trailing_reserve: 0,
+            base_indent_override: Some(base_offset),
+        },
+    }
+}
+
+/// Content to print at the end of the current line
+///
+/// LineSuffix is NOT included in width calculations during `fits()`,
+/// allowing lines to exceed print width when they have trailing comments.
+///
+/// Example:
+/// ```ignore
+/// // Trailing comment doesn't affect line break decisions
+/// concat(vec![
+///     text("value"),
+///     line_suffix(concat(vec![text(" "), text("// comment")])),
+/// ])
+/// ```
+pub fn line_suffix(doc: Doc) -> Doc {
+    Doc::LineSuffix(Box::new(doc))
+}
+
+/// Force pending LineSuffix content to be flushed
+///
+/// Prevents LineSuffix from bleeding across group boundaries.
+pub fn line_suffix_boundary() -> Doc {
+    Doc::LineSuffixBoundary
+}
+
+/// Force parent group to break
+///
+/// When encountered during printing, marks the enclosing group as broken.
+/// This is useful when a child element should force multiline layout.
+///
+/// # Example
+/// ```ignore
+/// // Force the for loop header to break when there's a trailing comment
+/// group(concat([
+///     text("for ("),
+///     indent(concat([softline(), content])),
+///     softline(),
+///     text(")"),
+///     break_parent(),  // Forces the group to break mode
+/// ]))
+/// ```
+pub fn break_parent() -> Doc {
+    Doc::BreakParent
 }

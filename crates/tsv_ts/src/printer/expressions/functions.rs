@@ -63,6 +63,24 @@ enum TypeAssertionWithObject<'a> {
     Satisfies(&'a internal::TSSatisfiesExpression),
 }
 
+/// Check if an expression is a huggable pattern for function parameters.
+///
+/// Prettier's `shouldHugFunctionParameters` hugs single object/array patterns,
+/// keeping `({` and `}: Type)` together while letting the pattern's content break.
+fn is_huggable_pattern(expr: &internal::Expression) -> bool {
+    match expr {
+        internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_) => true,
+        // Assignment pattern with object/array on left: `{a, b} = default`
+        internal::Expression::AssignmentPattern(ap) => {
+            matches!(
+                ap.left.as_ref(),
+                internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_)
+            )
+        }
+        _ => false,
+    }
+}
+
 impl<'a> Printer<'a> {
     /// Print an arrow function expression using doc-based formatting with width-aware wrapping.
     ///
@@ -232,33 +250,9 @@ impl<'a> Printer<'a> {
     ///            | B
     ///            | C =>
     fn build_arrow_return_type_doc(&self, annotation: &internal::TSTypeAnnotation) -> Doc {
-        match &*annotation.type_annotation {
-            internal::TSType::Union(union) if union.types.len() > 1 => {
-                // Union return types: break after colon, each member on own line with leading |
-                let mut union_parts = Vec::new();
-                for (i, t) in union.types.iter().enumerate() {
-                    if i > 0 {
-                        union_parts.push(doc::line());
-                    }
-                    union_parts.push(doc::text("| "));
-                    union_parts.push(self.build_type_doc(t));
-                }
-
-                doc::concat(vec![
-                    doc::text(":"),
-                    doc::if_break(
-                        // When breaking: colon, then indented union with leading pipes
-                        doc::indent_line(doc::concat(union_parts)),
-                        // When flat: normal inline format
-                        doc::concat(vec![
-                            doc::text(" "),
-                            self.build_type_doc(&annotation.type_annotation),
-                        ]),
-                    ),
-                ])
-            }
-            _ => self.build_type_annotation_doc(annotation),
-        }
+        // Use return type version - only wraps for complex type args (unions/intersections)
+        // Simple cases like Promise<void> let params break first
+        self.build_type_annotation_doc_for_return_type(annotation)
     }
 
     /// Build doc for arrow function type params
@@ -329,6 +323,40 @@ impl<'a> Printer<'a> {
         self.build_params_doc_with_comments(&arrow.params, params_start, trailing_comments_end)
     }
 
+    /// Build just the arrow function signature (async + type params + params + return type)
+    /// WITHOUT the ` =>` and body. Used by call printer for expand-last-arg pattern.
+    ///
+    /// This is extracted from `build_arrow_doc_wrapping` to support the special case
+    /// where call expressions need to build arrows with conditional parens around the body.
+    pub(crate) fn build_arrow_signature_doc(
+        &self,
+        arrow: &internal::ArrowFunctionExpression,
+    ) -> Doc {
+        let mut parts = Vec::new();
+
+        // Async keyword if present
+        if arrow.r#async {
+            parts.push(doc::text("async "));
+        }
+
+        let has_params = !arrow.params.is_empty();
+
+        // Type parameters: group them independently only when function params exist
+        if let Some(tp) = &arrow.type_parameters {
+            parts.push(self.build_type_params_doc_for_arrow(tp, has_params));
+        }
+
+        // Function parameters
+        parts.push(self.build_arrow_params_doc_ungrouped(arrow));
+
+        // Return type annotation
+        if let Some(return_type) = &arrow.return_type {
+            parts.push(self.build_arrow_return_type_doc(return_type));
+        }
+
+        doc::concat(parts)
+    }
+
     /// Check if any param has a trailing line comment
     fn has_trailing_line_comment_in_params(
         &self,
@@ -355,21 +383,6 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build doc for trailing same-line comments after a parameter
-    fn build_trailing_param_comments(&self, start: u32, end: u32) -> Doc {
-        let mut parts = Vec::new();
-
-        for comment in tsv_lang::comments_in_range(self.comments, start, end) {
-            // Only include comments on the same line as the param (trailing comments)
-            if is_same_line(self.source, start, comment.span.start) {
-                parts.push(doc::text(" "));
-                parts.push(self.build_comment_doc(comment));
-            }
-        }
-
-        doc::concat(parts)
-    }
-
     /// Build doc for arrow function body expression.
     fn build_arrow_body_doc(&self, expr: &internal::Expression) -> Doc {
         // Special case: type assertion wrapping object - parens go around inner object only
@@ -391,7 +404,19 @@ impl<'a> Printer<'a> {
             };
         }
 
-        // Standard cases: objects and assignments need parens
+        // Conditional expressions need parens only when inline:
+        // Same line: `() => (a ? b : c)` - parens needed to disambiguate
+        // New line:  `() =>\n    a ? b : c` - no parens needed
+        if matches!(expr, internal::Expression::ConditionalExpression(_)) {
+            let body_doc = self.build_expression_doc(expr);
+            // if_break: break_doc when on new line, flat_doc when inline
+            return doc::if_break(
+                body_doc.clone(),
+                doc::concat(vec![doc::text("("), body_doc, doc::text(")")]),
+            );
+        }
+
+        // Standard cases: objects and assignments always need parens
         if needs_parens(expr, ParenContext::ArrowBody) {
             doc::concat(vec![
                 doc::text("("),
@@ -427,16 +452,17 @@ impl<'a> Printer<'a> {
             parts.push(self.build_comment_doc(comment));
 
             // Determine separator after comment:
+            // - Line comments (// ...) → MUST use hardline (comment extends to EOL)
             // - Multi-line block comments (with newline before */) → hardline
-            // - Single-line block or line comments → space
-            // - Last comment followed by more → space
+            // - Single-line block comments → space
+            let is_line_comment = !comment.is_block;
             let is_multi_line_block = comment.is_block && comment.content.ends_with('\n');
 
-            if is_multi_line_block && i == comments.len() - 1 {
-                // Multi-line block comment as last comment before body → put body on new line
+            if is_line_comment || (is_multi_line_block && i == comments.len() - 1) {
+                // Line comment or multi-line block as last → put next content on new line
                 parts.push(doc::hardline());
             } else {
-                // Single-line comment or not last → space
+                // Single-line block comment → space
                 parts.push(doc::text(" "));
             }
         }
@@ -469,8 +495,9 @@ impl<'a> Printer<'a> {
         sig_parts.push(self.build_method_params_doc_ungrouped(func));
 
         // Return type annotation (e.g., `: number`)
+        // Use return type version - only wraps for complex type args (unions/intersections)
         if let Some(return_type) = &func.return_type {
-            sig_parts.push(self.build_type_annotation_doc(return_type));
+            sig_parts.push(self.build_type_annotation_doc_for_return_type(return_type));
         }
 
         // Wrap signature in a group for width-aware breaking
@@ -603,6 +630,30 @@ impl<'a> Printer<'a> {
             return doc::text("()");
         }
 
+        // Prettier's shouldHugFunctionParameters: single param that's an object/array pattern
+        // gets hugged - no breaks added around it, the pattern handles its own expansion.
+        // This keeps `({` and `}: Type)` together, letting the pattern's content break:
+        //   function fn({
+        //       a,
+        //       b,
+        //   }: Type): void {}
+        // NOT:
+        //   function fn(
+        //       {a, b}: Type,
+        //   ): void {}
+        let should_hug_single_pattern = params.len() == 1
+            && is_huggable_pattern(&params[0])
+            && !self.has_comments_between(
+                params_start.unwrap_or_else(|| params[0].span().start),
+                params[0].span().start,
+            );
+
+        if should_hug_single_pattern {
+            // Hug mode: just ( + pattern + optional trailing comma + )
+            let param_doc = self.build_function_parameter_doc(&params[0]);
+            return doc::concat(vec![doc::text("("), param_doc, doc::text(")")]);
+        }
+
         // Check if any trailing line comments exist on params
         // If so, we must use hardlines to force the group to break
         let has_trailing_line_comment =
@@ -657,12 +708,51 @@ impl<'a> Printer<'a> {
 
             // Add leading comments for this param
             // Use proper line breaks for line comments on their own line
-            inner_parts.push(self.build_leading_param_comments(search_start, param_start));
+            // For non-first params, find comma position to filter properly
+            let prev_comma_pos = if i > 0 {
+                self.find_comma_after(params[i - 1].span().end)
+            } else {
+                None
+            };
+            inner_parts.push(self.build_leading_param_comments(
+                search_start,
+                param_start,
+                prev_comma_pos,
+            ));
 
             // Use FunctionParameter context for object patterns
             inner_parts.push(self.build_function_parameter_doc(param));
 
-            // Add trailing comma BEFORE trailing comments
+            // Handle trailing same-line comments
+            let search_end = if is_last {
+                self.param_trailing_end(params, i, trailing_comments_end)
+            } else {
+                params[i + 1].span().start
+            };
+
+            // Find comma position for non-last params
+            let comma_pos = if !is_last {
+                self.find_comma_after(param.span().end)
+            } else {
+                None
+            };
+
+            // Collect same-line comments
+            let same_line_comments: Vec<_> =
+                tsv_lang::comments_in_range(self.comments, param.span().end, search_end)
+                    .filter(|c| is_same_line(self.source, param.span().end, c.span.start))
+                    .collect();
+
+            // Block comments BEFORE comma go before comma
+            for comment in same_line_comments
+                .iter()
+                .filter(|c| c.is_block && comma_pos.is_none_or(|pos| c.span.start < pos))
+            {
+                inner_parts.push(doc::text(" "));
+                inner_parts.push(self.build_comment_doc(comment));
+            }
+
+            // Add trailing comma
             // For non-last params: always add comma (it's a separator)
             // For last param: add comma if forcing break and not rest param
             let needs_comma = !is_last || (force_break && !has_rest_param);
@@ -670,13 +760,13 @@ impl<'a> Printer<'a> {
                 inner_parts.push(doc::text(","));
             }
 
-            // Add trailing comments ONLY for the last param
-            // For non-last params, comments after the comma are handled as leading
-            // comments for the next param (via build_comments_between above)
-            if is_last {
-                let trailing_end = self.param_trailing_end(params, i, trailing_comments_end);
-                inner_parts
-                    .push(self.build_trailing_param_comments(param.span().end, trailing_end));
+            // Line comments (any position) go after comma, wrapped in line_suffix
+            // Block comments AFTER comma are handled as leading for next param
+            for comment in same_line_comments.iter().filter(|c| !c.is_block) {
+                inner_parts.push(doc::line_suffix(doc::concat(vec![
+                    doc::text(" "),
+                    self.build_comment_doc(comment),
+                ])));
             }
         }
 
@@ -743,10 +833,29 @@ impl<'a> Printer<'a> {
 
     /// Build doc for leading comments before a parameter
     /// Handles line comments on their own line with proper hardlines
-    fn build_leading_param_comments(&self, start: u32, end: u32) -> Doc {
-        let comments: Vec<_> = tsv_lang::comments_in_range(self.comments, start, end).collect();
+    /// `prev_comma_pos`: if Some, filter out trailing comments for the previous param
+    fn build_leading_param_comments(
+        &self,
+        start: u32,
+        end: u32,
+        prev_comma_pos: Option<u32>,
+    ) -> Doc {
+        let comments: Vec<_> = tsv_lang::comments_in_range(self.comments, start, end)
+            .filter(|c| {
+                let Some(comma) = prev_comma_pos else {
+                    return true; // First param - keep all comments
+                };
+                // Different line from prev param - definitely a leading comment
+                if !is_same_line(self.source, start, c.span.start) {
+                    return true;
+                }
+                // Same line as prev param: only keep block comments after the comma
+                // (line comments go in line_suffix, block comments before comma are trailing)
+                c.is_block && c.span.start >= comma
+            })
+            .collect();
         if comments.is_empty() {
-            return doc::concat(vec![]);
+            return doc::empty();
         }
 
         let mut parts = Vec::new();

@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 96,
+		"end": 128,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 16,
-					"end": 87,
+					"end": 119,
 					"children": [
 						{
 							"type": "Declaration",
@@ -53,23 +53,30 @@
 							"end": 83,
 							"property": "background",
 							"value": "blue /* comment */"
+						},
+						{
+							"type": "Declaration",
+							"start": 87,
+							"end": 115,
+							"property": "color",
+							"value": "/* with, comma */ red"
 						}
 					]
 				},
 				"start": 9,
-				"end": 87
+				"end": 119
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 88,
-			"styles": "\n\t.class {\n\t\tfont-size: /* comment */ 12px;\n\t\tbackground: blue /* comment */;\n\t}\n",
+			"end": 120,
+			"styles": "\n\t.class {\n\t\tfont-size: /* comment */ 12px;\n\t\tbackground: blue /* comment */;\n\t\tcolor: /* with, comma */ red;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 97,
+	"end": 129,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

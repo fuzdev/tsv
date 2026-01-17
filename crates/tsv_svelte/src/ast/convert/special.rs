@@ -8,7 +8,7 @@
 
 use crate::ast::{internal, public};
 use string_interner::DefaultStringInterner;
-use tsv_lang::LocationTracker;
+use tsv_lang::{InfallibleResolve, LocationTracker};
 
 use super::{
     CommentAttachmentContext, attach_comments_recursively, convert_attribute_node,
@@ -93,8 +93,6 @@ pub(super) fn convert_svelte_options(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::SvelteOptions {
-    use tsv_lang::InfallibleResolve;
-
     // Check for `runes` attribute (boolean shorthand or explicit)
     let runes = options.attributes.iter().find_map(|attr| {
         if let internal::AttributeNode::Attribute(attr) = attr {

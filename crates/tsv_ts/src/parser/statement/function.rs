@@ -29,12 +29,13 @@ impl<'a> Parser<'a> {
 
         // No ASI - parse the return value expression
         let argument = self.parse_expression()?;
-        let arg_end = argument.span().end;
         self.semicolon()?;
+        // Span includes semicolon (current position after consuming it)
+        let end = self.prev_token_end();
 
         Ok(Statement::ReturnStatement(ReturnStatement {
             argument: Some(argument),
-            span: Span::new(start as u32, arg_end),
+            span: Span::new(start as u32, end as u32),
         }))
     }
 

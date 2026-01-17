@@ -76,6 +76,23 @@ async fn test_all_fixtures() {
         );
     }
 
+    // Detect Deno sidecar timeout pattern (requests taking too long)
+    let timeout_failures = summary.count_timeout_failures();
+    if timeout_failures > 0 {
+        panic!(
+            "\n\nDeno sidecar timed out during test run!\n\n\
+            {} fixtures failed with timeout errors.\n\
+            This indicates prettier/acorn is hanging on certain inputs.\n\n\
+            To identify the problematic fixture, run:\n\
+            cargo run -p tsv_debug fixtures_validate --verbose 2>&1 | tee /tmp/validate.log\n\n\
+            Common causes:\n\
+            - Malformed input triggering infinite loop in prettier/acorn\n\
+            - System under heavy load\n\
+            - Resource exhaustion\n",
+            timeout_failures
+        );
+    }
+
     // Get verbose mode from environment
     let verbose = std::env::var("VERBOSE").is_ok() || std::env::var("V").is_ok();
 

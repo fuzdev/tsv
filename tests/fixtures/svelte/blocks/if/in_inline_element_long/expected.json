@@ -1,0 +1,377 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 343,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 52,
+				"data": " 100 chars - stays on one line (at boundary) "
+			},
+			{
+				"type": "Text",
+				"start": 52,
+				"end": 53,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 53,
+				"end": 160,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 54
+					},
+					"end": {
+						"line": 2,
+						"column": 5,
+						"character": 58
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 61,
+							"end": 152,
+							"test": {
+								"type": "BinaryExpression",
+								"start": 66,
+								"end": 99,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 40
+									}
+								},
+								"left": {
+									"type": "UnaryExpression",
+									"start": 66,
+									"end": 86,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 7
+										},
+										"end": {
+											"line": 3,
+											"column": 27
+										}
+									},
+									"operator": "typeof",
+									"prefix": true,
+									"argument": {
+										"type": "Identifier",
+										"start": 73,
+										"end": 86,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 14
+											},
+											"end": {
+												"line": 3,
+												"column": 27
+											}
+										},
+										"name": "content_value"
+									}
+								},
+								"operator": "===",
+								"right": {
+									"type": "Literal",
+									"start": 91,
+									"end": 99,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 32
+										},
+										"end": {
+											"line": 3,
+											"column": 40
+										}
+									},
+									"value": "string",
+									"raw": "'string'"
+								}
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 100,
+										"end": 115,
+										"expression": {
+											"type": "Identifier",
+											"start": 101,
+											"end": 114,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 42
+												},
+												"end": {
+													"line": 3,
+													"column": 55
+												}
+											},
+											"name": "content_value"
+										}
+									}
+								]
+							},
+							"alternate": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "RenderTag",
+										"start": 122,
+										"end": 147,
+										"expression": {
+											"type": "CallExpression",
+											"start": 131,
+											"end": 146,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 72
+												},
+												"end": {
+													"line": 3,
+													"column": 87
+												}
+											},
+											"callee": {
+												"type": "Identifier",
+												"start": 131,
+												"end": 144,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 72
+													},
+													"end": {
+														"line": 3,
+														"column": 85
+													}
+												},
+												"name": "content_value"
+											},
+											"arguments": [],
+											"optional": false
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 160,
+				"end": 162,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 162,
+				"end": 231,
+				"data": " 103 chars - prettier keeps on one line (exceeds print width) "
+			},
+			{
+				"type": "Text",
+				"start": 231,
+				"end": 232,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 232,
+				"end": 342,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 233
+					},
+					"end": {
+						"line": 7,
+						"column": 5,
+						"character": 237
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 240,
+							"end": 334,
+							"test": {
+								"type": "BinaryExpression",
+								"start": 245,
+								"end": 279,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 41
+									}
+								},
+								"left": {
+									"type": "UnaryExpression",
+									"start": 245,
+									"end": 266,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 7
+										},
+										"end": {
+											"line": 8,
+											"column": 28
+										}
+									},
+									"operator": "typeof",
+									"prefix": true,
+									"argument": {
+										"type": "Identifier",
+										"start": 252,
+										"end": 266,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 14
+											},
+											"end": {
+												"line": 8,
+												"column": 28
+											}
+										},
+										"name": "content_value1"
+									}
+								},
+								"operator": "===",
+								"right": {
+									"type": "Literal",
+									"start": 271,
+									"end": 279,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 33
+										},
+										"end": {
+											"line": 8,
+											"column": 41
+										}
+									},
+									"value": "string",
+									"raw": "'string'"
+								}
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 280,
+										"end": 296,
+										"expression": {
+											"type": "Identifier",
+											"start": 281,
+											"end": 295,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 43
+												},
+												"end": {
+													"line": 8,
+													"column": 57
+												}
+											},
+											"name": "content_value1"
+										}
+									}
+								]
+							},
+							"alternate": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "RenderTag",
+										"start": 303,
+										"end": 329,
+										"expression": {
+											"type": "CallExpression",
+											"start": 312,
+											"end": 328,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 74
+												},
+												"end": {
+													"line": 8,
+													"column": 90
+												}
+											},
+											"callee": {
+												"type": "Identifier",
+												"start": 312,
+												"end": 326,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 74
+													},
+													"end": {
+														"line": 8,
+														"column": 88
+													}
+												},
+												"name": "content_value1"
+											},
+											"arguments": [],
+											"optional": false
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

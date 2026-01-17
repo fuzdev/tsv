@@ -3,6 +3,7 @@
 //! Contains all TS type definitions: `TSType` enum, type annotations,
 //! type literals, type operators, and related constructs.
 
+use crate::lexer::KeywordKind;
 use tsv_lang::Span;
 
 use super::{Expression, Identifier, Literal, MethodKind, TemplateElement, UnaryExpression};
@@ -207,8 +208,7 @@ impl TSKeywordKind {
     /// Convert from lexer KeywordKind to AST TSKeywordKind
     /// Returns None for non-type keywords (const, let, var, etc.)
     #[inline]
-    pub fn from_lexer_keyword(kw: crate::lexer::KeywordKind) -> Option<Self> {
-        use crate::lexer::KeywordKind;
+    pub fn from_lexer_keyword(kw: KeywordKind) -> Option<Self> {
         match kw {
             KeywordKind::Number => Some(TSKeywordKind::Number),
             KeywordKind::String => Some(TSKeywordKind::String),

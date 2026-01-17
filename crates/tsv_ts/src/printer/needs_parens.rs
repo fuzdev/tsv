@@ -62,6 +62,12 @@ pub enum ParenContext {
 
     /// Arrow function body (expression form): `() => <expr>`
     ArrowBody,
+
+    /// Object property value: `{key: <expr>}`
+    ObjectPropertyValue,
+
+    /// Spread element argument: `...<expr>`
+    SpreadArgument,
 }
 
 /// Determines if an expression needs parentheses in a given context.
@@ -128,18 +134,41 @@ pub fn needs_parens(expr: &Expression, ctx: ParenContext) -> bool {
             Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_)
         ),
 
-        // Unary argument: `!(a + b)` - binary needs parens (higher precedence)
-        ParenContext::UnaryArgument => matches!(expr, Expression::BinaryExpression(_)),
+        // Unary argument: `!(a + b)`, `!(await x)` - parens for clarity/precedence
+        ParenContext::UnaryArgument => matches!(
+            expr,
+            Expression::BinaryExpression(_) | Expression::AwaitExpression(_)
+        ),
 
         // Await argument: `await (a + b)` - binary needs parens (higher precedence)
         ParenContext::AwaitArgument => matches!(expr, Expression::BinaryExpression(_)),
 
-        // Arrow body: `() => ({})`, `() => (x = y)`, `() => (a ? b : c)`
+        // Arrow body: `() => ({})`, `() => (x = y)`
+        // Note: ConditionalExpression is handled specially in build_arrow_body_doc
+        // using if_break - parens only when inline, not when on new line
         ParenContext::ArrowBody => matches!(
             expr,
-            Expression::ObjectExpression(_)
-                | Expression::AssignmentExpression(_)
+            Expression::ObjectExpression(_) | Expression::AssignmentExpression(_)
+        ),
+
+        // Object property value: `{key: (a = b)}`
+        // Assignment expressions need parens in object literals (not in ObjectPattern)
+        ParenContext::ObjectPropertyValue => matches!(expr, Expression::AssignmentExpression(_)),
+
+        // Spread argument: `...(a || b)`, `...(a ? b : c)`, `...(await x)`, `...(x as T)`
+        // Spread has higher precedence than binary/conditional/assignment/await/yield/type assertions,
+        // so parens are needed to disambiguate: `...a || b` means `(...a) || b`, not `...(a || b)`
+        // Note: SequenceExpression already adds its own parens in build_sequence_doc
+        ParenContext::SpreadArgument => matches!(
+            expr,
+            Expression::BinaryExpression(_)
                 | Expression::ConditionalExpression(_)
+                | Expression::AssignmentExpression(_)
+                | Expression::AwaitExpression(_)
+                | Expression::YieldExpression(_)
+                | Expression::TSAsExpression(_)
+                | Expression::TSSatisfiesExpression(_)
+                | Expression::TSTypeAssertion(_)
         ),
     }
 }
@@ -174,6 +203,21 @@ fn needs_parens_binary_operand(
     parent_op: BinaryOperator,
     is_right: bool,
 ) -> bool {
+    // ConditionalExpression, AssignmentExpression, TSAsExpression, and TSSatisfiesExpression
+    // have lower precedence than any binary operator, so they ALWAYS need parens when used
+    // as operands.
+    // e.g., `a && (b ? c : d)` - without parens it becomes `(a && b) ? c : d`
+    // e.g., `(x as string) in obj` - without parens it becomes `x as (string in obj)`
+    if matches!(
+        expr,
+        Expression::ConditionalExpression(_)
+            | Expression::AssignmentExpression(_)
+            | Expression::TSAsExpression(_)
+            | Expression::TSSatisfiesExpression(_)
+    ) {
+        return true;
+    }
+
     let Expression::BinaryExpression(child) = expr else {
         return false;
     };

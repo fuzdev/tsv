@@ -1,6 +1,7 @@
 <script lang="ts">
 // =====================================================================
-// Basic Async Generic Arrow Functions
+// Basic Async Generic Arrow Functions (Svelte context - trailing comma needed)
+// See basic_ts/input.ts for pure TypeScript version (no trailing comma)
 // =====================================================================
 
 // Basic (trailing comma for JSX disambiguation)

@@ -1,0 +1,124 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 178,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 58,
+				"data": " Text after inline closing tag stays hugged with > "
+			},
+			{
+				"type": "Text",
+				"start": 58,
+				"end": 59,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 59,
+				"end": 177,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 60
+					},
+					"end": {
+						"line": 2,
+						"column": 2,
+						"character": 61
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 62,
+							"end": 100,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 ",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 "
+						},
+						{
+							"type": "Component",
+							"start": 100,
+							"end": 171,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 38,
+									"character": 101
+								},
+								"end": {
+									"line": 3,
+									"column": 42,
+									"character": 105
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 106,
+									"end": 155,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 3,
+											"column": 43,
+											"character": 106
+										},
+										"end": {
+											"line": 3,
+											"column": 47,
+											"character": 110
+										}
+									},
+									"value": [
+										{
+											"start": 112,
+											"end": 154,
+											"type": "Text",
+											"raw": "https://tsv.dev/long/path/to/resource/aaaa",
+											"data": "https://tsv.dev/long/path/to/resource/aaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 159,
+										"end": 162,
+										"raw": "MDN",
+										"data": "MDN"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 171,
+							"end": 173,
+							"raw": ".\n",
+							"data": ".\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

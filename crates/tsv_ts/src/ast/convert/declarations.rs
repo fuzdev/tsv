@@ -1,9 +1,10 @@
 // Type alias, function, and class declaration conversions
 
 use super::super::{internal, public};
+use super::types::convert_type_annotation as convert_type_annotation_from_types;
 use super::{
-    convert_block_statement, convert_expression, convert_type, convert_type_annotation,
-    create_location,
+    convert_block_statement, convert_expression, convert_statement, convert_type,
+    convert_type_annotation, create_location,
 };
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
@@ -256,8 +257,6 @@ fn convert_index_signature(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::TSIndexSignature {
-    use super::types::convert_type_annotation;
-
     public::TSIndexSignature {
         node_type: "TSIndexSignature".to_string(),
         start: sig.span.start,
@@ -277,15 +276,14 @@ fn convert_index_signature(
                     loc: create_location(p.span, loc, offset),
                     name,
                     optional: p.optional,
-                    type_annotation: p
-                        .type_annotation
-                        .as_ref()
-                        .map(|ta| convert_type_annotation(ta, source, loc, interner, offset)),
+                    type_annotation: p.type_annotation.as_ref().map(|ta| {
+                        convert_type_annotation_from_types(ta, source, loc, interner, offset)
+                    }),
                     decorators: Vec::new(),
                 }
             })
             .collect(),
-        type_annotation: convert_type_annotation(
+        type_annotation: convert_type_annotation_from_types(
             &sig.type_annotation,
             source,
             loc,
@@ -303,8 +301,6 @@ fn convert_static_block(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::StaticBlock {
-    use super::convert_statement;
-
     public::StaticBlock {
         node_type: "StaticBlock".to_string(),
         start: block.span.start,

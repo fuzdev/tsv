@@ -52,12 +52,27 @@ impl<'a> SvelteParser<'a> {
     /// - Spread attributes: `{...obj}` (Svelte 3+)
     /// - Shorthand attributes: `{name}` (equivalent to `name={name}`)
     pub(crate) fn parse_attributes(&mut self) -> Result<Vec<AttributeNode>, ParseError> {
+        self.parse_attributes_inner(true)
+    }
+
+    /// Parse attribute list for script/style tags where expressions are NOT parsed in quoted values
+    ///
+    /// Script and style tags use plain text attribute values - `{a: A}` is literal text,
+    /// not an expression tag.
+    pub(crate) fn parse_attributes_literal(&mut self) -> Result<Vec<AttributeNode>, ParseError> {
+        self.parse_attributes_inner(false)
+    }
+
+    fn parse_attributes_inner(
+        &mut self,
+        parse_expressions: bool,
+    ) -> Result<Vec<AttributeNode>, ParseError> {
         let mut attributes = Vec::new();
 
         // Parse attributes until we hit > or />
         while !self.check(TokenKind::RightAngle) && !self.check(TokenKind::Slash) {
             if self.check(TokenKind::Identifier) {
-                attributes.push(self.parse_attribute_or_directive()?);
+                attributes.push(self.parse_attribute_or_directive(parse_expressions)?);
             } else if self.check(TokenKind::TagOpen) {
                 // {@ token - check if it's @attach
                 attributes.push(AttributeNode::AttachTag(self.parse_attach_tag()?));
@@ -92,7 +107,10 @@ impl<'a> SvelteParser<'a> {
     ///
     /// Detects if the attribute name contains a colon (`:`) indicating a directive,
     /// and routes to the appropriate parser.
-    fn parse_attribute_or_directive(&mut self) -> Result<AttributeNode, ParseError> {
+    fn parse_attribute_or_directive(
+        &mut self,
+        parse_expressions: bool,
+    ) -> Result<AttributeNode, ParseError> {
         let name_str = self.current_value().to_string();
 
         // Check if this is a directive (contains colon)
@@ -104,7 +122,9 @@ impl<'a> SvelteParser<'a> {
         }
 
         // Not a directive, parse as regular attribute
-        Ok(AttributeNode::Attribute(self.parse_attribute()?))
+        Ok(AttributeNode::Attribute(
+            self.parse_attribute_inner(parse_expressions)?,
+        ))
     }
 
     /// Parse a directive (on:, bind:, class:, style:, use:, transition:, in:, out:, animate:, let:)
@@ -554,8 +574,7 @@ impl<'a> SvelteParser<'a> {
         })
     }
 
-    /// Parse a single attribute (e.g., `lang="ts"`)
-    pub(crate) fn parse_attribute(&mut self) -> Result<Attribute, ParseError> {
+    fn parse_attribute_inner(&mut self, parse_expressions: bool) -> Result<Attribute, ParseError> {
         let start = self.current_start;
 
         // Parse attribute name
@@ -573,7 +592,7 @@ impl<'a> SvelteParser<'a> {
             self.advance()?; // consume =
 
             // Parse attribute value (string or expression)
-            let value = self.parse_attribute_value()?;
+            let value = self.parse_attribute_value_inner(parse_expressions)?;
 
             // Find the end position from the last value part
             let value_end = if let Some(last_part) = value.last() {
@@ -617,6 +636,13 @@ impl<'a> SvelteParser<'a> {
     /// Parse attribute value (e.g., `"ts"`, `{expr}`, or unquoted `value`)
     /// Returns a Vec<AttributeValue> to support mixed text/expressions
     pub(crate) fn parse_attribute_value(&mut self) -> Result<Vec<AttributeValue>, ParseError> {
+        self.parse_attribute_value_inner(true)
+    }
+
+    fn parse_attribute_value_inner(
+        &mut self,
+        parse_expressions: bool,
+    ) -> Result<Vec<AttributeValue>, ParseError> {
         let mut parts = Vec::new();
 
         // Check for expression attribute {expr}
@@ -660,6 +686,21 @@ impl<'a> SvelteParser<'a> {
 
         // Advance past the string token now, before we start parsing expression tags
         self.advance()?;
+
+        // For script/style tag attributes, don't parse expressions - treat as literal text
+        if !parse_expressions {
+            let text_content = self.source[content_start..content_end].to_string();
+            let decoded = tsv_html::decode_character_references(&text_content, true);
+            parts.push(AttributeValue::Text(Text {
+                raw: text_content,
+                data: decoded,
+                span: Span {
+                    start: content_start as u32,
+                    end: content_end as u32,
+                },
+            }));
+            return Ok(parts);
+        }
 
         // Scan for expression tags within the quoted value
         // Example: "delete {'\"'}" contains text "delete " and expression {'\"'}

@@ -27,23 +27,3 @@ pub fn to_json_with_tabs<T: Serialize>(value: &T) -> Result<String, serde_json::
     #[allow(clippy::unwrap_used)]
     Ok(String::from_utf8(buf).unwrap())
 }
-
-/// Ensure a string ends with a newline character
-///
-/// If the string already ends with `\n`, returns it unchanged.
-/// Otherwise, appends a newline.
-///
-/// # Examples
-///
-/// ```rust
-/// # use tsv_cli::json_utils::ensure_trailing_newline;
-/// assert_eq!(ensure_trailing_newline("hello".to_string()), "hello\n");
-/// assert_eq!(ensure_trailing_newline("hello\n".to_string()), "hello\n");
-/// ```
-pub fn ensure_trailing_newline(s: String) -> String {
-    if s.ends_with('\n') {
-        s
-    } else {
-        format!("{s}\n")
-    }
-}

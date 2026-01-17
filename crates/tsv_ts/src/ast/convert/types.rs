@@ -2,8 +2,9 @@
 
 use super::super::{internal, public};
 use super::create_location;
+use internal::TSKeywordKind;
 use string_interner::DefaultStringInterner;
-use tsv_lang::LocationTracker;
+use tsv_lang::{InfallibleResolve, LocationTracker};
 
 pub(in crate::ast) fn convert_type_annotation(
     type_annotation: &internal::TSTypeAnnotation,
@@ -688,8 +689,6 @@ fn convert_keyword_type(
     loc: &LocationTracker,
     offset: usize,
 ) -> public::TSType {
-    use internal::TSKeywordKind;
-
     // Helper macro to reduce boilerplate - creates the public type struct
     macro_rules! make_public {
         ($variant:ident) => {{
@@ -974,8 +973,6 @@ pub(in crate::ast) fn convert_interface_declaration(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::TSInterfaceDeclaration {
-    use tsv_lang::InfallibleResolve;
-
     public::TSInterfaceDeclaration {
         node_type: "TSInterfaceDeclaration".to_string(),
         start: iface.span.start,
@@ -1026,8 +1023,6 @@ fn convert_entity_name_with_interner(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::TSEntityName {
-    use tsv_lang::InfallibleResolve;
-
     match name {
         internal::TSEntityName::Identifier(id) => {
             public::TSEntityName::Identifier(public::Identifier {
@@ -1093,8 +1088,6 @@ pub(in crate::ast) fn convert_declare_function(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::TSDeclareFunction {
-    use tsv_lang::InfallibleResolve;
-
     public::TSDeclareFunction {
         node_type: "TSDeclareFunction".to_string(),
         start: func.span.start,

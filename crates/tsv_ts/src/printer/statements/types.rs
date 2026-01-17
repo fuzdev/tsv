@@ -1,15 +1,15 @@
 // Type-related statement printing for TypeScript
 
-use super::{Printer, build_entity_name_doc};
-use crate::ast::internal;
-use tsv_lang::{SymbolToU32, comments_in_range, doc};
+use super::{Printer, build_entity_name_doc, intersection_has_huggable_last_type, unwrap_parenthesized};
+use crate::ast::internal::{self, TSType};
+use tsv_lang::{Comment, SymbolToU32, comments_in_range, doc, printing};
 
 /// Check if a type is "generic" - i.e., has type parameters.
 /// This matches prettier's `isGeneric` function in assignment.js.
-fn is_generic_type(ts_type: &internal::TSType) -> bool {
+fn is_generic_type(ts_type: &TSType) -> bool {
     match ts_type {
-        internal::TSType::Function(f) => f.type_parameters.is_some(),
-        internal::TSType::TypeReference(r) => r.type_arguments.is_some(),
+        TSType::Function(f) => f.type_parameters.is_some(),
+        TSType::TypeReference(r) => r.type_arguments.is_some(),
         _ => false,
     }
 }
@@ -21,7 +21,34 @@ fn should_break_before_conditional_type(conditional: &internal::TSConditionalTyp
     is_generic_type(&conditional.check_type) || is_generic_type(&conditional.extends_type)
 }
 
+/// Returns true if the type has its own internal breaking mechanism
+/// (e.g., braces, brackets, parentheses) and should NOT break after `=`.
+fn type_has_internal_breaking(ts_type: &TSType) -> bool {
+    match ts_type {
+        TSType::TypeLiteral(_)
+        | TSType::Mapped(_)
+        | TSType::Tuple(_)
+        | TSType::Function(_)
+        | TSType::Constructor(_) => true,
+        // TypeReference with type arguments has internal breaking via `<>`
+        TSType::TypeReference(r) => r.type_arguments.is_some(),
+        _ => false,
+    }
+}
+
+/// Build a fluid-style doc that can break after `=` when the line is too long.
+/// Flat: ` <type>`, Broken: `\n\t<type>`
+fn fluid_assignment_doc(type_doc: doc::Doc) -> doc::Doc {
+    doc::group(doc::indent(doc::concat(vec![doc::line(), type_doc])))
+}
+
 impl<'a> Printer<'a> {
+    /// Check if a comment spans multiple lines (block comment with newlines)
+    fn is_multiline_comment(&self, comment: &Comment) -> bool {
+        comment.is_block
+            && !printing::is_same_line(self.source, comment.span.start, comment.span.end)
+    }
+
     /// Build a doc for type alias declaration with proper line breaking
     ///
     /// For union types that don't fit on one line:
@@ -45,6 +72,10 @@ impl<'a> Printer<'a> {
         let mut parts = vec![doc::text("type ")];
         parts.push(doc::symbol(decl.id.name.to_u32()));
 
+        // Check if type parameters are complex (>1 param with constraints/defaults)
+        // Complex type params use break-lhs layout: params break, not the RHS
+        let has_complex_params = self.type_alias_has_complex_params(decl.type_parameters.as_ref());
+
         if let Some(type_params) = &decl.type_parameters {
             parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
         }
@@ -54,49 +85,51 @@ impl<'a> Printer<'a> {
         // Check the type kind for different formatting rules
         // For union/intersection types, build without their own group so they inherit
         // breaking from this context's group.
-        if let internal::TSType::Union(u) = &decl.type_annotation {
+        if let TSType::Union(u) = &decl.type_annotation {
             // Union types: break after `=` with leading `| `
-            // Don't wrap union in its own group - let this context control breaking
             let type_doc = self.build_union_type_doc(u, false);
-            parts.push(doc::group(doc::indent(doc::concat(vec![
-                doc::line(), // space when flat, newline when broken
-                type_doc,
-            ]))));
-        } else if let internal::TSType::Intersection(i) = &decl.type_annotation {
+            parts.push(fluid_assignment_doc(type_doc));
+        } else if let TSType::Intersection(i) = &decl.type_annotation {
             // Intersection types: first element stays inline, subsequent wrap with indent
-            // Don't wrap intersection in its own group - let this context control breaking
-            // Format: `= Type1 &\n\tType2 &\n\tType3`
+            // Special case: when the last type is a TypeLiteral (huggable), don't add indent
             let type_doc = self.build_intersection_type_doc(i, false);
             parts.push(doc::text(" "));
-            parts.push(doc::group(doc::indent(type_doc)));
-        } else if let internal::TSType::Conditional(cond) = &decl.type_annotation {
-            // Conditional types: check if we should break after `=`
-            // Break after `=` only if check_type or extends_type has type parameters
-            // (this matches prettier's shouldBreakBeforeConditionalType)
+            if intersection_has_huggable_last_type(i) {
+                parts.push(type_doc);
+            } else {
+                parts.push(doc::group(doc::indent(type_doc)));
+            }
+        } else if let TSType::Conditional(cond) = &decl.type_annotation {
+            // Conditional types: break after `=` only if check/extends has type parameters
             let type_doc = self.build_type_doc(&decl.type_annotation);
             if should_break_before_conditional_type(cond) {
-                // Type has generic check/extends - break after `=` with indent
-                // type T =
-                //     check extends SomeGeneric<X>
-                //         ? true
-                //         : false
-                parts.push(doc::group(doc::indent(doc::concat(vec![
-                    doc::line(), // space when flat, newline when broken
-                    type_doc,
-                ]))));
+                parts.push(fluid_assignment_doc(type_doc));
             } else {
-                // Type has non-generic check/extends - keep `=` inline, let conditional handle breaking
-                // type T = check extends {a: X}
-                //     ? true
-                //     : false
                 parts.push(doc::text(" "));
                 parts.push(type_doc);
             }
-        } else {
-            // Other types (object literals, etc.): just add space and the type
+        } else if type_has_internal_breaking(&decl.type_annotation) {
+            // Types with internal breaking (braces, brackets, parens, angle brackets) stay hugged
+            // Use wrapping version so TypeReference type args break internally when too long
+            let type_doc = self.build_type_doc_with_wrapping_type_args(&decl.type_annotation);
+            parts.push(doc::text(" "));
+            parts.push(type_doc);
+        } else if has_complex_params {
+            // Complex type parameters: use break-lhs layout
+            // Type params break, `=` stays on same line, RHS stays inline
+            // Example: type Foo<T extends string, U = number> = SomeLongType;
+            // Breaks as:
+            //   type Foo<
+            //     T extends string,
+            //     U = number,
+            //   > = SomeLongType;
             let type_doc = self.build_type_doc(&decl.type_annotation);
             parts.push(doc::text(" "));
             parts.push(type_doc);
+        } else {
+            // Other types: fluid layout - can break after `=` when line is too long
+            let type_doc = self.build_type_doc(&decl.type_annotation);
+            parts.push(fluid_assignment_doc(type_doc));
         }
 
         parts.push(doc::text(";"));
@@ -171,8 +204,11 @@ impl<'a> Printer<'a> {
         let mut parts = vec![header_doc, doc::text(" {")];
         if !decl.body.body.is_empty() {
             parts.push(doc::indent(doc::concat(vec![
-                doc::hardline(),
-                self.build_type_elements_doc(&decl.body.body),
+                self.build_type_elements_doc(
+                    &decl.body.body,
+                    decl.body.span.start,
+                    decl.body.span.end,
+                ),
             ])));
             parts.push(doc::hardline());
         }
@@ -285,6 +321,14 @@ impl<'a> Printer<'a> {
     /// Inline: `<T, U, V>`
     /// Wrapped: `<\n\tT,\n\tU,\n\tV\n>`
     ///
+    /// Special case: single TypeLiteral argument hugs the opening `<`:
+    /// `Array<{prop: string}>` stays hugged, and when broken:
+    /// ```text
+    /// Array<{
+    ///     prop: string;
+    /// }>
+    /// ```
+    ///
     /// Use this when type arguments should break independently of parent context,
     /// such as in property type annotations.
     pub(crate) fn build_type_arguments_doc_wrapping(
@@ -293,6 +337,42 @@ impl<'a> Printer<'a> {
     ) -> doc::Doc {
         if args.params.is_empty() {
             return doc::text("<>");
+        }
+
+        // Special case: single brace-delimited type argument (TypeLiteral or Mapped, possibly
+        // parenthesized) - hug `<{` together. These types handle their own internal breaking,
+        // so we don't need extra softlines/indents around them.
+        if args.params.len() == 1 {
+            let is_huggable = matches!(
+                unwrap_parenthesized(&args.params[0]),
+                TSType::TypeLiteral(_) | TSType::Mapped(_)
+            );
+            if is_huggable {
+                let mut parts = vec![doc::text("<")];
+
+                // Include leading comments: `Array</* comment */ {...}>`
+                let param_start = args.params[0].span().start;
+                let param_end = args.params[0].span().end;
+                let after_open = args.span.start + 1; // After the opening `<`
+                let before_close = args.span.end - 1; // Before the closing `>`
+                for comment in comments_in_range(self.comments, after_open, param_start) {
+                    if comment.is_block {
+                        parts.push(doc::text_owned(format!("/*{}*/ ", comment.content)));
+                    }
+                }
+
+                parts.push(self.build_type_doc(&args.params[0]));
+
+                // Include trailing comments: `Array<{...} /* trailing */>`
+                for comment in comments_in_range(self.comments, param_end, before_close) {
+                    if comment.is_block {
+                        parts.push(doc::text_owned(format!(" /*{}*/", comment.content)));
+                    }
+                }
+
+                parts.push(doc::text(">"));
+                return doc::concat(parts);
+            }
         }
 
         let mut inner_parts = Vec::new();
@@ -351,15 +431,99 @@ impl<'a> Printer<'a> {
         ]))
     }
 
-    /// Build doc for type elements
-    fn build_type_elements_doc(&self, members: &[internal::TSTypeElement]) -> doc::Doc {
+    /// Build doc for type elements with comment handling
+    fn build_type_elements_doc(
+        &self,
+        members: &[internal::TSTypeElement],
+        body_start: u32,
+        body_end: u32,
+    ) -> doc::Doc {
         let mut parts = Vec::new();
+        let mut prev_end = body_start + 1; // after opening brace
+
         for (i, member) in members.iter().enumerate() {
+            let member_start = member.span().start;
+            let is_first = i == 0;
+
+            // Find comments between previous element and this one
+            // Filter out trailing same-line comments from the previous member
+            // BUT keep multi-line block comments even if they start on the same line
+            let all_comments: Vec<_> =
+                comments_in_range(self.comments, prev_end, member_start).collect();
+            let leading_comments: Vec<_> = if !is_first {
+                all_comments
+                    .iter()
+                    .filter(|c| {
+                        // Keep if not on same line as prev_end
+                        if !printing::is_same_line(self.source, prev_end, c.span.start) {
+                            return true;
+                        }
+                        // Also keep multi-line block comments (they're always leading, never trailing)
+                        self.is_multiline_comment(c)
+                    })
+                    .copied()
+                    .collect()
+            } else {
+                all_comments
+            };
+
+            // Add separator before this member
+            // For first member: just hardline
+            // For other members: literalline + hardline if blank line in source, just hardline otherwise
             if i > 0 {
-                parts.push(doc::hardline());
+                let check_pos = if leading_comments.is_empty() {
+                    member_start
+                } else {
+                    leading_comments[0].span.start
+                };
+                if printing::has_blank_line_between(self.source, prev_end, check_pos) {
+                    parts.push(doc::literalline());
+                }
             }
+            // Always add hardline before member (or its leading comments)
+            parts.push(doc::hardline());
+
+            // Print leading comments with blank line preservation
+            parts.extend(
+                self.build_leading_comments_with_blank_lines(&leading_comments, member_start),
+            );
+
             parts.push(self.build_type_element_doc(member));
+
+            // Handle trailing inline comments on same line after member
+            // Skip multi-line block comments - they should be leading comments for the next element
+            let upper_bound = members
+                .get(i + 1)
+                .map_or(body_end, |next| next.span().start);
+            for comment in comments_in_range(self.comments, member.span().end, upper_bound) {
+                if printing::is_same_line(self.source, member.span().end, comment.span.start) {
+                    // Skip multi-line block comments (they're leading comments for next element)
+                    if self.is_multiline_comment(comment) {
+                        continue;
+                    }
+
+                    if comment.is_block {
+                        // Single-line block comments are inline, affect width
+                        parts.push(doc::text(" "));
+                        parts.push(self.build_comment_doc(comment));
+                    } else {
+                        // Line comments go in line_suffix, don't affect width
+                        parts.push(doc::line_suffix(doc::concat(vec![
+                            doc::text(" "),
+                            self.build_comment_doc(comment),
+                        ])));
+                    }
+                } else {
+                    break; // Only same-line comments
+                }
+            }
+
+            prev_end = member.span().end;
         }
+
+        // Handle trailing comments after the last member (before closing `}`)
+        parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end.saturating_sub(1)));
+
         doc::concat(parts)
     }
 
@@ -526,18 +690,74 @@ impl<'a> Printer<'a> {
         parts.push(doc::text(" {"));
 
         if !decl.members.is_empty() {
-            // Build member docs with trailing commas
-            // Use join_trailing with comma + hardline separator
-            let member_docs: Vec<doc::Doc> = decl
-                .members
-                .iter()
-                .map(|m| self.build_enum_member_doc(m))
-                .collect();
+            // Build member docs with comment handling
+            let mut member_parts = Vec::new();
+            let body_start = self.source[decl.span.start as usize..decl.span.end as usize]
+                .find('{')
+                .map_or(decl.span.start, |i| decl.span.start + i as u32 + 1);
+            let body_end = decl.span.end.saturating_sub(1); // Before '}'
+            let mut prev_end = body_start;
 
-            let sep = doc::comma_hardline();
+            for (i, member) in decl.members.iter().enumerate() {
+                let member_start = member.span.start;
+                let is_first = i == 0;
+
+                // Check for comments between previous position and this member
+                let comments: Vec<_> = comments_in_range(self.comments, prev_end, member_start)
+                    .filter(|c| {
+                        is_first || !printing::is_same_line(self.source, prev_end, c.span.start)
+                    })
+                    .collect();
+
+                // Check for blank lines
+                if !is_first {
+                    let check_pos = if comments.is_empty() {
+                        member_start
+                    } else {
+                        comments[0].span.start
+                    };
+                    if printing::has_blank_line_between(self.source, prev_end, check_pos) {
+                        member_parts.push(doc::literalline());
+                    }
+                    member_parts.push(doc::hardline());
+                }
+
+                // Process leading comments
+                for comment in &comments {
+                    member_parts.push(self.build_comment_doc(comment));
+                    // Block comment on same line as member gets space, otherwise hardline
+                    if comment.is_block
+                        && printing::is_same_line(self.source, comment.span.end, member_start)
+                    {
+                        member_parts.push(doc::text(" "));
+                    } else {
+                        member_parts.push(doc::hardline());
+                    }
+                }
+
+                member_parts.push(self.build_enum_member_doc(member));
+
+                // Add comma (trailing comma for last member)
+                member_parts.push(doc::text(","));
+
+                // Handle trailing same-line comments
+                let upper_bound = decl
+                    .members
+                    .get(i + 1)
+                    .map_or(body_end, |next| next.span.start);
+                member_parts.extend(
+                    self.build_trailing_same_line_comment_docs(member.span.end, upper_bound),
+                );
+
+                prev_end = member.span.end;
+            }
+
+            // Handle trailing comments after the last member
+            member_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
+
             parts.push(doc::indent(doc::concat(vec![
                 doc::hardline(),
-                doc::join_trailing(member_docs, sep),
+                doc::concat(member_parts),
             ])));
             parts.push(doc::hardline());
         }
@@ -652,11 +872,7 @@ impl<'a> Printer<'a> {
                         // Add separator: literalline + hardline if blank line in source, single hardline otherwise
                         // literalline() produces a bare newline (no indent), preserving truly blank lines
                         if !stmt_parts.is_empty() {
-                            if tsv_lang::printing::has_blank_line_between(
-                                self.source,
-                                prev_end,
-                                curr_start,
-                            ) {
+                            if printing::has_blank_line_between(self.source, prev_end, curr_start) {
                                 stmt_parts.push(doc::literalline()); // blank line (no indent)
                                 stmt_parts.push(doc::hardline()); // next statement with indent
                             } else {
@@ -667,6 +883,10 @@ impl<'a> Printer<'a> {
                         stmt_parts.push(self.build_statement_doc(stmt));
                         prev_end = stmt.span().end;
                     }
+
+                    // Handle trailing comments after the last statement
+                    let body_end = block.span.end.saturating_sub(1);
+                    stmt_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
 
                     parts.push(doc::indent(doc::concat(vec![
                         doc::hardline(),

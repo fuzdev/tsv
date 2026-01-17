@@ -23,8 +23,17 @@ impl<'a> Printer<'a> {
         // Check for comments inside the object
         let has_comments = self.has_comments_between(obj.span.start, obj.span.end);
 
-        // Check if object contains line comments (force multiline)
+        // Check if object contains line comments or block comments on their own line (force multiline)
         let has_line_comments = self.has_line_comments_between(obj.span.start, obj.span.end);
+
+        // Check for block comments on their own line (not same line as any property)
+        let property_spans: Vec<_> = obj
+            .properties
+            .iter()
+            .map(internal::ObjectProperty::span)
+            .collect();
+        let has_standalone_block_comment =
+            self.has_standalone_block_comment(obj.span.start, obj.span.end, &property_spans);
 
         if obj.properties.is_empty() {
             // Handle empty object with comments
@@ -68,7 +77,10 @@ impl<'a> Printer<'a> {
         });
 
         // Decide the formatting strategy
-        let force_multiline = has_line_comments || has_source_newline || has_multiline;
+        let force_multiline = has_line_comments
+            || has_standalone_block_comment
+            || has_source_newline
+            || has_multiline;
 
         if has_comments || force_multiline {
             // Comment-aware path
@@ -82,18 +94,19 @@ impl<'a> Printer<'a> {
                 let is_first = i == 0;
 
                 // Get comments between previous position and this property
-                // Filter out trailing same-line comments from the previous property
-                let all_comments: Vec<_> =
-                    comments_in_range(self.comments, prev_end, prop_start).collect();
-                let comments: Vec<_> = if !is_first {
-                    all_comments
-                        .iter()
-                        .filter(|c| !is_same_line(self.source, prev_end, c.span.start))
-                        .copied()
-                        .collect()
-                } else {
-                    all_comments
-                };
+                // For non-first properties, start search after the comma (not after property value)
+                let search_start = self.leading_comment_search_start(prev_end, is_first);
+
+                // Collect leading comments (search starts after comma for non-first properties)
+                // Skip line comments that are on same line as previous property (those are trailing)
+                // Block comments after comma on same line are leading
+                let comments: Vec<_> = comments_in_range(self.comments, search_start, prop_start)
+                    .filter(|c| {
+                        is_first ||
+                        c.is_block || // Block comments after comma are always leading
+                        !is_same_line(self.source, prev_end, c.span.start) // Line comments must be on different line
+                    })
+                    .collect();
 
                 // For non-first properties, add separator
                 if !is_first {
@@ -104,7 +117,7 @@ impl<'a> Printer<'a> {
                         } else {
                             comments[0].span.start
                         };
-                        if has_blank_line_between(self.source, prev_end, check_pos) {
+                        if has_blank_line_between(self.source, search_start, check_pos) {
                             parts.push(doc::literalline());
                         }
                         parts.push(doc::hardline());
@@ -115,8 +128,22 @@ impl<'a> Printer<'a> {
                 }
 
                 // Process comments before this property
-                let mut last_pos = prev_end;
+                let mut last_pos = search_start;
                 for (j, comment) in comments.iter().enumerate() {
+                    let is_last_comment = j == comments.len() - 1;
+
+                    // Check if there's a blank line after this comment (for force_multiline mode)
+                    let has_blank_after = force_multiline
+                        && if is_last_comment {
+                            has_blank_line_between(self.source, comment.span.end, prop_start)
+                        } else {
+                            has_blank_line_between(
+                                self.source,
+                                comment.span.end,
+                                comments[j + 1].span.start,
+                            )
+                        };
+
                     // For subsequent comments, check for blank lines between them
                     if force_multiline
                         && j > 0
@@ -128,13 +155,17 @@ impl<'a> Printer<'a> {
 
                     parts.push(self.build_comment_doc(comment));
                     if !comment.is_block {
-                        // Line comments need a hardline after
-                        parts.push(doc::hardline());
+                        // Line comments need a hardline after (unless blank line follows in force_multiline)
+                        if !has_blank_after {
+                            parts.push(doc::hardline());
+                        }
                     } else if force_multiline
                         && !is_same_line(self.source, comment.span.end, prop_start)
                     {
-                        // Block comment on its own line - hardline after (only when forcing multiline)
-                        parts.push(doc::hardline());
+                        // Block comment on its own line - hardline after (unless blank line follows)
+                        if !has_blank_after {
+                            parts.push(doc::hardline());
+                        }
                     } else {
                         // Block comment on same line as property - space after
                         parts.push(doc::text(" "));
@@ -156,16 +187,23 @@ impl<'a> Printer<'a> {
                 parts.push(prop_doc);
 
                 // Handle trailing inline comments on same line after property
-                // Block comments go before comma, line comments go after comma
+                // Only comments BEFORE comma are trailing - comments AFTER comma are leading on next property
                 let prop_end = prop.value_end();
                 let upper_bound = obj
                     .properties
                     .get(i + 1)
                     .map_or(obj.span.end, |next| next.span().start);
 
+                let comma_pos = self.find_comma_after(prop_end);
+
                 // Collect same-line trailing comments
+                // Line comments: always trailing if on same line (they extend to end of line)
+                // Block comments: only trailing if before comma
                 let trailing: Vec<_> = comments_in_range(self.comments, prop_end, upper_bound)
-                    .filter(|c| is_same_line(self.source, prop_end, c.span.start))
+                    .filter(|c| {
+                        is_same_line(self.source, prop_end, c.span.start)
+                            && (!c.is_block || comma_pos.is_none_or(|pos| c.span.start < pos))
+                    })
                     .collect();
 
                 // Block comments go before comma
@@ -182,10 +220,13 @@ impl<'a> Printer<'a> {
                     parts.push(doc::trailing_comma());
                 }
 
-                // Line comments go after comma
+                // Line comments go after comma, wrapped in line_suffix
+                // This excludes them from width calculations during break decisions
                 for comment in trailing.iter().filter(|c| !c.is_block) {
-                    parts.push(doc::text(" "));
-                    parts.push(self.build_comment_doc(comment));
+                    parts.push(doc::line_suffix(doc::concat(vec![
+                        doc::text(" "),
+                        self.build_comment_doc(comment),
+                    ])));
                 }
 
                 prev_end = prop.value_end();
@@ -193,17 +234,38 @@ impl<'a> Printer<'a> {
 
             // Handle trailing comments before closing brace
             let closing_brace_pos = obj.span.end - 1;
-            for comment in comments_in_range(self.comments, prev_end, closing_brace_pos) {
-                // Skip same-line comments (already handled above)
-                if is_same_line(self.source, prev_end, comment.span.start) {
-                    continue;
+            let trailing_comments: Vec<_> =
+                comments_in_range(self.comments, prev_end, closing_brace_pos)
+                    .filter(|c| !is_same_line(self.source, prev_end, c.span.start))
+                    .collect();
+
+            if !trailing_comments.is_empty() {
+                // Check for blank line before the first trailing comment
+                let first_comment = trailing_comments[0];
+                if force_multiline
+                    && has_blank_line_between(self.source, prev_end, first_comment.span.start)
+                {
+                    parts.push(doc::literalline());
                 }
-                if force_multiline {
-                    parts.push(doc::hardline());
-                } else {
-                    parts.push(doc::line());
+
+                let mut last_pos = prev_end;
+                for (j, comment) in trailing_comments.iter().enumerate() {
+                    // Check for blank lines between comments
+                    if force_multiline
+                        && j > 0
+                        && has_blank_line_between(self.source, last_pos, comment.span.start)
+                    {
+                        parts.push(doc::literalline());
+                    }
+
+                    if force_multiline {
+                        parts.push(doc::hardline());
+                    } else {
+                        parts.push(doc::line());
+                    }
+                    parts.push(self.build_comment_doc(comment));
+                    last_pos = comment.span.end;
                 }
-                parts.push(self.build_comment_doc(comment));
             }
 
             if force_multiline {
@@ -300,11 +362,32 @@ impl<'a> Printer<'a> {
         // For computed keys, use expression doc (preserves string quotes)
         // For regular keys, use property key doc (converts strings to bare identifiers when valid)
         let key_doc = if prop.computed {
-            doc::concat(vec![
-                doc::text("["),
-                self.build_expression_doc(&prop.key),
-                doc::text("]"),
-            ])
+            // Handle comments inside computed property brackets: [/* comment */ key]
+            let key_start = prop.key.span().start;
+            let key_end = prop.key.span().end;
+
+            // Find bracket positions
+            let bracket_start = self.find_opening_bracket_before(key_start);
+            let bracket_end = self.find_closing_bracket_after(key_end);
+
+            let mut parts = vec![doc::text("[")];
+
+            // Add comments between [ and key
+            for comment in comments_in_range(self.comments, bracket_start + 1, key_start) {
+                parts.push(self.build_comment_doc(comment));
+                parts.push(doc::text(" "));
+            }
+
+            parts.push(self.build_expression_doc(&prop.key));
+
+            // Add comments between key and ]
+            for comment in comments_in_range(self.comments, key_end, bracket_end) {
+                parts.push(doc::text(" "));
+                parts.push(self.build_comment_doc(comment));
+            }
+
+            parts.push(doc::text("]"));
+            doc::concat(parts)
         } else {
             self.build_property_key_doc(&prop.key)
         };
@@ -341,6 +424,15 @@ impl<'a> Printer<'a> {
                     parts.push(doc::text("*"));
                 }
                 parts.push(key_doc);
+
+                // Handle comments between method name and parameters: foo /* comment */ ()
+                let key_end = prop.key.span().end;
+                let params_start = func.params_start;
+                for comment in comments_in_range(self.comments, key_end, params_start) {
+                    parts.push(doc::text(" "));
+                    parts.push(self.build_comment_doc(comment));
+                }
+
                 parts.push(func_doc);
                 doc::concat(parts)
             } else {
@@ -368,14 +460,24 @@ impl<'a> Printer<'a> {
             let colon_comments: Vec<_> =
                 comments_in_range(self.comments, colon_pos + 1, value_start).collect();
 
+            // Check if value needs parens (e.g., assignment expressions)
+            let needs_parens =
+                super::needs_parens(&prop.value, super::ParenContext::ObjectPropertyValue);
+
             if colon_comments.is_empty() {
-                // No comments: use unified assignment layout
-                let key_width = self.estimate_key_width(&prop.key, prop.computed);
-                let context = super::assignment::LayoutContext::for_property(
-                    key_width,
-                    self.config.tab_width,
-                );
-                self.build_assignment_layout(key_doc, ":", &prop.value, context)
+                if needs_parens {
+                    // Build manually with parens
+                    let value_doc = doc::concat(vec![
+                        doc::text("("),
+                        self.build_expression_doc(&prop.value),
+                        doc::text(")"),
+                    ]);
+                    doc::concat(vec![key_doc, doc::text(": "), value_doc])
+                } else {
+                    // No parens needed: use unified assignment layout
+                    let is_short_key = self.is_short_property_key(&prop.key, prop.computed);
+                    self.build_assignment_layout(key_doc, ":", &prop.value, is_short_key)
+                }
             } else {
                 // Comments between colon and value: build manually to preserve them
                 let mut parts = vec![key_doc, doc::text(": ")];
@@ -383,38 +485,62 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_comment_doc(comment));
                     parts.push(doc::text(" "));
                 }
+
+                // Add parens around assignment expressions
+                if needs_parens {
+                    parts.push(doc::text("("));
+                }
                 parts.push(self.build_expression_doc(&prop.value));
+                if needs_parens {
+                    parts.push(doc::text(")"));
+                }
+
                 doc::concat(parts)
             }
         }
     }
 
-    /// Estimate the width of a property key for layout decisions
-    fn estimate_key_width(&self, key: &Expression, computed: bool) -> usize {
+    /// Check if a property key is "short" for layout decisions.
+    ///
+    /// Short keys don't benefit from breaking after the colon.
+    /// Complex expressions (calls, binary, etc.) are never short - they can't
+    /// be reduced to a simple width, matching Prettier's `cleanDoc` behavior.
+    ///
+    /// Reference: prettier's `isObjectPropertyWithShortKey` in assignment.js
+    fn is_short_property_key(&self, key: &Expression, computed: bool) -> bool {
+        let threshold = self.config.tab_width + super::assignment::MIN_OVERLAP_FOR_BREAK;
+
         let base_width = match key {
             Expression::Identifier(id) => self.resolve_symbol(id.name).len(),
             Expression::Literal(lit) => match &lit.value {
                 LiteralValue::String { content, .. } => {
-                    // Check if it's a valid identifier (no quotes needed)
-                    if is_valid_js_identifier(content) {
-                        content.len()
+                    // For computed keys, quotes are always preserved: ["x"] prints as ['x']
+                    // For non-computed keys, valid identifiers are unquoted: {"x":1} → {x:1}
+                    if computed || !is_valid_js_identifier(content) {
+                        content.len() + 2 // Include quotes
                     } else {
-                        content.len() + 2 // Add quotes
+                        content.len()
                     }
                 }
                 LiteralValue::Number(_) => {
                     // Use span to get actual source width
                     (lit.span.end - lit.span.start) as usize
                 }
-                _ => 10, // Conservative estimate
+                // Other literals (bool, null, etc.) - rare as keys, not short
+                _ => return false,
             },
-            _ => 10, // Conservative estimate for complex keys
+            // Complex expressions (calls, binary, member, etc.) are never "short".
+            // Prettier's cleanDoc can't reduce them to strings, so it returns false.
+            _ => return false,
         };
-        if computed {
+
+        let total_width = if computed {
             base_width + 2 // Add brackets
         } else {
             base_width
-        }
+        };
+
+        total_width < threshold
     }
 
     /// Build a Doc for a property key
@@ -449,5 +575,19 @@ impl<'a> Printer<'a> {
         } else {
             start as u32
         }
+    }
+
+    /// Find the opening `[` bracket before a position (for computed properties)
+    fn find_opening_bracket_before(&self, pos: u32) -> u32 {
+        self.source[..pos as usize]
+            .rfind('[')
+            .map_or(pos - 1, |offset| offset as u32)
+    }
+
+    /// Find the closing `]` bracket after a position (for computed properties)
+    fn find_closing_bracket_after(&self, pos: u32) -> u32 {
+        self.source[pos as usize..]
+            .find(']')
+            .map_or(pos + 1, |offset| pos + offset as u32)
     }
 }

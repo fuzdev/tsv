@@ -1,5 +1,5 @@
 use crate::cli::input_parser;
-use crate::diff::{ColorChoice, DiffOptions, diff_to_string};
+use crate::diff::{DiffOptions, diff_to_string};
 use crate::error;
 use crate::fixtures;
 use crate::{deno, subprocess};
@@ -84,10 +84,10 @@ async fn compare_two_inputs(
     let content1 = input1.content();
     let content2 = input2.content();
 
-    let ast1 = parse_to_json(content1, parser_type).await?;
-    let ast2 = parse_to_json(content2, parser_type).await?;
+    let ast1 = parse_to_value(content1, parser_type).await?;
+    let ast2 = parse_to_value(content2, parser_type).await?;
 
-    compare_asts(&ast1, &ast2)
+    compare_asts(ast1, ast2)
 }
 
 /// Compare round-trip: parse → format → parse → compare
@@ -95,25 +95,29 @@ async fn compare_round_trip(input: &Input, parser_type: ParserType) -> error::Re
     let content = input.content();
 
     // Parse original
-    let ast1 = parse_to_json(content, parser_type).await?;
+    let ast1 = parse_to_value(content, parser_type).await?;
 
     // Format
     let formatted = format_content(content, parser_type)?;
 
     // Parse formatted
-    let ast2 = parse_to_json(&formatted, parser_type).await?;
+    let ast2 = parse_to_value(&formatted, parser_type).await?;
 
-    compare_asts(&ast1, &ast2)
+    compare_asts(ast1, ast2)
 }
 
-/// Parse content to JSON AST string
-async fn parse_to_json(content: &str, parser_type: ParserType) -> error::Result<String> {
+/// Parse content to AST Value
+async fn parse_to_value(
+    content: &str,
+    parser_type: ParserType,
+) -> error::Result<serde_json::Value> {
     match parser_type {
         ParserType::Svelte => Ok(deno::parse_svelte(content).await?),
         ParserType::TypeScript => Ok(deno::parse_typescript(content).await?),
         ParserType::Css => {
-            // Use our Rust parser for CSS
-            subprocess::run_tsv_parse(content, true)
+            // CSS subprocess returns JSON string, parse to Value
+            let json_str = subprocess::run_tsv_parse(content, true)?;
+            Ok(serde_json::from_str(&json_str)?)
         }
     }
 }
@@ -129,11 +133,8 @@ fn format_content(content: &str, parser_type: ParserType) -> error::Result<Strin
     subprocess::run_tsv_format(content, parser_name)
 }
 
-/// Compare two AST JSON strings (ignoring spans/locations)
-fn compare_asts(json1: &str, json2: &str) -> error::Result<bool> {
-    let ast1: serde_json::Value = serde_json::from_str(json1)?;
-    let ast2: serde_json::Value = serde_json::from_str(json2)?;
-
+/// Compare two ASTs (ignoring spans/locations)
+fn compare_asts(ast1: serde_json::Value, ast2: serde_json::Value) -> error::Result<bool> {
     // Remove locations from both
     let ast1_clean = fixtures::remove_locations(ast1);
     let ast2_clean = fixtures::remove_locations(ast2);
@@ -147,15 +148,7 @@ fn compare_asts(json1: &str, json2: &str) -> error::Result<bool> {
     let pretty2 = serde_json::to_string_pretty(&ast2_clean)?;
 
     println!("\n=== AST Diff ===");
-    let options = DiffOptions::default().with_color_choice(ColorChoice::Auto);
-    let options = DiffOptions {
-        context_lines: None,
-        show_summary: true,
-        show_header: false,
-        inline_diff: true,
-        show_json_paths: true,
-        ..options
-    };
+    let options = DiffOptions::ast_diff();
     print!("{}", diff_to_string(&pretty1, &pretty2, &options));
 
     Ok(false)

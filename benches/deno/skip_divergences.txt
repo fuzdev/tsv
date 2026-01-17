@@ -1,0 +1,42 @@
+# Known Divergence Skip List
+#
+# Files listed here are excluded from the "differ" count by default.
+# Use --include-divergences to show all differences.
+#
+# Each line is a relative path from the corpus root (one per line).
+# Lines starting with # are comments. Empty lines are ignored.
+#
+# IMPORTANT: Only add files after manually verifying they differ due to
+# an intentional divergence documented in tests/fixtures/*_prettier_divergence/.
+# This list is NOT a way to hide bugs - it's for separating design choices
+# from conformance bugs.
+#
+# Example entries (relative to corpus root):
+#   src/lib/Glyph.svelte
+#   src/routes/+page.svelte
+
+# Block multiline attrs content hug (<pre> with multiline attrs, we break >)
+src/lib/ContentPreview.svelte
+
+# Template literal width (interpolations break to respect print width)
+src/lib/server/helpers.ts
+src/test/config_defaults.test.ts
+src/lib/frontend_http_transport.ts
+
+# Inline content hug (expression breaks at ternary/operator vs bracket break)
+src/lib/OllamaActions.svelte
+src/lib/ThreadListitem.svelte
+
+# Logical expression line wrap in block conditions (we break at ||/&& to respect print width)
+src/lib/DashboardChats.svelte
+src/lib/DashboardDiskfiles.svelte
+src/lib/OllamaModelDetail.svelte
+
+# Fill after inline (text after inline element exceeds print width - we break at 100, Prettier allows 102+)
+src/routes/projects/+page.svelte
+src/routes/tabs/+page.svelte
+src/routes/about/+page.svelte
+src/lib/CapabilityProviderOllama.svelte
+
+# Block multiline attrs content hug (<pre> with multiline attrs, we break >)
+src/lib/SocketMessageQueue.svelte

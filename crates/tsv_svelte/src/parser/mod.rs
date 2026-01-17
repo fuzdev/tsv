@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
+use crate::parser::element::ParsedElement;
 use tsv_lang::{ParseError, PeekData, Span};
 
 // Module declarations
@@ -108,7 +109,6 @@ impl<'a> SvelteParser<'a> {
                     last_end = comment.span.end_usize();
                     fragment_nodes.push(FragmentNode::Comment(comment));
                 } else if self.check(TokenKind::LeftAngle) {
-                    use crate::parser::element::ParsedElement;
                     match self.parse_element_or_special(false)? {
                         ParsedElement::Element(elem) => {
                             last_end = elem.span.end_usize();
@@ -165,59 +165,25 @@ impl<'a> SvelteParser<'a> {
 
         // root.start: First fragment node (whitespace-only text → skip, content/element/comment → include)
         if let Some(first_node) = fragment.nodes.first() {
-            match first_node {
-                FragmentNode::Text(text) => {
-                    if text.data.trim().is_empty() {
-                        // Whitespace-only: skip it (start after the whitespace)
-                        root_start = Some(text.span.end_usize());
-                    } else {
-                        // Has content: include it
-                        root_start = Some(text.span.start_usize());
-                    }
+            root_start = Some(match first_node {
+                FragmentNode::Text(text) if text.data.trim().is_empty() => {
+                    // Whitespace-only: skip it (start after the whitespace)
+                    text.span.end_usize()
                 }
-                FragmentNode::Element(_)
-                | FragmentNode::SpecialElement(_)
-                | FragmentNode::ExpressionTag(_)
-                | FragmentNode::Comment(_)
-                | FragmentNode::IfBlock(_)
-                | FragmentNode::EachBlock(_)
-                | FragmentNode::AwaitBlock(_)
-                | FragmentNode::KeyBlock(_)
-                | FragmentNode::SnippetBlock(_)
-                | FragmentNode::HtmlTag(_)
-                | FragmentNode::ConstTag(_)
-                | FragmentNode::DebugTag(_)
-                | FragmentNode::RenderTag(_) => {
-                    root_start = Some(first_node.span().start_usize());
-                }
-            }
+                // Any node with content: include it
+                _ => first_node.span().start_usize(),
+            });
         }
 
         // root.end: Last fragment node (whitespace-only text → exclude, content/element/comment → include)
         let end = if let Some(last_node) = fragment.nodes.last() {
             match last_node {
-                FragmentNode::Text(text) => {
-                    if text.data.trim().is_empty() {
-                        // Whitespace-only: exclude it (end before the whitespace)
-                        text.span.start
-                    } else {
-                        // Has content: include it
-                        text.span.end
-                    }
+                FragmentNode::Text(text) if text.data.trim().is_empty() => {
+                    // Whitespace-only: exclude it (end before the whitespace)
+                    text.span.start
                 }
-                FragmentNode::Element(_)
-                | FragmentNode::SpecialElement(_)
-                | FragmentNode::ExpressionTag(_)
-                | FragmentNode::Comment(_)
-                | FragmentNode::IfBlock(_)
-                | FragmentNode::EachBlock(_)
-                | FragmentNode::AwaitBlock(_)
-                | FragmentNode::KeyBlock(_)
-                | FragmentNode::SnippetBlock(_)
-                | FragmentNode::HtmlTag(_)
-                | FragmentNode::ConstTag(_)
-                | FragmentNode::DebugTag(_)
-                | FragmentNode::RenderTag(_) => last_node.span().end,
+                // Any node with content: include it
+                _ => last_node.span().end,
             }
         } else {
             // No fragment nodes - use max of all top-level items

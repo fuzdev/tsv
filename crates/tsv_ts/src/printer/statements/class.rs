@@ -2,7 +2,7 @@
 
 use super::Printer;
 use crate::ast::internal;
-use tsv_lang::{SymbolResolver, doc};
+use tsv_lang::{SymbolToU32, doc};
 
 impl<'a> Printer<'a> {
     /// Check if class should use "group mode" for heritage clauses
@@ -99,14 +99,19 @@ impl<'a> Printer<'a> {
             trailing_comments_end,
             force_params_break,
         );
-        parts.push(doc::group(params_doc));
+        // Don't wrap params in their own group - the outer signature group controls breaking.
+        // This ensures params break BEFORE return type when signature exceeds width.
+        parts.push(params_doc);
 
         // Return type annotation
         if let Some(return_type) = &func.return_type {
-            parts.push(self.build_type_annotation_doc(return_type));
+            parts.push(self.build_type_annotation_doc_for_return_type(return_type));
         }
 
-        doc::concat(parts)
+        // Single outer group for entire signature (params + return type).
+        // When this group breaks, params' softlines become newlines while return type stays flat.
+        // Matches Prettier's printMethodValue structure.
+        doc::group(doc::concat(parts))
     }
 
     /// Build a Doc for a class declaration
@@ -164,9 +169,8 @@ impl<'a> Printer<'a> {
 
         parts.push(doc::text("class"));
         if let Some(id) = &decl.id {
-            let id_str = self.resolve_symbol(id.name);
             parts.push(doc::text(" "));
-            parts.push(doc::text_owned(id_str));
+            parts.push(doc::symbol(id.name.to_u32()));
         }
 
         // Build heritage docs
@@ -226,8 +230,8 @@ impl<'a> Printer<'a> {
             if decl.body.body.is_empty() {
                 parts.push(doc::text(" "));
             } else {
-                // dedent so brace is at base indent (not heritage indent)
-                parts.push(doc::dedent(doc::line()));
+                // line() at base indent (heritage is indented, brace is at class level)
+                parts.push(doc::line());
             }
 
             doc::group(doc::concat(parts))
@@ -335,46 +339,9 @@ impl<'a> Printer<'a> {
                 member_parts.push(doc::hardline());
             }
 
-            // Process comments before this member
-            let mut last_pos = prev_end;
-            for (j, comment) in comments.iter().enumerate() {
-                // For subsequent comments, check for blank lines between them
-                if j > 0
-                    && tsv_lang::printing::has_blank_line_between(
-                        self.source,
-                        last_pos,
-                        comment.span.start,
-                    )
-                {
-                    member_parts.push(doc::literalline());
-                    member_parts.push(doc::hardline());
-                }
-
-                member_parts.push(self.build_comment_doc(comment));
-                if !comment.is_block {
-                    // Line comments need a hardline after
-                    member_parts.push(doc::hardline());
-                } else if !tsv_lang::printing::is_same_line(
-                    self.source,
-                    comment.span.end,
-                    member_start,
-                ) {
-                    // Block comment on its own line - hardline after
-                    member_parts.push(doc::hardline());
-                } else {
-                    // Block comment on same line as member - space before
-                    member_parts.push(doc::text(" "));
-                }
-                last_pos = comment.span.end;
-            }
-
-            // Check for blank line after last comment (before member)
-            if !comments.is_empty()
-                && tsv_lang::printing::has_blank_line_between(self.source, last_pos, member_start)
-            {
-                member_parts.push(doc::literalline());
-                member_parts.push(doc::hardline());
-            }
+            // Process comments before this member (with blank line preservation)
+            member_parts
+                .extend(self.build_leading_comments_with_blank_lines(&comments, member_start));
 
             member_parts.push(self.build_class_member_doc(member));
 
@@ -383,23 +350,15 @@ impl<'a> Printer<'a> {
                 .body
                 .get(i + 1)
                 .map_or(body.span.end, |next| next.span().start);
-            for comment in
-                tsv_lang::comments_in_range(self.comments, member.span().end, upper_bound)
-            {
-                if tsv_lang::printing::is_same_line(
-                    self.source,
-                    member.span().end,
-                    comment.span.start,
-                ) {
-                    member_parts.push(doc::text(" "));
-                    member_parts.push(self.build_comment_doc(comment));
-                } else {
-                    break;
-                }
-            }
+            member_parts
+                .extend(self.build_trailing_same_line_comment_docs(member.span().end, upper_bound));
 
             prev_end = member.span().end;
         }
+
+        // Handle trailing comments after the last member (before closing `}`)
+        let body_end = body.span.end.saturating_sub(1); // Before '}'
+        member_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
 
         // Wrap body content in indent
         doc::concat(vec![

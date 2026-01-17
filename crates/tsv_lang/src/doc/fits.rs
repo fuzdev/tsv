@@ -1,9 +1,10 @@
 //! Width fitting algorithms for the doc builder
 
 use crate::PrintConfig;
+use crate::printing::visual_width;
 use smallvec::SmallVec;
 
-use super::types::{Command, Doc, Mode, TextResolver, resolve_text};
+use super::types::{Command, Doc, LineKind, Mode, TextResolver, resolve_text};
 
 /// Check if a doc fits in the remaining width, looking ahead at remaining commands.
 ///
@@ -21,7 +22,7 @@ pub(super) fn fits_with_lookahead<'a, R: TextResolver + ?Sized>(
     mode: Mode,
     rest_commands: &[Command<'a>],
     remaining_width: isize,
-    _config: &PrintConfig,
+    config: &PrintConfig,
     resolver: Option<&R>,
 ) -> bool {
     if remaining_width == isize::MAX {
@@ -52,36 +53,55 @@ pub(super) fn fits_with_lookahead<'a, R: TextResolver + ?Sized>(
         match current_doc {
             Doc::Text(t) => {
                 let s = resolve_text(t, resolver);
-                remaining -= string_width(s) as isize;
+                // If text contains a newline, content after newline is on a new line
+                // and always "fits" for this check
+                if s.contains('\n') {
+                    return true;
+                }
+                remaining -= visual_width(s, config.tab_width) as isize;
                 // Don't return early on negative - let the while condition catch it
             }
 
-            Doc::Line { hard, soft, .. } => {
-                if current_mode == Mode::Break || *hard {
-                    // Line break found - rest fits on next line
-                    return true;
-                }
-                // In flat mode: soft line disappears, regular line becomes space
-                if !soft {
-                    remaining -= 1;
+            Doc::Line(kind) => {
+                match kind {
+                    LineKind::Hard | LineKind::Literal => {
+                        // Hard/literal lines always break - rest fits on next line
+                        return true;
+                    }
+                    _ if current_mode == Mode::Break => {
+                        // Any line in break mode means we're done checking this line
+                        return true;
+                    }
+                    LineKind::Soft => {
+                        // Soft line disappears in flat mode
+                    }
+                    LineKind::Normal => {
+                        // Normal line becomes space in flat mode
+                        remaining -= 1;
+                    }
                 }
             }
 
             Doc::Group {
                 contents,
                 expanded_states,
+                ..
             } => {
-                // Match prettier: when in break mode with expanded states,
-                // use the most expanded state (takes least space on current line)
-                // See prettier printer.js lines 126-130
+                // Prettier's fits() behavior (printer.js lines 74-81):
+                // - In Break mode with expandedStates: use last state
+                // - In all other cases: use contents (state[0])
+                //
+                // State selection (trying state[1], state[2], etc.) happens during
+                // RENDERING (render.rs lines 265-294), NOT during fits() check.
                 let doc_to_check = if current_mode == Mode::Break {
                     if let Some(states) = expanded_states {
-                        states.last().unwrap_or(contents)
+                        states.last().unwrap_or_else(|| contents.as_ref())
                     } else {
-                        contents
+                        contents.as_ref()
                     }
                 } else {
-                    contents
+                    // Flat mode: always use contents (state[0])
+                    contents.as_ref()
                 };
                 stack.push((doc_to_check, current_mode));
             }
@@ -90,6 +110,19 @@ pub(super) fn fits_with_lookahead<'a, R: TextResolver + ?Sized>(
                 // Indent/dedent don't affect width in fits() check
                 // (indentation only matters at line breaks, which end fits() early)
                 stack.push((inner, current_mode));
+            }
+
+            Doc::Align { contents, .. } => {
+                // Align doesn't affect width in fits() check
+                // (like Indent, indentation only matters at line breaks)
+                stack.push((contents, current_mode));
+            }
+
+            Doc::IndentIfBreak { contents, .. } => {
+                // IndentIfBreak doesn't affect width in fits() check
+                // (like Indent, indentation only matters at line breaks)
+                // Matches Prettier printer.js line 109: case DOC_TYPE_INDENT_IF_BREAK
+                stack.push((contents, current_mode));
             }
 
             Doc::IfBreak {
@@ -125,6 +158,21 @@ pub(super) fn fits_with_lookahead<'a, R: TextResolver + ?Sized>(
                 remaining -= context.trailing_reserve as isize;
                 stack.push((doc.as_ref(), current_mode));
             }
+
+            Doc::LineSuffix(_) => {
+                // LineSuffix content is NOT counted toward width.
+                // This allows trailing comments to be excluded from break decisions.
+            }
+
+            Doc::LineSuffixBoundary => {
+                // LineSuffixBoundary has no width effect.
+            }
+
+            Doc::BreakParent => {
+                // BreakParent forces the enclosing group to break
+                // In fits check, this means it doesn't fit in flat mode
+                return false;
+            }
         }
     }
 
@@ -159,53 +207,79 @@ pub(super) fn fits_multi<R: TextResolver + ?Sized>(
     docs: &[&Doc],
     width: usize,
     mode: Mode,
-    _config: &PrintConfig,
+    config: &PrintConfig,
     resolver: Option<&R>,
 ) -> bool {
     if width == usize::MAX {
         return true;
     }
 
-    let mut stack: SmallVec<[(&Doc, Mode, isize); 16]> = SmallVec::new();
+    let mut stack: SmallVec<[(&Doc, Mode); 16]> = SmallVec::new();
     let mut remaining_width = width as isize;
 
     // Push docs in reverse order (will be processed first-to-last)
     for doc in docs.iter().rev() {
-        stack.push((doc, mode, 0));
+        stack.push((doc, mode));
     }
 
-    while let Some((current_doc, current_mode, indent_delta)) = stack.pop() {
+    while let Some((current_doc, current_mode)) = stack.pop() {
         match current_doc {
             Doc::Text(t) => {
                 let s = resolve_text(t, resolver);
-                remaining_width -= string_width(s) as isize;
+                // If text contains a newline, content after newline is on a new line
+                // and always "fits" for this check
+                if s.contains('\n') {
+                    return true;
+                }
+                remaining_width -= visual_width(s, config.tab_width) as isize;
                 if remaining_width < 0 {
                     return false;
                 }
             }
 
-            Doc::Line { hard, soft, .. } => {
-                if current_mode == Mode::Break || *hard {
-                    return true;
-                }
-                if !*soft {
-                    remaining_width -= 1;
-                    if remaining_width < 0 {
-                        return false;
+            Doc::Line(kind) => {
+                match kind {
+                    LineKind::Hard | LineKind::Literal => {
+                        return true;
+                    }
+                    _ if current_mode == Mode::Break => {
+                        return true;
+                    }
+                    LineKind::Soft => {
+                        // Disappears in flat mode
+                    }
+                    LineKind::Normal => {
+                        remaining_width -= 1;
+                        if remaining_width < 0 {
+                            return false;
+                        }
                     }
                 }
             }
 
             Doc::Group { contents, .. } => {
-                stack.push((contents, current_mode, indent_delta));
+                // For conditional_group in flat mode, we should try all states,
+                // but fits_multi is a simplified checker used by Fill algorithm
+                // which doesn't need the full conditional_group logic.
+                // Just check contents for now.
+                stack.push((contents, current_mode));
             }
 
-            Doc::Indent(inner) => {
-                stack.push((inner, current_mode, indent_delta + 1));
+            Doc::Indent(inner) | Doc::Dedent(inner) => {
+                // Indent/dedent don't affect width in fits() check
+                // (indentation only matters at line breaks, which end fits() early)
+                stack.push((inner, current_mode));
             }
 
-            Doc::Dedent(inner) => {
-                stack.push((inner, current_mode, indent_delta - 1));
+            Doc::Align { contents, .. } => {
+                // Align doesn't affect width in fits() check
+                stack.push((contents, current_mode));
+            }
+
+            Doc::IndentIfBreak { contents, .. } => {
+                // IndentIfBreak doesn't affect width in fits() check
+                // (like Indent, indentation only matters at line breaks)
+                stack.push((contents, current_mode));
             }
 
             Doc::IfBreak {
@@ -217,18 +291,18 @@ pub(super) fn fits_multi<R: TextResolver + ?Sized>(
                 } else {
                     flat_doc
                 };
-                stack.push((chosen, current_mode, indent_delta));
+                stack.push((chosen, current_mode));
             }
 
             Doc::Concat(docs) => {
                 for doc in docs.iter().rev() {
-                    stack.push((doc, current_mode, indent_delta));
+                    stack.push((doc, current_mode));
                 }
             }
 
             Doc::Fill(parts) => {
                 for doc in parts.iter().rev() {
-                    stack.push((doc, current_mode, indent_delta));
+                    stack.push((doc, current_mode));
                 }
             }
 
@@ -238,7 +312,20 @@ pub(super) fn fits_multi<R: TextResolver + ?Sized>(
                 if remaining_width < 0 {
                     return false;
                 }
-                stack.push((doc.as_ref(), current_mode, indent_delta));
+                stack.push((doc.as_ref(), current_mode));
+            }
+
+            Doc::LineSuffix(_) => {
+                // LineSuffix content is NOT counted toward width.
+            }
+
+            Doc::LineSuffixBoundary => {
+                // LineSuffixBoundary has no width effect.
+            }
+
+            Doc::BreakParent => {
+                // BreakParent forces the enclosing group to break
+                return false;
             }
         }
     }
@@ -305,18 +392,19 @@ pub fn fits_at(
 // Utilities
 // =============================================================================
 
-/// Calculate visual width of a string
+/// Update position after rendering a text string, accounting for tab expansion.
 ///
-/// Uses a fast path for ASCII strings (O(1) via len()) since ~99% of
-/// formatter output is ASCII. Falls back to char counting for non-ASCII.
-///
-/// TODO: For full Unicode support, should use a library like `unicode-width`.
-/// For now, assumes non-ASCII multi-byte chars count as 1.
+/// If the string contains newlines, position is SET to the width of content
+/// after the last newline (since newlines reset column position).
+/// Otherwise, position is incremented by the string's visual width.
 #[inline]
-pub(super) fn string_width(s: &str) -> usize {
-    if s.is_ascii() {
-        s.len()
+pub(super) fn update_pos_for_text(pos: &mut usize, s: &str, tab_width: usize) {
+    if let Some(last_newline_pos) = s.rfind('\n') {
+        // Reset position to visual width of content after last newline
+        let after_newline = &s[last_newline_pos + 1..];
+        *pos = visual_width(after_newline, tab_width);
     } else {
-        s.chars().count()
+        // No newline - just increment by visual width
+        *pos += visual_width(s, tab_width);
     }
 }

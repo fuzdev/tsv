@@ -226,7 +226,7 @@ export function getBenchmarkTasks(
 			});
 		}
 
-		// OXC parser (TypeScript/JavaScript only)
+		// OXC parser (TypeScript/JS only)
 		if (impls.oxc?.supportsParseLanguage(language)) {
 			tasks.push({
 				name: 'oxc-parser',
@@ -267,7 +267,7 @@ export function getBenchmarkTasks(
 			});
 		}
 
-		// OXC formatter (TypeScript/JavaScript/CSS only) - async
+		// OXC formatter (TypeScript/JS/CSS only) - async
 		if (impls.oxc?.supportsFormatLanguage(language)) {
 			tasks.push({
 				name: 'oxfmt',

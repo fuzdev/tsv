@@ -16,7 +16,7 @@ mod types;
 mod variable;
 
 // Re-export for submodules to use `super::Printer` instead of `super::super::Printer`
-pub(super) use super::{Printer, build_entity_name_doc};
+pub(super) use super::{Printer, build_entity_name_doc, intersection_has_huggable_last_type, unwrap_parenthesized};
 
 use super::{ParenContext, needs_parens};
 use crate::ast::internal::{self, Statement};
@@ -29,15 +29,7 @@ impl<'a> Printer<'a> {
             Statement::ExpressionStatement(stmt) => self.build_expression_statement_doc(stmt),
             Statement::VariableDeclaration(decl) => self.build_variable_declaration_doc(decl),
             Statement::TSTypeAliasDeclaration(decl) => self.build_type_alias_declaration_doc(decl),
-            Statement::ReturnStatement(ret) => {
-                let mut parts = vec![doc::text("return")];
-                if let Some(arg) = &ret.argument {
-                    parts.push(doc::text(" "));
-                    parts.push(self.build_expression_doc(arg));
-                }
-                parts.push(doc::text(";"));
-                doc::concat(parts)
-            }
+            Statement::ReturnStatement(ret) => self.build_return_statement_doc(ret),
             Statement::BlockStatement(block) => self.build_block_statement_doc(block),
             Statement::FunctionDeclaration(decl) => self.build_function_declaration_doc(decl),
             Statement::ClassDeclaration(decl) => self.build_class_declaration_doc(decl),
@@ -98,7 +90,16 @@ impl<'a> Printer<'a> {
         if needs_parens {
             parts.push(doc::text("("));
         }
+
+        // Set context flags for chain handling
+        // is_expression_statement: allows short identifier names to merge with first call
+        // in_top_level_assignment: tells assignments to use regular layout (not chain formatting)
+        self.is_expression_statement.set(true);
+        self.in_top_level_assignment.set(true);
         parts.push(self.build_expression_doc(&stmt.expression));
+        self.in_top_level_assignment.set(false);
+        self.is_expression_statement.set(false);
+
         if needs_parens {
             parts.push(doc::text(")"));
         }
@@ -113,5 +114,75 @@ impl<'a> Printer<'a> {
 
         parts.push(doc::text(";"));
         doc::concat(parts)
+    }
+
+    /// Build a Doc for a return statement
+    ///
+    /// Handles parenthesization of multiline expressions:
+    /// ```javascript
+    /// // Single line - no parens
+    /// return a && b;
+    ///
+    /// // Multiline - Prettier wraps in parens
+    /// return (
+    ///     a &&
+    ///     b
+    /// );
+    /// ```
+    fn build_return_statement_doc(&self, ret: &internal::ReturnStatement) -> doc::Doc {
+        let Some(arg) = &ret.argument else {
+            return doc::text("return;");
+        };
+
+        // Check if the expression is a binary expression that might break
+        // Prettier wraps these in parentheses when they break to multiple lines
+        if let internal::Expression::BinaryExpression(binary) = arg
+            && binary.operator.is_logical()
+        {
+            // Build the expression with proper indentation for binary chains
+            let expr_doc = self.build_binary_chain_doc_ungrouped(binary);
+
+            // Find trailing comments between expression end and semicolon
+            // These need to be inside the parens when we wrap
+            let expr_end = binary.span.end as usize;
+            let semicolon_pos = self.source[expr_end..]
+                .find(';')
+                .map_or(expr_end, |i| expr_end + i);
+            let trailing_comments_doc =
+                self.build_inline_comments_between_doc(expr_end as u32, semicolon_pos as u32);
+
+            // Structure for multiline:
+            // return (
+            //     expr // trailing comment
+            // );
+            //
+            // Structure for single line:
+            // return expr; // trailing comment
+            let broken_doc = doc::concat(vec![
+                doc::text(" ("),
+                doc::indent(doc::concat(vec![
+                    doc::softline(),
+                    expr_doc.clone(),
+                    trailing_comments_doc.clone(),
+                ])),
+                doc::softline(),
+                doc::text(")"),
+            ]);
+
+            let flat_doc = doc::concat(vec![doc::text(" "), expr_doc, trailing_comments_doc]);
+
+            return doc::group(doc::concat(vec![
+                doc::text("return"),
+                doc::if_break(broken_doc, flat_doc),
+                doc::text(";"),
+            ]));
+        }
+
+        // Standard case: no parenthesization needed
+        doc::concat(vec![
+            doc::text("return "),
+            self.build_expression_doc(arg),
+            doc::text(";"),
+        ])
     }
 }

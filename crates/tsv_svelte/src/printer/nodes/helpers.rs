@@ -231,3 +231,32 @@ impl<'a> Printer<'a> {
         }
     }
 }
+
+/// Check if a fragment node is a control flow block (if/each/await/key/snippet).
+///
+/// Control flow blocks can hug adjacent inline content when directly adjacent,
+/// unlike HTML block elements (`<div>`, `<p>`) which get their own lines.
+pub fn is_control_flow_block(node: &FragmentNode) -> bool {
+    matches!(
+        node,
+        FragmentNode::IfBlock(_)
+            | FragmentNode::EachBlock(_)
+            | FragmentNode::AwaitBlock(_)
+            | FragmentNode::KeyBlock(_)
+            | FragmentNode::SnippetBlock(_)
+    )
+}
+
+/// Check if any child element contains block flow (if/each/etc).
+///
+/// Used to detect when a parent element will go multiline due to
+/// nested content forcing line breaks.
+pub fn has_nested_block_flow(nodes: &[FragmentNode]) -> bool {
+    nodes.iter().any(|n| {
+        if let FragmentNode::Element(child) = n {
+            child.fragment.nodes.iter().any(is_control_flow_block)
+        } else {
+            false
+        }
+    })
+}

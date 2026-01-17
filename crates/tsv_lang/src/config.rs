@@ -26,11 +26,18 @@ pub struct PrintConfig {
     /// This matches prettier's behavior in Svelte files where `<T>` could be confused with template syntax.
     /// Set to false for pure TypeScript (.ts) files.
     pub arrow_type_param_trailing_comma: bool,
+    /// Whether to force binary expressions to allow line breaks even with 2 operands (default: false)
+    /// When true, simple binary expressions like `a || b` can break when they exceed print width.
+    /// Used in attribute string contexts where Prettier allows internal expression breaks.
+    pub force_binary_breaks: bool,
 }
 
 impl Default for PrintConfig {
     fn default() -> Self {
         Self {
+            // TODO: Replace with `use_tabs: bool` to match Prettier's config model.
+            // Would require deriving indent string (Cow<str> or pre-computed) since
+            // spaces need `" ".repeat(tab_width)`. See CLAUDE.md § Configuration.
             indent: "\t",
             print_width: 100,
             tab_width: 2,
@@ -38,6 +45,7 @@ impl Default for PrintConfig {
             first_line_offset: 0,
             suffix_width: 0,
             arrow_type_param_trailing_comma: true, // Default to true for Svelte compatibility
+            force_binary_breaks: false,
         }
     }
 }

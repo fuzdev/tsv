@@ -157,9 +157,7 @@ impl<'a> Printer<'a> {
 
         // Check if it fits on one line
         // Account for: indent + trailing " {" (2 chars)
-        // Tab width is counted based on config.tab_width (default: 2)
-        let indent_width = self.effective_indent() * self.config.tab_width;
-        let overhead = indent_width + 2; // " {" or ", "
+        let overhead = self.indent_width() + 2; // " {" or ", "
         let available_width = self.config.print_width.saturating_sub(overhead);
         let fits = doc::fits(
             &selector_doc,

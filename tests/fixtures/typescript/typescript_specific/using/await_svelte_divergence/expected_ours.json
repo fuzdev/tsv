@@ -293,7 +293,7 @@
 							{
 								"type": "ReturnStatement",
 								"start": 128,
-								"end": 154,
+								"end": 155,
 								"loc": {
 									"start": {
 										"line": 5,
@@ -301,7 +301,7 @@
 									},
 									"end": {
 										"line": 5,
-										"column": 28
+										"column": 29
 									}
 								},
 								"argument": {
