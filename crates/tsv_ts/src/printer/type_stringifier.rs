@@ -7,8 +7,8 @@
 // This is a "best-effort" serializer that reconstructs minimal string
 // representations without comments or complex formatting.
 
-use super::expressions::normalize_number_literal;
 use super::Printer;
+use super::expressions::normalize_number_literal;
 use crate::ast::internal::{self, TSLiteralType, TSType, TemplateLiteralType};
 use tsv_lang::SymbolResolver;
 use tsv_lang::printing::{StringFormatOptions, format_string_literal};

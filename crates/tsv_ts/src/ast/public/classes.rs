@@ -149,6 +149,12 @@ pub struct PropertyDefinition {
     /// Whether this is a readonly property
     #[serde(skip_serializing_if = "Option::is_none")]
     pub readonly: Option<bool>,
+    /// Whether this property has the override modifier
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#override: Option<bool>,
+    /// Whether this property has the declare modifier (ambient)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub declare: Option<bool>,
     #[serde(rename = "static")]
     pub is_static: bool,
     pub computed: bool,

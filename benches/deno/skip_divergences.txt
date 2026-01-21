@@ -19,9 +19,15 @@
 src/lib/ContentPreview.svelte
 
 # Template literal width (interpolations break to respect print width)
+src/lib/action_collections.gen.ts
+src/lib/cell.svelte.ts
 src/lib/server/helpers.ts
 src/test/config_defaults.test.ts
 src/lib/frontend_http_transport.ts
+src/lib/server/backend_action_handlers.ts
+src/lib/server/backend_actions_api.ts
+src/lib/server/server.ts
+src/lib/server/server_info.ts
 
 # Inline content hug (expression breaks at ternary/operator vs bracket break)
 src/lib/OllamaActions.svelte

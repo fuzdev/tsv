@@ -208,7 +208,7 @@ async fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult
                     Err(e) => {
                         return FixtureResult::Failed(format!(
                             "Failed to serialize TypeScript AST: {e}"
-                        ))
+                        ));
                     }
                 },
                 Err(e) => return FixtureResult::Failed(format!("TypeScript parse error: {e}")),
@@ -234,7 +234,9 @@ async fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult
                 Ok(ast) => match to_json_with_tabs(&ast) {
                     Ok(json) => format!("{json}\n"),
                     Err(e) => {
-                        return FixtureResult::Failed(format!("Failed to serialize Svelte AST: {e}"))
+                        return FixtureResult::Failed(format!(
+                            "Failed to serialize Svelte AST: {e}"
+                        ));
                     }
                 },
                 Err(e) => return FixtureResult::Failed(format!("Svelte parse error: {e}")),
@@ -292,40 +294,39 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
     };
 
     // Generate expected_svelte.json from external parser (Svelte or acorn-typescript)
-    let svelte_json =
-        if fixture.input_file.ends_with(".svelte.ts") || fixture.input_file.ends_with(".ts") {
-            // For .ts and .svelte.ts files, use acorn-typescript
-            match parse_typescript(source).await {
-                Ok(ast) => match to_json_with_tabs(&ast) {
-                    Ok(json) => format!("{json}\n"),
-                    Err(e) => {
-                        return FixtureResult::Failed(format!(
-                            "Failed to serialize TypeScript AST: {e}"
-                        ))
-                    }
-                },
-                Err(_) => {
-                    // Parse failed - use canonical error marker
-                    fixtures::EXPECTED_SVELTE_ERROR_JSON.to_string()
+    let svelte_json = if fixture.input_file.ends_with(".svelte.ts")
+        || fixture.input_file.ends_with(".ts")
+    {
+        // For .ts and .svelte.ts files, use acorn-typescript
+        match parse_typescript(source).await {
+            Ok(ast) => match to_json_with_tabs(&ast) {
+                Ok(json) => format!("{json}\n"),
+                Err(e) => {
+                    return FixtureResult::Failed(format!(
+                        "Failed to serialize TypeScript AST: {e}"
+                    ));
                 }
+            },
+            Err(_) => {
+                // Parse failed - use canonical error marker
+                fixtures::EXPECTED_SVELTE_ERROR_JSON.to_string()
             }
-        } else {
-            // For .svelte files, use Svelte's parser
-            match parse_svelte(source).await {
-                Ok(ast) => match to_json_with_tabs(&ast) {
-                    Ok(json) => format!("{json}\n"),
-                    Err(e) => {
-                        return FixtureResult::Failed(format!(
-                            "Failed to serialize Svelte AST: {e}"
-                        ))
-                    }
-                },
-                Err(_) => {
-                    // Svelte parse failed - use canonical error marker
-                    fixtures::EXPECTED_SVELTE_ERROR_JSON.to_string()
+        }
+    } else {
+        // For .svelte files, use Svelte's parser
+        match parse_svelte(source).await {
+            Ok(ast) => match to_json_with_tabs(&ast) {
+                Ok(json) => format!("{json}\n"),
+                Err(e) => {
+                    return FixtureResult::Failed(format!("Failed to serialize Svelte AST: {e}"));
                 }
+            },
+            Err(_) => {
+                // Svelte parse failed - use canonical error marker
+                fixtures::EXPECTED_SVELTE_ERROR_JSON.to_string()
             }
-        };
+        }
+    };
 
     let expected_ours_path = fixture.expected_ours_path();
     let expected_svelte_path = fixture.expected_svelte_path();

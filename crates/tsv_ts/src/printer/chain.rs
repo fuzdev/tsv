@@ -1087,8 +1087,10 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
     fn add_comments_and_break(&mut self, group: &ChainGroup<'a>) {
         if let Some((object_end, property_start)) = group.first_member_range() {
             // Trailing line comments (on the same line as previous element)
-            self.parts
-                .push(self.printer.build_trailing_line_comments_doc(object_end, property_start));
+            self.parts.push(
+                self.printer
+                    .build_trailing_line_comments_doc(object_end, property_start),
+            );
 
             // Line break with blank line preservation
             self.parts.push(build_chain_line_break(
@@ -1141,7 +1143,8 @@ fn build_rest_parts_with_comments<'a, P: ChainPrinter>(
     use_hardline: bool,
     use_expanded: bool,
 ) -> Vec<Doc> {
-    let mut builder = ChainPartsBuilder::new(printer, use_hardline, use_expanded, rest_groups.len());
+    let mut builder =
+        ChainPartsBuilder::new(printer, use_hardline, use_expanded, rest_groups.len());
     for group in rest_groups {
         builder.add_group(group);
     }

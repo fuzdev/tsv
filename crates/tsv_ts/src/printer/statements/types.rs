@@ -1,6 +1,8 @@
 // Type-related statement printing for TypeScript
 
-use super::{Printer, build_entity_name_doc, intersection_has_huggable_last_type, unwrap_parenthesized};
+use super::{
+    Printer, build_entity_name_doc, intersection_has_huggable_last_type, unwrap_parenthesized,
+};
 use crate::ast::internal::{self, TSType};
 use tsv_lang::{Comment, SymbolToU32, comments_in_range, doc, printing};
 
@@ -238,15 +240,16 @@ impl<'a> Printer<'a> {
             parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
         }
 
-        // Function parameters
-        parts.push(doc::text("("));
-        let param_docs: Vec<_> = decl
-            .params
-            .iter()
-            .map(|param| self.build_expression_doc(param))
-            .collect();
-        parts.push(doc::join(param_docs, ", "));
-        parts.push(doc::text(")"));
+        // Function parameters with width-based breaking
+        // Find paren position for comment handling
+        let paren_search_start = decl
+            .type_parameters
+            .as_ref()
+            .map_or(decl.id.span.end, |tp| tp.span.end);
+        let paren_pos = self.source[paren_search_start as usize..]
+            .find('(')
+            .map(|p| paren_search_start + p as u32);
+        parts.push(self.build_signature_params_doc(&decl.params, paren_pos));
 
         // Return type
         if let Some(return_type) = &decl.return_type {
@@ -275,6 +278,11 @@ impl<'a> Printer<'a> {
     ) -> doc::Doc {
         if args.params.is_empty() {
             return doc::text("<>");
+        }
+
+        // Check for line comments between arguments or after last argument (force multiline)
+        if self.has_line_comments_in_delimited_list(&args.params, TSType::span, args.span.end - 1) {
+            return self.build_type_arguments_doc_with_line_comments(args);
         }
 
         let mut parts = Vec::new();
@@ -337,6 +345,11 @@ impl<'a> Printer<'a> {
     ) -> doc::Doc {
         if args.params.is_empty() {
             return doc::text("<>");
+        }
+
+        // Check for line comments between arguments or after last argument (force multiline)
+        if self.has_line_comments_in_delimited_list(&args.params, TSType::span, args.span.end - 1) {
+            return self.build_type_arguments_doc_with_line_comments(args);
         }
 
         // Special case: single brace-delimited type argument (TypeLiteral or Mapped, possibly
@@ -431,6 +444,56 @@ impl<'a> Printer<'a> {
         ]))
     }
 
+    /// Build doc for type arguments with line comments between them.
+    ///
+    /// Line comments force multiline because they can't appear inline.
+    fn build_type_arguments_doc_with_line_comments(
+        &self,
+        args: &internal::TSTypeParameterInstantiation,
+    ) -> doc::Doc {
+        let mut inner_parts = Vec::new();
+        let mut prev_end = args.span.start + 1; // After the opening `<`
+
+        for (i, param) in args.params.iter().enumerate() {
+            let param_start = param.span().start;
+            let param_end = param.span().end;
+            let is_last = i == args.params.len() - 1;
+
+            // Leading comments
+            inner_parts.extend(self.build_leading_comments_multiline(prev_end, param_start));
+
+            inner_parts.push(self.build_type_doc(param));
+
+            let next_boundary = if i + 1 < args.params.len() {
+                args.params[i + 1].span().start
+            } else {
+                args.span.end - 1 // Before the closing `>`
+            };
+
+            // Comma (not for last element in type args)
+            if !is_last {
+                inner_parts.push(doc::text(","));
+            }
+
+            // Trailing comments
+            inner_parts.extend(self.build_trailing_comments_multiline(param_end, next_boundary));
+
+            // Hardline to separate from next element
+            if !is_last {
+                inner_parts.push(doc::hardline());
+            }
+
+            prev_end = next_boundary;
+        }
+
+        doc::concat(vec![
+            doc::text("<"),
+            doc::indent(doc::concat(vec![doc::hardline(), doc::concat(inner_parts)])),
+            doc::hardline(),
+            doc::text(">"),
+        ])
+    }
+
     /// Build doc for type elements with comment handling
     fn build_type_elements_doc(
         &self,
@@ -508,10 +571,7 @@ impl<'a> Printer<'a> {
                         parts.push(self.build_comment_doc(comment));
                     } else {
                         // Line comments go in line_suffix, don't affect width
-                        parts.push(doc::line_suffix(doc::concat(vec![
-                            doc::text(" "),
-                            self.build_comment_doc(comment),
-                        ])));
+                        parts.push(self.build_trailing_line_comment_doc(comment));
                     }
                 } else {
                     break; // Only same-line comments
@@ -576,20 +636,14 @@ impl<'a> Printer<'a> {
                 if let Some(type_params) = &m.type_parameters {
                     parts.push(self.build_type_parameter_declaration_doc(type_params));
                 }
-                parts.push(doc::text("("));
-                let param_docs: Vec<_> = m
-                    .params
-                    .iter()
-                    .map(|param| self.build_expression_doc(param))
-                    .collect();
-                parts.push(doc::join(param_docs, ", "));
-                parts.push(doc::text(")"));
+                // Width-based breaking for params
+                parts.push(self.build_signature_params_doc(&m.params, None));
                 if let Some(rt) = &m.return_type {
                     parts.push(doc::text(": "));
                     parts.push(self.build_type_doc(&rt.type_annotation));
                 }
                 parts.push(doc::text(";"));
-                doc::concat(parts)
+                doc::group(doc::concat(parts))
             }
             internal::TSTypeElement::CallSignature(c) => {
                 let mut parts = Vec::new();
@@ -597,20 +651,14 @@ impl<'a> Printer<'a> {
                 if let Some(type_params) = &c.type_parameters {
                     parts.push(self.build_type_parameter_declaration_doc(type_params));
                 }
-                let param_docs: Vec<_> = c
-                    .params
-                    .iter()
-                    .map(|param| self.build_expression_doc(param))
-                    .collect();
-                parts.push(doc::text("("));
-                parts.push(doc::join(param_docs, ", "));
-                parts.push(doc::text(")"));
+                // Width-based breaking for params
+                parts.push(self.build_signature_params_doc(&c.params, None));
                 if let Some(rt) = &c.return_type {
                     parts.push(doc::text(": "));
                     parts.push(self.build_type_doc(&rt.type_annotation));
                 }
                 parts.push(doc::text(";"));
-                doc::concat(parts)
+                doc::group(doc::concat(parts))
             }
             internal::TSTypeElement::ConstructSignature(c) => {
                 let mut parts = vec![doc::text("new ")];
@@ -618,20 +666,14 @@ impl<'a> Printer<'a> {
                 if let Some(type_params) = &c.type_parameters {
                     parts.push(self.build_type_parameter_declaration_doc(type_params));
                 }
-                let param_docs: Vec<_> = c
-                    .params
-                    .iter()
-                    .map(|param| self.build_expression_doc(param))
-                    .collect();
-                parts.push(doc::text("("));
-                parts.push(doc::join(param_docs, ", "));
-                parts.push(doc::text(")"));
+                // Width-based breaking for params
+                parts.push(self.build_signature_params_doc(&c.params, None));
                 if let Some(rt) = &c.return_type {
                     parts.push(doc::text(": "));
                     parts.push(self.build_type_doc(&rt.type_annotation));
                 }
                 parts.push(doc::text(";"));
-                doc::concat(parts)
+                doc::group(doc::concat(parts))
             }
             internal::TSTypeElement::IndexSignature(i) => {
                 let mut parts = Vec::new();

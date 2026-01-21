@@ -25,23 +25,11 @@ pub(super) use literals::{format_string_literal_from_ast, normalize_number_liter
 use super::chain;
 pub(super) use super::{
     ParenContext, PatternContext, Printer, needs_parens, object_pattern_should_expand,
+    unwrap_parenthesized,
 };
 use crate::ast::internal::{BinaryExpression, BinaryOperator, Expression};
 use tsv_lang::doc::{self, Doc};
 use tsv_lang::printing::visual_width;
-
-/// Build a flat binary expression doc for 2-operand chains: `a op b`
-///
-/// Used when the binary expression should not break (non-logical 2-operand chains).
-fn build_flat_binary_doc(operands: &[Doc], operators: &[BinaryOperator]) -> Doc {
-    doc::concat(vec![
-        operands[0].clone(),
-        doc::text(" "),
-        doc::text(operators[0].as_str()),
-        doc::text(" "),
-        operands[1].clone(),
-    ])
-}
 
 impl<'a> Printer<'a> {
     /// Print an expression using doc-based formatting
@@ -124,7 +112,15 @@ impl<'a> Printer<'a> {
     ///         bbb,  // extra indent on continuation
     /// )
     /// ```
+    ///
+    /// Assignment expressions are wrapped in parens for clarity:
+    /// `fn((a = b))` not `fn(a = b)`
     pub(super) fn build_arg_expression_doc(&self, expr: &Expression) -> Doc {
+        // Assignment expressions need parens in argument context for clarity
+        if needs_parens(expr, ParenContext::Argument) {
+            return doc::parens(self.build_expression_doc(expr));
+        }
+
         match expr {
             Expression::BinaryExpression(binary) => {
                 // Use indented binary chain - continuation lines get extra indent
@@ -146,7 +142,7 @@ impl<'a> Printer<'a> {
     ) -> Doc {
         doc::concat(vec![
             doc::text("<"),
-            self.build_type_doc(&type_assert.type_annotation),
+            self.build_type_doc_with_wrapping_type_args(&type_assert.type_annotation),
             doc::text(">"),
             self.build_expression_doc(&type_assert.expression),
         ])
@@ -178,7 +174,7 @@ impl<'a> Printer<'a> {
         }
 
         parts.push(doc::text(" as "));
-        parts.push(self.build_type_doc(&as_expr.type_annotation));
+        parts.push(self.build_type_doc_with_wrapping_type_args(&as_expr.type_annotation));
 
         // Comments between `as` keyword and type → place after the type
         if let Some(as_pos) = as_keyword_pos {
@@ -212,7 +208,7 @@ impl<'a> Printer<'a> {
         parts.push(self.build_inline_comments_between_doc(expr_end, type_start));
 
         parts.push(doc::text(" satisfies "));
-        parts.push(self.build_type_doc(&sat_expr.type_annotation));
+        parts.push(self.build_type_doc_with_wrapping_type_args(&sat_expr.type_annotation));
         doc::concat(parts)
     }
 
@@ -320,13 +316,6 @@ impl<'a> Printer<'a> {
             return self.build_binary_doc(binary);
         }
 
-        // For 2-operand non-logical binaries, use flat formatting (no line breaks)
-        // This prevents `(a / b).method()` from breaking inside the parens
-        // Logical operators (&&, ||) should still be able to break
-        if operands.len() == 2 && !operators[0].is_logical() {
-            return build_flat_binary_doc(&operands, &operators);
-        }
-
         // Build with indented continuations for chains:
         // "first +
         //     second -
@@ -402,10 +391,16 @@ impl<'a> Printer<'a> {
             return self.build_binary_doc(binary);
         }
 
-        // For 2-operand non-logical chains, use flat formatting
-        // Logical operators (&&, ||) should still be able to break
+        // For 2-operand non-logical chains, use flat formatting (no line breaks)
+        // to avoid ugly breaks like `(a /\nb)`. Logical operators can still break.
         if operands.len() == 2 && !operators[0].is_logical() {
-            return build_flat_binary_doc(&operands, &operators);
+            return doc::concat(vec![
+                operands[0].clone(),
+                doc::text(" "),
+                doc::text(operators[0].as_str()),
+                doc::text(" "),
+                operands[1].clone(),
+            ]);
         }
 
         // For 3+ operand chains, use line breaks between operands:
@@ -453,7 +448,7 @@ impl<'a> Printer<'a> {
         parts.push(doc::text("`"));
 
         for (i, quasi) in template.quasis.iter().enumerate() {
-            // Template content (raw, preserving escapes)
+            // Template content (raw, preserving escape sequences verbatim)
             parts.push(doc::text_owned(quasi.raw.clone()));
 
             // Interpolation
@@ -472,7 +467,12 @@ impl<'a> Printer<'a> {
                 // Set in_template_interpolation to collapse blank lines
                 let prev_in_template = self.in_template_interpolation.get();
                 self.in_template_interpolation.set(true);
-                let expr_doc = self.build_expression_doc(expr);
+                // Assignment expressions need parens in template literals: `${(a = b)}`
+                let expr_doc = if needs_parens(expr, ParenContext::TemplateLiteralExpression) {
+                    doc::parens(self.build_expression_doc(expr))
+                } else {
+                    self.build_expression_doc(expr)
+                };
                 self.in_template_interpolation.set(prev_in_template);
 
                 // Collect comments in the interpolation region
@@ -576,16 +576,8 @@ impl<'a> Printer<'a> {
                         let base_indent = self
                             .estimate_inline_template_output_indent(template.span.start as usize);
                         // Add buffers for context that appears before the template.
-                        // For deeply nested templates, source ws_indent often underestimates
-                        // output indent because outer interpolations break and add indent.
-                        //
-                        // Buffer amounts are tuned to correctly distinguish 100-char (inline)
-                        // from 101-char (break) cases:
-                        // - Statement-level: "const x = " (11) + semicolon (1)
-                        // - Ternary arms: ": " or "? " prefix + extra indent = 5
-                        // - Array/function/object with closing: ] or ) or }, = 3
-                        // - Arrow function body (=> template): 4
-                        // - Other expression contexts (&&, ||): minimal buffer = 1
+                        // Buffer amounts are tuned to distinguish 100-char (inline)
+                        // from 101-char (break) cases.
                         let (_, is_expression_context, _) =
                             self.analyze_template_context(template.span.start as usize);
                         // Check context type from preceding characters
@@ -596,32 +588,38 @@ impl<'a> Printer<'a> {
                         let has_closing_delimiter = matches!(last_char, Some('(' | '[' | '{'));
                         let is_arrow_body = trimmed.ends_with("=>");
 
+                        // Check if template starts on its own line (after newline + whitespace only)
+                        let template_on_own_line = before_pos.rfind('\n').is_some_and(|nl_pos| {
+                            before_pos[nl_pos + 1..]
+                                .chars()
+                                .all(|c| c == ' ' || c == '\t')
+                        });
+
                         // base_indent is in indent LEVELS, not visual chars.
-                        // For statement-level (base_indent <= 2), we use a pre-tuned statement_buffer
-                        // that compensates for not multiplying.
-                        // For nested expressions, we need to convert to visual chars.
-                        //
-                        // Note: For logical operators (&&, ||), the operator ends up on the
-                        // PREVIOUS line after formatting, so we don't add expr_prefix.
-                        // The template will be on its own line with just indent.
-                        let (statement_buffer, closing, expr_prefix, use_visual) = if base_indent <= 2
-                        {
-                            (11, 1, 0, false) // "const x = " + semicolon (tuned for direct base_indent)
-                        } else if is_ternary_context {
-                            // Ternary arms: ": " prefix + indent adjustment
-                            (0, 0, 4, true)
-                        } else if is_arrow_body {
-                            // Arrow function body: deeper indent in output
-                            (0, 0, 7, true)
-                        } else if has_closing_delimiter {
-                            // Array/function/object: bracket + content
-                            (0, 0, 3, true)
-                        } else if is_expression_context {
-                            // Logical operators (&&, ||): operator on previous line
-                            (0, 0, 0, true)
-                        } else {
-                            (0, 0, 0, true)
-                        };
+                        // When template is on its own line, only visual indent matters.
+                        // Context-specific handling applies only for inline templates.
+                        let (statement_buffer, closing, expr_prefix, use_visual) =
+                            if template_on_own_line {
+                                // Template on own line: just visual indent, no context prefix
+                                (0, 0, 0, true)
+                            } else if has_closing_delimiter {
+                                // Inline after bracket: minimal buffer
+                                (0, 0, 3, true)
+                            } else if is_ternary_context {
+                                // Ternary arms: ": " prefix + indent adjustment
+                                (0, 0, 4, true)
+                            } else if is_arrow_body {
+                                // Arrow function body: deeper indent in output
+                                (0, 0, 7, true)
+                            } else if is_expression_context {
+                                // Logical operators (&&, ||): operator on previous line
+                                (0, 0, 0, true)
+                            } else if base_indent <= 2 {
+                                // Statement-level: "const x = " + semicolon
+                                (11, 1, 0, false)
+                            } else {
+                                (0, 0, 0, true)
+                            };
                         let visual_indent = if use_visual {
                             base_indent * self.config.tab_width
                         } else {
@@ -677,11 +675,7 @@ impl<'a> Printer<'a> {
                         let indented_content = doc::align(indent_levels, content);
                         // Wrap with base_indent_override=0 for correct width calculations
                         parts.push(doc::with_base_indent_override(
-                            doc::concat(vec![
-                                doc::text("${"),
-                                indented_content,
-                                doc::text("}"),
-                            ]),
+                            doc::concat(vec![doc::text("${"), indented_content, doc::text("}")]),
                             0,
                         ));
                     } else {
@@ -1043,8 +1037,14 @@ impl<'a> Printer<'a> {
         &self,
         tagged: &crate::ast::internal::TaggedTemplateExpression,
     ) -> Doc {
+        let tag_doc = self.build_expression_doc(&tagged.tag);
+        let tag_doc = if needs_parens(&tagged.tag, ParenContext::Callee) {
+            doc::parens(tag_doc)
+        } else {
+            tag_doc
+        };
         doc::concat(vec![
-            self.build_expression_doc(&tagged.tag),
+            tag_doc,
             self.build_template_literal_doc(&tagged.quasi),
         ])
     }

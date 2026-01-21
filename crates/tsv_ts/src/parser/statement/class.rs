@@ -341,6 +341,19 @@ impl<'a> Parser<'a> {
         // Parse any decorators on this member
         let decorators = self.parse_decorators()?;
 
+        // Handle 'declare' contextual keyword - only if followed by a class member name or another modifier
+        // Otherwise `declare` itself is the property name: `declare = 1;`
+        // Note: declare must be parsed BEFORE accessibility because `declare public a` is valid
+        let is_declare = if matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() == "declare"
+            && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
+        {
+            self.advance().ok();
+            true
+        } else {
+            false
+        };
+
         // Handle accessibility modifiers (public, private, protected)
         // Only consume as modifier if followed by a class member name or `*` (generator)
         // Otherwise the keyword itself is the property name: `private = 1;`
@@ -366,6 +379,18 @@ impl<'a> Parser<'a> {
             None
         };
 
+        // Handle 'declare' after accessibility (for non-canonical order like `public declare a`)
+        let is_declare = is_declare
+            || if matches!(self.current_kind(), TokenKind::Identifier)
+                && self.current_value() == "declare"
+                && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
+            {
+                self.advance().ok();
+                true
+            } else {
+                false
+            };
+
         // Handle 'static' contextual keyword - only if followed by a class member name or `{` (static block)
         // Otherwise `static` itself is the property name: `static = 2;`
         let is_static = if matches!(self.current_kind(), TokenKind::Identifier)
@@ -379,6 +404,18 @@ impl<'a> Parser<'a> {
         } else {
             false
         };
+
+        // Handle 'declare' after static (for non-canonical order like `static declare a`)
+        let is_declare = is_declare
+            || if matches!(self.current_kind(), TokenKind::Identifier)
+                && self.current_value() == "declare"
+                && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
+            {
+                self.advance().ok();
+                true
+            } else {
+                false
+            };
 
         // Check for static initialization block: `static { ... }` (ES2022)
         if is_static && matches!(self.current_kind(), TokenKind::BraceOpen) {
@@ -641,7 +678,9 @@ impl<'a> Parser<'a> {
                 value,
                 accessibility,
                 is_static,
+                declare: is_declare,
                 r#abstract: is_abstract,
+                r#override: is_override,
                 readonly,
                 computed,
                 accessor,

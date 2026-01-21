@@ -36,7 +36,7 @@ pub enum ParenContext {
     /// Binary right operand: `x + <expr>`
     BinaryRight { parent_op: BinaryOperator },
 
-    /// Callee position: `<expr>()`
+    /// Callee position: `<expr>()` or tagged template tag: `<expr>`template``
     Callee,
 
     /// New expression callee: `new <expr>()`
@@ -68,6 +68,18 @@ pub enum ParenContext {
 
     /// Spread element argument: `...<expr>`
     SpreadArgument,
+
+    /// Call/array/new argument: `fn(<expr>)`, `[<expr>]`, `new Fn(<expr>)`
+    /// Assignment expressions need parens for clarity
+    Argument,
+
+    /// Template literal expression: `${<expr>}`
+    /// Assignment expressions need parens for clarity
+    TemplateLiteralExpression,
+
+    /// Computed property key: `{[<expr>]: value}`
+    /// Assignment expressions need parens for clarity
+    ComputedPropertyKey,
 }
 
 /// Determines if an expression needs parentheses in a given context.
@@ -89,59 +101,59 @@ pub fn needs_parens(expr: &Expression, ctx: ParenContext) -> bool {
             needs_parens_binary_operand(expr, parent_op, true)
         }
 
-        // Callee: `(a ? b : c)()`, `(a + b)()`, `(() => {})()`, etc.
-        ParenContext::Callee | ParenContext::NewCallee => matches!(
-            expr,
-            Expression::ConditionalExpression(_)
-                | Expression::BinaryExpression(_)
-                | Expression::AssignmentExpression(_)
-                | Expression::SequenceExpression(_)
-                | Expression::ArrowFunctionExpression(_)
-                | Expression::FunctionExpression(_)
-        ),
+        // Callee: `(a ? b : c)()`, `(a + b)()`, `(() => {})()`, `(x as T)()`, `(<T>x)()`, etc.
+        // Also used for tagged template tags: `(x as T)`template``
+        // Note: SequenceExpression already adds its own parens in build_sequence_doc
+        // Note: ClassExpression needs parens only in NewCallee: `class {}()` is valid but `new class {}()` is not
+        ParenContext::Callee | ParenContext::NewCallee => {
+            // ClassExpression only needs parens in `new` context
+            if matches!(ctx, ParenContext::NewCallee)
+                && matches!(expr, Expression::ClassExpression(_))
+            {
+                return true;
+            }
+            is_await_or_yield(expr)
+                || is_type_assertion(expr)
+                || is_function_like(expr)
+                || matches!(
+                    expr,
+                    Expression::ConditionalExpression(_)
+                        | Expression::BinaryExpression(_)
+                        | Expression::AssignmentExpression(_)
+                        | Expression::UnaryExpression(_)
+                        | Expression::UpdateExpression(_)
+                )
+        }
 
-        // Chain base: `(a + b).method()`, `(await x).method()`, etc.
-        ParenContext::ChainBase => matches!(
-            expr,
-            Expression::BinaryExpression(_)
-                | Expression::ConditionalExpression(_)
-                | Expression::AssignmentExpression(_)
-                | Expression::AwaitExpression(_)
-                | Expression::TSAsExpression(_)
-                | Expression::TSSatisfiesExpression(_)
-                | Expression::TSTypeAssertion(_)
-        ),
+        // Chain base: `(a + b).method()`, `(await x).method()`, `(yield x).method()`, etc.
+        // Spread argument: `...(a || b)`, `...(a ? b : c)`, `...(await x)`, `...(x as T)`
+        ParenContext::ChainBase | ParenContext::SpreadArgument => is_lower_precedence(expr),
 
-        // Non-null: `(a + b)!`, `(!x)!`, `(a ? b : c)!`, etc.
-        ParenContext::NonNull => matches!(
-            expr,
-            Expression::BinaryExpression(_)
-                | Expression::UnaryExpression(_)
-                | Expression::ConditionalExpression(_)
-                | Expression::AssignmentExpression(_)
-                | Expression::AwaitExpression(_)
-                | Expression::TSTypeAssertion(_)
-                | Expression::TSAsExpression(_)
-                | Expression::TSSatisfiesExpression(_)
-        ),
+        // Non-null: `(a + b)!`, `(!x)!`, `(a ? b : c)!`, `(yield x)!`, etc.
+        ParenContext::NonNull => {
+            is_lower_precedence(expr) || matches!(expr, Expression::UnaryExpression(_))
+        }
 
-        // Type assertion: `(a + b) as T`
-        ParenContext::TypeAssertion => matches!(expr, Expression::BinaryExpression(_)),
+        // Type assertion: `(a + b) as T`, `(await x) as T`, `(yield x) as T`
+        // Unary argument: `!(a + b)`, `!(await x)`, `!(yield x)` - parens for clarity/precedence
+        ParenContext::TypeAssertion | ParenContext::UnaryArgument => {
+            is_await_or_yield(expr) || matches!(expr, Expression::BinaryExpression(_))
+        }
 
-        // Instantiation: `(<T>() => {})<U>`
-        ParenContext::InstantiationExpression => matches!(
-            expr,
-            Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_)
-        ),
+        // Instantiation: `(<T>() => {})<U>`, `(x as A)<T>`, `(<T>x)<U>`, `(await x)<T>`, `(yield x)<T>`
+        ParenContext::InstantiationExpression => {
+            is_await_or_yield(expr) || is_type_assertion(expr) || is_function_like(expr)
+        }
 
-        // Unary argument: `!(a + b)`, `!(await x)` - parens for clarity/precedence
-        ParenContext::UnaryArgument => matches!(
-            expr,
-            Expression::BinaryExpression(_) | Expression::AwaitExpression(_)
-        ),
-
-        // Await argument: `await (a + b)` - binary needs parens (higher precedence)
-        ParenContext::AwaitArgument => matches!(expr, Expression::BinaryExpression(_)),
+        // Await argument: `await (a + b)`, `await (x as T)` - parens needed for precedence/semantics
+        ParenContext::AwaitArgument => {
+            matches!(
+                expr,
+                Expression::BinaryExpression(_)
+                    | Expression::TSAsExpression(_)
+                    | Expression::TSSatisfiesExpression(_)
+            )
+        }
 
         // Arrow body: `() => ({})`, `() => (x = y)`
         // Note: ConditionalExpression is handled specially in build_arrow_body_doc
@@ -155,22 +167,59 @@ pub fn needs_parens(expr: &Expression, ctx: ParenContext) -> bool {
         // Assignment expressions need parens in object literals (not in ObjectPattern)
         ParenContext::ObjectPropertyValue => matches!(expr, Expression::AssignmentExpression(_)),
 
-        // Spread argument: `...(a || b)`, `...(a ? b : c)`, `...(await x)`, `...(x as T)`
-        // Spread has higher precedence than binary/conditional/assignment/await/yield/type assertions,
-        // so parens are needed to disambiguate: `...a || b` means `(...a) || b`, not `...(a || b)`
-        // Note: SequenceExpression already adds its own parens in build_sequence_doc
-        ParenContext::SpreadArgument => matches!(
+        // These contexts all need parens around assignment expressions for clarity:
+        // - Call/array/new argument: `fn((a = b))`, `[(a = b)]`, `new Fn((a = b))`
+        // - Template literal expression: `${(a = b)}`
+        // - Computed property key: `{[(a = b)]: c}`
+        ParenContext::Argument
+        | ParenContext::TemplateLiteralExpression
+        | ParenContext::ComputedPropertyKey => {
+            matches!(expr, Expression::AssignmentExpression(_))
+        }
+    }
+}
+
+// =============================================================================
+// Simple predicates (expression type groupings)
+// =============================================================================
+
+/// `await x` or `yield x` - always need parens together in most contexts
+fn is_await_or_yield(expr: &Expression) -> bool {
+    matches!(
+        expr,
+        Expression::AwaitExpression(_) | Expression::YieldExpression(_)
+    )
+}
+
+/// Lower precedence expressions that need parens in chain/spread/non-null contexts
+/// Combines: await/yield + type assertions + binary/conditional/assignment
+fn is_lower_precedence(expr: &Expression) -> bool {
+    is_await_or_yield(expr)
+        || is_type_assertion(expr)
+        || matches!(
             expr,
             Expression::BinaryExpression(_)
                 | Expression::ConditionalExpression(_)
                 | Expression::AssignmentExpression(_)
-                | Expression::AwaitExpression(_)
-                | Expression::YieldExpression(_)
-                | Expression::TSAsExpression(_)
-                | Expression::TSSatisfiesExpression(_)
-                | Expression::TSTypeAssertion(_)
-        ),
-    }
+        )
+}
+
+/// `x as T`, `x satisfies T`, or `<T>x` - TypeScript type assertions
+fn is_type_assertion(expr: &Expression) -> bool {
+    matches!(
+        expr,
+        Expression::TSAsExpression(_)
+            | Expression::TSSatisfiesExpression(_)
+            | Expression::TSTypeAssertion(_)
+    )
+}
+
+/// Arrow function or function expression
+fn is_function_like(expr: &Expression) -> bool {
+    matches!(
+        expr,
+        Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_)
+    )
 }
 
 // =============================================================================
@@ -203,17 +252,18 @@ fn needs_parens_binary_operand(
     parent_op: BinaryOperator,
     is_right: bool,
 ) -> bool {
-    // ConditionalExpression, AssignmentExpression, TSAsExpression, and TSSatisfiesExpression
-    // have lower precedence than any binary operator, so they ALWAYS need parens when used
-    // as operands.
+    // These expressions have lower precedence than any binary operator, so they ALWAYS
+    // need parens when used as operands.
     // e.g., `a && (b ? c : d)` - without parens it becomes `(a && b) ? c : d`
     // e.g., `(x as string) in obj` - without parens it becomes `x as (string in obj)`
+    // e.g., `b || ((fn) => fn)` - without parens it becomes `(b || fn) => fn` (syntax error)
     if matches!(
         expr,
         Expression::ConditionalExpression(_)
             | Expression::AssignmentExpression(_)
             | Expression::TSAsExpression(_)
             | Expression::TSSatisfiesExpression(_)
+            | Expression::ArrowFunctionExpression(_)
     ) {
         return true;
     }

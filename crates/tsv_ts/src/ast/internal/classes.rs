@@ -209,8 +209,12 @@ pub struct PropertyDefinition {
     pub accessibility: Option<Accessibility>,
     /// Whether this is a static property
     pub is_static: bool,
+    /// Whether this property has the declare modifier (ambient)
+    pub declare: bool,
     /// Whether this is an abstract property
     pub r#abstract: bool,
+    /// Whether this property has the override modifier
+    pub r#override: bool,
     /// Whether this is a readonly property
     pub readonly: bool,
     /// Whether the key is computed (`[expr] = value`)

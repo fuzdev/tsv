@@ -220,13 +220,9 @@ impl<'a> Printer<'a> {
                     parts.push(doc::trailing_comma());
                 }
 
-                // Line comments go after comma, wrapped in line_suffix
-                // This excludes them from width calculations during break decisions
+                // Line comments go after comma (excluded from width calculations)
                 for comment in trailing.iter().filter(|c| !c.is_block) {
-                    parts.push(doc::line_suffix(doc::concat(vec![
-                        doc::text(" "),
-                        self.build_comment_doc(comment),
-                    ])));
+                    parts.push(self.build_trailing_line_comment_doc(comment));
                 }
 
                 prev_end = prop.value_end();
@@ -378,7 +374,14 @@ impl<'a> Printer<'a> {
                 parts.push(doc::text(" "));
             }
 
-            parts.push(self.build_expression_doc(&prop.key));
+            // Assignment expressions need parens in computed keys: {[(a = b)]: c}
+            let key_expr_doc =
+                if super::needs_parens(&prop.key, super::ParenContext::ComputedPropertyKey) {
+                    doc::parens(self.build_expression_doc(&prop.key))
+                } else {
+                    self.build_expression_doc(&prop.key)
+                };
+            parts.push(key_expr_doc);
 
             // Add comments between key and ]
             for comment in comments_in_range(self.comments, key_end, bracket_end) {

@@ -6,8 +6,8 @@
 // - Finding and filtering comments in ranges
 // - Handling leading/trailing/inline comments
 
-use super::analysis::skip_string_or_comment;
 use super::Printer;
+use super::analysis::skip_string_or_comment;
 use crate::ast::internal;
 use tsv_lang::doc::{self, Doc};
 use tsv_lang::{CommentPosition, classify_comment, comments_in_range, printing};
@@ -97,9 +97,14 @@ impl<'a> Printer<'a> {
                     let lines: Vec<&str> = stripped.split('\n').collect();
 
                     for (i, line) in lines.iter().enumerate() {
+                        let is_last = i == lines.len() - 1;
                         if i > 0 {
                             self.write("\n");
-                            self.write_indent();
+                            // Blank lines inside comments should be truly empty (no indentation)
+                            // But the closing line (last line before */) needs context indent
+                            if !line.is_empty() || is_last {
+                                self.write_indent();
+                            }
                         }
                         self.write(line);
                     }
@@ -298,6 +303,47 @@ impl<'a> Printer<'a> {
         self.build_comments_between(start, end, CommentSpacing::Trailing)
     }
 
+    /// Build docs for leading comments in a forced-multiline context.
+    ///
+    /// Block comments: `/*content*/ ` (inline with trailing space)
+    /// Line comments: `//content` + hardline (on own line)
+    ///
+    /// Used when line comments force multiline formatting (unions, tuples, etc.)
+    pub(crate) fn build_leading_comments_multiline(&self, start: u32, end: u32) -> Vec<Doc> {
+        let mut parts = Vec::new();
+        for comment in comments_in_range(self.comments, start, end) {
+            parts.push(self.build_comment_doc(comment));
+            if comment.is_block {
+                parts.push(doc::text(" "));
+            } else {
+                parts.push(doc::hardline());
+            }
+        }
+        parts
+    }
+
+    /// Build docs for trailing comments in a forced-multiline context.
+    ///
+    /// Same-line comments (block or line): ` /*content*/` or ` //content` (inline with leading space)
+    /// Own-line comments: hardline + comment (on their own line)
+    ///
+    /// Used when line comments force multiline formatting (unions, tuples, etc.)
+    pub(crate) fn build_trailing_comments_multiline(&self, start: u32, end: u32) -> Vec<Doc> {
+        let mut parts = Vec::new();
+        for comment in comments_in_range(self.comments, start, end) {
+            if printing::is_same_line(self.source, start, comment.span.start) {
+                // Same line as start: trailing comment (both block and line)
+                parts.push(doc::text(" "));
+                parts.push(self.build_comment_doc(comment));
+            } else {
+                // Own line comment (block or line)
+                parts.push(doc::hardline());
+                parts.push(self.build_comment_doc(comment));
+            }
+        }
+        parts
+    }
+
     /// Filter line comments between two positions based on whether they're on the same line as start
     ///
     /// # Arguments
@@ -383,10 +429,7 @@ impl<'a> Printer<'a> {
                     docs.push(self.build_comment_doc(comment));
                 } else {
                     // Line comments go in line_suffix, don't affect width
-                    docs.push(doc::line_suffix(doc::concat(vec![
-                        doc::text(" "),
-                        self.build_comment_doc(comment),
-                    ])));
+                    docs.push(self.build_trailing_line_comment_doc(comment));
                 }
             } else {
                 break; // Only same-line comments
@@ -560,9 +603,14 @@ impl<'a> Printer<'a> {
                 let lines: Vec<&str> = stripped.split('\n').collect();
                 let mut line_docs = Vec::new();
                 for (i, line) in lines.iter().enumerate() {
+                    let is_last = i == lines.len() - 1;
                     if i > 0 {
-                        if use_context_indent {
-                            // Apply context indent
+                        // Blank lines inside comments should be truly empty (no indentation)
+                        // But the closing line (last line before */) needs context indent
+                        if line.is_empty() && !is_last {
+                            line_docs.push(doc::literalline());
+                        } else if use_context_indent {
+                            // Apply context indent for content lines and closing line
                             line_docs.push(doc::hardline());
                         } else {
                             // Preserve at column 0
@@ -585,5 +633,17 @@ impl<'a> Printer<'a> {
             // Line comment: // content
             doc::text_owned(format!("//{}", comment.content))
         }
+    }
+
+    /// Build a line_suffix doc for a trailing line comment (space + comment)
+    ///
+    /// Wrapping in line_suffix excludes the comment from width calculations,
+    /// so elements can stay compact even when the trailing comment would push
+    /// the line over print_width.
+    pub(crate) fn build_trailing_line_comment_doc(&self, comment: &internal::Comment) -> Doc {
+        doc::line_suffix(doc::concat(vec![
+            doc::text(" "),
+            self.build_comment_doc(comment),
+        ]))
     }
 }

@@ -112,8 +112,8 @@ pub(super) fn fits_with_lookahead<'a, R: TextResolver + ?Sized>(
                 stack.push((inner, current_mode));
             }
 
-            Doc::Align { contents, .. } => {
-                // Align doesn't affect width in fits() check
+            Doc::Align { contents, .. } | Doc::AlignSpaces { contents, .. } => {
+                // Align/AlignSpaces don't affect width in fits() check
                 // (like Indent, indentation only matters at line breaks)
                 stack.push((contents, current_mode));
             }
@@ -271,8 +271,8 @@ pub(super) fn fits_multi<R: TextResolver + ?Sized>(
                 stack.push((inner, current_mode));
             }
 
-            Doc::Align { contents, .. } => {
-                // Align doesn't affect width in fits() check
+            Doc::Align { contents, .. } | Doc::AlignSpaces { contents, .. } => {
+                // Align/AlignSpaces don't affect width in fits() check
                 stack.push((contents, current_mode));
             }
 

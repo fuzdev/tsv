@@ -78,10 +78,7 @@ pub async fn run_prettier(content: &str, parser: PrettierParser<'_>) -> Result<S
 /// # Errors
 /// Returns an error if Deno is not available or parsing fails.
 pub async fn parse_svelte(source: &str) -> Result<serde_json::Value, DenoError> {
-    get_actor()
-        .await?
-        .call("svelte-parse", source, None)
-        .await
+    get_actor().await?.call("svelte-parse", source, None).await
 }
 
 /// Parse TypeScript source code using acorn with TypeScript plugin

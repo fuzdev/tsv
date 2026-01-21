@@ -419,14 +419,11 @@ impl<'a> Printer<'a> {
         doc::concat(parts)
     }
 
-    /// Build docs for line comments (go after comma, wrapped in line_suffix)
+    /// Build docs for line comments (go after comma, excluded from width)
     fn build_line_comments_suffix_doc(&self, comments: &[&Comment]) -> Doc {
         let mut parts = Vec::new();
         for comment in comments {
-            parts.push(doc::line_suffix(doc::concat(vec![
-                doc::text(" "),
-                self.build_comment_doc(comment),
-            ])));
+            parts.push(self.build_trailing_line_comment_doc(comment));
         }
         doc::concat(parts)
     }

@@ -16,7 +16,9 @@ mod types;
 mod variable;
 
 // Re-export for submodules to use `super::Printer` instead of `super::super::Printer`
-pub(super) use super::{Printer, build_entity_name_doc, intersection_has_huggable_last_type, unwrap_parenthesized};
+pub(super) use super::{
+    Printer, build_entity_name_doc, intersection_has_huggable_last_type, unwrap_parenthesized,
+};
 
 use super::{ParenContext, needs_parens};
 use crate::ast::internal::{self, Statement};

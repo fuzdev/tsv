@@ -106,10 +106,7 @@ impl<'a> Printer<'a> {
                 }
                 return doc::concat(vec![
                     doc::text("{"),
-                    doc::indent(doc::concat(vec![
-                        doc::hardline(),
-                        doc::concat(all_content),
-                    ])),
+                    doc::indent(doc::concat(vec![doc::hardline(), doc::concat(all_content)])),
                     doc::hardline(),
                     doc::text("}"),
                 ]);
@@ -182,14 +179,27 @@ impl<'a> Printer<'a> {
         }
 
         // Handle trailing comments after the last statement (on their own line)
+        // Preserve blank lines between last statement and trailing comments, and between comments
         if let Some(last_stmt_end) = prev_stmt_end {
+            let mut trailing_prev_end = last_stmt_end;
             for comment in tsv_lang::comments_in_range(self.comments, last_stmt_end, block_end) {
                 if tsv_lang::printing::is_same_line(self.source, last_stmt_end, comment.span.start)
                 {
                     continue; // Skip same-line comments (already handled above)
                 }
+                // Check for blank line before this comment
+                if !self.in_template_interpolation.get()
+                    && tsv_lang::printing::has_blank_line_between(
+                        self.source,
+                        trailing_prev_end,
+                        comment.span.start,
+                    )
+                {
+                    body_parts.push(doc::literalline());
+                }
                 body_parts.push(doc::hardline());
                 body_parts.push(self.build_comment_doc(comment));
+                trailing_prev_end = comment.span.end;
             }
         }
 

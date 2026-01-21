@@ -403,6 +403,8 @@ fn convert_property_definition(
         accessor: if prop.accessor { Some(true) } else { None },
         accessibility: prop.accessibility.map(|a| a.as_str().to_string()),
         readonly: if prop.readonly { Some(true) } else { None },
+        r#override: if prop.r#override { Some(true) } else { None },
+        declare: if prop.declare { Some(true) } else { None },
         is_static: prop.is_static,
         computed: prop.computed,
         key: Box::new(convert_expression(&prop.key, source, loc, interner, offset)),

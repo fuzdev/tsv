@@ -82,9 +82,10 @@ pub use types::{Doc, DocContext, DocText, GroupId, LineKind, Mode, TextResolver}
 
 // Builders
 pub use builders::{
-    align, break_parent, concat, conditional_group, dedent, empty, fill, group, group_with_id,
-    hardline, if_break, indent, indent_if_break, line, line_suffix, line_suffix_boundary,
-    literalline, softline, symbol, text, text_owned, with_base_indent_override, with_context,
+    align, align_spaces, break_parent, concat, conditional_group, dedent, empty, fill, group,
+    group_with_id, hardline, if_break, indent, indent_if_break, line, line_suffix,
+    line_suffix_boundary, literalline, softline, symbol, text, text_owned,
+    with_base_indent_override, with_context,
 };
 
 // Helpers
@@ -843,6 +844,7 @@ mod tests {
         use std::mem::size_of;
 
         // Current sizes after optimization
+        // Note: AlignSpaces variant added for Prettier-style tabs+spaces alignment
         assert_eq!(
             size_of::<Doc>(),
             32,
@@ -857,19 +859,19 @@ mod tests {
         assert!(size_of::<SmallVec<[Doc; 1]>>() > size_of::<Doc>());
 
         // Command stack analysis (for potential SmallVec optimization)
-        // Command { indent, mode, doc, base_indent_override } = 40 bytes
+        // Command { indent, mode, doc, base_indent_override, align_spaces } = 48 bytes
         //   - indent: usize (8), mode: Mode (1 + 7 padding), doc: &Doc (8),
-        //   - base_indent_override: Option<usize> (16)
+        //   - base_indent_override: Option<usize> (16), align_spaces: usize (8)
         //
         // SmallVec viability for command stack:
-        // - SmallVec<[Command; 16]> = 656 bytes on stack, avoids heap for depth ≤16
+        // - SmallVec<[Command; 16]> = 784 bytes on stack, avoids heap for depth ≤16
         // - Typical doc depth: 10-20 (functions, nested expressions)
-        // - Trade-off: 656 bytes stack vs heap allocation
+        // - Trade-off: 784 bytes stack vs heap allocation
         //
         // Verdict: Less viable now with larger Command size. The heap allocation
         // for Vec is amortized across the entire render.
-        assert_eq!(size_of::<Command>(), 40);
-        assert_eq!(size_of::<SmallVec<[Command; 16]>>(), 656);
+        assert_eq!(size_of::<Command>(), 48);
+        assert_eq!(size_of::<SmallVec<[Command; 16]>>(), 784);
     }
 
     #[test]

@@ -15,6 +15,7 @@
 
 use super::Printer;
 use super::expressions::format_string_literal_from_ast;
+use super::is_string_literal;
 use crate::ast::internal::{self, Expression};
 use tsv_lang::doc::{self, Doc, GroupId};
 
@@ -90,6 +91,12 @@ pub fn choose_layout(
         return AssignmentLayout::BreakAfterOperator;
     }
 
+    // Curried arrow functions with return type → break after operator
+    // Produces: `key:\n  (x: T): H =>\n  (y) =>\n    expr`
+    if is_curried_arrow_with_return_type(right_expr) {
+        return AssignmentLayout::BreakAfterOperator;
+    }
+
     // Short property keys → never break after operator
     // (wrapping object properties with very short keys usually doesn't add much value)
     if is_short_key {
@@ -119,15 +126,46 @@ pub fn choose_layout(
 /// Note: Call expressions and NewExpressions are NOT included here.
 /// They use Fluid layout (from choose_layout default) which allows breaking
 /// after the operator when the total line exceeds printWidth.
+///
+/// Note: Curried arrow functions with return type annotations are NOT self-expanding.
+/// They need BreakAfterOperator to produce:
+///   const f =
+///       (x: T): H =>
+///       (y) => ...
 pub fn is_self_expanding_value(expr: &Expression) -> bool {
-    matches!(
-        expr,
+    match expr {
         Expression::ObjectExpression(_)
-            | Expression::ArrayExpression(_)
-            | Expression::FunctionExpression(_)
-            | Expression::ArrowFunctionExpression(_)
-            | Expression::ClassExpression(_)
-    )
+        | Expression::ArrayExpression(_)
+        | Expression::FunctionExpression(_)
+        | Expression::ClassExpression(_) => true,
+
+        // Arrow functions are self-expanding UNLESS they're curried with return type
+        Expression::ArrowFunctionExpression(_) => !is_curried_arrow_with_return_type(expr),
+
+        _ => false,
+    }
+}
+
+/// Check if an expression is a curried arrow function with return type annotation.
+/// Returns false for non-arrow expressions.
+///
+/// This pattern needs special breaking behavior:
+///   const f = (x: T): H => (y) => expr
+/// becomes:
+///   const f =
+///       (x: T): H =>
+///       (y) =>
+///           expr
+pub fn is_curried_arrow_with_return_type(expr: &Expression) -> bool {
+    if let Expression::ArrowFunctionExpression(arrow) = expr {
+        arrow.return_type.is_some()
+            && matches!(
+                &arrow.body,
+                internal::ArrowFunctionBody::Expression(body) if matches!(&**body, Expression::ArrowFunctionExpression(_))
+            )
+    } else {
+        false
+    }
 }
 
 /// Check if an expression is self-expanding but won't actually expand because
@@ -153,10 +191,7 @@ fn should_break_after_operator(expr: &Expression, source: &str, print_width: usi
     let core_expr = unwrap_expression(expr);
 
     // String literals should break after operator
-    if matches!(
-        core_expr,
-        Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. })
-    ) {
+    if is_string_literal(core_expr) {
         return true;
     }
 
@@ -323,10 +358,12 @@ fn is_poorly_breakable_chain_recursive(
     print_width: usize,
 ) -> bool {
     match expr {
-        // TSNonNullExpression: continue checking
+        // TSNonNullExpression is transparent - continue checking
         Expression::TSNonNullExpression(non_null) => {
             is_poorly_breakable_chain_recursive(&non_null.expression, deep, source, print_width)
         }
+        // Note: TSAsExpression and TSSatisfiesExpression are NOT included here.
+        // They have breakable type annotations, so they're not "poorly breakable".
 
         // CallExpression: check if it's a trivial call
         Expression::CallExpression(call) => {
@@ -397,6 +434,33 @@ fn is_short_arg(expr: &Expression, source: &str, print_width: usize) -> bool {
         // Everything else might be complex
         _ => false,
     }
+}
+
+/// Check if expression is a type assertion (`as` or `satisfies`) wrapping a call with long arguments.
+///
+/// Returns true when the expression is TSAsExpression/TSSatisfiesExpression wrapping a
+/// CallExpression with non-trivial arguments (multiple args or single long arg).
+///
+/// Used for break-after-operator layout decisions: when a type assertion call has long args,
+/// we break after `=` instead of inside the call. If the call has short/trivial args, the
+/// type annotation can break instead.
+pub fn is_type_assertion_call(expr: &Expression, source: &str, print_width: usize) -> bool {
+    let call = match expr {
+        Expression::TSAsExpression(as_expr) => match as_expr.expression.as_ref() {
+            Expression::CallExpression(call) => call,
+            _ => return false,
+        },
+        Expression::TSSatisfiesExpression(sat_expr) => match sat_expr.expression.as_ref() {
+            Expression::CallExpression(call) => call,
+            _ => return false,
+        },
+        _ => return false,
+    };
+
+    // Non-trivial = multiple args OR single long arg
+    // (Trivial = empty args OR single short arg)
+    !(call.arguments.is_empty()
+        || call.arguments.len() == 1 && is_short_arg(&call.arguments[0], source, print_width))
 }
 
 /// Check if an expression is a simple value that shouldn't break

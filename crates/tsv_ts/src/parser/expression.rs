@@ -220,82 +220,94 @@ impl<'a> Parser<'a> {
         // Parse prefix expression (primary or unary)
         let mut left = self.parse_prefix_expression_with_end()?;
 
-        // Parse infix operators
-        loop {
-            let kind = self.current_kind();
+        // Parse infix operators and TypeScript type assertions (as/satisfies)
+        // Binary operators have higher precedence than as/satisfies, so we check binary first.
+        // After parsing as/satisfies, we loop back to check for more binary operators.
+        // Example: `a + b as T` → `(a + b) as T` (binary first)
+        // Example: `a as T + b` → `(a as T) + b` (as first, then binary)
+        'infix: loop {
+            // First, try to parse binary operators (higher precedence)
+            loop {
+                let kind = self.current_kind();
 
-            // Check if this is an infix operator
-            let Some((left_bp, right_bp, operator)) = infix_operator_info(kind) else {
-                break;
-            };
+                // Check if this is an infix operator
+                let Some((left_bp, right_bp, operator)) = infix_operator_info(kind) else {
+                    break;
+                };
 
-            // Skip `in` operator when allow_in is false (parsing for-loop headers)
-            if matches!(operator, BinaryOperator::In) && !self.allow_in {
-                break;
-            }
-
-            // Check if operator binds tighter than minimum
-            if left_bp < min_bp {
-                break;
-            }
-
-            self.advance()?; // consume operator
-
-            // Parse right-hand side with right binding power
-            let right = self.parse_expression_bp(right_bp)?;
-
-            // Create binary expression
-            // Use expr_start (which includes any opening paren) instead of left.actual_start as u32
-            // Use right.actual_end (position after parsing) to include closing parens
-            let span = Span::new(expr_start as u32, right.actual_end as u32);
-            left = ParsedExpr {
-                expr: Expression::BinaryExpression(BinaryExpression {
-                    left: Box::new(left.expr),
-                    operator,
-                    right: Box::new(right.expr),
-                    span,
-                }),
-                actual_start: expr_start,
-                actual_end: right.actual_end,
-            };
-        }
-
-        // Handle TypeScript `as` and `satisfies` operators (after binary ops, before assignment)
-        // These have lower precedence than binary operators but higher than assignment
-        // Example: `a + b as T` parses as `(a + b) as T`
-        // Only parse when allow_ts_type_assertions is true (disabled in Svelte template contexts)
-        while min_bp <= BP_TS_TYPE_ASSERTION && self.allow_ts_type_assertions {
-            match self.current_kind() {
-                TokenKind::Keyword(KeywordKind::As) => {
-                    self.advance()?; // consume 'as'
-                    let type_annotation = Box::new(self.parse_type()?);
-                    let span = Span::new(expr_start as u32, type_annotation.span().end);
-                    left = ParsedExpr {
-                        expr: Expression::TSAsExpression(TSAsExpression {
-                            expression: Box::new(left.expr),
-                            type_annotation,
-                            span,
-                        }),
-                        actual_start: expr_start,
-                        actual_end: span.end_usize(),
-                    };
+                // Skip `in` operator when allow_in is false (parsing for-loop headers)
+                if matches!(operator, BinaryOperator::In) && !self.allow_in {
+                    break;
                 }
-                TokenKind::Keyword(KeywordKind::Satisfies) => {
-                    self.advance()?; // consume 'satisfies'
-                    let type_annotation = Box::new(self.parse_type()?);
-                    let span = Span::new(expr_start as u32, type_annotation.span().end);
-                    left = ParsedExpr {
-                        expr: Expression::TSSatisfiesExpression(TSSatisfiesExpression {
-                            expression: Box::new(left.expr),
-                            type_annotation,
-                            span,
-                        }),
-                        actual_start: expr_start,
-                        actual_end: span.end_usize(),
-                    };
+
+                // Check if operator binds tighter than minimum
+                if left_bp < min_bp {
+                    break;
                 }
-                _ => break,
+
+                self.advance()?; // consume operator
+
+                // Parse right-hand side with right binding power
+                let right = self.parse_expression_bp(right_bp)?;
+
+                // Create binary expression
+                // Use expr_start (which includes any opening paren) instead of left.actual_start as u32
+                // Use right.actual_end (position after parsing) to include closing parens
+                let span = Span::new(expr_start as u32, right.actual_end as u32);
+                left = ParsedExpr {
+                    expr: Expression::BinaryExpression(BinaryExpression {
+                        left: Box::new(left.expr),
+                        operator,
+                        right: Box::new(right.expr),
+                        span,
+                    }),
+                    actual_start: expr_start,
+                    actual_end: right.actual_end,
+                };
             }
+
+            // Then, try TypeScript `as` and `satisfies` operators (lower precedence than binary)
+            // Only parse when allow_ts_type_assertions is true (disabled in Svelte template contexts)
+            if min_bp <= BP_TS_TYPE_ASSERTION && self.allow_ts_type_assertions {
+                match self.current_kind() {
+                    TokenKind::Keyword(KeywordKind::As) => {
+                        self.advance()?; // consume 'as'
+                        let type_annotation = Box::new(self.parse_type_no_asi_bracket()?);
+                        let span = Span::new(expr_start as u32, type_annotation.span().end);
+                        left = ParsedExpr {
+                            expr: Expression::TSAsExpression(TSAsExpression {
+                                expression: Box::new(left.expr),
+                                type_annotation,
+                                span,
+                            }),
+                            actual_start: expr_start,
+                            actual_end: span.end_usize(),
+                        };
+                        // After parsing as, loop back to check for more binary operators
+                        continue 'infix;
+                    }
+                    TokenKind::Keyword(KeywordKind::Satisfies) => {
+                        self.advance()?; // consume 'satisfies'
+                        let type_annotation = Box::new(self.parse_type_no_asi_bracket()?);
+                        let span = Span::new(expr_start as u32, type_annotation.span().end);
+                        left = ParsedExpr {
+                            expr: Expression::TSSatisfiesExpression(TSSatisfiesExpression {
+                                expression: Box::new(left.expr),
+                                type_annotation,
+                                span,
+                            }),
+                            actual_start: expr_start,
+                            actual_end: span.end_usize(),
+                        };
+                        // After parsing satisfies, loop back to check for more binary operators
+                        continue 'infix;
+                    }
+                    _ => {}
+                }
+            }
+
+            // No more infix operators or type assertions
+            break;
         }
 
         // Handle assignment operator (after binary ops, before ternary)

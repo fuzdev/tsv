@@ -63,11 +63,7 @@ pub(crate) fn is_module_path_fluid_call(
     if let internal::Expression::AwaitExpression(await_expr) = expr
         && let internal::Expression::ImportExpression(import_expr) = await_expr.argument.as_ref()
     {
-        let is_string_arg = matches!(
-            import_expr.source.as_ref(),
-            internal::Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. })
-        );
-        return is_string_arg;
+        return is_string_literal(import_expr.source.as_ref());
     }
 
     let internal::Expression::CallExpression(call) = expr else {
@@ -75,14 +71,7 @@ pub(crate) fn is_module_path_fluid_call(
     };
 
     // Must have exactly 1 argument that is a string literal
-    if call.arguments.len() != 1 {
-        return false;
-    }
-    let is_string_arg = matches!(
-        &call.arguments[0],
-        internal::Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. })
-    );
-    if !is_string_arg {
+    if call.arguments.len() != 1 || !is_string_literal(&call.arguments[0]) {
         return false;
     }
 
@@ -114,14 +103,7 @@ pub(crate) fn is_plain_require_call(
     };
 
     // Must have exactly 1 argument that is a string literal
-    if call.arguments.len() != 1 {
-        return false;
-    }
-    let is_string_arg = matches!(
-        &call.arguments[0],
-        internal::Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. })
-    );
-    if !is_string_arg {
+    if call.arguments.len() != 1 || !is_string_literal(&call.arguments[0]) {
         return false;
     }
 
@@ -129,6 +111,14 @@ pub(crate) fn is_plain_require_call(
     matches!(
         call.callee.as_ref(),
         internal::Expression::Identifier(id) if interner.resolve(id.name) == Some("require")
+    )
+}
+
+/// Check if an expression is a string literal
+pub(crate) fn is_string_literal(expr: &internal::Expression) -> bool {
+    matches!(
+        expr,
+        internal::Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. })
     )
 }
 

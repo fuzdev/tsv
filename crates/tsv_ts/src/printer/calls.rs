@@ -9,10 +9,14 @@
 
 use super::chain::{self, ChainPrinter, SymbolLookup};
 use super::utils::{
-    could_expand_arrow_body, has_multiple_function_args, is_expandable_object,
-    is_hopefully_short_arg, last_arg_is_array_or_object, preceding_args_are_short,
+    could_expand_arrow_body, has_block_function_before_last, has_multiple_function_args,
+    is_array_or_object_unwrapped, is_block_function, is_expandable_object, is_hopefully_short_arg,
+    last_arg_is_array_or_object, preceding_args_allow_hug,
 };
-use super::{ParenContext, Printer, has_multiline_content, needs_parens, template_literal_has_newlines};
+use super::{
+    ParenContext, Printer, has_multiline_content, is_string_literal, needs_parens,
+    template_literal_has_newlines,
+};
 use crate::ast::internal;
 use string_interner::DefaultSymbol;
 use tsv_lang::SymbolResolver;
@@ -122,14 +126,7 @@ fn is_boolean_call(call: &internal::CallExpression, printer: &Printer) -> bool {
 /// - `require.resolve(string)` → don't break args, let assignment break
 fn is_module_path_no_break(call: &internal::CallExpression, printer: &Printer) -> bool {
     // Must have exactly 1 argument that is a string literal
-    if call.arguments.len() != 1 {
-        return false;
-    }
-    let is_string_arg = matches!(
-        &call.arguments[0],
-        internal::Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. })
-    );
-    if !is_string_arg {
+    if call.arguments.len() != 1 || !is_string_literal(&call.arguments[0]) {
         return false;
     }
 
@@ -274,10 +271,10 @@ pub(super) fn build_args_split_last(
     arguments: &[internal::Expression],
     printer: &Printer,
 ) -> (Vec<Doc>, Doc, Doc) {
-    // Build all args
+    // Build all args (using build_arg_expression_doc for proper parens on assignments)
     let arg_docs: Vec<_> = arguments
         .iter()
-        .map(|arg| printer.build_expression_doc(arg))
+        .map(|arg| printer.build_arg_expression_doc(arg))
         .collect();
 
     // Build head docs (all but last) with commas
@@ -353,6 +350,60 @@ fn arg_needs_soft_wrap(arg: &internal::Expression) -> bool {
     )
 }
 
+/// Classify how a single argument should be formatted in chain context.
+///
+/// Returns the `ChainArgKind` for arrow functions, or `NeedsSoftWrap` for
+/// other expression types that need soft wrapping (calls, members, binaries).
+fn classify_chain_arg(arg: &internal::Expression) -> ChainArgKind {
+    match arg {
+        // These expression types need soft wrapping
+        internal::Expression::CallExpression(_)
+        | internal::Expression::MemberExpression(_)
+        | internal::Expression::NewExpression(_)
+        | internal::Expression::Identifier(_)
+        | internal::Expression::BinaryExpression(_) => ChainArgKind::NeedsSoftWrap,
+        // Arrow functions are classified by their body
+        internal::Expression::ArrowFunctionExpression(arrow) => classify_arrow_body(arrow),
+        // Everything else hugs naturally (objects, arrays as direct args)
+        _ => ChainArgKind::HugsNaturally,
+    }
+}
+
+/// How a single argument should be formatted in chain context.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ChainArgKind {
+    /// Hugs naturally - objects, arrays, block bodies have their own formatting
+    HugsNaturally,
+    /// Needs huggable wrapper - ternaries hug but need trailing comma wrapper
+    NeedsWrapper,
+    /// Needs soft wrap - long strings, identifiers need call to expand
+    NeedsSoftWrap,
+}
+
+/// Classify how an arrow function body should be formatted in chain context.
+fn classify_arrow_body(arrow: &internal::ArrowFunctionExpression) -> ChainArgKind {
+    match &arrow.body {
+        internal::ArrowFunctionBody::BlockStatement(_) => ChainArgKind::HugsNaturally,
+        internal::ArrowFunctionBody::Expression(expr) => classify_expression_body(expr),
+    }
+}
+
+/// Classify how an expression body should be formatted.
+fn classify_expression_body(expr: &internal::Expression) -> ChainArgKind {
+    match expr {
+        // Objects and arrays have their own trailing comma handling
+        internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_) => {
+            ChainArgKind::HugsNaturally
+        }
+        // Ternaries hug but need trailing comma wrapper
+        internal::Expression::ConditionalExpression(_) => ChainArgKind::NeedsWrapper,
+        // Nested arrows inherit their body's classification
+        internal::Expression::ArrowFunctionExpression(inner) => classify_arrow_body(inner),
+        // Everything else needs soft wrap
+        _ => ChainArgKind::NeedsSoftWrap,
+    }
+}
+
 /// Wrap arguments with soft breaks (no callee, just prefix like "(" or "?.(")
 ///
 /// Used in chain context where the callee is handled separately.
@@ -363,6 +414,22 @@ fn wrap_args_with_soft_breaks(prefix: &'static str, args: Doc) -> Doc {
         doc::text(prefix),
         doc::indent_softline(doc::concat(vec![args, doc::trailing_comma()])),
         doc::softline(),
+        doc::text(")"),
+    ]))
+}
+
+/// Wrap a single huggable argument - hugs opening paren but adds trailing comma
+/// when the content breaks internally.
+///
+/// Used for expressions with natural break points (objects, arrays, ternaries)
+/// that should hug the opening paren but still get proper trailing comma handling.
+/// Structure: `prefix + arg + if_break(",\n") + ")"`
+#[inline]
+fn wrap_huggable_arg(prefix: &'static str, arg: Doc) -> Doc {
+    doc::group(doc::concat(vec![
+        doc::text(prefix),
+        arg,
+        doc::if_break(doc::concat(vec![doc::text(","), doc::line()]), doc::empty()),
         doc::text(")"),
     ]))
 }
@@ -378,14 +445,7 @@ fn get_module_path_chain_break<'a>(
     printer: &Printer,
 ) -> Option<(&'a internal::Expression, &'a internal::Identifier)> {
     // Must have exactly 1 argument that is a string literal
-    if call.arguments.len() != 1 {
-        return None;
-    }
-    let is_string_arg = matches!(
-        &call.arguments[0],
-        internal::Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. })
-    );
-    if !is_string_arg {
+    if call.arguments.len() != 1 || !is_string_literal(&call.arguments[0]) {
         return None;
     }
 
@@ -501,7 +561,7 @@ impl<'a> Printer<'a> {
     /// - Remaining args are "hopefully short" (simple values)
     /// - Result: first arg expands, tail args stay inline after closing `}`
     fn should_expand_first_arg(&self, args: &[internal::Expression]) -> bool {
-        // Need at least 2 args (first is function, rest are short)
+        // Need exactly 2 args (first is function, second is short)
         if args.len() != 2 {
             return false;
         }
@@ -510,25 +570,20 @@ impl<'a> Printer<'a> {
         let second_arg = &args[1];
 
         // First arg must be a function with block body
-        let first_is_expandable_function = match first_arg {
-            internal::Expression::ArrowFunctionExpression(arrow) => {
-                matches!(&arrow.body, internal::ArrowFunctionBody::BlockStatement(_))
-            }
-            internal::Expression::FunctionExpression(_) => true,
-            _ => false,
-        };
-
-        if !first_is_expandable_function {
+        if !is_block_function(first_arg) {
             return false;
         }
 
         // Second arg must be short/simple (won't expand)
-        // Also, second arg shouldn't be another function (would look odd)
+        // Exclude: functions, ternaries, objects, arrays, spreads - these should expand all args
         if matches!(
             second_arg,
             internal::Expression::ArrowFunctionExpression(_)
                 | internal::Expression::FunctionExpression(_)
                 | internal::Expression::ConditionalExpression(_)
+                | internal::Expression::ObjectExpression(_)
+                | internal::Expression::ArrayExpression(_)
+                | internal::Expression::SpreadElement(_)
         ) {
             return false;
         }
@@ -752,19 +807,9 @@ impl<'a> Printer<'a> {
                     ]);
                 }
 
-                // Object literal: hug it (object handles its own internal wrapping)
-                // e.g., @decorator({...}) or fn({prop: value})
-                internal::Expression::ObjectExpression(_) => {
-                    return doc::concat(vec![
-                        callee,
-                        doc::text("("),
-                        self.build_expression_doc(arg),
-                        doc::text(")"),
-                    ]);
-                }
-
-                // Array literal: hug it (array handles its own internal wrapping)
-                internal::Expression::ArrayExpression(_) => {
+                // Object/array literals (or type assertions wrapping them): hug them
+                // e.g., @decorator({...}), fn([item]), fn({...} as T), fn([...] satisfies T)
+                _ if is_array_or_object_unwrapped(arg) => {
                     return doc::concat(vec![
                         callee,
                         doc::text("("),
@@ -794,8 +839,12 @@ impl<'a> Printer<'a> {
                 // Expression arrow: check special cases
                 internal::Expression::ArrowFunctionExpression(arrow) => {
                     if let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
-                        // Object literal: hug it
-                        if matches!(&**body_expr, internal::Expression::ObjectExpression(_)) {
+                        // Object/array literal: hug it (array breaks internally when long)
+                        if matches!(
+                            &**body_expr,
+                            internal::Expression::ObjectExpression(_)
+                                | internal::Expression::ArrayExpression(_)
+                        ) {
                             return doc::concat(vec![
                                 callee,
                                 doc::text("("),
@@ -1003,10 +1052,74 @@ impl<'a> Printer<'a> {
             }
 
             // Wrap callback with width-aware breaking
-            if matches!(
-                &call.arguments[0],
-                internal::Expression::ArrowFunctionExpression(_)
-            ) {
+            if let internal::Expression::ArrowFunctionExpression(arrow) = &call.arguments[0] {
+                if let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
+                    // Prettier keeps `fn((x) =>` together (sig on opening line) only when:
+                    // 1. Body is a call expression
+                    // 2. No type annotations (return type, type params, or param types)
+                    // Otherwise it wraps at `fn(` putting the whole arrow on the next line.
+                    let has_type_annotations = arrow.return_type.is_some()
+                        || arrow.type_parameters.is_some()
+                        || arrow.params.iter().any(|p| {
+                            matches!(
+                                p,
+                                internal::Expression::Identifier(id) if id.type_annotation.is_some()
+                            )
+                        });
+
+                    if matches!(&**body_expr, internal::Expression::CallExpression(_))
+                        && !has_type_annotations
+                    {
+                        let arrow_doc = self.build_expression_doc(&call.arguments[0]);
+                        let body_doc = self.build_expression_doc(body_expr);
+
+                        // Build signature inline without break points
+                        let mut sig_parts = Vec::new();
+                        if arrow.r#async {
+                            sig_parts.push(doc::text("async "));
+                        }
+                        // Note: no type_parameters here (has_type_annotations excludes them)
+                        if arrow.params.is_empty() {
+                            sig_parts.push(doc::text("()"));
+                        } else {
+                            sig_parts.push(doc::text("("));
+                            let param_docs: Vec<_> = arrow
+                                .params
+                                .iter()
+                                .map(|p| self.build_function_parameter_doc(p))
+                                .collect();
+                            sig_parts.push(doc::join(param_docs, ", "));
+                            sig_parts.push(doc::text(")"));
+                        }
+                        let inline_sig = doc::concat(sig_parts);
+
+                        return doc::conditional_group(vec![
+                            // Flat: callee(() => body)
+                            doc::concat(vec![
+                                callee.clone(),
+                                doc::text("("),
+                                arrow_doc,
+                                doc::text(")"),
+                            ]),
+                            // Break: callee(() =>\n  body,\n)
+                            doc::concat(vec![
+                                callee,
+                                doc::text("("),
+                                inline_sig,
+                                doc::text(" =>"),
+                                doc::indent(doc::concat(vec![
+                                    doc::hardline(),
+                                    body_doc,
+                                    doc::text(","),
+                                ])),
+                                doc::hardline(),
+                                doc::text(")"),
+                            ]),
+                        ]);
+                    }
+                    // Other expression types: fall through to standard wrapping
+                }
+                // Block arrow or non-call expression body: standard wrapping
                 let arg_doc = self.build_expression_doc(&call.arguments[0]);
                 return wrap_call_with_soft_breaks(callee, arg_doc);
             }
@@ -1101,41 +1214,38 @@ impl<'a> Printer<'a> {
                 )
             );
 
-            if last_is_function {
-                // Skip this pattern if there are inter-argument comments
-                // (they'll be handled by the general inter-argument comment handler below)
-                let has_inter_arg_comments = has_inter_argument_comments(call, self);
+            if last_is_function
+                && preceding_args_allow_hug(&call.arguments, self.source)
+                && !has_inter_argument_comments(call, self)
+            {
+                let (head_parts, last_arg_doc, all_args_broken) =
+                    build_args_split_last(&call.arguments, self);
 
-                if preceding_args_are_short(&call.arguments) && !has_inter_arg_comments {
-                    let (head_parts, last_arg_doc, all_args_broken) =
-                        build_args_split_last(&call.arguments, self);
-
-                    // Try: inline, or break all args
-                    // Note: last arg contains hardlines, so state 1 only succeeds if the whole
-                    // line (including arrow signature) fits within print_width
-                    return doc::conditional_group(vec![
-                        // State 1: Keep all args inline (arrow breaks internally due to hardlines)
-                        doc::concat(vec![
-                            callee.clone(),
-                            doc::text("("),
-                            doc::concat(head_parts),
-                            last_arg_doc,
-                            doc::text(")"),
-                        ]),
-                        // State 2: All args broken out
-                        doc::concat(vec![
-                            callee,
-                            doc::text("("),
-                            doc::indent(doc::concat(vec![
-                                doc::line(),
-                                all_args_broken,
-                                doc::text(","),
-                            ])),
+                // Try: inline, or break all args
+                // Note: last arg contains hardlines, so state 1 only succeeds if the whole
+                // line (including arrow signature) fits within print_width
+                return doc::conditional_group(vec![
+                    // State 1: Keep all args inline (arrow breaks internally due to hardlines)
+                    doc::concat(vec![
+                        callee.clone(),
+                        doc::text("("),
+                        doc::concat(head_parts),
+                        last_arg_doc,
+                        doc::text(")"),
+                    ]),
+                    // State 2: All args broken out
+                    doc::concat(vec![
+                        callee,
+                        doc::text("("),
+                        doc::indent(doc::concat(vec![
                             doc::line(),
-                            doc::text(")"),
-                        ]),
-                    ]);
-                }
+                            all_args_broken,
+                            doc::text(","),
+                        ])),
+                        doc::line(),
+                        doc::text(")"),
+                    ]),
+                ]);
             }
         }
 
@@ -1265,29 +1375,39 @@ impl<'a> Printer<'a> {
             return wrap_call_with_soft_breaks(callee, arg_doc);
         }
 
+        // Block function before last arg: force expansion
+        // e.g., fn((x) => { ... }, {a: 1}) → all args on separate lines
+        if call.arguments.len() >= 2 && has_block_function_before_last(&call.arguments) {
+            let arg_docs: Vec<_> = call
+                .arguments
+                .iter()
+                .map(|arg| self.build_expression_doc(arg))
+                .collect();
+            let arg_parts = doc::join_doc(arg_docs, doc::comma_hardline());
+            return wrap_call_with_hard_breaks(callee, arg_parts);
+        }
+
         // "First args inline with last array/object" pattern:
         // When last arg is array/object and preceding args are short,
         // keep short args inline with the opening bracket/brace
         // e.g., fn('x', [Item1, Item2]) stays as fn('x', [\n\tItem1,\n\tItem2,\n])
-        if call.arguments.len() >= 2 && last_arg_is_array_or_object(&call.arguments) {
-            // Skip this pattern if there are inter-argument comments
-            // (they'll be handled by the general inter-argument comment handler below)
-            let has_inter_arg_comments = has_inter_argument_comments(call, self);
+        if call.arguments.len() >= 2
+            && last_arg_is_array_or_object(&call.arguments)
+            && preceding_args_allow_hug(&call.arguments, self.source)
+            && !has_inter_argument_comments(call, self)
+        {
+            let (head_parts, last_arg_doc, _) = build_args_split_last(&call.arguments, self);
 
-            if preceding_args_are_short(&call.arguments) && !has_inter_arg_comments {
-                let (head_parts, last_arg_doc, _) = build_args_split_last(&call.arguments, self);
-
-                // Keep short args inline with last arg's opener,
-                // wrapping the entire call in a group so the array/object
-                // only collapses if the WHOLE call fits
-                return doc::group(doc::concat(vec![
-                    callee,
-                    doc::text("("),
-                    doc::concat(head_parts),
-                    last_arg_doc,
-                    doc::text(")"),
-                ]));
-            }
+            // Keep short args inline with last arg's opener,
+            // wrapping the entire call in a group so the array/object
+            // only collapses if the WHOLE call fits
+            return doc::group(doc::concat(vec![
+                callee,
+                doc::text("("),
+                doc::concat(head_parts),
+                last_arg_doc,
+                doc::text(")"),
+            ]));
         }
 
         // Check for blank lines between arguments (forces expansion and preservation)
@@ -1545,15 +1665,32 @@ impl<'a> Printer<'a> {
             parts.push(doc::text(")"));
             doc::concat(parts)
         } else {
-            // Single argument that needs soft-break wrapping (not huggable)
-            if call.arguments.len() == 1 && arg_needs_soft_wrap(&call.arguments[0]) {
-                let arg_doc = self.build_arg_expression_doc(&call.arguments[0]);
-                parts.push(wrap_args_with_soft_breaks(prefix, arg_doc));
+            // Single argument handling
+            if call.arguments.len() == 1 {
+                let arg = &call.arguments[0];
+                let arg_doc = self.build_arg_expression_doc(arg);
+
+                match classify_chain_arg(arg) {
+                    ChainArgKind::NeedsSoftWrap => {
+                        // Needs soft-break wrapping - e.g., long strings
+                        parts.push(wrap_args_with_soft_breaks(prefix, arg_doc));
+                    }
+                    ChainArgKind::NeedsWrapper => {
+                        // Huggable with internal break points (ternary, etc.)
+                        // Hugs opening paren but adds trailing comma when content breaks
+                        parts.push(wrap_huggable_arg(prefix, arg_doc));
+                    }
+                    ChainArgKind::HugsNaturally => {
+                        // Objects/arrays/blocks that hug naturally
+                        parts.push(doc::text(prefix));
+                        parts.push(arg_doc);
+                        parts.push(doc::text(")"));
+                    }
+                }
                 return doc::concat(parts);
             }
 
-            // Simple join with comma+space - no group wrapping
-            // This allows object/array arguments to hug the parens
+            // Multiple arguments: simple join with comma+space
             // The chain's conditionalGroup handles breaking decisions
             let args: Vec<Doc> = call
                 .arguments
@@ -1654,10 +1791,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         // The boundary ensures the comment is flushed before the next softline
         let mut parts = Vec::new();
         for comment in line_comments {
-            parts.push(doc::line_suffix(doc::concat(vec![
-                doc::text(" "),
-                self.build_comment_doc(comment),
-            ])));
+            parts.push(self.build_trailing_line_comment_doc(comment));
         }
         // Add boundary to flush the line_suffix before any following softline
         parts.push(doc::line_suffix_boundary());

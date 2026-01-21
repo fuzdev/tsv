@@ -107,7 +107,8 @@ impl<'a> Printer<'a> {
         let mut end = prev_end;
         for comment in own_line {
             if tsv_lang::printing::has_blank_line_between(self.source, end, comment.span.start) {
-                parts.push(doc::hardline());
+                // Blank line then comment: literalline (empty) + hardline (indented)
+                parts.push(doc::literalline());
                 parts.push(doc::hardline());
             } else {
                 parts.push(doc::hardline());

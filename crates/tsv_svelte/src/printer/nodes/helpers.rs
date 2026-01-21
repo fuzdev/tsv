@@ -13,8 +13,16 @@ impl<'a> Printer<'a> {
     /// expressions in the template: `{expression}`
     pub fn print_expression_tag(&mut self, tag: &crate::ast::internal::ExpressionTag) {
         self.write("{");
+        // Assignment expressions need parens in expression tags: {(a = b)}
+        let needs_parens = matches!(tag.expression, tsv_ts::Expression::AssignmentExpression(_));
+        if needs_parens {
+            self.write("(");
+        }
         // Format the expression - comments are looked up from Root.comments by span position
         self.print_ts_expression_with_comments(&tag.expression, tag.span.start, tag.span.end);
+        if needs_parens {
+            self.write(")");
+        }
         self.write("}");
     }
 

@@ -165,6 +165,15 @@ pub enum Doc {
     /// how deeply nested the template is in function bodies or other blocks.
     Align { n: usize, contents: Box<Doc> },
 
+    /// Add alignment spaces to indentation (Prettier-style alignment)
+    ///
+    /// Unlike Indent which adds tab levels, AlignSpaces adds a fixed number
+    /// of spaces after the tabs. Used for aligning closing delimiters with
+    /// opening delimiters (e.g., `)` aligning with `(` in union types).
+    ///
+    /// Example: `| (A & {\n\t\t\t  })` - the `)` uses 2 spaces to align with `(`
+    AlignSpaces { spaces: usize, contents: Box<Doc> },
+
     /// Try to fit content on one line; if doesn't fit, break ALL lines in group
     /// This is the key primitive for prettier's "all-or-nothing" breaking
     ///
@@ -287,6 +296,9 @@ pub(super) struct Command<'a> {
     /// When Some(n), uses n instead of config.base_indent_offset.
     /// Propagated to child commands when set via WithContext.
     pub base_indent_override: Option<usize>,
+    /// Additional alignment spaces after tabs (Prettier-style alignment).
+    /// Used for aligning closing delimiters with opening delimiters.
+    pub align_spaces: usize,
 }
 
 impl<'a> Command<'a> {
@@ -297,10 +309,14 @@ impl<'a> Command<'a> {
     }
 
     /// Create a command with incremented indent
+    ///
+    /// Resets align_spaces to 0 because indent starts a new "scope" where
+    /// alignment is relative to the new indent level, not the parent's alignment.
     #[inline]
     pub fn indented(&self, doc: &'a Doc) -> Self {
         Self {
             indent: self.indent + 1,
+            align_spaces: 0, // Reset alignment when entering new indent level
             doc,
             ..*self
         }
@@ -319,7 +335,11 @@ impl<'a> Command<'a> {
     /// Create a command with absolute indent level
     #[inline]
     pub fn with_indent(&self, indent: usize, doc: &'a Doc) -> Self {
-        Self { indent, doc, ..*self }
+        Self {
+            indent,
+            doc,
+            ..*self
+        }
     }
 
     /// Create a command with a specific mode
@@ -334,6 +354,16 @@ impl<'a> Command<'a> {
         Self {
             doc,
             base_indent_override,
+            ..*self
+        }
+    }
+
+    /// Create a command with additional alignment spaces
+    #[inline]
+    pub fn with_align_spaces(&self, spaces: usize, doc: &'a Doc) -> Self {
+        Self {
+            doc,
+            align_spaces: self.align_spaces + spaces,
             ..*self
         }
     }

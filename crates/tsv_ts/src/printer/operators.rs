@@ -232,27 +232,39 @@ impl<'a> Printer<'a> {
     /// Common logic for building binary chain (shared by flat and continuation indent styles)
     ///
     /// Returns (head_parts, continuation_parts) where head includes first operand + operator.
+    ///
+    /// The `restrict_short_binaries` parameter controls behavior for 2-operand non-logical binaries:
+    /// - `true`: Use spaces (no breaks) for these expressions. Used in Svelte template expressions
+    ///   where Prettier keeps short binaries like `typeof x === 'string'` on one line.
+    /// - `false`: Allow breaks for all binaries. Used in script contexts where Prettier breaks
+    ///   long string concat like `'aaa...' + 'bbb...'` at the operator.
     fn build_binary_chain_parts(
         &self,
         operands: &[ChainOperand],
         operators: &[BinaryOperator],
+        restrict_short_binaries: bool,
     ) -> (Vec<Doc>, Vec<Doc>) {
         if operands.is_empty() || operands.len() == 1 {
             // Edge cases handled by callers
             return (Vec::new(), Vec::new());
         }
 
-        // For 2-operand binaries with non-logical operators, use space (no break)
-        // to prevent ugly breaks like `typeof x ===\n  'string'`.
-        // Logical operators (&&, ||) and longer chains use line() to allow breaking.
-        let first_op = operators.first().copied().unwrap_or(BinaryOperator::Plus);
-        let allow_breaks = operands.len() > 2 || first_op.is_logical();
-
         // First operand + first operator (stays at base indent)
         let mut head_parts = vec![operands[0].doc.clone()];
 
         let first_op = operators[0];
         let first_op_str = first_op.as_str();
+
+        // Determine whether to allow line breaks between operands
+        let allow_breaks = if restrict_short_binaries {
+            // In Svelte template expressions, use the restrictive heuristic:
+            // Only allow breaks for longer chains or logical operators
+            operands.len() > 2 || first_op.is_logical()
+        } else {
+            // In script contexts, always allow breaks - the print width algorithm
+            // decides when to actually break
+            true
+        };
         let first_op_pos =
             self.find_operator_position(operands[0].span.end, operands[1].span.start, first_op_str);
 
@@ -330,8 +342,9 @@ impl<'a> Printer<'a> {
             return operands[0].doc.clone();
         }
 
+        // In script contexts (flat style), allow all breaks - print width decides
         let (mut head_parts, continuation_parts) =
-            self.build_binary_chain_parts(operands, operators);
+            self.build_binary_chain_parts(operands, operators, false);
 
         // Combine: head + continuation (NO internal indent)
         // The parent context (assignment, etc.) provides the indent wrapper.
@@ -368,7 +381,9 @@ impl<'a> Printer<'a> {
         operands: &[ChainOperand],
         operators: &[BinaryOperator],
     ) -> Doc {
-        let (first_parts, continuation_parts) = self.build_binary_chain_parts(operands, operators);
+        // In Svelte template expressions, use restrictive behavior for short binaries
+        let (first_parts, continuation_parts) =
+            self.build_binary_chain_parts(operands, operators, true);
 
         // Combine: first_parts + indent(continuation_parts)
         doc::concat(vec![

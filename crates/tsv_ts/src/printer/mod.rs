@@ -43,11 +43,12 @@ mod utils;
 pub(crate) use analysis::{
     PatternContext, build_entity_name_doc, conditional_needs_fluid_layout, has_multiline_content,
     is_brace_block_multiline, is_module_path_fluid_call, is_multiline_string_literal,
-    is_plain_require_call, is_pure_property_chain, object_pattern_should_expand,
-    template_literal_has_newlines,
+    is_plain_require_call, is_pure_property_chain, is_string_literal,
+    object_pattern_should_expand, template_literal_has_newlines,
 };
 pub(crate) use assignment::{
-    is_poorly_breakable_chain, is_self_expanding_value, is_simple_self_expanding,
+    is_curried_arrow_with_return_type, is_poorly_breakable_chain, is_self_expanding_value,
+    is_simple_self_expanding, is_type_assertion_call,
 };
 pub(crate) use comments::{CommentFilter, CommentSpacing};
 pub(crate) use needs_parens::{ParenContext, needs_parens};
@@ -98,6 +99,10 @@ pub struct Printer<'a> {
     /// Used to collapse blank lines - in template interpolations, blank lines are
     /// normalized to single line breaks rather than preserved.
     pub(crate) in_template_interpolation: Cell<bool>,
+    /// Whether we're inside a curried arrow function with return type.
+    /// When true, nested arrows always break after `=>` regardless of their own return type.
+    /// Used for: const f = (x: T): H => (y) => expr - ALL arrows break, not just the typed ones.
+    pub(crate) in_curried_typed_arrow: Cell<bool>,
 }
 
 impl<'a> Printer<'a> {
@@ -120,6 +125,7 @@ impl<'a> Printer<'a> {
             in_top_level_assignment: Cell::new(false),
             force_chain_expand: Cell::new(false),
             in_template_interpolation: Cell::new(false),
+            in_curried_typed_arrow: Cell::new(false),
         }
     }
 
@@ -407,6 +413,28 @@ impl<'a> Printer<'a> {
         has_line_comments_in_range(self.comments, start, end)
     }
 
+    /// Check if a delimited list (tuple, type params, etc.) has line comments
+    /// between any elements OR after the last element.
+    ///
+    /// Used to determine if a list should be forced to multiline formatting.
+    pub(crate) fn has_line_comments_in_delimited_list<T, F>(
+        &self,
+        items: &[T],
+        get_span: F,
+        end_boundary: u32,
+    ) -> bool
+    where
+        F: Fn(&T) -> tsv_lang::Span,
+    {
+        let between = items.windows(2).any(|pair| {
+            self.has_line_comments_between(get_span(&pair[0]).end, get_span(&pair[1]).start)
+        });
+        let trailing = items
+            .last()
+            .is_some_and(|last| self.has_line_comments_between(get_span(last).end, end_boundary));
+        between || trailing
+    }
+
     /// Find the closing `)` between a start position and end boundary.
     ///
     /// Scans the source to find the `)` that closes the params. Returns
@@ -653,14 +681,19 @@ impl<'a> Printer<'a> {
             if matches!(statement, internal::Statement::EmptyStatement(_)) {
                 // Force non-inline: since we're skipping the semicolon, any "inline" comments
                 // (on same line as the semicolon) have nothing to be inline with
-                let comments_doc =
-                    self.build_leading_comments_doc(prev_end, statement.span().end, !has_output, true);
+                let comments_doc = self.build_leading_comments_doc(
+                    prev_end,
+                    statement.span().end,
+                    !has_output,
+                    true,
+                );
                 if !is_empty_doc(&comments_doc) {
                     if has_output {
                         // Check for blank line before the first comment (same as regular statements)
-                        let first_comment_start = comments_in_range(self.comments, prev_end, statement.span().end)
-                            .next()
-                            .map(|c| c.span.start);
+                        let first_comment_start =
+                            comments_in_range(self.comments, prev_end, statement.span().end)
+                                .next()
+                                .map(|c| c.span.start);
                         let check_end = first_comment_start.unwrap_or_else(|| statement.span().end);
 
                         if printing::has_blank_line_between(self.source, prev_end, check_end) {
@@ -680,9 +713,10 @@ impl<'a> Printer<'a> {
                 // Check for blank line before the next item:
                 // - If there are comments, check before the first comment
                 // - If no comments, check before the statement
-                let first_comment_start = comments_in_range(self.comments, prev_end, statement.span().start)
-                    .next()
-                    .map(|c| c.span.start);
+                let first_comment_start =
+                    comments_in_range(self.comments, prev_end, statement.span().start)
+                        .next()
+                        .map(|c| c.span.start);
                 let check_end = first_comment_start.unwrap_or_else(|| statement.span().start);
 
                 if printing::has_blank_line_between(self.source, prev_end, check_end) {
@@ -693,8 +727,12 @@ impl<'a> Printer<'a> {
             }
 
             // Leading comments (allow inline comments since statement will be printed)
-            let leading_doc =
-                self.build_leading_comments_doc(prev_end, statement.span().start, !has_output, false);
+            let leading_doc = self.build_leading_comments_doc(
+                prev_end,
+                statement.span().start,
+                !has_output,
+                false,
+            );
             if !is_empty_doc(&leading_doc) {
                 parts.push(leading_doc);
             }
@@ -823,10 +861,7 @@ impl<'a> Printer<'a> {
                     docs.push(self.build_comment_doc(comment));
                 } else {
                     // Line comments go in line_suffix, don't affect width
-                    docs.push(doc::line_suffix(doc::concat(vec![
-                        doc::text(" "),
-                        self.build_comment_doc(comment),
-                    ])));
+                    docs.push(self.build_trailing_line_comment_doc(comment));
                 }
             } else {
                 break;

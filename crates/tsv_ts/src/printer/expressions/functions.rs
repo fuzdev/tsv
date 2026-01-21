@@ -6,7 +6,7 @@
 //
 // Note: Block statements are in blocks.rs as a reusable utility
 
-use super::{ParenContext, Printer, needs_parens};
+use super::{ParenContext, Printer, needs_parens, unwrap_parenthesized};
 use crate::ast::internal;
 use tsv_lang::doc::{self, Doc};
 use tsv_lang::printing::is_same_line;
@@ -180,8 +180,15 @@ impl<'a> Printer<'a> {
                 let has_post_arrow_comments = self.has_comments_between(arrow_end, body_start);
 
                 // Prettier's `shouldPutBodyOnSameLine`: certain expression types stay hugged to =>
-                // Object/array literals and nested arrows don't break after =>
-                let should_hug = !has_post_arrow_comments && should_hug_arrow_body(expr);
+                // Object/array literals always hug.
+                // Nested arrows hug ONLY when outer has no return type annotation.
+                // With return type: const f = (x: T): H => (y) => expr; // breaks
+                // Without:          const f = (x: T) => (y) => expr;    // hugs
+                let is_arrow_body =
+                    matches!(&**expr, internal::Expression::ArrowFunctionExpression(_));
+                let should_hug = !has_post_arrow_comments
+                    && should_hug_arrow_body(expr)
+                    && !(is_arrow_body && arrow.return_type.is_some());
 
                 if has_post_arrow_comments {
                     // Build body doc with leading comments - always breaks
@@ -197,6 +204,33 @@ impl<'a> Printer<'a> {
                     let body_doc = self.build_arrow_body_doc(expr);
                     parts.push(doc::text(" "));
                     parts.push(body_doc);
+                } else if is_arrow_body
+                    && (arrow.return_type.is_some() || self.in_curried_typed_arrow.get())
+                {
+                    // Curried arrow chain - all arrows break without indent so they align:
+                    // const f = (x: T): H => (y) => expr
+                    // becomes:
+                    // const f =
+                    //     (x: T): H =>
+                    //     (y) =>
+                    //         expr
+                    //
+                    // Set context flag when entering chain (typed arrow), restore when done.
+                    let was_in_curried = self.in_curried_typed_arrow.get();
+                    if arrow.return_type.is_some() {
+                        self.in_curried_typed_arrow.set(true);
+                    }
+                    let body_doc = self.build_arrow_body_doc(expr);
+                    self.in_curried_typed_arrow.set(was_in_curried);
+                    parts.push(doc::concat(vec![doc::hardline(), body_doc]));
+                } else if self.in_curried_typed_arrow.get() {
+                    // Innermost arrow in curried chain - body is NOT another arrow.
+                    // This needs indent since it's the final expression.
+                    let body_doc = self.build_arrow_body_doc(expr);
+                    parts.push(doc::indent(doc::concat(vec![
+                        doc::hardline(),
+                        body_doc,
+                    ])));
                 } else {
                     // Normal expression: can break after => with indentation
                     // Short: (x) => x + 1
@@ -249,7 +283,19 @@ impl<'a> Printer<'a> {
     ///            | A
     ///            | B
     ///            | C =>
+    ///
+    /// Function types as return types get wrapped in parentheses for disambiguation:
+    /// `(x: T): ((y: T) => U) =>` not `(x: T): (y: T) => U =>`
     fn build_arrow_return_type_doc(&self, annotation: &internal::TSTypeAnnotation) -> Doc {
+        // Function types need parentheses to disambiguate from the arrow's `=>`
+        // Example: `(x: T): ((y: T) => U) =>` not `(x: T): (y: T) => U =>`
+        // Unwrap any explicit parenthesized types to check the inner type
+        let inner_type = unwrap_parenthesized(&annotation.type_annotation);
+        if matches!(inner_type, internal::TSType::Function(_)) {
+            let type_doc = self.build_type_doc(inner_type);
+            return doc::concat(vec![doc::text(": ("), type_doc, doc::text(")")]);
+        }
+
         // Use return type version - only wraps for complex type args (unions/intersections)
         // Simple cases like Promise<void> let params break first
         self.build_type_annotation_doc_for_return_type(annotation)
@@ -393,13 +439,13 @@ impl<'a> Printer<'a> {
                     doc::text("("),
                     self.build_expression_doc(&as_expr.expression),
                     doc::text(") as "),
-                    self.build_type_doc(&as_expr.type_annotation),
+                    self.build_type_doc_with_wrapping_type_args(&as_expr.type_annotation),
                 ]),
                 TypeAssertionWithObject::Satisfies(sat_expr) => doc::concat(vec![
                     doc::text("("),
                     self.build_expression_doc(&sat_expr.expression),
                     doc::text(") satisfies "),
-                    self.build_type_doc(&sat_expr.type_annotation),
+                    self.build_type_doc_with_wrapping_type_args(&sat_expr.type_annotation),
                 ]),
             };
         }
@@ -760,13 +806,10 @@ impl<'a> Printer<'a> {
                 inner_parts.push(doc::text(","));
             }
 
-            // Line comments (any position) go after comma, wrapped in line_suffix
+            // Line comments (any position) go after comma (excluded from width)
             // Block comments AFTER comma are handled as leading for next param
             for comment in same_line_comments.iter().filter(|c| !c.is_block) {
-                inner_parts.push(doc::line_suffix(doc::concat(vec![
-                    doc::text(" "),
-                    self.build_comment_doc(comment),
-                ])));
+                inner_parts.push(self.build_trailing_line_comment_doc(comment));
             }
         }
 

@@ -3,9 +3,10 @@
 use super::Printer;
 use crate::ast::internal::{self, Expression};
 use crate::printer::{
-    ParenContext, conditional_needs_fluid_layout, is_module_path_fluid_call,
-    is_multiline_string_literal, is_plain_require_call, is_poorly_breakable_chain,
-    is_pure_property_chain, is_self_expanding_value, is_simple_self_expanding, needs_parens,
+    ParenContext, conditional_needs_fluid_layout, is_curried_arrow_with_return_type,
+    is_module_path_fluid_call, is_multiline_string_literal, is_plain_require_call,
+    is_poorly_breakable_chain, is_pure_property_chain, is_self_expanding_value,
+    is_simple_self_expanding, is_string_literal, is_type_assertion_call, needs_parens,
 };
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc;
@@ -23,28 +24,47 @@ impl<'a> Printer<'a> {
     /// Build a doc for a variable binding pattern with optional definite assignment assertion.
     ///
     /// For identifiers with `definite: true`, builds doc for `name!: type` instead of `name: type`.
-    /// Uses wrapping type annotations so TypeReference type arguments break internally.
+    /// Uses wrapping type annotations so TypeReference type arguments break internally when needed.
     fn build_variable_binding_doc(&self, id: &Expression, definite: bool) -> doc::Doc {
         if definite {
             if let Expression::Identifier(ident) = id {
-                let mut parts = vec![doc::symbol(ident.name.to_u32()), doc::text("!")];
-
-                if let Some(type_annotation) = &ident.type_annotation {
-                    // Use wrapping version for TypeReference type args
-                    parts.push(self.build_type_annotation_doc_wrapping(type_annotation));
-                }
-
-                doc::concat(parts)
+                self.build_typed_identifier_doc(ident, true, true)
             } else {
                 // Destructuring patterns don't support definite assignment
                 self.build_expression_doc(id)
             }
         } else if let Expression::Identifier(ident) = id {
-            // Use wrapping version for identifiers so TypeReference type args break internally
             self.build_identifier_doc_with_wrapping_type(ident)
         } else {
             self.build_expression_doc(id)
         }
+    }
+
+    /// Build doc for an identifier with type annotation, configurable wrapping.
+    ///
+    /// - `definite`: include `!` after name
+    /// - `wrap_type`: use wrapping type annotation (breaks internally) vs non-wrapping (stays on one line)
+    fn build_typed_identifier_doc(
+        &self,
+        ident: &internal::Identifier,
+        definite: bool,
+        wrap_type: bool,
+    ) -> doc::Doc {
+        let mut parts = vec![doc::symbol(ident.name.to_u32())];
+        if definite {
+            parts.push(doc::text("!"));
+        }
+        if ident.optional {
+            parts.push(doc::text("?"));
+        }
+        if let Some(type_ann) = &ident.type_annotation {
+            if wrap_type {
+                parts.push(self.build_type_annotation_doc_wrapping(type_ann));
+            } else {
+                parts.push(self.build_type_annotation_doc(type_ann));
+            }
+        }
+        doc::concat(parts)
     }
 
     /// Build a Doc for a variable declaration statement
@@ -216,8 +236,17 @@ impl<'a> Printer<'a> {
                     || is_pure_property_chain(init)
                     || is_poorly_breakable_chain(init, self.source, self.config.print_width)
                     || matches!(init, Expression::BinaryExpression(_))
-                    || conditional_needs_fluid_layout(init))
+                    || conditional_needs_fluid_layout(init)
+                    || is_string_literal(init))
                     && !is_self_expanding_value(init);
+
+                // Type assertion calls with LHS type annotation need special fluid handling
+                // (handled separately below because they need non-wrapping LHS type)
+                let is_type_assertion_with_lhs_type = is_type_assertion_call(
+                    init,
+                    self.source,
+                    self.config.print_width,
+                ) && matches!(&declarator.id, Expression::Identifier(id) if id.type_annotation.is_some());
 
                 let is_simple_rhs_with_breakable_lhs =
                     can_break_left && is_simple_self_expanding(init);
@@ -234,6 +263,9 @@ impl<'a> Printer<'a> {
                 // Check for line comments after = which force a break
                 let has_line_comments_after_eq =
                     self.has_line_comments_between(equals_pos + 1, init_start);
+
+                // Curried arrows with return type always break after `=`
+                let is_curried_arrow = is_curried_arrow_with_return_type(init);
 
                 if is_multiline_string || has_line_comments_after_eq {
                     // Multiline strings or line comments: mandatory break after `=`
@@ -277,6 +309,14 @@ impl<'a> Printer<'a> {
                         },
                         wrap_init_doc(self.build_expression_doc(init), init),
                     ])));
+                } else if is_curried_arrow {
+                    // Curried arrow with return type: mandatory break after `=`
+                    // The arrow expression formatter handles the rest of the breaking
+                    parts.push(doc::text(" ="));
+                    parts.push(doc::indent(doc::concat(vec![
+                        doc::hardline(),
+                        wrap_init_doc(self.build_expression_doc(init), init),
+                    ])));
                 } else if (has_complex_type_annotation
                     || has_complex_destructuring
                     || is_arrow_with_breakable_left)
@@ -285,35 +325,18 @@ impl<'a> Printer<'a> {
                     // Break-lhs layout: LHS breaks internally, `=` stays on same line with RHS
                     // Only applies to first declarator or multi-declarator with breaks
                     //
-                    // Three cases:
-                    // 1. Complex type annotations: Need wrapping version - rebuild with `build_type_annotation_doc_wrapping()`
-                    // 2. Complex destructuring: Regular doc already correct (pattern handles breaking)
-                    // 3. Arrow function with breakable LHS: Regular doc already correct (has line elements)
-
-                    // Only rebuild for complex type annotations - others use the id_doc we already built
+                    // For complex type annotations, rebuild with wrapping type.
+                    // Complex destructuring and arrow with breakable left already have correct id_doc.
                     if has_complex_type_annotation
-                        && matches!(&declarator.id, Expression::Identifier(_))
+                        && let Expression::Identifier(ident) = &declarator.id
                     {
-                        // Complex type annotation: build custom doc with wrapping
-                        if let Expression::Identifier(ident) = &declarator.id {
-                            let mut id_parts = vec![doc::symbol(ident.name.to_u32())];
-                            if declarator.definite {
-                                id_parts.push(doc::text("!"));
-                            }
-                            if ident.optional {
-                                id_parts.push(doc::text("?"));
-                            }
-                            if let Some(type_ann) = &ident.type_annotation {
-                                id_parts.push(self.build_type_annotation_doc_wrapping(type_ann));
-                            }
-                            let id_doc_wrapping = doc::concat(id_parts);
-
-                            // Replace the regular id_doc with wrapping version
-                            parts.pop();
-                            parts.push(id_doc_wrapping);
-                        }
+                        parts.pop();
+                        parts.push(self.build_typed_identifier_doc(
+                            ident,
+                            declarator.definite,
+                            true, // wrap_type
+                        ));
                     }
-                    // else: Complex destructuring or arrow with breakable left already have correct id_doc in parts
 
                     // Add ` = rightDoc` (right side grouped)
                     parts.push(doc::text(" = "));
@@ -326,11 +349,22 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_inline_comments_between_doc(equals_pos + 1, init_start));
                     parts.push(doc::text(" "));
                     parts.push(wrap_init_doc(self.build_expression_doc(init), init));
-                } else if needs_break_after_operator {
-                    // Break-after-operator layout with nested groups - matches prettier exactly
-                    // Structure: group([leftParts, " =", group(indent([line, init]))])
+                } else if needs_break_after_operator || is_type_assertion_with_lhs_type {
+                    // Break-after-operator layout: group([leftParts, " =", group(indent([line, init]))])
                     // The inner group for init evaluates independently based on remaining width.
-                    // This allows the type annotation to expand while keeping `} = init` together.
+                    //
+                    // For type assertion calls with LHS type annotation, rebuild with non-wrapping
+                    // type so the LHS type stays together when breaking after `=`.
+                    if is_type_assertion_with_lhs_type
+                        && let Expression::Identifier(ident) = &declarator.id
+                    {
+                        parts.pop();
+                        parts.push(self.build_typed_identifier_doc(
+                            ident,
+                            declarator.definite,
+                            false, // non-wrapping
+                        ));
+                    }
                     parts.push(doc::text(" ="));
                     parts.push(doc::group(doc::indent(doc::concat(vec![
                         doc::line(),

@@ -7,7 +7,7 @@ use super::calls::{
     wrap_call_with_soft_breaks,
 };
 use super::utils::{
-    has_multiple_function_args, last_arg_is_array_or_object, preceding_args_are_short,
+    has_multiple_function_args, last_arg_is_array_or_object, preceding_args_allow_hug,
 };
 use super::{ParenContext, Printer, has_multiline_content, needs_parens};
 use crate::ast::internal;
@@ -132,7 +132,7 @@ impl<'a> Printer<'a> {
             let arg_docs: Vec<_> = new_expr
                 .arguments
                 .iter()
-                .map(|arg| self.build_expression_doc(arg))
+                .map(|arg| self.build_arg_expression_doc(arg))
                 .collect();
             let arg_parts = doc::join_doc(arg_docs, doc::comma_hardline());
 
@@ -150,7 +150,7 @@ impl<'a> Printer<'a> {
             let arg_docs: Vec<_> = new_expr
                 .arguments
                 .iter()
-                .map(|arg| self.build_expression_doc(arg))
+                .map(|arg| self.build_arg_expression_doc(arg))
                 .collect();
             let arg_parts = doc::join_doc(arg_docs, doc::comma_hardline());
 
@@ -160,31 +160,28 @@ impl<'a> Printer<'a> {
         // "First args inline with last array/object" pattern (same as CallExpression):
         // When last arg is array/object and preceding args are short,
         // keep short args inline with the opening bracket/brace
-        if new_expr.arguments.len() >= 2 && last_arg_is_array_or_object(&new_expr.arguments) {
-            // Skip this pattern if there are inter-argument comments
-            let has_inter_arg_comments =
-                has_inter_argument_comments_slice(&new_expr.arguments, self);
+        if new_expr.arguments.len() >= 2
+            && last_arg_is_array_or_object(&new_expr.arguments)
+            && preceding_args_allow_hug(&new_expr.arguments, self.source)
+            && !has_inter_argument_comments_slice(&new_expr.arguments, self)
+        {
+            let (head_parts, last_arg_doc, _) = build_args_split_last(&new_expr.arguments, self);
 
-            if preceding_args_are_short(&new_expr.arguments) && !has_inter_arg_comments {
-                let (head_parts, last_arg_doc, _) =
-                    build_args_split_last(&new_expr.arguments, self);
-
-                // Keep short args inline with last arg's opener
-                return doc::group(doc::concat(vec![
-                    callee_with_types,
-                    doc::text("("),
-                    doc::concat(head_parts),
-                    last_arg_doc,
-                    doc::text(")"),
-                ]));
-            }
+            // Keep short args inline with last arg's opener
+            return doc::group(doc::concat(vec![
+                callee_with_types,
+                doc::text("("),
+                doc::concat(head_parts),
+                last_arg_doc,
+                doc::text(")"),
+            ]));
         }
 
         // Build args with line separators (one per line when broken)
         let arg_docs: Vec<_> = new_expr
             .arguments
             .iter()
-            .map(|arg| self.build_expression_doc(arg))
+            .map(|arg| self.build_arg_expression_doc(arg))
             .collect();
         let arg_parts = doc::join_doc(arg_docs, doc::comma_line());
 

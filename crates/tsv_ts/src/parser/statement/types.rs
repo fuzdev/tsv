@@ -27,8 +27,20 @@ impl<'a> Parser<'a> {
 
     /// Parse a complete type expression (handles unions and conditional types at top level)
     pub(in crate::parser) fn parse_type(&mut self) -> Result<TSType, ParseError> {
+        self.parse_type_inner(false)
+    }
+
+    /// Parse a type in expression context (after `as` or `satisfies`).
+    /// Does not consume `[` across a line terminator to respect ASI.
+    /// Example: `x as A\n[B]` → ASI splits into `x as A;` and `[B];`
+    pub(in crate::parser) fn parse_type_no_asi_bracket(&mut self) -> Result<TSType, ParseError> {
+        self.parse_type_inner(true)
+    }
+
+    /// Internal type parsing with ASI control
+    fn parse_type_inner(&mut self, respect_asi_bracket: bool) -> Result<TSType, ParseError> {
         let start = self.current_pos().0;
-        let check_type = self.parse_union_type()?;
+        let check_type = self.parse_union_type_inner(respect_asi_bracket)?;
 
         // Check for conditional type: `T extends U ? V : W`
         if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
@@ -61,6 +73,11 @@ impl<'a> Parser<'a> {
 
     /// Parse union type: `A | B | C` or `| A | B | C`
     fn parse_union_type(&mut self) -> Result<TSType, ParseError> {
+        self.parse_union_type_inner(false)
+    }
+
+    /// Internal union type parsing with ASI control
+    fn parse_union_type_inner(&mut self, respect_asi_bracket: bool) -> Result<TSType, ParseError> {
         let start = self.current_pos().0;
 
         // Handle leading pipe: `| A | B`
@@ -69,12 +86,13 @@ impl<'a> Parser<'a> {
             self.advance()?; // consume leading '|'
         }
 
-        let first = self.parse_intersection_type()?;
+        let first = self.parse_intersection_type_inner(respect_asi_bracket)?;
 
         if !has_leading_pipe && !self.check(&TokenKind::Pipe) {
             return Ok(first);
         }
 
+        // After the first type, ASI no longer applies (we're in a union context)
         let mut types = vec![first];
         while self.check(&TokenKind::Pipe) {
             self.advance()?; // consume '|'
@@ -90,6 +108,14 @@ impl<'a> Parser<'a> {
 
     /// Parse intersection type: `A & B & C` or `& A & B & C`
     fn parse_intersection_type(&mut self) -> Result<TSType, ParseError> {
+        self.parse_intersection_type_inner(false)
+    }
+
+    /// Internal intersection type parsing with ASI control
+    fn parse_intersection_type_inner(
+        &mut self,
+        respect_asi_bracket: bool,
+    ) -> Result<TSType, ParseError> {
         let start = self.current_pos().0;
 
         // Handle leading ampersand: `& A & B`
@@ -98,12 +124,13 @@ impl<'a> Parser<'a> {
             self.advance()?; // consume leading '&'
         }
 
-        let first = self.parse_array_type()?;
+        let first = self.parse_array_type_inner(respect_asi_bracket)?;
 
         if !has_leading_amp && !self.check(&TokenKind::Ampersand) {
             return Ok(first);
         }
 
+        // After the first type, ASI no longer applies (we're in an intersection context)
         let mut types = vec![first];
         while self.check(&TokenKind::Ampersand) {
             self.advance()?; // consume '&'
@@ -119,8 +146,23 @@ impl<'a> Parser<'a> {
 
     /// Parse array type suffix `T[]` or indexed access type `T[K]`
     fn parse_array_type(&mut self) -> Result<TSType, ParseError> {
+        self.parse_array_type_inner(false)
+    }
+
+    /// Internal array type parsing with ASI control.
+    /// When `respect_asi_bracket` is true, we don't consume `[` if there's a line terminator
+    /// before it (ASI would insert a semicolon there in expression context).
+    fn parse_array_type_inner(&mut self, respect_asi_bracket: bool) -> Result<TSType, ParseError> {
         let start = self.current_pos().0;
         let mut result = self.parse_primary_type()?;
+
+        // ASI check: In expression context (after `as`/`satisfies`), if there's a
+        // line terminator before `[`, ASI would insert a semicolon, so the `[`
+        // starts a new statement (array literal), not an indexed access type.
+        // Only matters for the first `[` - subsequent brackets are unambiguous.
+        if respect_asi_bracket && self.check(&TokenKind::BracketOpen) && self.had_line_terminator {
+            return Ok(result);
+        }
 
         // Check for array type suffix [] or indexed access T[K]
         while self.check(&TokenKind::BracketOpen) {
@@ -316,12 +358,17 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse type operator: `keyof T`, `unique symbol`, `readonly T[]`
+    ///
+    /// Type operators bind looser than array `[]` and indexed access `[K]`, so:
+    /// - `keyof A[B]` parses as `keyof (A[B])`, not `(keyof A)[B]`
+    /// - `keyof A[]` parses as `keyof (A[])`, not `(keyof A)[]`
+    /// - `readonly A[B][]` parses as `readonly ((A[B])[])`
     fn parse_type_operator(&mut self, operator: TSTypeOperatorKind) -> Result<TSType, ParseError> {
         let start = self.current_pos().0;
         self.advance()?; // consume the operator keyword (keyof, unique, readonly)
 
-        // Parse the type being operated on
-        let type_annotation = self.parse_primary_type()?;
+        // Parse the type being operated on (including array/indexed access suffixes)
+        let type_annotation = self.parse_array_type()?;
         let end = type_annotation.span().end;
 
         Ok(TSType::TypeOperator(TSTypeOperator {
@@ -2387,7 +2434,9 @@ impl<'a> Parser<'a> {
                 value: None,
                 accessibility,
                 is_static,
+                declare: false,
                 r#abstract: false,
+                r#override: false,
                 readonly,
                 computed,
                 accessor: false,
@@ -2469,22 +2518,27 @@ impl<'a> Parser<'a> {
         self.advance()?;
         let name = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
 
+        // Track the end position as we parse optional parts
+        let mut end = id_end as u32;
+
         // Parse optional constraint: `extends U`
         let constraint = if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
             self.advance()?;
-            Some(Box::new(self.parse_type()?))
+            let constraint_type = self.parse_type()?;
+            end = constraint_type.span().end;
+            Some(Box::new(constraint_type))
         } else {
             None
         };
 
         // Parse optional default: `= V`
         let default = if self.eat(TokenKind::Equals) {
-            Some(Box::new(self.parse_type()?))
+            let default_type = self.parse_type()?;
+            end = default_type.span().end;
+            Some(Box::new(default_type))
         } else {
             None
         };
-
-        let end = self.current_pos().0 as u32;
 
         Ok(TSTypeParameter {
             name,

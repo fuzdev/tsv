@@ -149,6 +149,22 @@ pub fn align(n: usize, doc: Doc) -> Doc {
     }
 }
 
+/// Add alignment spaces after tabs (Prettier-style alignment)
+///
+/// Unlike `indent` which adds tab levels, `align_spaces` adds a fixed number
+/// of spaces after the tabs on each line. Used for aligning closing delimiters
+/// with opening delimiters.
+///
+/// Example: For `| (A & {...})`, when the object breaks, the `)` should align
+/// with the `(`. Since `| ` is 2 chars, we use `align_spaces(2, doc)` to add
+/// 2 spaces of alignment after the tabs.
+pub fn align_spaces(spaces: usize, doc: Doc) -> Doc {
+    Doc::AlignSpaces {
+        spaces,
+        contents: Box::new(doc),
+    }
+}
+
 /// Conditional rendering based on parent group breaking
 pub fn if_break(break_doc: Doc, flat_doc: Doc) -> Doc {
     Doc::IfBreak {

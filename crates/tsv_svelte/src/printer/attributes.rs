@@ -328,6 +328,17 @@ impl<'a> Printer<'a> {
         expr: &tsv_ts::ast::internal::Expression,
         config: &tsv_lang::PrintConfig,
     ) -> Doc {
+        // Assignment expressions need parens in attribute values: prop={(a = b)}
+        if let tsv_ts::ast::internal::Expression::AssignmentExpression(_) = expr {
+            return doc::parens(tsv_ts::build_expression_doc_with_comments(
+                expr,
+                self.source,
+                Rc::clone(&self.interner),
+                config,
+                self.comments,
+            ));
+        }
+
         if let tsv_ts::ast::internal::Expression::BinaryExpression(_) = expr {
             tsv_ts::build_expression_doc_with_continuation_indent(
                 expr,

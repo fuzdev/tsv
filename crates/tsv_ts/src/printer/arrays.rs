@@ -283,15 +283,16 @@ impl<'a> Printer<'a> {
 
                 // Separator comma between elements
                 parts.push(doc::text(","));
-                parts.push(doc::line());
-
-                // Blank line preservation (matches Prettier's strategy):
-                // line: \n+indent (when breaking) or space (when flat)
-                // softline: \n+indent (when breaking) or nothing (when flat)
-                // Result when breaking: first indented line is blank, second has content
-                // Result when flat: space between elements (blank line disappears)
                 if has_blank_after {
-                    parts.push(doc::softline());
+                    // Blank line preservation: empty line (no indent) then content line (with indent)
+                    // Flat mode: just a space (blank line collapses)
+                    // Break mode: literalline (empty) + hardline (indented)
+                    parts.push(doc::if_break(
+                        doc::concat(vec![doc::literalline(), doc::hardline()]),
+                        doc::text(" "),
+                    ));
+                } else {
+                    parts.push(doc::line());
                 }
             } else if has_trailing_elision {
                 // Trailing comma for elision - MUST be preserved (semantically significant)
@@ -389,14 +390,16 @@ impl<'a> Printer<'a> {
                 })
                 .collect();
 
-            // Check for blank line before this element (only if no leading comments)
-            // If there are leading comments, they handle the spacing
-            if i > 0
-                && leading_comments.is_empty()
-                && has_blank_line_between(self.source, prev_end, elem_start)
-            {
-                parts.push(doc::literalline());
-                parts.push(doc::hardline());
+            // Check for blank line before this element or before leading comments
+            if i > 0 {
+                // Check blank line to the first leading comment, or to the element if no comments
+                let blank_check_end = leading_comments
+                    .first()
+                    .map_or(elem_start, |c| c.span.start);
+                if has_blank_line_between(self.source, prev_end, blank_check_end) {
+                    parts.push(doc::literalline());
+                    parts.push(doc::hardline());
+                }
             }
 
             // Add leading comments
@@ -432,16 +435,14 @@ impl<'a> Printer<'a> {
 
             parts.push(doc::text(","));
 
-            // Line comments go after comma
+            // Line comments go after comma (excluded from width calculations)
             for comment in trailing.iter().filter(|c| !c.is_block) {
-                parts.push(doc::text(" "));
-                parts.push(self.build_comment_doc(comment));
+                parts.push(self.build_trailing_line_comment_doc(comment));
             }
 
-            // Check if next element has blank line before it (and no comments in between)
+            // Check if next element has blank line before it or before its leading comments
             // If so, don't add hardline here (blank line will be added at start of next iteration)
-            // If there are comments, we need the hardline so comments appear on next line
-            let next_has_blank_no_comments = if i + 1 < arr.elements.len() {
+            let next_has_blank_before = if i + 1 < arr.elements.len() {
                 let next_elem_start = arr.elements[i + 1].as_ref().map_or_else(
                     || {
                         // Elision: use next element's start or closing bracket
@@ -452,16 +453,17 @@ impl<'a> Printer<'a> {
                     },
                     |e| e.span().start,
                 );
-                let has_comments_before_next =
-                    comments_in_range(self.comments, elem_end, next_elem_start)
-                        .any(|c| !is_same_line(self.source, elem_end, c.span.start));
-                has_blank_line_between(self.source, elem_end, next_elem_start)
-                    && !has_comments_before_next
+                // Check for blank line to first leading comment, or to element if no comments
+                let first_leading_comment = comments_in_range(self.comments, elem_end, next_elem_start)
+                    .find(|c| !is_same_line(self.source, elem_end, c.span.start));
+                let blank_check_boundary = first_leading_comment
+                    .map_or(next_elem_start, |c| c.span.start);
+                has_blank_line_between(self.source, elem_end, blank_check_boundary)
             } else {
                 false
             };
 
-            if i < arr.elements.len() - 1 && !next_has_blank_no_comments {
+            if i < arr.elements.len() - 1 && !next_has_blank_before {
                 parts.push(doc::hardline());
             }
 

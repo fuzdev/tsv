@@ -1509,6 +1509,13 @@ impl<'a> Printer<'a> {
             tag.span.end - 1,   // before "}"
         );
 
+        // Assignment expressions need parens: {@html (a = b)}
+        let expr_doc = if matches!(tag.expression, tsv_ts::Expression::AssignmentExpression(_)) {
+            doc::parens(expr_doc)
+        } else {
+            expr_doc
+        };
+
         doc::concat(vec![doc::text("{@html "), expr_doc, doc::text("}")])
     }
 
@@ -1866,13 +1873,25 @@ impl<'a> Printer<'a> {
         // Unlike Prettier which uses removeLines() to force single-line, we let
         // expressions wrap naturally when they exceed print_width. This matches
         // how TypeScript formats the same expressions in <script> tags.
-        let expr_doc = tsv_ts::build_expression_doc_with_comments(
-            expr,
-            self.source,
-            Rc::clone(&self.interner),
-            &block_config,
-            self.comments,
-        );
+        //
+        // Assignment expressions need parens in block conditions: {#if (a = b)}
+        let expr_doc = if matches!(expr, tsv_ts::Expression::AssignmentExpression(_)) {
+            doc::parens(tsv_ts::build_expression_doc_with_comments(
+                expr,
+                self.source,
+                Rc::clone(&self.interner),
+                &block_config,
+                self.comments,
+            ))
+        } else {
+            tsv_ts::build_expression_doc_with_comments(
+                expr,
+                self.source,
+                Rc::clone(&self.interner),
+                &block_config,
+                self.comments,
+            )
+        };
 
         // Build docs for trailing comments
         let trailing_docs: Vec<Doc> =

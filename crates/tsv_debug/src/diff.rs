@@ -53,15 +53,15 @@ impl DiffLabels {
         }
     }
 
-    /// Labels for idempotency checks (formatted vs input file)
+    /// Labels for idempotency checks (formatted-actual vs input-expected)
     ///
-    /// Uses neutral terms since the input file's origin varies:
-    /// - Normal fixtures: input = prettier's output
-    /// - Divergence fixtures: input = our expected output
+    /// Uses standard testing terminology (actual vs expected):
+    /// - formatted-actual: what our formatter produces
+    /// - input-expected: the target output (input file must format to itself)
     pub const fn idempotency() -> Self {
         Self {
-            left_term: "formatted",
-            right_term: "input",
+            left_term: "formatted-actual",
+            right_term: "input-expected",
         }
     }
 
@@ -500,7 +500,8 @@ pub fn diff_to_string(expected: &str, actual: &str, options: &DiffOptions) -> St
                     } else {
                         // No width suffix for lines at or below threshold
                         if options.color {
-                            let _ = writeln!(output, "{INDENT}{code}{sign}{display_content}{reset}");
+                            let _ =
+                                writeln!(output, "{INDENT}{code}{sign}{display_content}{reset}");
                         } else {
                             let _ = writeln!(output, "{INDENT}{sign}{display_content}");
                         }
@@ -887,13 +888,13 @@ mod tests {
             "AST diff mode should use 'original-only'/'formatted-only' labels. Got: {output}"
         );
 
-        // Test idempotency labels (neutral: formatted vs input)
+        // Test idempotency labels (actual vs expected)
         let mut options = DiffOptions::idempotency();
         options.color = false;
         let output = diff_to_string(left, right, &options);
         assert!(
-            output.contains("-1 formatted, +1 input"),
-            "Idempotency mode should use 'formatted'/'input' labels. Got: {output}"
+            output.contains("-1 formatted-actual, +1 input-expected"),
+            "Idempotency mode should use 'formatted-actual'/'input-expected' labels. Got: {output}"
         );
     }
 

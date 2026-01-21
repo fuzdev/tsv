@@ -430,18 +430,25 @@ impl<'a> Printer<'a> {
             parts.push(dec_doc);
         }
 
+        // Declare modifier (comes first, before accessibility)
+        if prop.declare {
+            parts.push(doc::text("declare "));
+        }
+
         // Accessibility modifier
         if let Some(accessibility) = &prop.accessibility {
-            match accessibility {
-                internal::Accessibility::Public => parts.push(doc::text("public ")),
-                internal::Accessibility::Private => parts.push(doc::text("private ")),
-                internal::Accessibility::Protected => parts.push(doc::text("protected ")),
-            }
+            parts.push(doc::text(accessibility.as_str()));
+            parts.push(doc::text(" "));
         }
 
         // Static modifier
         if prop.is_static {
             parts.push(doc::text("static "));
+        }
+
+        // Override modifier
+        if prop.r#override {
+            parts.push(doc::text("override "));
         }
 
         // Abstract modifier

@@ -107,6 +107,8 @@ pub enum ValidationError {
     NormalizationUnformattedNotNormalized(String),
     #[error("{0} doesn't normalize to input.svelte")]
     NormalizationUnformattedOursNotNormalized(String),
+    #[error("{0} normalizes to input.svelte with prettier (should use unformatted_* instead)")]
+    NormalizationUnformattedOursPrettierAlsoNormalizes(String),
 
     // Duplicates (within fixture)
     #[error("Duplicate unformatted files: {}", .0.join(", "))]
@@ -194,6 +196,9 @@ impl ValidationError {
             Self::NormalizationUnformattedPrettierMismatch(_) => {
                 "Prettier doesn't normalize to input.svelte - check prettier behavior"
             }
+            Self::NormalizationUnformattedOursPrettierAlsoNormalizes(_) => {
+                "Rename to unformatted_*.* (prettier also normalizes this to input)"
+            }
             Self::DuplicateUnformattedWithinFixture(_)
             | Self::DuplicatePrettierQuirkWithinFixture(_) => {
                 "Remove duplicate files (identical content)"
@@ -257,7 +262,8 @@ impl ValidationError {
             | Self::NormalizationPrettierQuirkNotNormalized(_)
             | Self::NormalizationUnformattedNotNormalized(_)
             | Self::NormalizationUnformattedOursNotNormalized(_)
-            | Self::NormalizationUnformattedPrettierMismatch(_) => "Normalization",
+            | Self::NormalizationUnformattedPrettierMismatch(_)
+            | Self::NormalizationUnformattedOursPrettierAlsoNormalizes(_) => "Normalization",
 
             Self::DuplicateUnformattedWithinFixture(_)
             | Self::DuplicatePrettierQuirkWithinFixture(_)
@@ -851,7 +857,10 @@ async fn validate_formatter_prettier(
             if expected_prettier != formatted {
                 result.add_error(ValidationError::FormatterOutputPrettierOutdated);
                 diff::print_diff_with_options(
-                    &format!("outdated: {}/{}", fixture.relative_path, output_prettier_filename),
+                    &format!(
+                        "outdated: {}/{}",
+                        fixture.relative_path, output_prettier_filename
+                    ),
                     &expected_prettier,
                     &formatted,
                     &diff::DiffOptions::freshness(),
@@ -866,7 +875,10 @@ async fn validate_formatter_prettier(
         if formatted != *input {
             result.add_error(ValidationError::FormatterInputDiffersFromPrettier);
             diff::print_diff_with_options(
-                &format!("prettier mismatch: {}/{}", fixture.relative_path, fixture.input_file),
+                &format!(
+                    "prettier mismatch: {}/{}",
+                    fixture.relative_path, fixture.input_file
+                ),
                 input,
                 &formatted,
                 &diff::DiffOptions::input_vs_prettier(),
@@ -902,7 +914,10 @@ async fn validate_normalization_prettier(
                         quirk_name.clone(),
                     ));
                     diff::print_diff_with_options(
-                        &format!("quirk not preserved: {}/{}", fixture.relative_path, quirk_name),
+                        &format!(
+                            "quirk not preserved: {}/{}",
+                            fixture.relative_path, quirk_name
+                        ),
                         &quirk_content,
                         &formatted,
                         &diff::DiffOptions::prettier_behavior(),
@@ -942,10 +957,43 @@ async fn validate_normalization_prettier(
                         variant_name.clone(),
                     ));
                     diff::print_diff_with_options(
-                        &format!("prettier normalization: {}/{}", fixture.relative_path, variant_name),
+                        &format!(
+                            "prettier normalization: {}/{}",
+                            fixture.relative_path, variant_name
+                        ),
                         input,
                         &formatted,
                         &diff::DiffOptions::prettier_behavior(),
+                    );
+                }
+            }
+            Err(_) => continue,
+        }
+    }
+
+    // N6: prettier(unformatted_ours_*) != input
+    // unformatted_ours_* files claim that only our formatter normalizes them to input,
+    // so prettier should NOT normalize them to input (otherwise they should be unformatted_*)
+    let unformatted_ours_variants = discover_unformatted_ours_variants(fixture_dir, input_ext);
+    for variant_name in &unformatted_ours_variants {
+        let variant_path = fixture_dir.join(variant_name);
+        let Ok(variant_content) = read_file(&variant_path) else {
+            continue;
+        };
+
+        match run_prettier(
+            &variant_content,
+            PrettierParser::Filepath(&fixture.input_file),
+        )
+        .await
+        {
+            Ok(formatted) => {
+                if formatted == *input {
+                    // Prettier also normalizes to input - this should be unformatted_*, not unformatted_ours_*
+                    result.add_error(
+                        ValidationError::NormalizationUnformattedOursPrettierAlsoNormalizes(
+                            variant_name.clone(),
+                        ),
                     );
                 }
             }

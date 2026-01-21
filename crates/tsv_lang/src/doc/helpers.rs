@@ -19,10 +19,11 @@ pub fn will_break(doc: &Doc) -> bool {
         Doc::Text(_) => false,
         Doc::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
         Doc::Indent(inner) | Doc::Dedent(inner) => will_break(inner),
-        Doc::Align { contents, .. } => will_break(contents),
+        Doc::Align { contents, .. } | Doc::AlignSpaces { contents, .. } => will_break(contents),
         Doc::IndentIfBreak { contents, .. } => will_break(contents),
         Doc::Group { contents, .. } => will_break(contents),
-        Doc::IfBreak { break_doc, .. } => will_break(break_doc),
+        // IfBreak is conditional - it doesn't force break mode, just chooses between docs
+        Doc::IfBreak { .. } => false,
         Doc::Concat(docs) | Doc::Fill(docs) => docs.iter().any(will_break),
         Doc::WithContext { doc, .. } => will_break(doc),
         // LineSuffix content doesn't affect breaking decisions
@@ -55,7 +56,7 @@ pub fn can_break(doc: &Doc) -> bool {
         Doc::Line(_) => true,
         // Recurse into containers
         Doc::Indent(inner) | Doc::Dedent(inner) => can_break(inner),
-        Doc::Align { contents, .. } => can_break(contents),
+        Doc::Align { contents, .. } | Doc::AlignSpaces { contents, .. } => can_break(contents),
         Doc::IndentIfBreak { contents, .. } => can_break(contents),
         Doc::Group {
             contents,

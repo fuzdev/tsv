@@ -29,7 +29,15 @@ impl<'a> Printer<'a> {
         self.write("{@");
         self.write(name);
         self.write(" ");
+        // Assignment expressions need parens: {@html (a = b)}
+        let needs_parens = matches!(expression, tsv_ts::Expression::AssignmentExpression(_));
+        if needs_parens {
+            self.write("(");
+        }
         self.print_ts_expression_with_comments(expression, span.start, span.end);
+        if needs_parens {
+            self.write(")");
+        }
         self.write("}");
     }
 

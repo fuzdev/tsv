@@ -1,32 +1,51 @@
 //! Rendering algorithm for converting Doc trees to formatted strings
 
 use crate::PrintConfig;
+use smallvec::SmallVec;
 use std::collections::HashMap;
 
 use super::fits::{fits_multi, fits_with_lookahead, update_pos_for_text};
 use super::helpers::will_break;
 use super::types::{Command, Doc, DocContext, GroupId, LineKind, Mode, TextResolver, resolve_text};
 
-/// Strip trailing whitespace from each line (matches Prettier's behavior)
+/// Strip trailing whitespace from lines with content (matches Prettier's behavior)
+///
+/// - Lines with non-whitespace content → strip trailing whitespace
+/// - Whitespace-only lines IN THE MIDDLE → preserve (template literal blank lines, etc.)
+/// - Whitespace-only lines AT THE END → strip (trailing indentation noise)
 fn strip_trailing_whitespace(s: String) -> String {
-    // Fast path: if no trailing whitespace exists, return as-is
-    let has_trailing_ws = s.lines().any(|line| {
-        let trimmed = line.trim_end();
-        trimmed.len() != line.len()
-    });
-    if !has_trailing_ws {
+    // Fast path: no trailing whitespace to process
+    if !s.lines().any(|line| line.len() != line.trim_end().len()) {
         return s;
     }
 
-    // Build result directly without intermediate Vec allocation
+    // Single-pass: buffer whitespace-only lines, flush when followed by content
     let mut result = String::with_capacity(s.len());
-    for (i, line) in s.lines().enumerate() {
-        if i > 0 {
-            result.push('\n');
+    let mut pending: SmallVec<[&str; 2]> = SmallVec::new();
+
+    for line in s.lines() {
+        let trimmed = line.trim_end();
+        if trimmed.is_empty() {
+            // Buffer whitespace-only line (might be at end)
+            pending.push(line);
+        } else {
+            // Content line: flush pending ws-only lines (they're in the middle)
+            for ws_line in pending.drain(..) {
+                if !result.is_empty() {
+                    result.push('\n');
+                }
+                result.push_str(ws_line);
+            }
+            if !result.is_empty() {
+                result.push('\n');
+            }
+            result.push_str(trimmed);
         }
-        result.push_str(line.trim_end());
     }
-    if s.ends_with('\n') {
+
+    // Add trailing newline if: original ended with \n, OR there were trailing ws-only lines
+    // (the ws-only lines themselves are discarded, but the newline before them is preserved)
+    if s.ends_with('\n') || !pending.is_empty() {
         result.push('\n');
     }
     result
@@ -55,10 +74,12 @@ fn render_text<R: TextResolver + ?Sized>(
 /// Handles the line break itself and indentation. Does NOT flush line suffix -
 /// that must be done by the caller before calling this if needed.
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn render_line_break(
     kind: LineKind,
     mode: Mode,
     indent_level: usize,
+    align_spaces: usize,
     base_indent_override: Option<usize>,
     output: &mut String,
     pos: &mut usize,
@@ -71,9 +92,9 @@ fn render_line_break(
             // Literal line: just newline, no indentation (for blank lines)
             *pos = 0;
         } else {
-            // Normal line: newline + indentation
-            write_indentation(output, indent_level, config);
-            *pos = line_start_column(indent_level, config, base_indent_override);
+            // Normal line: newline + indentation + alignment spaces
+            write_indentation(output, indent_level, align_spaces, config);
+            *pos = line_start_column(indent_level, align_spaces, config, base_indent_override);
         }
         true // Did break
     } else {
@@ -296,6 +317,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
         mode: Mode::Break,
         doc,
         base_indent_override: None,
+        align_spaces: 0,
     }];
 
     // Buffer for LineSuffix content - flushed before line breaks
@@ -320,6 +342,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     *kind,
                     cmd.mode,
                     cmd.indent,
+                    cmd.align_spaces,
                     cmd.base_indent_override,
                     output,
                     pos,
@@ -337,6 +360,10 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
 
             Doc::Align { n, contents } => {
                 commands.push(cmd.with_indent(*n, contents));
+            }
+
+            Doc::AlignSpaces { spaces, contents } => {
+                commands.push(cmd.with_align_spaces(*spaces, contents));
             }
 
             Doc::Group {
@@ -424,7 +451,9 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         // No remaining state fit: use last state in break mode (or contents if no states)
                         if !found {
                             chosen_mode = Mode::Break;
-                            commands.push(cmd.with_mode(Mode::Break, states.last().unwrap_or(contents)));
+                            commands.push(
+                                cmd.with_mode(Mode::Break, states.last().unwrap_or(contents)),
+                            );
                         }
                     }
 
@@ -517,9 +546,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
             Doc::WithContext { doc, context } => {
                 // Extract context and apply to inner doc
                 // Merge override: context's override takes precedence, else inherit from parent
-                let merged_override = context
-                    .base_indent_override
-                    .or(cmd.base_indent_override);
+                let merged_override = context.base_indent_override.or(cmd.base_indent_override);
                 match doc.as_ref() {
                     Doc::Fill(parts) => {
                         // Apply context when rendering fill
@@ -590,12 +617,13 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
         // Case 1: Last item - render it (break to new line if it doesn't fit)
         if offset + 1 >= parts.len() {
             // Break to new line first if needed (unless already at line start)
+            // Note: Fill content doesn't track align_spaces, so we use 0
             if !content_fits {
                 let line_start_pos =
-                    line_start_column(indent_level, config, context.base_indent_override);
+                    line_start_column(indent_level, 0, config, context.base_indent_override);
                 if *pos != line_start_pos {
                     output.push('\n');
-                    write_indentation(output, indent_level, config);
+                    write_indentation(output, indent_level, 0, config);
                     *pos = line_start_pos;
                 }
             }
@@ -702,8 +730,9 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
         } else {
             // Neither fits at current position.
             // Check if content would fit at line start after breaking.
+            // Note: Fill content doesn't track align_spaces, so we use 0
             let line_start_pos =
-                line_start_column(indent_level, config, context.base_indent_override);
+                line_start_column(indent_level, 0, config, context.base_indent_override);
             let at_line_start = *pos == line_start_pos;
 
             if !at_line_start {
@@ -720,7 +749,7 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
 
                 // Break to new line
                 output.push('\n');
-                write_indentation(output, indent_level, config);
+                write_indentation(output, indent_level, 0, config);
                 *pos = line_start_pos;
 
                 if content_fits_at_start {
@@ -853,6 +882,7 @@ fn render_single_doc_inner<'a, R: TextResolver + ?Sized>(
         mode,
         doc,
         base_indent_override,
+        align_spaces: 0,
     }];
 
     // Track whether we're doing full suffix handling
@@ -880,6 +910,7 @@ fn render_single_doc_inner<'a, R: TextResolver + ?Sized>(
                     *kind,
                     cmd.mode,
                     cmd.indent,
+                    cmd.align_spaces,
                     cmd.base_indent_override,
                     output,
                     pos,
@@ -897,6 +928,10 @@ fn render_single_doc_inner<'a, R: TextResolver + ?Sized>(
 
             Doc::Align { n, contents } => {
                 commands.push(cmd.with_indent(*n, contents));
+            }
+
+            Doc::AlignSpaces { spaces, contents } => {
+                commands.push(cmd.with_align_spaces(*spaces, contents));
             }
 
             Doc::Group {
@@ -1003,11 +1038,7 @@ fn render_single_doc_inner<'a, R: TextResolver + ?Sized>(
             } => {
                 // No group tracking in Fill/suffix, defaults to Flat
                 commands.push(process_indent_if_break(
-                    contents,
-                    *group_id,
-                    *negate,
-                    None,
-                    &cmd,
+                    contents, *group_id, *negate, None, &cmd,
                 ));
             }
 
@@ -1040,17 +1071,14 @@ fn render_single_doc_inner<'a, R: TextResolver + ?Sized>(
                             );
                         }
                         _ => {
-                            let merged_override = context
-                                .base_indent_override
-                                .or(cmd.base_indent_override);
+                            let merged_override =
+                                context.base_indent_override.or(cmd.base_indent_override);
                             commands.push(cmd.with_base_override(merged_override, doc.as_ref()));
                         }
                     }
                 } else {
                     // Simplified: just merge override
-                    let merged_override = context
-                        .base_indent_override
-                        .or(cmd.base_indent_override);
+                    let merged_override = context.base_indent_override.or(cmd.base_indent_override);
                     commands.push(cmd.with_base_override(merged_override, doc.as_ref()));
                 }
             }
@@ -1090,7 +1118,7 @@ fn render_single_doc_inner<'a, R: TextResolver + ?Sized>(
 ///
 /// When `first_line_offset == 0`, we're formatting a standalone block where the outer
 /// context handles indentation (e.g., TypeScript in `<script>`).
-fn write_indentation(output: &mut String, level: usize, config: &PrintConfig) {
+fn write_indentation(output: &mut String, level: usize, align_spaces: usize, config: &PrintConfig) {
     // Add base_indent_offset only for inline-embedded expressions (first_line_offset > 0)
     let extra = if config.first_line_offset > 0 {
         config.base_indent_offset
@@ -1100,6 +1128,10 @@ fn write_indentation(output: &mut String, level: usize, config: &PrintConfig) {
     for _ in 0..(level + extra) {
         output.push_str(config.indent);
     }
+    // Add alignment spaces after tabs (Prettier-style alignment)
+    for _ in 0..align_spaces {
+        output.push(' ');
+    }
 }
 
 /// Calculate width of indentation
@@ -1107,17 +1139,18 @@ fn indent_width(level: usize, config: &PrintConfig) -> usize {
     level * indent_str_width(config.indent, config.tab_width)
 }
 
-/// Calculate column position at line start (indent + base offset)
+/// Calculate column position at line start (indent + base offset + align spaces)
 ///
 /// The `base_override` parameter allows overriding `config.base_indent_offset` for specific
 /// contexts (e.g., template expressions where the wrapper won't add its usual indentation).
 fn line_start_column(
     indent_level: usize,
+    align_spaces: usize,
     config: &PrintConfig,
     base_override: Option<usize>,
 ) -> usize {
     let base = base_override.unwrap_or(config.base_indent_offset);
-    indent_width(indent_level, config) + base * config.tab_width
+    indent_width(indent_level, config) + base * config.tab_width + align_spaces
 }
 
 /// Calculate visual width of indentation string

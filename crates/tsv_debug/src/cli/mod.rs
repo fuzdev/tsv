@@ -7,7 +7,7 @@ use commands::{
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
     fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
-    line_width::LineWidthCommand,
+    line_width::LineWidthCommand, test262::Test262Command,
 };
 use tsv_cli::cli::commands::CommandRegistry;
 
@@ -32,6 +32,9 @@ pub fn build_registry() -> CommandRegistry {
     registry.register(Box::new(FixturesUpdateParsedCommand));
     registry.register(Box::new(FixturesUpdateFormattedCommand));
     registry.register(Box::new(FixturesValidateCommand));
+
+    // Register test262 command
+    registry.register(Box::new(Test262Command));
 
     registry
 }

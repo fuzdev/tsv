@@ -127,7 +127,7 @@ impl Fixture {
         self.path.join(self.output_prettier_filename())
     }
 
-    /// Check if this fixture matches all the given filter terms
+    /// Check if this fixture matches any of the given filter terms
     pub fn matches_filters(&self, filters: &[String]) -> bool {
         if filters.is_empty() {
             return true;
