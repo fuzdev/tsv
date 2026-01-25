@@ -30,6 +30,10 @@ pub struct CssStyleSheet {
     ///
     /// Use `tsv_lang::comments_in_range()` for efficient range lookups.
     pub comments: Vec<Comment>,
+
+    /// Precomputed line break positions (byte offsets of newlines).
+    /// Used for O(log n) line boundary lookups during printing.
+    pub line_breaks: Vec<u32>,
 }
 
 impl CssStyleSheet {
@@ -38,6 +42,7 @@ impl CssStyleSheet {
         Self {
             nodes: Vec::new(),
             comments: Vec::new(),
+            line_breaks: Vec::new(),
         }
     }
 
@@ -46,6 +51,7 @@ impl CssStyleSheet {
         Self {
             nodes,
             comments: Vec::new(),
+            line_breaks: Vec::new(),
         }
     }
 }
@@ -83,9 +89,9 @@ pub struct CssRule {
     pub span: Span,                       // Full rule span
 }
 
-// ============================================================================
+//
 // Selector AST (Phase 2)
-// ============================================================================
+//
 //
 // Implements Selectors Level 4 specification:
 // https://drafts.csswg.org/selectors-4/
@@ -321,9 +327,9 @@ pub struct CssDeclaration {
     pub span: Span,
 }
 
-// ============================================================================
+//
 // CSS Value AST (Phase 4)
-// ============================================================================
+//
 //
 // Implements CSS Values and Units Level 4 specification:
 // https://drafts.csswg.org/css-values-4/
@@ -460,9 +466,9 @@ pub enum Color {
     },
 }
 
-// ============================================================================
+//
 // At-Rule AST (Phase 3)
-// ============================================================================
+//
 //
 // Implements CSS Syntax Module Level 3 at-rules:
 // https://drafts.csswg.org/css-syntax-3/#at-rules

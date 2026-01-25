@@ -258,7 +258,7 @@ impl<'a> SvelteParser<'a> {
         result
     }
 
-    // ========== Error Construction Helpers ==========
+    // Error Construction Helpers
     // Note: No #[inline] - error paths are cold paths, inlining would just bloat code size
 
     /// Create error with custom message at current position
@@ -333,7 +333,7 @@ impl<'a> SvelteParser<'a> {
         }
     }
 
-    // ========== TypeScript Expression Parsing Helpers ==========
+    // TypeScript Expression Parsing Helpers
     // These helpers wrap tsv_ts parsing functions and automatically collect comments.
 
     /// Parse a TypeScript expression and collect any comments.

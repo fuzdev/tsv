@@ -8,7 +8,6 @@ use super::{ParenContext, Printer, needs_parens};
 use crate::ast::internal::{self, BinaryOperator, Expression};
 use tsv_lang::Span;
 use tsv_lang::doc::{self, Doc};
-use tsv_lang::printing;
 
 /// Holds information about an operand in a binary expression chain
 /// Used to track position information for comment placement
@@ -195,7 +194,14 @@ impl<'a> Printer<'a> {
             return self.build_expression_doc(&binary.left);
         }
 
-        self.build_binary_chain_continuation_indent_parts(&operands, &operators)
+        // In Svelte template expressions, use restrictive behavior for short binaries
+        // In script contexts, allow breaks for all binaries
+        let restrict_short_binaries = self.config.first_line_offset > 0;
+        self.build_binary_chain_continuation_indent_parts(
+            &operands,
+            &operators,
+            restrict_short_binaries,
+        )
     }
 
     /// Core implementation for binary chain doc building
@@ -255,16 +261,12 @@ impl<'a> Printer<'a> {
         let first_op = operators[0];
         let first_op_str = first_op.as_str();
 
-        // Determine whether to allow line breaks between operands
-        let allow_breaks = if restrict_short_binaries {
-            // In Svelte template expressions, use the restrictive heuristic:
-            // Only allow breaks for longer chains or logical operators
-            operands.len() > 2 || first_op.is_logical()
-        } else {
-            // In script contexts, always allow breaks - the print width algorithm
-            // decides when to actually break
-            true
-        };
+        // Always allow line breaks - the group fitting algorithm decides when to actually
+        // break based on print width. Prettier uses `line()` for all binary continuations
+        // except for `shouldInlineLogicalExpression` cases (LogicalExpression with
+        // object/array/JSX on right), which we don't need special handling for here.
+        let allow_breaks = true;
+        let _ = restrict_short_binaries; // Parameter kept for API compatibility
         let first_op_pos =
             self.find_operator_position(operands[0].span.end, operands[1].span.start, first_op_str);
 
@@ -348,7 +350,7 @@ impl<'a> Printer<'a> {
 
         // Combine: head + continuation (NO internal indent)
         // The parent context (assignment, etc.) provides the indent wrapper.
-        // Nested binaries inside parens get their own indent via build_binary_chain_doc_with_continuation_indent.
+        // Nested binaries inside parens get their own group via build_binary_operand_doc.
         head_parts.extend(continuation_parts);
 
         match style {
@@ -369,21 +371,26 @@ impl<'a> Printer<'a> {
         operands: &[ChainOperand],
         operators: &[BinaryOperator],
     ) -> Doc {
-        doc::group(self.build_binary_chain_continuation_indent_parts(operands, operators))
+        // In Svelte template expressions (first_line_offset > 0), use restrictive behavior
+        doc::group(self.build_binary_chain_continuation_indent_parts(operands, operators, true))
     }
 
     /// Build binary chain continuation indent parts WITHOUT group wrapper
     ///
     /// Returns the concat of first_parts + indent(continuation_parts) without
     /// wrapping in a group. Use this when the caller controls grouping.
+    ///
+    /// `restrict_short_binaries`: When true, uses spaces (no breaks) for 2-operand
+    /// non-logical binaries. Used in Svelte template expressions. When false, allows
+    /// breaks for all binaries based on print width. Used in script contexts.
     fn build_binary_chain_continuation_indent_parts(
         &self,
         operands: &[ChainOperand],
         operators: &[BinaryOperator],
+        restrict_short_binaries: bool,
     ) -> Doc {
-        // In Svelte template expressions, use restrictive behavior for short binaries
         let (first_parts, continuation_parts) =
-            self.build_binary_chain_parts(operands, operators, true);
+            self.build_binary_chain_parts(operands, operators, restrict_short_binaries);
 
         // Combine: first_parts + indent(continuation_parts)
         doc::concat(vec![
@@ -443,8 +450,7 @@ impl<'a> Printer<'a> {
         let mut pos = op_end;
         for (i, comment) in comments.iter().enumerate() {
             let is_first = i == 0;
-            let has_newline_before =
-                printing::has_newline_between(self.source, pos, comment.span.start);
+            let has_newline_before = self.has_newline_between(pos, comment.span.start);
 
             if is_first && !has_newline_before {
                 // First comment on same line as operator: `a && // comment`
@@ -549,10 +555,30 @@ impl<'a> Printer<'a> {
         // For binary expressions that need parens, use continuation indent so that
         // when the inner binary breaks, its continuation lines are indented.
         // This gives: `(first &&\n\t\tsecond)` not `(first &&\n\tsecond)`
+        //
+        // Context-dependent behavior:
+        // - Script contexts (first_line_offset = 0): Use group with parens INSIDE so the
+        //   fit calculation includes `)`. This ensures `(A + B) *` at 101 chars breaks
+        //   inside the parens, not just at `*`.
+        // - Svelte template contexts (first_line_offset > 0): Use the grouped approach
+        //   from build_binary_chain_doc_with_continuation_indent, which keeps short
+        //   2-operand binaries flat (Prettier's behavior for template expressions).
         if needs_parens(operand, ctx) {
             if let Expression::BinaryExpression(inner_binary) = operand {
-                let inner_doc = self.build_binary_chain_doc_with_continuation_indent(inner_binary);
-                return doc::parens(inner_doc);
+                if self.config.first_line_offset > 0 {
+                    // Svelte template context: use grouped approach that keeps short binaries flat
+                    let inner_doc =
+                        self.build_binary_chain_doc_with_continuation_indent(inner_binary);
+                    return doc::parens(inner_doc);
+                }
+                // Script context: include parens in group for proper line width calculation
+                let inner_parts =
+                    self.build_binary_chain_parts_with_continuation_indent(inner_binary);
+                return doc::group(doc::concat(vec![
+                    doc::text("("),
+                    inner_parts,
+                    doc::text(")"),
+                ]));
             }
             let operand_doc = self.build_expression_doc(operand);
             doc::parens(operand_doc)

@@ -193,12 +193,12 @@ impl<'a> Printer<'a> {
 
     /// Build a doc representation of a selector list for width checking
     pub(crate) fn build_selector_list_doc(&self, list: &internal::SelectorList) -> doc::Doc {
-        let docs: Vec<_> = list
-            .selectors
-            .iter()
-            .map(|complex| self.build_complex_selector_doc(complex))
-            .collect();
-        doc::join_doc(docs, doc::text(", "))
+        doc::join_doc(
+            list.selectors
+                .iter()
+                .map(|complex| self.build_complex_selector_doc(complex)),
+            doc::text(", "),
+        )
     }
 
     /// Build a doc representation of a complex selector for width checking
@@ -212,9 +212,9 @@ impl<'a> Printer<'a> {
         doc::concat(docs)
     }
 
-    // ========================================================================
+    //
     // Doc Builders - all formatting logic expressed as doc IR
-    // ========================================================================
+    //
 
     /// Build a doc for a simple selector
     ///

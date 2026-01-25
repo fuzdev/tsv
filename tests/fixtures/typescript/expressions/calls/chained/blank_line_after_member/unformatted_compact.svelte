@@ -1,7 +1,7 @@
 <script lang="ts">
-// =====================================================================
+//
 // Blank Line After Member Access - Should Collapse
-// =====================================================================
+//
 // Blank lines after member access (before a call) are collapsed.
 // This is Rule 2: only blank lines after calls are preserved.
 

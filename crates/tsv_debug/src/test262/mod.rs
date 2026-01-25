@@ -7,5 +7,5 @@ pub mod discovery;
 pub mod frontmatter;
 pub mod runner;
 
-pub use discovery::{discover_tests, DiscoveryOptions};
-pub use runner::{format_failure, run_test, TestSummary};
+pub use discovery::{DiscoveryOptions, discover_tests};
+pub use runner::{TestSummary, format_failure, run_test};

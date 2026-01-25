@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 994,
+	"end": 854,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " =====================================================================",
+			"value": "",
 			"start": 20,
-			"end": 92,
+			"end": 22,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 73
+					"column": 3
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " Member-Only Chains with Blank Lines - Should Collapse",
-			"start": 94,
-			"end": 150,
+			"start": 24,
+			"end": 80,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -44,9 +44,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " =====================================================================",
-			"start": 152,
-			"end": 224,
+			"value": "",
+			"start": 82,
+			"end": 84,
 			"loc": {
 				"start": {
 					"line": 4,
@@ -54,15 +54,15 @@
 				},
 				"end": {
 					"line": 4,
-					"column": 73
+					"column": 3
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " Blank lines in member-only chains (no calls) are always collapsed.",
-			"start": 226,
-			"end": 295,
+			"start": 86,
+			"end": 155,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " This differs from call chains where blank lines between calls are preserved.",
-			"start": 297,
-			"end": 376,
+			"start": 157,
+			"end": 236,
 			"loc": {
 				"start": {
 					"line": 6,
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " Basic member chain - blank line collapses",
-			"start": 379,
-			"end": 423,
+			"start": 239,
+			"end": 283,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " Multiple blank lines - all collapse",
-			"start": 460,
-			"end": 498,
+			"start": 320,
+			"end": 358,
 			"loc": {
 				"start": {
 					"line": 11,
@@ -125,8 +125,8 @@
 		{
 			"type": "Line",
 			"value": " With optional chaining",
-			"start": 541,
-			"end": 566,
+			"start": 401,
+			"end": 426,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " Long chain that must break - blank lines still collapse",
-			"start": 606,
-			"end": 664,
+			"start": 466,
+			"end": 524,
 			"loc": {
 				"start": {
 					"line": 17,
@@ -157,8 +157,8 @@
 		{
 			"type": "Line",
 			"value": " Non-null assertions in member chain (inline, no blank line variant)",
-			"start": 774,
-			"end": 844,
+			"start": 634,
+			"end": 704,
 			"loc": {
 				"start": {
 					"line": 21,
@@ -173,8 +173,8 @@
 		{
 			"type": "Line",
 			"value": " Mixed optional and non-null (inline, no blank line variant)",
-			"start": 884,
-			"end": 946,
+			"start": 744,
+			"end": 806,
 			"loc": {
 				"start": {
 					"line": 24,
@@ -190,12 +190,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 993,
+		"end": 853,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 984,
+			"end": 844,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -209,8 +209,8 @@
 			"body": [
 				{
 					"type": "VariableDeclaration",
-					"start": 425,
-					"end": 457,
+					"start": 285,
+					"end": 317,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -224,8 +224,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 431,
-							"end": 456,
+							"start": 291,
+							"end": 316,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -238,8 +238,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 431,
-								"end": 432,
+								"start": 291,
+								"end": 292,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -254,8 +254,8 @@
 							},
 							"init": {
 								"type": "MemberExpression",
-								"start": 435,
-								"end": 456,
+								"start": 295,
+								"end": 316,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -268,8 +268,8 @@
 								},
 								"object": {
 									"type": "MemberExpression",
-									"start": 435,
-									"end": 450,
+									"start": 295,
+									"end": 310,
 									"loc": {
 										"start": {
 											"line": 9,
@@ -282,8 +282,8 @@
 									},
 									"object": {
 										"type": "MemberExpression",
-										"start": 435,
-										"end": 444,
+										"start": 295,
+										"end": 304,
 										"loc": {
 											"start": {
 												"line": 9,
@@ -296,8 +296,8 @@
 										},
 										"object": {
 											"type": "Identifier",
-											"start": 435,
-											"end": 438,
+											"start": 295,
+											"end": 298,
 											"loc": {
 												"start": {
 													"line": 9,
@@ -312,8 +312,8 @@
 										},
 										"property": {
 											"type": "Identifier",
-											"start": 439,
-											"end": 444,
+											"start": 299,
+											"end": 304,
 											"loc": {
 												"start": {
 													"line": 9,
@@ -331,8 +331,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 445,
-										"end": 450,
+										"start": 305,
+										"end": 310,
 										"loc": {
 											"start": {
 												"line": 9,
@@ -350,8 +350,8 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 451,
-									"end": 456,
+									"start": 311,
+									"end": 316,
 									"loc": {
 										"start": {
 											"line": 9,
@@ -373,46 +373,46 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " =====================================================================",
+							"value": "",
 							"start": 20,
-							"end": 92
+							"end": 22
 						},
 						{
 							"type": "Line",
 							"value": " Member-Only Chains with Blank Lines - Should Collapse",
-							"start": 94,
-							"end": 150
+							"start": 24,
+							"end": 80
 						},
 						{
 							"type": "Line",
-							"value": " =====================================================================",
-							"start": 152,
-							"end": 224
+							"value": "",
+							"start": 82,
+							"end": 84
 						},
 						{
 							"type": "Line",
 							"value": " Blank lines in member-only chains (no calls) are always collapsed.",
-							"start": 226,
-							"end": 295
+							"start": 86,
+							"end": 155
 						},
 						{
 							"type": "Line",
 							"value": " This differs from call chains where blank lines between calls are preserved.",
-							"start": 297,
-							"end": 376
+							"start": 157,
+							"end": 236
 						},
 						{
 							"type": "Line",
 							"value": " Basic member chain - blank line collapses",
-							"start": 379,
-							"end": 423
+							"start": 239,
+							"end": 283
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 500,
-					"end": 538,
+					"start": 360,
+					"end": 398,
 					"loc": {
 						"start": {
 							"line": 12,
@@ -426,8 +426,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 506,
-							"end": 537,
+							"start": 366,
+							"end": 397,
 							"loc": {
 								"start": {
 									"line": 12,
@@ -440,8 +440,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 506,
-								"end": 507,
+								"start": 366,
+								"end": 367,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -456,8 +456,8 @@
 							},
 							"init": {
 								"type": "MemberExpression",
-								"start": 510,
-								"end": 537,
+								"start": 370,
+								"end": 397,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -470,8 +470,8 @@
 								},
 								"object": {
 									"type": "MemberExpression",
-									"start": 510,
-									"end": 531,
+									"start": 370,
+									"end": 391,
 									"loc": {
 										"start": {
 											"line": 12,
@@ -484,8 +484,8 @@
 									},
 									"object": {
 										"type": "MemberExpression",
-										"start": 510,
-										"end": 525,
+										"start": 370,
+										"end": 385,
 										"loc": {
 											"start": {
 												"line": 12,
@@ -498,8 +498,8 @@
 										},
 										"object": {
 											"type": "MemberExpression",
-											"start": 510,
-											"end": 519,
+											"start": 370,
+											"end": 379,
 											"loc": {
 												"start": {
 													"line": 12,
@@ -512,8 +512,8 @@
 											},
 											"object": {
 												"type": "Identifier",
-												"start": 510,
-												"end": 513,
+												"start": 370,
+												"end": 373,
 												"loc": {
 													"start": {
 														"line": 12,
@@ -528,8 +528,8 @@
 											},
 											"property": {
 												"type": "Identifier",
-												"start": 514,
-												"end": 519,
+												"start": 374,
+												"end": 379,
 												"loc": {
 													"start": {
 														"line": 12,
@@ -547,8 +547,8 @@
 										},
 										"property": {
 											"type": "Identifier",
-											"start": 520,
-											"end": 525,
+											"start": 380,
+											"end": 385,
 											"loc": {
 												"start": {
 													"line": 12,
@@ -566,8 +566,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 526,
-										"end": 531,
+										"start": 386,
+										"end": 391,
 										"loc": {
 											"start": {
 												"line": 12,
@@ -585,8 +585,8 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 532,
-									"end": 537,
+									"start": 392,
+									"end": 397,
 									"loc": {
 										"start": {
 											"line": 12,
@@ -609,15 +609,15 @@
 						{
 							"type": "Line",
 							"value": " Multiple blank lines - all collapse",
-							"start": 460,
-							"end": 498
+							"start": 320,
+							"end": 358
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 568,
-					"end": 603,
+					"start": 428,
+					"end": 463,
 					"loc": {
 						"start": {
 							"line": 15,
@@ -631,8 +631,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 574,
-							"end": 602,
+							"start": 434,
+							"end": 462,
 							"loc": {
 								"start": {
 									"line": 15,
@@ -645,8 +645,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 574,
-								"end": 575,
+								"start": 434,
+								"end": 435,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -661,8 +661,8 @@
 							},
 							"init": {
 								"type": "ChainExpression",
-								"start": 578,
-								"end": 602,
+								"start": 438,
+								"end": 462,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -675,8 +675,8 @@
 								},
 								"expression": {
 									"type": "MemberExpression",
-									"start": 578,
-									"end": 602,
+									"start": 438,
+									"end": 462,
 									"loc": {
 										"start": {
 											"line": 15,
@@ -689,8 +689,8 @@
 									},
 									"object": {
 										"type": "MemberExpression",
-										"start": 578,
-										"end": 595,
+										"start": 438,
+										"end": 455,
 										"loc": {
 											"start": {
 												"line": 15,
@@ -703,8 +703,8 @@
 										},
 										"object": {
 											"type": "MemberExpression",
-											"start": 578,
-											"end": 588,
+											"start": 438,
+											"end": 448,
 											"loc": {
 												"start": {
 													"line": 15,
@@ -717,8 +717,8 @@
 											},
 											"object": {
 												"type": "Identifier",
-												"start": 578,
-												"end": 581,
+												"start": 438,
+												"end": 441,
 												"loc": {
 													"start": {
 														"line": 15,
@@ -733,8 +733,8 @@
 											},
 											"property": {
 												"type": "Identifier",
-												"start": 583,
-												"end": 588,
+												"start": 443,
+												"end": 448,
 												"loc": {
 													"start": {
 														"line": 15,
@@ -752,8 +752,8 @@
 										},
 										"property": {
 											"type": "Identifier",
-											"start": 590,
-											"end": 595,
+											"start": 450,
+											"end": 455,
 											"loc": {
 												"start": {
 													"line": 15,
@@ -771,8 +771,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 597,
-										"end": 602,
+										"start": 457,
+										"end": 462,
 										"loc": {
 											"start": {
 												"line": 15,
@@ -796,15 +796,15 @@
 						{
 							"type": "Line",
 							"value": " With optional chaining",
-							"start": 541,
-							"end": 566
+							"start": 401,
+							"end": 426
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 666,
-					"end": 771,
+					"start": 526,
+					"end": 631,
 					"loc": {
 						"start": {
 							"line": 18,
@@ -818,8 +818,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 672,
-							"end": 770,
+							"start": 532,
+							"end": 630,
 							"loc": {
 								"start": {
 									"line": 18,
@@ -832,8 +832,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 672,
-								"end": 673,
+								"start": 532,
+								"end": 533,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -848,8 +848,8 @@
 							},
 							"init": {
 								"type": "MemberExpression",
-								"start": 678,
-								"end": 770,
+								"start": 538,
+								"end": 630,
 								"loc": {
 									"start": {
 										"line": 19,
@@ -862,8 +862,8 @@
 								},
 								"object": {
 									"type": "MemberExpression",
-									"start": 678,
-									"end": 748,
+									"start": 538,
+									"end": 608,
 									"loc": {
 										"start": {
 											"line": 19,
@@ -876,8 +876,8 @@
 									},
 									"object": {
 										"type": "MemberExpression",
-										"start": 678,
-										"end": 726,
+										"start": 538,
+										"end": 586,
 										"loc": {
 											"start": {
 												"line": 19,
@@ -890,8 +890,8 @@
 										},
 										"object": {
 											"type": "Identifier",
-											"start": 678,
-											"end": 704,
+											"start": 538,
+											"end": 564,
 											"loc": {
 												"start": {
 													"line": 19,
@@ -906,8 +906,8 @@
 										},
 										"property": {
 											"type": "Identifier",
-											"start": 705,
-											"end": 726,
+											"start": 565,
+											"end": 586,
 											"loc": {
 												"start": {
 													"line": 19,
@@ -925,8 +925,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 727,
-										"end": 748,
+										"start": 587,
+										"end": 608,
 										"loc": {
 											"start": {
 												"line": 19,
@@ -944,8 +944,8 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 749,
-									"end": 770,
+									"start": 609,
+									"end": 630,
 									"loc": {
 										"start": {
 											"line": 19,
@@ -968,15 +968,15 @@
 						{
 							"type": "Line",
 							"value": " Long chain that must break - blank lines still collapse",
-							"start": 606,
-							"end": 664
+							"start": 466,
+							"end": 524
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 846,
-					"end": 881,
+					"start": 706,
+					"end": 741,
 					"loc": {
 						"start": {
 							"line": 22,
@@ -990,8 +990,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 852,
-							"end": 880,
+							"start": 712,
+							"end": 740,
 							"loc": {
 								"start": {
 									"line": 22,
@@ -1004,8 +1004,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 852,
-								"end": 853,
+								"start": 712,
+								"end": 713,
 								"loc": {
 									"start": {
 										"line": 22,
@@ -1020,8 +1020,8 @@
 							},
 							"init": {
 								"type": "MemberExpression",
-								"start": 856,
-								"end": 880,
+								"start": 716,
+								"end": 740,
 								"loc": {
 									"start": {
 										"line": 22,
@@ -1034,8 +1034,8 @@
 								},
 								"object": {
 									"type": "TSNonNullExpression",
-									"start": 856,
-									"end": 874,
+									"start": 716,
+									"end": 734,
 									"loc": {
 										"start": {
 											"line": 22,
@@ -1048,8 +1048,8 @@
 									},
 									"expression": {
 										"type": "MemberExpression",
-										"start": 856,
-										"end": 873,
+										"start": 716,
+										"end": 733,
 										"loc": {
 											"start": {
 												"line": 22,
@@ -1062,8 +1062,8 @@
 										},
 										"object": {
 											"type": "TSNonNullExpression",
-											"start": 856,
-											"end": 867,
+											"start": 716,
+											"end": 727,
 											"loc": {
 												"start": {
 													"line": 22,
@@ -1076,8 +1076,8 @@
 											},
 											"expression": {
 												"type": "MemberExpression",
-												"start": 856,
-												"end": 866,
+												"start": 716,
+												"end": 726,
 												"loc": {
 													"start": {
 														"line": 22,
@@ -1090,8 +1090,8 @@
 												},
 												"object": {
 													"type": "TSNonNullExpression",
-													"start": 856,
-													"end": 860,
+													"start": 716,
+													"end": 720,
 													"loc": {
 														"start": {
 															"line": 22,
@@ -1104,8 +1104,8 @@
 													},
 													"expression": {
 														"type": "Identifier",
-														"start": 856,
-														"end": 859,
+														"start": 716,
+														"end": 719,
 														"loc": {
 															"start": {
 																"line": 22,
@@ -1121,8 +1121,8 @@
 												},
 												"property": {
 													"type": "Identifier",
-													"start": 861,
-													"end": 866,
+													"start": 721,
+													"end": 726,
 													"loc": {
 														"start": {
 															"line": 22,
@@ -1141,8 +1141,8 @@
 										},
 										"property": {
 											"type": "Identifier",
-											"start": 868,
-											"end": 873,
+											"start": 728,
+											"end": 733,
 											"loc": {
 												"start": {
 													"line": 22,
@@ -1161,8 +1161,8 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 875,
-									"end": 880,
+									"start": 735,
+									"end": 740,
 									"loc": {
 										"start": {
 											"line": 22,
@@ -1185,15 +1185,15 @@
 						{
 							"type": "Line",
 							"value": " Non-null assertions in member chain (inline, no blank line variant)",
-							"start": 774,
-							"end": 844
+							"start": 634,
+							"end": 704
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 948,
-					"end": 983,
+					"start": 808,
+					"end": 843,
 					"loc": {
 						"start": {
 							"line": 25,
@@ -1207,8 +1207,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 954,
-							"end": 982,
+							"start": 814,
+							"end": 842,
 							"loc": {
 								"start": {
 									"line": 25,
@@ -1221,8 +1221,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 954,
-								"end": 955,
+								"start": 814,
+								"end": 815,
 								"loc": {
 									"start": {
 										"line": 25,
@@ -1237,8 +1237,8 @@
 							},
 							"init": {
 								"type": "ChainExpression",
-								"start": 958,
-								"end": 982,
+								"start": 818,
+								"end": 842,
 								"loc": {
 									"start": {
 										"line": 25,
@@ -1251,8 +1251,8 @@
 								},
 								"expression": {
 									"type": "MemberExpression",
-									"start": 958,
-									"end": 982,
+									"start": 818,
+									"end": 842,
 									"loc": {
 										"start": {
 											"line": 25,
@@ -1265,8 +1265,8 @@
 									},
 									"object": {
 										"type": "MemberExpression",
-										"start": 958,
-										"end": 975,
+										"start": 818,
+										"end": 835,
 										"loc": {
 											"start": {
 												"line": 25,
@@ -1279,8 +1279,8 @@
 										},
 										"object": {
 											"type": "TSNonNullExpression",
-											"start": 958,
-											"end": 969,
+											"start": 818,
+											"end": 829,
 											"loc": {
 												"start": {
 													"line": 25,
@@ -1293,8 +1293,8 @@
 											},
 											"expression": {
 												"type": "MemberExpression",
-												"start": 958,
-												"end": 968,
+												"start": 818,
+												"end": 828,
 												"loc": {
 													"start": {
 														"line": 25,
@@ -1307,8 +1307,8 @@
 												},
 												"object": {
 													"type": "Identifier",
-													"start": 958,
-													"end": 961,
+													"start": 818,
+													"end": 821,
 													"loc": {
 														"start": {
 															"line": 25,
@@ -1323,8 +1323,8 @@
 												},
 												"property": {
 													"type": "Identifier",
-													"start": 963,
-													"end": 968,
+													"start": 823,
+													"end": 828,
 													"loc": {
 														"start": {
 															"line": 25,
@@ -1343,8 +1343,8 @@
 										},
 										"property": {
 											"type": "Identifier",
-											"start": 970,
-											"end": 975,
+											"start": 830,
+											"end": 835,
 											"loc": {
 												"start": {
 													"line": 25,
@@ -1362,8 +1362,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 977,
-										"end": 982,
+										"start": 837,
+										"end": 842,
 										"loc": {
 											"start": {
 												"line": 25,
@@ -1387,8 +1387,8 @@
 						{
 							"type": "Line",
 							"value": " Mixed optional and non-null (inline, no blank line variant)",
-							"start": 884,
-							"end": 946
+							"start": 744,
+							"end": 806
 						}
 					]
 				}

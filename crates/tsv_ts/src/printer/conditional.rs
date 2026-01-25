@@ -55,8 +55,8 @@ impl<'a> Printer<'a> {
             || self.has_line_comments_between(consequent_end, alternate_start);
 
         // Check for comments between ? and consequent, or : and alternate
-        // These are comments that appear after the operator, which forces breaking
-        // e.g., `cond ? /* comment */ a : b` → breaks
+        // These comments need special positioning (after the operator) that the flat
+        // layout can't handle, so we use the breaking layout.
         let has_comments_after_operators = self.has_comments_after_ternary_operator(
             test_end,
             consequent_start,
@@ -240,8 +240,14 @@ impl<'a> Printer<'a> {
         for comment in
             tsv_lang::comments_in_range(self.comments, consequent_end, comments_before_colon_end)
         {
-            q_parts.push(doc::text(" "));
-            q_parts.push(self.build_comment_doc(comment));
+            if comment.is_block {
+                // Block comments count toward width
+                q_parts.push(doc::text(" "));
+                q_parts.push(self.build_comment_doc(comment));
+            } else {
+                // Line comments use line_suffix to exclude from width calculations
+                q_parts.push(self.build_trailing_line_comment_doc(comment));
+            }
         }
 
         // : on new line
@@ -289,7 +295,8 @@ impl<'a> Printer<'a> {
     /// - There's a comment between `?` and the consequent expression
     /// - There's a comment between `:` and the alternate expression
     ///
-    /// These comments force the ternary to break, even if it would otherwise fit on one line.
+    /// These comments need special positioning that the flat layout can't handle,
+    /// so we force the breaking layout when they're present.
     fn has_comments_after_ternary_operator(
         &self,
         test_end: u32,

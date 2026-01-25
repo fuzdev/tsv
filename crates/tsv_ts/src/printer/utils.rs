@@ -1,7 +1,7 @@
 //! Shared utility functions for the TypeScript printer
 
 use crate::ast::internal::{self, Expression};
-use tsv_lang::printing::has_newline_between;
+use tsv_lang::printing::has_newline_between_fast;
 
 /// Check if an argument is "hopefully short" enough to stay inline
 ///
@@ -50,9 +50,7 @@ pub(super) fn could_expand_arrow_body(body: &Expression) -> bool {
 /// Check if the last argument is an array or object expression (unwrapping type assertions)
 #[inline]
 pub(super) fn last_arg_is_array_or_object(arguments: &[Expression]) -> bool {
-    arguments
-        .last()
-        .is_some_and(is_array_or_object_unwrapped)
+    arguments.last().is_some_and(is_array_or_object_unwrapped)
 }
 
 /// Check if an expression is an array or object, unwrapping TS type wrappers
@@ -106,8 +104,8 @@ fn preceding_args_are_short(arguments: &[Expression]) -> bool {
 /// Note: Block functions are handled by explicit early checks in calls.rs,
 /// and arrow functions already fail the "short" check.
 #[inline]
-pub(super) fn preceding_args_allow_hug(arguments: &[Expression], source: &str) -> bool {
-    preceding_args_are_short(arguments) && !has_multiline_object_before_last(arguments, source)
+pub(super) fn preceding_args_allow_hug(arguments: &[Expression], line_breaks: &[u32]) -> bool {
+    preceding_args_are_short(arguments) && !has_multiline_object_before_last(arguments, line_breaks)
 }
 
 /// Check if an expression is a function with a block body.
@@ -271,31 +269,131 @@ pub fn is_simple_call_argument(expr: &Expression, depth: usize) -> bool {
     }
 }
 
-/// Check if an expression is an object with source newlines inside it.
+/// Check if an expression contains a call expression with arguments (recursively).
+///
+/// Used to determine if a chain's first call has an argument that may need to
+/// break independently. When the first call's arg contains a call WITH arguments,
+/// that inner call might break, so we let each group format independently rather
+/// than forcing expansion on the last call.
+///
+/// Empty calls like `a.b()` don't count because they won't break.
+pub fn contains_call_expression(expr: &Expression) -> bool {
+    match expr {
+        // A call with arguments might break - return true
+        // Empty calls (no args) won't break - continue checking inside
+        Expression::CallExpression(call) => {
+            !call.arguments.is_empty() || contains_call_expression(&call.callee)
+        }
+        Expression::NewExpression(new_expr) => {
+            !new_expr.arguments.is_empty() || contains_call_expression(&new_expr.callee)
+        }
+
+        // Recurse into common wrapper types
+        Expression::MemberExpression(member) => {
+            contains_call_expression(&member.object)
+                || (member.computed && contains_call_expression(&member.property))
+        }
+        Expression::TSAsExpression(e) => contains_call_expression(&e.expression),
+        Expression::TSSatisfiesExpression(e) => contains_call_expression(&e.expression),
+        Expression::TSTypeAssertion(e) => contains_call_expression(&e.expression),
+        Expression::TSNonNullExpression(e) => contains_call_expression(&e.expression),
+        Expression::TSInstantiationExpression(e) => contains_call_expression(&e.expression),
+        Expression::AwaitExpression(e) => contains_call_expression(&e.argument),
+        Expression::UnaryExpression(e) => contains_call_expression(&e.argument),
+        Expression::UpdateExpression(e) => contains_call_expression(&e.argument),
+        Expression::SpreadElement(e) => contains_call_expression(&e.argument),
+
+        // Binary expressions (includes logical operators in internal AST)
+        Expression::BinaryExpression(e) => {
+            contains_call_expression(&e.left) || contains_call_expression(&e.right)
+        }
+        Expression::AssignmentExpression(e) => {
+            contains_call_expression(&e.left) || contains_call_expression(&e.right)
+        }
+
+        // Conditional expression
+        Expression::ConditionalExpression(e) => {
+            contains_call_expression(&e.test)
+                || contains_call_expression(&e.consequent)
+                || contains_call_expression(&e.alternate)
+        }
+
+        // Sequence expression
+        Expression::SequenceExpression(e) => e.expressions.iter().any(contains_call_expression),
+
+        // Template literal expressions
+        Expression::TemplateLiteral(t) => t.expressions.iter().any(contains_call_expression),
+        Expression::TaggedTemplateExpression(t) => {
+            contains_call_expression(&t.tag)
+                || t.quasi.expressions.iter().any(contains_call_expression)
+        }
+
+        // Array/object literals
+        Expression::ArrayExpression(arr) => arr
+            .elements
+            .iter()
+            .any(|el| el.as_ref().is_some_and(contains_call_expression)),
+        Expression::ObjectExpression(obj) => obj.properties.iter().any(|prop| match prop {
+            internal::ObjectProperty::Property(p) => {
+                (p.computed && contains_call_expression(&p.key))
+                    || contains_call_expression(&p.value)
+            }
+            internal::ObjectProperty::SpreadElement(s) => contains_call_expression(&s.argument),
+        }),
+
+        // Arrow/function expressions - check body for expression arrows
+        Expression::ArrowFunctionExpression(arr) => {
+            if let internal::ArrowFunctionBody::Expression(body) = &arr.body {
+                contains_call_expression(body)
+            } else {
+                false
+            }
+        }
+
+        // Simple expressions that don't contain calls
+        Expression::Identifier(_)
+        | Expression::Literal(_)
+        | Expression::RegexLiteral(_)
+        | Expression::Super(_)
+        | Expression::MetaProperty(_)
+        | Expression::FunctionExpression(_)
+        | Expression::ClassExpression(_)
+        | Expression::YieldExpression(_)
+        | Expression::ImportExpression(_)
+        | Expression::ArrayPattern(_)
+        | Expression::ObjectPattern(_)
+        | Expression::AssignmentPattern(_)
+        | Expression::RestElement(_)
+        | Expression::PrivateIdentifier(_)
+        | Expression::TSParameterProperty(_) => false,
+    }
+}
+
+/// Check if an expression is an object with newlines inside it.
 ///
 /// Prettier preserves multiline object formatting and expands all call args
 /// when any preceding arg is a multiline object in source.
-pub(super) fn is_multiline_object_in_source(expr: &Expression, source: &str) -> bool {
+pub(super) fn is_multiline_object(expr: &Expression, line_breaks: &[u32]) -> bool {
     if let Expression::ObjectExpression(obj) = expr {
         if obj.properties.is_empty() {
             return false;
         }
         // Check if there's a newline after the opening brace
         let first_prop_start = obj.properties[0].span().start;
-        has_newline_between(source, obj.span.start + 1, first_prop_start)
+        has_newline_between_fast(line_breaks, obj.span.start + 1, first_prop_start)
     } else {
         false
     }
 }
 
-/// Check if any argument (except the last) is a multiline object in source.
+/// Check if any argument (except the last) is a multiline object.
 ///
 /// When true, the call should use hard expansion instead of the hug pattern.
-pub(super) fn has_multiline_object_before_last(args: &[Expression], source: &str) -> bool {
+pub(super) fn has_multiline_object_before_last(args: &[Expression], line_breaks: &[u32]) -> bool {
     if args.len() < 2 {
         return false;
     }
     args[..args.len() - 1]
         .iter()
-        .any(|arg| is_multiline_object_in_source(arg, source))
+        .any(|arg| is_multiline_object(arg, line_breaks))
 }

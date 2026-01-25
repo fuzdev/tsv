@@ -9,7 +9,6 @@
 use super::{ParenContext, Printer, needs_parens, unwrap_parenthesized};
 use crate::ast::internal;
 use tsv_lang::doc::{self, Doc};
-use tsv_lang::printing::is_same_line;
 
 /// Check if an expression is directly an object literal (needs parentheses in arrow body)
 /// Only returns true for direct ObjectExpression - TSAsExpression etc. are handled separately
@@ -155,14 +154,10 @@ impl<'a> Printer<'a> {
         let arrow_end = arrow_pos + 2; // Position after `=>`
 
         // Check for comments between signature and `=>` (e.g., `(x) /* c */ =>`)
-        let has_pre_arrow_comments = self.has_comments_between(sig_end, arrow_pos);
-
-        if has_pre_arrow_comments {
-            // Print comments before `=>`
-            for comment in tsv_lang::comments_in_range(self.comments, sig_end, arrow_pos) {
-                sig_parts.push(doc::text(" "));
-                sig_parts.push(self.build_comment_doc(comment));
-            }
+        // Single binary search via comments_in_range
+        for comment in tsv_lang::comments_in_range(self.comments, sig_end, arrow_pos) {
+            sig_parts.push(doc::text(" "));
+            sig_parts.push(self.build_comment_doc(comment));
         }
 
         // Include " =>" in the signature group for width calculation
@@ -227,10 +222,7 @@ impl<'a> Printer<'a> {
                     // Innermost arrow in curried chain - body is NOT another arrow.
                     // This needs indent since it's the final expression.
                     let body_doc = self.build_arrow_body_doc(expr);
-                    parts.push(doc::indent(doc::concat(vec![
-                        doc::hardline(),
-                        body_doc,
-                    ])));
+                    parts.push(doc::indent(doc::concat(vec![doc::hardline(), body_doc])));
                 } else {
                     // Normal expression: can break after => with indentation
                     // Short: (x) => x + 1
@@ -453,9 +445,17 @@ impl<'a> Printer<'a> {
         // Conditional expressions need parens only when inline:
         // Same line: `() => (a ? b : c)` - parens needed to disambiguate
         // New line:  `() =>\n    a ? b : c` - no parens needed
+        //
+        // We use two checks:
+        // 1. will_break: If body contains hardlines, it WILL break, so no parens needed
+        // 2. if_break: For bodies without hardlines, check if enclosing group breaks
         if matches!(expr, internal::Expression::ConditionalExpression(_)) {
             let body_doc = self.build_expression_doc(expr);
-            // if_break: break_doc when on new line, flat_doc when inline
+            // If body contains hardlines (will definitely break), no parens
+            if doc::will_break(&body_doc) {
+                return body_doc;
+            }
+            // Otherwise, use if_break to check enclosing group
             return doc::if_break(
                 body_doc.clone(),
                 doc::concat(vec![doc::text("("), body_doc, doc::text(")")]),
@@ -613,6 +613,13 @@ impl<'a> Printer<'a> {
         // Optional function name
         if let Some(id) = &func.id {
             parts.push(doc::text(" "));
+            // Comments between keywords and the name (same as FunctionDeclaration)
+            parts.push(
+                self.build_inline_comments_between_doc_trailing_space(
+                    func.span.start,
+                    id.span.start,
+                ),
+            );
             parts.push(self.build_identifier_doc(id));
         }
 
@@ -786,7 +793,7 @@ impl<'a> Printer<'a> {
             // Collect same-line comments
             let same_line_comments: Vec<_> =
                 tsv_lang::comments_in_range(self.comments, param.span().end, search_end)
-                    .filter(|c| is_same_line(self.source, param.span().end, c.span.start))
+                    .filter(|c| self.is_same_line(param.span().end, c.span.start))
                     .collect();
 
             // Block comments BEFORE comma go before comma
@@ -867,7 +874,7 @@ impl<'a> Printer<'a> {
                 return true;
             }
             // Check if block comment is on its own line (newline before it)
-            if !is_same_line(self.source, start, comment.span.start) {
+            if !self.is_same_line(start, comment.span.start) {
                 return true;
             }
         }
@@ -889,7 +896,7 @@ impl<'a> Printer<'a> {
                     return true; // First param - keep all comments
                 };
                 // Different line from prev param - definitely a leading comment
-                if !is_same_line(self.source, start, c.span.start) {
+                if !self.is_same_line(start, c.span.start) {
                     return true;
                 }
                 // Same line as prev param: only keep block comments after the comma
@@ -910,7 +917,7 @@ impl<'a> Printer<'a> {
             } else {
                 comments[i - 1].span.end
             };
-            let on_own_line = !is_same_line(self.source, prev_pos, comment.span.start);
+            let on_own_line = !self.is_same_line(prev_pos, comment.span.start);
 
             if on_own_line && i > 0 {
                 // Comment on its own line (not first) - add hardline before it
@@ -921,7 +928,7 @@ impl<'a> Printer<'a> {
 
         // Check if the param itself is on its own line after the last comment
         let last_comment_end = comments.last().map_or(start, |c| c.span.end);
-        let param_on_own_line = !is_same_line(self.source, last_comment_end, end);
+        let param_on_own_line = !self.is_same_line(last_comment_end, end);
 
         if param_on_own_line {
             parts.push(doc::hardline());

@@ -131,9 +131,9 @@ impl<'a> Printer<'a> {
         }
     }
 
-    // =========================================================================
+    //
     // TypeScript Type Assertions
-    // =========================================================================
+    //
 
     /// Build a Doc for a TypeScript angle-bracket type assertion: `<Type>expr`
     fn build_ts_type_assertion_doc(
@@ -427,9 +427,9 @@ impl<'a> Printer<'a> {
         doc::concat(parts)
     }
 
-    // =========================================================================
+    //
     // Template Literals
-    // =========================================================================
+    //
 
     /// Build a Doc for a template literal
     ///
@@ -1038,11 +1038,23 @@ impl<'a> Printer<'a> {
         tagged: &crate::ast::internal::TaggedTemplateExpression,
     ) -> Doc {
         let tag_doc = self.build_expression_doc(&tagged.tag);
+
+        // Wrap tag in parens if needed (e.g., ternary: `(a ? b : c)`template``)
+        // This must happen BEFORE adding removed-paren comments so comments stay outside
         let tag_doc = if needs_parens(&tagged.tag, ParenContext::Callee) {
             doc::parens(tag_doc)
         } else {
             tag_doc
         };
+
+        // Check for comments between removed parentheses and tag
+        // e.g., (/* comment */ tag)`template` has tagged.span.start at '(' and tag.span.start at 'tag'
+        let tag_doc = self.prepend_removed_paren_comments(
+            tagged.span.start,
+            tagged.tag.span().start,
+            tag_doc,
+        );
+
         doc::concat(vec![
             tag_doc,
             self.build_template_literal_doc(&tagged.quasi),

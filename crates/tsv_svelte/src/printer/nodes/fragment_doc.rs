@@ -753,9 +753,9 @@ impl<'a> Printer<'a> {
         }
     }
 
-    // =========================================================================
+    //
     // Text nodes
-    // =========================================================================
+    //
 
     /// Build a doc for a text node
     ///
@@ -843,9 +843,9 @@ impl<'a> Printer<'a> {
         Some(doc::fill(parts))
     }
 
-    // =========================================================================
+    //
     // Comment nodes
-    // =========================================================================
+    //
 
     /// Build a doc for an HTML comment
     pub(crate) fn build_html_comment_doc(&self, comment: &internal::HtmlComment) -> Doc {
@@ -856,9 +856,9 @@ impl<'a> Printer<'a> {
         ])
     }
 
-    // =========================================================================
+    //
     // Control flow blocks
-    // =========================================================================
+    //
 
     /// Build a doc for an if block
     ///
@@ -1495,9 +1495,9 @@ impl<'a> Printer<'a> {
         doc::concat(parts)
     }
 
-    // =========================================================================
+    //
     // Template tags
-    // =========================================================================
+    //
 
     /// Build a doc for {@html expr}
     pub(crate) fn build_html_tag_doc(&self, tag: &internal::HtmlTag) -> Doc {
@@ -1583,9 +1583,9 @@ impl<'a> Printer<'a> {
         doc::concat(vec![doc::text("{@render "), expr_doc, doc::text("}")])
     }
 
-    // =========================================================================
+    //
     // Helper methods
-    // =========================================================================
+    //
 
     /// Extract source range as string slice
     fn extract_source_range(&self, start: usize, end: usize) -> &str {

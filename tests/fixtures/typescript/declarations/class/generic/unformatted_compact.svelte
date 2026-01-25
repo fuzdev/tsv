@@ -1,7 +1,7 @@
 <script lang="ts">
-// =====================================================================
+//
 // Generic Classes
-// =====================================================================
+//
 
 // Single type parameter
 class Single<T>{value:T;constructor(value:T){this.value=value;}}

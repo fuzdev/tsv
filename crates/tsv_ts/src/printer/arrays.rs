@@ -10,9 +10,47 @@ use super::{Printer, has_multiline_content};
 use crate::ast::internal::{self, Expression, LiteralValue};
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::{self, Doc};
-use tsv_lang::printing::{has_blank_line_between, is_same_line};
 
 impl<'a> Printer<'a> {
+    /// Check if array should force break based on Prettier's heuristic
+    ///
+    /// Returns true when:
+    /// - More than 1 element
+    /// - ALL elements are arrays (or ALL are objects - no mixing)
+    /// - EACH inner array/object has more than 1 item
+    ///
+    /// This matches prettier's shouldBreak logic in array.js:89-106
+    fn should_break_nested_array(&self, arr: &internal::ArrayExpression) -> bool {
+        if arr.elements.len() <= 1 {
+            return false;
+        }
+
+        let mut expect_arrays: Option<bool> = None;
+
+        for elem in &arr.elements {
+            let Some(expr) = elem else { return false };
+
+            let (is_array, inner_len) = match expr {
+                Expression::ArrayExpression(inner) => (true, inner.elements.len()),
+                Expression::ObjectExpression(inner) => (false, inner.properties.len()),
+                _ => return false,
+            };
+
+            // All elements must be same type (all arrays or all objects)
+            if expect_arrays.is_some_and(|expected| expected != is_array) {
+                return false;
+            }
+            expect_arrays = Some(is_array);
+
+            // Each inner must have more than 1 item
+            if inner_len <= 1 {
+                return false;
+            }
+        }
+
+        true
+    }
+
     /// Calculate the boundary position for the next element (or array end)
     ///
     /// Used to find the range for trailing comments after an element.
@@ -100,7 +138,7 @@ impl<'a> Printer<'a> {
         let comma_pos = self.find_comma_after(elem_end);
 
         for comment in comments_in_range(self.comments, elem_end, next_boundary) {
-            if comment.is_block && is_same_line(self.source, elem_end, comment.span.start) {
+            if comment.is_block && self.is_same_line(elem_end, comment.span.start) {
                 // Only add if before comma (or no comma found - shouldn't happen in valid arrays with more elements)
                 if comma_pos.is_none_or(|pos| comment.span.start < pos) {
                     parts.push(self.format_inline_block_comment(comment, false));
@@ -112,31 +150,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an array with proper wrapping behavior
     pub(super) fn build_array_doc_with_wrapping(&self, arr: &internal::ArrayExpression) -> Doc {
         if arr.elements.is_empty() {
-            // Check for comments inside empty array
-            let has_inner_comments =
-                self.has_comments_between(arr.span.start + 1, arr.span.end - 1);
-            if has_inner_comments {
-                // Build array with comments inside
-                let mut comment_parts = Vec::new();
-                for comment in
-                    comments_in_range(self.comments, arr.span.start + 1, arr.span.end - 1)
-                {
-                    comment_parts.push(self.build_comment_doc(comment));
-                    if !comment.is_block {
-                        comment_parts.push(doc::hardline());
-                    }
-                }
-                return doc::concat(vec![
-                    doc::text("["),
-                    doc::indent(doc::concat(vec![
-                        doc::hardline(),
-                        doc::concat(comment_parts),
-                    ])),
-                    doc::hardline(),
-                    doc::text("]"),
-                ]);
-            }
-            return doc::text("[]");
+            return self.build_empty_brackets_with_comments_doc(arr.span);
         }
 
         // Check for line comments in the array (force expansion - can't be inline)
@@ -251,6 +265,9 @@ impl<'a> Printer<'a> {
         // Check if last element is an elision (requires mandatory trailing comma)
         let has_trailing_elision = arr.elements.last().is_some_and(Option::is_none);
 
+        // Check Prettier's shouldBreak heuristic for nested arrays/objects
+        let should_break = self.should_break_nested_array(arr);
+
         for (i, elem) in arr.elements.iter().enumerate() {
             // Calculate elem_end for blank line checking (even for elisions)
             let elem_end = self.element_end_position(elem.as_ref(), arr);
@@ -279,7 +296,7 @@ impl<'a> Printer<'a> {
             if !is_last {
                 // Check for blank line after this element (using same boundary logic as comments)
                 let next_start = self.next_element_boundary(arr, i);
-                let has_blank_after = has_blank_line_between(self.source, elem_end, next_start);
+                let has_blank_after = self.has_blank_line_between(elem_end, next_start);
 
                 // Separator comma between elements
                 parts.push(doc::text(","));
@@ -311,12 +328,18 @@ impl<'a> Printer<'a> {
         let inner = doc::concat(vec![doc::softline(), doc::concat(parts), trailing]);
         let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, doc::softline());
 
-        doc::group(doc::concat(vec![
+        // Build group contents, adding break_parent() if shouldBreak heuristic matched
+        let mut group_contents = vec![
             doc::text("["),
             indented_content,
             closing_line,
             doc::text("]"),
-        ]))
+        ];
+        if should_break {
+            group_contents.push(doc::break_parent());
+        }
+
+        doc::group(doc::concat(group_contents))
     }
 
     /// Build group doc for arrays with multiline content (forced expansion with hardlines)
@@ -330,7 +353,7 @@ impl<'a> Printer<'a> {
                     .as_ref()
                     .map_or(arr.span.start + 1, |e| e.span().end);
                 let curr_start = elem.as_ref().map_or(arr.span.end - 1, |e| e.span().start);
-                has_blank_line_between(self.source, prev_end, curr_start)
+                self.has_blank_line_between(prev_end, curr_start)
             } else {
                 false
             };
@@ -386,7 +409,7 @@ impl<'a> Printer<'a> {
             let leading_comments: Vec<_> = comments_in_range(self.comments, prev_end, elem_start)
                 .filter(|c| {
                     // Skip comments that are trailing on the previous line
-                    !(i > 0 && is_same_line(self.source, prev_end, c.span.start))
+                    !(i > 0 && self.is_same_line(prev_end, c.span.start))
                 })
                 .collect();
 
@@ -396,7 +419,7 @@ impl<'a> Printer<'a> {
                 let blank_check_end = leading_comments
                     .first()
                     .map_or(elem_start, |c| c.span.start);
-                if has_blank_line_between(self.source, prev_end, blank_check_end) {
+                if self.has_blank_line_between(prev_end, blank_check_end) {
                     parts.push(doc::literalline());
                     parts.push(doc::hardline());
                 }
@@ -407,7 +430,7 @@ impl<'a> Printer<'a> {
                 parts.push(self.build_comment_doc(comment));
                 // Line comments always need hardline after
                 // Block comments: hardline if NOT on same line as element, space otherwise
-                if !comment.is_block || !is_same_line(self.source, comment.span.end, elem_start) {
+                if !comment.is_block || !self.is_same_line(comment.span.end, elem_start) {
                     parts.push(doc::hardline());
                 } else {
                     parts.push(doc::text(" "));
@@ -424,7 +447,7 @@ impl<'a> Printer<'a> {
 
             // Collect same-line trailing comments (block before comma, line after)
             let trailing: Vec<_> = comments_in_range(self.comments, elem_end, next_boundary)
-                .filter(|c| is_same_line(self.source, elem_end, c.span.start))
+                .filter(|c| self.is_same_line(elem_end, c.span.start))
                 .collect();
 
             // Block comments go before comma
@@ -454,11 +477,12 @@ impl<'a> Printer<'a> {
                     |e| e.span().start,
                 );
                 // Check for blank line to first leading comment, or to element if no comments
-                let first_leading_comment = comments_in_range(self.comments, elem_end, next_elem_start)
-                    .find(|c| !is_same_line(self.source, elem_end, c.span.start));
-                let blank_check_boundary = first_leading_comment
-                    .map_or(next_elem_start, |c| c.span.start);
-                has_blank_line_between(self.source, elem_end, blank_check_boundary)
+                let first_leading_comment =
+                    comments_in_range(self.comments, elem_end, next_elem_start)
+                        .find(|c| !self.is_same_line(elem_end, c.span.start));
+                let blank_check_boundary =
+                    first_leading_comment.map_or(next_elem_start, |c| c.span.start);
+                self.has_blank_line_between(elem_end, blank_check_boundary)
             } else {
                 false
             };
@@ -472,7 +496,7 @@ impl<'a> Printer<'a> {
 
         // Add any final comments before closing bracket
         for comment in comments_in_range(self.comments, prev_end, arr.span.end - 1) {
-            if !is_same_line(self.source, prev_end, comment.span.start) {
+            if !self.is_same_line(prev_end, comment.span.start) {
                 parts.push(doc::hardline());
                 parts.push(self.build_comment_doc(comment));
             }

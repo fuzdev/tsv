@@ -149,9 +149,9 @@ pub struct SpreadAttribute {
     pub expression: Expression,
 }
 
-// =============================================================================
+//
 // Directives
-// =============================================================================
+//
 
 /// OnDirective - event handler (`on:click={handler}`)
 #[derive(Debug, Clone, Serialize, Deserialize)]

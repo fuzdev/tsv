@@ -51,9 +51,9 @@ fn strip_trailing_whitespace(s: String) -> String {
     result
 }
 
-// =============================================================================
+//
 // Shared rendering helpers
-// =============================================================================
+//
 
 /// Render text content and update position
 #[inline]
@@ -1106,9 +1106,9 @@ fn render_single_doc_inner<'a, R: TextResolver + ?Sized>(
     }
 }
 
-// =============================================================================
+//
 // Utilities
-// =============================================================================
+//
 
 /// Write indentation to output
 ///

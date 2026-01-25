@@ -256,10 +256,11 @@ impl<'a> Lexer<'a> {
                 self.advance(); // consume '.'
                 self.scan_digits(|c| c.is_ascii_digit());
             } else if next_char.is_none()
-                || !next_char.is_some_and(|c| is_xid_start(c) || c == '_' || c == '$' || c == '.')
+                || !next_char.is_some_and(|c| is_xid_start(c) || c == '_' || c == '$')
             {
-                // Trailing decimal: 5. (followed by ; or space or end)
-                // But not: 5.toString() or 5..toString()
+                // Trailing decimal: 5. or 0. (followed by operator, punctuation, or end)
+                // Don't consume if followed by identifier: 5.toString() is invalid anyway
+                // Do consume for 0..toString() so the number is "0." and second dot is member access
                 self.advance(); // consume '.'
             }
         }

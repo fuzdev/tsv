@@ -4,9 +4,9 @@ use super::Printer;
 use crate::ast::internal::{self, Expression};
 use crate::printer::{
     ParenContext, conditional_needs_fluid_layout, is_curried_arrow_with_return_type,
-    is_module_path_fluid_call, is_multiline_string_literal, is_plain_require_call,
-    is_poorly_breakable_chain, is_pure_property_chain, is_self_expanding_value,
-    is_simple_self_expanding, is_string_literal, is_type_assertion_call, needs_parens,
+    is_module_path_fluid_call, is_multiline_string_literal, is_poorly_breakable_chain,
+    is_pure_property_chain, is_self_expanding_value, is_simple_self_expanding, is_string_literal,
+    is_type_assertion_call, needs_parens,
 };
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc;
@@ -93,12 +93,13 @@ impl<'a> Printer<'a> {
         };
         let first_decl_start = decl.declarations[0].span.start;
 
-        if self.has_comments_between(keyword_end, first_decl_start) {
-            parts.push(self.build_inline_comments_between_doc(keyword_end, first_decl_start));
-            parts.push(doc::text(" "));
-        } else {
-            parts.push(doc::text(" "));
+        // Use _opt variant to avoid redundant binary search
+        if let Some(comments_doc) =
+            self.build_inline_comments_between_doc_opt(keyword_end, first_decl_start)
+        {
+            parts.push(comments_doc);
         }
+        parts.push(doc::text(" "));
 
         let is_multi_declarator = decl.declarations.len() > 1;
         let has_any_init = decl.declarations.iter().any(|d| d.init.is_some());
@@ -230,7 +231,16 @@ impl<'a> Printer<'a> {
                 // Break-after-operator layout: group([left, " =", group(indent([line, right]))])
                 // Used for fluid RHS or simple RHS when LHS can break.
                 let interner = self.interner.borrow();
-                let is_plain_require = is_plain_require_call(init, &interner);
+
+                // Calls with trailing comments expand internally and should not use fluid layout
+                let is_call_with_trailing_comments = if let Expression::CallExpression(call) = init
+                {
+                    call.arguments.last().is_some_and(|last_arg| {
+                        self.has_line_comments_between(last_arg.span().end, call.span.end)
+                    })
+                } else {
+                    false
+                };
 
                 let is_fluid_rhs = (is_module_path_fluid_call(init, &interner)
                     || is_pure_property_chain(init)
@@ -238,7 +248,8 @@ impl<'a> Printer<'a> {
                     || matches!(init, Expression::BinaryExpression(_))
                     || conditional_needs_fluid_layout(init)
                     || is_string_literal(init))
-                    && !is_self_expanding_value(init);
+                    && !is_self_expanding_value(init)
+                    && !is_call_with_trailing_comments;
 
                 // Type assertion calls with LHS type annotation need special fluid handling
                 // (handled separately below because they need non-wrapping LHS type)
@@ -252,7 +263,6 @@ impl<'a> Printer<'a> {
                     can_break_left && is_simple_self_expanding(init);
 
                 let needs_break_after_operator = !should_break
-                    && !is_plain_require
                     && (is_fluid_rhs || is_simple_rhs_with_breakable_lhs)
                     && !doc::will_break(&id_doc)
                     && !has_complex_type_annotation
@@ -275,11 +285,7 @@ impl<'a> Printer<'a> {
                         for comment in
                             tsv_lang::comments_in_range(self.comments, equals_pos + 1, init_start)
                         {
-                            if tsv_lang::printing::is_same_line(
-                                self.source,
-                                equals_pos,
-                                comment.span.start,
-                            ) {
+                            if self.is_same_line(equals_pos, comment.span.start) {
                                 // Inline comment on same line as =
                                 parts.push(doc::text(" "));
                                 parts.push(self.build_comment_doc(comment));
@@ -296,11 +302,7 @@ impl<'a> Printer<'a> {
                                 equals_pos + 1,
                                 init_start,
                             ) {
-                                if !tsv_lang::printing::is_same_line(
-                                    self.source,
-                                    equals_pos,
-                                    comment.span.start,
-                                ) {
+                                if !self.is_same_line(equals_pos, comment.span.start) {
                                     leading.push(self.build_comment_doc(comment));
                                     leading.push(doc::hardline());
                                 }

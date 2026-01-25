@@ -1,7 +1,7 @@
 <script lang="ts">
-	// =======================================================
+	//
 	// Reserved words in object literal positions (ES5+)
-	// =======================================================
+	//
 
 	const obj = {
 		// Control flow keywords
@@ -74,9 +74,9 @@
 	const f = obj.class;
 	obj.else = 100;
 
-	// =======================================================
+	//
 	// Reserved words as class members
-	// =======================================================
+	//
 
 	class A {
 		// JS reserved words as method names
@@ -108,10 +108,10 @@
 		static extends(): void {}
 	}
 
-	// =======================================================
+	//
 	// Strict mode reserved words as class members
 	// (Valid as property/method names, NOT as parameter names)
-	// =======================================================
+	//
 
 	class C {
 		// As property names
@@ -131,9 +131,9 @@
 		public(): void {}
 	}
 
-	// =======================================================
+	//
 	// TypeScript contextual keywords as class members
-	// =======================================================
+	//
 
 	class D {
 		// As property names
@@ -145,10 +145,10 @@
 		package(): void {}
 	}
 
-	// =======================================================
+	//
 	// TypeScript modifier keywords as class members
 	// (readonly, override, abstract, accessor, static, async)
-	// =======================================================
+	//
 
 	class E {
 		// As property names

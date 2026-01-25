@@ -1,7 +1,7 @@
 <script lang="ts">
-	// =====================================================================
+	//
 	// Generic Arrow Functions
-	// =====================================================================
+	//
 
 	// Basic identity with trailing comma
 	const identity = <T,>(x: T) => x;
@@ -33,9 +33,9 @@
 	// Generic arrow with conditional type in default
 	const conditionalDefault = <T, U extends T = T extends string ? T : never>(x: T) => x;
 
-	// =====================================================================
+	//
 	// Instantiation Expressions
-	// =====================================================================
+	//
 
 	// Basic instantiation expression (PR #17724)
 	void (<_T extends never>() => {})<never>;

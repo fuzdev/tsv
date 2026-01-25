@@ -55,6 +55,15 @@ impl<'a> Printer<'a> {
         }
         if let Some(id) = &decl.id {
             parts.push(doc::text(" "));
+            // Comments between keywords and the name: `async /* a */ function* /* b */ F()`
+            // Search from span start to find all comments before the name
+            // (prettier normalizes them to after `function*`)
+            parts.push(
+                self.build_inline_comments_between_doc_trailing_space(
+                    decl.span.start,
+                    id.span.start,
+                ),
+            );
             parts.push(doc::symbol(id.name.to_u32()));
         } else {
             // Prettier adds a space before () for anonymous functions

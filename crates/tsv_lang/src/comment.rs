@@ -1,6 +1,7 @@
 // Shared comment type and utilities used across languages
 use crate::Span;
 use crate::printing;
+use smallvec::SmallVec;
 
 #[derive(Debug, Clone)]
 pub struct Comment {
@@ -9,9 +10,9 @@ pub struct Comment {
     pub span: Span,
 }
 
-// ============================================================================
+//
 // Comment Classification
-// ============================================================================
+//
 //
 // Comments between two nodes can be classified as:
 // - Trailing: on same line as prev_end (belongs to previous node)
@@ -59,6 +60,102 @@ pub fn classify_comment(
 
     // Otherwise, it's on its own line
     CommentPosition::LeadingOwnLine
+}
+
+/// Classify a comment's position using precomputed line breaks (O(log n)).
+///
+/// This is the optimized version of [`classify_comment`] that uses binary search
+/// on a precomputed line breaks table instead of scanning the source string.
+///
+/// # Arguments
+///
+/// * `comment` - The comment to classify
+/// * `prev_end` - End position of the previous element
+/// * `curr_start` - Start position of the next element
+/// * `line_breaks` - Sorted slice of newline byte offsets
+///
+/// # Returns
+///
+/// The comment's position classification.
+#[inline]
+pub fn classify_comment_fast(
+    comment: &Comment,
+    prev_end: u32,
+    curr_start: u32,
+    line_breaks: &[u32],
+) -> CommentPosition {
+    // Check if trailing (same line as prev_end)
+    if printing::is_same_line_fast(line_breaks, prev_end, comment.span.start) {
+        return CommentPosition::Trailing;
+    }
+
+    // Check if inline leading (same line as curr_start)
+    if printing::is_same_line_fast(line_breaks, comment.span.end, curr_start) {
+        return CommentPosition::LeadingInline;
+    }
+
+    // Otherwise, it's on its own line
+    CommentPosition::LeadingOwnLine
+}
+
+/// Comments classified by position and type in a single pass.
+///
+/// Used by chain printers to avoid multiple binary searches per chain segment.
+/// Instead of calling 4 separate filter functions (block/line × trailing/leading),
+/// this struct collects all comments in O(log n + k) time.
+#[derive(Debug, Default)]
+pub struct ClassifiedComments<'a> {
+    /// Block comments on same line as prev_end (trailing position)
+    pub trailing_block: SmallVec<[&'a Comment; 2]>,
+    /// Line comments on same line as prev_end (trailing position)
+    pub trailing_line: SmallVec<[&'a Comment; 2]>,
+    /// Block comments on their own line (leading position)
+    pub leading_block: SmallVec<[&'a Comment; 2]>,
+    /// Line comments on their own line (leading position)
+    pub leading_line: SmallVec<[&'a Comment; 2]>,
+}
+
+impl<'a> ClassifiedComments<'a> {
+    /// Classify all comments in a range using a single binary search.
+    ///
+    /// This is more efficient than calling separate filter functions when you need
+    /// multiple comment categories from the same range.
+    ///
+    /// # Arguments
+    ///
+    /// * `comments` - All comments sorted by span.start
+    /// * `start` - Start position (e.g., end of previous chain element)
+    /// * `end` - End position (e.g., start of next chain element)
+    /// * `line_breaks` - Precomputed line break positions for O(log n) same-line checks
+    ///
+    /// # Complexity
+    ///
+    /// O(log n + k) where n is total comments and k is comments in range.
+    /// Compared to 4 separate filter calls which would be O(4 log n + 4k).
+    pub fn from_range(comments: &'a [Comment], start: u32, end: u32, line_breaks: &[u32]) -> Self {
+        let mut result = Self::default();
+
+        for comment in comments_in_range(comments, start, end) {
+            let same_line = printing::is_same_line_fast(line_breaks, start, comment.span.start);
+            match (comment.is_block, same_line) {
+                (true, true) => result.trailing_block.push(comment),
+                (false, true) => result.trailing_line.push(comment),
+                (true, false) => result.leading_block.push(comment),
+                (false, false) => result.leading_line.push(comment),
+            }
+        }
+
+        result
+    }
+
+    /// Check if all buckets are empty (no comments in range).
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.trailing_block.is_empty()
+            && self.trailing_line.is_empty()
+            && self.leading_block.is_empty()
+            && self.leading_line.is_empty()
+    }
 }
 
 /// Iterate over leading comments (excludes trailing).
@@ -123,9 +220,9 @@ pub fn trailing_comments<'a>(
     })
 }
 
-// ============================================================================
+//
 // Efficient Comment Lookup Utilities
-// ============================================================================
+//
 //
 // Comments are collected in order during lexing, so they're naturally sorted
 // by span.start. These functions use binary search for O(log n) range lookups.

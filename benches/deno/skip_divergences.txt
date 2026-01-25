@@ -17,17 +17,24 @@
 
 # Block multiline attrs content hug (<pre> with multiline attrs, we break >)
 src/lib/ContentPreview.svelte
+src/lib/SocketMessageQueue.svelte
 
 # Template literal width (interpolations break to respect print width)
+dist_server/server/server.js
 src/lib/action_collections.gen.ts
+src/lib/action_event.ts
+src/lib/action_metatypes.gen.ts
 src/lib/cell.svelte.ts
-src/lib/server/helpers.ts
-src/test/config_defaults.test.ts
+src/lib/cell_registry.svelte.ts
+src/lib/chat.svelte.ts
 src/lib/frontend_http_transport.ts
+src/lib/indexed_collection.svelte.ts
 src/lib/server/backend_action_handlers.ts
 src/lib/server/backend_actions_api.ts
+src/lib/server/helpers.ts
 src/lib/server/server.ts
 src/lib/server/server_info.ts
+src/test/config_defaults.test.ts
 
 # Inline content hug (expression breaks at ternary/operator vs bracket break)
 src/lib/OllamaActions.svelte
@@ -39,10 +46,13 @@ src/lib/DashboardDiskfiles.svelte
 src/lib/OllamaModelDetail.svelte
 
 # Fill after inline (text after inline element exceeds print width - we break at 100, Prettier allows 102+)
+src/lib/CapabilityProviderOllama.svelte
+src/routes/about/+page.svelte
 src/routes/projects/+page.svelte
 src/routes/tabs/+page.svelte
-src/routes/about/+page.svelte
-src/lib/CapabilityProviderOllama.svelte
 
-# Block multiline attrs content hug (<pre> with multiline attrs, we break >)
-src/lib/SocketMessageQueue.svelte
+# Single specifier import wrapping (we wrap at print width, Prettier keeps inline)
+src/routes/projects/projects.svelte.ts
+
+# Short expr 100+ (in_inline_element_long divergence - we break at ===, Prettier exceeds print width)
+src/lib/ToggleButton.svelte

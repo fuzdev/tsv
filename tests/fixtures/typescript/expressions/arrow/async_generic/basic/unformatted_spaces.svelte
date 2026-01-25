@@ -1,8 +1,8 @@
 <script lang="ts">
-	// =====================================================================
+	//
 	// Basic Async Generic Arrow Functions (Svelte context - trailing comma needed)
 	// See basic_ts/input.ts for pure TypeScript version (no trailing comma)
-	// =====================================================================
+	//
 
 	// Basic (trailing comma for JSX disambiguation)
 	const   basic   =   async   < T ,
@@ -39,9 +39,9 @@
 	 T > ( )   
 	 =>   { } ;
 
-	// =====================================================================
+	//
 	// Complex Constraints
-	// =====================================================================
+	//
 
 	// Object type constraint
 	const   objectConstraint   =   async   < T   extends   { foo :   string } > ( )   =>
@@ -75,9 +75,9 @@
 	const   conditionalDefault   =   async   < T ,   U  
 	 extends   T   =   T   extends   string   ?   T   :   never > ( )   =>   { } ;
 
-	// =====================================================================
+	//
 	// With Parameters and Return Types
-	// =====================================================================
+	//
 
 	// With parameter
 	const   withParam   =   async   < T , > ( x :   T ) :   Promise < T >   =>   x ;
@@ -105,9 +105,9 @@
 	const   nestedReturn   =   async   < T
 	 , > ( ) :   Promise < Awaited < T > >   =>   x ;
 
-	// =====================================================================
+	//
 	// Special Patterns
-	// =====================================================================
+	//
 
 	// Typed variable with async generic arrow
 	const   typed :   < T > ( )   =>   Promise < T >   =   

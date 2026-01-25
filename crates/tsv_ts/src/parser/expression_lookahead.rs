@@ -10,7 +10,7 @@
 
 use super::scan::{
     is_identifier_start, skip_block_comment, skip_identifier, skip_line_comment,
-    skip_string_literal, skip_whitespace, skip_whitespace_and_comments,
+    skip_string_literal, skip_whitespace_and_comments,
 };
 
 /// Scan through parentheses and check if followed by `=>`
@@ -159,13 +159,13 @@ fn scan_for_arrow(bytes: &[u8], mut pos: usize) -> bool {
 /// Check if position starts with an identifier followed by `=>`
 ///
 /// Detects single-parameter arrow functions without parentheses: `x => expr`
-/// Returns `true` if pattern `identifier =>` is found (with optional whitespace).
+/// Returns `true` if pattern `identifier =>` is found (with optional whitespace/comments).
 pub(super) fn scan_identifier_then_arrow(bytes: &[u8], pos: usize) -> bool {
     // Skip the identifier (already validated by lexer as TokenKind::Identifier)
     let end = skip_identifier(bytes, pos);
 
-    // Skip whitespace after identifier
-    let pos = skip_whitespace(bytes, end);
+    // Skip whitespace and comments after identifier: `a /* comment */ =>`
+    let pos = skip_whitespace_and_comments(bytes, end);
 
     // Check for =>
     pos + 1 < bytes.len() && bytes[pos] == b'=' && bytes[pos + 1] == b'>'
@@ -232,22 +232,22 @@ pub(super) fn is_function_type_start(bytes: &[u8], pos: usize) -> bool {
         return false;
     }
 
-    let after_paren = skip_whitespace(bytes, pos + 1);
+    let after_paren = skip_whitespace_and_comments(bytes, pos + 1);
     if after_paren >= bytes.len() {
         return false;
     }
 
     // `(identifier:` or `(identifier?:` → function type parameter
     if is_identifier_start(bytes[after_paren]) {
-        let after_id = skip_whitespace(bytes, skip_identifier(bytes, after_paren));
+        let after_id = skip_whitespace_and_comments(bytes, skip_identifier(bytes, after_paren));
         if after_id < bytes.len() && matches!(bytes[after_id], b':' | b'?') {
             return true;
         }
     }
 
-    // `() =>` → no-params function type
+    // `() =>` or `( /* comment */ ) =>` → no-params function type
     if bytes[after_paren] == b')' {
-        let after_close = skip_whitespace(bytes, after_paren + 1);
+        let after_close = skip_whitespace_and_comments(bytes, after_paren + 1);
         if after_close + 1 < bytes.len()
             && bytes[after_close] == b'='
             && bytes[after_close + 1] == b'>'

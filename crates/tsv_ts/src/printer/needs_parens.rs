@@ -16,7 +16,7 @@
 // - prettier/src/language-js/needs-parens.js
 // - prettier/src/language-js/print/index.js (application layer)
 
-use crate::ast::internal::{BinaryOperator, Expression};
+use crate::ast::internal::{BinaryOperator, Expression, LiteralValue};
 
 /// Context for parenthesization decisions
 ///
@@ -126,8 +126,12 @@ pub fn needs_parens(expr: &Expression, ctx: ParenContext) -> bool {
         }
 
         // Chain base: `(a + b).method()`, `(await x).method()`, `(yield x).method()`, etc.
+        // Numeric literals need parens for `.method()` calls: `0.toString()` is invalid syntax.
+        // Prettier normalizes `0..toString()` to `(0).toString()`.
+        ParenContext::ChainBase => is_lower_precedence(expr) || is_numeric_literal(expr),
+
         // Spread argument: `...(a || b)`, `...(a ? b : c)`, `...(await x)`, `...(x as T)`
-        ParenContext::ChainBase | ParenContext::SpreadArgument => is_lower_precedence(expr),
+        ParenContext::SpreadArgument => is_lower_precedence(expr),
 
         // Non-null: `(a + b)!`, `(!x)!`, `(a ? b : c)!`, `(yield x)!`, etc.
         ParenContext::NonNull => {
@@ -179,9 +183,9 @@ pub fn needs_parens(expr: &Expression, ctx: ParenContext) -> bool {
     }
 }
 
-// =============================================================================
+//
 // Simple predicates (expression type groupings)
-// =============================================================================
+//
 
 /// `await x` or `yield x` - always need parens together in most contexts
 fn is_await_or_yield(expr: &Expression) -> bool {
@@ -222,9 +226,18 @@ fn is_function_like(expr: &Expression) -> bool {
     )
 }
 
-// =============================================================================
+/// Numeric literal - needs parens in chain base context because `0.toString()` is invalid.
+/// Prettier normalizes `0..toString()` to `(0).toString()`.
+fn is_numeric_literal(expr: &Expression) -> bool {
+    matches!(
+        expr,
+        Expression::Literal(lit) if matches!(lit.value, LiteralValue::Number(_))
+    )
+}
+
+//
 // Complex helpers (non-trivial logic)
-// =============================================================================
+//
 
 /// Expression statement: `<expr>;`
 /// Object expressions and object pattern assignments need parens to avoid ambiguity

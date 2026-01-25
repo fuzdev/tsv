@@ -478,6 +478,58 @@ impl<'a> Parser<'a> {
         )
     }
 
+    /// Peek past any comments to find the next non-comment token kind.
+    ///
+    /// Unlike `peek_kind()`, this skips over comment tokens to find the actual
+    /// next code token. Comments encountered are collected into the comments Vec.
+    ///
+    /// Used for disambiguating constructs where comments may appear between keywords:
+    /// - `async /* comment */ function` - detect async function declaration
+    ///
+    /// Note: This may consume multiple tokens from the lexer. The peek_cache
+    /// will hold the first non-comment token found.
+    pub(super) fn peek_non_comment_kind(&mut self) -> TokenKind {
+        // First, populate peek_cache if empty
+        let mut kind = self.peek_kind();
+
+        // Skip over any comment tokens
+        while let TokenKind::Comment { content, is_block } = &kind {
+            // Collect the comment
+            if let Some(peek) = self.peek_cache.take() {
+                self.comments.push(Comment {
+                    content: content.clone(),
+                    is_block: *is_block,
+                    span: Span::new(
+                        (peek.start + self.base_offset) as u32,
+                        (peek.end + self.base_offset) as u32,
+                    ),
+                });
+            }
+
+            // Get the next token
+            if self.lexer_error.is_some() {
+                return TokenKind::Eof;
+            }
+            match self.lexer.next_token() {
+                Ok(token) => {
+                    self.peek_cache = Some(PeekData::with_decoded(
+                        token.kind.clone(),
+                        token.start,
+                        token.end,
+                        token.decoded,
+                    ));
+                    kind = token.kind;
+                }
+                Err(err) => {
+                    self.lexer_error = Some(err);
+                    return TokenKind::Eof;
+                }
+            }
+        }
+
+        kind
+    }
+
     /// Check if current token is an identifier or keyword.
     ///
     /// In JS/TypeScript, reserved words (keywords) can be used as property names
@@ -1109,9 +1161,18 @@ impl<'a> Parser<'a> {
         // Use current_pos() to get global position (includes base_offset)
         let (_, end) = self.current_pos();
 
+        // Build line breaks table for O(log n) line boundary lookups
+        // Must add base_offset to each position since AST spans use global positions
+        let base_offset_u32 = self.base_offset as u32;
+        let line_breaks: Vec<u32> = tsv_lang::printing::build_line_breaks(self.source)
+            .into_iter()
+            .map(|pos| pos + base_offset_u32)
+            .collect();
+
         Ok(Program {
             body,
             comments: std::mem::take(&mut self.comments),
+            line_breaks,
             span: Span::new(start as u32, end as u32),
             interner: Rc::clone(&self.interner),
         })

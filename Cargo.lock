@@ -771,6 +771,7 @@ dependencies = [
  "phf",
  "serde",
  "serde_json",
+ "smallvec",
  "string-interner",
  "tsv_lang",
  "unicode-ident",

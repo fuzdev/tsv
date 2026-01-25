@@ -1,7 +1,7 @@
 <script lang="ts">
-// =====================================================================
+//
 // Member-Only Chains with Blank Lines - Should Collapse
-// =====================================================================
+//
 // Blank lines in member-only chains (no calls) are always collapsed.
 // This differs from call chains where blank lines between calls are preserved.
 

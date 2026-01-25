@@ -43,8 +43,8 @@ mod utils;
 pub(crate) use analysis::{
     PatternContext, build_entity_name_doc, conditional_needs_fluid_layout, has_multiline_content,
     is_brace_block_multiline, is_module_path_fluid_call, is_multiline_string_literal,
-    is_plain_require_call, is_pure_property_chain, is_string_literal,
-    object_pattern_should_expand, template_literal_has_newlines,
+    is_pure_property_chain, is_string_literal, object_pattern_should_expand,
+    template_literal_has_newlines,
 };
 pub(crate) use assignment::{
     is_curried_arrow_with_return_type, is_poorly_breakable_chain, is_self_expanding_value,
@@ -59,8 +59,8 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use string_interner::DefaultStringInterner;
 use tsv_lang::{
-    CommentPosition, OutputBuffer, PrintConfig, SymbolResolver, classify_comment, comments_after,
-    comments_in_range,
+    CommentPosition, OutputBuffer, PrintConfig, SymbolResolver, classify_comment_fast,
+    comments_after, comments_in_range,
     doc::{self, Doc},
     has_comments_in_range, has_line_comments_in_range, printing,
 };
@@ -79,6 +79,8 @@ pub struct Printer<'a> {
     pub(crate) source: &'a str,
     /// Comments from the program (for printing leading/trailing comments)
     pub(crate) comments: &'a [internal::Comment],
+    /// Precomputed line break positions for O(log n) line boundary lookups
+    pub(crate) line_breaks: &'a [u32],
     /// Extra indent depth for declaration contexts (0 normally, 1+ in multi-declarator)
     /// When > 0, multiline objects/arrays get extra indentation
     /// Uses Cell for interior mutability so doc builders (&self) can set this
@@ -106,11 +108,12 @@ pub struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    /// Create a new printer with the given interner, source, comments, and config
+    /// Create a new printer with the given interner, source, comments, line_breaks, and config
     pub fn with_config(
         interner: Rc<RefCell<DefaultStringInterner>>,
         source: &'a str,
         comments: &'a [internal::Comment],
+        line_breaks: &'a [u32],
         config: PrintConfig,
     ) -> Self {
         Self {
@@ -120,6 +123,7 @@ impl<'a> Printer<'a> {
             interner,
             source,
             comments,
+            line_breaks,
             declaration_indent_depth: Cell::new(0),
             is_expression_statement: Cell::new(false),
             in_top_level_assignment: Cell::new(false),
@@ -192,6 +196,24 @@ impl<'a> Printer<'a> {
     /// Get the current column position (for doc-builder width calculations)
     pub(crate) fn current_column(&self) -> usize {
         self.buffer.current_column(self.config.tab_width)
+    }
+
+    /// Check if two positions are on the same line (O(log n) binary search)
+    #[inline]
+    pub(crate) fn is_same_line(&self, prev_end: u32, curr_start: u32) -> bool {
+        printing::is_same_line_fast(self.line_breaks, prev_end, curr_start)
+    }
+
+    /// Check if there's a blank line (2+ newlines) between two positions (O(log n) binary search)
+    #[inline]
+    pub(crate) fn has_blank_line_between(&self, prev_end: u32, curr_start: u32) -> bool {
+        printing::has_blank_line_between_fast(self.line_breaks, prev_end, curr_start)
+    }
+
+    /// Check if there's any newline between two positions (O(log n) binary search)
+    #[inline]
+    pub(crate) fn has_newline_between(&self, start: u32, end: u32) -> bool {
+        printing::has_newline_between_fast(self.line_breaks, start, end)
     }
 
     /// Render a Doc to a flat string with effectively infinite width.
@@ -580,7 +602,7 @@ impl<'a> Printer<'a> {
                 // (comments handle their own blank line preservation)
                 let stmt_start = statement.span().start;
                 if !has_comments_in_range(self.comments, prev_end, stmt_start)
-                    && printing::has_blank_line_between(self.source, prev_end, stmt_start)
+                    && self.has_blank_line_between(prev_end, stmt_start)
                 {
                     self.write("\n");
                 }
@@ -623,7 +645,7 @@ impl<'a> Printer<'a> {
             // already handled by statement-level printers (print_inline_comments_in_statement)
             // BUT: When prev_end == 0 (no statements), there's no previous statement to be
             // trailing from, so comments at position 0 should NOT be skipped.
-            if prev_end > 0 && printing::is_same_line(self.source, prev_end, comment.span.start) {
+            if prev_end > 0 && self.is_same_line(prev_end, comment.span.start) {
                 last_comment_end = comment.span.end;
                 continue;
             }
@@ -633,11 +655,7 @@ impl<'a> Printer<'a> {
                 // Comment on its own line - add newline and possible blank line
                 self.write("\n");
 
-                if printing::has_blank_line_between(
-                    self.source,
-                    last_comment_end,
-                    comment.span.start,
-                ) {
+                if self.has_blank_line_between(last_comment_end, comment.span.start) {
                     self.write("\n");
                 }
             }
@@ -696,7 +714,7 @@ impl<'a> Printer<'a> {
                                 .map(|c| c.span.start);
                         let check_end = first_comment_start.unwrap_or_else(|| statement.span().end);
 
-                        if printing::has_blank_line_between(self.source, prev_end, check_end) {
+                        if self.has_blank_line_between(prev_end, check_end) {
                             parts.push(doc::literalline()); // Blank line at column 0
                         }
                         parts.push(doc::hardline()); // Separator with indent
@@ -719,7 +737,7 @@ impl<'a> Printer<'a> {
                         .map(|c| c.span.start);
                 let check_end = first_comment_start.unwrap_or_else(|| statement.span().start);
 
-                if printing::has_blank_line_between(self.source, prev_end, check_end) {
+                if self.has_blank_line_between(prev_end, check_end) {
                     parts.push(doc::literalline()); // Blank line at column 0
                 }
 
@@ -784,7 +802,7 @@ impl<'a> Printer<'a> {
         let mut printed_any = false;
 
         for comment in comments_in_range(self.comments, prev_end, curr_start) {
-            let position = classify_comment(comment, prev_end, curr_start, self.source);
+            let position = classify_comment_fast(comment, prev_end, curr_start, self.line_breaks);
 
             // Skip trailing comments EXCEPT for first statement (file start)
             if !is_first && matches!(position, CommentPosition::Trailing) {
@@ -808,11 +826,7 @@ impl<'a> Printer<'a> {
             // We only handle blank lines between subsequent comments here
             let has_blank_before = printed_any
                 && comment.span.start > last_comment_end
-                && printing::has_blank_line_between(
-                    self.source,
-                    last_comment_end,
-                    comment.span.start,
-                );
+                && self.has_blank_line_between(last_comment_end, comment.span.start);
 
             // Add separator BEFORE this comment (first comment has no separator - parent's hardline handles it)
             if has_blank_before {
@@ -835,7 +849,7 @@ impl<'a> Printer<'a> {
         if printed_any && !force_non_inline {
             // Check if there's a blank line after the last comment
             let has_blank_after = last_comment_end < curr_start
-                && printing::has_blank_line_between(self.source, last_comment_end, curr_start);
+                && self.has_blank_line_between(last_comment_end, curr_start);
 
             if has_blank_after {
                 parts.push(doc::literalline()); // Blank line at column 0
@@ -854,7 +868,7 @@ impl<'a> Printer<'a> {
         let mut docs = Vec::new();
 
         for comment in &self.comments[first_idx..] {
-            if printing::is_same_line(self.source, after_pos, comment.span.start) {
+            if self.is_same_line(after_pos, comment.span.start) {
                 if comment.is_block {
                     // Block comments are inline, affect width
                     docs.push(doc::text(" "));
@@ -879,7 +893,7 @@ impl<'a> Printer<'a> {
         let mut end = after_pos;
 
         for comment in &self.comments[first_idx..] {
-            if printing::is_same_line(self.source, after_pos, comment.span.start) {
+            if self.is_same_line(after_pos, comment.span.start) {
                 end = comment.span.end;
             } else {
                 break;
@@ -901,7 +915,7 @@ impl<'a> Printer<'a> {
             // already handled by build_trailing_same_line_comments_doc
             // BUT: When prev_end == 0 (no statements), there's no previous statement to be
             // trailing from, so comments at position 0 should NOT be skipped.
-            if prev_end > 0 && printing::is_same_line(self.source, prev_end, comment.span.start) {
+            if prev_end > 0 && self.is_same_line(prev_end, comment.span.start) {
                 last_comment_end = comment.span.end;
                 continue;
             }
@@ -909,11 +923,7 @@ impl<'a> Printer<'a> {
             // For comments-only files (no statements), don't add leading newline for first comment
             if prev_end > 0 || !is_first_comment {
                 // Blank line before this comment (add literalline BEFORE hardline)
-                if printing::has_blank_line_between(
-                    self.source,
-                    last_comment_end,
-                    comment.span.start,
-                ) {
+                if self.has_blank_line_between(last_comment_end, comment.span.start) {
                     docs.push(doc::literalline());
                 }
 

@@ -1,7 +1,7 @@
 <script lang="ts">
-// =====================================================================
+//
 // Generic Function Declarations
-// =====================================================================
+//
 
 // Single type parameter
 function single<T>(x:T):T{return x;}

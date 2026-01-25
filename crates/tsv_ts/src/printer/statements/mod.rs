@@ -72,7 +72,7 @@ impl<'a> Printer<'a> {
     pub(super) fn print_trailing_same_line_comments(&mut self, after_pos: u32) {
         let first_idx = tsv_lang::find_first_comment_from(self.comments, after_pos);
         for comment in &self.comments[first_idx..] {
-            if tsv_lang::printing::is_same_line(self.source, after_pos, comment.span.start) {
+            if self.is_same_line(after_pos, comment.span.start) {
                 self.write(" ");
                 self.print_comment(comment);
             } else {
@@ -110,8 +110,10 @@ impl<'a> Printer<'a> {
         // Prettier keeps comments BEFORE the semicolon in expression statements
         let expr_end = stmt.expression.span().end;
         let semicolon_pos = stmt.span.end.saturating_sub(1);
-        if self.has_comments_between(expr_end, semicolon_pos) {
-            parts.push(self.build_inline_comments_between_doc(expr_end, semicolon_pos));
+        if let Some(comments_doc) =
+            self.build_inline_comments_between_doc_opt(expr_end, semicolon_pos)
+        {
+            parts.push(comments_doc);
         }
 
         parts.push(doc::text(";"));

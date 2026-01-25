@@ -1,7 +1,7 @@
 <script lang="ts">
-	// =====================================================================
+	//
 	// Function Expression Body - Blank Lines Force Chain Breaks
-	// =====================================================================
+	//
 	// Blank lines in chains force all members to break, regardless of fit.
 	// This applies in all contexts: arrow functions, IIFEs, function
 	// declarations, class methods, blocks, and top-level.

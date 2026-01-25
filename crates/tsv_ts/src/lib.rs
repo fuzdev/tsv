@@ -84,6 +84,7 @@ pub fn format_with_config(
         Rc::clone(&program.interner),
         source,
         &program.comments,
+        &program.line_breaks,
         config,
     );
     printer.print_program(program);
@@ -108,6 +109,7 @@ pub fn format_with_doc_config(
         Rc::clone(&program.interner),
         source,
         &program.comments,
+        &program.line_breaks,
         config,
     );
     printer.print_program(program);
@@ -236,10 +238,12 @@ pub fn format_expression_with_indent(
     indent_level: usize,
 ) -> String {
     let comments = Vec::new();
+    let line_breaks = tsv_lang::printing::build_line_breaks(source);
     let mut printer = printer::Printer::with_config(
         interner,
         source,
         &comments,
+        &line_breaks,
         tsv_lang::PrintConfig::default(),
     );
     printer.set_indent_level(indent_level);
@@ -259,8 +263,14 @@ pub fn format_expression_with_indent_and_comments(
     indent_level: usize,
     comments: &[ast::Comment],
 ) -> String {
-    let mut printer =
-        printer::Printer::with_config(interner, source, comments, tsv_lang::PrintConfig::default());
+    let line_breaks = tsv_lang::printing::build_line_breaks(source);
+    let mut printer = printer::Printer::with_config(
+        interner,
+        source,
+        comments,
+        &line_breaks,
+        tsv_lang::PrintConfig::default(),
+    );
     printer.set_indent_level(indent_level);
     printer.print_expression(expression);
     printer.into_string()
@@ -276,8 +286,14 @@ pub fn format_expression_with_comments(
     interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
     comments: &[ast::Comment],
 ) -> String {
-    let mut printer =
-        printer::Printer::with_config(interner, source, comments, tsv_lang::PrintConfig::default());
+    let line_breaks = tsv_lang::printing::build_line_breaks(source);
+    let mut printer = printer::Printer::with_config(
+        interner,
+        source,
+        comments,
+        &line_breaks,
+        tsv_lang::PrintConfig::default(),
+    );
     printer.print_expression(expression);
     printer.into_string()
 }
@@ -294,7 +310,9 @@ pub fn format_expression_with_config(
     comments: &[ast::Comment],
     config: tsv_lang::PrintConfig,
 ) -> String {
-    let mut printer = printer::Printer::with_config(interner, source, comments, config);
+    let line_breaks = tsv_lang::printing::build_line_breaks(source);
+    let mut printer =
+        printer::Printer::with_config(interner, source, comments, &line_breaks, config);
     // Set indent level from base_indent_offset so wrapped lines (e.g., method chains)
     // are indented relative to the outer context (e.g., Svelte block directives)
     printer.set_indent_level(config.base_indent_offset);
@@ -420,7 +438,8 @@ pub fn build_expression_doc(
     config: &tsv_lang::PrintConfig,
 ) -> tsv_lang::doc::Doc {
     let comments = Vec::new();
-    let printer = printer::Printer::with_config(interner, source, &comments, *config);
+    let line_breaks = tsv_lang::printing::build_line_breaks(source);
+    let printer = printer::Printer::with_config(interner, source, &comments, &line_breaks, *config);
     printer.build_expression_doc_public(expression)
 }
 
@@ -434,7 +453,8 @@ pub fn build_expression_doc_with_comments(
     config: &tsv_lang::PrintConfig,
     comments: &[ast::Comment],
 ) -> tsv_lang::doc::Doc {
-    let printer = printer::Printer::with_config(interner, source, comments, *config);
+    let line_breaks = tsv_lang::printing::build_line_breaks(source);
+    let printer = printer::Printer::with_config(interner, source, comments, &line_breaks, *config);
     printer.build_expression_doc_public(expression)
 }
 
@@ -456,7 +476,8 @@ pub fn build_expression_doc_with_continuation_indent(
     config: &tsv_lang::PrintConfig,
     comments: &[ast::Comment],
 ) -> tsv_lang::doc::Doc {
-    let printer = printer::Printer::with_config(interner, source, comments, *config);
+    let line_breaks = tsv_lang::printing::build_line_breaks(source);
+    let printer = printer::Printer::with_config(interner, source, comments, &line_breaks, *config);
     printer.build_expression_doc_with_continuation_indent_public(expression)
 }
 
@@ -484,7 +505,8 @@ pub fn build_condition_doc(
     config: &tsv_lang::PrintConfig,
     comments: &[ast::Comment],
 ) -> tsv_lang::doc::Doc {
-    let printer = printer::Printer::with_config(interner, source, comments, *config);
+    let line_breaks = tsv_lang::printing::build_line_breaks(source);
+    let printer = printer::Printer::with_config(interner, source, comments, &line_breaks, *config);
     printer.build_condition_doc_public(expression)
 }
 
@@ -524,6 +546,7 @@ pub fn build_program_doc(
         Rc::clone(&program.interner),
         source,
         &program.comments,
+        &program.line_breaks,
         config,
     );
     printer.build_program_doc(program)

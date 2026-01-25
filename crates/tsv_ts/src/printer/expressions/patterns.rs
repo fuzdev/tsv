@@ -7,12 +7,13 @@
 // - Assignment expressions: `a = b` with width-based wrapping and chain detection
 // - Rest elements: `...rest`
 
+use smallvec::SmallVec;
+
 use super::{PatternContext, Printer, object_pattern_should_expand};
 use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
 use tsv_lang::Comment;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::{self, Doc};
-use tsv_lang::printing::{has_blank_line_between, is_same_line};
 
 /// Context for assignment expression printing (chain detection)
 ///
@@ -33,9 +34,9 @@ enum AssignmentContext {
 /// Trailing comments collected for a list element (property or array element)
 struct TrailingComments<'a> {
     /// Block comments that go before the comma
-    block: Vec<&'a Comment>,
+    block: SmallVec<[&'a Comment; 2]>,
     /// Line comments that go after the comma (in line_suffix)
-    line: Vec<&'a Comment>,
+    line: SmallVec<[&'a Comment; 2]>,
     /// Position after all trailing comments (for updating prev_end)
     end_pos: u32,
 }
@@ -301,7 +302,7 @@ impl<'a> Printer<'a> {
             // Same-line comments are handled in the property loop
             let mut parts = Vec::new();
             for comment in comments_in_range(self.comments, prop_end, boundary) {
-                if !is_same_line(self.source, prop_end, comment.span.start) {
+                if !self.is_same_line(prop_end, comment.span.start) {
                     parts.push(doc::text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
@@ -333,7 +334,7 @@ impl<'a> Printer<'a> {
             // Check for blank line (before any comments)
             let first_comment = comments_in_range(self.comments, prev_end, elem_start).next();
             let check_pos = first_comment.map_or(elem_start, |c| c.span.start);
-            if has_blank_line_between(self.source, prev_end, check_pos) {
+            if self.has_blank_line_between(prev_end, check_pos) {
                 has_blank_lines = true;
             }
 
@@ -393,7 +394,7 @@ impl<'a> Printer<'a> {
         // Collect same-line trailing comments
         let all: Vec<_> = comments_in_range(self.comments, elem_end, upper_bound)
             .filter(|c| {
-                is_same_line(self.source, elem_end, c.span.start)
+                self.is_same_line(elem_end, c.span.start)
                     && (!c.is_block || comma_pos.is_none_or(|comma| c.span.start < comma))
             })
             .collect();
@@ -430,13 +431,14 @@ impl<'a> Printer<'a> {
 
     /// Build doc for empty object pattern: `{}` with optional type annotation
     fn build_empty_object_pattern_doc(&self, obj: &internal::ObjectPattern) -> Doc {
+        let body_doc = self.build_empty_body_with_comments_doc(obj.span);
         if let Some(type_annotation) = &obj.type_annotation {
             doc::concat(vec![
-                doc::text("{}"),
+                body_doc,
                 self.build_type_annotation_doc(type_annotation),
             ])
         } else {
-            doc::text("{}")
+            body_doc
         }
     }
 
@@ -496,7 +498,7 @@ impl<'a> Printer<'a> {
                     .next()
                     .map_or(next_start, |c| c.span.start);
 
-                if has_blank_line_between(self.source, trailing.end_pos, check_pos) {
+                if self.has_blank_line_between(trailing.end_pos, check_pos) {
                     // Preserve blank line: literalline (no indent) + hardline (with indent)
                     prop_parts.push(doc::literalline());
                 }
@@ -605,13 +607,21 @@ impl<'a> Printer<'a> {
 
     /// Build doc for empty array pattern: `[]` with optional type annotation
     fn build_empty_array_pattern_doc(&self, arr: &internal::ArrayPattern) -> Doc {
+        // For array patterns with type annotations, the body ends before the annotation
+        let body_end = arr
+            .type_annotation
+            .as_ref()
+            .map_or(arr.span.end, |t| t.span.start);
+
+        let body_doc = self.build_empty_brackets_with_comments_doc_range(arr.span.start, body_end);
+
         if let Some(type_annotation) = &arr.type_annotation {
             doc::concat(vec![
-                doc::text("[]"),
+                body_doc,
                 self.build_type_annotation_doc(type_annotation),
             ])
         } else {
-            doc::text("[]")
+            body_doc
         }
     }
 
@@ -751,7 +761,7 @@ impl<'a> Printer<'a> {
                             comments_in_range(self.comments, trailing.end_pos, next_start)
                                 .next()
                                 .map_or(next_start, |c| c.span.start);
-                        if has_blank_line_between(self.source, trailing.end_pos, check_pos) {
+                        if self.has_blank_line_between(trailing.end_pos, check_pos) {
                             parts.push(doc::literalline());
                         }
                     }

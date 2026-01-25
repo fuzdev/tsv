@@ -289,8 +289,9 @@ async function main(): Promise<void> {
 		totalSkipped += s.skipped;
 		totalCount += s.total;
 
-		const pct = ((s.match / s.total) * 100).toFixed(1);
-		const matchStr = `${s.match}/${s.total} match (${pct}%)`.padEnd(24);
+		const compared = s.total - s.skipped;
+		const pct = compared > 0 ? ((s.match / compared) * 100).toFixed(1) : '100.0';
+		const matchStr = `${s.match}/${compared} match (${pct}%)`.padEnd(24);
 		const differStr = `${s.differ} differ`.padEnd(12);
 		const skippedStr = s.skipped > 0 ? ` | ${s.skipped} skipped` : '';
 		const errorStr = `${s.errors} errors`;
@@ -300,8 +301,9 @@ async function main(): Promise<void> {
 
 	if (totalCount > 0) {
 		console.log('  ' + '─'.repeat(68));
-		const pct = ((totalMatch / totalCount) * 100).toFixed(1);
-		const matchStr = `${totalMatch}/${totalCount} match (${pct}%)`.padEnd(24);
+		const totalCompared = totalCount - totalSkipped;
+		const pct = totalCompared > 0 ? ((totalMatch / totalCompared) * 100).toFixed(1) : '100.0';
+		const matchStr = `${totalMatch}/${totalCompared} match (${pct}%)`.padEnd(24);
 		const differStr = `${totalDiffer} differ`.padEnd(12);
 		const skippedStr = totalSkipped > 0 ? ` | ${totalSkipped} skipped` : '';
 		const errorStr = `${totalErrors} errors`;

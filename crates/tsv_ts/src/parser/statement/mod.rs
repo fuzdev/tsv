@@ -61,7 +61,8 @@ impl<'a> Parser<'a> {
                 KeywordKind::Async => {
                     // `async function` is a function declaration
                     // `async () => ...` or `async x => ...` is an expression
-                    if self.peek_kind() == TokenKind::Keyword(KeywordKind::Function) {
+                    // Use peek_non_comment_kind to skip comments between `async` and `function`
+                    if self.peek_non_comment_kind() == TokenKind::Keyword(KeywordKind::Function) {
                         self.parse_async_function_declaration()
                     } else {
                         // Async arrow function expression

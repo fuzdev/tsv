@@ -106,8 +106,10 @@ impl<'a> Printer<'a> {
     ///
     /// Consolidates comma-separated and space-separated list building.
     fn build_list_doc(&self, values: &[CssValue], separator: &'static str) -> doc::Doc {
-        let docs: Vec<_> = values.iter().map(|v| self.build_css_value_doc(v)).collect();
-        doc::join(docs, separator)
+        doc::join(
+            values.iter().map(|v| self.build_css_value_doc(v)),
+            separator,
+        )
     }
 
     /// Check if a function should wrap its arguments (with explicit context offset)

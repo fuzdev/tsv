@@ -1,7 +1,7 @@
 <script lang="ts">
-// =====================================================================
+//
 // Blank Line Before First Method Only - Should Collapse
-// =====================================================================
+//
 // When there's a blank line before the first method but NO blank lines
 // between subsequent methods, Prettier collapses everything to inline.
 // This is different from having blank lines BETWEEN methods (which preserve).

@@ -17,17 +17,17 @@
 // ## References
 // - prettier/src/language-js/print/member-chain.js
 
-use super::utils::is_simple_call_argument;
+use super::utils::{contains_call_expression, is_simple_call_argument};
 use crate::ast::internal::{self, Expression, LiteralValue};
 use crate::printer::{ParenContext, needs_parens};
 use string_interner::DefaultSymbol;
-use tsv_lang::Span;
 use tsv_lang::doc::{self, Doc};
-use tsv_lang::printing::has_blank_line_between;
+use tsv_lang::printing::{self, has_blank_line_between_fast};
+use tsv_lang::{ClassifiedComments, Span, SymbolToU32};
 
-// =============================================================================
+//
 // Data Structures
-// =============================================================================
+//
 
 /// A node in a linearized chain
 ///
@@ -62,10 +62,12 @@ pub enum ChainNode<'a> {
         property_start: u32,
     },
     /// Computed member access: [expr]
+    /// `bracket_end` is the position just before the closing `]` (for trailing comment detection)
     ComputedMember {
         expr: &'a Expression,
         optional: bool,
         object_end: u32,
+        bracket_end: u32,
     },
     /// Non-null assertion: !
     NonNull,
@@ -124,11 +126,17 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Create a new computed member node
-    pub fn computed_member(expr: &'a Expression, optional: bool, object_end: u32) -> Self {
+    pub fn computed_member(
+        expr: &'a Expression,
+        optional: bool,
+        object_end: u32,
+        bracket_end: u32,
+    ) -> Self {
         Self::ComputedMember {
             expr,
             optional,
             object_end,
+            bracket_end,
         }
     }
 
@@ -198,6 +206,16 @@ impl<'a> ChainNode<'a> {
             _ => None,
         }
     }
+
+    /// Get the CallExpression if this is a Call node
+    pub fn as_call_expression(&self) -> Option<&internal::CallExpression> {
+        if let Self::Call { expr, .. } = self
+            && let Expression::CallExpression(call) = expr
+        {
+            return Some(call);
+        }
+        None
+    }
 }
 
 /// A group of chain nodes that stay on the same line
@@ -232,9 +250,9 @@ impl<'a> Default for ChainGroup<'a> {
     }
 }
 
-// =============================================================================
+//
 // Linearization
-// =============================================================================
+//
 
 /// Linearize a chain expression into a flat list of nodes
 ///
@@ -272,6 +290,7 @@ fn linearize_recursive<'a>(expr: &'a Expression, nodes: &mut Vec<ChainNode<'a>>)
                     &member.property,
                     member.optional,
                     object_end,
+                    member.span.end,
                 ));
             } else if let Expression::Identifier(id) = member.property.as_ref() {
                 nodes.push(ChainNode::member(
@@ -293,6 +312,7 @@ fn linearize_recursive<'a>(expr: &'a Expression, nodes: &mut Vec<ChainNode<'a>>)
                     &member.property,
                     member.optional,
                     object_end,
+                    member.span.end,
                 ));
             }
         }
@@ -311,9 +331,9 @@ fn linearize_recursive<'a>(expr: &'a Expression, nodes: &mut Vec<ChainNode<'a>>)
     }
 }
 
-// =============================================================================
+//
 // Grouping
-// =============================================================================
+//
 
 /// Group linearized chain nodes into logical groups
 ///
@@ -390,9 +410,9 @@ pub fn group_chain_nodes<'a>(nodes: Vec<ChainNode<'a>>) -> Vec<ChainGroup<'a>> {
     groups
 }
 
-// =============================================================================
+//
 // Merge Logic
-// =============================================================================
+//
 
 /// Check if first two groups should be merged (factory pattern)
 ///
@@ -496,9 +516,9 @@ pub trait SymbolLookup {
     fn lookup(&self, symbol: DefaultSymbol) -> Option<String>;
 }
 
-// =============================================================================
+//
 // Doc Building
-// =============================================================================
+//
 
 /// Check if there are blank lines BETWEEN methods (not just before the first method)
 ///
@@ -512,14 +532,37 @@ fn has_blank_lines_between_methods<'a, P: ChainPrinter>(
     groups: &[ChainGroup<'a>],
     printer: &P,
 ) -> bool {
-    let source = printer.get_source();
+    let line_breaks = printer.get_line_breaks();
     // Skip groups[0] (base) and groups[1] (first method) - only check groups[2+]
     groups.iter().skip(2).any(|group| {
         group
             .first_member_range()
             .is_some_and(|(obj_end, prop_start)| {
-                has_blank_line_between(source, obj_end, prop_start)
+                has_blank_line_between_fast(line_breaks, obj_end, prop_start)
             })
+    })
+}
+
+/// Check if there are any comments between chain segments (e.g., after an identifier before a member)
+///
+/// Comments between chain segments force expansion because:
+/// 1. Line comments MUST be on their own line
+/// 2. Block comments between segments also trigger expansion in prettier
+///
+/// Returns true if ANY member node in the chain has comments in its range.
+/// This includes comments within the first group (e.g., `a /* comment */.b.c()`)
+/// and comments at non-first members in any group.
+fn has_comments_between_segments<'a, P: ChainPrinter>(
+    groups: &[ChainGroup<'a>],
+    printer: &P,
+) -> bool {
+    // Check ALL groups for comments at ANY member node (not just first member)
+    groups.iter().any(|group| {
+        group.nodes.iter().any(|node| {
+            node.comment_range().is_some_and(|(obj_end, prop_start)| {
+                printer.has_comments_between(obj_end, prop_start)
+            })
+        })
     })
 }
 
@@ -573,14 +616,33 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
         return build_member_only_chain_doc(groups, printer);
     }
 
-    // Prettier's 3+ calls rule (member-chain.js:400-408):
-    // If there are more than 2 call expressions AND at least one has non-simple arguments
-    // (arrow functions, function expressions), force the expanded layout.
-    // Blank lines BETWEEN methods (not just before first) also force expansion.
-    // Additionally, force expand when inside template expressions with original breaks.
+    // Prettier's chain expansion rules (member-chain.js:400-408):
+    // 1. Blank lines BETWEEN methods (not just before first) force expansion
+    // 2. 3+ calls with complex args force expansion
+    // 3. 2+ calls with callbacks, where any callback has a multiline body, force expansion
+    // 4. Inside template expressions with original breaks force expansion
     let has_blank_lines_between = has_blank_lines_between_methods(groups, printer);
+
+    // Single pass: count callbacks and check if any breaks
+    let line_breaks = printer.get_line_breaks();
+    let (calls_with_callbacks, any_callback_breaks) =
+        call_nodes
+            .iter()
+            .fold((0usize, false), |(count, any_breaks), node| {
+                let status = call_callback_status(node, line_breaks);
+                (
+                    count + usize::from(status.has_callback),
+                    any_breaks || status.will_break,
+                )
+            });
+
+    // Comments between chain segments (e.g., `obj.method() /* comment */.next()`) force expansion
+    let has_segment_comments = has_comments_between_segments(groups, printer);
+
     let force_expand = has_blank_lines_between
-        || (call_nodes.len() > 2 && call_nodes.iter().any(|n| call_has_complex_args(n, printer)))
+        || has_segment_comments
+        || (call_nodes.len() > 2 && call_nodes.iter().any(|n| call_has_complex_args(n)))
+        || (calls_with_callbacks >= 2 && any_callback_breaks)
         || printer.should_force_expand();
 
     // Split groups into first (merged) and rest based on should_merge
@@ -595,10 +657,6 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
             .collect();
         doc::concat(first_docs)
     };
-
-    // Check if first groups will break (e.g., multiline object/array arg)
-    // Note: This is currently unused in the short chain path but kept for potential future use.
-    let _first_will_break = doc::will_break(&first_doc);
 
     // Chains with calls use group-based breaking
     // Short chains: use group with softlines so it can break if needed
@@ -627,35 +685,121 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
             .map(|g| print_group(g, printer))
             .collect();
         let on_line = doc::concat(
-            std::iter::once(first_doc)
+            std::iter::once(first_doc.clone())
                 .chain(rest_docs.clone())
                 .collect(),
         );
 
-        // If first groups have multi-arg calls, use 3-state conditionalGroup
-        // to try breaking args before breaking chain
+        // Check if first groups contain any calls (regardless of arg count)
+        let first_has_calls = first_groups
+            .iter()
+            .flat_map(|g| g.nodes.iter())
+            .any(ChainNode::is_call);
+
+        // If first groups have multi-arg calls, use 4-state conditionalGroup.
+        // Prettier tries these in order until one fits:
+        // 0. Everything flat (on_line)
+        // 1. First args inline, last call's args expanded (for short first args, long total)
+        // 2. First args expanded, last call flexible (for long first args)
+        // 3. Everything expanded (first args broken, chain broken)
         if first_has_multiarg_calls {
-            // State 1: Args expanded, chain inline (args forced to break, chain stays)
+            // State 1: First args inline, rest groups with expanded call args
+            // For `expect(short_args).toBe(false)` where total exceeds width but first fits
+            let rest_expanded_inline: Vec<Doc> = rest_groups
+                .iter()
+                .map(|g| print_group_expanded(g, printer))
+                .collect();
+            let state_last_expanded = doc::concat(
+                std::iter::once(first_doc)
+                    .chain(rest_expanded_inline)
+                    .collect(),
+            );
+
+            // State 2: First call's args expanded, rest groups flexible
+            // For cases like `fn(long, args).method(true)` where first call needs to break
             let first_expanded: Vec<Doc> = first_groups
                 .iter()
                 .map(|g| print_group_expanded(g, printer))
                 .collect();
             let first_expanded_doc = doc::concat(first_expanded);
 
-            let state_1 = doc::concat(
+            let state_first_expanded = doc::concat(
                 std::iter::once(first_expanded_doc.clone())
                     .chain(rest_docs)
                     .collect(),
             );
 
-            // State 2: Everything expanded (args broken, chain broken)
+            // State 3: Everything expanded (first args broken, chain broken)
             let rest_parts_hard = build_rest_parts_with_comments(rest_groups, printer, true, true);
-            let state_2 = doc::concat(vec![
+            let state_all_expanded = doc::concat(vec![
                 first_expanded_doc,
                 doc::indent(doc::concat(rest_parts_hard)),
             ]);
 
-            return doc::conditional_group(vec![on_line, state_1, state_2]);
+            return doc::conditional_group(vec![
+                on_line,
+                state_last_expanded,
+                state_first_expanded,
+                state_all_expanded,
+            ]);
+        }
+
+        // Single-arg first calls with NON-CALL args: use 2-state conditionalGroup.
+        // Prettier prefers breaking at the LAST call when the first call has a simple arg.
+        // 0. Everything flat (on_line)
+        // 1. First call inline, last call's args expanded
+        // This handles patterns like `fn(a.b()).call(longTemplate)` where Prettier
+        // keeps `fn(a.b())` together and breaks at `.call(`.
+        //
+        // IMPORTANT: Only apply this when the first call's single arg does NOT contain
+        // nested calls. When the first call's arg is itself a call (or contains calls),
+        // that inner call may need to break, so let each group format independently -
+        // the last call stays inline if it fits.
+        //
+        // Example where we DON'T want to force last-call expansion:
+        //   fn(complex_call(long, args)).c.d(x)
+        // → fn(
+        //     complex_call(long, args),
+        //   ).c.d(x);  // .c.d(x) stays inline because x fits
+        let first_call_arg_contains_call = first_groups
+            .iter()
+            .flat_map(|g| g.nodes.iter())
+            .filter_map(ChainNode::as_call_expression)
+            .any(|call| call.arguments.iter().any(contains_call_expression));
+
+        // Check if chain ends with member (for callback arg breaking preference)
+        let chain_ends_with_member = ends_with_member(rest_groups, first_groups);
+
+        // When chain ends with member and first groups have calls, prefer expanding
+        // first groups' call args over breaking the chain.
+        // e.g., `Object.keys(obj).filter(\n  cb,\n).length` not `Object.keys(\n  obj,\n).filter(...)`
+        if first_has_calls && chain_ends_with_member {
+            let first_expanded: Vec<Doc> = first_groups
+                .iter()
+                .map(|g| print_group_expanded(g, printer))
+                .collect();
+            let first_expanded_doc = doc::concat(first_expanded);
+            let state_first_expanded = doc::concat(
+                std::iter::once(first_expanded_doc)
+                    .chain(rest_docs)
+                    .collect(),
+            );
+
+            return doc::conditional_group(vec![on_line, state_first_expanded]);
+        }
+
+        if first_has_calls && !first_call_arg_contains_call {
+            let rest_expanded_inline: Vec<Doc> = rest_groups
+                .iter()
+                .map(|g| print_group_expanded(g, printer))
+                .collect();
+            let state_last_expanded = doc::concat(
+                std::iter::once(first_doc)
+                    .chain(rest_expanded_inline)
+                    .collect(),
+            );
+
+            return doc::conditional_group(vec![on_line, state_last_expanded]);
         }
 
         return doc::group(on_line);
@@ -684,6 +828,44 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
     let on_line: Vec<Doc> = groups.iter().map(|g| print_group(g, printer)).collect();
     let on_line_doc = doc::concat(on_line);
 
+    // Check if this chain ends with member access (not a call)
+    // This enables the intermediate state: args expanded but chain inline
+    // e.g., `items.filter(\n  (x) => ...,\n).length` instead of breaking the chain
+    //
+    // When the chain ends with a call (e.g., `items.map(...).join(...)`), we prefer
+    // breaking the chain over expanding args - this is Prettier's behavior.
+    let chain_ends_with_member = ends_with_member(rest_groups, first_groups);
+
+    // We already computed call_nodes above, so reuse that instead of re-scanning
+    if chain_ends_with_member && !call_nodes.is_empty() {
+        // Only apply this intermediate state when there's exactly one call in rest_groups.
+        // With multiple calls (e.g., `.filter(cb1).map(cb2).length`), Prettier prefers
+        // breaking the chain over expanding multiple callbacks.
+        let rest_call_count = rest_groups
+            .iter()
+            .flat_map(|g| g.nodes.iter())
+            .filter(|n| n.is_call())
+            .count();
+
+        if rest_call_count == 1 {
+            // First groups stay flat
+            let first_docs: Vec<Doc> = first_groups
+                .iter()
+                .map(|g| print_group(g, printer))
+                .collect();
+            // Rest groups have calls expanded
+            let rest_expanded: Vec<Doc> = rest_groups
+                .iter()
+                .map(|g| print_group_expanded(g, printer))
+                .collect();
+            let args_expanded_doc =
+                doc::concat(first_docs.into_iter().chain(rest_expanded).collect());
+
+            // Try: 1. Everything inline, 2. Args expanded chain inline, 3. Chain expanded
+            return doc::conditional_group(vec![on_line_doc, args_expanded_doc, expanded]);
+        }
+    }
+
     // Use conditionalGroup to let printer decide
     doc::conditional_group(vec![on_line_doc, expanded])
 }
@@ -692,18 +874,84 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
 ///
 /// Uses Prettier's `isSimpleCallArgument` logic (inverted) to determine
 /// if a 3+ call chain should force break.
-fn call_has_complex_args<'a, P: ChainPrinter>(node: &ChainNode<'a>, _printer: &P) -> bool {
-    let ChainNode::Call { expr, .. } = node else {
+fn call_has_complex_args<'a>(node: &ChainNode<'a>) -> bool {
+    let Some(call) = node.as_call_expression() else {
         return false;
     };
-    let Expression::CallExpression(call) = expr else {
-        return false;
-    };
-
     // Check if any argument is NOT simple (using Prettier's depth-limited check)
     call.arguments
         .iter()
         .any(|arg| !is_simple_call_argument(arg, 2))
+}
+
+/// Status of callback arguments in a call node
+#[derive(Default)]
+struct CallbackStatus {
+    /// Whether the call has any callback argument (arrow/function)
+    has_callback: bool,
+    /// Whether any callback will break (multiline body)
+    will_break: bool,
+}
+
+/// Analyze callback status for a call node in a single pass
+fn call_callback_status<'a>(node: &ChainNode<'a>, line_breaks: &[u32]) -> CallbackStatus {
+    let Some(call) = node.as_call_expression() else {
+        return CallbackStatus::default();
+    };
+
+    let mut has_callback = false;
+    let mut will_break = false;
+
+    for arg in &call.arguments {
+        match arg {
+            Expression::ArrowFunctionExpression(arrow) => {
+                has_callback = true;
+                if !will_break {
+                    will_break = match &arrow.body {
+                        // Block body always breaks
+                        internal::ArrowFunctionBody::BlockStatement(_) => true,
+                        // Expression body - check if it's multiline (O(log n))
+                        internal::ArrowFunctionBody::Expression(expr) => {
+                            let span = expr.span();
+                            printing::has_newline_between_fast(line_breaks, span.start, span.end)
+                        }
+                    };
+                }
+            }
+            Expression::FunctionExpression(_) => {
+                // Function expressions always have a block body, which breaks
+                has_callback = true;
+                will_break = true;
+            }
+            _ => {}
+        }
+        // Early exit if we've found everything
+        if has_callback && will_break {
+            break;
+        }
+    }
+
+    CallbackStatus {
+        has_callback,
+        will_break,
+    }
+}
+
+/// Check if chain ends with member access (not a call)
+///
+/// Used to enable the intermediate state where callback args expand but chain stays inline.
+/// Skips trailing NonNull assertions - `.length!` counts as ending with member.
+fn ends_with_member(rest_groups: &[ChainGroup], first_groups: &[ChainGroup]) -> bool {
+    rest_groups
+        .last()
+        .or_else(|| first_groups.last())
+        .is_some_and(|g| {
+            g.nodes
+                .iter()
+                .rev()
+                .find(|n| !n.is_non_null())
+                .is_some_and(ChainNode::is_member)
+        })
 }
 
 /// Check if chain starts with "(complex)!" pattern that needs chain-preferring breaks
@@ -890,6 +1138,7 @@ fn build_member_only_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], p
 
     // Build segments by collecting nodes until we see the NEXT member
     // Each segment includes everything up to and including a member (+ trailing non-null)
+    // Note: Block comments are handled by print_node for member nodes
     let remaining_nodes = &all_nodes[first_doc_end..];
     let mut segments: Vec<Doc> = Vec::new();
     let mut current_segment: Vec<Doc> = Vec::new();
@@ -903,6 +1152,7 @@ fn build_member_only_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], p
             seen_member = false;
         }
 
+        // print_node handles block comments for member nodes
         current_segment.push(print_node(node, printer));
 
         if node.is_member() {
@@ -1041,10 +1291,10 @@ fn build_chain_line_break<P: ChainPrinter>(
     // Check for blank line preservation (only when no comments - comments handle their own spacing)
     // When there are comments between obj and property, the 2+ newlines (one before comment,
     // one after) should NOT be treated as a blank line.
-    let source = printer.get_source();
+    let line_breaks = printer.get_line_breaks();
     let has_comments = printer.has_comments_between(object_end, property_start);
 
-    if !has_comments && has_blank_line_between(source, object_end, property_start) {
+    if !has_comments && has_blank_line_between_fast(line_breaks, object_end, property_start) {
         // Preserve blank line: literalline (no indent) + hardline (with indent for next content)
         doc::concat(vec![doc::literalline(), doc::hardline()])
     } else {
@@ -1084,12 +1334,32 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
     }
 
     /// Add trailing comments, line break, and leading comments before a group
+    ///
+    /// Emits comments in this order:
+    /// 1. Trailing block comments (same line as previous element) - before line break
+    /// 2. Trailing line comments (same line) - via line_suffix
+    /// 3. Line break
+    /// 4. Leading block comments (on their own line)
+    /// 5. Leading line comments (on their own line)
+    ///
+    /// Uses single-pass comment classification (O(log n + k)) instead of 4 separate
+    /// filter calls (O(4 log n + 4k)).
     fn add_comments_and_break(&mut self, group: &ChainGroup<'a>) {
         if let Some((object_end, property_start)) = group.first_member_range() {
-            // Trailing line comments (on the same line as previous element)
+            // Classify all comments in one pass (single binary search)
+            let classified = self.printer.classify_comments(object_end, property_start);
+
+            // Trailing block comments (same line as previous element)
+            // Use Leading spacing (space before comment): `method() /* c */`
             self.parts.push(
                 self.printer
-                    .build_trailing_line_comments_doc(object_end, property_start),
+                    .build_trailing_block_doc(&classified.trailing_block),
+            );
+
+            // Trailing line comments (same line as previous element)
+            self.parts.push(
+                self.printer
+                    .build_trailing_line_doc(&classified.trailing_line),
             );
 
             // Line break with blank line preservation
@@ -1100,15 +1370,16 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
                 self.use_hardline,
             ));
 
-            // Leading comments (between prev and this element, on their own lines)
-            self.parts.push(self.printer.build_block_comments_doc(
-                object_end,
-                property_start,
-                super::CommentSpacing::Leading,
-            ));
+            // Leading block comments (on their own line)
             self.parts.push(
                 self.printer
-                    .build_leading_line_comments_doc(object_end, property_start),
+                    .build_leading_block_doc(&classified.leading_block),
+            );
+
+            // Leading line comments (on their own line)
+            self.parts.push(
+                self.printer
+                    .build_leading_line_doc(&classified.leading_line),
             );
         } else {
             // No member range - just add line break
@@ -1121,11 +1392,14 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
     }
 
     /// Add the group's doc (either expanded or normal)
+    ///
+    /// Skips block comments for the first member since `add_comments_and_break`
+    /// already handles them (emitting before the line break).
     fn add_group_doc(&mut self, group: &ChainGroup<'a>) {
         self.parts.push(if self.use_expanded {
-            print_group_expanded(group, self.printer)
+            print_group_expanded_skip_first_comments(group, self.printer)
         } else {
-            print_group(group, self.printer)
+            print_group_skip_first_comments(group, self.printer)
         });
     }
 
@@ -1152,6 +1426,10 @@ fn build_rest_parts_with_comments<'a, P: ChainPrinter>(
 }
 
 /// Print a member access (shared logic for Member and PrivateMember)
+///
+/// Emits block comments before the member access (e.g., `a /* comment */.b`).
+/// The `skip_comments` flag is used by the expanded path where `add_comments_and_break`
+/// already handles comments for the first member of rest groups.
 fn print_member_access<P: ChainPrinter>(
     printer: &P,
     property: DefaultSymbol,
@@ -1159,23 +1437,44 @@ fn print_member_access<P: ChainPrinter>(
     object_end: u32,
     property_start: u32,
     is_private: bool,
+    skip_comments: bool,
 ) -> Doc {
-    let prop_name = printer.lookup_symbol(property);
-    let block_comments_doc = printer.build_block_comments_doc(
+    // Build member doc without format! allocation - use doc::symbol for deferred resolution
+    let prop_id = property.to_u32();
+    let member_doc = match (optional, is_private) {
+        (false, false) => doc::concat(vec![doc::text("."), doc::symbol(prop_id)]),
+        (true, false) => doc::concat(vec![doc::text("?."), doc::symbol(prop_id)]),
+        (false, true) => doc::concat(vec![doc::text(".#"), doc::symbol(prop_id)]),
+        (true, true) => doc::concat(vec![doc::text("?.#"), doc::symbol(prop_id)]),
+    };
+
+    if skip_comments {
+        return member_doc;
+    }
+
+    // Emit same-line block comments before the member access
+    let comments = printer.build_block_comments_doc(
         object_end,
         property_start,
         super::CommentSpacing::Leading,
     );
-    let hash = if is_private { "#" } else { "" };
-    let dot = if optional { "?." } else { "." };
-    doc::concat(vec![
-        block_comments_doc,
-        doc::text_owned(format!("{dot}{hash}{prop_name}")),
-    ])
+    doc::concat(vec![comments, member_doc])
 }
 
 /// Print a single chain node
 fn print_node<'a, P: ChainPrinter>(node: &ChainNode<'a>, printer: &P) -> Doc {
+    print_node_impl(node, printer, false)
+}
+
+/// Print a single chain node, optionally skipping comments for first member
+///
+/// Used by `add_group_doc` in expanded path where `add_comments_and_break`
+/// already handles comments for the first member.
+fn print_node_impl<'a, P: ChainPrinter>(
+    node: &ChainNode<'a>,
+    printer: &P,
+    skip_comments: bool,
+) -> Doc {
     match node {
         ChainNode::Base { expr, needs_parens } => {
             if *needs_parens {
@@ -1205,6 +1504,7 @@ fn print_node<'a, P: ChainPrinter>(node: &ChainNode<'a>, printer: &P) -> Doc {
             *object_end,
             *property_start,
             false,
+            skip_comments,
         ),
 
         ChainNode::PrivateMember {
@@ -1219,23 +1519,33 @@ fn print_node<'a, P: ChainPrinter>(node: &ChainNode<'a>, printer: &P) -> Doc {
             *object_end,
             *property_start,
             true,
+            skip_comments,
         ),
 
         ChainNode::ComputedMember {
             expr,
             optional,
             object_end,
+            bracket_end,
         } => {
             let inner = printer.print_expression(expr);
-            let prop_start = printer.get_property_span(expr).start;
-            // Block comments go INSIDE the brackets for computed members: obj[/* c */ key]
-            // Use trailing space (not leading) since we're right after `[`
-            let block_comments_doc = printer.build_block_comments_doc(
+            let prop_span = printer.get_property_span(expr);
+            // Leading block comments: obj[/* c */ key]
+            // Use trailing space since we're right after `[`
+            let leading_comments_doc = printer.build_block_comments_doc(
                 *object_end,
-                prop_start,
+                prop_span.start,
                 super::CommentSpacing::Trailing,
             );
-            let inner_with_comments = doc::concat(vec![block_comments_doc, inner]);
+            // Trailing block comments: obj[key /* c */]
+            // Use leading space since we're before `]`
+            let trailing_comments_doc = printer.build_block_comments_doc(
+                prop_span.end,
+                *bracket_end,
+                super::CommentSpacing::Leading,
+            );
+            let inner_with_comments =
+                doc::concat(vec![leading_comments_doc, inner, trailing_comments_doc]);
             if *optional {
                 doc::concat(vec![doc::text("?.["), inner_with_comments, doc::text("]")])
             } else {
@@ -1249,6 +1559,15 @@ fn print_node<'a, P: ChainPrinter>(node: &ChainNode<'a>, printer: &P) -> Doc {
 
 /// Print a single chain node with forced call expansion
 fn print_node_expanded<'a, P: ChainPrinter>(node: &ChainNode<'a>, printer: &P) -> Doc {
+    print_node_expanded_impl(node, printer, false)
+}
+
+/// Print a single chain node with forced call expansion, optionally skipping comments
+fn print_node_expanded_impl<'a, P: ChainPrinter>(
+    node: &ChainNode<'a>,
+    printer: &P,
+    skip_comments: bool,
+) -> Doc {
     match node {
         ChainNode::Call { expr, optional } => {
             if let Expression::CallExpression(call) = expr {
@@ -1258,7 +1577,7 @@ fn print_node_expanded<'a, P: ChainPrinter>(node: &ChainNode<'a>, printer: &P) -
             }
         }
         // All other nodes print the same way
-        _ => print_node(node, printer),
+        _ => print_node_impl(node, printer, skip_comments),
     }
 }
 
@@ -1268,6 +1587,48 @@ fn print_group_expanded<'a, P: ChainPrinter>(group: &ChainGroup<'a>, printer: &P
         .nodes
         .iter()
         .map(|n| print_node_expanded(n, printer))
+        .collect();
+    doc::concat(docs)
+}
+
+/// Print a chain group, skipping block comments for the first member node
+///
+/// Used by `add_group_doc` in expanded path where `add_comments_and_break`
+/// already handles comments for the first member (emitting before the line break).
+fn print_group_skip_first_comments<'a, P: ChainPrinter>(
+    group: &ChainGroup<'a>,
+    printer: &P,
+) -> Doc {
+    print_group_skip_first_comments_impl(group, printer, false)
+}
+
+/// Print a chain group with forced call expansion, skipping block comments for the first member
+fn print_group_expanded_skip_first_comments<'a, P: ChainPrinter>(
+    group: &ChainGroup<'a>,
+    printer: &P,
+) -> Doc {
+    print_group_skip_first_comments_impl(group, printer, true)
+}
+
+/// Implementation for printing a chain group, optionally with forced call expansion
+fn print_group_skip_first_comments_impl<'a, P: ChainPrinter>(
+    group: &ChainGroup<'a>,
+    printer: &P,
+    force_expand: bool,
+) -> Doc {
+    let docs: Vec<Doc> = group
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| {
+            // Skip comments only for the first member node
+            let skip_comments = i == 0 && n.is_member();
+            if force_expand {
+                print_node_expanded_impl(n, printer, skip_comments)
+            } else {
+                print_node_impl(n, printer, skip_comments)
+            }
+        })
         .collect();
     doc::concat(docs)
 }
@@ -1287,22 +1648,11 @@ pub trait ChainPrinter: SymbolLookup {
     /// Used for the "args broken, chain inline" state in conditionalGroup
     fn print_call_args_expanded(&self, call: &internal::CallExpression, optional: bool) -> Doc;
 
-    /// Look up a symbol to its string representation
-    fn lookup_symbol(&self, symbol: DefaultSymbol) -> String;
-
     /// Build a doc for inline block comments between two positions
     /// Returns a doc with block comments using the specified spacing
     /// Note: Only block comments are included (line comments are filtered out)
     fn build_block_comments_doc(&self, start: u32, end: u32, spacing: super::CommentSpacing)
     -> Doc;
-
-    /// Build a line_suffix doc for trailing line comments between two positions
-    /// Returns empty doc if no line comments found
-    fn build_trailing_line_comments_doc(&self, start: u32, end: u32) -> Doc;
-
-    /// Build a doc for leading line comments (comments on their own line)
-    /// Returns empty doc if no line comments found
-    fn build_leading_line_comments_doc(&self, start: u32, end: u32) -> Doc;
 
     /// Get the span for a given expression
     fn get_property_span(&self, expr: &Expression) -> Span;
@@ -1313,11 +1663,34 @@ pub trait ChainPrinter: SymbolLookup {
     /// first call (e.g., `a.fn().b()` → merge `a` with `.fn()` only in statements).
     fn is_expression_statement(&self) -> bool;
 
-    /// Get the source code
-    fn get_source(&self) -> &str;
+    /// Get the precomputed line breaks table for O(log n) line boundary lookups
+    fn get_line_breaks(&self) -> &[u32];
 
     /// Check if there are any comments between two positions
     fn has_comments_between(&self, start: u32, end: u32) -> bool;
+
+    /// Classify all comments in a range by position and type in a single pass.
+    ///
+    /// Returns comments organized into 4 buckets (trailing_block, trailing_line,
+    /// leading_block, leading_line) using a single binary search instead of 4
+    /// separate filter calls.
+    fn classify_comments(&self, start: u32, end: u32) -> ClassifiedComments<'_>;
+
+    /// Build doc for trailing block comments from a pre-classified slice.
+    /// Emits space before each comment: `method() /* c */`
+    fn build_trailing_block_doc(&self, comments: &[&tsv_lang::Comment]) -> Doc;
+
+    /// Build doc for trailing line comments from a pre-classified slice.
+    /// Uses line_suffix to keep comments with preceding element.
+    fn build_trailing_line_doc(&self, comments: &[&tsv_lang::Comment]) -> Doc;
+
+    /// Build doc for leading block comments from a pre-classified slice.
+    /// Comments are on their own lines, no surrounding spaces.
+    fn build_leading_block_doc(&self, comments: &[&tsv_lang::Comment]) -> Doc;
+
+    /// Build doc for leading line comments from a pre-classified slice.
+    /// Emits hardline after each comment.
+    fn build_leading_line_doc(&self, comments: &[&tsv_lang::Comment]) -> Doc;
 
     /// Get the tab width from config
     fn get_tab_width(&self) -> usize;

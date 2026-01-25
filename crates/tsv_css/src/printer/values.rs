@@ -35,9 +35,9 @@ impl<'a> Printer<'a> {
         self.print_css_value(value);
     }
 
-    // ========================================================================
+    //
     // Doc Builders - all formatting logic expressed as doc IR
-    // ========================================================================
+    //
 
     /// Build a doc for a CSS value
     ///
@@ -130,28 +130,20 @@ impl<'a> Printer<'a> {
         // url() also never wraps since it has no natural break points.
         let is_url = name == "url";
         if is_url {
-            let arg_docs: Vec<_> = args
-                .iter()
-                .map(|arg| self.build_css_value_doc(arg))
-                .collect();
             return doc::concat(vec![
                 doc::text_owned(name.to_string()),
                 doc::text("("),
-                doc::join(arg_docs, ","),
+                doc::join(args.iter().map(|arg| self.build_css_value_doc(arg)), ","),
                 doc::text(")"),
             ]);
         }
 
         if !has_wrappable_args(args) {
             // Single simple arg - inline only, no break points
-            let arg_docs: Vec<_> = args
-                .iter()
-                .map(|arg| self.build_css_value_doc(arg))
-                .collect();
             return doc::concat(vec![
                 doc::text_owned(name.to_string()),
                 doc::text("("),
-                doc::join(arg_docs, ", "),
+                doc::join(args.iter().map(|arg| self.build_css_value_doc(arg)), ", "),
                 doc::text(")"),
             ]);
         }
@@ -186,13 +178,11 @@ impl<'a> Printer<'a> {
 
     /// Build a doc for space-separated values
     fn build_space_separated_doc(&self, values: &[CssValue]) -> doc::Doc {
-        let docs: Vec<_> = values.iter().map(|v| self.build_css_value_doc(v)).collect();
-        doc::join(docs, " ")
+        doc::join(values.iter().map(|v| self.build_css_value_doc(v)), " ")
     }
 
     /// Build a doc for comma-separated values
     fn build_comma_separated_doc(&self, values: &[CssValue]) -> doc::Doc {
-        let docs: Vec<_> = values.iter().map(|v| self.build_css_value_doc(v)).collect();
-        doc::join(docs, ", ")
+        doc::join(values.iter().map(|v| self.build_css_value_doc(v)), ", ")
     }
 }

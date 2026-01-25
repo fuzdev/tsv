@@ -213,7 +213,7 @@ impl<'a> CssParser<'a> {
         self.base_offset + self.current_start
     }
 
-    // ==================== Error Helpers ====================
+    // Error Helpers
 
     /// Create an error with custom message at current position
     pub(crate) fn error_msg(&self, message: &str) -> ParseError {
@@ -310,9 +310,19 @@ impl<'a> CssParser<'a> {
         }
 
         // Comments are already sorted by span.start since we add them in order during parsing
+
+        // Build line breaks table for O(log n) line boundary lookups
+        // Must add base_offset to each position since AST spans use global positions
+        let base_offset_u32 = self.base_offset as u32;
+        let line_breaks: Vec<u32> = tsv_lang::printing::build_line_breaks(self.source)
+            .into_iter()
+            .map(|pos| pos + base_offset_u32)
+            .collect();
+
         Ok(CssStyleSheet {
             nodes,
             comments: std::mem::take(&mut self.comments),
+            line_breaks,
         })
     }
 }

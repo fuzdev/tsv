@@ -11,7 +11,7 @@
 
 use super::Printer;
 use crate::ast::internal;
-use tsv_lang::{comments_in_range, doc, printing};
+use tsv_lang::{comments_in_range, doc};
 
 /// Convert a supports connector to its string representation
 fn connector_str(conn: internal::SupportsConnector) -> &'static str {
@@ -186,12 +186,9 @@ impl<'a> Printer<'a> {
                 if let Some(internal::CssBlockChild::Comment(comment)) = rule.declarations.first() {
                     // Check if comment is on same line as selector AND before the opening brace
                     // If there's a '{' between selector and comment, the comment is inside the block, not after selector
-                    if printing::is_same_line(
-                        self.source,
-                        rule.selector.span.end,
-                        comment.span.start,
-                    ) && !self
-                        .has_opening_brace_between(rule.selector.span.end, comment.span.start)
+                    if self.is_same_line(rule.selector.span.end, comment.span.start)
+                        && !self
+                            .has_opening_brace_between(rule.selector.span.end, comment.span.start)
                     {
                         // Print comment inline after selector
                         self.write(" /*");

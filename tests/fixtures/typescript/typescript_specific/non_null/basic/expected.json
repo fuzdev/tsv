@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 828,
+	"end": 688,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " =====================================================================",
+			"value": "",
 			"start": 20,
-			"end": 92,
+			"end": 22,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 73
+					"column": 3
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " Non-Null Assertion Operator (!)",
-			"start": 94,
-			"end": 128,
+			"start": 24,
+			"end": 58,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -44,9 +44,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " =====================================================================",
-			"start": 130,
-			"end": 202,
+			"value": "",
+			"start": 60,
+			"end": 62,
 			"loc": {
 				"start": {
 					"line": 4,
@@ -54,15 +54,15 @@
 				},
 				"end": {
 					"line": 4,
-					"column": 73
+					"column": 3
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " Basic non-null assertion",
-			"start": 205,
-			"end": 232,
+			"start": 65,
+			"end": 92,
 			"loc": {
 				"start": {
 					"line": 6,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " Member access after non-null",
-			"start": 240,
-			"end": 271,
+			"start": 100,
+			"end": 131,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " Call result",
-			"start": 292,
-			"end": 306,
+			"start": 152,
+			"end": 166,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " Array/index access",
-			"start": 329,
-			"end": 350,
+			"start": 189,
+			"end": 210,
 			"loc": {
 				"start": {
 					"line": 17,
@@ -125,8 +125,8 @@
 		{
 			"type": "Line",
 			"value": " Optional chaining then non-null",
-			"start": 377,
-			"end": 411,
+			"start": 237,
+			"end": 271,
 			"loc": {
 				"start": {
 					"line": 21,
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " Parenthesized (low precedence expressions)",
-			"start": 433,
-			"end": 478,
+			"start": 293,
+			"end": 338,
 			"loc": {
 				"start": {
 					"line": 25,
@@ -157,8 +157,8 @@
 		{
 			"type": "Line",
 			"value": " With await",
-			"start": 529,
-			"end": 542,
+			"start": 389,
+			"end": 402,
 			"loc": {
 				"start": {
 					"line": 31,
@@ -173,8 +173,8 @@
 		{
 			"type": "Line",
 			"value": " In assignment",
-			"start": 584,
-			"end": 600,
+			"start": 444,
+			"end": 460,
 			"loc": {
 				"start": {
 					"line": 35,
@@ -189,8 +189,8 @@
 		{
 			"type": "Line",
 			"value": " With type assertion",
-			"start": 636,
-			"end": 658,
+			"start": 496,
+			"end": 518,
 			"loc": {
 				"start": {
 					"line": 39,
@@ -205,8 +205,8 @@
 		{
 			"type": "Line",
 			"value": " Double assertion (non-null twice - valid but unusual)",
-			"start": 683,
-			"end": 739,
+			"start": 543,
+			"end": 599,
 			"loc": {
 				"start": {
 					"line": 43,
@@ -221,8 +221,8 @@
 		{
 			"type": "Line",
 			"value": " Non-null in expression context",
-			"start": 748,
-			"end": 781,
+			"start": 608,
+			"end": 641,
 			"loc": {
 				"start": {
 					"line": 46,
@@ -238,12 +238,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 827,
+		"end": 687,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 818,
+			"end": 678,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -257,8 +257,8 @@
 			"body": [
 				{
 					"type": "ExpressionStatement",
-					"start": 234,
-					"end": 237,
+					"start": 94,
+					"end": 97,
 					"loc": {
 						"start": {
 							"line": 7,
@@ -271,8 +271,8 @@
 					},
 					"expression": {
 						"type": "TSNonNullExpression",
-						"start": 234,
-						"end": 236,
+						"start": 94,
+						"end": 96,
 						"loc": {
 							"start": {
 								"line": 7,
@@ -285,8 +285,8 @@
 						},
 						"expression": {
 							"type": "Identifier",
-							"start": 234,
-							"end": 235,
+							"start": 94,
+							"end": 95,
 							"loc": {
 								"start": {
 									"line": 7,
@@ -303,34 +303,34 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " =====================================================================",
+							"value": "",
 							"start": 20,
-							"end": 92
+							"end": 22
 						},
 						{
 							"type": "Line",
 							"value": " Non-Null Assertion Operator (!)",
-							"start": 94,
-							"end": 128
+							"start": 24,
+							"end": 58
 						},
 						{
 							"type": "Line",
-							"value": " =====================================================================",
-							"start": 130,
-							"end": 202
+							"value": "",
+							"start": 60,
+							"end": 62
 						},
 						{
 							"type": "Line",
 							"value": " Basic non-null assertion",
-							"start": 205,
-							"end": 232
+							"start": 65,
+							"end": 92
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 273,
-					"end": 278,
+					"start": 133,
+					"end": 138,
 					"loc": {
 						"start": {
 							"line": 10,
@@ -343,8 +343,8 @@
 					},
 					"expression": {
 						"type": "MemberExpression",
-						"start": 273,
-						"end": 277,
+						"start": 133,
+						"end": 137,
 						"loc": {
 							"start": {
 								"line": 10,
@@ -357,8 +357,8 @@
 						},
 						"object": {
 							"type": "TSNonNullExpression",
-							"start": 273,
-							"end": 275,
+							"start": 133,
+							"end": 135,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -371,8 +371,8 @@
 							},
 							"expression": {
 								"type": "Identifier",
-								"start": 273,
-								"end": 274,
+								"start": 133,
+								"end": 134,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -388,8 +388,8 @@
 						},
 						"property": {
 							"type": "Identifier",
-							"start": 276,
-							"end": 277,
+							"start": 136,
+							"end": 137,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -409,15 +409,15 @@
 						{
 							"type": "Line",
 							"value": " Member access after non-null",
-							"start": 240,
-							"end": 271
+							"start": 100,
+							"end": 131
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 280,
-					"end": 289,
+					"start": 140,
+					"end": 149,
 					"loc": {
 						"start": {
 							"line": 11,
@@ -430,8 +430,8 @@
 					},
 					"expression": {
 						"type": "TSNonNullExpression",
-						"start": 280,
-						"end": 288,
+						"start": 140,
+						"end": 148,
 						"loc": {
 							"start": {
 								"line": 11,
@@ -444,8 +444,8 @@
 						},
 						"expression": {
 							"type": "MemberExpression",
-							"start": 280,
-							"end": 287,
+							"start": 140,
+							"end": 147,
 							"loc": {
 								"start": {
 									"line": 11,
@@ -458,8 +458,8 @@
 							},
 							"object": {
 								"type": "TSNonNullExpression",
-								"start": 280,
-								"end": 285,
+								"start": 140,
+								"end": 145,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -472,8 +472,8 @@
 								},
 								"expression": {
 									"type": "MemberExpression",
-									"start": 280,
-									"end": 284,
+									"start": 140,
+									"end": 144,
 									"loc": {
 										"start": {
 											"line": 11,
@@ -486,8 +486,8 @@
 									},
 									"object": {
 										"type": "TSNonNullExpression",
-										"start": 280,
-										"end": 282,
+										"start": 140,
+										"end": 142,
 										"loc": {
 											"start": {
 												"line": 11,
@@ -500,8 +500,8 @@
 										},
 										"expression": {
 											"type": "Identifier",
-											"start": 280,
-											"end": 281,
+											"start": 140,
+											"end": 141,
 											"loc": {
 												"start": {
 													"line": 11,
@@ -517,8 +517,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 283,
-										"end": 284,
+										"start": 143,
+										"end": 144,
 										"loc": {
 											"start": {
 												"line": 11,
@@ -537,8 +537,8 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 286,
-								"end": 287,
+								"start": 146,
+								"end": 147,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -558,8 +558,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 308,
-					"end": 314,
+					"start": 168,
+					"end": 174,
 					"loc": {
 						"start": {
 							"line": 14,
@@ -572,8 +572,8 @@
 					},
 					"expression": {
 						"type": "TSNonNullExpression",
-						"start": 308,
-						"end": 313,
+						"start": 168,
+						"end": 173,
 						"loc": {
 							"start": {
 								"line": 14,
@@ -586,8 +586,8 @@
 						},
 						"expression": {
 							"type": "CallExpression",
-							"start": 308,
-							"end": 312,
+							"start": 168,
+							"end": 172,
 							"loc": {
 								"start": {
 									"line": 14,
@@ -600,8 +600,8 @@
 							},
 							"callee": {
 								"type": "Identifier",
-								"start": 308,
-								"end": 310,
+								"start": 168,
+								"end": 170,
 								"loc": {
 									"start": {
 										"line": 14,
@@ -622,15 +622,15 @@
 						{
 							"type": "Line",
 							"value": " Call result",
-							"start": 292,
-							"end": 306
+							"start": 152,
+							"end": 166
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 316,
-					"end": 326,
+					"start": 176,
+					"end": 186,
 					"loc": {
 						"start": {
 							"line": 15,
@@ -643,8 +643,8 @@
 					},
 					"expression": {
 						"type": "MemberExpression",
-						"start": 316,
-						"end": 325,
+						"start": 176,
+						"end": 185,
 						"loc": {
 							"start": {
 								"line": 15,
@@ -657,8 +657,8 @@
 						},
 						"object": {
 							"type": "TSNonNullExpression",
-							"start": 316,
-							"end": 323,
+							"start": 176,
+							"end": 183,
 							"loc": {
 								"start": {
 									"line": 15,
@@ -671,8 +671,8 @@
 							},
 							"expression": {
 								"type": "CallExpression",
-								"start": 316,
-								"end": 322,
+								"start": 176,
+								"end": 182,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -685,8 +685,8 @@
 								},
 								"callee": {
 									"type": "MemberExpression",
-									"start": 316,
-									"end": 320,
+									"start": 176,
+									"end": 180,
 									"loc": {
 										"start": {
 											"line": 15,
@@ -699,8 +699,8 @@
 									},
 									"object": {
 										"type": "Identifier",
-										"start": 316,
-										"end": 317,
+										"start": 176,
+										"end": 177,
 										"loc": {
 											"start": {
 												"line": 15,
@@ -715,8 +715,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 318,
-										"end": 320,
+										"start": 178,
+										"end": 180,
 										"loc": {
 											"start": {
 												"line": 15,
@@ -738,8 +738,8 @@
 						},
 						"property": {
 							"type": "Identifier",
-							"start": 324,
-							"end": 325,
+							"start": 184,
+							"end": 185,
 							"loc": {
 								"start": {
 									"line": 15,
@@ -758,8 +758,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 352,
-					"end": 358,
+					"start": 212,
+					"end": 218,
 					"loc": {
 						"start": {
 							"line": 18,
@@ -772,8 +772,8 @@
 					},
 					"expression": {
 						"type": "TSNonNullExpression",
-						"start": 352,
-						"end": 357,
+						"start": 212,
+						"end": 217,
 						"loc": {
 							"start": {
 								"line": 18,
@@ -786,8 +786,8 @@
 						},
 						"expression": {
 							"type": "MemberExpression",
-							"start": 352,
-							"end": 356,
+							"start": 212,
+							"end": 216,
 							"loc": {
 								"start": {
 									"line": 18,
@@ -800,8 +800,8 @@
 							},
 							"object": {
 								"type": "Identifier",
-								"start": 352,
-								"end": 353,
+								"start": 212,
+								"end": 213,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -816,8 +816,8 @@
 							},
 							"property": {
 								"type": "Literal",
-								"start": 354,
-								"end": 355,
+								"start": 214,
+								"end": 215,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -839,15 +839,15 @@
 						{
 							"type": "Line",
 							"value": " Array/index access",
-							"start": 329,
-							"end": 350
+							"start": 189,
+							"end": 210
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 360,
-					"end": 374,
+					"start": 220,
+					"end": 234,
 					"loc": {
 						"start": {
 							"line": 19,
@@ -860,8 +860,8 @@
 					},
 					"expression": {
 						"type": "TSNonNullExpression",
-						"start": 360,
-						"end": 373,
+						"start": 220,
+						"end": 233,
 						"loc": {
 							"start": {
 								"line": 19,
@@ -874,8 +874,8 @@
 						},
 						"expression": {
 							"type": "CallExpression",
-							"start": 360,
-							"end": 372,
+							"start": 220,
+							"end": 232,
 							"loc": {
 								"start": {
 									"line": 19,
@@ -888,8 +888,8 @@
 							},
 							"callee": {
 								"type": "MemberExpression",
-								"start": 360,
-								"end": 365,
+								"start": 220,
+								"end": 225,
 								"loc": {
 									"start": {
 										"line": 19,
@@ -902,8 +902,8 @@
 								},
 								"object": {
 									"type": "Identifier",
-									"start": 360,
-									"end": 361,
+									"start": 220,
+									"end": 221,
 									"loc": {
 										"start": {
 											"line": 19,
@@ -918,8 +918,8 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 362,
-									"end": 365,
+									"start": 222,
+									"end": 225,
 									"loc": {
 										"start": {
 											"line": 19,
@@ -938,8 +938,8 @@
 							"arguments": [
 								{
 									"type": "Literal",
-									"start": 366,
-									"end": 371,
+									"start": 226,
+									"end": 231,
 									"loc": {
 										"start": {
 											"line": 19,
@@ -960,8 +960,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 413,
-					"end": 419,
+					"start": 273,
+					"end": 279,
 					"loc": {
 						"start": {
 							"line": 22,
@@ -974,8 +974,8 @@
 					},
 					"expression": {
 						"type": "ChainExpression",
-						"start": 413,
-						"end": 418,
+						"start": 273,
+						"end": 278,
 						"loc": {
 							"start": {
 								"line": 22,
@@ -988,8 +988,8 @@
 						},
 						"expression": {
 							"type": "TSNonNullExpression",
-							"start": 413,
-							"end": 418,
+							"start": 273,
+							"end": 278,
 							"loc": {
 								"start": {
 									"line": 22,
@@ -1002,8 +1002,8 @@
 							},
 							"expression": {
 								"type": "MemberExpression",
-								"start": 413,
-								"end": 417,
+								"start": 273,
+								"end": 277,
 								"loc": {
 									"start": {
 										"line": 22,
@@ -1016,8 +1016,8 @@
 								},
 								"object": {
 									"type": "Identifier",
-									"start": 413,
-									"end": 414,
+									"start": 273,
+									"end": 274,
 									"loc": {
 										"start": {
 											"line": 22,
@@ -1032,8 +1032,8 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 416,
-									"end": 417,
+									"start": 276,
+									"end": 277,
 									"loc": {
 										"start": {
 											"line": 22,
@@ -1055,15 +1055,15 @@
 						{
 							"type": "Line",
 							"value": " Optional chaining then non-null",
-							"start": 377,
-							"end": 411
+							"start": 237,
+							"end": 271
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 421,
-					"end": 430,
+					"start": 281,
+					"end": 290,
 					"loc": {
 						"start": {
 							"line": 23,
@@ -1076,8 +1076,8 @@
 					},
 					"expression": {
 						"type": "ChainExpression",
-						"start": 421,
-						"end": 429,
+						"start": 281,
+						"end": 289,
 						"loc": {
 							"start": {
 								"line": 23,
@@ -1090,8 +1090,8 @@
 						},
 						"expression": {
 							"type": "TSNonNullExpression",
-							"start": 421,
-							"end": 429,
+							"start": 281,
+							"end": 289,
 							"loc": {
 								"start": {
 									"line": 23,
@@ -1104,8 +1104,8 @@
 							},
 							"expression": {
 								"type": "MemberExpression",
-								"start": 421,
-								"end": 428,
+								"start": 281,
+								"end": 288,
 								"loc": {
 									"start": {
 										"line": 23,
@@ -1118,8 +1118,8 @@
 								},
 								"object": {
 									"type": "MemberExpression",
-									"start": 421,
-									"end": 425,
+									"start": 281,
+									"end": 285,
 									"loc": {
 										"start": {
 											"line": 23,
@@ -1132,8 +1132,8 @@
 									},
 									"object": {
 										"type": "Identifier",
-										"start": 421,
-										"end": 422,
+										"start": 281,
+										"end": 282,
 										"loc": {
 											"start": {
 												"line": 23,
@@ -1148,8 +1148,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 424,
-										"end": 425,
+										"start": 284,
+										"end": 285,
 										"loc": {
 											"start": {
 												"line": 23,
@@ -1167,8 +1167,8 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 427,
-									"end": 428,
+									"start": 287,
+									"end": 288,
 									"loc": {
 										"start": {
 											"line": 23,
@@ -1189,8 +1189,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 480,
-					"end": 490,
+					"start": 340,
+					"end": 350,
 					"loc": {
 						"start": {
 							"line": 26,
@@ -1203,8 +1203,8 @@
 					},
 					"expression": {
 						"type": "TSNonNullExpression",
-						"start": 480,
-						"end": 489,
+						"start": 340,
+						"end": 349,
 						"loc": {
 							"start": {
 								"line": 26,
@@ -1217,8 +1217,8 @@
 						},
 						"expression": {
 							"type": "LogicalExpression",
-							"start": 481,
-							"end": 487,
+							"start": 341,
+							"end": 347,
 							"loc": {
 								"start": {
 									"line": 26,
@@ -1231,8 +1231,8 @@
 							},
 							"left": {
 								"type": "Identifier",
-								"start": 481,
-								"end": 482,
+								"start": 341,
+								"end": 342,
 								"loc": {
 									"start": {
 										"line": 26,
@@ -1248,8 +1248,8 @@
 							"operator": "||",
 							"right": {
 								"type": "Identifier",
-								"start": 486,
-								"end": 487,
+								"start": 346,
+								"end": 347,
 								"loc": {
 									"start": {
 										"line": 26,
@@ -1268,15 +1268,15 @@
 						{
 							"type": "Line",
 							"value": " Parenthesized (low precedence expressions)",
-							"start": 433,
-							"end": 478
+							"start": 293,
+							"end": 338
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 492,
-					"end": 501,
+					"start": 352,
+					"end": 361,
 					"loc": {
 						"start": {
 							"line": 27,
@@ -1289,8 +1289,8 @@
 					},
 					"expression": {
 						"type": "TSNonNullExpression",
-						"start": 492,
-						"end": 500,
+						"start": 352,
+						"end": 360,
 						"loc": {
 							"start": {
 								"line": 27,
@@ -1303,8 +1303,8 @@
 						},
 						"expression": {
 							"type": "BinaryExpression",
-							"start": 493,
-							"end": 498,
+							"start": 353,
+							"end": 358,
 							"loc": {
 								"start": {
 									"line": 27,
@@ -1317,8 +1317,8 @@
 							},
 							"left": {
 								"type": "Identifier",
-								"start": 493,
-								"end": 494,
+								"start": 353,
+								"end": 354,
 								"loc": {
 									"start": {
 										"line": 27,
@@ -1334,8 +1334,8 @@
 							"operator": "+",
 							"right": {
 								"type": "Identifier",
-								"start": 497,
-								"end": 498,
+								"start": 357,
+								"end": 358,
 								"loc": {
 									"start": {
 										"line": 27,
@@ -1353,8 +1353,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 503,
-					"end": 516,
+					"start": 363,
+					"end": 376,
 					"loc": {
 						"start": {
 							"line": 28,
@@ -1367,8 +1367,8 @@
 					},
 					"expression": {
 						"type": "TSNonNullExpression",
-						"start": 503,
-						"end": 515,
+						"start": 363,
+						"end": 375,
 						"loc": {
 							"start": {
 								"line": 28,
@@ -1381,8 +1381,8 @@
 						},
 						"expression": {
 							"type": "ConditionalExpression",
-							"start": 504,
-							"end": 513,
+							"start": 364,
+							"end": 373,
 							"loc": {
 								"start": {
 									"line": 28,
@@ -1395,8 +1395,8 @@
 							},
 							"test": {
 								"type": "Identifier",
-								"start": 504,
-								"end": 505,
+								"start": 364,
+								"end": 365,
 								"loc": {
 									"start": {
 										"line": 28,
@@ -1411,8 +1411,8 @@
 							},
 							"consequent": {
 								"type": "Identifier",
-								"start": 508,
-								"end": 509,
+								"start": 368,
+								"end": 369,
 								"loc": {
 									"start": {
 										"line": 28,
@@ -1427,8 +1427,8 @@
 							},
 							"alternate": {
 								"type": "Identifier",
-								"start": 512,
-								"end": 513,
+								"start": 372,
+								"end": 373,
 								"loc": {
 									"start": {
 										"line": 28,
@@ -1446,8 +1446,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 518,
-					"end": 526,
+					"start": 378,
+					"end": 386,
 					"loc": {
 						"start": {
 							"line": 29,
@@ -1460,8 +1460,8 @@
 					},
 					"expression": {
 						"type": "TSNonNullExpression",
-						"start": 518,
-						"end": 525,
+						"start": 378,
+						"end": 385,
 						"loc": {
 							"start": {
 								"line": 29,
@@ -1474,8 +1474,8 @@
 						},
 						"expression": {
 							"type": "SequenceExpression",
-							"start": 519,
-							"end": 523,
+							"start": 379,
+							"end": 383,
 							"loc": {
 								"start": {
 									"line": 29,
@@ -1489,8 +1489,8 @@
 							"expressions": [
 								{
 									"type": "Identifier",
-									"start": 519,
-									"end": 520,
+									"start": 379,
+									"end": 380,
 									"loc": {
 										"start": {
 											"line": 29,
@@ -1505,8 +1505,8 @@
 								},
 								{
 									"type": "Identifier",
-									"start": 522,
-									"end": 523,
+									"start": 382,
+									"end": 383,
 									"loc": {
 										"start": {
 											"line": 29,
@@ -1525,8 +1525,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 544,
-					"end": 561,
+					"start": 404,
+					"end": 421,
 					"loc": {
 						"start": {
 							"line": 32,
@@ -1539,8 +1539,8 @@
 					},
 					"expression": {
 						"type": "TSNonNullExpression",
-						"start": 544,
-						"end": 560,
+						"start": 404,
+						"end": 420,
 						"loc": {
 							"start": {
 								"line": 32,
@@ -1553,8 +1553,8 @@
 						},
 						"expression": {
 							"type": "AwaitExpression",
-							"start": 545,
-							"end": 558,
+							"start": 405,
+							"end": 418,
 							"loc": {
 								"start": {
 									"line": 32,
@@ -1567,8 +1567,8 @@
 							},
 							"argument": {
 								"type": "Identifier",
-								"start": 551,
-								"end": 558,
+								"start": 411,
+								"end": 418,
 								"loc": {
 									"start": {
 										"line": 32,
@@ -1587,15 +1587,15 @@
 						{
 							"type": "Line",
 							"value": " With await",
-							"start": 529,
-							"end": 542
+							"start": 389,
+							"end": 402
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 563,
-					"end": 581,
+					"start": 423,
+					"end": 441,
 					"loc": {
 						"start": {
 							"line": 33,
@@ -1608,8 +1608,8 @@
 					},
 					"expression": {
 						"type": "MemberExpression",
-						"start": 563,
-						"end": 580,
+						"start": 423,
+						"end": 440,
 						"loc": {
 							"start": {
 								"line": 33,
@@ -1622,8 +1622,8 @@
 						},
 						"object": {
 							"type": "TSNonNullExpression",
-							"start": 563,
-							"end": 578,
+							"start": 423,
+							"end": 438,
 							"loc": {
 								"start": {
 									"line": 33,
@@ -1636,8 +1636,8 @@
 							},
 							"expression": {
 								"type": "AwaitExpression",
-								"start": 564,
-								"end": 576,
+								"start": 424,
+								"end": 436,
 								"loc": {
 									"start": {
 										"line": 33,
@@ -1650,8 +1650,8 @@
 								},
 								"argument": {
 									"type": "CallExpression",
-									"start": 570,
-									"end": 576,
+									"start": 430,
+									"end": 436,
 									"loc": {
 										"start": {
 											"line": 33,
@@ -1664,8 +1664,8 @@
 									},
 									"callee": {
 										"type": "MemberExpression",
-										"start": 570,
-										"end": 574,
+										"start": 430,
+										"end": 434,
 										"loc": {
 											"start": {
 												"line": 33,
@@ -1678,8 +1678,8 @@
 										},
 										"object": {
 											"type": "Identifier",
-											"start": 570,
-											"end": 571,
+											"start": 430,
+											"end": 431,
 											"loc": {
 												"start": {
 													"line": 33,
@@ -1694,8 +1694,8 @@
 										},
 										"property": {
 											"type": "Identifier",
-											"start": 572,
-											"end": 574,
+											"start": 432,
+											"end": 434,
 											"loc": {
 												"start": {
 													"line": 33,
@@ -1718,8 +1718,8 @@
 						},
 						"property": {
 							"type": "Identifier",
-							"start": 579,
-							"end": 580,
+							"start": 439,
+							"end": 440,
 							"loc": {
 								"start": {
 									"line": 33,
@@ -1738,8 +1738,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 602,
-					"end": 615,
+					"start": 462,
+					"end": 475,
 					"loc": {
 						"start": {
 							"line": 36,
@@ -1753,8 +1753,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 608,
-							"end": 614,
+							"start": 468,
+							"end": 474,
 							"loc": {
 								"start": {
 									"line": 36,
@@ -1767,8 +1767,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 608,
-								"end": 609,
+								"start": 468,
+								"end": 469,
 								"loc": {
 									"start": {
 										"line": 36,
@@ -1783,8 +1783,8 @@
 							},
 							"init": {
 								"type": "TSNonNullExpression",
-								"start": 612,
-								"end": 614,
+								"start": 472,
+								"end": 474,
 								"loc": {
 									"start": {
 										"line": 36,
@@ -1797,8 +1797,8 @@
 								},
 								"expression": {
 									"type": "Identifier",
-									"start": 612,
-									"end": 613,
+									"start": 472,
+									"end": 473,
 									"loc": {
 										"start": {
 											"line": 36,
@@ -1819,15 +1819,15 @@
 						{
 							"type": "Line",
 							"value": " In assignment",
-							"start": 584,
-							"end": 600
+							"start": 444,
+							"end": 460
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 617,
-					"end": 633,
+					"start": 477,
+					"end": 493,
 					"loc": {
 						"start": {
 							"line": 37,
@@ -1841,8 +1841,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 623,
-							"end": 632,
+							"start": 483,
+							"end": 492,
 							"loc": {
 								"start": {
 									"line": 37,
@@ -1855,8 +1855,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 623,
-								"end": 624,
+								"start": 483,
+								"end": 484,
 								"loc": {
 									"start": {
 										"line": 37,
@@ -1871,8 +1871,8 @@
 							},
 							"init": {
 								"type": "TSNonNullExpression",
-								"start": 627,
-								"end": 632,
+								"start": 487,
+								"end": 492,
 								"loc": {
 									"start": {
 										"line": 37,
@@ -1885,8 +1885,8 @@
 								},
 								"expression": {
 									"type": "MemberExpression",
-									"start": 627,
-									"end": 631,
+									"start": 487,
+									"end": 491,
 									"loc": {
 										"start": {
 											"line": 37,
@@ -1899,8 +1899,8 @@
 									},
 									"object": {
 										"type": "TSNonNullExpression",
-										"start": 627,
-										"end": 629,
+										"start": 487,
+										"end": 489,
 										"loc": {
 											"start": {
 												"line": 37,
@@ -1913,8 +1913,8 @@
 										},
 										"expression": {
 											"type": "Identifier",
-											"start": 627,
-											"end": 628,
+											"start": 487,
+											"end": 488,
 											"loc": {
 												"start": {
 													"line": 37,
@@ -1930,8 +1930,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 630,
-										"end": 631,
+										"start": 490,
+										"end": 491,
 										"loc": {
 											"start": {
 												"line": 37,
@@ -1954,8 +1954,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 660,
-					"end": 670,
+					"start": 520,
+					"end": 530,
 					"loc": {
 						"start": {
 							"line": 40,
@@ -1968,8 +1968,8 @@
 					},
 					"expression": {
 						"type": "TSNonNullExpression",
-						"start": 660,
-						"end": 669,
+						"start": 520,
+						"end": 529,
 						"loc": {
 							"start": {
 								"line": 40,
@@ -1982,8 +1982,8 @@
 						},
 						"expression": {
 							"type": "TSAsExpression",
-							"start": 661,
-							"end": 667,
+							"start": 521,
+							"end": 527,
 							"loc": {
 								"start": {
 									"line": 40,
@@ -1996,8 +1996,8 @@
 							},
 							"expression": {
 								"type": "Identifier",
-								"start": 661,
-								"end": 662,
+								"start": 521,
+								"end": 522,
 								"loc": {
 									"start": {
 										"line": 40,
@@ -2012,8 +2012,8 @@
 							},
 							"typeAnnotation": {
 								"type": "TSTypeReference",
-								"start": 666,
-								"end": 667,
+								"start": 526,
+								"end": 527,
 								"loc": {
 									"start": {
 										"line": 40,
@@ -2026,8 +2026,8 @@
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 666,
-									"end": 667,
+									"start": 526,
+									"end": 527,
 									"loc": {
 										"start": {
 											"line": 40,
@@ -2047,15 +2047,15 @@
 						{
 							"type": "Line",
 							"value": " With type assertion",
-							"start": 636,
-							"end": 658
+							"start": 496,
+							"end": 518
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 672,
-					"end": 680,
+					"start": 532,
+					"end": 540,
 					"loc": {
 						"start": {
 							"line": 41,
@@ -2068,8 +2068,8 @@
 					},
 					"expression": {
 						"type": "TSNonNullExpression",
-						"start": 672,
-						"end": 679,
+						"start": 532,
+						"end": 539,
 						"loc": {
 							"start": {
 								"line": 41,
@@ -2082,8 +2082,8 @@
 						},
 						"expression": {
 							"type": "TSTypeAssertion",
-							"start": 673,
-							"end": 677,
+							"start": 533,
+							"end": 537,
 							"loc": {
 								"start": {
 									"line": 41,
@@ -2096,8 +2096,8 @@
 							},
 							"typeAnnotation": {
 								"type": "TSTypeReference",
-								"start": 674,
-								"end": 675,
+								"start": 534,
+								"end": 535,
 								"loc": {
 									"start": {
 										"line": 41,
@@ -2110,8 +2110,8 @@
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 674,
-									"end": 675,
+									"start": 534,
+									"end": 535,
 									"loc": {
 										"start": {
 											"line": 41,
@@ -2127,8 +2127,8 @@
 							},
 							"expression": {
 								"type": "Identifier",
-								"start": 676,
-								"end": 677,
+								"start": 536,
+								"end": 537,
 								"loc": {
 									"start": {
 										"line": 41,
@@ -2146,8 +2146,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 741,
-					"end": 745,
+					"start": 601,
+					"end": 605,
 					"loc": {
 						"start": {
 							"line": 44,
@@ -2160,8 +2160,8 @@
 					},
 					"expression": {
 						"type": "TSNonNullExpression",
-						"start": 741,
-						"end": 744,
+						"start": 601,
+						"end": 604,
 						"loc": {
 							"start": {
 								"line": 44,
@@ -2174,8 +2174,8 @@
 						},
 						"expression": {
 							"type": "TSNonNullExpression",
-							"start": 741,
-							"end": 743,
+							"start": 601,
+							"end": 603,
 							"loc": {
 								"start": {
 									"line": 44,
@@ -2188,8 +2188,8 @@
 							},
 							"expression": {
 								"type": "Identifier",
-								"start": 741,
-								"end": 742,
+								"start": 601,
+								"end": 602,
 								"loc": {
 									"start": {
 										"line": 44,
@@ -2208,15 +2208,15 @@
 						{
 							"type": "Line",
 							"value": " Double assertion (non-null twice - valid but unusual)",
-							"start": 683,
-							"end": 739
+							"start": 543,
+							"end": 599
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 783,
-					"end": 794,
+					"start": 643,
+					"end": 654,
 					"loc": {
 						"start": {
 							"line": 47,
@@ -2229,8 +2229,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 783,
-						"end": 793,
+						"start": 643,
+						"end": 653,
 						"loc": {
 							"start": {
 								"line": 47,
@@ -2243,8 +2243,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 783,
-							"end": 785,
+							"start": 643,
+							"end": 645,
 							"loc": {
 								"start": {
 									"line": 47,
@@ -2260,8 +2260,8 @@
 						"arguments": [
 							{
 								"type": "TSNonNullExpression",
-								"start": 786,
-								"end": 788,
+								"start": 646,
+								"end": 648,
 								"loc": {
 									"start": {
 										"line": 47,
@@ -2274,8 +2274,8 @@
 								},
 								"expression": {
 									"type": "Identifier",
-									"start": 786,
-									"end": 787,
+									"start": 646,
+									"end": 647,
 									"loc": {
 										"start": {
 											"line": 47,
@@ -2291,8 +2291,8 @@
 							},
 							{
 								"type": "TSNonNullExpression",
-								"start": 790,
-								"end": 792,
+								"start": 650,
+								"end": 652,
 								"loc": {
 									"start": {
 										"line": 47,
@@ -2305,8 +2305,8 @@
 								},
 								"expression": {
 									"type": "Identifier",
-									"start": 790,
-									"end": 791,
+									"start": 650,
+									"end": 651,
 									"loc": {
 										"start": {
 											"line": 47,
@@ -2327,15 +2327,15 @@
 						{
 							"type": "Line",
 							"value": " Non-null in expression context",
-							"start": 748,
-							"end": 781
+							"start": 608,
+							"end": 641
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 796,
-					"end": 804,
+					"start": 656,
+					"end": 664,
 					"loc": {
 						"start": {
 							"line": 48,
@@ -2348,8 +2348,8 @@
 					},
 					"expression": {
 						"type": "BinaryExpression",
-						"start": 796,
-						"end": 803,
+						"start": 656,
+						"end": 663,
 						"loc": {
 							"start": {
 								"line": 48,
@@ -2362,8 +2362,8 @@
 						},
 						"left": {
 							"type": "TSNonNullExpression",
-							"start": 796,
-							"end": 798,
+							"start": 656,
+							"end": 658,
 							"loc": {
 								"start": {
 									"line": 48,
@@ -2376,8 +2376,8 @@
 							},
 							"expression": {
 								"type": "Identifier",
-								"start": 796,
-								"end": 797,
+								"start": 656,
+								"end": 657,
 								"loc": {
 									"start": {
 										"line": 48,
@@ -2394,8 +2394,8 @@
 						"operator": "+",
 						"right": {
 							"type": "TSNonNullExpression",
-							"start": 801,
-							"end": 803,
+							"start": 661,
+							"end": 663,
 							"loc": {
 								"start": {
 									"line": 48,
@@ -2408,8 +2408,8 @@
 							},
 							"expression": {
 								"type": "Identifier",
-								"start": 801,
-								"end": 802,
+								"start": 661,
+								"end": 662,
 								"loc": {
 									"start": {
 										"line": 48,
@@ -2427,8 +2427,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 806,
-					"end": 817,
+					"start": 666,
+					"end": 677,
 					"loc": {
 						"start": {
 							"line": 49,
@@ -2441,8 +2441,8 @@
 					},
 					"expression": {
 						"type": "ConditionalExpression",
-						"start": 806,
-						"end": 816,
+						"start": 666,
+						"end": 676,
 						"loc": {
 							"start": {
 								"line": 49,
@@ -2455,8 +2455,8 @@
 						},
 						"test": {
 							"type": "TSNonNullExpression",
-							"start": 806,
-							"end": 808,
+							"start": 666,
+							"end": 668,
 							"loc": {
 								"start": {
 									"line": 49,
@@ -2469,8 +2469,8 @@
 							},
 							"expression": {
 								"type": "Identifier",
-								"start": 806,
-								"end": 807,
+								"start": 666,
+								"end": 667,
 								"loc": {
 									"start": {
 										"line": 49,
@@ -2486,8 +2486,8 @@
 						},
 						"consequent": {
 							"type": "Identifier",
-							"start": 811,
-							"end": 812,
+							"start": 671,
+							"end": 672,
 							"loc": {
 								"start": {
 									"line": 49,
@@ -2502,8 +2502,8 @@
 						},
 						"alternate": {
 							"type": "Identifier",
-							"start": 815,
-							"end": 816,
+							"start": 675,
+							"end": 676,
 							"loc": {
 								"start": {
 									"line": 49,

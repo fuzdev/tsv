@@ -115,9 +115,9 @@ pub struct ReturnStatement {
     pub span: Span,
 }
 
-// ============================================================================
+//
 // Control Flow Statements
-// ============================================================================
+//
 
 /// If statement: `if (test) consequent` or `if (test) consequent else alternate`
 #[derive(Debug, Clone)]
@@ -263,9 +263,9 @@ pub struct EmptyStatement {
     pub span: Span,
 }
 
-// ============================================================================
+//
 // Declarations
-// ============================================================================
+//
 
 /// Function declaration: `function foo(x) { return x + 1; }`
 ///

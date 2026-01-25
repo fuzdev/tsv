@@ -6,7 +6,7 @@ use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
 use super::super::scan::{
-    is_identifier_start, parse_number_literal, skip_identifier, skip_whitespace,
+    is_identifier_start, parse_number_literal, skip_identifier, skip_whitespace_and_comments,
 };
 
 impl<'a> Parser<'a> {
@@ -435,15 +435,15 @@ impl<'a> Parser<'a> {
         // Lookahead: check if pattern is `[identifier:`
         // We need to look past the '[', then the identifier, then check for ':'
         let bytes = self.source.as_bytes();
-        let pos = skip_whitespace(bytes, self.current_start + 1); // skip '[' and whitespace
+        let pos = skip_whitespace_and_comments(bytes, self.current_start + 1); // skip '[' and whitespace/comments
 
         // Must be followed by an identifier
         if pos >= bytes.len() || !is_identifier_start(bytes[pos]) {
             return false;
         }
 
-        // Skip the identifier and trailing whitespace
-        let pos = skip_whitespace(bytes, skip_identifier(bytes, pos));
+        // Skip the identifier and trailing whitespace/comments
+        let pos = skip_whitespace_and_comments(bytes, skip_identifier(bytes, pos));
 
         // Check for ':'
         pos < bytes.len() && bytes[pos] == b':'
@@ -1615,9 +1615,9 @@ impl<'a> Parser<'a> {
         })
     }
 
-    // ============================================================================
+    //
     // Interface Declaration
-    // ============================================================================
+    //
 
     /// Parse interface declaration: `interface Foo { ... }` or `interface Foo extends Bar { ... }`
     pub(super) fn parse_interface_declaration(&mut self) -> Result<Statement, ParseError> {
@@ -1991,9 +1991,9 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    // ============================================================================
+    //
     // Declare Statement
-    // ============================================================================
+    //
 
     /// Parse declare statement: `declare function`, `declare class`, `declare enum`, `declare const enum`, `declare namespace`, `declare global`, `declare var/let/const`
     pub(super) fn parse_declare_statement(&mut self) -> Result<Statement, ParseError> {
@@ -2584,9 +2584,9 @@ impl<'a> Parser<'a> {
         })
     }
 
-    // ============================================================================
+    //
     // Enum Declaration
-    // ============================================================================
+    //
 
     /// Parse enum declaration: `enum Foo { A, B }`, `const enum Foo { A = 1 }`, etc.
     ///

@@ -56,10 +56,8 @@ impl<'a> Printer<'a> {
                 parts.push(doc::text("{}"));
             } else {
                 // Build specifier docs with line breaks between them
-                let spec_docs: Vec<_> = decl
-                    .specifiers
-                    .iter()
-                    .map(|spec| {
+                let spec_parts = doc::join_trailing(
+                    decl.specifiers.iter().map(|spec| {
                         let mut spec_parts = Vec::new();
                         // Add inline type modifier if this specifier is type-only
                         // (only when the overall export is NOT type-only)
@@ -76,9 +74,9 @@ impl<'a> Printer<'a> {
                             spec_parts.push(doc::symbol(exported_sym));
                         }
                         doc::concat(spec_parts)
-                    })
-                    .collect();
-                let spec_parts = doc::join_trailing(spec_docs, doc::comma_line());
+                    }),
+                    doc::comma_line(),
+                );
 
                 // Check for trailing comments after last specifier (before closing brace)
                 // e.g., `export {a /*, b*/}`
@@ -253,9 +251,8 @@ impl<'a> Printer<'a> {
                 parts.push(doc::text("{}"));
             } else {
                 // Build specifier docs with line breaks between them
-                let spec_docs: Vec<_> = named_specs
-                    .iter()
-                    .map(|named_spec| {
+                let spec_parts = doc::join_trailing(
+                    named_specs.iter().map(|named_spec| {
                         let mut parts = Vec::new();
                         // Add inline type modifier if this specifier is type-only
                         // (only when the overall import is NOT type-only)
@@ -272,9 +269,9 @@ impl<'a> Printer<'a> {
                             parts.push(doc::symbol(local_sym));
                         }
                         doc::concat(parts)
-                    })
-                    .collect();
-                let spec_parts = doc::join_trailing(spec_docs, doc::comma_line());
+                    }),
+                    doc::comma_line(),
+                );
 
                 // Check for trailing comments after last specifier (before closing brace)
                 // e.g., `import {a /*, b*/} from 'x'`
@@ -303,18 +300,16 @@ impl<'a> Printer<'a> {
             parts.push(doc::text(" with "));
 
             // Build attribute docs with line breaks between them
-            let attr_docs: Vec<_> = decl
-                .attributes
-                .iter()
-                .map(|attr| {
+            let attr_parts = doc::join_trailing(
+                decl.attributes.iter().map(|attr| {
                     doc::concat(vec![
                         doc::symbol(attr.key.name.to_u32()),
                         doc::text(": "),
                         self.build_literal_doc(&attr.value),
                     ])
-                })
-                .collect();
-            let attr_parts = doc::join_trailing(attr_docs, doc::comma_line());
+                }),
+                doc::comma_line(),
+            );
 
             // Build the braces content with same pattern as named specifiers
             parts.push(doc::text("{"));

@@ -25,9 +25,9 @@ impl<'a> Printer<'a> {
         self.render_doc_immediate(&doc);
     }
 
-    // =========================================================================
+    //
     // Hug mode helpers (used by fragment_doc.rs)
-    // =========================================================================
+    //
 
     /// Check if element should hug the start
     ///

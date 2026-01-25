@@ -90,30 +90,6 @@ pub(crate) fn is_module_path_fluid_call(
     false
 }
 
-/// Check if expression is a plain require() call
-///
-/// Plain require() calls with string arguments should never break
-/// (prettier keeps them on one line even when exceeding print width)
-pub(crate) fn is_plain_require_call(
-    expr: &internal::Expression,
-    interner: &DefaultStringInterner,
-) -> bool {
-    let internal::Expression::CallExpression(call) = expr else {
-        return false;
-    };
-
-    // Must have exactly 1 argument that is a string literal
-    if call.arguments.len() != 1 || !is_string_literal(&call.arguments[0]) {
-        return false;
-    }
-
-    // Check for plain `require()` - callee is just "require" identifier
-    matches!(
-        call.callee.as_ref(),
-        internal::Expression::Identifier(id) if interner.resolve(id.name) == Some("require")
-    )
-}
-
 /// Check if an expression is a string literal
 pub(crate) fn is_string_literal(expr: &internal::Expression) -> bool {
     matches!(

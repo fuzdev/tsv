@@ -335,9 +335,9 @@ pub(super) fn fits_multi<R: TextResolver + ?Sized>(
     remaining_width >= 0
 }
 
-// =============================================================================
+//
 // Width Calculation Helpers
-// =============================================================================
+//
 
 /// Calculate available width for fitting check
 ///
@@ -388,9 +388,9 @@ pub fn fits_at(
     fits(doc, available, Mode::Flat, config)
 }
 
-// =============================================================================
+//
 // Utilities
-// =============================================================================
+//
 
 /// Update position after rendering a text string, accounting for tab expansion.
 ///

@@ -2,7 +2,7 @@
 
 use super::Printer;
 use crate::ast::internal;
-use tsv_lang::{SymbolToU32, doc};
+use tsv_lang::{SymbolToU32, comments_in_range, doc};
 
 impl<'a> Printer<'a> {
     /// Check if class should use "group mode" for heritage clauses
@@ -273,31 +273,7 @@ impl<'a> Printer<'a> {
         _is_ambient: bool,
     ) -> doc::Doc {
         if body.body.is_empty() {
-            // Check for comments inside empty body
-            let body_start = body.span.start + 1; // After '{'
-            let body_end = body.span.end.saturating_sub(1); // Before '}'
-            let has_inner_comments = self.has_comments_between(body_start, body_end);
-
-            if has_inner_comments {
-                let mut comment_parts = Vec::new();
-                for comment in tsv_lang::comments_in_range(self.comments, body_start, body_end) {
-                    comment_parts.push(self.build_comment_doc(comment));
-                    if !comment.is_block {
-                        comment_parts.push(doc::hardline());
-                    }
-                }
-                return doc::concat(vec![
-                    doc::text("{"),
-                    doc::indent(doc::concat(vec![
-                        doc::hardline(),
-                        doc::concat(comment_parts),
-                    ])),
-                    doc::hardline(),
-                    doc::text("}"),
-                ]);
-            }
-
-            return doc::text("{}");
+            return self.build_empty_body_with_comments_doc(body.span);
         }
 
         // Build member docs with comments and blank line preservation
@@ -311,13 +287,11 @@ impl<'a> Printer<'a> {
             // Check for comments between previous position and this member
             // Filter out trailing same-line comments from the previous member
             let all_comments: Vec<_> =
-                tsv_lang::comments_in_range(self.comments, prev_end, member_start).collect();
+                comments_in_range(self.comments, prev_end, member_start).collect();
             let comments: Vec<_> = if !is_first {
                 all_comments
                     .iter()
-                    .filter(|c| {
-                        !tsv_lang::printing::is_same_line(self.source, prev_end, c.span.start)
-                    })
+                    .filter(|c| !self.is_same_line(prev_end, c.span.start))
                     .copied()
                     .collect()
             } else {
@@ -332,7 +306,7 @@ impl<'a> Printer<'a> {
                 } else {
                     comments[0].span.start
                 };
-                if tsv_lang::printing::has_blank_line_between(self.source, prev_end, check_pos) {
+                if self.has_blank_line_between(prev_end, check_pos) {
                     // Blank line before first comment or member
                     member_parts.push(doc::literalline());
                 }
@@ -395,12 +369,10 @@ impl<'a> Printer<'a> {
         }
 
         parts.push(doc::text("["));
-        let param_docs: Vec<_> = sig
-            .parameters
-            .iter()
-            .map(|p| self.build_identifier_doc(p))
-            .collect();
-        parts.push(doc::join(param_docs, ", "));
+        parts.push(doc::join(
+            sig.parameters.iter().map(|p| self.build_identifier_doc(p)),
+            ", ",
+        ));
         parts.push(doc::text("]"));
         parts.push(self.build_type_annotation_doc(&sig.type_annotation));
         parts.push(doc::text(";"));
@@ -490,6 +462,19 @@ impl<'a> Printer<'a> {
         // Value if present
         if let Some(value) = &prop.value {
             parts.push(doc::text(" = "));
+
+            // Check for comments between = and value (e.g., /* @__PURE__ */ annotations)
+            // The = comes after the key (and type annotation if present)
+            let before_value = prop
+                .type_annotation
+                .as_ref()
+                .map_or_else(|| prop.key.span().end, |ta| ta.span.end);
+            if let Some(comments) =
+                self.build_inline_comments_between_doc_trailing_space_opt(before_value, value.span().start)
+            {
+                parts.push(comments);
+            }
+
             parts.push(self.build_expression_doc(value));
         }
 

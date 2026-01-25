@@ -209,9 +209,9 @@ pub struct AttachTag {
     pub span: Span,
 }
 
-// =============================================================================
+//
 // Directives
-// =============================================================================
+//
 
 /// OnDirective - event handler (`on:click={handler}`)
 ///
@@ -373,9 +373,9 @@ pub struct LetDirective {
     pub expression_tag_span: Option<Span>,
 }
 
-// =============================================================================
+//
 // Special Elements
-// =============================================================================
+//
 
 /// Tag identifier for special elements (used during parsing before data is available)
 ///

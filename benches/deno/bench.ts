@@ -49,9 +49,9 @@ import {
 } from './lib/report.ts';
 import type { Language, SourceFile } from './lib/types.ts';
 
-// ============================================================================
+//
 // CLI Arguments
-// ============================================================================
+//
 
 const args = {
 	json: Deno.args.includes('--json'),
@@ -71,9 +71,9 @@ function log(...messages: unknown[]): void {
 	}
 }
 
-// ============================================================================
+//
 // Configuration
-// ============================================================================
+//
 
 /** Parse optional integer from env var */
 const envInt = (name: string): number | undefined => {
@@ -102,9 +102,9 @@ const LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
 /** Baseline file path */
 const BASELINE_PATH = 'benches/deno/baseline.json';
 
-// ============================================================================
+//
 // Setup
-// ============================================================================
+//
 
 log('Loading corpus...\n');
 const corpusLoader = new DevReposLoader();
@@ -159,9 +159,9 @@ log();
 // Initialize implementations
 const impls = await initImplementations({ logger: log });
 
-// ============================================================================
+//
 // Formatter Validation
-// ============================================================================
+//
 
 // Validate formatters before benchmarking
 {
@@ -241,9 +241,9 @@ const impls = await initImplementations({ logger: log });
 	}
 }
 
-// ============================================================================
+//
 // Benchmark Helpers
-// ============================================================================
+//
 
 // Track skipped files for reporting
 const skippedFiles: Map<string, Map<string, string>> = new Map();
@@ -305,9 +305,9 @@ const filesByLanguage: Record<Language, SourceFile[]> = {
 	css: cssFiles,
 };
 
-// ============================================================================
+//
 // Run Benchmarks
-// ============================================================================
+//
 
 const allGroupResults: GroupResults[] = [];
 
@@ -386,9 +386,9 @@ for (const lang of LANGUAGES) {
 	await runBenchmarkGroup('format', lang);
 }
 
-// ============================================================================
+//
 // Baseline Handling
-// ============================================================================
+//
 
 interface BaselineEntry {
 	name: string;
@@ -580,9 +580,9 @@ async function compareBaseline(): Promise<void> {
 	}
 }
 
-// ============================================================================
+//
 // Output
-// ============================================================================
+//
 
 if (args.json) {
 	// JSON output

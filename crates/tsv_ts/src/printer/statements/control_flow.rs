@@ -1,8 +1,13 @@
 // Control flow statement printing for TypeScript
 
+use smallvec::SmallVec;
+
 use super::Printer;
 use crate::ast::internal::{self, Statement};
 use tsv_lang::{SymbolToU32, doc};
+
+/// Small vector of comment references, stack-allocated for typical cases.
+type CommentVec<'a> = SmallVec<[&'a tsv_lang::Comment; 2]>;
 
 /// Span positions for a for loop header
 ///
@@ -56,20 +61,14 @@ impl<'a> Printer<'a> {
         &self,
         prev_end: u32,
         next_start: u32,
-    ) -> (
-        Vec<&tsv_lang::Comment>,
-        Vec<&tsv_lang::Comment>,
-        Vec<&tsv_lang::Comment>,
-    ) {
-        let mut inline_prev = Vec::new();
-        let mut own_line = Vec::new();
-        let mut inline_next = Vec::new();
+    ) -> (CommentVec<'a>, CommentVec<'a>, CommentVec<'a>) {
+        let mut inline_prev = SmallVec::new();
+        let mut own_line = SmallVec::new();
+        let mut inline_next = SmallVec::new();
 
         for comment in tsv_lang::comments_in_range(self.comments, prev_end, next_start) {
-            let same_line_as_prev =
-                tsv_lang::printing::is_same_line(self.source, prev_end, comment.span.start);
-            let same_line_as_next =
-                tsv_lang::printing::is_same_line(self.source, comment.span.end, next_start);
+            let same_line_as_prev = self.is_same_line(prev_end, comment.span.start);
+            let same_line_as_next = self.is_same_line(comment.span.end, next_start);
 
             if same_line_as_prev {
                 inline_prev.push(comment);
@@ -106,7 +105,7 @@ impl<'a> Printer<'a> {
         // Own-line comments: preserve blank lines before them
         let mut end = prev_end;
         for comment in own_line {
-            if tsv_lang::printing::has_blank_line_between(self.source, end, comment.span.start) {
+            if self.has_blank_line_between(end, comment.span.start) {
                 // Blank line then comment: literalline (empty) + hardline (indented)
                 parts.push(doc::literalline());
                 parts.push(doc::hardline());
@@ -214,7 +213,7 @@ impl<'a> Printer<'a> {
         // Check if there are own-line leading comments (not on same line as open paren)
         let has_own_line_leading = leading_comments
             .iter()
-            .any(|c| !tsv_lang::printing::is_same_line(self.source, open_paren_pos, c.span.start));
+            .any(|c| !self.is_same_line(open_paren_pos, c.span.start));
 
         if preserve_inline {
             // Preserve inline comments after open paren (used for do-while divergence)
@@ -222,8 +221,7 @@ impl<'a> Printer<'a> {
 
             // Leading inline comments (on same line as open paren)
             for comment in &leading_comments {
-                if tsv_lang::printing::is_same_line(self.source, open_paren_pos, comment.span.start)
-                {
+                if self.is_same_line(open_paren_pos, comment.span.start) {
                     // Only add space if source has whitespace between ( and comment
                     let space_between =
                         &self.source[(open_paren_pos + 1) as usize..comment.span.start as usize];
@@ -231,8 +229,7 @@ impl<'a> Printer<'a> {
                         inner_parts.push(doc::text(" "));
                     }
                     inner_parts.push(self.build_comment_doc(comment));
-                    if !tsv_lang::printing::is_same_line(self.source, comment.span.end, test_start)
-                    {
+                    if !self.is_same_line(comment.span.end, test_start) {
                         has_inline_comment_followed_by_newline = true;
                     } else {
                         inner_parts.push(doc::text(" "));
@@ -246,17 +243,12 @@ impl<'a> Printer<'a> {
 
             // Own-line comments
             for comment in &leading_comments {
-                if !tsv_lang::printing::is_same_line(
-                    self.source,
-                    open_paren_pos,
-                    comment.span.start,
-                ) {
+                if !self.is_same_line(open_paren_pos, comment.span.start) {
                     if !has_inline_comment_followed_by_newline {
                         inner_parts.push(doc::hardline());
                     }
                     inner_parts.push(self.build_comment_doc(comment));
-                    if !tsv_lang::printing::is_same_line(self.source, comment.span.end, test_start)
-                    {
+                    if !self.is_same_line(comment.span.end, test_start) {
                         inner_parts.push(doc::hardline());
                     } else {
                         inner_parts.push(doc::text(" "));
@@ -274,11 +266,7 @@ impl<'a> Printer<'a> {
             let mut added_comment = false;
             let mut last_comment_same_line_as_test = false;
             for comment in &leading_comments {
-                let on_same_line_as_open = tsv_lang::printing::is_same_line(
-                    self.source,
-                    open_paren_pos,
-                    comment.span.start,
-                );
+                let on_same_line_as_open = self.is_same_line(open_paren_pos, comment.span.start);
 
                 if on_same_line_as_open {
                     // Comment is inline with open paren - use softline to allow collapse
@@ -291,8 +279,7 @@ impl<'a> Printer<'a> {
                 added_comment = true;
 
                 // Check if condition is on same line as comment end
-                last_comment_same_line_as_test =
-                    tsv_lang::printing::is_same_line(self.source, comment.span.end, test_start);
+                last_comment_same_line_as_test = self.is_same_line(comment.span.end, test_start);
                 // Space if on same line, hardline if on different line
                 if last_comment_same_line_as_test {
                     inner_parts.push(doc::text(" "));
@@ -562,7 +549,7 @@ impl<'a> Printer<'a> {
         inner_parts.push(doc::text(";"));
         if let (Some(semi1), Some(semi2)) = (first_semi, second_semi) {
             for comment in tsv_lang::comments_in_range(self.comments, semi1 + 1, semi2) {
-                if tsv_lang::printing::is_same_line(self.source, semi1, comment.span.start) {
+                if self.is_same_line(semi1, comment.span.start) {
                     inner_parts.push(doc::text(" "));
                     inner_parts.push(self.build_comment_doc(comment));
                 }
@@ -577,7 +564,7 @@ impl<'a> Printer<'a> {
         if let Some(semi2) = second_semi {
             let mut own_line_comments = Vec::new();
             for comment in tsv_lang::comments_in_range(self.comments, semi2 + 1, close_paren) {
-                if tsv_lang::printing::is_same_line(self.source, semi2, comment.span.start) {
+                if self.is_same_line(semi2, comment.span.start) {
                     inner_parts.push(doc::text(" "));
                     inner_parts.push(self.build_comment_doc(comment));
                 } else {
@@ -680,9 +667,7 @@ impl<'a> Printer<'a> {
             // Inline block comments before the first clause (on the same line)
             // e.g., `for (/* before init */ let j = 0; ...)`
             for comment in tsv_lang::comments_in_range(self.comments, open + 1, first_start) {
-                if comment.is_block
-                    && tsv_lang::printing::is_same_line(self.source, comment.span.end, first_start)
-                {
+                if comment.is_block && self.is_same_line(comment.span.end, first_start) {
                     inner_parts.push(self.build_comment_doc(comment));
                     inner_parts.push(doc::text(" "));
                 }
@@ -716,7 +701,7 @@ impl<'a> Printer<'a> {
                 .or(close_paren)
                 .unwrap_or(stmt.span.end);
             for comment in tsv_lang::comments_in_range(self.comments, semi + 1, boundary) {
-                if tsv_lang::printing::is_same_line(self.source, end, comment.span.start) {
+                if self.is_same_line(end, comment.span.start) {
                     inner_parts.push(doc::text(" "));
                     inner_parts.push(self.build_comment_doc(comment));
                 }
@@ -745,10 +730,8 @@ impl<'a> Printer<'a> {
             // e.g., `for (let i = 0; /* before test */ i < 10; ...)`
             for comment in tsv_lang::comments_in_range(self.comments, search_start, start) {
                 if comment.is_block
-                    && tsv_lang::printing::is_same_line(self.source, comment.span.end, start)
-                    && init_end.is_none_or(|ie| {
-                        !tsv_lang::printing::is_same_line(self.source, ie, comment.span.start)
-                    })
+                    && self.is_same_line(comment.span.end, start)
+                    && init_end.is_none_or(|ie| !self.is_same_line(ie, comment.span.start))
                 {
                     inner_parts.push(self.build_comment_doc(comment));
                     inner_parts.push(doc::text(" "));
@@ -772,7 +755,7 @@ impl<'a> Printer<'a> {
         if let (Some(semi), Some(end)) = (second_semi, test_end) {
             let boundary = update_start.or(close_paren).unwrap_or(stmt.span.end);
             for comment in tsv_lang::comments_in_range(self.comments, semi + 1, boundary) {
-                if tsv_lang::printing::is_same_line(self.source, end, comment.span.start) {
+                if self.is_same_line(end, comment.span.start) {
                     inner_parts.push(doc::text(" "));
                     inner_parts.push(self.build_comment_doc(comment));
                 }
@@ -801,10 +784,8 @@ impl<'a> Printer<'a> {
             // e.g., `for (let i = 0; i < 10; /* before update */ i++)`
             for comment in tsv_lang::comments_in_range(self.comments, search_start, start) {
                 if comment.is_block
-                    && tsv_lang::printing::is_same_line(self.source, comment.span.end, start)
-                    && test_end.is_none_or(|te| {
-                        !tsv_lang::printing::is_same_line(self.source, te, comment.span.start)
-                    })
+                    && self.is_same_line(comment.span.end, start)
+                    && test_end.is_none_or(|te| !self.is_same_line(te, comment.span.start))
                 {
                     inner_parts.push(self.build_comment_doc(comment));
                     inner_parts.push(doc::text(" "));
@@ -823,7 +804,7 @@ impl<'a> Printer<'a> {
             if let Some(end) = update_end {
                 let boundary = close_paren.unwrap_or(stmt.span.end);
                 for comment in tsv_lang::comments_in_range(self.comments, end, boundary) {
-                    if tsv_lang::printing::is_same_line(self.source, end, comment.span.start) {
+                    if self.is_same_line(end, comment.span.start) {
                         inner_parts.push(doc::text(" "));
                         inner_parts.push(self.build_comment_doc(comment));
                     }
@@ -864,11 +845,9 @@ impl<'a> Printer<'a> {
             // Only include comments that are:
             // 1. NOT on the same line as the next clause
             // 2. NOT on the same line as the previous expression (inline comments)
-            let is_own_line_before_clause =
-                !tsv_lang::printing::is_same_line(self.source, comment.span.end, clause_start);
-            let is_own_line_after_prev = prev_expr_end.is_none_or(|end| {
-                !tsv_lang::printing::is_same_line(self.source, end, comment.span.start)
-            });
+            let is_own_line_before_clause = !self.is_same_line(comment.span.end, clause_start);
+            let is_own_line_after_prev =
+                prev_expr_end.is_none_or(|end| !self.is_same_line(end, comment.span.start));
             if is_own_line_before_clause && is_own_line_after_prev {
                 parts.push(doc::hardline());
                 parts.push(self.build_comment_doc(comment));
@@ -921,12 +900,10 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a for loop update expression
     fn build_for_update_doc(&self, expr: &internal::Expression) -> doc::Doc {
         if let internal::Expression::SequenceExpression(seq) = expr {
-            let expr_docs: Vec<_> = seq
-                .expressions
-                .iter()
-                .map(|e| self.build_expression_doc(e))
-                .collect();
-            doc::join(expr_docs, ", ")
+            doc::join(
+                seq.expressions.iter().map(|e| self.build_expression_doc(e)),
+                ", ",
+            )
         } else {
             self.build_expression_doc(expr)
         }
@@ -1182,7 +1159,7 @@ impl<'a> Printer<'a> {
 
         // Inline comment after left
         for comment in tsv_lang::comments_in_range(self.comments, left_end, keyword_pos) {
-            if tsv_lang::printing::is_same_line(self.source, left_end, comment.span.start) {
+            if self.is_same_line(left_end, comment.span.start) {
                 inner.push(doc::text(" "));
                 inner.push(self.build_comment_doc(comment));
             }
@@ -1198,7 +1175,7 @@ impl<'a> Printer<'a> {
 
         // Inline comment after keyword
         for comment in tsv_lang::comments_in_range(self.comments, keyword_end, right_start) {
-            if tsv_lang::printing::is_same_line(self.source, keyword_end, comment.span.start) {
+            if self.is_same_line(keyword_end, comment.span.start) {
                 keyword_parts.push(doc::text(" "));
                 keyword_parts.push(self.build_comment_doc(comment));
             }
@@ -1211,7 +1188,7 @@ impl<'a> Printer<'a> {
         // Inline comment after right
         if let Some(close) = close_paren {
             for comment in tsv_lang::comments_in_range(self.comments, right_end, close) {
-                if tsv_lang::printing::is_same_line(self.source, right_end, comment.span.start) {
+                if self.is_same_line(right_end, comment.span.start) {
                     keyword_parts.push(doc::text(" "));
                     keyword_parts.push(self.build_comment_doc(comment));
                 }
@@ -1267,9 +1244,7 @@ impl<'a> Printer<'a> {
         let mut added = false;
         for comment in tsv_lang::comments_in_range(self.comments, start, end) {
             // Only include block comments that are on the same line
-            if comment.is_block
-                && tsv_lang::printing::is_same_line(self.source, start, comment.span.start)
-            {
+            if comment.is_block && self.is_same_line(start, comment.span.start) {
                 parts.push(doc::text(" "));
                 parts.push(self.build_comment_doc(comment));
                 parts.push(doc::text(" "));
@@ -1310,9 +1285,7 @@ impl<'a> Printer<'a> {
     fn append_for_in_of_trailing_comments(&self, parts: &mut Vec<doc::Doc>, start: u32, end: u32) {
         for comment in tsv_lang::comments_in_range(self.comments, start, end) {
             // Only include block comments that are on the same line
-            if comment.is_block
-                && tsv_lang::printing::is_same_line(self.source, start, comment.span.start)
-            {
+            if comment.is_block && self.is_same_line(start, comment.span.start) {
                 parts.push(doc::text(" "));
                 parts.push(self.build_comment_doc(comment));
             }
@@ -1423,12 +1396,13 @@ impl<'a> Printer<'a> {
             // Skip inline comments that belong to the previous case label (fallthrough cases)
             let comments: Vec<_> =
                 tsv_lang::comments_in_range(self.comments, prev_end, case.span.start).collect();
+            let mut last_content_end = prev_end;
             for comment in &comments {
                 // Skip comments that are on the same line as the previous case label
                 // Those are inline comments for the case (e.g., `case 3: // fallthrough`)
-                if prev_case_label_end.is_some_and(|label_end| {
-                    tsv_lang::printing::is_same_line(self.source, label_end, comment.span.start)
-                }) {
+                if prev_case_label_end
+                    .is_some_and(|label_end| self.is_same_line(label_end, comment.span.start))
+                {
                     continue;
                 }
                 // Add hardline before comment (except for very first item - body_doc handles that)
@@ -1437,9 +1411,15 @@ impl<'a> Printer<'a> {
                 }
                 is_first_item = false;
                 case_parts.push(self.build_comment_doc(comment));
+                last_content_end = comment.span.end;
             }
             // Add hardline before case (except for very first item)
+            // Preserve blank lines between cases (check from last content, not prev_end)
             if !is_first_item {
+                // Check for blank line between last content (case or comment) and current case
+                if self.has_blank_line_between(last_content_end, case.span.start) {
+                    case_parts.push(doc::literalline());
+                }
                 case_parts.push(doc::hardline());
             }
             is_first_item = false;
@@ -1534,7 +1514,7 @@ impl<'a> Printer<'a> {
         for comment in
             tsv_lang::comments_in_range(self.comments, case_label_end, inline_comment_end)
         {
-            if tsv_lang::printing::is_same_line(self.source, case_label_end, comment.span.start) {
+            if self.is_same_line(case_label_end, comment.span.start) {
                 parts.push(doc::text(" "));
                 parts.push(self.build_comment_doc(comment));
                 if !comment.is_block {
@@ -1567,18 +1547,14 @@ impl<'a> Printer<'a> {
             let leading_comments: Vec<_> = if let Some(prev_stmt) = prev_stmt_end {
                 comments
                     .iter()
-                    .filter(|c| {
-                        !tsv_lang::printing::is_same_line(self.source, prev_stmt, c.span.start)
-                    })
+                    .filter(|c| !self.is_same_line(prev_stmt, c.span.start))
                     .copied()
                     .collect()
             } else {
                 // For first statement, filter out inline comments after case label
                 comments
                     .iter()
-                    .filter(|c| {
-                        !tsv_lang::printing::is_same_line(self.source, case_label_end, c.span.start)
-                    })
+                    .filter(|c| !self.is_same_line(case_label_end, c.span.start))
                     .copied()
                     .collect()
             };
@@ -1621,11 +1597,7 @@ impl<'a> Printer<'a> {
                     if !comment.is_block {
                         // Line comment: add hardline after
                         stmt_parts.push(doc::hardline());
-                    } else if !tsv_lang::printing::is_same_line(
-                        self.source,
-                        comment.span.end,
-                        stmt_start,
-                    ) {
+                    } else if !self.is_same_line(comment.span.end, stmt_start) {
                         // Block comment not on same line as statement - add hardline
                         stmt_parts.push(doc::hardline());
                     } else {
@@ -1649,9 +1621,9 @@ impl<'a> Printer<'a> {
         doc::concat(parts)
     }
 
-    // ========================================================================
+    //
     // Control Flow Statement Doc Builders
-    // ========================================================================
+    //
 
     pub(super) fn build_if_statement_doc(&self, stmt: &internal::IfStatement) -> doc::Doc {
         // Check for comments between consequent and alternate that need special handling
@@ -1789,12 +1761,10 @@ impl<'a> Printer<'a> {
                 // e.g., `for (i = 0, j = 0; ...)` not `for ((i = 0, j = 0); ...)`
                 // Same handling as build_for_update_doc
                 if let internal::Expression::SequenceExpression(seq) = expr {
-                    let expr_docs: Vec<_> = seq
-                        .expressions
-                        .iter()
-                        .map(|e| self.build_expression_doc(e))
-                        .collect();
-                    doc::join(expr_docs, ", ")
+                    doc::join(
+                        seq.expressions.iter().map(|e| self.build_expression_doc(e)),
+                        ", ",
+                    )
                 } else {
                     self.build_expression_doc(expr)
                 }

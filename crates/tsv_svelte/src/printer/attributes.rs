@@ -17,9 +17,9 @@ use tsv_lang::doc::{self, Doc};
 use tsv_lang::{SymbolResolver, SymbolToU32};
 
 impl<'a> Printer<'a> {
-    // =========================================================================
+    //
     // JS Comment Doc builders
-    // =========================================================================
+    //
 
     /// Build a Doc for a leading JS comment (before content)
     ///
@@ -60,9 +60,9 @@ impl<'a> Printer<'a> {
         }
     }
 
-    // =========================================================================
+    //
     // Attribute node printing (unified via Doc)
-    // =========================================================================
+    //
 
     /// Format an attribute node (attribute, attach tag, directive, etc.)
     ///
@@ -93,9 +93,9 @@ impl<'a> Printer<'a> {
         }
     }
 
-    // =========================================================================
+    //
     // Attribute Doc builders
-    // =========================================================================
+    //
 
     /// Build a Doc for a single attribute (name="value" or name or {shorthand})
     pub(super) fn build_attribute_doc(&self, attr: &internal::Attribute) -> Doc {
@@ -209,9 +209,9 @@ impl<'a> Printer<'a> {
         doc::concat(parts)
     }
 
-    // =========================================================================
+    //
     // Directive Doc builders
-    // =========================================================================
+    //
 
     /// Build a Doc for on:event directive
     fn build_on_directive_doc(&self, d: &internal::OnDirective) -> Doc {
@@ -310,9 +310,9 @@ impl<'a> Printer<'a> {
         doc::concat(parts)
     }
 
-    // =========================================================================
+    //
     // Shared helpers
-    // =========================================================================
+    //
 
     /// Build Doc parts for modifiers: `|mod1|mod2`
     fn build_modifiers_doc(&self, modifiers: &[String]) -> Vec<Doc> {

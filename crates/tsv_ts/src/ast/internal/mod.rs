@@ -14,9 +14,9 @@ mod types;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
 pub use tsv_lang::{Comment, Span};
 
-// ============================================================================
+//
 // Re-exports from submodules
-// ============================================================================
+//
 
 // Types
 pub use types::{
@@ -79,15 +79,18 @@ pub use expressions::{
     UpdateExpression, UpdateOperator, YieldExpression,
 };
 
-// ============================================================================
+//
 // Foundational Types (defined here, used everywhere)
-// ============================================================================
+//
 
 /// Program node - the root of the AST
 #[derive(Debug, Clone)]
 pub struct Program {
     pub body: Vec<Statement>,
     pub comments: Vec<Comment>,
+    /// Precomputed line break positions (byte offsets of newlines).
+    /// Used for O(log n) line boundary lookups during printing.
+    pub line_breaks: Vec<u32>,
     pub span: Span,
     pub interner: std::rc::Rc<std::cell::RefCell<DefaultStringInterner>>,
 }

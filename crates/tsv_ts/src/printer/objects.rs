@@ -13,7 +13,6 @@ use crate::ast::internal::{self, Expression, Literal, LiteralValue};
 use tsv_lang::SymbolResolver;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::{self, Doc};
-use tsv_lang::printing::{has_blank_line_between, has_newline_between, is_same_line};
 
 impl<'a> Printer<'a> {
     /// Build a Doc for an object expression
@@ -37,33 +36,12 @@ impl<'a> Printer<'a> {
 
         if obj.properties.is_empty() {
             // Handle empty object with comments
-            if has_comments {
-                let obj_start = obj.span.start + 1; // After '{'
-                let obj_end = obj.span.end.saturating_sub(1); // Before '}'
-                let mut comment_parts = Vec::new();
-                for comment in comments_in_range(self.comments, obj_start, obj_end) {
-                    comment_parts.push(self.build_comment_doc(comment));
-                    if !comment.is_block {
-                        comment_parts.push(doc::hardline());
-                    }
-                }
-                return doc::concat(vec![
-                    doc::text("{"),
-                    doc::indent(doc::concat(vec![
-                        doc::hardline(),
-                        doc::concat(comment_parts),
-                    ])),
-                    doc::hardline(),
-                    doc::text("}"),
-                ]);
-            }
-            return doc::text("{}");
+            return self.build_empty_body_with_comments_doc(obj.span);
         }
 
         // Check if source has newline after opening brace
         let first_prop_start = obj.properties[0].span().start;
-        let has_source_newline =
-            has_newline_between(self.source, obj.span.start + 1, first_prop_start);
+        let has_source_newline = self.has_newline_between(obj.span.start + 1, first_prop_start);
 
         // Check if any property value has multiline content (e.g., line continuation strings)
         // Prettier expands objects containing multiline strings (recursively)
@@ -104,7 +82,7 @@ impl<'a> Printer<'a> {
                     .filter(|c| {
                         is_first ||
                         c.is_block || // Block comments after comma are always leading
-                        !is_same_line(self.source, prev_end, c.span.start) // Line comments must be on different line
+                        !self.is_same_line( prev_end, c.span.start) // Line comments must be on different line
                     })
                     .collect();
 
@@ -117,7 +95,7 @@ impl<'a> Printer<'a> {
                         } else {
                             comments[0].span.start
                         };
-                        if has_blank_line_between(self.source, search_start, check_pos) {
+                        if self.has_blank_line_between(search_start, check_pos) {
                             parts.push(doc::literalline());
                         }
                         parts.push(doc::hardline());
@@ -135,10 +113,9 @@ impl<'a> Printer<'a> {
                     // Check if there's a blank line after this comment (for force_multiline mode)
                     let has_blank_after = force_multiline
                         && if is_last_comment {
-                            has_blank_line_between(self.source, comment.span.end, prop_start)
+                            self.has_blank_line_between(comment.span.end, prop_start)
                         } else {
-                            has_blank_line_between(
-                                self.source,
+                            self.has_blank_line_between(
                                 comment.span.end,
                                 comments[j + 1].span.start,
                             )
@@ -147,7 +124,7 @@ impl<'a> Printer<'a> {
                     // For subsequent comments, check for blank lines between them
                     if force_multiline
                         && j > 0
-                        && has_blank_line_between(self.source, last_pos, comment.span.start)
+                        && self.has_blank_line_between(last_pos, comment.span.start)
                     {
                         parts.push(doc::literalline());
                         parts.push(doc::hardline());
@@ -159,9 +136,7 @@ impl<'a> Printer<'a> {
                         if !has_blank_after {
                             parts.push(doc::hardline());
                         }
-                    } else if force_multiline
-                        && !is_same_line(self.source, comment.span.end, prop_start)
-                    {
+                    } else if force_multiline && !self.is_same_line(comment.span.end, prop_start) {
                         // Block comment on its own line - hardline after (unless blank line follows)
                         if !has_blank_after {
                             parts.push(doc::hardline());
@@ -176,7 +151,7 @@ impl<'a> Printer<'a> {
                 // Check for blank line after last comment (before property)
                 if force_multiline
                     && !comments.is_empty()
-                    && has_blank_line_between(self.source, last_pos, prop_start)
+                    && self.has_blank_line_between(last_pos, prop_start)
                 {
                     parts.push(doc::literalline());
                     parts.push(doc::hardline());
@@ -201,7 +176,7 @@ impl<'a> Printer<'a> {
                 // Block comments: only trailing if before comma
                 let trailing: Vec<_> = comments_in_range(self.comments, prop_end, upper_bound)
                     .filter(|c| {
-                        is_same_line(self.source, prop_end, c.span.start)
+                        self.is_same_line(prop_end, c.span.start)
                             && (!c.is_block || comma_pos.is_none_or(|pos| c.span.start < pos))
                     })
                     .collect();
@@ -214,6 +189,11 @@ impl<'a> Printer<'a> {
 
                 // Add comma
                 if i < obj.properties.len() - 1 {
+                    parts.push(doc::text(","));
+                } else if force_multiline {
+                    // Last property in force_multiline: always add comma
+                    // (trailing_comma() uses if_break which needs a group, but
+                    // force_multiline objects don't create a group)
                     parts.push(doc::text(","));
                 } else {
                     // Last property: trailing comma only when broken
@@ -232,14 +212,14 @@ impl<'a> Printer<'a> {
             let closing_brace_pos = obj.span.end - 1;
             let trailing_comments: Vec<_> =
                 comments_in_range(self.comments, prev_end, closing_brace_pos)
-                    .filter(|c| !is_same_line(self.source, prev_end, c.span.start))
+                    .filter(|c| !self.is_same_line(prev_end, c.span.start))
                     .collect();
 
             if !trailing_comments.is_empty() {
                 // Check for blank line before the first trailing comment
                 let first_comment = trailing_comments[0];
                 if force_multiline
-                    && has_blank_line_between(self.source, prev_end, first_comment.span.start)
+                    && self.has_blank_line_between(prev_end, first_comment.span.start)
                 {
                     parts.push(doc::literalline());
                 }
@@ -249,7 +229,7 @@ impl<'a> Printer<'a> {
                     // Check for blank lines between comments
                     if force_multiline
                         && j > 0
-                        && has_blank_line_between(self.source, last_pos, comment.span.start)
+                        && self.has_blank_line_between(last_pos, comment.span.start)
                     {
                         parts.push(doc::literalline());
                     }
@@ -298,7 +278,7 @@ impl<'a> Printer<'a> {
                 let has_blank_before = if i > 0 {
                     let prev_prop = &obj.properties[i - 1];
                     let prev_end = prev_prop.value_end();
-                    has_blank_line_between(self.source, prev_end, prop.span().start)
+                    self.has_blank_line_between(prev_end, prop.span().start)
                 } else {
                     false
                 };
@@ -320,7 +300,7 @@ impl<'a> Printer<'a> {
                     let next_prop = &obj.properties[i + 1];
                     let curr_end = prop.value_end();
                     let next_has_blank =
-                        has_blank_line_between(self.source, curr_end, next_prop.span().start);
+                        self.has_blank_line_between(curr_end, next_prop.span().start);
 
                     if !next_has_blank {
                         parts.push(doc::line());

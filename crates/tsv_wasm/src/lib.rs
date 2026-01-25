@@ -5,9 +5,9 @@
 
 use wasm_bindgen::prelude::*;
 
-// ============================================================================
+//
 // Svelte
-// ============================================================================
+//
 
 /// Parse Svelte source code and return the AST as a JavaScript object.
 ///
@@ -38,9 +38,9 @@ pub fn format_svelte(source: &str) -> Result<String, JsError> {
     Ok(tsv_svelte::format(&ast, source))
 }
 
-// ============================================================================
+//
 // TypeScript
-// ============================================================================
+//
 
 /// Parse TypeScript source code and return the AST as a JavaScript object.
 ///
@@ -71,9 +71,9 @@ pub fn format_typescript(source: &str) -> Result<String, JsError> {
     Ok(tsv_ts::format(&ast, source))
 }
 
-// ============================================================================
+//
 // CSS
-// ============================================================================
+//
 
 /// Parse CSS source code and return the AST as a JavaScript object.
 #[wasm_bindgen]

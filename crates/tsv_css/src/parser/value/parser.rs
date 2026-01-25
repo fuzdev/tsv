@@ -377,7 +377,7 @@ mod tests {
         assert_eq!(abs_span.end, 2);
     }
 
-    // ===== Phase 2 Tests: Parsing Methods =====
+    // Phase 2 Tests: Parsing Methods
 
     #[test]
     fn test_parse_single_identifier() {

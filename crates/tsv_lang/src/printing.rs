@@ -275,6 +275,186 @@ pub fn has_newline_between(source: &str, start: u32, end: u32) -> bool {
     source[start..end].contains('\n')
 }
 
+// =============================================================================
+// Line Breaks Table Functions (O(log n) binary search)
+// =============================================================================
+//
+// These functions use a precomputed line breaks table for O(log n) lookups
+// instead of O(n) string scans. The table is a Vec<u32> of newline byte offsets
+// built during lexing.
+
+/// Check if two positions are on the same line using precomputed line breaks.
+///
+/// This is the O(log n) version of [`is_same_line`] that uses binary search
+/// instead of scanning the source string.
+///
+/// # Arguments
+///
+/// * `line_breaks` - Sorted slice of newline byte offsets
+/// * `prev_end` - End position of the first element
+/// * `curr_start` - Start position of the second element
+///
+/// # Returns
+///
+/// `true` if there is no newline between the positions, `false` otherwise.
+///
+/// # Examples
+///
+/// ```
+/// use tsv_lang::printing::is_same_line_fast;
+///
+/// // Source: "foo\nbar" - newline at position 3
+/// let line_breaks = vec![3u32];
+/// assert_eq!(is_same_line_fast(&line_breaks, 0, 3), true);   // before newline
+/// assert_eq!(is_same_line_fast(&line_breaks, 3, 4), false);  // crosses newline
+/// assert_eq!(is_same_line_fast(&line_breaks, 4, 7), true);   // after newline
+/// ```
+#[inline]
+pub fn is_same_line_fast(line_breaks: &[u32], prev_end: u32, curr_start: u32) -> bool {
+    // Adjacent tokens are on the same line
+    if prev_end == curr_start {
+        return true;
+    }
+
+    // Positions out of order are not on the same line
+    // (matches behavior of is_same_line which returns false for invalid ranges)
+    if prev_end > curr_start {
+        return false;
+    }
+
+    // Binary search: find first newline >= prev_end
+    let idx = line_breaks.partition_point(|&pos| pos < prev_end);
+
+    // If no newline found, or first newline is at/after curr_start, they're on same line
+    line_breaks.get(idx).is_none_or(|&pos| pos >= curr_start)
+}
+
+/// Check if there's a blank line (2+ newlines) between two positions.
+///
+/// This is the O(log n) version of [`has_blank_line_between`] that uses binary
+/// search instead of counting newlines in a string slice.
+///
+/// # Arguments
+///
+/// * `line_breaks` - Sorted slice of newline byte offsets
+/// * `prev_end` - End position of the first element
+/// * `curr_start` - Start position of the second element
+///
+/// # Returns
+///
+/// `true` if there are 2 or more newlines between the positions.
+///
+/// # Examples
+///
+/// ```
+/// use tsv_lang::printing::has_blank_line_between_fast;
+///
+/// // Source: "foo\n\nbar" - newlines at positions 3 and 4
+/// let line_breaks = vec![3u32, 4];
+/// assert_eq!(has_blank_line_between_fast(&line_breaks, 0, 5), true);  // two newlines
+///
+/// // Source: "foo\nbar" - newline at position 3
+/// let line_breaks = vec![3u32];
+/// assert_eq!(has_blank_line_between_fast(&line_breaks, 0, 4), false); // one newline
+/// ```
+#[inline]
+pub fn has_blank_line_between_fast(line_breaks: &[u32], prev_end: u32, curr_start: u32) -> bool {
+    if prev_end >= curr_start {
+        return false;
+    }
+
+    // Find first newline >= prev_end
+    let first_idx = line_breaks.partition_point(|&pos| pos < prev_end);
+
+    // Check if there's a newline in range
+    let Some(&first_pos) = line_breaks.get(first_idx) else {
+        return false;
+    };
+    if first_pos >= curr_start {
+        return false;
+    }
+
+    // Check if there's a second newline before curr_start
+    let second_idx = first_idx + 1;
+    line_breaks
+        .get(second_idx)
+        .is_some_and(|&pos| pos < curr_start)
+}
+
+/// Check if there's any newline between two positions.
+///
+/// This is the O(log n) version of [`has_newline_between`] that uses binary
+/// search instead of scanning the source string.
+///
+/// # Arguments
+///
+/// * `line_breaks` - Sorted slice of newline byte offsets
+/// * `start` - Start position
+/// * `end` - End position
+///
+/// # Returns
+///
+/// `true` if there's at least one newline between the positions.
+///
+/// # Examples
+///
+/// ```
+/// use tsv_lang::printing::has_newline_between_fast;
+///
+/// // Source: "{\na: 1}" - newline at position 1
+/// let line_breaks = vec![1u32];
+/// assert_eq!(has_newline_between_fast(&line_breaks, 1, 2), true);
+///
+/// // Source: "{a: 1}" - no newlines
+/// let line_breaks: Vec<u32> = vec![];
+/// assert_eq!(has_newline_between_fast(&line_breaks, 1, 2), false);
+/// ```
+#[inline]
+pub fn has_newline_between_fast(line_breaks: &[u32], start: u32, end: u32) -> bool {
+    if start >= end {
+        return false;
+    }
+
+    // Find first newline >= start
+    let idx = line_breaks.partition_point(|&pos| pos < start);
+
+    // Check if that newline is before end
+    line_breaks.get(idx).is_some_and(|&pos| pos < end)
+}
+
+/// Build a line breaks table from source code.
+///
+/// Scans the source string and records the byte offset of each newline character.
+/// Only records `\n` (LF) as the canonical newline - `\r\n` (CRLF) is handled by
+/// recording the `\n` position.
+///
+/// # Arguments
+///
+/// * `source` - The source text
+///
+/// # Returns
+///
+/// A vector of byte offsets where newlines occur.
+///
+/// # Examples
+///
+/// ```
+/// use tsv_lang::printing::build_line_breaks;
+///
+/// let source = "foo\nbar\nbaz";
+/// let breaks = build_line_breaks(source);
+/// assert_eq!(breaks, vec![3, 7]);
+/// ```
+pub fn build_line_breaks(source: &str) -> Vec<u32> {
+    let mut breaks = Vec::new();
+    for (pos, ch) in source.bytes().enumerate() {
+        if ch == b'\n' {
+            breaks.push(pos as u32);
+        }
+    }
+    breaks
+}
+
 /// Check if a line ends with a JS/TypeScript string line continuation
 ///
 /// A line continuation is a backslash (`\`) at the end of a line inside a string literal.

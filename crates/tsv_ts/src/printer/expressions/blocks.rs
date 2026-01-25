@@ -10,6 +10,8 @@
 // By extracting to a separate module, we avoid code duplication across
 // expressions/ and statements/ modules.
 
+use smallvec::SmallVec;
+
 use super::Printer;
 use crate::ast::internal;
 use tsv_lang::doc::{self, Doc};
@@ -66,11 +68,14 @@ impl<'a> Printer<'a> {
     fn build_inner_comments_for_empty_block(&self, block: &internal::BlockStatement) -> Vec<Doc> {
         let block_start = block.span.start + 1; // After '{'
         let block_end = block.span.end - 1; // Before '}'
+        let comments: Vec<_> =
+            tsv_lang::comments_in_range(self.comments, block_start, block_end).collect();
         let mut comment_parts = Vec::new();
-        for comment in tsv_lang::comments_in_range(self.comments, block_start, block_end) {
+        for (i, comment) in comments.iter().enumerate() {
             comment_parts.push(self.build_comment_doc(comment));
-            if !comment.is_block {
-                // Line comments need a hardline after
+            // Add hardline after line comments, except for the last one
+            // (the hardline before `}` handles that)
+            if !comment.is_block && i < comments.len() - 1 {
                 comment_parts.push(doc::hardline());
             }
         }
@@ -152,11 +157,7 @@ impl<'a> Printer<'a> {
                     stmt_start
                 };
                 if !self.in_template_interpolation.get()
-                    && tsv_lang::printing::has_blank_line_between(
-                        self.source,
-                        prev_end,
-                        blank_line_check_end,
-                    )
+                    && self.has_blank_line_between(prev_end, blank_line_check_end)
                 {
                     body_parts.push(doc::literalline());
                 }
@@ -183,17 +184,12 @@ impl<'a> Printer<'a> {
         if let Some(last_stmt_end) = prev_stmt_end {
             let mut trailing_prev_end = last_stmt_end;
             for comment in tsv_lang::comments_in_range(self.comments, last_stmt_end, block_end) {
-                if tsv_lang::printing::is_same_line(self.source, last_stmt_end, comment.span.start)
-                {
+                if self.is_same_line(last_stmt_end, comment.span.start) {
                     continue; // Skip same-line comments (already handled above)
                 }
                 // Check for blank line before this comment
                 if !self.in_template_interpolation.get()
-                    && tsv_lang::printing::has_blank_line_between(
-                        self.source,
-                        trailing_prev_end,
-                        comment.span.start,
-                    )
+                    && self.has_blank_line_between(trailing_prev_end, comment.span.start)
                 {
                     body_parts.push(doc::literalline());
                 }
@@ -217,13 +213,13 @@ impl<'a> Printer<'a> {
         prev_end: u32,
         stmt_start: u32,
         prev_stmt_end: Option<u32>,
-    ) -> Vec<&internal::Comment> {
-        let comments: Vec<_> =
+    ) -> SmallVec<[&internal::Comment; 4]> {
+        let comments: SmallVec<[_; 4]> =
             tsv_lang::comments_in_range(self.comments, prev_end, stmt_start).collect();
         if let Some(prev_stmt) = prev_stmt_end {
             comments
                 .into_iter()
-                .filter(|c| !tsv_lang::printing::is_same_line(self.source, prev_stmt, c.span.start))
+                .filter(|c| !self.is_same_line(prev_stmt, c.span.start))
                 .collect()
         } else {
             comments

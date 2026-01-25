@@ -107,9 +107,9 @@ pub struct ReturnStatement {
     pub argument: Option<Box<Expression>>,
 }
 
-// ============================================================================
+//
 // Control Flow Statements
-// ============================================================================
+//
 
 /// If statement: `if (test) consequent` or `if (test) consequent else alternate`
 #[derive(Debug, Clone, Serialize, Deserialize)]

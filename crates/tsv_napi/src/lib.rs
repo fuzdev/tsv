@@ -16,9 +16,9 @@
 
 use napi_derive::napi;
 
-// ============================================================================
+//
 // Svelte
-// ============================================================================
+//
 
 /// Parse Svelte source code and return JSON AST.
 #[napi]
@@ -45,9 +45,9 @@ pub fn format_svelte(source: String) -> napi::Result<String> {
     Ok(tsv_svelte::format(&ast, &source))
 }
 
-// ============================================================================
+//
 // TypeScript
-// ============================================================================
+//
 
 /// Parse TypeScript source code and return JSON AST.
 #[napi]
@@ -73,9 +73,9 @@ pub fn format_typescript(source: String) -> napi::Result<String> {
     Ok(tsv_ts::format(&ast, &source))
 }
 
-// ============================================================================
+//
 // CSS
-// ============================================================================
+//
 
 /// Parse CSS source code and return JSON AST.
 #[napi]

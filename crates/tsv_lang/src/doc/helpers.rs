@@ -3,9 +3,9 @@
 use super::builders::{concat, empty, hardline, if_break, indent, line, softline, text};
 use super::types::{Doc, LineKind};
 
-// =============================================================================
+//
 // Analysis Utilities
-// =============================================================================
+//
 
 /// Check if a doc will definitely break (contains hardline)
 ///
@@ -82,9 +82,9 @@ pub fn can_break(doc: &Doc) -> bool {
     }
 }
 
-// =============================================================================
+//
 // Join Helpers
-// =============================================================================
+//
 
 /// Build a doc from items with a static string separator between them
 ///
@@ -96,18 +96,21 @@ pub fn can_break(doc: &Doc) -> bool {
 /// let result = join(docs, ", ");
 /// // Renders as: "a, b, c"
 /// ```
-pub fn join(docs: Vec<Doc>, separator: &'static str) -> Doc {
-    if docs.is_empty() {
-        return empty();
-    }
-    let mut parts = Vec::with_capacity(docs.len() * 2 - 1);
-    for (i, doc) in docs.into_iter().enumerate() {
+pub fn join(docs: impl IntoIterator<Item = Doc>, separator: &'static str) -> Doc {
+    let iter = docs.into_iter();
+    let (lower, _) = iter.size_hint();
+    let mut parts = Vec::with_capacity(lower.saturating_mul(2).saturating_sub(1));
+    for (i, doc) in iter.enumerate() {
         if i > 0 {
             parts.push(text(separator));
         }
         parts.push(doc);
     }
-    concat(parts)
+    if parts.is_empty() {
+        empty()
+    } else {
+        concat(parts)
+    }
 }
 
 /// Build a doc from items with a Doc separator between them
@@ -124,18 +127,21 @@ pub fn join(docs: Vec<Doc>, separator: &'static str) -> Doc {
 /// let result = join_doc(docs, sep);
 /// // In break mode renders as: "a,\nb,\nc"
 /// ```
-pub fn join_doc(docs: Vec<Doc>, separator: Doc) -> Doc {
-    if docs.is_empty() {
-        return empty();
-    }
-    let mut parts = Vec::with_capacity(docs.len() * 2 - 1);
-    for (i, doc) in docs.into_iter().enumerate() {
+pub fn join_doc(docs: impl IntoIterator<Item = Doc>, separator: Doc) -> Doc {
+    let iter = docs.into_iter();
+    let (lower, _) = iter.size_hint();
+    let mut parts = Vec::with_capacity(lower.saturating_mul(2).saturating_sub(1));
+    for (i, doc) in iter.enumerate() {
         if i > 0 {
             parts.push(separator.clone());
         }
         parts.push(doc);
     }
-    concat(parts)
+    if parts.is_empty() {
+        empty()
+    } else {
+        concat(parts)
+    }
 }
 
 /// Join docs with separator, adding trailing separator only when breaking
@@ -152,16 +158,18 @@ pub fn join_doc(docs: Vec<Doc>, separator: Doc) -> Doc {
 /// // Flat: "a, b, c"
 /// // Break: "a,\nb,\nc,"
 /// ```
-pub fn join_trailing(docs: Vec<Doc>, separator: Doc) -> Doc {
-    if docs.is_empty() {
-        return empty();
-    }
-    let mut parts = Vec::with_capacity(docs.len() * 2);
-    for (i, doc) in docs.into_iter().enumerate() {
+pub fn join_trailing(docs: impl IntoIterator<Item = Doc>, separator: Doc) -> Doc {
+    let iter = docs.into_iter();
+    let (lower, _) = iter.size_hint();
+    let mut parts = Vec::with_capacity(lower.saturating_mul(2));
+    for (i, doc) in iter.enumerate() {
         if i > 0 {
             parts.push(separator.clone());
         }
         parts.push(doc);
+    }
+    if parts.is_empty() {
+        return empty();
     }
     // Add trailing separator only when breaking
     // Extract just the punctuation part (e.g., "," from ",\n")
@@ -191,9 +199,9 @@ fn extract_trailing_punctuation(separator: &Doc) -> Doc {
     }
 }
 
-// =============================================================================
+//
 // Wrap Helpers
-// =============================================================================
+//
 
 /// Wrap a doc with open and close delimiters
 ///
@@ -232,9 +240,9 @@ pub fn braces(inner: Doc) -> Doc {
     wrap("{", inner, "}")
 }
 
-// =============================================================================
+//
 // Indent Helpers
-// =============================================================================
+//
 
 /// Indent with leading line break
 ///
@@ -269,9 +277,9 @@ pub fn indent_softline(inner: Doc) -> Doc {
     indent(concat(vec![softline(), inner]))
 }
 
-// =============================================================================
+//
 // Separator Helpers
-// =============================================================================
+//
 
 /// Comma followed by line break (common separator for lists)
 ///
@@ -323,9 +331,9 @@ pub fn trailing_comma() -> Doc {
     if_break(text(","), text(""))
 }
 
-// =============================================================================
+//
 // Multi-Level Indent
-// =============================================================================
+//
 
 /// Apply N levels of indentation to a doc.
 ///

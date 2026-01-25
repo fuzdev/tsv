@@ -21,13 +21,12 @@ use super::expression_lookahead::{
     scan_identifier_then_arrow, scan_parens_then_arrow,
 };
 use super::scan::{
-    is_identifier_start, parse_number_literal, skip_identifier, skip_whitespace,
-    skip_whitespace_and_comments,
+    is_identifier_start, parse_number_literal, skip_identifier, skip_whitespace_and_comments,
 };
 
-// =============================================================================
+//
 // Binding Power Constants for Pratt Parser
-// =============================================================================
+//
 // Higher values = tighter binding (evaluated first)
 // Left-associative: left_bp < right_bp
 // Right-associative: left_bp > right_bp
@@ -888,7 +887,8 @@ impl<'a> Parser<'a> {
                 self.current_start = next_token.start;
                 self.current_end = next_token.end;
                 self.current_decoded = next_token.decoded;
-                // Note: had_line_terminator not updated here - regex doesn't affect ASI context
+                // Update ASI state - line terminators after regex enable semicolon insertion
+                self.had_line_terminator = self.lexer.had_line_terminator();
 
                 Ok(ParsedExpr::with_end(
                     Expression::RegexLiteral(RegexLiteral {
@@ -1006,8 +1006,8 @@ impl<'a> Parser<'a> {
             return false;
         }
 
-        // After '>', check for `(...) =>`
-        let pos = skip_whitespace(bytes, pos);
+        // After '>', check for `(...) =>` (allow comments: `<T> /* comment */ () =>`)
+        let pos = skip_whitespace_and_comments(bytes, pos);
         scan_parens_then_arrow(bytes, pos)
     }
 
@@ -1138,9 +1138,9 @@ impl<'a> Parser<'a> {
         match bytes[pos] {
             // Type keywords: string, number, boolean, never, any, unknown, void, etc.
             _ if self.is_type_keyword_at(bytes, pos) => {
-                // Exception: `this.` is member access, not type
+                // Exception: `this.` is member access, not type (allow `this /* comment */ .`)
                 if bytes[pos..].starts_with(b"this") {
-                    let after_this = skip_whitespace(bytes, pos + 4);
+                    let after_this = skip_whitespace_and_comments(bytes, pos + 4);
                     if after_this < bytes.len() && bytes[after_this] == b'.' {
                         return false;
                     }
@@ -1225,7 +1225,7 @@ impl<'a> Parser<'a> {
     /// - `arr[i]` followed by `<` or `;`: array access
     /// - `T[K]` followed by `>` or `,`: indexed type
     fn check_indexed_type_pattern(&self, bytes: &[u8], pos: usize) -> bool {
-        let inside = skip_whitespace(bytes, pos + 1);
+        let inside = skip_whitespace_and_comments(bytes, pos + 1);
         if inside >= bytes.len() {
             return false;
         }
@@ -1238,9 +1238,9 @@ impl<'a> Parser<'a> {
         // Identifier index: check what follows `]`
         if is_identifier_start(bytes[inside]) {
             let after_id = skip_identifier(bytes, inside);
-            let after_bracket = skip_whitespace(bytes, after_id);
+            let after_bracket = skip_whitespace_and_comments(bytes, after_id);
             if after_bracket < bytes.len() && bytes[after_bracket] == b']' {
-                let after_close = skip_whitespace(bytes, after_bracket + 1);
+                let after_close = skip_whitespace_and_comments(bytes, after_bracket + 1);
                 // Type args end with `>` or continue with `,`
                 if after_close < bytes.len() && matches!(bytes[after_close], b'>' | b',') {
                     return true;
@@ -1261,7 +1261,7 @@ impl<'a> Parser<'a> {
         // Skip optional minus sign
         if pos < bytes.len() && bytes[pos] == b'-' {
             pos += 1;
-            pos = skip_whitespace(bytes, pos);
+            pos = skip_whitespace_and_comments(bytes, pos);
         }
 
         // Must have at least one digit
@@ -1900,14 +1900,38 @@ impl<'a> Parser<'a> {
             return Err(self.error_expected_after("'target'", "new."));
         }
 
-        // Parse the callee - this could be an identifier, member expression, or even nested `new`
-        // Handle nested new: `new new Foo()()`
-        let callee_parsed = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::New)) {
-            let nested = self.parse_new_expression()?;
-            ParsedExpr::from_expr(nested)
+        // Parse the callee - identifier, member expr, function/class expression, or nested `new`
+        // Check async function first (peek borrows self, can't be inside match)
+        let is_async_function = *self.current_kind() == TokenKind::Keyword(KeywordKind::Async)
+            && self.peek_kind() == TokenKind::Keyword(KeywordKind::Function);
+
+        let callee_parsed = if is_async_function {
+            // Async function expression: `new async function() {}`
+            let (start, _) = self.current_pos();
+            self.advance()?; // consume 'async'
+            let expr = self.parse_async_function_expression(start)?;
+            ParsedExpr::from_expr(expr)
         } else {
-            // We use primary + postfix parsing but stop before call expressions
-            self.parse_primary_expression_with_end()?
+            match self.current_kind() {
+                TokenKind::Keyword(KeywordKind::New) => {
+                    let nested = self.parse_new_expression()?;
+                    ParsedExpr::from_expr(nested)
+                }
+                TokenKind::Keyword(KeywordKind::Function) => {
+                    // Function expression: `new function() {}`
+                    let expr = self.parse_function_expression()?;
+                    ParsedExpr::from_expr(expr)
+                }
+                TokenKind::Keyword(KeywordKind::Class) => {
+                    // Class expression: `new class {}`
+                    let expr = self.parse_class_expression()?;
+                    ParsedExpr::from_expr(expr)
+                }
+                _ => {
+                    // We use primary + postfix parsing but stop before call expressions
+                    self.parse_primary_expression_with_end()?
+                }
+            }
         };
 
         // Parse member access chains: new Foo.Bar.Baz()
@@ -2433,9 +2457,9 @@ impl<'a> Parser<'a> {
         }
     }
 
-    // =========================================================================
+    //
     // Pattern Conversion (Cover Grammar)
-    // =========================================================================
+    //
 
     /// Convert an expression to an assignable pattern (cover grammar)
     ///

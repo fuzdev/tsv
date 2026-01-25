@@ -12,9 +12,9 @@ pub mod patterns;
 pub mod statements;
 pub mod types;
 
-// ============================================================================
+//
 // Re-exports from submodules
-// ============================================================================
+//
 
 // Types
 pub use types::{
@@ -78,9 +78,9 @@ pub use expressions::{
     TemplateLiteral, UnaryExpression, UpdateExpression, YieldExpression,
 };
 
-// ============================================================================
+//
 // Helper functions
-// ============================================================================
+//
 
 /// Helper for skip_serializing_if to skip false bools
 #[allow(clippy::trivially_copy_pass_by_ref)] // serde requires &T signature
@@ -103,9 +103,9 @@ where
     value.serialize(serializer)
 }
 
-// ============================================================================
+//
 // Foundational Types (defined here, used everywhere)
-// ============================================================================
+//
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Program {

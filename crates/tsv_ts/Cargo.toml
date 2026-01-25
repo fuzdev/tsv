@@ -8,6 +8,7 @@ description = "TypeScript parsing and formatting library"
 tsv_lang.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+smallvec.workspace = true
 string-interner.workspace = true
 phf = { version = "0.11", features = ["macros"] }
 unicode-ident.workspace = true

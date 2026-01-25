@@ -27,7 +27,7 @@ pub mod source_fidelity;
 mod values;
 
 use crate::ast::internal::{Comment, CssBlockChild, CssNode, CssStyleSheet, CssValue};
-use tsv_lang::{CommentPosition, OutputBuffer, PrintConfig, classify_comment, doc, printing};
+use tsv_lang::{CommentPosition, OutputBuffer, PrintConfig, classify_comment_fast, doc, printing};
 
 /// Check if function args have wrappable content (break points)
 ///
@@ -52,23 +52,43 @@ pub struct Printer<'a> {
     pub(crate) source: &'a str,
     /// All comments sorted by span.start
     pub(crate) comments: &'a [Comment],
+    /// Precomputed line break positions for O(log n) line boundary lookups
+    pub(crate) line_breaks: &'a [u32],
 }
 
 impl<'a> Printer<'a> {
-    /// Create a new printer with source and comments
-    pub fn new(source: &'a str, comments: &'a [Comment]) -> Self {
-        Self::with_config(source, comments, PrintConfig::default())
+    /// Create a new printer with source, comments, and line_breaks
+    pub fn new(source: &'a str, comments: &'a [Comment], line_breaks: &'a [u32]) -> Self {
+        Self::with_config(source, comments, line_breaks, PrintConfig::default())
     }
 
     /// Create a new printer with the given config
-    pub fn with_config(source: &'a str, comments: &'a [Comment], config: PrintConfig) -> Self {
+    pub fn with_config(
+        source: &'a str,
+        comments: &'a [Comment],
+        line_breaks: &'a [u32],
+        config: PrintConfig,
+    ) -> Self {
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
             config,
             source,
             comments,
+            line_breaks,
         }
+    }
+
+    /// Check if two positions are on the same line (O(log n) binary search)
+    #[inline]
+    pub(crate) fn is_same_line(&self, prev_end: u32, curr_start: u32) -> bool {
+        printing::is_same_line_fast(self.line_breaks, prev_end, curr_start)
+    }
+
+    /// Check if there's a blank line (2+ newlines) between two positions (O(log n) binary search)
+    #[inline]
+    pub(crate) fn has_blank_line_between(&self, prev_end: u32, curr_start: u32) -> bool {
+        printing::has_blank_line_between_fast(self.line_breaks, prev_end, curr_start)
     }
 
     /// Check if a declaration has value comments (comments inside the value, not property name)
@@ -230,7 +250,7 @@ impl<'a> Printer<'a> {
                 continue;
             }
 
-            let position = classify_comment(comment, prev_end, curr_start, self.source);
+            let position = classify_comment_fast(comment, prev_end, curr_start, self.line_breaks);
 
             // Skip trailing comments (same line as prev node)
             if prev_end > 0 && matches!(position, CommentPosition::Trailing) {
@@ -242,7 +262,7 @@ impl<'a> Printer<'a> {
             // Print with proper spacing
             if printed > 0 {
                 // Check if this comment is on the same line as the previous comment
-                if printing::is_same_line(self.source, last_end, comment.span.start) {
+                if self.is_same_line(last_end, comment.span.start) {
                     self.write(" ");
                 } else if self.has_blank_line_between_spans(last_end, comment.span.start) {
                     self.write("\n\n");
@@ -279,7 +299,7 @@ impl<'a> Printer<'a> {
 
         while *comment_idx < self.comments.len() {
             let comment = &self.comments[*comment_idx];
-            if !printing::is_same_line(self.source, last_end, comment.span.start) {
+            if !self.is_same_line(last_end, comment.span.start) {
                 break;
             }
 
@@ -308,7 +328,7 @@ impl<'a> Printer<'a> {
             }
 
             // Skip inline comments (same line as last item) - already handled
-            if printing::is_same_line(self.source, prev_end, comment.span.start) {
+            if self.is_same_line(prev_end, comment.span.start) {
                 *comment_idx += 1;
                 last_end = comment.span.end;
                 continue;
@@ -418,7 +438,7 @@ impl<'a> Printer<'a> {
 
         while let Some(CssBlockChild::Comment(next_comment)) =
             children.get(current_idx + 1 + consumed)
-            && printing::is_same_line(self.source, last_end, next_comment.span.start)
+            && self.is_same_line(last_end, next_comment.span.start)
         {
             self.write(" /*");
             self.write(&next_comment.content);
@@ -445,7 +465,7 @@ impl<'a> Printer<'a> {
 
         while let Some(CssBlockChild::Comment(next_comment)) =
             children.get(current_idx + 1 + consumed)
-            && printing::is_same_line(self.source, last_end, next_comment.span.start)
+            && self.is_same_line(last_end, next_comment.span.start)
         {
             if consumed == 0 {
                 // First inline comment - remove the trailing newline from declaration
@@ -467,7 +487,7 @@ impl<'a> Printer<'a> {
 
     /// Check if there's a blank line between two spans in the source
     pub(crate) fn has_blank_line_between_spans(&self, prev_end: u32, curr_start: u32) -> bool {
-        printing::has_blank_line_between(self.source, prev_end, curr_start)
+        self.has_blank_line_between(prev_end, curr_start)
     }
 
     /// Check if previous sibling is a comment
@@ -497,7 +517,7 @@ impl<'a> Printer<'a> {
 /// Format CSS stylesheet to a string
 /// Requires source for blank line preservation and raw value extraction
 pub fn format_css(stylesheet: &CssStyleSheet, source: &str) -> String {
-    let mut printer = Printer::new(source, &stylesheet.comments);
+    let mut printer = Printer::new(source, &stylesheet.comments, &stylesheet.line_breaks);
     printer.print_css_nodes(&stylesheet.nodes);
     printer.into_string()
 }
@@ -510,7 +530,12 @@ pub fn format_css_with_config(
     source: &str,
     config: PrintConfig,
 ) -> String {
-    let mut printer = Printer::with_config(source, &stylesheet.comments, config);
+    let mut printer = Printer::with_config(
+        source,
+        &stylesheet.comments,
+        &stylesheet.line_breaks,
+        config,
+    );
     printer.print_css_nodes(&stylesheet.nodes);
     printer.into_string()
 }

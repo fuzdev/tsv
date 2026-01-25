@@ -4,7 +4,7 @@ use super::{
     Printer, build_entity_name_doc, intersection_has_huggable_last_type, unwrap_parenthesized,
 };
 use crate::ast::internal::{self, TSType};
-use tsv_lang::{Comment, SymbolToU32, comments_in_range, doc, printing};
+use tsv_lang::{Comment, SymbolToU32, comments_in_range, doc};
 
 /// Check if a type is "generic" - i.e., has type parameters.
 /// This matches prettier's `isGeneric` function in assignment.js.
@@ -47,8 +47,7 @@ fn fluid_assignment_doc(type_doc: doc::Doc) -> doc::Doc {
 impl<'a> Printer<'a> {
     /// Check if a comment spans multiple lines (block comment with newlines)
     fn is_multiline_comment(&self, comment: &Comment) -> bool {
-        comment.is_block
-            && !printing::is_same_line(self.source, comment.span.start, comment.span.end)
+        comment.is_block && !self.is_same_line(comment.span.start, comment.span.end)
     }
 
     /// Build a doc for type alias declaration with proper line breaking
@@ -203,8 +202,12 @@ impl<'a> Printer<'a> {
         };
 
         // Build body separately (outside the header group)
-        let mut parts = vec![header_doc, doc::text(" {")];
-        if !decl.body.body.is_empty() {
+        let mut parts = vec![header_doc, doc::text(" ")];
+
+        if decl.body.body.is_empty() {
+            parts.push(self.build_empty_body_with_comments_doc(decl.body.span));
+        } else {
+            parts.push(doc::text("{"));
             parts.push(doc::indent(doc::concat(vec![
                 self.build_type_elements_doc(
                     &decl.body.body,
@@ -213,8 +216,8 @@ impl<'a> Printer<'a> {
                 ),
             ])));
             parts.push(doc::hardline());
+            parts.push(doc::text("}"));
         }
-        parts.push(doc::text("}"));
 
         doc::concat(parts)
     }
@@ -268,6 +271,18 @@ impl<'a> Printer<'a> {
         build_entity_name_doc(name)
     }
 
+    /// Build doc for a type used as a type argument.
+    ///
+    /// For single type arg contexts, uses normal doc (allows object types to break).
+    /// For multiple type arg contexts, uses hugging (objects don't break independently).
+    fn build_type_arg_doc(&self, param: &TSType, is_multi_arg: bool) -> doc::Doc {
+        if is_multi_arg {
+            self.build_type_doc_for_type_arg(param)
+        } else {
+            self.build_type_doc(param)
+        }
+    }
+
     /// Build doc for type arguments with comment preservation: `</* a */ T /* b */, U>`
     ///
     /// Default version: no independent width-based wrapping (parent context controls breaking).
@@ -302,7 +317,7 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            parts.push(self.build_type_doc(param));
+            parts.push(self.build_type_arg_doc(param, args.params.len() > 1));
 
             // Add trailing block comments after this type argument
             let param_end = param.span().end;
@@ -374,7 +389,7 @@ impl<'a> Printer<'a> {
                     }
                 }
 
-                parts.push(self.build_type_doc(&args.params[0]));
+                parts.push(self.build_type_arg_doc(&args.params[0], false));
 
                 // Include trailing comments: `Array<{...} /* trailing */>`
                 for comment in comments_in_range(self.comments, param_end, before_close) {
@@ -405,7 +420,7 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            arg_parts.push(self.build_type_doc(param));
+            arg_parts.push(self.build_type_arg_doc(param, true));
 
             // Add trailing block comments after this type argument
             let param_end = param.span().end;
@@ -462,7 +477,7 @@ impl<'a> Printer<'a> {
             // Leading comments
             inner_parts.extend(self.build_leading_comments_multiline(prev_end, param_start));
 
-            inner_parts.push(self.build_type_doc(param));
+            inner_parts.push(self.build_type_arg_doc(param, args.params.len() > 1));
 
             let next_boundary = if i + 1 < args.params.len() {
                 args.params[i + 1].span().start
@@ -518,7 +533,7 @@ impl<'a> Printer<'a> {
                     .iter()
                     .filter(|c| {
                         // Keep if not on same line as prev_end
-                        if !printing::is_same_line(self.source, prev_end, c.span.start) {
+                        if !self.is_same_line(prev_end, c.span.start) {
                             return true;
                         }
                         // Also keep multi-line block comments (they're always leading, never trailing)
@@ -539,7 +554,7 @@ impl<'a> Printer<'a> {
                 } else {
                     leading_comments[0].span.start
                 };
-                if printing::has_blank_line_between(self.source, prev_end, check_pos) {
+                if self.has_blank_line_between(prev_end, check_pos) {
                     parts.push(doc::literalline());
                 }
             }
@@ -559,7 +574,7 @@ impl<'a> Printer<'a> {
                 .get(i + 1)
                 .map_or(body_end, |next| next.span().start);
             for comment in comments_in_range(self.comments, member.span().end, upper_bound) {
-                if printing::is_same_line(self.source, member.span().end, comment.span.start) {
+                if self.is_same_line(member.span().end, comment.span.start) {
                     // Skip multi-line block comments (they're leading comments for next element)
                     if self.is_multiline_comment(comment) {
                         continue;
@@ -729,15 +744,22 @@ impl<'a> Printer<'a> {
 
         parts.push(doc::text("enum "));
         parts.push(doc::symbol(decl.id.name.to_u32()));
-        parts.push(doc::text(" {"));
+        parts.push(doc::text(" "));
 
-        if !decl.members.is_empty() {
+        // Find body start (after '{')
+        let body_start = self.source[decl.span.start as usize..decl.span.end as usize]
+            .find('{')
+            .map_or(decl.span.start, |i| decl.span.start + i as u32 + 1);
+        let body_end = decl.span.end.saturating_sub(1); // Before '}'
+        let body_span = tsv_lang::Span::new(body_start - 1, decl.span.end); // Include '{' and '}'
+
+        if decl.members.is_empty() {
+            // Empty enum body - handle comments inside
+            parts.push(self.build_empty_body_with_comments_doc(body_span));
+        } else {
+            parts.push(doc::text("{"));
             // Build member docs with comment handling
             let mut member_parts = Vec::new();
-            let body_start = self.source[decl.span.start as usize..decl.span.end as usize]
-                .find('{')
-                .map_or(decl.span.start, |i| decl.span.start + i as u32 + 1);
-            let body_end = decl.span.end.saturating_sub(1); // Before '}'
             let mut prev_end = body_start;
 
             for (i, member) in decl.members.iter().enumerate() {
@@ -746,9 +768,7 @@ impl<'a> Printer<'a> {
 
                 // Check for comments between previous position and this member
                 let comments: Vec<_> = comments_in_range(self.comments, prev_end, member_start)
-                    .filter(|c| {
-                        is_first || !printing::is_same_line(self.source, prev_end, c.span.start)
-                    })
+                    .filter(|c| is_first || !self.is_same_line(prev_end, c.span.start))
                     .collect();
 
                 // Check for blank lines
@@ -758,7 +778,7 @@ impl<'a> Printer<'a> {
                     } else {
                         comments[0].span.start
                     };
-                    if printing::has_blank_line_between(self.source, prev_end, check_pos) {
+                    if self.has_blank_line_between(prev_end, check_pos) {
                         member_parts.push(doc::literalline());
                     }
                     member_parts.push(doc::hardline());
@@ -768,9 +788,7 @@ impl<'a> Printer<'a> {
                 for comment in &comments {
                     member_parts.push(self.build_comment_doc(comment));
                     // Block comment on same line as member gets space, otherwise hardline
-                    if comment.is_block
-                        && printing::is_same_line(self.source, comment.span.end, member_start)
-                    {
+                    if comment.is_block && self.is_same_line(comment.span.end, member_start) {
                         member_parts.push(doc::text(" "));
                     } else {
                         member_parts.push(doc::hardline());
@@ -802,9 +820,8 @@ impl<'a> Printer<'a> {
                 doc::concat(member_parts),
             ])));
             parts.push(doc::hardline());
+            parts.push(doc::text("}"));
         }
-
-        parts.push(doc::text("}"));
 
         doc::concat(parts)
     }
@@ -901,9 +918,14 @@ impl<'a> Printer<'a> {
         // Body (may be None for shorthand: `declare module 'name';`)
         match &decl.body {
             Some(internal::TSModuleDeclarationBody::TSModuleBlock(block)) => {
-                parts.push(doc::text(" {"));
+                parts.push(doc::text(" "));
 
-                if !block.body.is_empty() {
+                if block.body.is_empty() {
+                    // Empty namespace body - handle comments inside
+                    parts.push(self.build_empty_body_with_comments_doc(block.span));
+                } else {
+                    parts.push(doc::text("{"));
+
                     // Build statement docs with blank line preservation
                     let mut stmt_parts = Vec::new();
                     let mut prev_end = block.span.start + 1; // After opening '{'
@@ -914,7 +936,7 @@ impl<'a> Printer<'a> {
                         // Add separator: literalline + hardline if blank line in source, single hardline otherwise
                         // literalline() produces a bare newline (no indent), preserving truly blank lines
                         if !stmt_parts.is_empty() {
-                            if printing::has_blank_line_between(self.source, prev_end, curr_start) {
+                            if self.has_blank_line_between(prev_end, curr_start) {
                                 stmt_parts.push(doc::literalline()); // blank line (no indent)
                                 stmt_parts.push(doc::hardline()); // next statement with indent
                             } else {
@@ -935,9 +957,8 @@ impl<'a> Printer<'a> {
                         doc::concat(stmt_parts),
                     ])));
                     parts.push(doc::hardline());
+                    parts.push(doc::text("}"));
                 }
-
-                parts.push(doc::text("}"));
             }
             Some(internal::TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
                 // Nested namespace: `namespace Outer.Inner { }`

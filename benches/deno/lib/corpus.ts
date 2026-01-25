@@ -34,9 +34,9 @@ export interface CorpusLoader {
 	load(logger?: Logger): Promise<{ files: SourceFile[]; stats: CorpusStats }>;
 }
 
-// ============================================================================
+//
 // Shared Utilities
-// ============================================================================
+//
 
 /** Detect language from file extension */
 export function detectLanguage(path: string): Language | null {
@@ -118,9 +118,9 @@ export function groupByLanguage(files: SourceFile[]): Record<Language, SourceFil
 	};
 }
 
-// ============================================================================
+//
 // Default Implementation: ~/dev/ repos
-// ============================================================================
+//
 
 /** Configuration for DevReposLoader */
 export interface DevReposLoaderOptions {
@@ -239,9 +239,9 @@ export class DevReposLoader implements CorpusLoader {
 	}
 }
 
-// ============================================================================
+//
 // Alternative Implementation: Single Directory
-// ============================================================================
+//
 
 /** Configuration for DirectoryLoader */
 export interface DirectoryLoaderOptions {
