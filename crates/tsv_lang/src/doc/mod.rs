@@ -83,15 +83,16 @@ pub use types::{Doc, DocContext, DocText, GroupId, LineKind, Mode, TextResolver}
 // Builders
 pub use builders::{
     align, align_spaces, break_parent, concat, conditional_group, dedent, empty, fill, group,
-    group_with_id, hardline, if_break, indent, indent_if_break, line, line_suffix,
-    line_suffix_boundary, literalline, softline, symbol, text, text_owned,
+    group_break, group_with_id, hardline, if_break, indent, indent_if_break, isolated_group, line,
+    line_suffix, line_suffix_boundary, literalline, softline, symbol, text, text_owned,
     with_base_indent_override, with_context,
 };
 
 // Helpers
 pub use helpers::{
-    apply_indent_levels, braces, brackets, can_break, comma_hardline, comma_line, indent_line,
-    indent_softline, join, join_doc, join_trailing, parens, trailing_comma, will_break, wrap,
+    apply_indent_levels, braces, brackets, can_break, comma_hardline, comma_line, has_forced_break,
+    indent_line, indent_softline, join, join_doc, join_trailing, parens, parens_break,
+    remove_lines, trailing_comma, will_break, wrap,
 };
 
 // Fits
@@ -901,5 +902,92 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(print_doc(&doc, &narrow), "fn(\n  arg1, arg2\n)");
+    }
+
+    //
+    // IsolatedGroup tests
+    //
+
+    #[test]
+    fn test_isolated_group_prevents_break_propagation() {
+        // IsolatedGroup with hardline inside should not force parent to break
+        let doc = group(concat(vec![
+            text("fn("),
+            isolated_group(concat(vec![text("a"), hardline(), text("b")])),
+            text(")"),
+        ]));
+        let config = PrintConfig {
+            print_width: 100,
+            ..Default::default()
+        };
+        // Parent stays flat, internal hardline still breaks
+        assert_eq!(print_doc(&doc, &config), "fn(a\nb)");
+    }
+
+    #[test]
+    fn test_isolated_group_still_breaks_on_width() {
+        // IsolatedGroup should still break if content doesn't fit
+        let doc = group(concat(vec![
+            text("fn("),
+            indent_softline(isolated_group(text("verylongcontent"))),
+            softline(),
+            text(")"),
+        ]));
+        let config = PrintConfig {
+            print_width: 10,
+            indent: "  ",
+            tab_width: 2,
+            ..Default::default()
+        };
+        // Outer group breaks because content doesn't fit
+        assert!(print_doc(&doc, &config).contains('\n'));
+    }
+
+    #[test]
+    fn test_will_break_false_for_isolated_group() {
+        // will_break() should return false for IsolatedGroup
+        let doc = isolated_group(concat(vec![text("a"), hardline(), text("b")]));
+        assert!(!will_break(&doc));
+    }
+
+    #[test]
+    fn test_isolated_group_with_softlines() {
+        // IsolatedGroup with softlines should work normally
+        let doc = group(concat(vec![
+            text("outer("),
+            isolated_group(group(concat(vec![
+                text("inner("),
+                indent_softline(text("content")),
+                softline(),
+                text(")"),
+            ]))),
+            text(")"),
+        ]));
+        let config = PrintConfig {
+            print_width: 100,
+            ..Default::default()
+        };
+        // Everything fits flat
+        assert_eq!(print_doc(&doc, &config), "outer(inner(content))");
+    }
+
+    #[test]
+    fn test_nested_isolated_groups() {
+        // Nested IsolatedGroups should each isolate independently
+        let doc = group(concat(vec![
+            text("a("),
+            isolated_group(concat(vec![
+                text("b("),
+                isolated_group(concat(vec![text("x"), hardline(), text("y")])),
+                text(")"),
+            ])),
+            text(")"),
+        ]));
+        let config = PrintConfig {
+            print_width: 100,
+            ..Default::default()
+        };
+        // Both outer groups stay flat, inner hardline breaks
+        assert_eq!(print_doc(&doc, &config), "a(b(x\ny))");
     }
 }

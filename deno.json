@@ -28,7 +28,9 @@
 		"bench:run": "deno run --v8-flags=--expose-gc --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/bench.ts",
 
 		"corpus:compare": "deno task build:ffi && deno task corpus:compare:run",
-		"corpus:compare:run": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/corpus_compare.ts"
+		"corpus:compare:run": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/corpus_compare.ts",
+
+		"divergence:audit": "deno run --allow-read benches/deno/divergence_audit.ts"
 	},
 	"fmt": {
 		"useTabs": true,

@@ -34,10 +34,7 @@ impl<'a> Printer<'a> {
                 // - Flat: add parens for readability: `T extends A ? (T extends B ? C : D) : E`
                 // - Broken: no parens (the line breaks provide clarity)
                 let inner_doc = self.build_conditional_type_doc_inner(inner);
-                doc::if_break(
-                    inner_doc.clone(),
-                    doc::concat(vec![doc::text("("), inner_doc, doc::text(")")]),
-                )
+                doc::if_break(inner_doc.clone(), doc::parens(inner_doc))
             } else {
                 self.build_type_doc(&c.true_type)
             };
@@ -211,7 +208,7 @@ impl<'a> Printer<'a> {
             // One-line source: width-aware (stays inline if fits, wraps if too long)
             let mut all_parts = vec![doc::softline()];
             all_parts.extend(body_parts);
-            all_parts.push(doc::if_break(doc::text(";"), doc::text("")));
+            all_parts.push(doc::if_break(doc::text(";"), doc::empty()));
 
             doc::group(doc::concat(vec![
                 doc::text("{"),

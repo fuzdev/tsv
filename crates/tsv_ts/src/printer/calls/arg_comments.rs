@@ -158,14 +158,14 @@ pub(super) fn any_comment_forces_expansion(
         // check if ANY comment is AFTER the comma (leading on next arg).
         // If so, it forces expansion even if it's an inline block comment.
         if i < call.arguments.len() - 1
-            && let Some(comma_pos) = find_comma_pos(printer.source, arg_end, next_boundary) {
-                for comment in tsv_lang::comments_in_range(printer.comments, arg_end, next_boundary)
-                {
-                    if is_comment_after_comma(comment, comma_pos) {
-                        return true;
-                    }
+            && let Some(comma_pos) = find_comma_pos(printer.source, arg_end, next_boundary)
+        {
+            for comment in tsv_lang::comments_in_range(printer.comments, arg_end, next_boundary) {
+                if is_comment_after_comma(comment, comma_pos) {
+                    return true;
                 }
             }
+        }
     }
 
     false

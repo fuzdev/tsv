@@ -328,17 +328,20 @@ impl<'a> Printer<'a> {
             }
 
             // Skip inline comments (same line as last item) - already handled
-            if self.is_same_line(prev_end, comment.span.start) {
+            // But only if there was a last item (prev_end > 0) - otherwise this is the first content
+            if prev_end > 0 && self.is_same_line(prev_end, comment.span.start) {
                 *comment_idx += 1;
                 last_end = comment.span.end;
                 continue;
             }
 
-            // Print with proper spacing
-            if self.has_blank_line_between_spans(last_end, comment.span.start) {
-                self.write("\n\n");
-            } else {
-                self.write("\n");
+            // Print with proper spacing (but no leading newline for first content)
+            if last_end > 0 {
+                if self.has_blank_line_between_spans(last_end, comment.span.start) {
+                    self.write("\n\n");
+                } else {
+                    self.write("\n");
+                }
             }
 
             self.print_css_comment(comment);

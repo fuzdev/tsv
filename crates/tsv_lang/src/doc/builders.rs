@@ -73,6 +73,27 @@ pub fn group(doc: Doc) -> Doc {
         contents: Box::new(doc),
         expanded_states: None,
         id: None,
+        should_break: false,
+    }
+}
+
+/// Create a group that forces break mode during rendering
+///
+/// Unlike regular `group()`, this group will always use break mode when rendered
+/// (softlines become hardlines), but fits() still measures the flat content.
+///
+/// This is used when source formatting indicates content should be expanded (e.g., objects
+/// with source newlines) but we need accurate width measurement for outer groups.
+///
+/// Note: This does NOT propagate to parent groups - it only affects this group's rendering.
+/// For chain/parens patterns that need cascading breaks, the chain code handles this
+/// by detecting `will_break` and using appropriate doc structures.
+pub fn group_break(doc: Doc) -> Doc {
+    Doc::Group {
+        contents: Box::new(doc),
+        expanded_states: None,
+        id: None,
+        should_break: true,
     }
 }
 
@@ -93,6 +114,7 @@ pub fn group_with_id(doc: Doc, id: GroupId) -> Doc {
         contents: Box::new(doc),
         expanded_states: None,
         id: Some(id),
+        should_break: false,
     }
 }
 
@@ -124,6 +146,7 @@ pub fn conditional_group(mut states: Vec<Doc>) -> Doc {
         contents: Box::new(first),
         expanded_states: Some(Box::new(states)), // Now contains states[1..]
         id: None,
+        should_break: false,
     }
 }
 
@@ -307,4 +330,29 @@ pub fn line_suffix_boundary() -> Doc {
 /// ```
 pub fn break_parent() -> Doc {
     Doc::BreakParent
+}
+
+/// Create an isolated group that prevents hardline propagation.
+///
+/// Content inside can break normally, but `will_break()` returns false,
+/// preventing parent groups from being forced into Break mode.
+///
+/// Use for call arguments that may contain hardlines (template literals
+/// with `${` breaks, multiline objects in arrow bodies) but should not
+/// force the outer call to break at `(`.
+///
+/// # Example
+/// ```ignore
+/// // Template literal breaks internally but doesn't force call to expand
+/// group(concat([
+///     text("fn("),
+///     indent_softline(isolated_group(template_literal_doc)),
+///     softline(),
+///     text(")"),
+/// ]))
+/// ```
+pub fn isolated_group(doc: Doc) -> Doc {
+    Doc::IsolatedGroup {
+        contents: Box::new(doc),
+    }
 }

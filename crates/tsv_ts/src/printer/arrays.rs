@@ -74,6 +74,14 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Build expression doc for array element, wrapping certain expressions in isolated_group
+    ///
+    /// This prevents internal breaks from propagating to parent groups,
+    /// enabling arrays to stay hugged (matching Prettier behavior).
+    fn build_array_element_doc(&self, expr: &Expression) -> Doc {
+        self.build_huggable_expression_doc(expr)
+    }
+
     /// Add leading comments after opening bracket for the first array element
     fn add_first_element_comments(
         &self,
@@ -285,8 +293,8 @@ impl<'a> Printer<'a> {
                     self.add_leading_array_comments(arr, elem_start, i, &mut parts);
                 }
 
-                // Add element
-                parts.push(self.build_arg_expression_doc(expr));
+                // Add element (templates wrapped in isolated_group)
+                parts.push(self.build_array_element_doc(expr));
 
                 // Add trailing block comments (before comma only)
                 self.add_trailing_array_comments(arr, elem_end, i, &mut parts);
@@ -320,7 +328,7 @@ impl<'a> Printer<'a> {
         // Use trailing_comma() only if last element is NOT an elision
         // (elision trailing comma was already added unconditionally above)
         let trailing = if has_trailing_elision {
-            doc::text("")
+            doc::empty()
         } else {
             doc::trailing_comma()
         };
@@ -328,18 +336,24 @@ impl<'a> Printer<'a> {
         let inner = doc::concat(vec![doc::softline(), doc::concat(parts), trailing]);
         let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, doc::softline());
 
-        // Build group contents, adding break_parent() if shouldBreak heuristic matched
-        let mut group_contents = vec![
+        // Build group contents
+        let group_contents = doc::concat(vec![
             doc::text("["),
             indented_content,
             closing_line,
             doc::text("]"),
-        ];
-        if should_break {
-            group_contents.push(doc::break_parent());
-        }
+        ]);
 
-        doc::group(doc::concat(group_contents))
+        // Use group_break() when shouldBreak heuristic matched.
+        // This sets shouldBreak on the GROUP ITSELF rather than using break_parent().
+        // The difference: shouldBreak is local to this group, while break_parent()
+        // propagates up and forces enclosing groups to break.
+        // Prettier uses shouldBreak for this heuristic (array.js lines 89-106, 143).
+        if should_break {
+            doc::group_break(group_contents)
+        } else {
+            doc::group(group_contents)
+        }
     }
 
     /// Build group doc for arrays with multiline content (forced expansion with hardlines)
@@ -364,7 +378,7 @@ impl<'a> Printer<'a> {
             }
 
             if let Some(expr) = elem {
-                parts.push(self.build_arg_expression_doc(expr));
+                parts.push(self.build_array_element_doc(expr));
             }
 
             if i < arr.elements.len() - 1 {
@@ -439,7 +453,7 @@ impl<'a> Printer<'a> {
 
             // Add element (or nothing for elision)
             if let Some(e) = elem {
-                parts.push(self.build_arg_expression_doc(e));
+                parts.push(self.build_array_element_doc(e));
             }
 
             // Boundary for trailing comments: next element or closing bracket
@@ -520,5 +534,40 @@ impl<'a> Printer<'a> {
     pub(super) fn build_array_doc(&self, arr: &internal::ArrayExpression) -> Doc {
         // Use the same wrapping logic as top-level arrays to handle multiline content
         self.build_array_doc_with_wrapping(arr)
+    }
+
+    /// Build a Doc for an array expression with forced expansion (hardlines).
+    ///
+    /// Used by chain arg formatting when we need the array to expand internally
+    /// with hardlines so fits() can correctly measure the first line.
+    /// Produces: `[\n  elem,\n]` with actual hardlines.
+    pub(super) fn build_array_doc_expanded(&self, arr: &internal::ArrayExpression) -> Doc {
+        if arr.elements.is_empty() {
+            return doc::text("[]");
+        }
+
+        let mut parts = Vec::new();
+        for (i, elem) in arr.elements.iter().enumerate() {
+            // Elements are Option<Expression> where None = hole/elision
+            if let Some(expr) = elem {
+                parts.push(self.build_array_element_doc(expr));
+            }
+            // Holes are represented by just a comma (no element content)
+
+            if i < arr.elements.len() - 1 {
+                parts.push(doc::text(","));
+                parts.push(doc::hardline());
+            } else {
+                // Trailing comma on last element
+                parts.push(doc::text(","));
+            }
+        }
+
+        doc::concat(vec![
+            doc::text("["),
+            doc::indent(doc::concat(vec![doc::hardline(), doc::concat(parts)])),
+            doc::hardline(),
+            doc::text("]"),
+        ])
     }
 }

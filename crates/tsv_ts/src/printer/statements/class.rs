@@ -40,6 +40,23 @@ impl<'a> Printer<'a> {
     fn build_method_signature_doc(&self, method: &internal::MethodDefinition) -> doc::Doc {
         let func = &method.value;
 
+        // Check if return type will break on its own (object type or multiline).
+        // This matches Prettier's shouldGroupFunctionParameters behavior:
+        // - Object types (TypeLiteral) break when they have multiple members
+        // - Already multiline types (contains '\n') will obviously break
+        // When true, we shouldn't include return type width when deciding if params should break,
+        // and we should wrap params in their own group so they break independently.
+        let return_type_will_break = func.return_type.as_ref().is_some_and(|rt| {
+            // Check if it's an object type (TSTypeLiteral)
+            let is_object_type = matches!(
+                rt.type_annotation.as_ref(),
+                internal::TSType::TypeLiteral(_)
+            );
+            // Check if it's already multiline in source
+            let is_multiline = rt.span.extract(self.source).contains('\n');
+            is_object_type || is_multiline
+        });
+
         // Estimate if params should be forced to break based on total signature width.
         // Similar to build_function_signature_doc in function.rs.
         let force_params_break = if let Some(tp) = &func.type_parameters {
@@ -52,6 +69,17 @@ impl<'a> Printer<'a> {
             if type_params_will_break {
                 // Type params break → params get fresh line budget → don't force break
                 false
+            } else if return_type_will_break {
+                // Return type is multiline - it breaks on its own, so only check if params fit
+                let current_col = self.current_column();
+                let params_width: usize = func
+                    .params
+                    .iter()
+                    .map(|p| (p.span().end - p.span().start) as usize + 2)
+                    .sum();
+                // +4 for (): and opening of return type
+                let estimated_params = current_col + params_width + 4;
+                estimated_params > self.config.print_width
             } else {
                 // Estimate total signature width (current column + remaining content)
                 let current_col = self.current_column();
@@ -68,6 +96,17 @@ impl<'a> Printer<'a> {
                 let estimated_total = current_col + params_width + return_type_width + 4;
                 estimated_total > self.config.print_width
             }
+        } else if return_type_will_break {
+            // Return type is multiline - it breaks on its own, so only check if params fit
+            let current_col = self.current_column();
+            let params_width: usize = func
+                .params
+                .iter()
+                .map(|p| (p.span().end - p.span().start) as usize + 2)
+                .sum();
+            // +4 for (): and opening of return type
+            let estimated_params = current_col + params_width + 4;
+            estimated_params > self.config.print_width
         } else {
             // No type params - still need to check if signature fits
             let current_col = self.current_column();
@@ -99,9 +138,21 @@ impl<'a> Printer<'a> {
             trailing_comments_end,
             force_params_break,
         );
-        // Don't wrap params in their own group - the outer signature group controls breaking.
-        // This ensures params break BEFORE return type when signature exceeds width.
-        parts.push(params_doc);
+
+        // Prettier's shouldGroupFunctionParameters: when return type is object/multiline and
+        // we have 1 param, wrap params in their own group. This allows params to stay on one
+        // line even when the outer group breaks (due to multiline return type).
+        // See: printMethodValue in prettier/src/language-js/print/function.js
+        let should_group_params =
+            func.params.len() == 1 && return_type_will_break && func.return_type.is_some();
+
+        if should_group_params {
+            // Wrap params in their own group - params break independently from return type
+            parts.push(doc::group(params_doc));
+        } else {
+            // No nested group - outer signature group controls all breaking
+            parts.push(params_doc);
+        }
 
         // Return type annotation
         if let Some(return_type) = &func.return_type {
@@ -469,9 +520,10 @@ impl<'a> Printer<'a> {
                 .type_annotation
                 .as_ref()
                 .map_or_else(|| prop.key.span().end, |ta| ta.span.end);
-            if let Some(comments) =
-                self.build_inline_comments_between_doc_trailing_space_opt(before_value, value.span().start)
-            {
+            if let Some(comments) = self.build_inline_comments_between_doc_trailing_space_opt(
+                before_value,
+                value.span().start,
+            ) {
                 parts.push(comments);
             }
 

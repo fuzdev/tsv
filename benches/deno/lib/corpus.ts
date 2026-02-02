@@ -136,20 +136,31 @@ export interface DevReposLoaderOptions {
 	exclusions?: string[];
 }
 
-/** Default repos for the dev loader */
+/**
+ * Default repos for the dev loader.
+ * SvelteKit projects from ~/dev/web.code-workspace (those with src/routes/).
+ */
 const DEFAULT_REPOS = [
+	// Large apps
 	'zzz',
+	'mage_guild',
+	// Fuz ecosystem
+	'fuz.dev',
 	'fuz_css',
 	'fuz_ui',
-	'gro',
 	'fuz_util',
 	'fuz_template',
 	'fuz_blog',
 	'fuz_mastodon',
 	'fuz_code',
 	'fuz_gitops',
+	// Build tooling
+	'gro',
+	'svelte-docinfo',
+	// Personal sites
 	'webdevladder.net',
 	'ryanatkn.com',
+	'trillionx.dev',
 ];
 
 /**

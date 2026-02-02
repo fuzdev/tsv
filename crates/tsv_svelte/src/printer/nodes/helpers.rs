@@ -26,90 +26,6 @@ impl<'a> Printer<'a> {
         self.write("}");
     }
 
-    /// Format a TypeScript pattern (destructuring context)
-    ///
-    /// Patterns use spaces inside braces: `{ a, b }` instead of `{a, b}`.
-    /// Used for `{#each ... as pattern}` contexts.
-    pub fn print_ts_pattern(&mut self, expr: &tsv_ts::Expression) {
-        match expr {
-            // ObjectExpression may appear in legacy AST or from external sources
-            tsv_ts::Expression::ObjectExpression(obj) => {
-                // Destructuring patterns use spaces inside braces (matches prettier)
-                self.write("{ ");
-                for (i, prop) in obj.properties.iter().enumerate() {
-                    match prop {
-                        tsv_ts::ObjectProperty::Property(p) => {
-                            self.print_ts_expression(&p.key);
-                            if !p.shorthand {
-                                self.write(": ");
-                                self.print_ts_pattern(&p.value);
-                            }
-                        }
-                        tsv_ts::ObjectProperty::SpreadElement(s) => {
-                            self.write("...");
-                            self.print_ts_pattern(&s.argument);
-                        }
-                    }
-                    if i < obj.properties.len() - 1 {
-                        self.write(", ");
-                    }
-                }
-                self.write(" }");
-            }
-            tsv_ts::Expression::ObjectPattern(obj) => {
-                // ObjectPattern - correct AST type for destructuring patterns
-                self.write("{ ");
-                for (i, prop) in obj.properties.iter().enumerate() {
-                    match prop {
-                        tsv_ts::ObjectPatternProperty::Property(p) => {
-                            self.print_ts_expression(&p.key);
-                            if !p.shorthand {
-                                self.write(": ");
-                                self.print_ts_pattern(&p.value);
-                            }
-                        }
-                        tsv_ts::ObjectPatternProperty::RestElement(r) => {
-                            self.write("...");
-                            self.print_ts_pattern(&r.argument);
-                        }
-                    }
-                    if i < obj.properties.len() - 1 {
-                        self.write(", ");
-                    }
-                }
-                self.write(" }");
-            }
-            tsv_ts::Expression::ArrayExpression(arr) => {
-                // Array patterns also use spaces inside brackets
-                self.write("[");
-                for (i, elem) in arr.elements.iter().enumerate() {
-                    if let Some(e) = elem {
-                        self.print_ts_pattern(e);
-                    }
-                    if i < arr.elements.len() - 1 {
-                        self.write(", ");
-                    }
-                }
-                self.write("]");
-            }
-            tsv_ts::Expression::ArrayPattern(arr) => {
-                // ArrayPattern - correct AST type for array destructuring
-                self.write("[");
-                for (i, elem) in arr.elements.iter().enumerate() {
-                    if let Some(e) = elem {
-                        self.print_ts_pattern(e);
-                    }
-                    if i < arr.elements.len() - 1 {
-                        self.write(", ");
-                    }
-                }
-                self.write("]");
-            }
-            // For other expression types, delegate to regular expression printing
-            _ => self.print_ts_expression(expr),
-        }
-    }
-
     /// Format a TypeScript expression
     ///
     /// Delegates to the TypeScript printer for correct parenthesization and formatting.
@@ -253,6 +169,54 @@ pub fn is_control_flow_block(node: &FragmentNode) -> bool {
             | FragmentNode::KeyBlock(_)
             | FragmentNode::SnippetBlock(_)
     )
+}
+
+/// Check if a fragment node is a control flow block that forces block elements to expand.
+///
+/// Only if/each/key blocks force expansion. Await blocks do NOT - they stay inline
+/// in block elements (e.g., `<div>{#await promise}loading{/await}</div>` stays inline).
+pub fn is_expanding_control_flow_block(node: &FragmentNode) -> bool {
+    matches!(
+        node,
+        FragmentNode::IfBlock(_) | FragmentNode::EachBlock(_) | FragmentNode::KeyBlock(_)
+    )
+}
+
+/// Check if nodes contain any expanding blocks, either directly or nested in await blocks.
+///
+/// This is a convenience function combining `is_expanding_control_flow_block` and
+/// `has_expanding_block_in_await` checks that are commonly used together.
+pub fn has_any_expanding_blocks(nodes: &[FragmentNode]) -> bool {
+    nodes.iter().any(is_expanding_control_flow_block) || has_expanding_block_in_await(nodes)
+}
+
+/// Check if any await block contains expanding blocks (if/each/key) in its content.
+///
+/// Prettier treats expanding blocks inside await blocks as if they were directly
+/// in the parent element, forcing multiline. For example:
+/// `<a>{#await p}{#if c}text{/if}{/await}</a>` breaks because the if block
+/// is effectively inside the inline element.
+///
+/// This function recursively checks nested await blocks, so deeply nested
+/// structures like `{#await p1}{#await p2}{#if c}...{/if}{/await}{/await}`
+/// are also detected.
+fn has_expanding_block_in_await(nodes: &[FragmentNode]) -> bool {
+    nodes.iter().any(|n| {
+        if let FragmentNode::AwaitBlock(block) = n {
+            // Check all branches of the await block for expanding blocks
+            // or recursively for nested awaits containing expanding blocks
+            let check_fragment = |f: &crate::ast::internal::Fragment| {
+                f.nodes.iter().any(is_expanding_control_flow_block)
+                    || has_expanding_block_in_await(&f.nodes)
+            };
+            let has_in_pending = block.pending.as_ref().is_some_and(check_fragment);
+            let has_in_then = block.then.as_ref().is_some_and(check_fragment);
+            let has_in_catch = block.catch.as_ref().is_some_and(check_fragment);
+            has_in_pending || has_in_then || has_in_catch
+        } else {
+            false
+        }
+    })
 }
 
 /// Check if any child element contains block flow (if/each/etc).

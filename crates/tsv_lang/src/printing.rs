@@ -5,6 +5,8 @@
 
 use crate::Span;
 use crate::escapes::swap_quote_escaping;
+use unicode_segmentation::UnicodeSegmentation;
+use unicode_width::UnicodeWidthChar;
 
 /// Options for string literal formatting
 #[derive(Debug, Clone, Copy)]
@@ -574,9 +576,10 @@ pub fn strip_comment_indentation(source: &str, content: &str, comment_start: u32
 
 /// Calculate the visual width of a string, treating tabs as `tab_width` columns.
 ///
-/// This is useful for calculating line lengths when tabs may be present.
-/// Each tab character contributes `tab_width` to the total, while all other
-/// characters contribute 1.
+/// Uses grapheme cluster segmentation to match Prettier's width calculation:
+/// - Multi-codepoint graphemes (emoji sequences, skin tones, ZWJ) = 2 columns
+/// - Single codepoint: uses unicode-width (CJK = 2, regular = 1, zero-width = 0)
+/// - Tabs = `tab_width` columns
 ///
 /// # Example
 /// ```
@@ -585,12 +588,57 @@ pub fn strip_comment_indentation(source: &str, content: &str, comment_start: u32
 /// assert_eq!(visual_width("hello", 2), 5);
 /// assert_eq!(visual_width("\thello", 2), 7); // tab (2) + "hello" (5)
 /// assert_eq!(visual_width("\thello", 4), 9); // tab (4) + "hello" (5)
+/// assert_eq!(visual_width("⭐", 2), 2);      // emoji = 2 columns
+/// assert_eq!(visual_width("中文", 2), 4);    // CJK = 2 columns each
+/// assert_eq!(visual_width("👋🏽", 2), 2);    // emoji + skin tone = 2 (grapheme)
+/// assert_eq!(visual_width("👨‍👩‍👧", 2), 2);  // ZWJ family = 2 (grapheme)
 /// ```
 #[inline]
 pub fn visual_width(s: &str, tab_width: usize) -> usize {
-    s.chars()
-        .map(|c| if c == '\t' { tab_width } else { 1 })
+    s.graphemes(true)
+        .map(|g| grapheme_width(g, tab_width))
         .sum()
+}
+
+/// Calculate width of a single grapheme cluster.
+#[inline]
+fn grapheme_width(g: &str, tab_width: usize) -> usize {
+    let mut chars = g.chars();
+    let Some(first) = chars.next() else {
+        return 0;
+    };
+
+    // Single-char grapheme: use unicode-width
+    if chars.next().is_none() {
+        return if first == '\t' {
+            tab_width
+        } else {
+            first.width().unwrap_or(0)
+        };
+    }
+
+    // Multi-char grapheme: check if it's an emoji sequence
+    // Emoji with skin tones or ZWJ sequences = 2
+    // Non-emoji (base + combining marks) = sum of char widths
+    if g.chars().any(is_emoji_modifier) {
+        2
+    } else {
+        // Sum widths - combining marks are 0
+        g.chars().filter_map(UnicodeWidthChar::width).sum()
+    }
+}
+
+/// Check if char is an emoji modifier (triggers width 2 for grapheme).
+/// Only checks for modifiers that would make summed width incorrect.
+#[inline]
+fn is_emoji_modifier(c: char) -> bool {
+    let cp = c as u32;
+    matches!(
+        cp,
+        0x1F3FB
+            ..=0x1F3FF | // Skin tone modifiers
+        0x200D // ZWJ (zero-width joiner)
+    )
 }
 
 #[cfg(test)]

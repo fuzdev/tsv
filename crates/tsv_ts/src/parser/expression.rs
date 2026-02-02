@@ -244,6 +244,20 @@ impl<'a> Parser<'a> {
                     break;
                 }
 
+                // ES2016+: Unary expression as left operand of ** without parens is a syntax error
+                // `-2 ** 3` is ambiguous - must be `(-2) ** 3` or `-(2 ** 3)`
+                // Detect unparenthesized unary: actual_start equals expression span start
+                if operator == BinaryOperator::StarStar
+                    && matches!(left.expr, Expression::UnaryExpression(_))
+                    && left.actual_start == left.expr.span().start as usize
+                {
+                    return Err(ParseError::InvalidSyntax {
+                        message: "Unary expression cannot be the left operand of ** without parentheses. Use (-x) ** y or -(x ** y).".to_string(),
+                        position: left.expr.span().start as usize,
+                        context: None,
+                    });
+                }
+
                 self.advance()?; // consume operator
 
                 // Parse right-hand side with right binding power

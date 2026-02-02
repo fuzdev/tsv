@@ -30,29 +30,37 @@ impl<'a> ChainPrinter for Printer<'a> {
         match expr {
             internal::Expression::BinaryExpression(binary) => {
                 // Different structures for different operator types:
-                // - Arithmetic chains (/, *, etc.): group(["(", indent([softline, content]), softline, ")"])
-                //   In flat: (a / b / c)
-                //   In break: (\n\ta /\n\tb /\n\tc\n)
-                // - Logical chains (&&, ||): Keep original structure with continuation indent
-                //   In flat: (a || b)
-                //   In break: (a ||\n\tb)
+                // - Arithmetic: parens_break for indent-on-break structure
+                // - Logical (&&, ||): Keep original structure with continuation indent
                 if binary.operator.is_logical() {
-                    // For logical operators, use the original structure
                     let inner = self.build_binary_chain_parts_indented(binary);
                     doc::group(doc::parens(inner))
                 } else {
-                    // For arithmetic operators, use the parens-on-own-line structure
                     let inner = self.build_binary_chain_for_parens(binary);
-                    doc::group(doc::concat(vec![
-                        doc::text("("),
-                        doc::indent(doc::concat(vec![doc::softline(), inner])),
-                        doc::softline(),
-                        doc::text(")"),
-                    ]))
+                    doc::parens_break(inner)
                 }
+            }
+            // Await in chain base: (await fn(...)).method()
+            // Use parens_break so chain prefers breaking at parens over inside call args
+            // Note: YieldExpression uses simple parens - Prettier treats yield differently
+            internal::Expression::AwaitExpression(_) => {
+                let inner = self.build_expression_doc(expr);
+                doc::parens_break(inner)
             }
             _ => doc::parens(self.build_expression_doc(expr)),
         }
+    }
+
+    fn print_parenthesized_base_expanded(&self, expr: &internal::Expression) -> Doc {
+        // Expanded version with hardlines so fits() can measure actual line widths.
+        // Used for args_break state in conditional_group.
+        let inner = self.build_expression_doc(expr);
+        doc::concat(vec![
+            doc::text("("),
+            doc::indent(doc::concat(vec![doc::hardline(), inner])),
+            doc::hardline(),
+            doc::text(")"),
+        ])
     }
 
     fn print_call_args(&self, call: &internal::CallExpression, optional: bool) -> Doc {
@@ -179,11 +187,39 @@ impl<'a> ChainPrinter for Printer<'a> {
         doc::concat(parts)
     }
 
+    fn build_line_comments_no_boundary(&self, comments: &[&Comment]) -> Doc {
+        if comments.is_empty() {
+            return doc::empty();
+        }
+
+        // Build line_suffix docs WITHOUT a trailing boundary.
+        // The comments will stay deferred until the actual end of line.
+        let mut parts = Vec::with_capacity(comments.len());
+        for comment in comments {
+            parts.push(self.build_trailing_line_comment_doc(comment));
+        }
+        doc::concat(parts)
+    }
+
     fn get_tab_width(&self) -> usize {
         self.config.tab_width
     }
 
+    fn get_print_width(&self) -> usize {
+        self.config.print_width
+    }
+
     fn should_force_expand(&self) -> bool {
         self.force_chain_expand.get()
+    }
+
+    fn fits_chain_tail(&self, doc: &Doc, available: usize) -> bool {
+        doc::fits_resolved(
+            doc,
+            available,
+            doc::Mode::Flat,
+            &self.config,
+            &*self.interner.borrow(),
+        )
     }
 }

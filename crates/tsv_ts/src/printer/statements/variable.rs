@@ -3,18 +3,18 @@
 use super::Printer;
 use crate::ast::internal::{self, Expression};
 use crate::printer::{
-    ParenContext, conditional_needs_fluid_layout, is_curried_arrow_with_return_type,
-    is_module_path_fluid_call, is_multiline_string_literal, is_poorly_breakable_chain,
-    is_pure_property_chain, is_self_expanding_value, is_simple_self_expanding, is_string_literal,
-    is_type_assertion_call, needs_parens,
+    ParenContext, conditional_needs_fluid_layout, is_call_on_member_chain,
+    is_curried_arrow_with_return_type, is_module_path_fluid_call, is_multiline_string_literal,
+    is_poorly_breakable_chain, is_pure_property_chain, is_self_expanding_value,
+    is_simple_self_expanding, is_string_literal, is_type_assertion_call, needs_parens,
 };
 use tsv_lang::SymbolToU32;
-use tsv_lang::doc;
+use tsv_lang::doc::{self, GroupId};
 
 /// Wrap a doc in parentheses if the expression needs them for variable init context
 fn wrap_init_doc(init_doc: doc::Doc, init: &Expression) -> doc::Doc {
     if needs_parens(init, ParenContext::VariableInit) {
-        doc::concat(vec![doc::text("("), init_doc, doc::text(")")])
+        doc::parens(init_doc)
     } else {
         init_doc
     }
@@ -242,14 +242,45 @@ impl<'a> Printer<'a> {
                     false
                 };
 
-                let is_fluid_rhs = (is_module_path_fluid_call(init, &interner)
+                // Call chains with line comments should NOT be treated as fluid.
+                // The chain formatter handles breaking at the comment location.
+                // E.g., `const a = items // comment\n  .foo()` keeps `= items // comment` together.
+                let has_line_comments_in_chain = matches!(init, Expression::CallExpression(_))
+                    && self.has_line_comments_in_call_chain(init);
+
+                // Expressions that benefit from FLUID layout (Prettier's indentIfBreak pattern):
+                // The printer tries to break at `=` BEFORE evaluating the RHS's internal groups.
+                // This gives better results for chains where expanding internal groups is worse
+                // than breaking at the assignment.
+                let needs_fluid_layout = (is_module_path_fluid_call(init, &interner)
                     || is_pure_property_chain(init)
                     || is_poorly_breakable_chain(init, self.source, self.config.print_width)
-                    || matches!(init, Expression::BinaryExpression(_))
-                    || conditional_needs_fluid_layout(init)
-                    || is_string_literal(init))
+                    || is_string_literal(init)
+                    || matches!(init, Expression::RegexLiteral(_)))
                     && !is_self_expanding_value(init)
-                    && !is_call_with_trailing_comments;
+                    && !is_call_with_trailing_comments
+                    && !has_line_comments_in_chain;
+
+                // Single-call member chains with complex args (arrows, objects, arrays):
+                // Use TRUE fluid layout to break at `=` only when necessary.
+                // E.g., `const x = a.b.c.filter((x) => ...)` breaks at `=` if > print_width
+                let is_single_call_member_chain = is_call_on_member_chain(init)
+                    && !is_self_expanding_value(init)
+                    && !is_call_with_trailing_comments
+                    && !has_line_comments_in_chain;
+
+                // Expressions that need break-after-operator layout (old style):
+                // group([left, " =", indent([line, right])])
+                // For binary/logical expressions, breaking happens at operators within the RHS,
+                // and the entire RHS is indented together after `=`.
+                let needs_break_after_op_layout = (matches!(init, Expression::BinaryExpression(_))
+                    || conditional_needs_fluid_layout(init))
+                    && !is_self_expanding_value(init)
+                    && !is_call_with_trailing_comments
+                    && !has_line_comments_in_chain;
+
+                // Combined flag for backward compatibility with existing logic
+                let is_fluid_rhs = needs_fluid_layout || needs_break_after_op_layout;
 
                 // Type assertion calls with LHS type annotation need special fluid handling
                 // (handled separately below because they need non-wrapping LHS type)
@@ -351,15 +382,10 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_inline_comments_between_doc(equals_pos + 1, init_start));
                     parts.push(doc::text(" "));
                     parts.push(wrap_init_doc(self.build_expression_doc(init), init));
-                } else if needs_break_after_operator || is_type_assertion_with_lhs_type {
-                    // Break-after-operator layout: group([leftParts, " =", group(indent([line, init]))])
-                    // The inner group for init evaluates independently based on remaining width.
-                    //
-                    // For type assertion calls with LHS type annotation, rebuild with non-wrapping
-                    // type so the LHS type stays together when breaking after `=`.
-                    if is_type_assertion_with_lhs_type
-                        && let Expression::Identifier(ident) = &declarator.id
-                    {
+                } else if is_type_assertion_with_lhs_type {
+                    // Type assertion calls with LHS type annotation: use fluid layout
+                    // with non-wrapping type so the LHS type stays together.
+                    if let Expression::Identifier(ident) = &declarator.id {
                         parts.pop();
                         parts.push(self.build_typed_identifier_doc(
                             ident,
@@ -367,6 +393,43 @@ impl<'a> Printer<'a> {
                             false, // non-wrapping
                         ));
                     }
+                    parts.push(doc::text(" ="));
+                    parts.push(doc::group_with_id(
+                        doc::indent(doc::line()),
+                        GroupId::Assignment,
+                    ));
+                    parts.push(doc::line_suffix_boundary());
+                    parts.push(doc::indent_if_break(
+                        wrap_init_doc(self.build_expression_doc(init), init),
+                        GroupId::Assignment,
+                        false,
+                    ));
+                } else if is_single_call_member_chain {
+                    // TRUE fluid layout for single-call member chains with complex args:
+                    // Structure: [" =", group(indent(line)), lineSuffixBoundary, indentIfBreak(init)]
+                    //
+                    // The init is NOT inside the line group. This means the printer tries to
+                    // break at `=` BEFORE evaluating init's internal groups. This gives
+                    // Prettier-style behavior where long chains break at `=` instead of
+                    // expanding call arguments.
+                    parts.push(doc::text(" ="));
+                    parts.push(doc::group_with_id(
+                        doc::indent(doc::line()),
+                        GroupId::Assignment,
+                    ));
+                    parts.push(doc::line_suffix_boundary());
+                    parts.push(doc::indent_if_break(
+                        wrap_init_doc(self.build_expression_doc(init), init),
+                        GroupId::Assignment,
+                        false,
+                    ));
+                } else if needs_break_after_operator {
+                    // Break-after-operator layout for binary/conditional expressions:
+                    // Structure: [" =", group(indent([line, init]))]
+                    //
+                    // The init IS inside the group with the line. This allows the binary/conditional
+                    // expression to control its own breaking at operators. The entire RHS is
+                    // indented together after the `=` break.
                     parts.push(doc::text(" ="));
                     parts.push(doc::group(doc::indent(doc::concat(vec![
                         doc::line(),

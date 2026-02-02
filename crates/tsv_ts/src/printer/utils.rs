@@ -24,7 +24,7 @@ pub(super) fn is_hopefully_short_arg(expr: &Expression) -> bool {
         }
 
         // Prettier: return isRegExpLiteral(node) || isSimpleCallArgument(node)
-        // RegExp literals are handled by is_simple_call_argument (via Literal)
+        // RegExp literals are handled by is_simple_call_argument (via RegexLiteral)
         _ => is_simple_call_argument(expr, 2),
     }
 }
@@ -131,24 +131,6 @@ pub(super) fn has_block_function_before_last(args: &[Expression]) -> bool {
     args[..args.len() - 1].iter().any(is_block_function)
 }
 
-/// Check if there are multiple arrow/function arguments
-///
-/// Returns true if 2+ arguments are arrow or function expressions.
-/// Prettier always breaks these to multi-line format.
-#[inline]
-pub(super) fn has_multiple_function_args(arguments: &[Expression]) -> bool {
-    arguments
-        .iter()
-        .filter(|arg| {
-            matches!(
-                arg,
-                Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_)
-            )
-        })
-        .nth(1)
-        .is_some()
-}
-
 /// Check if an expression is a "simple" call argument (Prettier's `isSimpleCallArgument`)
 ///
 /// Uses depth-limited recursion (typically depth=2) to prevent checking arbitrarily
@@ -176,7 +158,8 @@ pub fn is_simple_call_argument(expr: &Expression, depth: usize) -> bool {
 
     match expr {
         // Simple literals are always simple (Prettier: isLiteral)
-        Expression::Literal(_) => true,
+        // Note: RegexLiteral is separate from Literal in our internal AST
+        Expression::Literal(_) | Expression::RegexLiteral(_) => true,
 
         // Single-word types are simple (Prettier: isSingleWordType)
         // Includes: Identifier, ThisExpression, Super, MetaProperty
@@ -367,6 +350,46 @@ pub fn contains_call_expression(expr: &Expression) -> bool {
         | Expression::PrivateIdentifier(_)
         | Expression::TSParameterProperty(_) => false,
     }
+}
+
+/// Check if arguments form a "function composition" pattern that forces expansion.
+///
+/// Matches Prettier's `isFunctionCompositionArgs` logic:
+/// - 2+ arguments
+/// - Either: 2+ function/arrow arguments, OR
+///   any argument is a call expression containing a function/arrow argument
+///
+/// This triggers `allArgsBrokenOut()` in Prettier to expand all arguments.
+pub(super) fn is_function_composition_args(arguments: &[Expression]) -> bool {
+    if arguments.len() <= 1 {
+        return false;
+    }
+
+    let mut function_count = 0;
+
+    for arg in arguments {
+        if matches!(
+            arg,
+            Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_)
+        ) {
+            function_count += 1;
+            if function_count > 1 {
+                return true;
+            }
+        } else if let Expression::CallExpression(call) = arg {
+            // Check if this call has any function/arrow arguments
+            if call.arguments.iter().any(|child_arg| {
+                matches!(
+                    child_arg,
+                    Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_)
+                )
+            }) {
+                return true;
+            }
+        }
+    }
+
+    false
 }
 
 /// Check if an expression is an object with newlines inside it.

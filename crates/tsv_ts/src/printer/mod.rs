@@ -40,6 +40,7 @@ mod type_stringifier;
 mod types;
 mod utils;
 
+use analysis::needs_isolation_for_hugging;
 pub(crate) use analysis::{
     PatternContext, build_entity_name_doc, conditional_needs_fluid_layout, has_multiline_content,
     is_brace_block_multiline, is_module_path_fluid_call, is_multiline_string_literal,
@@ -47,8 +48,9 @@ pub(crate) use analysis::{
     template_literal_has_newlines,
 };
 pub(crate) use assignment::{
-    is_curried_arrow_with_return_type, is_poorly_breakable_chain, is_self_expanding_value,
-    is_simple_self_expanding, is_type_assertion_call,
+    arrow_chain_has_return_type, is_call_on_member_chain, is_curried_arrow_with_return_type,
+    is_poorly_breakable_chain, is_self_expanding_value, is_simple_self_expanding,
+    is_type_assertion_call,
 };
 pub(crate) use comments::{CommentFilter, CommentSpacing};
 pub(crate) use needs_parens::{ParenContext, needs_parens};
@@ -255,6 +257,19 @@ impl<'a> Printer<'a> {
     /// when embedding TS expressions in larger documents (e.g., Svelte attributes).
     pub fn build_expression_doc_public(&self, expr: &internal::Expression) -> Doc {
         self.build_expression_doc(expr)
+    }
+
+    /// Build expression doc with IsolatedGroup wrapping for huggable expressions.
+    ///
+    /// Wraps templates and arrow-with-template-body in `isolated_group` to prevent
+    /// internal breaks from forcing parent calls/arrays to break (enables hugging).
+    pub(crate) fn build_huggable_expression_doc(&self, expr: &internal::Expression) -> Doc {
+        let base_doc = self.build_arg_expression_doc(expr);
+        if needs_isolation_for_hugging(expr) {
+            doc::isolated_group(base_doc)
+        } else {
+            base_doc
+        }
     }
 
     /// Build a Doc for a condition expression (if/while/for test) in an isolated context.

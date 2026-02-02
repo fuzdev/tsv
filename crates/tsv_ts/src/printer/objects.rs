@@ -55,14 +55,13 @@ impl<'a> Printer<'a> {
         });
 
         // Decide the formatting strategy
-        let force_multiline = has_line_comments
-            || has_standalone_block_comment
-            || has_source_newline
-            || has_multiline;
+        // must_break: conditions that require hardlines (comments, multiline content)
+        // has_source_newline: prefers expanded, but uses group_break for proper propagation
+        let must_break = has_line_comments || has_standalone_block_comment || has_multiline;
 
-        if has_comments || force_multiline {
+        if has_comments || must_break {
             // Comment-aware path
-            // Use hardlines when force_multiline, use line() when only has_comments
+            // Use hardlines when must_break, use line() when only has_comments
             // This allows inline objects with block comments to stay inline if they fit
             let mut parts = Vec::new();
             let mut prev_end = obj.span.start + 1; // After opening brace
@@ -88,7 +87,7 @@ impl<'a> Printer<'a> {
 
                 // For non-first properties, add separator
                 if !is_first {
-                    if force_multiline {
+                    if must_break {
                         // Must break: check for blank line preservation
                         let check_pos = if comments.is_empty() {
                             prop_start
@@ -110,8 +109,8 @@ impl<'a> Printer<'a> {
                 for (j, comment) in comments.iter().enumerate() {
                     let is_last_comment = j == comments.len() - 1;
 
-                    // Check if there's a blank line after this comment (for force_multiline mode)
-                    let has_blank_after = force_multiline
+                    // Check if there's a blank line after this comment (for must_break mode)
+                    let has_blank_after = must_break
                         && if is_last_comment {
                             self.has_blank_line_between(comment.span.end, prop_start)
                         } else {
@@ -122,7 +121,7 @@ impl<'a> Printer<'a> {
                         };
 
                     // For subsequent comments, check for blank lines between them
-                    if force_multiline
+                    if must_break
                         && j > 0
                         && self.has_blank_line_between(last_pos, comment.span.start)
                     {
@@ -132,11 +131,11 @@ impl<'a> Printer<'a> {
 
                     parts.push(self.build_comment_doc(comment));
                     if !comment.is_block {
-                        // Line comments need a hardline after (unless blank line follows in force_multiline)
+                        // Line comments need a hardline after (unless blank line follows in must_break)
                         if !has_blank_after {
                             parts.push(doc::hardline());
                         }
-                    } else if force_multiline && !self.is_same_line(comment.span.end, prop_start) {
+                    } else if must_break && !self.is_same_line(comment.span.end, prop_start) {
                         // Block comment on its own line - hardline after (unless blank line follows)
                         if !has_blank_after {
                             parts.push(doc::hardline());
@@ -149,7 +148,7 @@ impl<'a> Printer<'a> {
                 }
 
                 // Check for blank line after last comment (before property)
-                if force_multiline
+                if must_break
                     && !comments.is_empty()
                     && self.has_blank_line_between(last_pos, prop_start)
                 {
@@ -190,10 +189,10 @@ impl<'a> Printer<'a> {
                 // Add comma
                 if i < obj.properties.len() - 1 {
                     parts.push(doc::text(","));
-                } else if force_multiline {
-                    // Last property in force_multiline: always add comma
+                } else if must_break {
+                    // Last property in must_break: always add comma
                     // (trailing_comma() uses if_break which needs a group, but
-                    // force_multiline objects don't create a group)
+                    // must_break objects don't create a group)
                     parts.push(doc::text(","));
                 } else {
                     // Last property: trailing comma only when broken
@@ -218,23 +217,21 @@ impl<'a> Printer<'a> {
             if !trailing_comments.is_empty() {
                 // Check for blank line before the first trailing comment
                 let first_comment = trailing_comments[0];
-                if force_multiline
-                    && self.has_blank_line_between(prev_end, first_comment.span.start)
-                {
+                if must_break && self.has_blank_line_between(prev_end, first_comment.span.start) {
                     parts.push(doc::literalline());
                 }
 
                 let mut last_pos = prev_end;
                 for (j, comment) in trailing_comments.iter().enumerate() {
                     // Check for blank lines between comments
-                    if force_multiline
+                    if must_break
                         && j > 0
                         && self.has_blank_line_between(last_pos, comment.span.start)
                     {
                         parts.push(doc::literalline());
                     }
 
-                    if force_multiline {
+                    if must_break {
                         parts.push(doc::hardline());
                     } else {
                         parts.push(doc::line());
@@ -244,7 +241,7 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            if force_multiline {
+            if must_break {
                 // Forced multiline - use hardlines for predictable formatting
                 let inner = doc::concat(vec![doc::hardline(), doc::concat(parts)]);
                 let (indented_content, closing_line) =
@@ -262,12 +259,7 @@ impl<'a> Printer<'a> {
                 let (indented_content, closing_line) =
                     self.wrap_with_decl_indent(inner, doc::softline());
 
-                doc::group(doc::concat(vec![
-                    doc::text("{"),
-                    indented_content,
-                    closing_line,
-                    doc::text("}"),
-                ]))
+                self.wrap_object_braces(indented_content, closing_line, has_source_newline)
             }
         } else {
             // No comments, no forced multiline: use width-based wrapping with soft lines
@@ -316,13 +308,63 @@ impl<'a> Printer<'a> {
             let (indented_content, closing_line) =
                 self.wrap_with_decl_indent(inner, doc::softline());
 
-            doc::group(doc::concat(vec![
-                doc::text("{"),
-                indented_content,
-                closing_line,
-                doc::text("}"),
-            ]))
+            self.wrap_object_braces(indented_content, closing_line, has_source_newline)
         }
+    }
+
+    /// Wrap content in braces with appropriate grouping for object expressions.
+    ///
+    /// Uses `group_break` when source had newlines (propagates break upward),
+    /// otherwise uses `group` for width-based breaking.
+    fn wrap_object_braces(
+        &self,
+        indented_content: Doc,
+        closing_line: Doc,
+        has_source_newline: bool,
+    ) -> Doc {
+        let object_doc = doc::concat(vec![
+            doc::text("{"),
+            indented_content,
+            closing_line,
+            doc::text("}"),
+        ]);
+        if has_source_newline {
+            doc::group_break(object_doc)
+        } else {
+            doc::group(object_doc)
+        }
+    }
+
+    /// Build a Doc for an object expression with forced expansion (hardlines).
+    ///
+    /// Used by chain arg formatting when we need the object to expand internally
+    /// with hardlines so fits() can correctly measure the first line.
+    /// Produces: `{\n  prop,\n}` with actual hardlines.
+    pub(super) fn build_object_doc_expanded(&self, obj: &internal::ObjectExpression) -> Doc {
+        if obj.properties.is_empty() {
+            return doc::text("{}");
+        }
+
+        let mut parts = Vec::new();
+        for (i, prop) in obj.properties.iter().enumerate() {
+            let prop_doc = self.build_object_property_doc(prop);
+            parts.push(prop_doc);
+
+            if i < obj.properties.len() - 1 {
+                parts.push(doc::text(","));
+                parts.push(doc::hardline());
+            } else {
+                // Trailing comma on last property
+                parts.push(doc::text(","));
+            }
+        }
+
+        doc::concat(vec![
+            doc::text("{"),
+            doc::indent(doc::concat(vec![doc::hardline(), doc::concat(parts)])),
+            doc::hardline(),
+            doc::text("}"),
+        ])
     }
 
     /// Build a Doc for an object property (either Property or SpreadElement)

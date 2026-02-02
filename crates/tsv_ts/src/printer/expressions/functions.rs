@@ -8,6 +8,7 @@
 
 use super::{ParenContext, Printer, needs_parens, unwrap_parenthesized};
 use crate::ast::internal;
+use crate::printer::types::helpers::is_huggable_type;
 use tsv_lang::doc::{self, Doc};
 
 /// Check if an expression is directly an object literal (needs parentheses in arrow body)
@@ -76,6 +77,25 @@ fn is_huggable_pattern(expr: &internal::Expression) -> bool {
                 internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_)
             )
         }
+        _ => false,
+    }
+}
+
+/// Check if an expression has a huggable type annotation.
+///
+/// Parameters with huggable type annotations like `a?: { b: T }` should be hugged:
+/// - The opening `{` stays on the same line as the parameter name
+/// - The content expands internally
+/// - The closing `}` comes on its own line
+///
+/// This matches Prettier's behavior where `fn(a?: {` stays together.
+fn has_huggable_type_annotation(expr: &internal::Expression) -> bool {
+    match expr {
+        internal::Expression::Identifier(id) => id
+            .type_annotation
+            .as_ref()
+            .is_some_and(|ann| is_huggable_type(&ann.type_annotation)),
+        internal::Expression::AssignmentPattern(ap) => has_huggable_type_annotation(&ap.left),
         _ => false,
     }
 }
@@ -181,9 +201,15 @@ impl<'a> Printer<'a> {
                 // Without:          const f = (x: T) => (y) => expr;    // hugs
                 let is_arrow_body =
                     matches!(&**expr, internal::Expression::ArrowFunctionExpression(_));
+
+                // Check if this is a curried arrow where ANY arrow triggers chain breaking.
+                // Triggers: return type with params, type parameters, non-identifier params
+                let chain_has_return_type =
+                    is_arrow_body && crate::printer::arrow_chain_has_return_type(arrow);
+
                 let should_hug = !has_post_arrow_comments
                     && should_hug_arrow_body(expr)
-                    && !(is_arrow_body && arrow.return_type.is_some());
+                    && !chain_has_return_type;
 
                 if has_post_arrow_comments {
                     // Build body doc with leading comments - always breaks
@@ -200,19 +226,20 @@ impl<'a> Printer<'a> {
                     parts.push(doc::text(" "));
                     parts.push(body_doc);
                 } else if is_arrow_body
-                    && (arrow.return_type.is_some() || self.in_curried_typed_arrow.get())
+                    && (chain_has_return_type || self.in_curried_typed_arrow.get())
                 {
                     // Curried arrow chain - all arrows break without indent so they align:
-                    // const f = (x: T): H => (y) => expr
+                    // const f = (x: T): H => (y) => expr   // outer has return type
+                    // const f = (x: T) => (y): H => expr   // inner has return type
                     // becomes:
                     // const f =
-                    //     (x: T): H =>
-                    //     (y) =>
-                    //         expr
+                    //     (x: T): H =>      or      (x: T) =>
+                    //     (y) =>                    (y): H =>
+                    //         expr                      expr
                     //
-                    // Set context flag when entering chain (typed arrow), restore when done.
+                    // Set context flag when entering chain, restore when done.
                     let was_in_curried = self.in_curried_typed_arrow.get();
-                    if arrow.return_type.is_some() {
+                    if chain_has_return_type {
                         self.in_curried_typed_arrow.set(true);
                     }
                     let body_doc = self.build_arrow_body_doc(expr);
@@ -232,7 +259,20 @@ impl<'a> Printer<'a> {
                     // The body is wrapped in a group so it can make its own fits() decision.
                     // This allows the arrow body to stay inline even when the parent element
                     // is in break mode, as long as the body content fits from its position.
+                    //
+                    // For template literal bodies, wrap in IsolatedGroup to prevent the
+                    // template's internal ${} breaks from forcing the arrow body to break.
+                    // This enables `.map((x) => \`${...}\`)` to stay hugged.
                     let body_doc = self.build_arrow_body_doc(expr);
+                    let body_doc = if matches!(
+                        expr.as_ref(),
+                        internal::Expression::TemplateLiteral(_)
+                            | internal::Expression::TaggedTemplateExpression(_)
+                    ) {
+                        doc::isolated_group(body_doc)
+                    } else {
+                        body_doc
+                    };
                     parts.push(doc::group(doc::indent(doc::concat(vec![
                         doc::line(),
                         body_doc,
@@ -456,19 +496,12 @@ impl<'a> Printer<'a> {
                 return body_doc;
             }
             // Otherwise, use if_break to check enclosing group
-            return doc::if_break(
-                body_doc.clone(),
-                doc::concat(vec![doc::text("("), body_doc, doc::text(")")]),
-            );
+            return doc::if_break(body_doc.clone(), doc::parens(body_doc));
         }
 
         // Standard cases: objects and assignments always need parens
         if needs_parens(expr, ParenContext::ArrowBody) {
-            doc::concat(vec![
-                doc::text("("),
-                self.build_expression_doc(expr),
-                doc::text(")"),
-            ])
+            doc::parens(self.build_expression_doc(expr))
         } else {
             self.build_expression_doc(expr)
         }
@@ -694,17 +727,27 @@ impl<'a> Printer<'a> {
         //   function fn(
         //       {a, b}: Type,
         //   ): void {}
+        //
+        // Also applies to parameters with TypeLiteral type annotations like `a?: { b: T }`:
+        //   function fn(a?: {
+        //       b: T;
+        //   }): void {}
+        // NOT:
+        //   function fn(
+        //       a?: { b: T },
+        //   ): void {}
+        let no_leading_comments = !self.has_comments_between(
+            params_start.unwrap_or_else(|| params[0].span().start),
+            params[0].span().start,
+        );
         let should_hug_single_pattern = params.len() == 1
-            && is_huggable_pattern(&params[0])
-            && !self.has_comments_between(
-                params_start.unwrap_or_else(|| params[0].span().start),
-                params[0].span().start,
-            );
+            && (is_huggable_pattern(&params[0]) || has_huggable_type_annotation(&params[0]))
+            && no_leading_comments;
 
         if should_hug_single_pattern {
             // Hug mode: just ( + pattern + optional trailing comma + )
             let param_doc = self.build_function_parameter_doc(&params[0]);
-            return doc::concat(vec![doc::text("("), param_doc, doc::text(")")]);
+            return doc::parens(param_doc);
         }
 
         // Check if any trailing line comments exist on params

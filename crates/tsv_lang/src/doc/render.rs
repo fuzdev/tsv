@@ -370,6 +370,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 contents,
                 expanded_states,
                 id,
+                should_break,
             } => {
                 // CRITICAL: Check expanded_states BEFORE will_break()
                 //
@@ -461,8 +462,10 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     if let Some(group_id) = id {
                         group_mode_map.insert(*group_id, chosen_mode);
                     }
-                } else if will_break(contents) {
-                    // If contents will definitely break (contains hardline), use break mode
+                } else if *should_break || will_break(contents) {
+                    // Force Break mode when:
+                    // - should_break is true (source prefers expanded)
+                    // - contents contain hardline (will definitely break)
                     let chosen_mode = Mode::Break;
                     commands.push(cmd.with_mode(chosen_mode, contents));
                     // Track this group's mode for indentIfBreak
@@ -494,6 +497,29 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         group_mode_map.insert(*group_id, chosen_mode);
                     }
                 }
+            }
+
+            Doc::IsolatedGroup { contents } => {
+                // IsolatedGroup renders like a regular group but without will_break() check.
+                // This prevents internal hardlines from forcing the group into Break mode.
+                // Instead, only the fits() width check determines Flat vs Break.
+                let suffix = if *pos >= config.first_line_offset {
+                    config.suffix_width
+                } else {
+                    0
+                };
+                let effective_width = config.print_width.saturating_sub(suffix);
+                let remaining_width = effective_width.saturating_sub(*pos) as isize;
+                let fits = fits_with_lookahead(
+                    contents,
+                    Mode::Flat,
+                    &commands,
+                    remaining_width,
+                    config,
+                    resolver,
+                );
+                let chosen_mode = if fits { Mode::Flat } else { Mode::Break };
+                commands.push(cmd.with_mode(chosen_mode, contents));
             }
 
             Doc::IfBreak {
@@ -532,6 +558,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
 
             Doc::Fill(parts) => {
                 // Fill needs special handling for greedy packing
+                // Pass rest_commands so fill can see trailing content for accurate width
                 render_fill_iterative(
                     parts,
                     output,
@@ -539,6 +566,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     cmd.indent,
                     config,
                     &DocContext::default(),
+                    &commands,
                     resolver,
                 );
             }
@@ -550,8 +578,9 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 match doc.as_ref() {
                     Doc::Fill(parts) => {
                         // Apply context when rendering fill
+                        // Pass rest_commands so fill can see trailing content
                         render_fill_iterative(
-                            parts, output, pos, cmd.indent, config, context, resolver,
+                            parts, output, pos, cmd.indent, config, context, &commands, resolver,
                         );
                     }
                     _ => {
@@ -582,13 +611,20 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
 }
 
 /// Render a fill doc using greedy line packing (iterative version)
-fn render_fill_iterative<R: TextResolver + ?Sized>(
+///
+/// The `rest_commands` parameter allows the fill to see content that follows
+/// it in the document tree. This is important for accurate width calculation
+/// when the fill is embedded in a larger structure (e.g., expression inside
+/// `{#if}...{/if}</a>`).
+#[allow(clippy::too_many_arguments)]
+fn render_fill_iterative<'a, R: TextResolver + ?Sized>(
     parts: &[Doc],
     output: &mut String,
     pos: &mut usize,
     indent_level: usize,
     config: &PrintConfig,
     context: &DocContext,
+    rest_commands: &[Command<'a>],
     resolver: Option<&R>,
 ) {
     let mut offset = 0;
@@ -597,22 +633,41 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
         let remaining = config.print_width.saturating_sub(*pos);
         let content = &parts[offset];
 
-        // Apply trailing_reserve only to final segments (last or second-to-last).
-        // Intermediate segments pack greedily to print_width.
+        // For intermediate segments, pack greedily to print_width.
+        // For final segments (last or second-to-last), consider trailing content.
         let is_final_segment = offset + 2 >= parts.len();
+
+        // Calculate available width for fits check
         let available = if is_final_segment {
             remaining.saturating_sub(context.trailing_reserve)
         } else {
             remaining
         };
-        let content_fits = fits_with_lookahead(
-            content,
-            Mode::Flat,
-            &[],
-            available as isize,
-            config,
-            resolver,
-        );
+
+        // Use rest_commands for fits check on final segments so the fill can see
+        // content that follows (e.g., `}{/if}</a`). For intermediate segments,
+        // just check if the content fits in remaining width.
+        let content_fits = if is_final_segment && !rest_commands.is_empty() {
+            // Check fits with actual trailing content from document tree
+            fits_with_lookahead(
+                content,
+                Mode::Flat,
+                rest_commands,
+                remaining as isize,
+                config,
+                resolver,
+            )
+        } else {
+            // Check fits with trailing_reserve for intermediate segments
+            fits_with_lookahead(
+                content,
+                Mode::Flat,
+                &[],
+                available as isize,
+                config,
+                resolver,
+            )
+        };
 
         // Case 1: Last item - render it (break to new line if it doesn't fit)
         if offset + 1 >= parts.len() {
@@ -937,7 +992,8 @@ fn render_single_doc_inner<'a, R: TextResolver + ?Sized>(
             Doc::Group {
                 contents,
                 expanded_states,
-                id: _,
+                id: _, // Group ID not used in suffix tracking path
+                should_break,
             } => {
                 if !tracking_suffix {
                     // Simplified Group handling for suffix content - just pass through
@@ -991,11 +1047,40 @@ fn render_single_doc_inner<'a, R: TextResolver + ?Sized>(
                             commands.push(cmd.with_mode(Mode::Break, fallback_doc));
                         }
                     }
-                } else if will_break(contents) {
-                    // If contents will definitely break (contains hardline), use break mode
+                } else if *should_break || will_break(contents) {
+                    // Force Break mode (see detailed comment in render_doc_iterative)
                     commands.push(cmd.with_mode(Mode::Break, contents));
                 } else {
                     // Regular group: check if content fits
+                    let suffix = if *pos >= config.first_line_offset {
+                        config.suffix_width
+                    } else {
+                        0
+                    };
+                    let effective_width = config.print_width.saturating_sub(suffix);
+                    let remaining = effective_width.saturating_sub(*pos) as isize;
+                    let chosen_mode = if fits_with_lookahead(
+                        contents,
+                        Mode::Flat,
+                        &commands,
+                        remaining,
+                        config,
+                        resolver,
+                    ) {
+                        Mode::Flat
+                    } else {
+                        Mode::Break
+                    };
+                    commands.push(cmd.with_mode(chosen_mode, contents));
+                }
+            }
+
+            Doc::IsolatedGroup { contents } => {
+                if !tracking_suffix {
+                    // Simplified IsolatedGroup handling for suffix content - just pass through
+                    commands.push(cmd.with_doc(contents));
+                } else {
+                    // IsolatedGroup renders like a regular group but without will_break() check
                     let suffix = if *pos >= config.first_line_offset {
                         config.suffix_width
                     } else {
@@ -1049,6 +1134,7 @@ fn render_single_doc_inner<'a, R: TextResolver + ?Sized>(
             }
 
             Doc::Fill(parts) => {
+                // In render_single_doc context, we don't have outer rest_commands
                 render_fill_iterative(
                     parts,
                     output,
@@ -1056,6 +1142,7 @@ fn render_single_doc_inner<'a, R: TextResolver + ?Sized>(
                     cmd.indent,
                     config,
                     &DocContext::default(),
+                    &[],
                     resolver,
                 );
             }
@@ -1066,8 +1153,16 @@ fn render_single_doc_inner<'a, R: TextResolver + ?Sized>(
                     // Full handling: special case for Fill
                     match doc.as_ref() {
                         Doc::Fill(parts) => {
+                            // In render_single_doc context, we don't have outer rest_commands
                             render_fill_iterative(
-                                parts, output, pos, cmd.indent, config, context, resolver,
+                                parts,
+                                output,
+                                pos,
+                                cmd.indent,
+                                config,
+                                context,
+                                &[],
+                                resolver,
                             );
                         }
                         _ => {

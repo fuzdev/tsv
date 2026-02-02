@@ -20,17 +20,22 @@ static INLINE_ELEMENTS: phf::Set<&'static str> = phf_set! {
     "strong", "sub", "sup", "textarea", "time", "u", "var",
 };
 
+// Block elements for formatting purposes (matches prettier-plugin-svelte)
+// Elements NOT in this list are treated as inline for formatting (including table cells).
+// This matches prettier's logic: isInlineElement = !isBlockElement.
 static BLOCK_ELEMENTS: phf::Set<&'static str> = phf_set! {
     "address",
     "article",
     "aside",
     "blockquote",
     "center",
+    "details",
     "dialog",
     "div",
     "dl",
     "dd",
     "dt",
+    "fieldset",
     "figure",
     "figcaption",
     "footer",
@@ -42,6 +47,7 @@ static BLOCK_ELEMENTS: phf::Set<&'static str> = phf_set! {
     "h5",
     "h6",
     "header",
+    "hgroup",
     "hr",
     "li",
     "main",
@@ -53,12 +59,6 @@ static BLOCK_ELEMENTS: phf::Set<&'static str> = phf_set! {
     "section",
     "select",
     "table",
-    "tbody",
-    "td",
-    "tfoot",
-    "th",
-    "thead",
-    "tr",
     "ul",
     "svg",
     "math",

@@ -146,35 +146,111 @@ pub fn is_self_expanding_value(expr: &Expression) -> bool {
     }
 }
 
-/// Check if an expression is a curried arrow function with return type annotation.
-/// Returns false for non-arrow expressions.
+/// Check if an expression is a curried arrow function where ANY arrow in the chain
+/// has a return type annotation (with params). Returns false for non-curried arrows.
 ///
-/// This pattern needs special breaking behavior:
-///   const f = (x: T): H => (y) => expr
-/// becomes:
-///   const f =
-///       (x: T): H =>
-///       (y) =>
-///           expr
+/// Prettier breaks the entire chain if ANY arrow has:
+/// - return type annotation AND parameters
+/// - type parameters (generics)
+/// - non-identifier params (destructuring, defaults)
+///
+/// Examples that break:
+///   const f = (x: T): H => (y) => expr    // outer has return type
+///   const f = (x: T) => (y): H => expr    // inner has return type
+///   const f = (x: T): A => (y): B => expr // both have return types
+///
+/// Examples that stay inline:
+///   const f = (x: T) => (y) => expr       // neither has return type
 pub fn is_curried_arrow_with_return_type(expr: &Expression) -> bool {
     if let Expression::ArrowFunctionExpression(arrow) = expr {
-        arrow.return_type.is_some()
-            && matches!(
-                &arrow.body,
-                internal::ArrowFunctionBody::Expression(body) if matches!(&**body, Expression::ArrowFunctionExpression(_))
-            )
+        // Must be a curried arrow (body is another arrow)
+        let is_curried = matches!(
+            &arrow.body,
+            internal::ArrowFunctionBody::Expression(body) if matches!(&**body, Expression::ArrowFunctionExpression(_))
+        );
+
+        if !is_curried {
+            return false;
+        }
+
+        // Check if ANY arrow in the chain has return type (with params)
+        arrow_chain_has_return_type(arrow)
     } else {
         false
     }
 }
 
+/// Recursively check if any arrow in a curried chain should trigger chain breaking.
+/// Used by both assignment context (for break-after-equals) and arrow body formatting.
+///
+/// Prettier breaks the chain if ANY arrow has:
+/// - return type annotation AND parameters
+/// - type parameters (generics like `<T>`)
+/// - non-identifier params (destructuring, defaults, rest)
+pub fn arrow_chain_has_return_type(arrow: &internal::ArrowFunctionExpression) -> bool {
+    // Check this arrow for breaking conditions:
+    // 1. return_type AND has params
+    // 2. type_params (generics)
+    // 3. any param that's not a simple identifier
+    let has_non_identifier_param = arrow
+        .params
+        .iter()
+        .any(|p| !matches!(p, Expression::Identifier(_)));
+
+    let should_break = (arrow.return_type.is_some() && !arrow.params.is_empty())
+        || arrow.type_parameters.is_some()
+        || has_non_identifier_param;
+
+    if should_break {
+        return true;
+    }
+
+    // Check inner arrow if body is an arrow
+    if let internal::ArrowFunctionBody::Expression(body) = &arrow.body
+        && let Expression::ArrowFunctionExpression(inner) = &**body
+    {
+        return arrow_chain_has_return_type(inner);
+    }
+
+    false
+}
+
 /// Check if an expression is self-expanding but won't actually expand because
 /// it's empty or trivially short. Used when LHS has a breakable type annotation -
 /// we need a break point after `=` so the type doesn't expand prematurely.
+///
+/// Returns true only if the value truly won't expand:
+/// - Empty arrays/objects
+/// - Single-element arrays/objects where the element itself won't expand
 pub fn is_simple_self_expanding(expr: &Expression) -> bool {
     match expr {
-        Expression::ArrayExpression(arr) => arr.elements.len() <= 1,
-        Expression::ObjectExpression(obj) => obj.properties.len() <= 1,
+        Expression::ArrayExpression(arr) => {
+            if arr.elements.is_empty() {
+                return true;
+            }
+            if arr.elements.len() > 1 {
+                return false;
+            }
+            // Single element - check if it will expand
+            arr.elements[0]
+                .as_ref()
+                .is_none_or(|e| !is_self_expanding_value(e))
+        }
+        Expression::ObjectExpression(obj) => {
+            if obj.properties.is_empty() {
+                return true;
+            }
+            if obj.properties.len() > 1 {
+                return false;
+            }
+            // Single property - check if value will expand (for non-shorthand)
+            match &obj.properties[0] {
+                internal::ObjectProperty::Property(prop) => {
+                    !prop.shorthand && !is_self_expanding_value(&prop.value)
+                }
+                internal::ObjectProperty::SpreadElement(_) => false,
+            }
+        }
         _ => false,
     }
 }
@@ -184,6 +260,7 @@ pub fn is_simple_self_expanding(expr: &Expression) -> bool {
 /// Returns true for expressions that don't break well internally:
 /// - Poorly breakable chains (member-only chains, trivial call chains)
 /// - String literals (can't break internally)
+/// - Regex literals (can't break internally)
 ///
 /// Precondition: Only called when is_short_key is false (checked in choose_layout)
 fn should_break_after_operator(expr: &Expression, source: &str, print_width: usize) -> bool {
@@ -192,6 +269,11 @@ fn should_break_after_operator(expr: &Expression, source: &str, print_width: usi
 
     // String literals should break after operator
     if is_string_literal(core_expr) {
+        return true;
+    }
+
+    // Regex literals can't break internally, so break after operator
+    if matches!(core_expr, Expression::RegexLiteral(_)) {
         return true;
     }
 
@@ -213,132 +295,6 @@ fn unwrap_expression(expr: &Expression) -> &Expression {
             }
         }
         _ => expr,
-    }
-}
-
-/// Check if an expression is a member chain that will use member chain formatting.
-///
-/// Prettier's `printMemberChain` returns `group(oneLine)` without `memberChain` label
-/// when the chain is too short (groups.length <= cutoff), causing
-/// `isPoorlyBreakableMemberOrCallChain` to treat it as "poorly breakable".
-///
-/// Cutoff logic:
-/// - Factory pattern (starts with capital or `$_`): cutoff = 3
-/// - Non-factory: cutoff = 2
-///
-/// Groups are counted following Prettier's grouping algorithm:
-/// - First group: base identifier
-/// - Subsequent groups: sequences of MemberExpression followed by CallExpression
-///
-/// See: prettier/src/language-js/print/member-chain.js (lines 310-360)
-fn is_member_chain_with_multiple_calls(expr: &Expression, source: &str) -> bool {
-    // Count groups in the chain
-    let group_count = count_member_chain_groups(expr);
-
-    // If we don't have at least 2 groups (base + 1 call), not a chain
-    if group_count < 2 {
-        return false;
-    }
-
-    // Extract the base identifier to check factory pattern
-    let base_name = get_base_identifier(expr, source);
-
-    // Determine cutoff based on factory pattern
-    let cutoff = if let Some(name) = base_name {
-        if is_factory_pattern(name) { 3 } else { 2 }
-    } else {
-        2
-    };
-
-    // If groups <= cutoff, Prettier doesn't use memberChain label
-    // so it's treated as "poorly breakable"
-    group_count > cutoff
-}
-
-/// Check if a name matches Prettier's factory pattern: /^[A-Z]|^[$_]+$/
-fn is_factory_pattern(name: &str) -> bool {
-    // Starts with capital letter, or all characters are $ or _
-    name.chars()
-        .next()
-        .is_some_and(|c| c.is_uppercase() || name.chars().all(|c| c == '$' || c == '_'))
-}
-
-/// Count groups in a member chain following Prettier's grouping algorithm.
-///
-/// Example: `Factory.create(x).build(y)` creates 3 groups:
-/// - Group 0: [Identifier("Factory")]
-/// - Group 1: [MemberExpression(.create), CallExpression(.create(x))]
-/// - Group 2: [MemberExpression(.build), CallExpression(.build(y))]
-///
-/// See: prettier/src/language-js/print/member-chain.js (lines 190-259)
-fn count_member_chain_groups(expr: &Expression) -> usize {
-    let mut groups = 0;
-    let mut current = expr;
-    let mut has_seen_call_in_group = false;
-
-    loop {
-        match current {
-            Expression::TSNonNullExpression(non_null) => {
-                current = &non_null.expression;
-            }
-            Expression::CallExpression(call) => {
-                if !has_seen_call_in_group {
-                    // First call in this group
-                    has_seen_call_in_group = true;
-                }
-
-                // Continue traversing through callee
-                current = &call.callee;
-            }
-            Expression::MemberExpression(member) => {
-                if has_seen_call_in_group {
-                    // We've seen a call and now hit a member - new group
-                    groups += 1;
-                    has_seen_call_in_group = false;
-                }
-
-                // Continue traversing through object
-                current = &member.object;
-            }
-            _ => {
-                // Base of the chain (identifier, literal, etc.) - counts as a group
-                groups += 1;
-
-                // If we had a pending call group, count it
-                if has_seen_call_in_group {
-                    groups += 1;
-                }
-
-                break;
-            }
-        }
-    }
-
-    groups
-}
-
-/// Extract the base identifier name from a member chain.
-fn get_base_identifier<'a>(expr: &Expression, source: &'a str) -> Option<&'a str> {
-    let mut current = expr;
-
-    loop {
-        match current {
-            Expression::TSNonNullExpression(non_null) => {
-                current = &non_null.expression;
-            }
-            Expression::CallExpression(call) => {
-                current = &call.callee;
-            }
-            Expression::MemberExpression(member) => {
-                current = &member.object;
-            }
-            Expression::Identifier(ident) => {
-                return Some(ident.span.extract(source));
-            }
-            _ => {
-                return None;
-            }
-        }
     }
 }
 
@@ -365,17 +321,19 @@ fn is_poorly_breakable_chain_recursive(
         // Note: TSAsExpression and TSSatisfiesExpression are NOT included here.
         // They have breakable type annotations, so they're not "poorly breakable".
 
-        // CallExpression: check if it's a trivial call
+        // CallExpression: check if it's a factory pattern with trivial args
+        //
+        // Factory patterns (Object.keys, React.createElement, etc.) with 2 calls
+        // and trivial args should use break-after-operator layout. This keeps the
+        // chain flat on the indented line instead of expanding call args.
+        //
+        // For non-factory chains or chains with more calls, the chain formatter
+        // handles breaking internally.
         Expression::CallExpression(call) => {
-            // If this is a member chain with 2+ calls, it's NOT poorly breakable
-            // Member chains handle their own breaking internally
-            // Check this FIRST before checking if call is trivial
-            if is_member_chain_with_multiple_calls(expr, source) {
-                return false;
-            }
-
-            // Empty args or single short arg = trivial call
-            // Note: identifiers are excluded from "short" - they break inside call
+            // Check if this call has trivial args (empty or single short arg)
+            // Matches Prettier: args.length === 0 || (args.length === 1 && isLoneShortArgument)
+            // Arrow functions, objects, arrays are NOT "lone short arguments" - they should
+            // be allowed to break internally via the call's conditional_group states.
             let is_trivial_call = call.arguments.is_empty()
                 || (call.arguments.len() == 1
                     && is_short_arg(&call.arguments[0], source, print_width));
@@ -384,8 +342,46 @@ fn is_poorly_breakable_chain_recursive(
                 return false;
             }
 
-            // Continue down the chain
-            is_poorly_breakable_chain_recursive(&call.callee, true, source, print_width)
+            // Check if callee is a member chain that might be a factory pattern
+            if !matches!(
+                &*call.callee,
+                Expression::MemberExpression(_) | Expression::TSNonNullExpression(_)
+            ) {
+                // Non-memberish callee (e.g., `fn()()`), continue down
+                return is_poorly_breakable_chain_recursive(
+                    &call.callee,
+                    true,
+                    source,
+                    print_width,
+                );
+            }
+
+            // Count calls in the chain
+            let call_count = count_calls_in_chain(&call.callee) + 1; // +1 for this call
+
+            // Single call with member access: obj.fn(arg) → poorly breakable
+            // Continue checking to ensure it's a valid chain structure
+            if call_count == 1 {
+                return is_poorly_breakable_chain_recursive(
+                    &call.callee,
+                    true,
+                    source,
+                    print_width,
+                );
+            }
+
+            // 2 calls: check if factory pattern
+            if call_count == 2 {
+                if is_factory_chain(&call.callee, source) {
+                    // Factory pattern with 2 calls → break after operator
+                    return true;
+                }
+                // Non-factory with 2 calls → let chain formatter handle it
+                return false;
+            }
+
+            // More than 2 calls → let chain formatter handle it
+            false
         }
 
         // MemberExpression: continue down the chain
@@ -398,6 +394,49 @@ fn is_poorly_breakable_chain_recursive(
 
         // Everything else breaks the chain
         _ => false,
+    }
+}
+
+/// Check if an expression is a call on a member chain with complex args.
+///
+/// Returns true for patterns like `a.b.c.filter((x) => x.s)` where a single call
+/// is at the end of a member expression chain AND the call has complex args
+/// (arrow functions, objects, arrays). These expressions benefit from fluid layout
+/// because breaking at `=` is preferable to expanding call args.
+///
+/// The key insight is that for single-call chains with non-trivial args, there are
+/// no good internal break points. Breaking at `=` keeps the chain flat on an indented
+/// line, while expanding args would create deeper nesting.
+///
+/// Does NOT match:
+/// - Bare calls: `foo()` (no member chain)
+/// - Multiple calls: `a.b().c()` (handled by chain formatter)
+/// - Trivial args: `obj.fn(arg)` (chain formatter handles these well)
+pub fn is_call_on_member_chain(expr: &Expression) -> bool {
+    if let Expression::CallExpression(call) = expr {
+        // The callee must be a member expression chain (possibly with non-null assertions)
+        let is_member_chain = matches!(
+            &*call.callee,
+            Expression::MemberExpression(_) | Expression::TSNonNullExpression(_)
+        ) && count_calls_in_chain(&call.callee) == 0;
+
+        if !is_member_chain {
+            return false;
+        }
+
+        // Only match when args are "complex" (arrow, object, array) - these are the cases
+        // where Prettier breaks at `=` instead of expanding args
+        call.arguments.iter().any(|arg| {
+            matches!(
+                arg,
+                Expression::ArrowFunctionExpression(_)
+                    | Expression::ObjectExpression(_)
+                    | Expression::ArrayExpression(_)
+                    | Expression::FunctionExpression(_)
+            )
+        })
+    } else {
+        false
     }
 }
 
@@ -463,6 +502,48 @@ pub fn is_type_assertion_call(expr: &Expression, source: &str, print_width: usiz
         || call.arguments.len() == 1 && is_short_arg(&call.arguments[0], source, print_width))
 }
 
+/// Check if an expression is a member-only chain (no calls).
+fn is_member_only_chain(expr: &Expression) -> bool {
+    match expr {
+        Expression::MemberExpression(member) => is_member_only_chain(&member.object),
+        Expression::TSNonNullExpression(non_null) => is_member_only_chain(&non_null.expression),
+        Expression::Identifier(_) | Expression::Super(_) => true,
+        _ => false,
+    }
+}
+
+/// Count calls in a chain expression.
+fn count_calls_in_chain(expr: &Expression) -> usize {
+    match expr {
+        Expression::CallExpression(call) => 1 + count_calls_in_chain(&call.callee),
+        Expression::MemberExpression(member) => count_calls_in_chain(&member.object),
+        Expression::TSNonNullExpression(non_null) => count_calls_in_chain(&non_null.expression),
+        _ => 0,
+    }
+}
+
+/// Check if a chain starts with a factory pattern (capital letter or special prefixes).
+///
+/// Factory patterns include:
+/// - Capital letter start: Object.keys, React.createElement, etc.
+/// - Special prefixes: $_, $__ (lodash-style)
+fn is_factory_chain(expr: &Expression, source: &str) -> bool {
+    match expr {
+        Expression::CallExpression(call) => is_factory_chain(&call.callee, source),
+        Expression::MemberExpression(member) => is_factory_chain(&member.object, source),
+        Expression::TSNonNullExpression(non_null) => is_factory_chain(&non_null.expression, source),
+        Expression::Identifier(id) => {
+            let name = id.span.extract(source);
+            // Factory patterns: capital letter start OR $_ style (lodash)
+            name.chars()
+                .next()
+                .is_some_and(|c| c.is_uppercase() || (c == '$' || c == '_'))
+        }
+        Expression::Super(_) => true,
+        _ => false,
+    }
+}
+
 /// Check if an expression is a simple value that shouldn't break
 fn is_simple_value(expr: &Expression) -> bool {
     matches!(
@@ -489,12 +570,32 @@ impl<'a> Printer<'a> {
         right_expr: &Expression,
         is_short_key: bool,
     ) -> Doc {
-        let layout = choose_layout(
+        let mut layout = choose_layout(
             right_expr,
             is_short_key,
             self.source,
             self.config.print_width,
         );
+
+        // Override layout based on line comments in the RHS:
+        //
+        // For member-only chains with line comments, force BreakAfterOperator.
+        // Line comments cause Prettier's first pass to break at `=`.
+        //
+        // For call chains with line comments, do NOT use BreakAfterOperator.
+        // The chain formatter handles breaking at the comment location.
+        // Use NeverBreakAfterOperator so the chain stays with `=` and breaks internally.
+        if layout != AssignmentLayout::BreakAfterOperator
+            && self.has_line_comments_in_member_chain(right_expr)
+        {
+            layout = AssignmentLayout::BreakAfterOperator;
+        } else if layout == AssignmentLayout::BreakAfterOperator
+            && matches!(right_expr, Expression::CallExpression(_))
+            && self.has_line_comments_in_call_chain(right_expr)
+        {
+            layout = AssignmentLayout::NeverBreakAfterOperator;
+        }
+
         let right_doc = self.build_expression_doc(right_expr);
 
         match layout {
@@ -505,7 +606,7 @@ impl<'a> Printer<'a> {
                 doc::group(doc::concat(vec![
                     doc::group(left_doc),
                     doc::text(operator),
-                    doc::group(doc::indent(doc::concat(vec![doc::line(), right_doc]))),
+                    doc::group(doc::indent_line(right_doc)),
                 ]))
             }
 
@@ -539,6 +640,47 @@ impl<'a> Printer<'a> {
                     doc::indent_if_break(right_doc, GroupId::Assignment, false),
                 ]))
             }
+        }
+    }
+
+    /// Check if an expression is a member-only chain with line comments.
+    ///
+    /// Member-only chains with line comments between segments should force
+    /// BreakAfterOperator layout to match Prettier's first-pass behavior.
+    fn has_line_comments_in_member_chain(&self, expr: &Expression) -> bool {
+        // Only check member-only chains (no calls)
+        if !is_member_only_chain(expr) {
+            return false;
+        }
+        self.has_line_comments_in_chain(expr)
+    }
+
+    /// Check if an expression is a call chain with line comments.
+    ///
+    /// For call chains with line comments (e.g., `items // comment\n.foo()`),
+    /// we should NOT use BreakAfterOperator because the chain formatter
+    /// handles breaking at the comment location.
+    pub(crate) fn has_line_comments_in_call_chain(&self, expr: &Expression) -> bool {
+        self.has_line_comments_in_chain(expr)
+    }
+
+    /// Recursively check for line comments in a chain (calls, members, non-null).
+    fn has_line_comments_in_chain(&self, expr: &Expression) -> bool {
+        match expr {
+            Expression::CallExpression(call) => self.has_line_comments_in_chain(&call.callee),
+            Expression::MemberExpression(member) => {
+                // Check for line comments between object and property
+                let obj_end = member.object.span().end;
+                let prop_start = member.property.span().start;
+                if self.has_line_comments_between(obj_end, prop_start) {
+                    return true;
+                }
+                self.has_line_comments_in_chain(&member.object)
+            }
+            Expression::TSNonNullExpression(non_null) => {
+                self.has_line_comments_in_chain(&non_null.expression)
+            }
+            _ => false,
         }
     }
 }

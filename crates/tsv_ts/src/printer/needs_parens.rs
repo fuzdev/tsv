@@ -49,7 +49,12 @@ pub enum ParenContext {
     NonNull,
 
     /// Left side of `as` or `satisfies`: `<expr> as T`
+    /// Only angle-bracket `<T>x` needs parens here (as/satisfies are left-associative)
     TypeAssertion,
+
+    /// Expression in angle-bracket assertion: `<T><expr>`
+    /// All type assertions need parens here
+    AngleBracketAssertion,
 
     /// Expression in TSInstantiationExpression: `<expr><T>`
     InstantiationExpression,
@@ -138,10 +143,29 @@ pub fn needs_parens(expr: &Expression, ctx: ParenContext) -> bool {
             is_lower_precedence(expr) || matches!(expr, Expression::UnaryExpression(_))
         }
 
-        // Type assertion: `(a + b) as T`, `(await x) as T`, `(yield x) as T`
-        // Unary argument: `!(a + b)`, `!(await x)`, `!(yield x)` - parens for clarity/precedence
-        ParenContext::TypeAssertion | ParenContext::UnaryArgument => {
-            is_await_or_yield(expr) || matches!(expr, Expression::BinaryExpression(_))
+        // Type assertion (as/satisfies): `(a + b) as T`, `(await x) as T`, `(<U>x) as T`
+        // Arrow functions need parens because `(...args) => x as T` parses as `(...args) => (x as T)`
+        // Only angle-bracket assertions need parens here (as/satisfies are left-associative)
+        ParenContext::TypeAssertion => {
+            is_await_or_yield(expr)
+                || matches!(
+                    expr,
+                    Expression::BinaryExpression(_)
+                        | Expression::ArrowFunctionExpression(_)
+                        | Expression::TSTypeAssertion(_)
+                )
+        }
+
+        // Angle-bracket assertion: `<T>(a + b)`, `<T>(<U>x)`, `<T>(x as U)`
+        // Unary argument: `!(a + b)`, `!(await x)`, `!(<T>x)`
+        // Both need parens for: await/yield, all type assertions, binary, arrow
+        ParenContext::AngleBracketAssertion | ParenContext::UnaryArgument => {
+            is_await_or_yield(expr)
+                || is_type_assertion(expr)
+                || matches!(
+                    expr,
+                    Expression::BinaryExpression(_) | Expression::ArrowFunctionExpression(_)
+                )
         }
 
         // Instantiation: `(<T>() => {})<U>`, `(x as A)<T>`, `(<T>x)<U>`, `(await x)<T>`, `(yield x)<T>`
@@ -149,14 +173,14 @@ pub fn needs_parens(expr: &Expression, ctx: ParenContext) -> bool {
             is_await_or_yield(expr) || is_type_assertion(expr) || is_function_like(expr)
         }
 
-        // Await argument: `await (a + b)`, `await (x as T)` - parens needed for precedence/semantics
+        // Await argument: `await (a + b)`, `await (x as T)`, `await (<T>x)`, `await (a ? b : c)`
+        // Parens needed for precedence/semantics - await has higher precedence than ?:
         ParenContext::AwaitArgument => {
-            matches!(
-                expr,
-                Expression::BinaryExpression(_)
-                    | Expression::TSAsExpression(_)
-                    | Expression::TSSatisfiesExpression(_)
-            )
+            is_type_assertion(expr)
+                || matches!(
+                    expr,
+                    Expression::BinaryExpression(_) | Expression::ConditionalExpression(_)
+                )
         }
 
         // Arrow body: `() => ({})`, `() => (x = y)`
@@ -265,11 +289,12 @@ fn needs_parens_binary_operand(
     parent_op: BinaryOperator,
     is_right: bool,
 ) -> bool {
-    // These expressions have lower precedence than any binary operator, so they ALWAYS
-    // need parens when used as operands.
+    // These expressions need parens when used as operands of binary expressions.
+    // Some have lower precedence, others are for clarity (await/yield).
     // e.g., `a && (b ? c : d)` - without parens it becomes `(a && b) ? c : d`
     // e.g., `(x as string) in obj` - without parens it becomes `x as (string in obj)`
     // e.g., `b || ((fn) => fn)` - without parens it becomes `(b || fn) => fn` (syntax error)
+    // e.g., `a && (await b)` - parens for clarity (Prettier style)
     if matches!(
         expr,
         Expression::ConditionalExpression(_)
@@ -277,7 +302,18 @@ fn needs_parens_binary_operand(
             | Expression::TSAsExpression(_)
             | Expression::TSSatisfiesExpression(_)
             | Expression::ArrowFunctionExpression(_)
+            | Expression::AwaitExpression(_)
+            | Expression::YieldExpression(_)
     ) {
+        return true;
+    }
+
+    // Unary expressions as left operand of ** require parens (ES2016+ syntax rule)
+    // `-2 ** 3` is a syntax error; must be `(-2) ** 3` or `-(2 ** 3)`
+    if !is_right
+        && parent_op == BinaryOperator::StarStar
+        && matches!(expr, Expression::UnaryExpression(_))
+    {
         return true;
     }
 

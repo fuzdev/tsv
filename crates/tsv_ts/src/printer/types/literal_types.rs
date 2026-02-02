@@ -98,7 +98,7 @@ impl<'a> Printer<'a> {
                         ]),
                         doc::concat(vec![
                             doc::text("${"),
-                            doc::indent(doc::concat(vec![doc::line(), type_doc])),
+                            doc::indent_line(type_doc),
                             doc::line(),
                             doc::text("}"),
                         ]),

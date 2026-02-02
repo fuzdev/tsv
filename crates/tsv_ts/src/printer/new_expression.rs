@@ -7,7 +7,7 @@ use super::calls::{
     has_trailing_line_comments_slice, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
 };
 use super::utils::{
-    has_multiple_function_args, is_block_function, is_hopefully_short_arg,
+    is_block_function, is_function_composition_args, is_hopefully_short_arg,
     last_arg_is_array_or_object, preceding_args_allow_hug,
 };
 use super::{ParenContext, Printer, has_multiline_content, needs_parens};
@@ -135,9 +135,11 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Multiple arrow/function arguments: always break (Prettier behavior)
-        // e.g., new Cls(() => a, () => b) → new Cls(\n\t() => a,\n\t() => b,\n)
-        if has_multiple_function_args(&new_expr.arguments) {
+        // Function composition pattern: when any argument is a call containing a callback
+        // OR when there are multiple function arguments
+        // e.g., new Cls(arr.map((x) => x), b) → new Cls(\n\t...,\n)
+        // e.g., new Cls(() => a, () => b) → new Cls(\n\t...,\n)
+        if is_function_composition_args(&new_expr.arguments) {
             let arg_parts = doc::join_doc(
                 new_expr
                     .arguments

@@ -11,15 +11,17 @@
 	const c =
 		require.resolve('./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
 
-	/* require.resolve.paths() - breaks at chain (both match) */
-	const d = require.resolve
-		.paths('./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+	/* require.resolve.paths() - we expand args, prettier breaks at chain */
+	const d = require.resolve.paths(
+		'./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+	);
 
 	/* await import() - breaks at assignment (both match) */
 	const e =
 		await import('./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
 
-	/* import.meta.resolve() - breaks at chain (both match) */
-	const f = import.meta
-		.resolve('./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+	/* import.meta.resolve() - we expand args, prettier breaks at chain */
+	const f = import.meta.resolve(
+		'./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+	);
 </script>

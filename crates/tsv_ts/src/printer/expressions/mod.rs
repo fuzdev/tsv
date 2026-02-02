@@ -131,6 +131,20 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Build a Doc for an expression with forced expansion (hardlines).
+    ///
+    /// Used by chain arg formatting when we need the object/array to expand
+    /// internally with hardlines so fits() can correctly measure the first line.
+    /// For example, `.fn({prop})` should become `.fn({\n  prop,\n})` when expanded.
+    pub(super) fn build_arg_expression_doc_expanded(&self, expr: &Expression) -> Doc {
+        match expr {
+            Expression::ObjectExpression(obj) => self.build_object_doc_expanded(obj),
+            Expression::ArrayExpression(arr) => self.build_array_doc_expanded(arr),
+            // For other expressions, use normal doc building
+            _ => self.build_arg_expression_doc(expr),
+        }
+    }
+
     //
     // TypeScript Type Assertions
     //
@@ -140,12 +154,21 @@ impl<'a> Printer<'a> {
         &self,
         type_assert: &crate::ast::internal::TSTypeAssertion,
     ) -> Doc {
-        doc::concat(vec![
+        let expr_needs_parens =
+            needs_parens(&type_assert.expression, ParenContext::AngleBracketAssertion);
+        let mut parts = vec![
             doc::text("<"),
             self.build_type_doc_with_wrapping_type_args(&type_assert.type_annotation),
             doc::text(">"),
-            self.build_expression_doc(&type_assert.expression),
-        ])
+        ];
+        if expr_needs_parens {
+            parts.push(doc::text("("));
+        }
+        parts.push(self.build_expression_doc(&type_assert.expression));
+        if expr_needs_parens {
+            parts.push(doc::text(")"));
+        }
+        doc::concat(parts)
     }
 
     /// Build a Doc for a TypeScript `as` expression
@@ -600,8 +623,8 @@ impl<'a> Printer<'a> {
                         // Context-specific handling applies only for inline templates.
                         let (statement_buffer, closing, expr_prefix, use_visual) =
                             if template_on_own_line {
-                                // Template on own line: just visual indent, no context prefix
-                                (0, 0, 0, true)
+                                // Template on own line: just visual indent + trailing content (;)
+                                (0, trailing_after_template, 0, true)
                             } else if has_closing_delimiter {
                                 // Inline after bracket: minimal buffer
                                 (0, 0, 3, true)
@@ -613,7 +636,8 @@ impl<'a> Printer<'a> {
                                 (0, 0, 7, true)
                             } else if is_expression_context {
                                 // Logical operators (&&, ||): operator on previous line
-                                (0, 0, 0, true)
+                                // Include trailing content (;) since template ends up on own line
+                                (0, trailing_after_template, 0, true)
                             } else if base_indent <= 2 {
                                 // Statement-level: "const x = " + semicolon
                                 (11, 1, 0, false)
@@ -831,6 +855,9 @@ impl<'a> Printer<'a> {
             ]),
         );
 
+        // Build the interpolation group without isolation.
+        // IsolatedGroup is applied at the call/array level where hugging is needed,
+        // not here - this allows ternaries and binary expressions to see the breaks.
         doc::group(doc::concat(vec![
             doc::text("${"),
             content_doc,
@@ -855,6 +882,13 @@ impl<'a> Printer<'a> {
         let has_closing_delimiter = matches!(last_char, Some('(' | '[' | '{'));
         let is_arrow_body = trimmed.ends_with("=>");
 
+        // Check if template starts on its own line (after newline + whitespace + context)
+        let template_on_own_line = before_pos.rfind('\n').is_some_and(|nl_pos| {
+            before_pos[nl_pos + 1..]
+                .chars()
+                .all(|c| c == ' ' || c == '\t' || c == '?' || c == ':')
+        });
+
         // Add context-specific bonuses for proper indentation after breaking.
         // These account for both the expression context and template nesting.
         // Note: build_aligned_interpolation adds +1 for content, so these are
@@ -869,8 +903,13 @@ impl<'a> Printer<'a> {
         // Use .max(1) to ensure minimum indent of 1 (Svelte script level) when source
         // has no whitespace (unformatted code). Formatted code will have ws_indent >= 1.
         if is_ternary_context {
-            // Ternary arms: +1 for context + 2 per nesting level
-            ws_indent.max(1) + 1 + template_nesting * 2
+            // Ternary arms: when source already broken, use ws_indent + 1
+            // When source is compact (ternary will break in output), need +2
+            if template_on_own_line {
+                ws_indent.max(1) + 1 + template_nesting * 2
+            } else {
+                ws_indent.max(1) + 2 + template_nesting * 2
+            }
         } else if is_arrow_body {
             // Arrow function body: +3 per nesting level (deeper structure)
             ws_indent.max(1) + template_nesting * 3
@@ -878,8 +917,9 @@ impl<'a> Printer<'a> {
             // Array/function/object: +2 per nesting level
             ws_indent.max(1) + template_nesting * 2
         } else if is_expression_context {
-            // Other expressions (&&, ||): +1 per nesting level (flatter)
-            ws_indent.max(1) + template_nesting
+            // Other expressions (&&, ||): +1 for context (binary breaks add indent)
+            // +1 per nesting level for template depth
+            ws_indent.max(1) + 1 + template_nesting
         } else if ws_indent == 0 {
             // Unformatted source (no leading whitespace) → use default of 1
             // This hardcoded value works for Svelte context where scripts are at indent level 1.

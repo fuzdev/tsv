@@ -1,0 +1,323 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 187,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 53,
+				"name": "a",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 2,
+						"character": 2
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "AwaitBlock",
+							"start": 5,
+							"end": 48,
+							"expression": {
+								"type": "Identifier",
+								"start": 13,
+								"end": 20,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 10
+									},
+									"end": {
+										"line": 2,
+										"column": 17
+									}
+								},
+								"name": "promise"
+							},
+							"value": null,
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "IfBlock",
+										"elseif": false,
+										"start": 21,
+										"end": 40,
+										"test": {
+											"type": "Identifier",
+											"start": 26,
+											"end": 30,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 23
+												},
+												"end": {
+													"line": 2,
+													"column": 27
+												}
+											},
+											"name": "cond"
+										},
+										"consequent": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 31,
+													"end": 35,
+													"raw": "text",
+													"data": "text"
+												}
+											]
+										},
+										"alternate": null
+									}
+								]
+							},
+							"then": null,
+							"catch": null
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 53,
+				"end": 55,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 55,
+				"end": 127,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 56
+					},
+					"end": {
+						"line": 5,
+						"column": 5,
+						"character": 60
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "AwaitBlock",
+							"start": 63,
+							"end": 119,
+							"expression": {
+								"type": "Identifier",
+								"start": 71,
+								"end": 78,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 10
+									},
+									"end": {
+										"line": 6,
+										"column": 17
+									}
+								},
+								"name": "promise"
+							},
+							"value": null,
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "EachBlock",
+										"start": 79,
+										"end": 111,
+										"expression": {
+											"type": "Identifier",
+											"start": 86,
+											"end": 91,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 25
+												},
+												"end": {
+													"line": 6,
+													"column": 30
+												}
+											},
+											"name": "items"
+										},
+										"body": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 100,
+													"end": 104,
+													"raw": "text",
+													"data": "text"
+												}
+											]
+										},
+										"context": {
+											"type": "Identifier",
+											"name": "item",
+											"start": 95,
+											"end": 99,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 34,
+													"character": 95
+												},
+												"end": {
+													"line": 6,
+													"column": 38,
+													"character": 99
+												}
+											}
+										}
+									}
+								]
+							},
+							"then": null,
+							"catch": null
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 127,
+				"end": 129,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 129,
+				"end": 186,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 130
+					},
+					"end": {
+						"line": 9,
+						"column": 4,
+						"character": 133
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 134,
+							"end": 136,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "AwaitBlock",
+							"start": 136,
+							"end": 179,
+							"expression": {
+								"type": "Identifier",
+								"start": 144,
+								"end": 151,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 9
+									},
+									"end": {
+										"line": 10,
+										"column": 16
+									}
+								},
+								"name": "promise"
+							},
+							"value": null,
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "KeyBlock",
+										"start": 152,
+										"end": 171,
+										"expression": {
+											"type": "Identifier",
+											"start": 158,
+											"end": 160,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 23
+												},
+												"end": {
+													"line": 10,
+													"column": 25
+												}
+											},
+											"name": "id"
+										},
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 161,
+													"end": 165,
+													"raw": "text",
+													"data": "text"
+												}
+											]
+										}
+									}
+								]
+							},
+							"then": null,
+							"catch": null
+						},
+						{
+							"type": "Text",
+							"start": 179,
+							"end": 180,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

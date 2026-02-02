@@ -41,7 +41,7 @@ fn type_has_internal_breaking(ts_type: &TSType) -> bool {
 /// Build a fluid-style doc that can break after `=` when the line is too long.
 /// Flat: ` <type>`, Broken: `\n\t<type>`
 fn fluid_assignment_doc(type_doc: doc::Doc) -> doc::Doc {
-    doc::group(doc::indent(doc::concat(vec![doc::line(), type_doc])))
+    doc::group(doc::indent_line(type_doc))
 }
 
 impl<'a> Printer<'a> {
@@ -182,7 +182,7 @@ impl<'a> Printer<'a> {
 
             // Extends clause with line break
             if let Some(ext_doc) = extends_doc {
-                header_parts.push(doc::indent(doc::concat(vec![doc::line(), ext_doc])));
+                header_parts.push(doc::indent_line(ext_doc));
             }
 
             doc::group(doc::concat(header_parts))

@@ -39,8 +39,8 @@ pub(crate) use arg_wrapping::{
 use super::Printer;
 use super::chain;
 use super::utils::{is_block_function, preceding_args_allow_hug};
-use arg_comments::any_comment_forces_expansion;
 use crate::ast::internal;
+use arg_comments::any_comment_forces_expansion;
 use tsv_lang::doc::{self, Doc};
 
 /// Check if a chain expression contains any call expressions
@@ -51,6 +51,12 @@ fn chain_has_calls(expr: &internal::Expression) -> bool {
         internal::Expression::TSNonNullExpression(non_null) => {
             chain_has_calls(&non_null.expression)
         }
+        // Look through await/yield to find nested calls: (await fn()).method()
+        internal::Expression::AwaitExpression(await_expr) => chain_has_calls(&await_expr.argument),
+        internal::Expression::YieldExpression(yield_expr) => yield_expr
+            .argument
+            .as_ref()
+            .is_some_and(|arg| chain_has_calls(arg)),
         _ => false,
     }
 }
@@ -100,9 +106,10 @@ impl<'a> Printer<'a> {
         // Must check BEFORE chain handling to bypass chain logic.
         // Skip if there are blank lines between args or comments that force expansion
         // (line comments or block comments on their own line - inline block comments are OK).
-        let has_blank_lines_between_args = call.arguments.windows(2).any(|w| {
-            self.has_blank_line_between(w[0].span().end, w[1].span().start)
-        });
+        let has_blank_lines_between_args = call
+            .arguments
+            .windows(2)
+            .any(|w| self.has_blank_line_between(w[0].span().end, w[1].span().start));
         let paren_open = call.callee.span().end;
         if matches!(&*call.callee, internal::Expression::CallExpression(_))
             && call.arguments.len() >= 2
@@ -120,8 +127,8 @@ impl<'a> Printer<'a> {
 
             // Build inner parts: optional leading comments + head args + last arg
             // Uses _opt variant to avoid double binary search
-            let leading_comments =
-                self.build_inline_comments_between_doc_trailing_space_opt(paren_open, first_arg_start);
+            let leading_comments = self
+                .build_inline_comments_between_doc_trailing_space_opt(paren_open, first_arg_start);
             let inner = doc::concat(
                 leading_comments
                     .into_iter()
@@ -136,40 +143,22 @@ impl<'a> Printer<'a> {
         // Check if this is a true chain (callee contains calls, like `a().b()`)
         let is_true_chain = chain_has_calls(&call.callee);
 
-        // For memberish callees without nested calls, check if there are comments
-        // between member segments. If so, use chain module for proper comment handling.
-        let has_callee_comments = if !is_true_chain && is_memberish(&call.callee) {
-            self.has_comments_in_member_chain(&call.callee)
-        } else {
-            false
-        };
+        // For memberish callees, use chain module to format the entire call expression.
+        // This ensures proper handling of member chains in assignments - the chain module
+        // returns group(oneLine) for short chains, letting the assignment's Fluid layout
+        // decide whether to break after `=`.
+        //
+        // Without this, the callee is formatted separately as a member chain with
+        // conditional_group/fill that has internal break points, causing the chain
+        // to break before the assignment breaks.
+        let callee_is_memberish = is_memberish(&call.callee);
 
-        if is_true_chain || has_callee_comments {
-            // Use chain wrapping for true chains or chains with comments
+        if is_true_chain || callee_is_memberish {
+            // Use chain wrapping for chains (nested calls) or memberish callees
             self.build_chain_doc_with_wrapping(&internal::Expression::CallExpression(call.clone()))
         } else {
-            // Simple call or simple method call - wrap args, keep callee together
+            // Simple call (non-memberish callee) - wrap args directly
             self.build_call_doc_with_wrapping(call)
-        }
-    }
-
-    /// Check if a member expression chain has comments between segments
-    fn has_comments_in_member_chain(&self, expr: &internal::Expression) -> bool {
-        match expr {
-            internal::Expression::MemberExpression(member) => {
-                // Check for comments between object end and property start
-                let obj_end = member.object.span().end;
-                let prop_start = member.property.span().start;
-                if self.has_comments_between(obj_end, prop_start) {
-                    return true;
-                }
-                // Recursively check the object
-                self.has_comments_in_member_chain(&member.object)
-            }
-            internal::Expression::TSNonNullExpression(non_null) => {
-                self.has_comments_in_member_chain(&non_null.expression)
-            }
-            _ => false,
         }
     }
 
@@ -226,7 +215,6 @@ impl<'a> Printer<'a> {
     ) -> Doc {
         chain_args::build_call_args_doc_for_chain_expanded(self, call, optional)
     }
-
 }
 
 /// Get the start position of the innermost base expression in a chain

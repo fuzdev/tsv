@@ -11,6 +11,16 @@ use super::helpers::unwrap_parenthesized;
 use crate::ast::internal::{TSIntersectionType, TSType, TSTypeElement, TSTypeLiteral};
 use tsv_lang::doc::{self, Doc};
 
+/// Mode for building type literal docs.
+enum TypeLiteralMode {
+    /// Inline `; ` separators, no softlines, no group (for type args)
+    Hugging,
+    /// Width-aware with softlines, wrapped in group
+    Standard,
+    /// Width-aware with softlines, no group (parent controls breaking)
+    NoGroup,
+}
+
 impl<'a> Printer<'a> {
     //
     // Comment partitioning helpers
@@ -188,7 +198,7 @@ impl<'a> Printer<'a> {
         force_multiline: bool,
     ) -> Doc {
         if t.members.is_empty() {
-            return doc::text("");
+            return doc::empty();
         }
 
         let mut member_parts = vec![];
@@ -338,7 +348,7 @@ impl<'a> Printer<'a> {
     /// - Multi-line source (newline after `{`) stays multi-line
     /// - Comments force multi-line formatting
     pub(super) fn build_type_literal_doc(&self, t: &TSTypeLiteral) -> Doc {
-        self.build_type_literal_doc_inner(t, false)
+        self.build_type_literal_doc_inner(t, TypeLiteralMode::Standard)
     }
 
     /// Build a Doc for a type literal without wrapping in a group ("hugging").
@@ -346,27 +356,28 @@ impl<'a> Printer<'a> {
     /// Used for type arguments where the type literal should "hug" and let
     /// the parent `<...>` group control breaking, matching Prettier's behavior.
     pub(super) fn build_type_literal_doc_hugging(&self, t: &TSTypeLiteral) -> Doc {
-        self.build_type_literal_doc_inner(t, true)
+        self.build_type_literal_doc_inner(t, TypeLiteralMode::Hugging)
     }
 
     /// Inner implementation for type literal doc building.
     ///
-    /// When `hug` is true:
-    /// - Uses inline `; ` separators (no breaking)
-    /// - No group wrapper (parent controls breaking)
-    ///
-    /// When `hug` is false:
-    /// - Uses softline/if_break for width-aware breaking
-    /// - Wrapped in group for independent breaking
-    fn build_type_literal_doc_inner(&self, t: &TSTypeLiteral, hug: bool) -> Doc {
+    /// `mode` controls formatting behavior:
+    /// - `Hugging`: Inline `; ` separators, no softlines, no group (for type args)
+    /// - `Standard`: Width-aware with softlines, wrapped in group
+    /// - `NoGroup`: Width-aware with softlines, no group (parent controls breaking)
+    fn build_type_literal_doc_inner(&self, t: &TSTypeLiteral, mode: TypeLiteralMode) -> Doc {
+        use TypeLiteralMode::{Hugging, Standard};
+        let hug = matches!(mode, Hugging);
+        let wrap_in_group = matches!(mode, Standard);
         let force_multiline = self.type_literal_force_multiline(t);
 
         if t.members.is_empty() {
             // Empty type literal - handle comments inside
-            return if hug {
-                self.build_empty_body_with_comments_doc(t.span)
+            let empty_doc = self.build_empty_body_with_comments_doc(t.span);
+            return if wrap_in_group {
+                doc::group(empty_doc)
             } else {
-                doc::group(self.build_empty_body_with_comments_doc(t.span))
+                empty_doc
             };
         }
 
@@ -480,11 +491,22 @@ impl<'a> Printer<'a> {
         }
         parts.push(doc::text("}"));
 
-        if hug {
-            doc::concat(parts)
-        } else {
+        if wrap_in_group {
             doc::group(doc::concat(parts))
+        } else {
+            doc::concat(parts)
         }
+    }
+
+    /// Build a Doc for a type literal in function param context (no group wrapper).
+    ///
+    /// Uses width-aware format with softlines (can break), but WITHOUT wrapping
+    /// in its own group. This lets the parent function type group control breaking.
+    ///
+    /// When the function type group breaks (because line is too long), these
+    /// softlines become newlines, expanding the param's object type.
+    pub(super) fn build_type_literal_doc_for_function_param(&self, t: &TSTypeLiteral) -> Doc {
+        self.build_type_literal_doc_inner(t, TypeLiteralMode::NoGroup)
     }
 
     /// Build a Doc for a type expression suitable for use as a type argument.

@@ -85,6 +85,7 @@ pub(super) fn fits_with_lookahead<'a, R: TextResolver + ?Sized>(
             Doc::Group {
                 contents,
                 expanded_states,
+                should_break,
                 ..
             } => {
                 // Prettier's fits() behavior (printer.js lines 74-81):
@@ -93,7 +94,18 @@ pub(super) fn fits_with_lookahead<'a, R: TextResolver + ?Sized>(
                 //
                 // State selection (trying state[1], state[2], etc.) happens during
                 // RENDERING (render.rs lines 265-294), NOT during fits() check.
-                let doc_to_check = if current_mode == Mode::Break {
+                //
+                // IMPORTANT: When should_break is true (source prefers expanded), the group
+                // should be evaluated in Break mode even when the outer context is Flat.
+                // This enables the "hug" pattern: `fn('a', 'b', {\n  props\n})` where the
+                // head args stay inline but the object breaks. Without this, fits() would
+                // check the full inline content and fail, causing all args to expand.
+                let mode_for_group = if *should_break {
+                    Mode::Break
+                } else {
+                    current_mode
+                };
+                let doc_to_check = if mode_for_group == Mode::Break {
                     if let Some(states) = expanded_states {
                         states.last().unwrap_or_else(|| contents.as_ref())
                     } else {
@@ -103,7 +115,12 @@ pub(super) fn fits_with_lookahead<'a, R: TextResolver + ?Sized>(
                     // Flat mode: always use contents (state[0])
                     contents.as_ref()
                 };
-                stack.push((doc_to_check, current_mode));
+                stack.push((doc_to_check, mode_for_group));
+            }
+
+            Doc::IsolatedGroup { contents } => {
+                // IsolatedGroup behaves like a regular group for fits() checking
+                stack.push((contents.as_ref(), current_mode));
             }
 
             Doc::Indent(inner) | Doc::Dedent(inner) => {
@@ -262,6 +279,10 @@ pub(super) fn fits_multi<R: TextResolver + ?Sized>(
                 // but fits_multi is a simplified checker used by Fill algorithm
                 // which doesn't need the full conditional_group logic.
                 // Just check contents for now.
+                stack.push((contents, current_mode));
+            }
+
+            Doc::IsolatedGroup { contents } => {
                 stack.push((contents, current_mode));
             }
 

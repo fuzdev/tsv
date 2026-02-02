@@ -8,6 +8,8 @@ description = "Language-agnostic foundation primitives for TSV"
 smallvec.workspace = true
 string-interner.workspace = true
 thiserror.workspace = true
+unicode-segmentation.workspace = true
+unicode-width.workspace = true
 
 [lints]
 workspace = true

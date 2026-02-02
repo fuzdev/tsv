@@ -88,7 +88,7 @@ impl<'a> Printer<'a> {
 
                 // Build the braces content (will be wrapped in outer group)
                 parts.push(doc::text("{"));
-                parts.push(doc::indent(doc::concat(vec![doc::softline(), spec_parts])));
+                parts.push(doc::indent_softline(spec_parts));
                 parts.push(trailing_comments_doc);
                 parts.push(doc::softline());
                 parts.push(doc::text("}"));
@@ -281,7 +281,7 @@ impl<'a> Printer<'a> {
 
                 // Build the braces content (will be wrapped in outer group)
                 parts.push(doc::text("{"));
-                parts.push(doc::indent(doc::concat(vec![doc::softline(), spec_parts])));
+                parts.push(doc::indent_softline(spec_parts));
                 parts.push(trailing_comments_doc);
                 parts.push(doc::softline());
                 parts.push(doc::text("}"));
@@ -313,7 +313,7 @@ impl<'a> Printer<'a> {
 
             // Build the braces content with same pattern as named specifiers
             parts.push(doc::text("{"));
-            parts.push(doc::indent(doc::concat(vec![doc::softline(), attr_parts])));
+            parts.push(doc::indent_softline(attr_parts));
             parts.push(doc::softline());
             parts.push(doc::text("}"));
         }

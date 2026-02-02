@@ -162,11 +162,15 @@ impl<'a> Printer<'a> {
             //
             // Structure for single line:
             // return expr; // trailing comment
+            //
+            // The binary chain is wrapped in its own group so it can independently
+            // decide whether to break. When the outer group breaks (to add parens),
+            // the inner chain should still try to fit on one line if possible.
             let broken_doc = doc::concat(vec![
                 doc::text(" ("),
                 doc::indent(doc::concat(vec![
                     doc::softline(),
-                    expr_doc.clone(),
+                    doc::group(expr_doc.clone()),
                     trailing_comments_doc.clone(),
                 ])),
                 doc::softline(),
@@ -180,6 +184,16 @@ impl<'a> Printer<'a> {
                 doc::if_break(broken_doc, flat_doc),
                 doc::text(";"),
             ]));
+        }
+
+        // Assignment expressions need parentheses: return (a = b);
+        // This matches Prettier's behavior for clarity (assignment vs equality)
+        if matches!(arg, internal::Expression::AssignmentExpression(_)) {
+            return doc::concat(vec![
+                doc::text("return ("),
+                self.build_expression_doc(arg),
+                doc::text(");"),
+            ]);
         }
 
         // Standard case: no parenthesization needed

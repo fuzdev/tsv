@@ -101,10 +101,14 @@ impl<'a> Printer<'a> {
         })
     }
 
-    /// Check if a fragment has space-only whitespace (no newlines) that should trigger expansion.
+    /// Check if a fragment has space-only whitespace (no newlines) at boundaries.
     ///
-    /// Patterns like `{#if a} content {/if}` or `{#if a} content{/if}` should expand to multiline,
-    /// matching prettier's typical behavior. Only fully hugged content stays inline.
+    /// Returns true if the fragment has leading OR trailing whitespace that is
+    /// space-only (no newlines). This triggers expansion to multiline for patterns
+    /// like `{#if a} content {/if}`.
+    ///
+    /// Note: Prettier has a quirk where the last block in a file doesn't expand.
+    /// We consistently expand all such blocks regardless of position.
     pub(super) fn fragment_has_space_only_ws(&self, fragment: &Fragment) -> bool {
         // If there are newlines, the existing ws detection handles expansion
         if self.fragment_has_any_newlines(fragment) {

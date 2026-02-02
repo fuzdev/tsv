@@ -337,7 +337,7 @@ impl<'a> Printer<'a> {
         style: BinaryChainStyle,
     ) -> Doc {
         if operands.is_empty() {
-            return doc::text("");
+            return doc::empty();
         }
 
         if operands.len() == 1 {

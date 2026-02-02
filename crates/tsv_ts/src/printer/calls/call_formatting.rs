@@ -4,8 +4,8 @@
 // all the special cases for call expression formatting.
 
 use super::super::utils::{
-    could_expand_arrow_body, has_block_function_before_last, has_multiple_function_args,
-    is_array_or_object_unwrapped, is_block_function, is_hopefully_short_arg,
+    could_expand_arrow_body, has_block_function_before_last, is_array_or_object_unwrapped,
+    is_block_function, is_function_composition_args, is_hopefully_short_arg,
     last_arg_is_array_or_object, preceding_args_allow_hug,
 };
 use super::super::{
@@ -18,8 +18,9 @@ use super::arg_comments::{
 };
 use super::arg_wrapping::{
     arg_needs_soft_wrap, arrow_has_type_annotations, build_args_split_last,
-    build_arrow_inline_signature, build_expand_all_args, build_inline_args,
-    build_inline_or_expand_all, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
+    build_arrow_call_body_states, build_arrow_inline_signature, build_expand_all_args,
+    build_inline_args, build_inline_or_expand_all, wrap_call_with_hard_breaks,
+    wrap_call_with_soft_breaks,
 };
 use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_module_path_no_break};
 use super::test_patterns::{get_member_chain_parts, is_test_call};
@@ -176,12 +177,22 @@ pub(super) fn build_call_doc_with_wrapping(
         if let Some(inline_comments) =
             printer.build_inline_comments_between_doc_no_leading_space_opt(paren_open, arg_start)
         {
+            let arg_doc = printer.build_expression_doc(first_arg);
+
+            // If the arg will break internally (multiline content), use expanded format
+            // e.g., fn(/* c */ {\n  prop,\n}) → fn(\n  /* c */ {\n    prop,\n  },\n)
+            if doc::will_break(&arg_doc) {
+                let arg_with_comment = doc::concat(vec![inline_comments, doc::text(" "), arg_doc]);
+                return wrap_call_with_hard_breaks(callee, arg_with_comment);
+            }
+
+            // Otherwise keep everything inline: fn(/* c */ {short})
             return doc::concat(vec![
                 callee,
                 doc::text("("),
                 inline_comments,
                 doc::text(" "),
-                printer.build_expression_doc(first_arg),
+                arg_doc,
                 // Check for trailing comments
                 printer.build_inline_comments_between_doc(arg_end, paren_close),
                 doc::text(")"),
@@ -207,10 +218,9 @@ pub(super) fn build_call_doc_with_wrapping(
         };
 
         // Check for trailing comments on last arg
-        let last_arg = call
-            .arguments
-            .last()
-            .expect("is_test_call requires arguments");
+        let Some(last_arg) = call.arguments.last() else {
+            unreachable!("is_test_call requires arguments");
+        };
         let paren_close = call.span.end;
         let mut parts = vec![
             flat_callee,
@@ -275,11 +285,19 @@ pub(super) fn build_call_doc_with_wrapping(
     // - Block arrows stay hugged if first line fits, wrap if it doesn't
     // - Expression arrows use width-aware group (wrap when exceeds line limit)
     // Skip hugging if there are trailing comments - let comment handling block handle it
-    if call.arguments.len() == 1 && !has_trailing_comments_on_args(call, printer) {
+    // Note: Check both trailing line comments AND trailing block comments
+    let has_trailing_block_comment = call.arguments.last().is_some_and(|last_arg| {
+        tsv_lang::comments_in_range(printer.comments, last_arg.span().end, call.span.end)
+            .any(|c| c.is_block)
+    });
+    if call.arguments.len() == 1
+        && !has_trailing_comments_on_args(call, printer)
+        && !has_trailing_block_comment
+    {
         let arg = &call.arguments[0];
 
         // Non-huggable arguments: use soft-break wrapping so outer call can break first
-        // (call expressions, member expressions, new expressions, identifiers)
+        // (call expressions, member expressions, new expressions, identifiers, conditionals)
         if arg_needs_soft_wrap(arg) {
             let arg_doc = printer.build_expression_doc(arg);
             return wrap_call_with_soft_breaks(callee, arg_doc);
@@ -405,49 +423,33 @@ pub(super) fn build_call_doc_with_wrapping(
                         };
 
                     if is_complex_call_body && has_no_type_annotations {
-                        // Build arrow doc with non-breaking signature
-                        // Use concat (not group) for signature to prevent breaking
-                        let mut arrow_parts = Vec::new();
-                        if arrow.r#async {
-                            arrow_parts.push(doc::text("async "));
+                        // Build inline signature for the arrow
+                        let inline_sig = build_arrow_inline_signature(printer, arrow);
+                        let arrow_doc = printer.build_expression_doc(arg);
+                        let body_doc = printer.build_expression_doc(body_expr);
+
+                        // If the body already has hardlines (e.g., nested callback with block body),
+                        // use the standard group-based approach - the body's own structure handles formatting.
+                        // Only use conditional_group when the body fits on one line (no hardlines).
+                        if doc::will_break(&body_doc) {
+                            return doc::group(doc::concat(vec![
+                                callee,
+                                doc::text("("),
+                                doc::concat(vec![inline_sig, doc::text(" =>")]),
+                                doc::group(doc::concat(vec![
+                                    doc::indent_line(body_doc),
+                                    doc::trailing_comma(),
+                                ])),
+                                doc::softline(),
+                                doc::text(")"),
+                            ]));
                         }
 
-                        // Build params inline without softlines/breaks
-                        if arrow.params.is_empty() {
-                            arrow_parts.push(doc::text("()"));
-                        } else if arrow.params.len() == 1 && arrow.params_start.is_none() {
-                            // Single param without parens
-                            arrow_parts
-                                .push(printer.build_function_parameter_doc(&arrow.params[0]));
-                        } else {
-                            // Multiple params or single param with parens - inline format
-                            arrow_parts.push(doc::text("("));
-                            arrow_parts.push(doc::join(
-                                arrow
-                                    .params
-                                    .iter()
-                                    .map(|p| printer.build_function_parameter_doc(p)),
-                                ", ",
-                            ));
-                            arrow_parts.push(doc::text(")"));
-                        }
-                        // Note: No return type check needed - has_no_type_annotations guarantees none
-
-                        // Build custom call wrapping that keeps arrow signature inline
-                        // The outer group controls whether we break the whole call
-                        // The inner group around the arrow body controls whether the body breaks
-                        return doc::group(doc::concat(vec![
-                            callee,
-                            doc::text("("),
-                            doc::concat(arrow_parts),
-                            doc::text(" =>"),
-                            doc::group(doc::concat(vec![
-                                doc::indent_line(printer.build_expression_doc(body_expr)),
-                                doc::trailing_comma(),
-                            ])),
-                            doc::softline(),
-                            doc::text(")"),
-                        ]));
+                        // Body fits on one line - use conditional_group to properly handle
+                        // the case where total line exceeds print width
+                        return build_arrow_call_body_states(
+                            callee, arrow_doc, inline_sig, body_doc,
+                        );
                     }
 
                     // Expandable body (ternary): use conditional parens
@@ -546,29 +548,7 @@ pub(super) fn build_call_doc_with_wrapping(
                     let body_doc = printer.build_expression_doc(body_expr);
                     let inline_sig = build_arrow_inline_signature(printer, arrow);
 
-                    return doc::conditional_group(vec![
-                        // Flat: callee(() => body)
-                        doc::concat(vec![
-                            callee.clone(),
-                            doc::text("("),
-                            arrow_doc,
-                            doc::text(")"),
-                        ]),
-                        // Break: callee(() =>\n  body,\n)
-                        doc::concat(vec![
-                            callee,
-                            doc::text("("),
-                            inline_sig,
-                            doc::text(" =>"),
-                            doc::indent(doc::concat(vec![
-                                doc::hardline(),
-                                body_doc,
-                                doc::text(","),
-                            ])),
-                            doc::hardline(),
-                            doc::text(")"),
-                        ]),
-                    ]);
+                    return build_arrow_call_body_states(callee, arrow_doc, inline_sig, body_doc);
                 }
                 // Other expression types: fall through to standard wrapping
             }
@@ -628,6 +608,23 @@ pub(super) fn build_call_doc_with_wrapping(
         return wrap_call_with_hard_breaks(callee, arg_parts);
     }
 
+    // Function composition pattern: when any argument is a call containing a callback
+    // e.g., fn(arr.map((x) => x), b) → fn(\n\tarr.map((x) => x),\n\tb,\n)
+    // Prettier's isFunctionCompositionArgs: 2+ args, any arg is call with function/arrow inside
+    // Skip if there are trailing comments - let the comment handling code deal with expansion
+    if is_function_composition_args(&call.arguments)
+        && !has_trailing_comments_on_args(call, printer)
+    {
+        let arg_parts = doc::join_doc(
+            call.arguments
+                .iter()
+                .map(|arg| printer.build_expression_doc(arg)),
+            doc::comma_hardline(),
+        );
+
+        return wrap_call_with_hard_breaks(callee, arg_parts);
+    }
+
     // "Expand first arg" pattern: when first arg is a function with block body
     // and remaining args are short, hug the function and put tail args after closing }
     // e.g., setTimeout(() => { tick(); }, 100);
@@ -654,17 +651,21 @@ pub(super) fn build_call_doc_with_wrapping(
         ]);
     }
 
-    // Multiple arrow/function arguments: always break (Prettier behavior)
-    // e.g., fn((a) => a, (b) => b) → fn(\n\t(a) => a,\n\t(b) => b,\n)
-    if has_multiple_function_args(&call.arguments) && !has_trailing_comments_on_args(call, printer)
-    {
+    // Multiple arrow function arguments: always expand to multiple lines
+    // Prettier always expands 2+ arrow function arguments, regardless of source formatting.
+    // This matches Prettier's behavior: fn(() => x, () => y) → fn(\n  () => x,\n  () => y,\n)
+    let all_args_are_arrows = call.arguments.len() >= 2
+        && call.arguments.iter().all(|arg| {
+            matches!(arg, internal::Expression::ArrowFunctionExpression(_))
+        });
+
+    if all_args_are_arrows && !has_trailing_comments_on_args(call, printer) {
         let arg_parts = doc::join_doc(
             call.arguments
                 .iter()
                 .map(|arg| printer.build_expression_doc(arg)),
             doc::comma_hardline(),
         );
-
         return wrap_call_with_hard_breaks(callee, arg_parts);
     }
 
@@ -698,41 +699,75 @@ pub(super) fn build_call_doc_with_wrapping(
             if let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
                 call.arguments.last()
                 && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-                    && matches!(&**body_expr, internal::Expression::CallExpression(_))
-                        && !arrow_has_type_annotations(arrow)
-                    {
-                        let inline_sig = build_arrow_inline_signature(printer, arrow);
-                        let body_doc = printer.build_expression_doc(body_expr);
+                && matches!(&**body_expr, internal::Expression::CallExpression(_))
+                && !arrow_has_type_annotations(arrow)
+            {
+                let inline_sig = build_arrow_inline_signature(printer, arrow);
+                let body_doc = printer.build_expression_doc(body_expr);
 
-                        // State 1: all inline (reuse existing helper)
-                        let state_inline =
-                            build_inline_args(callee.clone(), head_parts.clone(), last_arg_doc);
+                // State 1: all inline (reuse existing helper)
+                let state_inline =
+                    build_inline_args(callee.clone(), head_parts.clone(), last_arg_doc);
 
-                        // State 2: preceding args inline, arrow body breaks after =>
-                        let state_break_body = doc::concat(vec![
-                            callee.clone(),
-                            doc::text("("),
-                            doc::concat(head_parts),
-                            inline_sig,
-                            doc::text(" =>"),
-                            doc::indent(doc::concat(vec![
-                                doc::hardline(),
-                                body_doc,
-                                doc::text(","),
-                            ])),
-                            doc::hardline(),
-                            doc::text(")"),
-                        ]);
+                // State 2: preceding args inline, arrow body breaks after =>
+                let state_break_body = doc::concat(vec![
+                    callee.clone(),
+                    doc::text("("),
+                    doc::concat(head_parts),
+                    inline_sig,
+                    doc::text(" =>"),
+                    doc::indent(doc::concat(vec![doc::hardline(), body_doc, doc::text(",")])),
+                    doc::hardline(),
+                    doc::text(")"),
+                ]);
 
-                        // State 3: all args expanded (reuse existing helper)
-                        let state_expand_all = build_expand_all_args(callee, all_args_broken);
+                // State 3: all args expanded (reuse existing helper)
+                let state_expand_all = build_expand_all_args(callee, all_args_broken);
 
-                        return doc::conditional_group(vec![
-                            state_inline,
-                            state_break_body,
-                            state_expand_all,
-                        ]);
-                    }
+                return doc::conditional_group(vec![
+                    state_inline,
+                    state_break_body,
+                    state_expand_all,
+                ]);
+            }
+
+            // Special case: expression arrow with object/array body
+            // Prettier keeps preceding args inline and expands object/array internally
+            // e.g., fn(arg, (x) => ({\n  a: x,\n}));
+            if let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
+                call.arguments.last()
+                && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+                && matches!(
+                    &**body_expr,
+                    internal::Expression::ObjectExpression(_)
+                        | internal::Expression::ArrayExpression(_)
+                )
+                && !arrow_has_type_annotations(arrow)
+            {
+                let inline_sig = build_arrow_inline_signature(printer, arrow);
+                // Object/array in arrow body needs parens: (x) => ({ ... })
+                let body_doc = doc::parens(printer.build_expression_doc(body_expr));
+
+                // State 0: all inline
+                let state_inline =
+                    build_inline_args(callee.clone(), head_parts.clone(), last_arg_doc);
+
+                // State 1: hug - head inline, object/array expands internally
+                let state_hug = doc::concat(vec![
+                    callee.clone(),
+                    doc::text("("),
+                    doc::concat(head_parts),
+                    inline_sig,
+                    doc::text(" => "),
+                    doc::group_break(body_doc),
+                    doc::text(")"),
+                ]);
+
+                // State 2: expand all args
+                let state_expand_all = build_expand_all_args(callee, all_args_broken);
+
+                return doc::conditional_group(vec![state_inline, state_hug, state_expand_all]);
+            }
 
             // Try: inline, or break all args
             // Note: last arg contains hardlines, so state 1 only succeeds if the whole
@@ -747,8 +782,10 @@ pub(super) fn build_call_doc_with_wrapping(
         && printer.has_comments_between(paren_open, call.arguments[0].span().start);
     let has_inter_arg_comments = has_inter_argument_comments(call, printer);
     let has_trailing_arg_comments = has_trailing_comments_on_args(call, printer);
+    // Also check for trailing block comments (has_trailing_comments_on_args only checks line comments)
+    let has_any_trailing_comments = has_trailing_arg_comments || has_trailing_block_comment;
 
-    if has_leading_comments || has_inter_arg_comments || has_trailing_arg_comments {
+    if has_leading_comments || has_inter_arg_comments || has_any_trailing_comments {
         // Build arguments with leading and/or inter-argument comments
         let mut arg_parts = Vec::new();
         let mut force_expansion = false;
@@ -828,11 +865,7 @@ pub(super) fn build_call_doc_with_wrapping(
                     }
 
                     // Add leading comments - inline with next arg if on same line
-                    pc.emit_leading_comments_inline_aware(
-                        &mut arg_parts,
-                        printer,
-                        next_arg_start,
-                    );
+                    pc.emit_leading_comments_inline_aware(&mut arg_parts, printer, next_arg_start);
                 } else {
                     // No comments, just comma and line
                     arg_parts.push(doc::comma_line());
@@ -874,6 +907,14 @@ pub(super) fn build_call_doc_with_wrapping(
                         arg_parts.push(comments);
                     }
                     has_trailing_comma_on_last = true;
+                } else if pc.has_trailing_block() {
+                    // Trailing block comments: place comment after arg
+                    // Don't force expansion - let the content decide based on width/source newlines
+                    // e.g., fn({short} /* c */) stays inline, fn({long...} /* c */) expands
+                    for comment in &pc.trailing_block {
+                        arg_parts.push(doc::text(" "));
+                        arg_parts.push(printer.build_comment_doc(comment));
+                    }
                 }
             }
         }
@@ -966,9 +1007,11 @@ pub(super) fn build_call_doc_with_wrapping(
             let (head_parts, last_arg_doc, all_args_broken) =
                 build_args_split_last(&call.arguments, printer);
 
-            // If last arg has hardlines (e.g., comments), skip the conditional_group
-            // and go directly to expand-all (state 1 would be selected incorrectly)
-            if doc::will_break(&last_arg_doc) {
+            // If last arg has forced breaks (e.g., line comments), skip the conditional_group
+            // and go directly to expand-all (state 1 would be selected incorrectly).
+            // Note: Use has_forced_break() not will_break() - objects with source newlines
+            // use group_break() which makes will_break() true, but they should still hug.
+            if doc::has_forced_break(&last_arg_doc) {
                 return build_expand_all_args(callee, all_args_broken);
             }
 
@@ -980,21 +1023,37 @@ pub(super) fn build_call_doc_with_wrapping(
         let (head_parts, last_arg_doc, all_args_broken) =
             build_args_split_last(&call.arguments, printer);
 
-        // If last arg will break (has hardlines), use expand-all
-        if doc::will_break(&last_arg_doc) {
+        // If last arg has forced breaks (hardlines), use expand-all instead of hug.
+        // Note: Use has_forced_break() not will_break() - see comment above.
+        if doc::has_forced_break(&last_arg_doc) {
             return build_inline_or_expand_all(callee, head_parts, last_arg_doc, all_args_broken);
         }
 
-        // No hardlines: use the original "hug" behavior
-        // The array/object has its own group that decides whether to expand
-        // e.g., fn('x', [Long1, Long2]) → fn('x', [\n\tLong1,\n\tLong2,\n])
-        return doc::group(doc::concat(vec![
-            callee,
+        // No hardlines: build 3-state conditional_group
+        // State 0: inline - fn('x', [a, b])
+        // State 1: hug - fn('x', [\n  a,\n  b,\n]) - head inline, last expands
+        // State 2: expand all - fn(\n  'x',\n  [\n    a,\n  ],\n)
+        //
+        // This ensures:
+        // - Short total: stays inline
+        // - Long last arg content: head stays inline, last expands internally
+        // - Long total due to many/long head args: expand all
+        //
+        // Key: In state_hug, wrap last_arg_doc in group_break() to force the array/object
+        // to break. This makes fits() return true when it hits the first line inside,
+        // allowing the hug state to be selected when head args + opening bracket fit.
+        // Matches Prettier: group(lastArg, { shouldBreak: true })
+        let state_inline =
+            build_inline_args(callee.clone(), head_parts.clone(), last_arg_doc.clone());
+        let state_hug = doc::concat(vec![
+            callee.clone(),
             doc::text("("),
             doc::concat(head_parts),
-            last_arg_doc,
+            doc::group_break(last_arg_doc),
             doc::text(")"),
-        ]));
+        ]);
+        let state_expand_all = build_expand_all_args(callee, all_args_broken);
+        return doc::conditional_group(vec![state_inline, state_hug, state_expand_all]);
     }
 
     // Check for blank lines between arguments (forces expansion and preservation)

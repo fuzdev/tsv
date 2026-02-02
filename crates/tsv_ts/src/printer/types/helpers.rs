@@ -100,7 +100,16 @@ pub fn unwrap_parenthesized(ts_type: &TSType) -> &TSType {
     }
 }
 
-/// Check if the last type in an intersection is "huggable" (like TypeLiteral).
+/// Check if a type is "huggable" - brace-delimited types that expand internally.
+///
+/// TypeLiteral (`{ a: T }`) and Mapped (`{ [K in T]: V }`) types are huggable:
+/// they handle their own expansion and should keep `{` hugged to the context.
+#[inline]
+pub fn is_huggable_type(ts_type: &TSType) -> bool {
+    matches!(ts_type, TSType::TypeLiteral(_) | TSType::Mapped(_))
+}
+
+/// Check if the last type in an intersection is "huggable" (like TypeLiteral or MappedType).
 ///
 /// Huggable types expand independently and should not have breaks/indent applied
 /// around them in the parent context. This keeps patterns like `& {` hugged together.
@@ -109,7 +118,7 @@ pub fn intersection_has_huggable_last_type(intersection: &TSIntersectionType) ->
     intersection
         .types
         .last()
-        .is_some_and(|t| matches!(unwrap_parenthesized(t), TSType::TypeLiteral(_)))
+        .is_some_and(|t| is_huggable_type(unwrap_parenthesized(t)))
 }
 
 //

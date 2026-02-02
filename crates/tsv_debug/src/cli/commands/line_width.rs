@@ -1,6 +1,7 @@
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
 use tsv_cli::cli::input::Input;
+use tsv_lang::printing::visual_width;
 
 /// Line width measurement command - measures line widths accounting for tab width
 pub struct LineWidthCommand;
@@ -116,11 +117,11 @@ impl Executable for LineWidthExecutable {
                 continue;
             }
 
-            // Count tabs and calculate width
+            // Calculate visual width using Unicode Standard Annex #11
+            let total = visual_width(line, self.tab_width);
             let tab_count = line.chars().filter(|&c| c == '\t').count();
             let tab_width_total = tab_count * self.tab_width;
-            let content_len = line.chars().count() - tab_count;
-            let total = tab_width_total + content_len;
+            let content_width = total - tab_width_total;
 
             let exceeds = total > self.print_width;
             if exceeds {
@@ -133,7 +134,7 @@ impl Executable for LineWidthExecutable {
                     "total": total,
                     "tabs": tab_count,
                     "tab_width_total": tab_width_total,
-                    "content_length": content_len,
+                    "content_width": content_width,
                     "exceeds": exceeds,
                 }));
             } else {
@@ -146,7 +147,7 @@ impl Executable for LineWidthExecutable {
                 };
 
                 println!(
-                    "Line {line_num}: {total} chars ({tab_count} tabs = {tab_width_total}, content = {content_len}) {status}"
+                    "Line {line_num}: {total} chars ({tab_count} tabs = {tab_width_total}, content = {content_width}) {status}"
                 );
 
                 // Show line preview for specific line queries

@@ -38,7 +38,7 @@ impl<'a> Printer<'a> {
         wrap_in_group: bool,
     ) -> Doc {
         if union.types.is_empty() {
-            return doc::text("");
+            return doc::empty();
         }
 
         // Check for line comments between union members (force multiline)
@@ -84,7 +84,7 @@ impl<'a> Printer<'a> {
                 }
             } else {
                 // First type: "| " when broken, nothing when flat
-                parts.push(doc::if_break(doc::text("| "), doc::text("")));
+                parts.push(doc::if_break(doc::text("| "), doc::empty()));
             }
 
             // Special handling for object type literals: use aligned indentation
@@ -209,7 +209,7 @@ impl<'a> Printer<'a> {
         wrap_in_group: bool,
     ) -> Doc {
         if intersection.types.is_empty() {
-            return doc::text("");
+            return doc::empty();
         }
 
         // Check for line comments between intersection members (force multiline)

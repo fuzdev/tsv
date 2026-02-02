@@ -205,7 +205,7 @@ impl<'a> Printer<'a> {
                 doc::indent(doc::group(doc::concat(vec![
                     doc::concat(attr_docs.to_vec()),
                     if hug_start && !is_empty {
-                        doc::text("")
+                        doc::empty()
                     } else {
                         doc::dedent(doc::softline())
                     },
@@ -387,11 +387,19 @@ impl<'a> Printer<'a> {
             });
 
             // Force multiline when:
-            // - Block flow children (if, each, etc.)
+            // - Expanding control flow blocks (if, each, key) - always force break
+            //   Note: await blocks do NOT force break - they stay inline in inline elements
+            // - Expanding blocks nested inside await blocks also force break
+            // - Snippet blocks only force break when their content is not inline
             // - Content needs multiline (multiple blocks, mixed content, source breaks)
             // - Source has leading break (preserve author's multiline structure)
             // - Children contain elements that will be multiline
-            let force_break = ctx.has_block_flow_children
+            let has_expanding_blocks =
+                super::helpers::has_any_expanding_blocks(&element.fragment.nodes);
+            let snippet_forces_break =
+                ctx.has_block_flow_children && self.block_flow_forces_multiline(element);
+            let force_break = has_expanding_blocks
+                || snippet_forces_break
                 || ctx.needs_multiline
                 || ctx.source_has_leading_break
                 || has_multiline_element_children;
@@ -491,7 +499,15 @@ impl<'a> Printer<'a> {
             // With attrs - layout depends on whether there are block flow children
             // Rebuild attr_docs since we're in a different branch
             let hug_attr_docs = self.build_element_attrs_doc(&element.attributes);
-            if ctx.has_block_flow_children {
+            // Expanding blocks (if/each/key) always force multiline
+            // Note: await blocks do NOT force multiline - they stay inline in inline elements
+            // But expanding blocks nested inside await blocks DO force multiline
+            // Snippet blocks only force multiline when content is not inline
+            let has_expanding_blocks =
+                super::helpers::has_any_expanding_blocks(&element.fragment.nodes);
+            let snippet_forces_break =
+                ctx.has_block_flow_children && self.block_flow_forces_multiline(element);
+            if has_expanding_blocks || snippet_forces_break {
                 // Block flow forces multiline: > on new line after attrs
                 // <span attr="val"
                 //     >{#if ...}{/if}</span
@@ -605,7 +621,7 @@ impl<'a> Printer<'a> {
                         doc::text("<"),
                         doc::symbol(tag_sym),
                         doc::indent(doc::group(doc::concat(hug_attr_docs))),
-                        doc::group(doc::indent(doc::concat(vec![doc::softline(), html_body]))),
+                        doc::group(doc::indent_softline(html_body)),
                         doc::softline(),
                         doc::text(">"),
                     ]))
@@ -1159,15 +1175,17 @@ impl<'a> Printer<'a> {
         let is_foreign = tsv_html::is_foreign_element(&tag_name);
 
         // Determine element kind
+        // Matches prettier-plugin-svelte: isInlineElement = !isBlockElement
+        // Elements NOT in the block list (including table cells) use inline formatting.
         let kind = if tag_name.starts_with(|c: char| c.is_ascii_uppercase())
             || tag_name.contains(':')
             || tag_name.contains('.')
         {
             ElementKind::Component
-        } else if tsv_html::is_inline_element(&tag_name) {
-            ElementKind::Inline
-        } else {
+        } else if tsv_html::is_block_element(&tag_name) {
             ElementKind::Block
+        } else {
+            ElementKind::Inline
         };
 
         // Check if self-closing
@@ -1309,6 +1327,12 @@ impl<'a> Printer<'a> {
             return true;
         }
 
+        // Block elements with expanding blocks (if/each/key, or those inside await) always expand
+        // Note: await blocks alone do NOT force expansion in block elements
+        if kind.is_block() && super::helpers::has_any_expanding_blocks(&element.fragment.nodes) {
+            return true;
+        }
+
         // Block flow forces multiline
         if has_block_flow_children && self.block_flow_forces_multiline(element) {
             return true;
@@ -1342,10 +1366,17 @@ impl<'a> Printer<'a> {
             _ => false,
         });
 
-        // Check if there's whitespace around block flow children
-        let has_ws_around_blocks = element.fragment.nodes.iter().any(|n| {
-            matches!(n, FragmentNode::Text(t) if t.raw.is_whitespace_only() && !t.raw.is_empty())
-        });
+        // Check if there's whitespace around EXPANDING block flow children (if/each/key)
+        // Await and snippet blocks don't force multiline when surrounded by whitespace
+        let has_expanding_blocks = element
+            .fragment
+            .nodes
+            .iter()
+            .any(super::helpers::is_expanding_control_flow_block);
+        let has_ws_around_blocks = has_expanding_blocks
+            && element.fragment.nodes.iter().any(|n| {
+                matches!(n, FragmentNode::Text(t) if t.raw.is_whitespace_only() && !t.raw.is_empty())
+            });
 
         has_non_inline_block || has_ws_around_blocks
     }

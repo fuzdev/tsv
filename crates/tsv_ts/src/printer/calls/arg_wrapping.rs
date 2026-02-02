@@ -5,10 +5,10 @@
 // - Call expression wrapping with soft/hard breaks
 // - Building argument lists split into head/last patterns
 
+use super::super::Printer;
 use super::arg_comments::{
     find_comma_pos, is_inline_block_after_comma, is_inline_block_before_comma,
 };
-use super::super::Printer;
 use crate::ast::internal;
 use tsv_lang::doc::{self, Doc};
 
@@ -95,9 +95,13 @@ pub(crate) fn wrap_call_with_hard_breaks(callee: Doc, args: Doc) -> Doc {
 
 /// Check if a single argument needs soft-break wrapping (not huggable)
 ///
-/// Call expressions, member expressions, new expressions, and identifiers should
-/// allow breaking after "(" so the outer call can break before the inner expression.
+/// Call expressions, member expressions, new expressions, identifiers, and conditionals
+/// should allow breaking after "(" so the outer call can break before the inner expression.
 /// Objects and arrays are "huggable" and don't need soft wrapping.
+///
+/// Conditionals (ternaries) are included because when a call's ternary argument exceeds
+/// print width, Prettier breaks after "(" and keeps the ternary on one line (if it fits),
+/// rather than keeping "(cond" hugged and breaking the ternary at ? and :.
 pub(super) fn arg_needs_soft_wrap(arg: &internal::Expression) -> bool {
     matches!(
         arg,
@@ -105,6 +109,7 @@ pub(super) fn arg_needs_soft_wrap(arg: &internal::Expression) -> bool {
             | internal::Expression::MemberExpression(_)
             | internal::Expression::NewExpression(_)
             | internal::Expression::Identifier(_)
+            | internal::Expression::ConditionalExpression(_)
     )
 }
 
@@ -125,12 +130,18 @@ pub(super) enum ChainArgKind {
 /// other expression types that need soft wrapping (calls, members, binaries).
 pub(super) fn classify_chain_arg(arg: &internal::Expression) -> ChainArgKind {
     match arg {
-        // These expression types need soft wrapping
+        // These expression types need soft wrapping so the call can break
+        // before the argument, giving the argument a fresh line to fit on
         internal::Expression::CallExpression(_)
         | internal::Expression::MemberExpression(_)
         | internal::Expression::NewExpression(_)
         | internal::Expression::Identifier(_)
-        | internal::Expression::BinaryExpression(_) => ChainArgKind::NeedsSoftWrap,
+        | internal::Expression::BinaryExpression(_)
+        | internal::Expression::ConditionalExpression(_) => ChainArgKind::NeedsSoftWrap,
+        // Template literals need soft wrap so long lines can break at the call's (
+        internal::Expression::TemplateLiteral(_) => ChainArgKind::NeedsSoftWrap,
+        // Tagged templates need soft wrap too
+        internal::Expression::TaggedTemplateExpression(_) => ChainArgKind::NeedsSoftWrap,
         // Literals need soft wrapping so chains can break at the last call
         // This allows e.g. `fn1(fn2()).fn3('short')` to break at fn3 instead of fn2
         internal::Expression::Literal(_) => ChainArgKind::NeedsSoftWrap,
@@ -237,10 +248,11 @@ pub(crate) fn build_args_split_last(
     arguments: &[internal::Expression],
     printer: &Printer,
 ) -> (Vec<Doc>, Doc, Doc) {
-    // Build all args (using build_arg_expression_doc for proper parens on assignments)
+    // Build all args (using build_huggable_expression_doc for proper parens on assignments
+    // and isolated_group wrapping for templates)
     let arg_docs: Vec<_> = arguments
         .iter()
-        .map(|arg| printer.build_arg_expression_doc(arg))
+        .map(|arg| printer.build_huggable_expression_doc(arg))
         .collect();
 
     // Build head docs (all but last) with commas and inline block comments
@@ -292,7 +304,8 @@ pub(crate) fn build_args_split_last(
 
             // Only add inline block comments that are BEFORE the comma
             if let Some(cpos) = comma_pos {
-                for comment in tsv_lang::comments_in_range(printer.comments, arg_end, next_arg_start)
+                for comment in
+                    tsv_lang::comments_in_range(printer.comments, arg_end, next_arg_start)
                 {
                     if is_inline_block_before_comma(comment, cpos, printer.line_breaks, arg_end) {
                         all_args_parts.push(doc::text(" "));
@@ -346,6 +359,10 @@ pub(super) fn build_inline_args(callee: Doc, head_parts: Vec<Doc>, last_arg_doc:
 ///
 /// State 1: Try all args inline
 /// State 2: Expand all args to separate lines
+///
+/// Note: Arrays/objects with the nested heuristic use group_break() (shouldBreak on the group)
+/// rather than break_parent(). This keeps the break local to the array/object group,
+/// allowing state 1 to work when head args fit inline and only the last arg needs to break.
 pub(super) fn build_inline_or_expand_all(
     callee: Doc,
     head_parts: Vec<Doc>,
@@ -355,5 +372,45 @@ pub(super) fn build_inline_or_expand_all(
     doc::conditional_group(vec![
         build_inline_args(callee.clone(), head_parts, last_arg_doc),
         build_expand_all_args(callee, all_args_broken),
+    ])
+}
+
+/// Build a conditional group for arrow functions with call expression bodies.
+///
+/// Used when an arrow's body is a call expression (simple or with complex args).
+/// Creates two states:
+/// - State 0 (flat): `callee((params) => body)`
+/// - State 1 (break): `callee((params) =>\n  body,\n)`
+///
+/// Parameters:
+/// - `callee`: The call expression's callee doc
+/// - `arrow_doc`: The full arrow expression doc (for flat state)
+/// - `inline_sig`: The arrow's inline signature (for break state)
+/// - `body_doc`: The arrow body expression doc
+#[inline]
+pub(super) fn build_arrow_call_body_states(
+    callee: Doc,
+    arrow_doc: Doc,
+    inline_sig: Doc,
+    body_doc: Doc,
+) -> Doc {
+    doc::conditional_group(vec![
+        // Flat: callee((params) => body)
+        doc::concat(vec![
+            callee.clone(),
+            doc::text("("),
+            arrow_doc,
+            doc::text(")"),
+        ]),
+        // Break: callee((params) =>\n  body,\n)
+        doc::concat(vec![
+            callee,
+            doc::text("("),
+            inline_sig,
+            doc::text(" =>"),
+            doc::indent(doc::concat(vec![doc::hardline(), body_doc, doc::text(",")])),
+            doc::hardline(),
+            doc::text(")"),
+        ]),
     ])
 }

@@ -1,21 +1,21 @@
 {
 	"css": {
 		"type": "StyleSheet",
-		"start": 226,
-		"end": 347,
+		"start": 222,
+		"end": 341,
 		"attributes": [],
 		"children": [
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 235,
-					"end": 241,
+					"start": 231,
+					"end": 237,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 235,
-							"end": 241,
+							"start": 231,
+							"end": 237,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -24,12 +24,12 @@
 										{
 											"type": "ClassSelector",
 											"name": "emoji",
-											"start": 235,
-											"end": 241
+											"start": 231,
+											"end": 237
 										}
 									],
-									"start": 235,
-									"end": 241
+									"start": 231,
+									"end": 237
 								}
 							]
 						}
@@ -37,32 +37,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 242,
-					"end": 267,
+					"start": 238,
+					"end": 263,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 246,
-							"end": 263,
+							"start": 242,
+							"end": 259,
 							"property": "content",
 							"value": "'\\\\11F4A9'"
 						}
 					]
 				},
-				"start": 235,
-				"end": 267
+				"start": 231,
+				"end": 263
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 270,
-					"end": 276,
+					"start": 266,
+					"end": 272,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 270,
-							"end": 276,
+							"start": 266,
+							"end": 272,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -71,12 +71,12 @@
 										{
 											"type": "ClassSelector",
 											"name": "heart",
-											"start": 270,
-											"end": 276
+											"start": 266,
+											"end": 272
 										}
 									],
-									"start": 270,
-									"end": 276
+									"start": 266,
+									"end": 272
 								}
 							]
 						}
@@ -84,32 +84,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 277,
-					"end": 302,
+					"start": 273,
+					"end": 298,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 281,
-							"end": 298,
+							"start": 277,
+							"end": 294,
 							"property": "content",
 							"value": "'\\\\11F496'"
 						}
 					]
 				},
-				"start": 270,
-				"end": 302
+				"start": 266,
+				"end": 298
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 305,
-					"end": 312,
+					"start": 301,
+					"end": 306,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 305,
-							"end": 312,
+							"start": 301,
+							"end": 306,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -117,13 +117,13 @@
 									"selectors": [
 										{
 											"type": "ClassSelector",
-											"name": "rocket",
-											"start": 305,
-											"end": 312
+											"name": "star",
+											"start": 301,
+											"end": 306
 										}
 									],
-									"start": 305,
-									"end": 312
+									"start": 301,
+									"end": 306
 								}
 							]
 						}
@@ -131,58 +131,58 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 313,
-					"end": 338,
+					"start": 307,
+					"end": 332,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 317,
-							"end": 334,
+							"start": 311,
+							"end": 328,
 							"property": "content",
-							"value": "'\\\\11F680'"
+							"value": "'\\\\11F31F'"
 						}
 					]
 				},
-				"start": 305,
-				"end": 338
+				"start": 301,
+				"end": 332
 			}
 		],
 		"content": {
-			"start": 233,
-			"end": 339,
-			"styles": "\n\t.emoji {\n\t\tcontent: '\\1F4A9';\n\t}\n\n\t.heart {\n\t\tcontent: '\\1F496';\n\t}\n\n\t.rocket {\n\t\tcontent: '\\1F680';\n\t}\n",
+			"start": 229,
+			"end": 333,
+			"styles": "\n\t.emoji {\n\t\tcontent: '\\1F4A9';\n\t}\n\n\t.heart {\n\t\tcontent: '\\1F496';\n\t}\n\n\t.star {\n\t\tcontent: '\\1F31F';\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 348,
+	"end": 342,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
 		"nodes": [
 			{
 				"type": "Text",
-				"start": 112,
-				"end": 114,
+				"start": 110,
+				"end": 112,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 114,
-				"end": 148,
+				"start": 112,
+				"end": 146,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 7,
 						"column": 1,
-						"character": 115
+						"character": 113
 					},
 					"end": {
 						"line": 7,
 						"column": 2,
-						"character": 116
+						"character": 114
 					}
 				},
 				"attributes": [],
@@ -191,8 +191,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 117,
-							"end": 144,
+							"start": 115,
+							"end": 142,
 							"raw": "emoji via entity: &#128169;",
 							"data": "emoji via entity: 💩"
 						}
@@ -201,26 +201,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 148,
-				"end": 149,
+				"start": 146,
+				"end": 147,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 149,
-				"end": 187,
+				"start": 147,
+				"end": 185,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 8,
 						"column": 1,
-						"character": 150
+						"character": 148
 					},
 					"end": {
 						"line": 8,
 						"column": 2,
-						"character": 151
+						"character": 149
 					}
 				},
 				"attributes": [],
@@ -229,8 +229,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 152,
-							"end": 183,
+							"start": 150,
+							"end": 181,
 							"raw": "heart via hex entity: &#x1F496;",
 							"data": "heart via hex entity: 💖"
 						}
@@ -239,26 +239,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 187,
-				"end": 188,
+				"start": 185,
+				"end": 186,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 188,
-				"end": 224,
+				"start": 186,
+				"end": 220,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 9,
 						"column": 1,
-						"character": 189
+						"character": 187
 					},
 					"end": {
 						"line": 9,
 						"column": 2,
-						"character": 190
+						"character": 188
 					}
 				},
 				"attributes": [],
@@ -267,18 +267,18 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 191,
-							"end": 220,
-							"raw": "rocket via decimal: &#128640;",
-							"data": "rocket via decimal: 🚀"
+							"start": 189,
+							"end": 216,
+							"raw": "star via decimal: &#127775;",
+							"data": "star via decimal: 🌟"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 224,
-				"end": 226,
+				"start": 220,
+				"end": 222,
 				"raw": "\n\n",
 				"data": "\n\n"
 			}
@@ -289,12 +289,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 112,
+		"end": 110,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 103,
+			"end": 101,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -441,7 +441,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 72,
-					"end": 102,
+					"end": 100,
 					"loc": {
 						"start": {
 							"line": 4,
@@ -449,14 +449,14 @@
 						},
 						"end": {
 							"line": 4,
-							"column": 31
+							"column": 29
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 78,
-							"end": 101,
+							"end": 99,
 							"loc": {
 								"start": {
 									"line": 4,
@@ -464,13 +464,13 @@
 								},
 								"end": {
 									"line": 4,
-									"column": 30
+									"column": 28
 								}
 							},
 							"id": {
 								"type": "Identifier",
 								"start": 78,
-								"end": 84,
+								"end": 82,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -478,27 +478,27 @@
 									},
 									"end": {
 										"line": 4,
-										"column": 13
+										"column": 11
 									}
 								},
-								"name": "rocket"
+								"name": "star"
 							},
 							"init": {
 								"type": "Literal",
-								"start": 87,
-								"end": 101,
+								"start": 85,
+								"end": 99,
 								"loc": {
 									"start": {
 										"line": 4,
-										"column": 16
+										"column": 14
 									},
 									"end": {
 										"line": 4,
-										"column": 30
+										"column": 28
 									}
 								},
-								"value": "🚀",
-								"raw": "'\\uD83D\\uDE80'"
+								"value": "🌟",
+								"raw": "'\\uD83C\\uDF1F'"
 							}
 						}
 					],

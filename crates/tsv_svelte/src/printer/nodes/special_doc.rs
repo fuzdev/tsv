@@ -10,6 +10,7 @@ use std::rc::Rc;
 
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
+use crate::printer::text::TextAnalysis;
 use tsv_lang::doc::{self, Doc};
 
 impl<'a> Printer<'a> {
@@ -159,13 +160,37 @@ impl<'a> Printer<'a> {
             .last()
             .is_some_and(FragmentNode::is_boundary_break);
 
+        // Check for expanding control flow blocks (if/each/key) or expanding blocks inside await
+        // These force hug mode (not full multiline) for inline special elements like <slot>
+        // BUT only when there's no whitespace around the blocks
+        // NOTE: svelte:boundary NEVER uses hug mode - it always uses normal multiline for expanding blocks
+        let has_expanding_blocks =
+            super::helpers::has_any_expanding_blocks(&element.fragment.nodes);
+        // Check if there's whitespace around expanding blocks
+        // e.g., `<slot> {#if c}...{/if} </slot>` has whitespace, should use normal multiline
+        let has_ws_around_expanding = has_expanding_blocks
+            && element
+                .fragment
+                .nodes
+                .iter()
+                .any(|n| matches!(n, FragmentNode::Text(t) if t.raw.is_whitespace_only() && !t.raw.is_empty()));
+        // Only force hug mode when expanding blocks present WITHOUT surrounding whitespace
+        // svelte:boundary never uses hug mode - it always uses normal multiline for expanding blocks
+        let forces_hug_mode =
+            !is_boundary_without_snippets && has_expanding_blocks && !has_ws_around_expanding;
+
         // Determine if multiline formatting is needed
-        // svelte:boundary WITHOUT snippets stays inline (even with block children)
-        let needs_multiline = !is_boundary_without_snippets
-            && (source_has_leading_break
-                || source_has_trailing_break
-                || has_block_children
-                || is_boundary_with_snippets);
+        // svelte:boundary with expanding blocks always uses multiline (not hug mode)
+        // Also need multiline when whitespace surrounds expanding blocks
+        let boundary_needs_multiline_for_blocks =
+            is_boundary_without_snippets && has_expanding_blocks;
+        let needs_multiline = boundary_needs_multiline_for_blocks
+            || (!is_boundary_without_snippets
+                && (source_has_leading_break
+                    || source_has_trailing_break
+                    || has_block_children
+                    || is_boundary_with_snippets
+                    || has_ws_around_expanding));
 
         // Build children doc based on formatting mode
         // Special elements are block-level, so always trim boundaries
@@ -179,11 +204,13 @@ impl<'a> Printer<'a> {
 
         // Hug mode detection (like regular elements)
         // svelte:boundary with snippets disables hug mode
+        // Expanding blocks (if/each/key or those inside await) force hug mode
         let hug_start = !needs_multiline
             && !is_boundary_with_snippets
-            && self.should_hug_start_special(element);
-        let hug_end =
-            !needs_multiline && !is_boundary_with_snippets && self.should_hug_end_special(element);
+            && (forces_hug_mode || self.should_hug_start_special(element));
+        let hug_end = !needs_multiline
+            && !is_boundary_with_snippets
+            && (forces_hug_mode || self.should_hug_end_special(element));
 
         // Build the final doc based on hug mode and attrs
         if !has_attrs {
@@ -199,6 +226,26 @@ impl<'a> Printer<'a> {
                     doc::text(tag_name),
                     doc::text(">"),
                 ])
+            } else if forces_hug_mode {
+                // Expanding blocks force hug mode with hardlines
+                // <slot
+                //   >{#if c}text{/if}</slot
+                // >
+                doc::group(doc::concat(vec![
+                    doc::text("<"),
+                    doc::text(tag_name),
+                    doc::indent(doc::concat(vec![
+                        doc::hardline(),
+                        doc::group(doc::concat(vec![
+                            doc::text(">"),
+                            children_doc,
+                            doc::text("</"),
+                            doc::text(tag_name),
+                        ])),
+                    ])),
+                    doc::hardline(),
+                    doc::text(">"),
+                ]))
             } else if hug_start && hug_end {
                 // Hug both - use group with softlines
                 doc::group(doc::concat(vec![
@@ -241,6 +288,26 @@ impl<'a> Printer<'a> {
                 doc::text(tag_name),
                 doc::text(">"),
             ])
+        } else if forces_hug_mode {
+            // Expanding blocks force hug mode with hardlines (with attrs)
+            // <slot name="x"
+            //   >{#if c}text{/if}</slot
+            // >
+            let body = doc::concat(vec![
+                doc::text(">"),
+                children_doc,
+                doc::text("</"),
+                doc::text(tag_name),
+            ]);
+
+            doc::group(doc::concat(vec![
+                doc::text("<"),
+                doc::text(tag_name),
+                doc::indent(doc::group(doc::concat(attr_docs))),
+                doc::indent(doc::concat(vec![doc::hardline(), body])),
+                doc::hardline(),
+                doc::text(">"),
+            ]))
         } else if hug_start && hug_end {
             // With attrs, hug mode - use nested groups like regular elements
             // Outer group: controls whether content goes on new line
@@ -256,7 +323,7 @@ impl<'a> Printer<'a> {
                 doc::text("<"),
                 doc::text(tag_name),
                 doc::indent(doc::group(doc::concat(attr_docs))),
-                doc::group(doc::indent(doc::concat(vec![doc::softline(), body]))),
+                doc::group(doc::indent_softline(body)),
                 doc::softline(),
                 doc::text(">"),
             ]))

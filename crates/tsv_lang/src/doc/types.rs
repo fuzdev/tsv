@@ -195,6 +195,13 @@ pub enum Doc {
         expanded_states: Option<Box<Vec<Doc>>>,
         /// Optional ID for tracking this group's mode (prettier's GroupId)
         id: Option<GroupId>,
+        /// Force break mode during rendering while fits check measures flat content.
+        ///
+        /// When true, the group renders with break mode (softlines become hardlines)
+        /// but fits() still measures the flat content width. This is used when source
+        /// formatting indicates content should be expanded (e.g., objects with source
+        /// newlines) but we need accurate width measurement for outer groups.
+        should_break: bool,
     },
 
     /// Conditional rendering based on whether parent group breaks
@@ -274,6 +281,17 @@ pub enum Doc {
     /// Used when a child element (like a trailing comment) should force
     /// the entire parent construct to expand to multiple lines.
     BreakParent,
+
+    /// A group that prevents hardline propagation to parent groups.
+    ///
+    /// Unlike regular `Group`, `will_break()` returns false for `IsolatedGroup`,
+    /// preventing internal hardlines from forcing parent groups into Break mode.
+    /// The content still renders normally - breaks happen internally as expected.
+    ///
+    /// Use for call arguments that may contain hardlines (template literals
+    /// with `${` breaks, multiline objects in arrow bodies) but should not force
+    /// the outer call to break at `(`.
+    IsolatedGroup { contents: Box<Doc> },
 }
 
 /// Rendering mode for a doc

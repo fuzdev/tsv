@@ -98,6 +98,33 @@ pub(crate) fn is_string_literal(expr: &internal::Expression) -> bool {
     )
 }
 
+/// Check if an expression needs isolation to enable call hugging
+///
+/// Returns true for expressions that may contain internal breaks but should not
+/// force the parent call/array to break:
+/// - Template literals
+/// - Tagged template expressions
+/// - Arrow functions with template literal bodies
+pub(crate) fn needs_isolation_for_hugging(expr: &internal::Expression) -> bool {
+    match expr {
+        internal::Expression::TemplateLiteral(_)
+        | internal::Expression::TaggedTemplateExpression(_) => true,
+        internal::Expression::ArrowFunctionExpression(arrow) => {
+            // Check if the arrow body is a template literal (not a block statement)
+            if let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
+                matches!(
+                    body_expr.as_ref(),
+                    internal::Expression::TemplateLiteral(_)
+                        | internal::Expression::TaggedTemplateExpression(_)
+                )
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
 /// Check if an expression is a pure property chain (member expressions without calls)
 ///
 /// Pure property chains like `obj.a.b.c` or `obj!.a!.b!` should use fluid assignment wrapping
@@ -118,6 +145,10 @@ pub(crate) fn is_pure_property_chain(expr: &internal::Expression) -> bool {
     }
 }
 
+/// Check if an expression is a memberish call chain (CallExpression with member chain callee)
+///
+/// Memberish call chains like `obj.a.b.method(args)` should use fluid assignment wrapping
+/// (break after `=` if doesn't fit). This includes chains like:
 /// Check if a ConditionalExpression needs fluid layout for variable assignment.
 ///
 /// Prettier uses "break-after-operator" layout when the ternary's test expression
@@ -336,18 +367,20 @@ pub(crate) fn has_multiline_content(expr: &internal::Expression, source: &str) -
         // Private identifiers are just #name, no multiline content
         internal::Expression::PrivateIdentifier(_) => false,
         internal::Expression::TemplateLiteral(template) => {
-            // Template literals themselves don't count as "multiline content" even if they
-            // contain newlines - Prettier keeps them inline. Only their interpolated expressions
-            // are checked for multiline content.
-            template
-                .expressions
-                .iter()
-                .any(|e| has_multiline_content(e, source))
+            // Template literals with newlines count as multiline content.
+            // For single-arg calls, there's a special case earlier in call_formatting.rs
+            // that keeps them inline. But for multi-arg calls, they trigger expansion.
+            template_literal_has_newlines(template)
+                || template
+                    .expressions
+                    .iter()
+                    .any(|e| has_multiline_content(e, source))
         }
         internal::Expression::TaggedTemplateExpression(tagged) => {
-            // Tagged template literals are also kept inline by Prettier, even with newlines
-            // Check tag and interpolated expressions for multiline content
+            // Tagged template literals with newlines count as multiline content.
+            // Check tag, template quasis, and interpolated expressions.
             has_multiline_content(&tagged.tag, source)
+                || template_literal_has_newlines(&tagged.quasi)
                 || tagged
                     .quasi
                     .expressions

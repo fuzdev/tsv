@@ -10,7 +10,33 @@ use super::super::comments_in_range;
 use super::Printer;
 use super::helpers::type_args_should_wrap_for_return_type;
 use crate::ast::internal::{self, TSConstructorType, TSFunctionType, TSType};
+use tsv_lang::SymbolToU32;
 use tsv_lang::doc::{self, Doc};
+
+/// Check if an expression is an identifier with a TypeLiteral type annotation.
+///
+/// Used for function param hugging: `fn: (options: { a: T }) => U`
+/// - The opening `{` stays on the same line as the parameter name
+/// - The content expands internally
+/// - The closing `}` comes on its own line when broken
+///
+/// Note: Only TypeLiteral is handled specially. Mapped types (`{ [K in T]: V }`)
+/// also pass `is_huggable_type` but use standard param formatting.
+fn get_type_literal_from_identifier(
+    expr: &internal::Expression,
+) -> Option<(&internal::Identifier, &internal::TSTypeLiteral)> {
+    match expr {
+        internal::Expression::Identifier(id) => {
+            id.type_annotation
+                .as_ref()
+                .and_then(|ann| match ann.type_annotation.as_ref() {
+                    TSType::TypeLiteral(t) => Some((id, t)),
+                    _ => None,
+                })
+        }
+        _ => None,
+    }
+}
 
 impl<'a> Printer<'a> {
     //
@@ -37,7 +63,7 @@ impl<'a> Printer<'a> {
                 let type_doc = self.build_union_type_doc(u, false);
                 doc::concat(vec![
                     doc::text(" =>"),
-                    doc::group(doc::indent(doc::concat(vec![doc::line(), type_doc]))),
+                    doc::group(doc::indent_line(type_doc)),
                 ])
             }
             TSType::Intersection(i) => {
@@ -292,43 +318,96 @@ impl<'a> Printer<'a> {
                 return self.build_function_params_doc_with_line_comments(params, paren_pos);
             }
 
-            let mut param_parts = Vec::new();
-            for (i, p) in params.iter().enumerate() {
-                if i > 0 {
-                    param_parts.push(doc::text(","));
-                    param_parts.push(doc::line());
-                }
-                param_parts.push(self.build_function_type_param_expression_doc(p));
+            // Check for huggable single param: (options: { ... })
+            // Prettier's shouldHugFunctionParameters: single param with object type annotation
+            // gets hugged - no breaks added around it, the TypeLiteral handles its own expansion.
+            // This keeps `(options: {` together, letting the object's content break:
+            //   fn: (options: {
+            //       repo: LocalRepo;
+            //       log: Logger;
+            //   }) => ReturnType
+            // NOT:
+            //   fn: (
+            //       options: { repo: LocalRepo; log: Logger },
+            //   ) => ReturnType
+            let no_leading_comments = paren_pos
+                .is_none_or(|pos| !self.has_comments_between(pos + 1, params[0].span().start));
+            let huggable_param = if params.len() == 1 && no_leading_comments {
+                get_type_literal_from_identifier(&params[0])
+            } else {
+                None
+            };
 
-                // Handle trailing comments after this param
-                let param_end = p.span().end;
-                let next_boundary = if i + 1 < params.len() {
-                    params[i + 1].span().start
-                } else {
-                    paren_pos
-                        .and_then(|p| self.find_close_paren(p))
-                        .unwrap_or(param_end)
-                };
-
-                for comment in comments_in_range(self.comments, param_end, next_boundary) {
-                    param_parts.push(doc::text(" "));
-                    param_parts.push(self.build_comment_doc(comment));
+            if let Some((id, type_literal)) = huggable_param {
+                // Hug mode: build identifier with TypeLiteral that doesn't have its own group.
+                // This way the TypeLiteral's softlines are part of the function type group,
+                // and when the function type group breaks (because line is too long),
+                // those softlines become newlines, breaking the param's object type.
+                //
+                // Key insight: fits_with_lookahead evaluates if_break in Flat mode, which
+                // can cause off-by-one errors with trailing semicolons. By removing the
+                // TypeLiteral's group wrapper, its softlines directly contribute to the
+                // function type group's breaking decision.
+                parts.push(doc::text("("));
+                // Build identifier name + optional marker
+                parts.push(doc::symbol(id.name.to_u32()));
+                if id.optional {
+                    parts.push(doc::text("?"));
                 }
+                // Build type annotation with TypeLiteral that has softlines but no group wrapper
+                parts.push(doc::text(": "));
+                parts.push(self.build_type_literal_doc_for_function_param(type_literal));
+
+                // Handle trailing comments after the param (between type literal and close paren)
+                let param_end = params[0].span().end;
+                let close_paren = paren_pos
+                    .and_then(|p| self.find_close_paren(p))
+                    .unwrap_or(param_end);
+                for comment in comments_in_range(self.comments, param_end, close_paren) {
+                    parts.push(doc::text(" "));
+                    parts.push(self.build_comment_doc(comment));
+                }
+
+                parts.push(doc::text(")"));
+            } else {
+                let mut param_parts = Vec::new();
+                for (i, p) in params.iter().enumerate() {
+                    if i > 0 {
+                        param_parts.push(doc::text(","));
+                        param_parts.push(doc::line());
+                    }
+                    param_parts.push(self.build_function_type_param_expression_doc(p));
+
+                    // Handle trailing comments after this param
+                    let param_end = p.span().end;
+                    let next_boundary = if i + 1 < params.len() {
+                        params[i + 1].span().start
+                    } else {
+                        paren_pos
+                            .and_then(|p| self.find_close_paren(p))
+                            .unwrap_or(param_end)
+                    };
+
+                    for comment in comments_in_range(self.comments, param_end, next_boundary) {
+                        param_parts.push(doc::text(" "));
+                        param_parts.push(self.build_comment_doc(comment));
+                    }
+                }
+                parts.push(doc::text("("));
+                parts.push(doc::indent(doc::concat(vec![
+                    doc::softline(),
+                    doc::concat(param_parts),
+                ])));
+                // Trailing comma when breaking, UNLESS last param is a rest element
+                let last_is_rest = params
+                    .last()
+                    .is_some_and(|p| matches!(p, internal::Expression::RestElement(_)));
+                if !last_is_rest {
+                    parts.push(doc::trailing_comma());
+                }
+                parts.push(doc::softline());
+                parts.push(doc::text(")"));
             }
-            parts.push(doc::text("("));
-            parts.push(doc::indent(doc::concat(vec![
-                doc::softline(),
-                doc::concat(param_parts),
-            ])));
-            // Trailing comma when breaking, UNLESS last param is a rest element
-            let last_is_rest = params
-                .last()
-                .is_some_and(|p| matches!(p, internal::Expression::RestElement(_)));
-            if !last_is_rest {
-                parts.push(doc::trailing_comma());
-            }
-            parts.push(doc::softline());
-            parts.push(doc::text(")"));
         }
         parts
     }

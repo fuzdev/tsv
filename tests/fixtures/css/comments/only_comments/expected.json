@@ -1,0 +1,25 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 90,
+		"attributes": [],
+		"children": [],
+		"content": {
+			"start": 7,
+			"end": 82,
+			"styles": "\n\t/* first comment */\n\n\t/*\n\n:root {\n  --some_stylish_property: 100%;\n}\n\n*/\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 91,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

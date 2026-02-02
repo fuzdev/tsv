@@ -528,7 +528,7 @@ impl<'a> Printer<'a> {
             // Broken: ={\n\tgetter,\n\tsetter\n}
             let inner = doc::group(doc::concat(vec![
                 doc::text("{"),
-                doc::indent(doc::concat(vec![doc::softline(), items_doc])),
+                doc::indent_softline(items_doc),
                 doc::softline(),
                 doc::text("}"),
             ]));

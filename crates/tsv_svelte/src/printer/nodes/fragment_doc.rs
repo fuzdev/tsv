@@ -115,11 +115,38 @@ impl<'a> Printer<'a> {
     ) -> Doc {
         let docs: Vec<Doc> = nodes
             .iter()
-            .filter_map(|node| self.build_fragment_node_doc_with_context(node, trim_text))
+            .enumerate()
+            .filter_map(|(i, node)| {
+                // For control flow blocks, check if there's preceding breakable content
+                let is_control_flow = matches!(
+                    node,
+                    FragmentNode::IfBlock(_)
+                        | FragmentNode::EachBlock(_)
+                        | FragmentNode::AwaitBlock(_)
+                        | FragmentNode::KeyBlock(_)
+                );
+                if is_control_flow {
+                    let has_preceding_breakable = nodes[..i].iter().any(|n| {
+                        matches!(
+                            n,
+                            FragmentNode::ExpressionTag(_)
+                                | FragmentNode::Element(_)
+                                | FragmentNode::SpecialElement(_)
+                        )
+                    });
+                    self.build_fragment_node_doc_with_preceding_context(
+                        node,
+                        trim_text,
+                        has_preceding_breakable,
+                    )
+                } else {
+                    self.build_fragment_node_doc_with_context(node, trim_text)
+                }
+            })
             .collect();
 
         if docs.is_empty() {
-            doc::text("")
+            doc::empty()
         } else {
             doc::concat(docs)
         }
@@ -148,7 +175,7 @@ impl<'a> Printer<'a> {
         trim_boundaries: bool,
     ) -> Doc {
         if nodes.is_empty() {
-            return doc::text("");
+            return doc::empty();
         }
 
         // Find boundary indices based on trim_boundaries setting:
@@ -176,7 +203,7 @@ impl<'a> Printer<'a> {
             .map_or(0, |i| i + 1);
 
         if start_idx >= end_idx {
-            return doc::text("");
+            return doc::empty();
         }
 
         let trimmed_nodes = &nodes[start_idx..end_idx];
@@ -212,15 +239,33 @@ impl<'a> Printer<'a> {
                     &mut child_docs,
                     &mut handle_whitespace_of_prev_text,
                 );
-            } else if let Some(node_doc) = self.build_fragment_node_doc_with_context(node, false) {
-                // Other nodes (blocks, etc.) - just add directly
-                child_docs.push(node_doc);
+            } else {
+                // Other nodes (blocks, etc.)
+                // Check if there's preceding breakable content (expression tags or elements)
+                // This affects whether block conditions should use remove_lines() or not:
+                // - With preceding breakable content: use remove_lines() so that content breaks first
+                // - Without preceding breakable content: allow wrapping to respect print_width
+                let has_preceding_breakable = trimmed_nodes[..i].iter().any(|n| {
+                    matches!(
+                        n,
+                        FragmentNode::ExpressionTag(_)
+                            | FragmentNode::Element(_)
+                            | FragmentNode::SpecialElement(_)
+                    )
+                });
+                if let Some(node_doc) = self.build_fragment_node_doc_with_preceding_context(
+                    node,
+                    false,
+                    has_preceding_breakable,
+                ) {
+                    child_docs.push(node_doc);
+                }
                 handle_whitespace_of_prev_text = false;
             }
         }
 
         if child_docs.is_empty() {
-            doc::text("")
+            doc::empty()
         } else {
             doc::concat(child_docs)
         }
@@ -368,7 +413,7 @@ impl<'a> Printer<'a> {
     /// Text nodes with newlines split into separate lines, preserving source structure.
     pub(super) fn build_nodes_doc_multiline(&self, nodes: &[FragmentNode]) -> Doc {
         if nodes.is_empty() {
-            return doc::text("");
+            return doc::empty();
         }
 
         // Find first and last non-whitespace indices
@@ -382,7 +427,7 @@ impl<'a> Printer<'a> {
             .map_or(0, |i| i + 1);
 
         if start_idx >= end_idx {
-            return doc::text("");
+            return doc::empty();
         }
 
         let trimmed_nodes = &nodes[start_idx..end_idx];
@@ -638,7 +683,7 @@ impl<'a> Printer<'a> {
         }
 
         if docs.is_empty() {
-            doc::text("")
+            doc::empty()
         } else {
             doc::concat(docs)
         }
@@ -710,7 +755,7 @@ impl<'a> Printer<'a> {
         node: &FragmentNode,
         trim_text: bool,
     ) -> Option<Doc> {
-        self.build_fragment_node_doc_impl(node, trim_text, false)
+        self.build_fragment_node_doc_impl(node, trim_text, false, false)
     }
 
     /// Build a fragment node doc with multiline context awareness.
@@ -722,7 +767,20 @@ impl<'a> Printer<'a> {
         node: &FragmentNode,
         trim_text: bool,
     ) -> Option<Doc> {
-        self.build_fragment_node_doc_impl(node, trim_text, true)
+        self.build_fragment_node_doc_impl(node, trim_text, true, false)
+    }
+
+    /// Build a fragment node doc with preceding content context.
+    ///
+    /// When `has_preceding_breakable` is true, block conditions will use remove_lines()
+    /// to ensure earlier content breaks before the condition.
+    fn build_fragment_node_doc_with_preceding_context(
+        &self,
+        node: &FragmentNode,
+        trim_text: bool,
+        has_preceding_breakable: bool,
+    ) -> Option<Doc> {
+        self.build_fragment_node_doc_impl(node, trim_text, false, has_preceding_breakable)
     }
 
     fn build_fragment_node_doc_impl(
@@ -730,6 +788,7 @@ impl<'a> Printer<'a> {
         node: &FragmentNode,
         trim_text: bool,
         in_multiline_context: bool,
+        has_preceding_breakable: bool,
     ) -> Option<Doc> {
         match node {
             FragmentNode::Text(text) => self.build_text_doc(text, trim_text),
@@ -737,14 +796,26 @@ impl<'a> Printer<'a> {
             FragmentNode::SpecialElement(element) => Some(self.build_special_element_doc(element)),
             FragmentNode::ExpressionTag(tag) => Some(self.build_expression_tag_doc(tag)),
             FragmentNode::Comment(comment) => Some(self.build_html_comment_doc(comment)),
-            FragmentNode::IfBlock(block) => {
-                Some(self.build_if_block_doc_with_context(block, in_multiline_context))
-            }
-            FragmentNode::EachBlock(block) => {
-                Some(self.build_each_block_doc_with_context(block, in_multiline_context))
-            }
-            FragmentNode::AwaitBlock(block) => Some(self.build_await_block_doc(block)),
-            FragmentNode::KeyBlock(block) => Some(self.build_key_block_doc(block)),
+            FragmentNode::IfBlock(block) => Some(self.build_if_block_doc_with_full_context(
+                block,
+                in_multiline_context,
+                has_preceding_breakable,
+            )),
+            FragmentNode::EachBlock(block) => Some(self.build_each_block_doc_with_full_context(
+                block,
+                in_multiline_context,
+                has_preceding_breakable,
+            )),
+            FragmentNode::AwaitBlock(block) => Some(self.build_await_block_doc_with_full_context(
+                block,
+                in_multiline_context,
+                has_preceding_breakable,
+            )),
+            FragmentNode::KeyBlock(block) => Some(self.build_key_block_doc_with_full_context(
+                block,
+                in_multiline_context,
+                has_preceding_breakable,
+            )),
             FragmentNode::SnippetBlock(block) => Some(self.build_snippet_block_doc(block)),
             FragmentNode::HtmlTag(tag) => Some(self.build_html_tag_doc(tag)),
             FragmentNode::ConstTag(tag) => Some(self.build_const_tag_doc(tag)),
@@ -882,12 +953,29 @@ impl<'a> Printer<'a> {
         block: &internal::IfBlock,
         in_multiline_context: bool,
     ) -> Doc {
-        // Build expression doc tree (preserves conditional_group for width-based breaking)
-        // Then apply remove_lines to force single-line while preserving hardlines
+        self.build_if_block_doc_with_full_context(block, in_multiline_context, false)
+    }
+
+    /// Build if block doc with full context (multiline + preceding content).
+    ///
+    /// `has_preceding_breakable`: If true, there's breakable content before this block,
+    /// so use remove_lines() to ensure that content breaks first.
+    fn build_if_block_doc_with_full_context(
+        &self,
+        block: &internal::IfBlock,
+        in_multiline_context: bool,
+        has_preceding_breakable: bool,
+    ) -> Doc {
+        // Build expression doc with context-dependent behavior
+        // Use remove_lines only if there's preceding breakable content (so it breaks first).
+        // Otherwise, allow natural wrapping to respect print_width.
+        let allow_wrapping = !has_preceding_breakable;
         let expr_doc = self.build_expression_doc_for_block(
             &block.test,
             block.opening_tag_span.start + 5, // after "{#if "
             block.opening_tag_span.end - 1,   // before "}"
+            5,                                // "{#if " = 5 chars
+            allow_wrapping || in_multiline_context,
         );
 
         // Check leading/trailing whitespace, considering multiline context.
@@ -986,13 +1074,14 @@ impl<'a> Printer<'a> {
         // Check if this can be flattened to {:else if ...}
         if let Some(else_if) = Self::get_flattenable_else_if(alt) {
             // {:else if condition}
-            // Build expression doc tree (preserves conditional_group for width-based breaking)
             // The span offset depends on whether this is a true {:else if} or a normalized {#if}
             let opening_offset: usize = if else_if.elseif { 10 } else { 5 };
             let expr_doc = self.build_expression_doc_for_block(
                 &else_if.test,
                 else_if.opening_tag_span.start + opening_offset as u32,
                 else_if.opening_tag_span.end - 1,
+                opening_offset,
+                in_multiline_context,
             );
 
             // Check this branch's own leading/trailing whitespace
@@ -1095,8 +1184,19 @@ impl<'a> Printer<'a> {
         block: &internal::EachBlock,
         in_multiline_context: bool,
     ) -> Doc {
-        // Build expression doc tree (preserves conditional_group for width-based breaking)
+        self.build_each_block_doc_with_full_context(block, in_multiline_context, false)
+    }
+
+    /// Build each block doc with full context (multiline + preceding content).
+    fn build_each_block_doc_with_full_context(
+        &self,
+        block: &internal::EachBlock,
+        in_multiline_context: bool,
+        has_preceding_breakable: bool,
+    ) -> Doc {
+        // Build expression doc with context-dependent behavior
         // Comment range: after "{#each " to before "as" keyword (or end if no context)
+        let allow_wrapping = !has_preceding_breakable;
         let expr_comment_end = block
             .context
             .as_ref()
@@ -1105,6 +1205,8 @@ impl<'a> Printer<'a> {
             &block.expression,
             block.opening_tag_span.start + 7, // after "{#each "
             expr_comment_end,
+            7, // "{#each " = 7 chars
+            allow_wrapping || in_multiline_context,
         );
 
         let mut opening = vec![doc::text("{#each "), expr_doc];
@@ -1126,15 +1228,18 @@ impl<'a> Printer<'a> {
         }
 
         if let Some(key) = &block.key {
-            // Build key doc tree (preserves conditional_group for width-based breaking)
+            // Build key doc with context-dependent behavior
+            // The key expression is inside parens, so opening offset accounts for that
             let key_doc = if let Some(key_span) = block.key_span {
                 self.build_expression_doc_for_block(
                     key,
                     key_span.start + 1, // after "("
                     key_span.end - 1,   // before ")"
+                    1,                  // "(" = 1 char (key is inside parens)
+                    allow_wrapping || in_multiline_context,
                 )
             } else {
-                // No key_span: build doc directly (no remove_lines - let it wrap naturally)
+                // No key_span: build doc directly
                 tsv_ts::build_expression_doc_with_comments(
                     key,
                     self.source,
@@ -1211,11 +1316,33 @@ impl<'a> Printer<'a> {
     ///
     /// Uses same inline/multiline pattern as if blocks.
     pub(crate) fn build_await_block_doc(&self, block: &internal::AwaitBlock) -> Doc {
-        // Build expression doc tree (preserves conditional_group for width-based breaking)
+        self.build_await_block_doc_with_context(block, false)
+    }
+
+    /// Build await block doc with multiline context awareness.
+    pub(crate) fn build_await_block_doc_with_context(
+        &self,
+        block: &internal::AwaitBlock,
+        in_multiline_context: bool,
+    ) -> Doc {
+        self.build_await_block_doc_with_full_context(block, in_multiline_context, false)
+    }
+
+    /// Build await block doc with full context (multiline + preceding content).
+    fn build_await_block_doc_with_full_context(
+        &self,
+        block: &internal::AwaitBlock,
+        in_multiline_context: bool,
+        has_preceding_breakable: bool,
+    ) -> Doc {
+        // Build expression doc with context-dependent behavior
+        let allow_wrapping = !has_preceding_breakable;
         let expr_doc = self.build_expression_doc_for_block(
             &block.expression,
             block.opening_tag_span.start + 8, // after "{#await "
             block.opening_tag_span.end - 1,   // before "}"
+            8,                                // "{#await " = 8 chars
+            allow_wrapping || in_multiline_context,
         );
 
         let mut parts = vec![doc::text("{#await "), expr_doc];
@@ -1283,9 +1410,12 @@ impl<'a> Printer<'a> {
         let mut final_has_trailing = false;
         let mut prev_has_trailing = false;
 
-        // Pending - full form uses space-only detection like other blocks
+        // Pending - await blocks only use newline-based detection (NOT space-only)
+        // Unlike if/each/key, await blocks stay inline even with symmetric spaces:
+        // `{#await p} text {/await}` stays inline, not multiline
         if let Some(pending) = &block.pending {
-            let (has_leading, has_trailing) = self.fragment_ws_status(pending, false);
+            let has_leading = self.fragment_has_leading_ws(pending);
+            let has_trailing = self.fragment_has_trailing_ws(pending);
             let is_inline = !has_leading && !has_trailing;
             let body_doc = if is_inline {
                 self.build_fragment_doc(pending)
@@ -1314,7 +1444,9 @@ impl<'a> Printer<'a> {
             parts.push(doc::text("{:then}"));
         }
         if let Some(then_block) = &block.then {
-            let (has_leading, has_trailing) = self.fragment_ws_status(then_block, false);
+            // Await blocks only use newline-based detection
+            let has_leading = self.fragment_has_leading_ws(then_block);
+            let has_trailing = self.fragment_has_trailing_ws(then_block);
             let is_inline = !has_leading && !has_trailing;
             let body_doc = if is_inline {
                 self.build_fragment_doc(then_block)
@@ -1343,7 +1475,9 @@ impl<'a> Printer<'a> {
             parts.push(doc::text("{:catch}"));
         }
         if let Some(catch_block) = &block.catch {
-            let (has_leading, has_trailing) = self.fragment_ws_status(catch_block, false);
+            // Await blocks only use newline-based detection
+            let has_leading = self.fragment_has_leading_ws(catch_block);
+            let has_trailing = self.fragment_has_trailing_ws(catch_block);
             let is_inline = !has_leading && !has_trailing;
             let body_doc = if is_inline {
                 self.build_fragment_doc(catch_block)
@@ -1367,11 +1501,33 @@ impl<'a> Printer<'a> {
     ///
     /// Uses same inline/multiline pattern as if blocks.
     pub(crate) fn build_key_block_doc(&self, block: &internal::KeyBlock) -> Doc {
-        // Build expression doc tree (preserves conditional_group for width-based breaking)
+        self.build_key_block_doc_with_context(block, false)
+    }
+
+    /// Build key block doc with multiline context awareness.
+    pub(crate) fn build_key_block_doc_with_context(
+        &self,
+        block: &internal::KeyBlock,
+        in_multiline_context: bool,
+    ) -> Doc {
+        self.build_key_block_doc_with_full_context(block, in_multiline_context, false)
+    }
+
+    /// Build key block doc with full context (multiline + preceding content).
+    fn build_key_block_doc_with_full_context(
+        &self,
+        block: &internal::KeyBlock,
+        in_multiline_context: bool,
+        has_preceding_breakable: bool,
+    ) -> Doc {
+        // Build expression doc with context-dependent behavior
+        let allow_wrapping = !has_preceding_breakable;
         let expr_doc = self.build_expression_doc_for_block(
             &block.expression,
             block.opening_tag_span.start + 6, // after "{#key "
             block.opening_tag_span.end - 1,   // before "}"
+            6,                                // "{#key " = 6 chars
+            allow_wrapping || in_multiline_context,
         );
 
         // Check leading/trailing whitespace, considering space-only patterns.
@@ -1417,16 +1573,16 @@ impl<'a> Printer<'a> {
         let is_inline = !has_leading && !has_trailing;
 
         // Type parameters (generics)
-        let type_params_part = block.type_parameters.as_ref().map_or_else(
-            || doc::text(""),
-            |tp| {
+        let type_params_part = block
+            .type_parameters
+            .as_ref()
+            .map_or_else(doc::empty, |tp| {
                 doc::concat(vec![
                     doc::text("<"),
                     doc::text_owned(tp.clone()),
                     doc::text(">"),
                 ])
-            },
-        );
+            });
 
         // Parameters: use raw_parameters if available (preserves TypeScript types),
         // otherwise format individual params
@@ -1445,10 +1601,20 @@ impl<'a> Printer<'a> {
                 .collect()
         };
 
-        // Build params doc with line() separators for wrapping
-        let params_doc = if params_docs.is_empty() {
-            doc::text("")
+        // Build opening tag with group for parameter wrapping
+        // When fits: {#snippet name(a, b, c)}
+        // When wraps: {#snippet name(\n\ta,\n\tb,\n\tc,\n)}
+        // Empty params: {#snippet name()} - no wrapping structure
+        let opening_doc = if params_docs.is_empty() {
+            // No params - simple structure that won't break incorrectly
+            doc::concat(vec![
+                doc::text("{#snippet "),
+                doc::text_owned(name.to_string()),
+                type_params_part,
+                doc::text("()}"),
+            ])
         } else {
+            // Build params doc with line() separators for wrapping
             // Pre-allocate: each param + separator (except first)
             let mut parts = Vec::with_capacity(params_docs.len() * 3);
             for (i, param_doc) in params_docs.into_iter().enumerate() {
@@ -1458,22 +1624,19 @@ impl<'a> Printer<'a> {
                 }
                 parts.push(param_doc);
             }
-            doc::concat(parts)
-        };
+            let params_doc = doc::concat(parts);
 
-        // Build opening tag with group for parameter wrapping
-        // When fits: {#snippet name(a, b, c)}
-        // When wraps: {#snippet name(\n\ta,\n\tb,\n\tc,\n)}
-        let opening_doc = doc::group(doc::concat(vec![
-            doc::text("{#snippet "),
-            doc::text_owned(name.to_string()),
-            type_params_part,
-            doc::text("("),
-            doc::indent(doc::concat(vec![doc::softline(), params_doc])),
-            doc::if_break(doc::text(","), doc::text("")),
-            doc::softline(),
-            doc::text(")}"),
-        ]));
+            doc::group(doc::concat(vec![
+                doc::text("{#snippet "),
+                doc::text_owned(name.to_string()),
+                type_params_part,
+                doc::text("("),
+                doc::indent_softline(params_doc),
+                doc::trailing_comma(),
+                doc::softline(),
+                doc::text(")}"),
+            ]))
+        };
 
         let mut parts = vec![opening_doc];
 
@@ -1839,19 +2002,27 @@ impl<'a> Printer<'a> {
 
     /// Build expression doc for block expressions (if, each, await, key).
     ///
-    /// Unlike `build_expression_with_context_doc` which formats to string first,
-    /// this builds a Doc tree directly, preserving `conditional_group` for chains.
-    /// Expressions wrap naturally when they exceed print_width, matching how
-    /// TypeScript formats the same expressions in `<script>` tags.
+    /// # Context-dependent behavior
     ///
-    /// This differs from Prettier which uses `removeLines()` to force single-line
-    /// layout in block expressions (keeping long lines inline even when exceeding
-    /// print_width). We intentionally diverge to provide consistent formatting.
+    /// - **Inline context** (`in_multiline_context=false`): Applies `remove_lines()` to prevent
+    ///   the block condition from breaking. When the line exceeds print_width, EARLIER content
+    ///   should break instead. Example: `{expr}{#if cond}` - expr breaks, cond stays flat.
+    ///
+    /// - **Multiline context** (`in_multiline_context=true`): The condition is on its own line.
+    ///   No `remove_lines()` is applied, allowing long chains to wrap naturally.
+    ///   Uses `first_line_offset` to get proper continuation indent for wrapped binary expressions.
+    ///
+    /// # Parameters
+    /// - `opening_offset` - Characters before the expression (e.g., 5 for `{#if `). Used to
+    ///   calculate `first_line_offset` which triggers continuation indent for binary expressions.
+    /// - `in_multiline_context` - Whether the block is on its own line (multiline) or inline
     fn build_expression_doc_for_block(
         &self,
         expr: &tsv_ts::Expression,
         span_start: u32,
         span_end: u32,
+        opening_offset: usize,
+        in_multiline_context: bool,
     ) -> Doc {
         let expr_start = expr.span().start;
         let expr_end = expr.span().end;
@@ -1862,25 +2033,29 @@ impl<'a> Printer<'a> {
                 .map(Self::build_leading_js_comment_doc)
                 .collect();
 
-        // Use a config with first_line_offset > 0 to trigger continuation indent
-        // for binary expressions. This ensures wrapped lines are indented properly.
-        let block_config = tsv_lang::PrintConfig {
-            first_line_offset: 1,
-            ..self.config
+        // Set up config with first_line_offset to trigger continuation indent in the
+        // TypeScript formatter. The formatter checks `first_line_offset > 0` to decide
+        // whether to use continuation indent for binary expressions.
+        // Only apply in multiline context where wrapping is allowed.
+        let config = if in_multiline_context {
+            let context_indent = self.config.tab_width;
+            let first_line_offset = context_indent + opening_offset;
+            tsv_lang::PrintConfig {
+                first_line_offset,
+                ..self.config
+            }
+        } else {
+            self.config
         };
 
-        // Build expression doc tree (preserves conditional_group for chains)
-        // Unlike Prettier which uses removeLines() to force single-line, we let
-        // expressions wrap naturally when they exceed print_width. This matches
-        // how TypeScript formats the same expressions in <script> tags.
-        //
+        // Build expression doc tree
         // Assignment expressions need parens in block conditions: {#if (a = b)}
         let expr_doc = if matches!(expr, tsv_ts::Expression::AssignmentExpression(_)) {
             doc::parens(tsv_ts::build_expression_doc_with_comments(
                 expr,
                 self.source,
                 Rc::clone(&self.interner),
-                &block_config,
+                &config,
                 self.comments,
             ))
         } else {
@@ -1888,9 +2063,18 @@ impl<'a> Printer<'a> {
                 expr,
                 self.source,
                 Rc::clone(&self.interner),
-                &block_config,
+                &config,
                 self.comments,
             )
+        };
+
+        // Apply remove_lines() only in INLINE contexts to prevent the condition
+        // from being the first thing to break when there's other content on the line.
+        // In multiline contexts, the condition is on its own line and can wrap naturally.
+        let expr_doc = if in_multiline_context {
+            expr_doc
+        } else {
+            doc::remove_lines(expr_doc)
         };
 
         // Build docs for trailing comments

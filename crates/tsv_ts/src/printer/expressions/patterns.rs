@@ -69,7 +69,7 @@ fn build_chain_doc(
             parts.push(right_doc);
         } else {
             // Standard chain tail: indent the final value
-            parts.push(doc::indent(doc::concat(vec![doc::line(), right_doc])));
+            parts.push(doc::indent_line(right_doc));
         }
     } else {
         // Chain middle: soft line break, no indent
@@ -563,11 +563,7 @@ impl<'a> Printer<'a> {
                     // Handle computed keys: {[key]: value}
                     // For regular keys, use property_key_doc to normalize string keys to identifiers
                     let key_doc = if p.computed {
-                        doc::concat(vec![
-                            doc::text("["),
-                            self.build_expression_doc(&p.key),
-                            doc::text("]"),
-                        ])
+                        doc::brackets(self.build_expression_doc(&p.key))
                     } else {
                         self.build_property_key_doc(&p.key)
                     };

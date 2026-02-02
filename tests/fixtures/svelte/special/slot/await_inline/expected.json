@@ -1,0 +1,199 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 114,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SlotElement",
+				"start": 0,
+				"end": 41,
+				"name": "slot",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 5,
+						"character": 5
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "AwaitBlock",
+							"start": 6,
+							"end": 34,
+							"expression": {
+								"type": "Identifier",
+								"start": 14,
+								"end": 21,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 14
+									},
+									"end": {
+										"line": 1,
+										"column": 21
+									}
+								},
+								"name": "promise"
+							},
+							"value": null,
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 22,
+										"end": 26,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							},
+							"then": null,
+							"catch": null
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 41,
+				"end": 43,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "SlotElement",
+				"start": 43,
+				"end": 113,
+				"name": "slot",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 44
+					},
+					"end": {
+						"line": 3,
+						"column": 5,
+						"character": 48
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 49,
+						"end": 57,
+						"name": "name",
+						"name_loc": {
+							"start": {
+								"line": 3,
+								"column": 6,
+								"character": 49
+							},
+							"end": {
+								"line": 3,
+								"column": 10,
+								"character": 53
+							}
+						},
+						"value": [
+							{
+								"start": 55,
+								"end": 56,
+								"type": "Text",
+								"raw": "x",
+								"data": "x"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "AwaitBlock",
+							"start": 58,
+							"end": 106,
+							"expression": {
+								"type": "Identifier",
+								"start": 66,
+								"end": 73,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 23
+									},
+									"end": {
+										"line": 3,
+										"column": 30
+									}
+								},
+								"name": "promise"
+							},
+							"value": {
+								"type": "Identifier",
+								"name": "value",
+								"start": 88,
+								"end": 93,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 45,
+										"character": 88
+									},
+									"end": {
+										"line": 3,
+										"column": 50,
+										"character": 93
+									}
+								}
+							},
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 74,
+										"end": 81,
+										"raw": "loading",
+										"data": "loading"
+									}
+								]
+							},
+							"then": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 94,
+										"end": 98,
+										"raw": "done",
+										"data": "done"
+									}
+								]
+							},
+							"catch": null
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

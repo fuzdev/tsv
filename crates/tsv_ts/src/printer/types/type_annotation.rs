@@ -5,8 +5,11 @@
 // - Width-aware wrapping for type arguments
 // - Return type annotations
 
-use super::helpers::{intersection_has_huggable_last_type, type_args_should_wrap_for_return_type};
-use super::{CommentSpacing, Printer};
+use super::helpers::{
+    find_separator_position, intersection_has_huggable_last_type,
+    type_args_should_wrap_for_return_type, type_needs_parens_in_intersection,
+};
+use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType};
 use tsv_lang::doc::{self, Doc};
 
@@ -86,40 +89,20 @@ impl<'a> Printer<'a> {
                     ]))
                 }
                 TSType::Intersection(i) => {
-                    // Check if last type is huggable (TypeLiteral) - if so, don't add indent/line
-                    // because the TypeLiteral handles its own expansion with proper indentation
-                    let type_doc = self.build_intersection_type_doc(i, false);
-                    if intersection_has_huggable_last_type(i) {
-                        // No indent/line - keep `: Type & {` hugged
-                        doc::concat(vec![doc::text(": "), type_doc])
-                    } else {
-                        doc::group(doc::concat(vec![
-                            doc::text(":"),
-                            doc::indent(doc::concat(vec![doc::line(), type_doc])),
-                        ]))
-                    }
+                    // Build intersection with proper indentation for type annotation context:
+                    // `: FirstType &` stays on the same line, continuation types are indented
+                    self.build_intersection_type_annotation_doc(i)
                 }
                 _ => {
-                    // Block comments stay inline for simple types
-                    // Use trailing spacing so comment gets space after: `: /* comment */ Type`
-                    let has_comments = self.has_comments_between(colon_end, type_start);
-                    if has_comments {
-                        let comments_doc = self.build_comments_between(
-                            colon_end,
-                            type_start,
-                            CommentSpacing::Trailing,
-                        );
-                        doc::concat(vec![
-                            doc::text(": "),
-                            comments_doc,
-                            self.build_type_doc(&annotation.type_annotation),
-                        ])
-                    } else {
-                        doc::concat(vec![
-                            doc::text(": "),
-                            self.build_type_doc(&annotation.type_annotation),
-                        ])
-                    }
+                    // Block comments stay inline: `: /* comment */ Type`
+                    let mut parts = vec![doc::text(": ")];
+                    parts.push(self.build_comments_between(
+                        colon_end,
+                        type_start,
+                        CommentSpacing::Trailing,
+                    ));
+                    parts.push(self.build_type_doc(&annotation.type_annotation));
+                    doc::concat(parts)
                 }
             }
         }
@@ -193,7 +176,7 @@ impl<'a> Printer<'a> {
         // Handle Union types - break after colon with indent when long
         if let TSType::Union(u) = annotation.type_annotation.as_ref() {
             let type_doc = self.build_union_type_doc(u, false);
-            let union_group = doc::group(doc::indent(doc::concat(vec![doc::line(), type_doc])));
+            let union_group = doc::group(doc::indent_line(type_doc));
             return doc::concat(vec![doc::text(":"), union_group]);
         }
 
@@ -216,5 +199,148 @@ impl<'a> Printer<'a> {
                 &*annotation.type_annotation,
                 TSType::Union(_) | TSType::Intersection(_)
             )
+    }
+
+    /// Build intersection type annotation with proper indentation.
+    ///
+    /// Structure for class properties:
+    /// ```text
+    /// property: FirstType &
+    ///     SecondType &
+    ///     ThirdType;
+    /// ```
+    ///
+    /// The first type stays on the same line as `:`, continuation types are indented.
+    /// This differs from `build_intersection_type_doc` which doesn't add internal
+    /// indentation (expecting the parent context like type alias to provide it).
+    fn build_intersection_type_annotation_doc(
+        &self,
+        intersection: &internal::TSIntersectionType,
+    ) -> Doc {
+        if intersection.types.is_empty() {
+            return doc::text(": ");
+        }
+
+        // Single type - just use the normal intersection doc
+        if intersection.types.len() == 1 {
+            return doc::concat(vec![
+                doc::text(": "),
+                self.build_type_doc_with_wrapping_type_args(&intersection.types[0]),
+            ]);
+        }
+
+        // Check for huggable last type (TypeLiteral)
+        let last_is_huggable = intersection_has_huggable_last_type(intersection);
+        let last_idx = intersection.types.len() - 1;
+
+        // Build first type (stays on same line as `:`)
+        // Use wrapping type args so GenericType<...> can break at print width
+        let first_type = &intersection.types[0];
+        let first_type_doc = self.build_intersection_member_type_doc(first_type);
+
+        let mut first_parts = vec![doc::text(": "), first_type_doc];
+
+        // Add trailing block comments after first type (before the `&`)
+        let first_type_end = first_type.span().end;
+        let second_type_start = intersection.types[1].span().start;
+        if let Some(amp_pos) =
+            find_separator_position(self.source, first_type_end, second_type_start, b'&')
+        {
+            first_parts.push(self.build_comments_between_filtered(
+                first_type_end,
+                amp_pos,
+                CommentSpacing::Leading,
+                CommentFilter::BlockOnly,
+            ));
+        }
+        first_parts.push(doc::text(" &"));
+
+        // Build continuation types (indented when breaking)
+        let mut continuation_parts = Vec::new();
+        for (i, t) in intersection.types.iter().enumerate().skip(1) {
+            let type_start = t.span().start;
+            let type_end = t.span().end;
+            let is_last = i == last_idx;
+
+            // Space/line before this type
+            if is_last && last_is_huggable {
+                // Keep `& {` hugged
+                continuation_parts.push(doc::text(" "));
+            } else {
+                continuation_parts.push(doc::line());
+            }
+
+            // Add leading block comments (after `&`)
+            let prev_type_end = intersection.types[i - 1].span().end;
+            if let Some(amp_pos) =
+                find_separator_position(self.source, prev_type_end, type_start, b'&')
+            {
+                continuation_parts.push(self.build_comments_between_filtered(
+                    amp_pos + 1,
+                    type_start,
+                    CommentSpacing::Trailing,
+                    CommentFilter::BlockOnly,
+                ));
+            }
+
+            // The type itself (with wrapping type args so generics can break)
+            continuation_parts.push(self.build_intersection_member_type_doc(t));
+
+            // Trailing block comments and `&` separator (except for last type)
+            if !is_last {
+                let next_type_start = intersection.types[i + 1].span().start;
+                if let Some(amp_pos) =
+                    find_separator_position(self.source, type_end, next_type_start, b'&')
+                {
+                    continuation_parts.push(self.build_comments_between_filtered(
+                        type_end,
+                        amp_pos,
+                        CommentSpacing::Leading,
+                        CommentFilter::BlockOnly,
+                    ));
+                }
+                continuation_parts.push(doc::text(" &"));
+            } else {
+                // Last type - trailing comments
+                continuation_parts.push(self.build_comments_between_filtered(
+                    type_end,
+                    intersection.span.end,
+                    CommentSpacing::Leading,
+                    CommentFilter::BlockOnly,
+                ));
+            }
+        }
+
+        // Combine: first_parts + indented continuation
+        let mut parts = first_parts;
+        if !continuation_parts.is_empty() {
+            // Huggable-only (A & {b}): no indent, TypeLiteral handles its own expansion
+            // All other cases: wrap continuation in indent
+            if last_is_huggable && intersection.types.len() == 2 {
+                parts.extend(continuation_parts);
+            } else {
+                parts.push(doc::indent(doc::concat(continuation_parts)));
+            }
+        }
+
+        // Huggable types don't need a group (TypeLiteral expands itself)
+        if last_is_huggable {
+            doc::concat(parts)
+        } else {
+            doc::group(doc::concat(parts))
+        }
+    }
+
+    /// Build intersection member type with optional parens and wrapping type args.
+    fn build_intersection_member_type_doc(&self, t: &TSType) -> Doc {
+        if type_needs_parens_in_intersection(t) {
+            doc::concat(vec![
+                doc::text("("),
+                self.build_type_doc_with_wrapping_type_args(t),
+                doc::text(")"),
+            ])
+        } else {
+            self.build_type_doc_with_wrapping_type_args(t)
+        }
     }
 }

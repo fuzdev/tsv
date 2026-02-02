@@ -27,7 +27,14 @@ impl<'a> Printer<'a> {
             self.print_attribute_node(attr);
         }
 
-        self.write(">\n");
+        // Check if script had any original content (including whitespace)
+        let had_content = script.content.span.start != script.content.span.end;
+
+        if had_content {
+            self.write(">\n");
+        } else {
+            self.write(">");
+        }
 
         // Build Doc for script content
         // Width calculations are handled by:
@@ -86,8 +93,11 @@ impl<'a> Printer<'a> {
 
         self.write(">");
 
-        // Format CSS content if present
-        if !style.css_stylesheet.nodes.is_empty() {
+        // Check if there was any original content (including whitespace)
+        let had_content = style.content_span.start != style.content_span.end;
+
+        // Format CSS content if present (nodes or comments)
+        if !style.css_stylesheet.nodes.is_empty() || !style.css_stylesheet.comments.is_empty() {
             self.write("\n");
 
             // Pass the entire source to CSS printer (CSS node spans are absolute)
@@ -127,6 +137,9 @@ impl<'a> Printer<'a> {
                 self.write("\n");
             }
             self.indent_level -= 1;
+        } else if had_content {
+            // Preserve block structure when original had whitespace-only content
+            self.write("\n");
         }
 
         // Closing tag

@@ -130,7 +130,7 @@ impl<'a> Printer<'a> {
     fn build_condition_group(&self, test_expr: &internal::Expression) -> doc::Doc {
         let test_doc = self.build_condition_doc(test_expr);
         doc::group(doc::concat(vec![
-            doc::indent(doc::concat(vec![doc::softline(), test_doc])),
+            doc::indent_softline(test_doc),
             doc::softline(),
         ]))
     }
@@ -410,7 +410,7 @@ impl<'a> Printer<'a> {
             // - When flat: line becomes space -> `if (cond) a;`
             // - When broken: line becomes newline + indent -> `if (cond)\n\ta;`
             let consequent_doc = self.build_statement_doc(&stmt.consequent);
-            let adjust_clause = doc::indent(doc::concat(vec![doc::line(), consequent_doc]));
+            let adjust_clause = doc::indent_line(consequent_doc);
 
             let mut parts = vec![doc::group(doc::concat(vec![
                 doc::text("if ("),
@@ -812,7 +812,7 @@ impl<'a> Printer<'a> {
             }
         } else if has_test && !has_own_line_comments {
             // Prettier adds trailing space when update is None but test exists (no comments)
-            inner_parts.push(doc::if_break(doc::text(""), doc::text(" ")));
+            inner_parts.push(doc::if_break(doc::empty(), doc::text(" ")));
         }
 
         let closing = if has_own_line_comments {
@@ -1352,7 +1352,7 @@ impl<'a> Printer<'a> {
             // - When flat: line becomes space -> `while (cond) a;`
             // - When broken: line becomes newline + indent -> `while (cond)\n\ta;`
             let body_doc = self.build_statement_doc(&stmt.body);
-            let adjust_clause = doc::indent(doc::concat(vec![doc::line(), body_doc]));
+            let adjust_clause = doc::indent_line(body_doc);
 
             doc::group(doc::concat(vec![
                 doc::text("while ("),
