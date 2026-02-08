@@ -6,6 +6,7 @@
 //
 // Note: Block statements are in blocks.rs as a reusable utility
 
+use super::super::utils::arrow_has_trailing_param_comments;
 use super::{ParenContext, Printer, needs_parens, unwrap_parenthesized};
 use crate::ast::internal;
 use crate::printer::types::helpers::is_huggable_type;
@@ -207,9 +208,21 @@ impl<'a> Printer<'a> {
                 let chain_has_return_type =
                     is_arrow_body && crate::printer::arrow_chain_has_return_type(arrow);
 
+                // Check if body arrow has trailing param comments (forces break)
+                let body_arrow_has_trailing_param_comments =
+                    if let internal::Expression::ArrowFunctionExpression(body_arrow) = expr.as_ref()
+                    {
+                        arrow_has_trailing_param_comments(body_arrow, |start, end| {
+                            self.has_comments_between(start, end)
+                        })
+                    } else {
+                        false
+                    };
+
                 let should_hug = !has_post_arrow_comments
                     && should_hug_arrow_body(expr)
-                    && !chain_has_return_type;
+                    && !chain_has_return_type
+                    && !body_arrow_has_trailing_param_comments;
 
                 if has_post_arrow_comments {
                     // Build body doc with leading comments - always breaks
@@ -245,6 +258,19 @@ impl<'a> Printer<'a> {
                     let body_doc = self.build_arrow_body_doc(expr);
                     self.in_curried_typed_arrow.set(was_in_curried);
                     parts.push(doc::concat(vec![doc::hardline(), body_doc]));
+                } else if is_arrow_body && body_arrow_has_trailing_param_comments {
+                    // Nested arrow with trailing param comments - first level gets indent,
+                    // subsequent levels align (use curried pattern)
+                    // (a, // c) => (b, // c) => {}
+                    // becomes:
+                    // (a, // c) =>
+                    //     (b, // c) =>
+                    //     (c, // c) => {}
+                    let was_in_curried = self.in_curried_typed_arrow.get();
+                    self.in_curried_typed_arrow.set(true);
+                    let body_doc = self.build_arrow_body_doc(expr);
+                    self.in_curried_typed_arrow.set(was_in_curried);
+                    parts.push(doc::indent(doc::concat(vec![doc::hardline(), body_doc])));
                 } else if self.in_curried_typed_arrow.get() {
                     // Innermost arrow in curried chain - body is NOT another arrow.
                     // This needs indent since it's the final expression.
@@ -856,10 +882,23 @@ impl<'a> Printer<'a> {
                 inner_parts.push(doc::text(","));
             }
 
-            // Line comments (any position) go after comma (excluded from width)
+            // Line comments (same-line) go after comma (excluded from width)
             // Block comments AFTER comma are handled as leading for next param
             for comment in same_line_comments.iter().filter(|c| !c.is_block) {
                 inner_parts.push(self.build_trailing_line_comment_doc(comment));
+            }
+
+            // Own-line line comments (on their own line after last param, before `)`)
+            // Only for the last param - non-last param comments are handled as leading for next param
+            if is_last {
+                for comment in
+                    tsv_lang::comments_in_range(self.comments, param.span().end, search_end).filter(
+                        |c| !c.is_block && !self.is_same_line(param.span().end, c.span.start),
+                    )
+                {
+                    inner_parts.push(doc::hardline());
+                    inner_parts.push(self.build_comment_doc(comment));
+                }
             }
         }
 

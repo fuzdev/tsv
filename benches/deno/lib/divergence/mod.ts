@@ -13,8 +13,10 @@ export {
 	type DetectionContext,
 	type DivergenceMatch,
 	type DivergencePattern,
+	type HunkCoverageResult,
 	PATTERNS,
 } from './patterns.ts';
+export { type DiffHunk, extractHunks } from '../diff.ts';
 export {
 	type AuditReport,
 	type DocumentedDivergence,

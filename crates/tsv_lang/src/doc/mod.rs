@@ -69,6 +69,9 @@
 //! />
 //! ```
 
+pub mod arena;
+mod arena_fits;
+mod arena_render;
 mod builders;
 mod fits;
 mod helpers;
@@ -104,6 +107,16 @@ pub use render::{
     print_doc_with_indent, print_doc_with_indent_resolved,
     print_doc_with_indent_resolved_preserve_whitespace,
 };
+
+// Arena render
+pub use arena_render::{
+    arena_print_doc, arena_print_doc_at_column, arena_print_doc_at_column_resolved,
+    arena_print_doc_resolved, arena_print_doc_with_indent, arena_print_doc_with_indent_resolved,
+    arena_print_doc_with_indent_resolved_preserve_whitespace,
+};
+
+// Arena fits
+pub use arena_fits::arena_fits;
 
 #[cfg(test)]
 mod tests {
@@ -989,5 +1002,501 @@ mod tests {
         };
         // Both outer groups stay flat, inner hardline breaks
         assert_eq!(print_doc(&doc, &config), "a(b(x\ny))");
+    }
+}
+
+#[cfg(test)]
+mod arena_tests {
+    use super::arena::DocArena;
+    use super::*;
+    use crate::PrintConfig;
+
+    #[test]
+    fn test_arena_simple_text() {
+        let a = DocArena::new();
+        let doc = a.text("hello");
+        let config = PrintConfig::default();
+        assert_eq!(arena_print_doc(&a, doc, &config), "hello");
+    }
+
+    #[test]
+    fn test_arena_concat() {
+        let a = DocArena::new();
+        let doc = a.concat(vec![a.text("hello"), a.text(" "), a.text("world")]);
+        let config = PrintConfig::default();
+        assert_eq!(arena_print_doc(&a, doc, &config), "hello world");
+    }
+
+    #[test]
+    fn test_arena_line_in_flat_mode_fits() {
+        let a = DocArena::new();
+        let doc = a.group(a.concat(vec![a.text("a"), a.line(), a.text("b")]));
+        let config = PrintConfig {
+            indent: "\t",
+            print_width: 10,
+            tab_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config), "a b");
+    }
+
+    #[test]
+    fn test_arena_line_in_break_mode() {
+        let a = DocArena::new();
+        let doc = a.group(a.concat(vec![a.text("hello"), a.line(), a.text("world")]));
+        let config = PrintConfig {
+            indent: "\t",
+            print_width: 8,
+            tab_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config), "hello\nworld");
+    }
+
+    #[test]
+    fn test_arena_hardline() {
+        let a = DocArena::new();
+        let doc = a.concat(vec![a.text("a"), a.hardline(), a.text("b")]);
+        let config = PrintConfig {
+            indent: "\t",
+            print_width: 100,
+            tab_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config), "a\nb");
+    }
+
+    #[test]
+    fn test_arena_softline() {
+        let a = DocArena::new();
+        let doc = a.group(a.concat(vec![a.text("a"), a.softline(), a.text("b")]));
+        let config = PrintConfig {
+            indent: "\t",
+            print_width: 10,
+            tab_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config), "ab");
+    }
+
+    #[test]
+    fn test_arena_indent() {
+        let a = DocArena::new();
+        let inner = a.concat(vec![a.hardline(), a.text("child")]);
+        let doc = a.concat(vec![a.text("parent"), a.indent(inner)]);
+        let config = PrintConfig {
+            indent: "\t",
+            print_width: 80,
+            tab_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config), "parent\n\tchild");
+    }
+
+    #[test]
+    fn test_arena_group_with_indent() {
+        let a = DocArena::new();
+        let inner = a.concat(vec![a.line(), a.text("content")]);
+        let indented = a.indent(inner);
+        let doc = a.group(a.concat(vec![a.text("("), indented, a.line(), a.text(")")]));
+
+        let config_wide = PrintConfig {
+            indent: "  ",
+            print_width: 20,
+            tab_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config_wide), "( content )");
+
+        let a2 = DocArena::new();
+        let inner2 = a2.concat(vec![a2.line(), a2.text("content")]);
+        let indented2 = a2.indent(inner2);
+        let doc2 = a2.group(a2.concat(vec![a2.text("("), indented2, a2.line(), a2.text(")")]));
+
+        let config_narrow = PrintConfig {
+            indent: "  ",
+            print_width: 8,
+            tab_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a2, doc2, &config_narrow), "(\n  content\n)");
+    }
+
+    #[test]
+    fn test_arena_if_break() {
+        let a = DocArena::new();
+        let doc = a.group(a.concat(vec![
+            a.text("("),
+            a.if_break(a.text(",\n"), a.text(", ")),
+            a.text(")"),
+        ]));
+
+        let config_wide = PrintConfig {
+            indent: "\t",
+            print_width: 20,
+            tab_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config_wide), "(, )");
+    }
+
+    #[test]
+    fn test_arena_dedent() {
+        let a = DocArena::new();
+        let inner = a.concat(vec![a.hardline(), a.text("back-to-level0")]);
+        let dedented = a.dedent(inner);
+        let doc = a.indent(a.concat(vec![
+            a.text("level1"),
+            a.hardline(),
+            a.text("still-level1"),
+            dedented,
+        ]));
+        let config = PrintConfig {
+            indent: "\t",
+            print_width: 80,
+            tab_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(
+            arena_print_doc(&a, doc, &config),
+            "level1\n\tstill-level1\nback-to-level0"
+        );
+    }
+
+    #[test]
+    fn test_arena_fill_all_fit() {
+        let a = DocArena::new();
+        let doc = a.fill(vec![a.text("a"), a.line(), a.text("b"), a.line(), a.text("c")]);
+        let config = PrintConfig {
+            indent: "\t",
+            print_width: 20,
+            tab_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config), "a b c");
+    }
+
+    #[test]
+    fn test_arena_fill_greedy_packing() {
+        let a = DocArena::new();
+        let doc = a.fill(vec![
+            a.text("aa"),
+            a.line(),
+            a.text("bb"),
+            a.line(),
+            a.text("cc"),
+        ]);
+        let config = PrintConfig {
+            indent: "\t",
+            print_width: 6,
+            tab_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config), "aa bb\ncc");
+    }
+
+    #[test]
+    fn test_arena_fill_long_comma_list() {
+        let a = DocArena::new();
+        let doc = a.fill(vec![
+            a.text("aaaa"),
+            a.concat(vec![a.text(","), a.line()]),
+            a.text("bbbb"),
+            a.concat(vec![a.text(","), a.line()]),
+            a.text("cccc"),
+            a.concat(vec![a.text(","), a.line()]),
+            a.text("dddd"),
+        ]);
+        let config = PrintConfig {
+            indent: "\t",
+            print_width: 15,
+            tab_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config), "aaaa, bbbb,\ncccc, dddd");
+    }
+
+    #[test]
+    fn test_arena_fill_with_base_indent_offset() {
+        let a = DocArena::new();
+        let doc = a.indent(a.fill(vec![
+            a.text("1"),
+            a.concat(vec![a.text(","), a.line()]),
+            a.text("2"),
+            a.concat(vec![a.text(","), a.line()]),
+            a.text("3"),
+            a.concat(vec![a.text(","), a.line()]),
+            a.text("4"),
+            a.concat(vec![a.text(","), a.line()]),
+            a.text("5"),
+            a.concat(vec![a.text(","), a.line()]),
+            a.text("6"),
+            a.concat(vec![a.text(","), a.line()]),
+            a.text("7"),
+            a.concat(vec![a.text(","), a.line()]),
+            a.text("8"),
+        ]));
+
+        let config_no_offset = PrintConfig {
+            indent: "\t",
+            print_width: 12,
+            tab_width: 2,
+            base_indent_offset: 0,
+            ..Default::default()
+        };
+        assert_eq!(
+            arena_print_doc(&a, doc, &config_no_offset),
+            "1, 2, 3, 4,\n\t5, 6, 7, 8"
+        );
+
+        let a2 = DocArena::new();
+        let doc2 = a2.indent(a2.fill(vec![
+            a2.text("1"),
+            a2.concat(vec![a2.text(","), a2.line()]),
+            a2.text("2"),
+            a2.concat(vec![a2.text(","), a2.line()]),
+            a2.text("3"),
+            a2.concat(vec![a2.text(","), a2.line()]),
+            a2.text("4"),
+            a2.concat(vec![a2.text(","), a2.line()]),
+            a2.text("5"),
+            a2.concat(vec![a2.text(","), a2.line()]),
+            a2.text("6"),
+            a2.concat(vec![a2.text(","), a2.line()]),
+            a2.text("7"),
+            a2.concat(vec![a2.text(","), a2.line()]),
+            a2.text("8"),
+        ]));
+
+        let config_with_offset = PrintConfig {
+            indent: "\t",
+            print_width: 12,
+            tab_width: 2,
+            base_indent_offset: 1,
+            ..Default::default()
+        };
+        assert_eq!(
+            arena_print_doc(&a2, doc2, &config_with_offset),
+            "1, 2, 3, 4,\n\t5, 6, 7,\n\t8"
+        );
+    }
+
+    #[test]
+    fn test_arena_join() {
+        let a = DocArena::new();
+        let docs = vec![a.text("a"), a.text("b"), a.text("c")];
+        let doc = a.join(docs, ", ");
+        let config = PrintConfig::default();
+        assert_eq!(arena_print_doc(&a, doc, &config), "a, b, c");
+    }
+
+    #[test]
+    fn test_arena_join_empty() {
+        let a = DocArena::new();
+        let docs: Vec<_> = vec![];
+        let doc = a.join(docs, ", ");
+        let config = PrintConfig::default();
+        assert_eq!(arena_print_doc(&a, doc, &config), "");
+    }
+
+    #[test]
+    fn test_arena_join_doc_with_line() {
+        let a = DocArena::new();
+        let sep = a.line();
+        let docs = vec![a.text("a"), a.text("b"), a.text("c")];
+        let joined = a.join_doc(docs, sep);
+        let doc = a.group(joined);
+
+        let config_wide = PrintConfig {
+            print_width: 20,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config_wide), "a b c");
+
+        let a2 = DocArena::new();
+        let sep2 = a2.line();
+        let docs2 = vec![a2.text("a"), a2.text("b"), a2.text("c")];
+        let joined2 = a2.join_doc(docs2, sep2);
+        let doc2 = a2.group(joined2);
+
+        let config_narrow = PrintConfig {
+            print_width: 3,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a2, doc2, &config_narrow), "a\nb\nc");
+    }
+
+    #[test]
+    fn test_arena_wrap() {
+        let a = DocArena::new();
+        let doc = a.wrap("(", a.text("content"), ")");
+        let config = PrintConfig::default();
+        assert_eq!(arena_print_doc(&a, doc, &config), "(content)");
+    }
+
+    #[test]
+    fn test_arena_parens() {
+        let a = DocArena::new();
+        let doc = a.parens(a.text("x"));
+        let config = PrintConfig::default();
+        assert_eq!(arena_print_doc(&a, doc, &config), "(x)");
+    }
+
+    #[test]
+    fn test_arena_brackets() {
+        let a = DocArena::new();
+        let doc = a.brackets(a.text("0"));
+        let config = PrintConfig::default();
+        assert_eq!(arena_print_doc(&a, doc, &config), "[0]");
+    }
+
+    #[test]
+    fn test_arena_braces() {
+        let a = DocArena::new();
+        let doc = a.braces(a.text("a: 1"));
+        let config = PrintConfig::default();
+        assert_eq!(arena_print_doc(&a, doc, &config), "{a: 1}");
+    }
+
+    #[test]
+    fn test_arena_join_trailing_flat() {
+        let a = DocArena::new();
+        let sep = a.concat(vec![a.text(","), a.line()]);
+        let docs = vec![a.text("a"), a.text("b"), a.text("c")];
+        let trailing = a.join_trailing(docs, sep);
+        let doc = a.group(trailing);
+        let config = PrintConfig {
+            print_width: 20,
+            indent: "  ",
+            tab_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config), "a, b, c");
+    }
+
+    #[test]
+    fn test_arena_join_trailing_break() {
+        let a = DocArena::new();
+        let sep = a.concat(vec![a.text(","), a.line()]);
+        let docs = vec![a.text("a"), a.text("b"), a.text("c")];
+        let trailing = a.join_trailing(docs, sep);
+        let doc = a.group(trailing);
+        let config = PrintConfig {
+            print_width: 3,
+            indent: "  ",
+            tab_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config), "a,\nb,\nc,");
+    }
+
+    #[test]
+    fn test_arena_indent_line() {
+        let a = DocArena::new();
+        let doc = a.group(a.concat(vec![
+            a.text("prefix"),
+            a.indent_line(a.text("indented")),
+        ]));
+        let config = PrintConfig {
+            print_width: 10,
+            indent: "  ",
+            tab_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config), "prefix\n  indented");
+    }
+
+    #[test]
+    fn test_arena_indent_softline_flat() {
+        let a = DocArena::new();
+        let doc = a.group(a.concat(vec![
+            a.text("a"),
+            a.indent_softline(a.text("b")),
+        ]));
+        let config = PrintConfig {
+            print_width: 20,
+            indent: "  ",
+            tab_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config), "ab");
+    }
+
+    #[test]
+    fn test_arena_isolated_group_prevents_break() {
+        let a = DocArena::new();
+        let inner = a.concat(vec![a.text("a"), a.hardline(), a.text("b")]);
+        let iso = a.isolated_group(inner);
+        let doc = a.group(a.concat(vec![a.text("fn("), iso, a.text(")")]));
+        let config = PrintConfig {
+            print_width: 100,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config), "fn(a\nb)");
+    }
+
+    #[test]
+    fn test_arena_will_break_false_for_isolated() {
+        let a = DocArena::new();
+        let doc = a.isolated_group(a.concat(vec![a.text("a"), a.hardline(), a.text("b")]));
+        assert!(!a.will_break(doc));
+    }
+
+    #[test]
+    fn test_arena_nested_isolated_groups() {
+        let a = DocArena::new();
+        let inner_iso = a.isolated_group(a.concat(vec![a.text("x"), a.hardline(), a.text("y")]));
+        let outer_iso = a.isolated_group(a.concat(vec![a.text("b("), inner_iso, a.text(")")]));
+        let doc = a.group(a.concat(vec![a.text("a("), outer_iso, a.text(")")]));
+        let config = PrintConfig {
+            print_width: 100,
+            ..Default::default()
+        };
+        assert_eq!(arena_print_doc(&a, doc, &config), "a(b(x\ny))");
+    }
+
+    #[test]
+    fn test_arena_fill_wraps_last_item_at_101() {
+        let a = DocArena::new();
+        let items = vec![
+            "a0000000000",
+            "a1111111111",
+            "a2222222222",
+            "a3333333333",
+            "a4444444444",
+            "a5555555555",
+            "a6666666666666666",
+        ];
+
+        let mut parts = Vec::new();
+        for (i, item) in items.iter().enumerate() {
+            parts.push(a.text(*item));
+            if i < items.len() - 1 {
+                parts.push(a.concat(vec![a.text(","), a.line()]));
+            }
+        }
+
+        let doc = a.fill(parts);
+        let config = PrintConfig {
+            indent: "\t",
+            print_width: 100,
+            tab_width: 2,
+            base_indent_offset: 1,
+            ..Default::default()
+        };
+
+        let start_column = 6;
+        let indent_level = 3;
+        let output = arena_print_doc_with_indent(&a, doc, &config, start_column, indent_level);
+
+        assert!(
+            !output.contains("a5555555555, a6666666666666666"),
+            "Last item should wrap"
+        );
+        assert!(
+            output.contains("a5555555555,\n\t\t\ta6666666666666666"),
+            "Expected last item on own line. Got:\n{}",
+            output
+        );
     }
 }

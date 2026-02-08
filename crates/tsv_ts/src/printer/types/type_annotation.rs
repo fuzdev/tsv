@@ -211,8 +211,10 @@ impl<'a> Printer<'a> {
     /// ```
     ///
     /// The first type stays on the same line as `:`, continuation types are indented.
-    /// This differs from `build_intersection_type_doc` which doesn't add internal
-    /// indentation (expecting the parent context like type alias to provide it).
+    /// This differs from `build_intersection_type_doc` (in union_intersection.rs) which
+    /// doesn't add internal indentation (expecting the parent context to provide it).
+    /// Both functions share the same grouping rule: huggable-only (2-type with
+    /// TypeLiteral last) skips the group; all other cases need one.
     fn build_intersection_type_annotation_doc(
         &self,
         intersection: &internal::TSIntersectionType,
@@ -323,8 +325,9 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Huggable types don't need a group (TypeLiteral expands itself)
-        if last_is_huggable {
+        // Huggable-only (A & {b}): no group needed, TypeLiteral expands itself.
+        // All other cases: group controls line() flat/break behavior.
+        if last_is_huggable && intersection.types.len() == 2 {
             doc::concat(parts)
         } else {
             doc::group(doc::concat(parts))

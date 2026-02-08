@@ -9,6 +9,7 @@
 
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
+use crate::printer::helpers::has_multiline_template_literal;
 use crate::printer::text::TextAnalysis;
 use tsv_lang::doc::{self, Doc};
 use tsv_lang::{SymbolResolver, SymbolToU32};
@@ -111,6 +112,8 @@ struct ElementContext {
     has_block_flow_children: bool,
     /// Whether to trim boundary whitespace from children
     trim_boundaries: bool,
+    /// Whether any attribute contains a template literal with embedded newlines
+    has_multiline_template_attr: bool,
 }
 
 impl<'a> Printer<'a> {
@@ -146,10 +149,16 @@ impl<'a> Printer<'a> {
         // Phase 3: Build doc based on layout
         match layout {
             ElementLayout::Void | ElementLayout::SelfClosing => {
-                self.build_void_element_doc(tag_sym, attr_docs)
+                self.build_void_element_doc(tag_sym, attr_docs, &element.attributes)
             }
             ElementLayout::Empty => {
-                let opening_tag = self.build_opening_tag(tag_sym, &attr_docs, false, ctx.is_empty);
+                let opening_tag = self.build_opening_tag(
+                    tag_sym,
+                    &attr_docs,
+                    false,
+                    ctx.is_empty,
+                    ctx.has_multiline_template_attr,
+                );
                 self.build_empty_element_doc(
                     &ctx.tag_name,
                     element,
@@ -174,42 +183,71 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for void or self-closing element
-    fn build_void_element_doc(&self, tag_sym: u32, attr_docs: Vec<Doc>) -> Doc {
+    ///
+    /// When any attribute contains a template literal with embedded newlines,
+    /// forces attributes to break across multiple lines to match Prettier behavior.
+    fn build_void_element_doc(
+        &self,
+        tag_sym: u32,
+        attr_docs: Vec<Doc>,
+        attrs: &[internal::AttributeNode],
+    ) -> Doc {
         if attr_docs.is_empty() {
             doc::concat(vec![doc::text("<"), doc::symbol(tag_sym), doc::text(" />")])
         } else {
-            doc::group(doc::concat(vec![
+            // Check if any attribute contains a template literal with embedded newlines
+            let has_multiline_template = attrs
+                .iter()
+                .any(|a| has_multiline_template_literal(a.span().extract(self.source)));
+
+            let inner = doc::concat(vec![
                 doc::text("<"),
                 doc::symbol(tag_sym),
                 doc::indent(doc::concat(attr_docs)),
                 doc::line(),
                 doc::text("/>"),
-            ]))
+            ]);
+
+            if has_multiline_template {
+                doc::group_break(inner)
+            } else {
+                doc::group(inner)
+            }
         }
     }
 
     /// Build opening tag with attributes
+    ///
+    /// When `force_break` is true (e.g., template literal with embedded newlines),
+    /// forces attributes to break across multiple lines.
     fn build_opening_tag(
         &self,
         tag_sym: u32,
         attr_docs: &[Doc],
         hug_start: bool,
         is_empty: bool,
+        force_break: bool,
     ) -> Doc {
         if attr_docs.is_empty() {
             doc::concat(vec![doc::text("<"), doc::symbol(tag_sym)])
         } else {
+            let inner = doc::concat(vec![
+                doc::concat(attr_docs.to_vec()),
+                if hug_start && !is_empty {
+                    doc::empty()
+                } else {
+                    doc::dedent(doc::softline())
+                },
+            ]);
+            let attr_group = if force_break {
+                doc::group_break(inner)
+            } else {
+                doc::group(inner)
+            };
             doc::concat(vec![
                 doc::text("<"),
                 doc::symbol(tag_sym),
-                doc::indent(doc::group(doc::concat(vec![
-                    doc::concat(attr_docs.to_vec()),
-                    if hug_start && !is_empty {
-                        doc::empty()
-                    } else {
-                        doc::dedent(doc::softline())
-                    },
-                ]))),
+                doc::indent(attr_group),
             ])
         }
     }
@@ -249,6 +287,7 @@ impl<'a> Printer<'a> {
             attr_docs,
             start_mode == BoundaryMode::Hug,
             ctx.is_empty,
+            ctx.has_multiline_template_attr,
         );
 
         // Build doc structure based on boundary modes
@@ -1225,11 +1264,17 @@ impl<'a> Printer<'a> {
             .iter()
             .any(super::helpers::is_control_flow_block);
 
-        // Opening tag multiline (attribute values span lines)
-        let opening_tag_multiline = element
+        // Opening tag multiline: any newline in attribute source (for trim_boundaries)
+        let has_multiline_attr = element
             .attributes
             .iter()
             .any(|a| a.span().extract(self.source).contains('\n'));
+
+        // Template literals with embedded newlines (for forcing attribute break)
+        let has_multiline_template_attr = element
+            .attributes
+            .iter()
+            .any(|a| has_multiline_template_literal(a.span().extract(self.source)));
 
         // Compute needs_multiline
         let needs_multiline = self.compute_needs_multiline(
@@ -1246,7 +1291,7 @@ impl<'a> Printer<'a> {
         let will_go_multiline = element.attributes.len() > 1
             || (has_block_flow_children && self.block_flow_forces_multiline(element))
             || super::helpers::has_nested_block_flow(&element.fragment.nodes)
-            || opening_tag_multiline;
+            || has_multiline_attr;
         let trim_boundaries = !kind.is_inline() || will_go_multiline;
 
         ElementContext {
@@ -1262,6 +1307,7 @@ impl<'a> Printer<'a> {
             needs_multiline,
             has_block_flow_children,
             trim_boundaries,
+            has_multiline_template_attr,
         }
     }
 

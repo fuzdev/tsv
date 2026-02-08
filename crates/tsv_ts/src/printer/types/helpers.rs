@@ -54,38 +54,13 @@ pub(super) fn find_separator_position(
     end: u32,
     separator: u8,
 ) -> Option<u32> {
-    let bytes = source.as_bytes();
-    let mut pos = start as usize;
-    let end = end as usize;
-
-    while pos < end {
-        let b = bytes[pos];
-        if b == separator {
-            return Some(pos as u32);
-        }
-        // Skip block comments: /* ... */
-        if b == b'/' && pos + 1 < end && bytes[pos + 1] == b'*' {
-            pos += 2;
-            while pos + 1 < end {
-                if bytes[pos] == b'*' && bytes[pos + 1] == b'/' {
-                    pos += 2;
-                    break;
-                }
-                pos += 1;
-            }
-            continue;
-        }
-        // Skip line comments: // ...
-        if b == b'/' && pos + 1 < end && bytes[pos + 1] == b'/' {
-            pos += 2;
-            while pos < end && bytes[pos] != b'\n' {
-                pos += 1;
-            }
-            continue;
-        }
-        pos += 1;
-    }
-    None
+    crate::printer::analysis::find_char_skipping_comments(
+        source.as_bytes(),
+        start as usize,
+        end as usize,
+        separator,
+    )
+    .map(|pos| pos as u32)
 }
 
 //

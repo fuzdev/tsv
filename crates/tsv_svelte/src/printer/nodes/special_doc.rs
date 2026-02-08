@@ -10,6 +10,7 @@ use std::rc::Rc;
 
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
+use crate::printer::helpers::has_multiline_template_literal;
 use crate::printer::text::TextAnalysis;
 use tsv_lang::doc::{self, Doc};
 
@@ -65,19 +66,31 @@ impl<'a> Printer<'a> {
         let attr_docs = self.build_special_element_attrs_doc(element);
         let has_attrs = !attr_docs.is_empty();
 
+        // Check if any attribute contains a template literal with embedded newlines
+        let has_multiline_template = element
+            .attributes
+            .iter()
+            .any(|a| has_multiline_template_literal(a.span().extract(self.source)));
+
         // Handle self-closing elements
         if is_self_closing {
             return if !has_attrs {
                 doc::concat(vec![doc::text("<"), doc::text(tag_name), doc::text(" />")])
             } else {
                 // Self-closing with attrs - use group for proper wrapping
-                doc::group(doc::concat(vec![
+                let inner = doc::concat(vec![
                     doc::text("<"),
                     doc::text(tag_name),
                     doc::indent(doc::concat(attr_docs)),
                     doc::line(),
                     doc::text("/>"),
-                ]))
+                ]);
+
+                if has_multiline_template {
+                    doc::group_break(inner)
+                } else {
+                    doc::group(inner)
+                }
             };
         }
 
@@ -319,10 +332,40 @@ impl<'a> Printer<'a> {
                 doc::text(tag_name),
             ]);
 
-            doc::group(doc::concat(vec![
+            let attr_group = if has_multiline_template {
+                doc::group_break(doc::concat(attr_docs))
+            } else {
+                doc::group(doc::concat(attr_docs))
+            };
+
+            let inner = doc::concat(vec![
                 doc::text("<"),
                 doc::text(tag_name),
-                doc::indent(doc::group(doc::concat(attr_docs))),
+                doc::indent(attr_group),
+                doc::group(doc::indent_softline(body)),
+                doc::softline(),
+                doc::text(">"),
+            ]);
+
+            if has_multiline_template {
+                doc::group_break(inner)
+            } else {
+                doc::group(inner)
+            }
+        } else if has_multiline_template {
+            // With attrs containing multiline template, inline children
+            // Force attrs to break and use hug structure like Prettier
+            let body = doc::concat(vec![
+                doc::text(">"),
+                children_doc,
+                doc::text("</"),
+                doc::text(tag_name),
+            ]);
+
+            doc::group_break(doc::concat(vec![
+                doc::text("<"),
+                doc::text(tag_name),
+                doc::indent(doc::concat(attr_docs)),
                 doc::group(doc::indent_softline(body)),
                 doc::softline(),
                 doc::text(">"),
@@ -412,6 +455,7 @@ impl<'a> Printer<'a> {
             self.source,
             Rc::clone(&self.interner),
             &self.config,
+            &self.line_breaks,
         );
         doc::concat(vec![doc::text("this={"), expr_doc, doc::text("}")])
     }

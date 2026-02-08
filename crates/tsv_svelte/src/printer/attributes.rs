@@ -196,6 +196,7 @@ impl<'a> Printer<'a> {
             Rc::clone(&self.interner),
             &self.config,
             self.comments,
+            &self.line_breaks,
         );
         parts.push(expr_doc);
 
@@ -336,6 +337,7 @@ impl<'a> Printer<'a> {
                 Rc::clone(&self.interner),
                 config,
                 self.comments,
+                &self.line_breaks,
             ));
         }
 
@@ -346,6 +348,7 @@ impl<'a> Printer<'a> {
                 Rc::clone(&self.interner),
                 config,
                 self.comments,
+                &self.line_breaks,
             )
         } else {
             tsv_ts::build_expression_doc_with_comments(
@@ -354,6 +357,7 @@ impl<'a> Printer<'a> {
                 Rc::clone(&self.interner),
                 config,
                 self.comments,
+                &self.line_breaks,
             )
         }
     }
@@ -511,6 +515,7 @@ impl<'a> Printer<'a> {
                         Rc::clone(&self.interner),
                         &self.config,
                         self.comments,
+                        &self.line_breaks,
                     );
                     if i < len - 1 {
                         doc::concat(vec![expr_doc, doc::text(",")])

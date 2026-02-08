@@ -147,3 +147,37 @@ impl<'a> Printer<'a> {
         (has_leading, has_trailing)
     }
 }
+
+/// Check if source contains a template literal with embedded newlines.
+///
+/// Returns true if the source contains a backtick-delimited string that spans multiple lines.
+/// This is used to force attribute breaking when template literals have embedded newlines.
+pub(super) fn has_multiline_template_literal(source: &str) -> bool {
+    let mut in_template = false;
+    let mut chars = source.chars();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '`' => {
+                if in_template {
+                    // Closing backtick
+                    in_template = false;
+                } else {
+                    // Opening backtick
+                    in_template = true;
+                }
+            }
+            '\\' if in_template => {
+                // Skip escaped character
+                chars.next();
+            }
+            '\n' if in_template => {
+                // Found newline inside template literal
+                return true;
+            }
+            _ => {}
+        }
+    }
+
+    false
+}

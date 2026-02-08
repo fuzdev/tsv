@@ -1246,6 +1246,7 @@ impl<'a> Printer<'a> {
                     Rc::clone(&self.interner),
                     &self.config,
                     self.comments,
+                    &self.line_breaks,
                 )
             };
             opening.push(doc::text(" ("));
@@ -1595,7 +1596,7 @@ impl<'a> Printer<'a> {
                 .map(|p| {
                     // Format parameter through TypeScript formatter for proper normalization
                     let formatted =
-                        tsv_ts::format_expression(p, self.source, Rc::clone(&self.interner));
+                        tsv_ts::format_expression(p, self.source, Rc::clone(&self.interner), &self.line_breaks);
                     doc::text_owned(formatted)
                 })
                 .collect()
@@ -1693,6 +1694,7 @@ impl<'a> Printer<'a> {
             self.source,
             Rc::clone(&self.interner),
             &self.config,
+            &self.line_breaks,
         );
         // Build init with comments (comments are typically trailing after init)
         let init_doc = self.build_expression_with_comments_doc(
@@ -1776,6 +1778,7 @@ impl<'a> Printer<'a> {
                                 &p.key,
                                 self.source,
                                 Rc::clone(&self.interner),
+                                &self.line_breaks,
                             );
                             parts.push(doc::text_owned(key));
                             if !p.shorthand {
@@ -1805,6 +1808,7 @@ impl<'a> Printer<'a> {
                                 &p.key,
                                 self.source,
                                 Rc::clone(&self.interner),
+                                &self.line_breaks,
                             );
                             parts.push(doc::text_owned(key));
                             if !p.shorthand {
@@ -1859,12 +1863,13 @@ impl<'a> Printer<'a> {
                     &assign.right,
                     self.source,
                     Rc::clone(&self.interner),
+                    &self.line_breaks,
                 )),
             ]),
             // Default: format as regular expression
             _ => {
                 let formatted =
-                    tsv_ts::format_expression(expr, self.source, Rc::clone(&self.interner));
+                    tsv_ts::format_expression(expr, self.source, Rc::clone(&self.interner), &self.line_breaks);
                 doc::text_owned(formatted)
             }
         }
@@ -1944,6 +1949,7 @@ impl<'a> Printer<'a> {
             Rc::clone(&self.interner),
             self.comments,
             config,
+            &self.line_breaks,
         );
 
         // Convert newlines to hardlines for proper doc-based rendering.
@@ -2057,6 +2063,7 @@ impl<'a> Printer<'a> {
                 Rc::clone(&self.interner),
                 &config,
                 self.comments,
+                &self.line_breaks,
             ))
         } else {
             tsv_ts::build_expression_doc_with_comments(
@@ -2065,6 +2072,7 @@ impl<'a> Printer<'a> {
                 Rc::clone(&self.interner),
                 &config,
                 self.comments,
+                &self.line_breaks,
             )
         };
 

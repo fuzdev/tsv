@@ -33,6 +33,8 @@ pub struct TSInterfaceHeritage {
 }
 
 /// Declare function: `declare function foo(): void`
+///
+/// Also used for function overload signatures (no body).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TSDeclareFunction {
     #[serde(rename = "type")]
@@ -41,6 +43,13 @@ pub struct TSDeclareFunction {
     pub end: u32,
     pub loc: SourceLocation,
     pub id: Identifier,
+    /// Always false for function declarations (only true for function expressions).
+    pub expression: bool,
+    /// Whether this is a generator function.
+    pub generator: bool,
+    /// Whether this is an async function.
+    #[serde(rename = "async")]
+    pub is_async: bool,
     pub params: Vec<Expression>,
     #[serde(rename = "returnType", skip_serializing_if = "Option::is_none")]
     pub return_type: Option<TSTypeAnnotation>,

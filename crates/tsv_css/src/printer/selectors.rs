@@ -23,7 +23,7 @@ impl<'a> Printer<'a> {
     ///
     /// Returns the combinator string with appropriate spacing.
     /// For Descendant, returns "" when leading (caller handles the space/linebreak).
-    fn get_combinator_str(combinator: &internal::Combinator, is_leading: bool) -> &'static str {
+    fn get_combinator_str(combinator: internal::Combinator, is_leading: bool) -> &'static str {
         match (combinator, is_leading) {
             (internal::Combinator::Descendant, true) => "",
             (internal::Combinator::Descendant, false) => " ",
@@ -313,7 +313,7 @@ impl<'a> Printer<'a> {
         let mut parts = Vec::new();
 
         // Add combinator if present
-        if let Some(combinator) = &relative.combinator {
+        if let Some(combinator) = relative.combinator {
             let combinator_text = Self::get_combinator_str(combinator, is_first);
             if !combinator_text.is_empty() {
                 parts.push(doc::text(combinator_text));
@@ -339,7 +339,7 @@ impl<'a> Printer<'a> {
         at_line_start: bool,
     ) {
         // Print combinator if present
-        if let Some(combinator) = &relative.combinator {
+        if let Some(combinator) = relative.combinator {
             // Leading combinator: first selector in a complex selector with a combinator,
             // or at start of line (after line break in wrapped selector)
             // Example: :has(> img) - the > is leading (no space before)
@@ -595,13 +595,11 @@ impl<'a> Printer<'a> {
             internal::PseudoClassArgs::SelectorList { selectors, .. } => {
                 self.selector_list_has_complex_content(selectors)
             }
-            internal::PseudoClassArgs::Nth { of_selector, .. } => {
-                if let Some(selectors) = of_selector {
-                    self.selector_list_has_complex_content(selectors)
-                } else {
-                    false
-                }
-            }
+            internal::PseudoClassArgs::Nth {
+                of_selector: Some(selectors),
+                ..
+            } => self.selector_list_has_complex_content(selectors),
+            internal::PseudoClassArgs::Nth { .. } => false,
             _ => false,
         }
     }
@@ -615,7 +613,10 @@ impl<'a> Printer<'a> {
             // Check if any simple selector is a pseudo-class with long args
             for rel in &complex.children {
                 for simple in &rel.selectors {
-                    if let internal::SimpleSelector::PseudoClass { args: Some(args), .. } = simple {
+                    if let internal::SimpleSelector::PseudoClass {
+                        args: Some(args), ..
+                    } = simple
+                    {
                         // Check if this pseudo-class's args would break
                         let args_doc = self.build_pseudo_class_args_doc(args);
                         // Use a conservative width check
@@ -640,7 +641,9 @@ impl<'a> Printer<'a> {
             internal::PseudoClassArgs::SelectorList { selectors, .. } => {
                 self.build_selector_list_doc(selectors)
             }
-            internal::PseudoClassArgs::Nth { value, of_selector, .. } => {
+            internal::PseudoClassArgs::Nth {
+                value, of_selector, ..
+            } => {
                 let normalized = Self::normalize_an_plus_b(value);
                 if let Some(selectors) = of_selector {
                     doc::concat(vec![
@@ -652,15 +655,14 @@ impl<'a> Printer<'a> {
                     doc::text_owned(normalized)
                 }
             }
-            internal::PseudoClassArgs::Slotted { selectors, .. } => {
-                doc::concat(selectors.iter().map(|s| self.build_simple_selector_doc(s)).collect())
-            }
-            internal::PseudoClassArgs::Part { idents, .. } => {
-                doc::text_owned(idents.join(" "))
-            }
-            internal::PseudoClassArgs::Identifier { value, .. } => {
-                doc::text_owned(value.clone())
-            }
+            internal::PseudoClassArgs::Slotted { selectors, .. } => doc::concat(
+                selectors
+                    .iter()
+                    .map(|s| self.build_simple_selector_doc(s))
+                    .collect(),
+            ),
+            internal::PseudoClassArgs::Part { idents, .. } => doc::text_owned(idents.join(" ")),
+            internal::PseudoClassArgs::Identifier { value, .. } => doc::text_owned(value.clone()),
         }
     }
 
@@ -674,7 +676,9 @@ impl<'a> Printer<'a> {
         multiline: bool,
     ) {
         match args {
-            internal::PseudoClassArgs::Nth { value, of_selector, .. } => {
+            internal::PseudoClassArgs::Nth {
+                value, of_selector, ..
+            } => {
                 if multiline {
                     self.write_indent();
                 }
@@ -765,7 +769,7 @@ impl<'a> Printer<'a> {
         extra_indent: bool,
     ) {
         // Print combinator if present
-        if let Some(combinator) = &relative.combinator {
+        if let Some(combinator) = relative.combinator {
             let combinator_text = Self::get_combinator_str(combinator, is_first);
             if !combinator_text.is_empty() {
                 self.write(combinator_text);
@@ -802,7 +806,9 @@ impl<'a> Printer<'a> {
     /// Uses `print_selector_list_nested` which auto-wraps if content is too long.
     fn print_pseudo_element_args(&mut self, args: &internal::PseudoClassArgs) {
         match args {
-            internal::PseudoClassArgs::Nth { value, of_selector, .. } => {
+            internal::PseudoClassArgs::Nth {
+                value, of_selector, ..
+            } => {
                 let normalized = Self::normalize_an_plus_b(value);
                 self.write(&normalized);
                 if let Some(selectors) = of_selector {

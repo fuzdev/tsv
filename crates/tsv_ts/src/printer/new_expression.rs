@@ -3,12 +3,13 @@
 // Handles: new Foo(), new Foo(arg1, arg2), new Foo<T>()
 
 use super::calls::{
-    PartitionedComments, build_args_split_last, has_inter_argument_comments_slice,
-    has_trailing_line_comments_slice, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
+    PartitionedComments, build_args_split_last, find_comma_pos, has_inter_argument_comments_slice,
+    has_trailing_comments_slice, has_trailing_line_comments_slice, is_comment_after_comma,
+    is_comment_before_comma, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
 };
 use super::utils::{
-    is_block_function, is_function_composition_args, is_hopefully_short_arg,
-    last_arg_is_array_or_object, preceding_args_allow_hug,
+    arrow_has_trailing_param_comments, is_block_function, is_function_composition_args,
+    is_short_second_arg_for_expand_first, last_arg_is_array_or_object, preceding_args_allow_hug,
 };
 use super::{ParenContext, Printer, has_multiline_content, needs_parens};
 use crate::ast::internal;
@@ -75,7 +76,11 @@ impl<'a> Printer<'a> {
 
         // Single huggable argument: object literal or function
         // These stay on the same line as the opening paren: `new Cls({...})` not `new Cls(\n{...})`
-        if new_expr.arguments.len() == 1 {
+        // Skip hugging if there are trailing comments (line OR block) - let the comment handling below handle it
+        let single_arg_has_trailing_comment = new_expr.arguments.len() == 1
+            && has_trailing_comments_slice(&new_expr.arguments, new_expr.span.end, self);
+
+        if new_expr.arguments.len() == 1 && !single_arg_has_trailing_comment {
             match &new_expr.arguments[0] {
                 // Object literal: hug it
                 internal::Expression::ObjectExpression(_) => {
@@ -100,6 +105,27 @@ impl<'a> Printer<'a> {
                     if !arrow.body.is_expression() =>
                 {
                     let arrow_doc = self.build_expression_doc(&new_expr.arguments[0]);
+
+                    // If the arrow has trailing param comments, force wrapped state
+                    let has_trailing_param_comments =
+                        arrow_has_trailing_param_comments(arrow, |start, end| {
+                            self.has_comments_between(start, end)
+                        });
+
+                    if has_trailing_param_comments {
+                        return doc::concat(vec![
+                            callee_with_types,
+                            doc::text("("),
+                            doc::indent(doc::concat(vec![
+                                doc::softline(),
+                                arrow_doc,
+                                doc::text(","),
+                            ])),
+                            doc::softline(),
+                            doc::text(")"),
+                        ]);
+                    }
+
                     return doc::conditional_group(vec![
                         // State 1: hugged - new Callee((arrow) => { body })
                         doc::concat(vec![
@@ -139,7 +165,10 @@ impl<'a> Printer<'a> {
         // OR when there are multiple function arguments
         // e.g., new Cls(arr.map((x) => x), b) → new Cls(\n\t...,\n)
         // e.g., new Cls(() => a, () => b) → new Cls(\n\t...,\n)
-        if is_function_composition_args(&new_expr.arguments) {
+        // Skip this path if there are trailing comments - let the comment handling paths handle it
+        if is_function_composition_args(&new_expr.arguments)
+            && !has_trailing_comments_slice(&new_expr.arguments, new_expr.span.end, self)
+        {
             let arg_parts = doc::join_doc(
                 new_expr
                     .arguments
@@ -176,7 +205,11 @@ impl<'a> Printer<'a> {
             let first_arg = &new_expr.arguments[0];
             let second_arg = &new_expr.arguments[1];
 
-            if is_block_function(first_arg) && is_short_second_arg(second_arg, self) {
+            if is_block_function(first_arg)
+                && is_short_second_arg_for_expand_first(second_arg, |start, end| {
+                    self.has_comments_between(start, end)
+                })
+            {
                 let first_arg_doc = self.build_expression_doc(first_arg);
                 let second_arg_doc = self.build_expression_doc(second_arg);
 
@@ -191,7 +224,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Check for trailing line comments on arguments (forces expansion)
+        // Check for trailing LINE comments on arguments (forces hardline expansion)
         // Must check this BEFORE the "last arg is array/object" pattern below,
         // otherwise trailing comments on the last arg cause it to be hugged incorrectly.
         // e.g., new Class(arg1, // comment\n  arg2)
@@ -220,7 +253,7 @@ impl<'a> Printer<'a> {
                     arg_parts.push(doc::hardline());
                     pc.emit_leading_comments(&mut arg_parts, self);
                 } else {
-                    // Last argument - check for trailing line comments before closing paren
+                    // Last argument - check for trailing comments before closing paren
                     let arg_end = arg.span().end;
                     let paren_close = new_expr.span.end;
 
@@ -232,10 +265,24 @@ impl<'a> Printer<'a> {
                     );
 
                     if pc.has_trailing_line() {
-                        // Add comma before trailing comments
+                        // Line comment present - need to handle block comments specially
+                        // If both block and line: `() => {} /* block */, // line`
+                        // If only line: `() => {}, // line`
+                        for comment in &pc.trailing_block {
+                            arg_parts.push(doc::text(" "));
+                            arg_parts.push(self.build_comment_doc(comment));
+                        }
                         arg_parts.push(doc::text(","));
-                        pc.emit_trailing_comments(&mut arg_parts, self);
+                        for comment in &pc.trailing_line {
+                            arg_parts.push(doc::text(" "));
+                            arg_parts.push(self.build_comment_doc(comment));
+                        }
                         has_trailing_comma_on_last = true;
+                    } else if pc.has_trailing_block() {
+                        // Block comment only in hardline expansion: emit comment before comma
+                        // e.g., new A(() => {}, () => {} /* comment */,)
+                        pc.emit_trailing_comments(&mut arg_parts, self);
+                        // has_trailing_comma_on_last stays false, so trailing comma will be added
                     }
                 }
             }
@@ -254,6 +301,50 @@ impl<'a> Printer<'a> {
                 doc::hardline(),
                 doc::text(")"),
             ]);
+        }
+
+        // Check for trailing BLOCK comments only (no line comments)
+        // Block comments should stay inline for simple args: new A(a, b /* comment */)
+        // But function composition cases should expand: new A(() => {}, () => {} /* comment */,)
+        let has_trailing_block_only = new_expr.arguments.last().is_some_and(|last_arg| {
+            let arg_end = last_arg.span().end;
+            let paren_close = new_expr.span.end;
+            self.has_comments_between(arg_end, paren_close)
+                && !self.has_line_comments_between(arg_end, paren_close)
+        });
+
+        if has_trailing_block_only {
+            // Build args with trailing block comment
+            let last_idx = new_expr.arguments.len() - 1;
+            let mut arg_docs: Vec<Doc> = new_expr
+                .arguments
+                .iter()
+                .map(|arg| self.build_arg_expression_doc(arg))
+                .collect();
+
+            // Add trailing block comment to last arg
+            let last_arg = &new_expr.arguments[last_idx];
+            let pc = PartitionedComments::new(
+                self.comments,
+                self.line_breaks,
+                last_arg.span().end,
+                new_expr.span.end,
+            );
+
+            if let Some(last_doc) = arg_docs.pop() {
+                let mut last_with_comment = vec![last_doc];
+                pc.emit_trailing_comments(&mut last_with_comment, self);
+                arg_docs.push(doc::concat(last_with_comment));
+
+                // For function composition (multiple callbacks), use hardlines
+                // For simple args, use soft breaks (can stay inline)
+                if is_function_composition_args(&new_expr.arguments) {
+                    let arg_parts = doc::join_doc(arg_docs, doc::comma_hardline());
+                    return wrap_call_with_hard_breaks(callee_with_types, arg_parts);
+                }
+                let arg_parts = doc::join_doc(arg_docs, doc::comma_line());
+                return wrap_call_with_soft_breaks(callee_with_types, arg_parts);
+            }
         }
 
         // "First args inline with last array/object" pattern (same as CallExpression):
@@ -277,6 +368,93 @@ impl<'a> Printer<'a> {
             ]));
         }
 
+        // Check for leading comments or inter-argument block comments
+        // These need explicit handling that the simple join_doc path doesn't provide
+        let paren_open = new_expr.callee.span().end;
+        let has_leading_comments = !new_expr.arguments.is_empty()
+            && self.has_comments_between(paren_open, new_expr.arguments[0].span().start);
+        let has_inter_arg_comments = has_inter_argument_comments_slice(&new_expr.arguments, self);
+
+        if has_leading_comments || has_inter_arg_comments {
+            // Build arguments with explicit comment handling
+            let mut arg_parts = Vec::new();
+
+            for (i, arg) in new_expr.arguments.iter().enumerate() {
+                // Handle leading comments before first argument
+                if i == 0 && has_leading_comments {
+                    let first_arg_start = arg.span().start;
+                    arg_parts.push(self.build_inline_comments_between_doc_no_leading_space(
+                        paren_open,
+                        first_arg_start,
+                    ));
+                    arg_parts.push(doc::line());
+                }
+
+                // Build the argument
+                arg_parts.push(self.build_expression_doc(arg));
+
+                // Check for comments after this argument (before next arg or closing paren)
+                if i < new_expr.arguments.len() - 1 {
+                    let arg_end = arg.span().end;
+                    let next_arg_start = new_expr.arguments[i + 1].span().start;
+
+                    if self.has_comments_between(arg_end, next_arg_start) {
+                        let pc = PartitionedComments::new(
+                            self.comments,
+                            self.line_breaks,
+                            arg_end,
+                            next_arg_start,
+                        );
+
+                        let comma_pos = find_comma_pos(self.source, arg_end, next_arg_start);
+
+                        if pc.has_trailing_line() {
+                            // Trailing line comments: comma, comment, hardline
+                            arg_parts.push(doc::text(","));
+                            for comment in &pc.trailing_line {
+                                arg_parts.push(doc::text(" "));
+                                arg_parts.push(self.build_comment_doc(comment));
+                            }
+                            arg_parts.push(doc::hardline());
+                        } else if pc.has_trailing_block() {
+                            // Trailing block comments: place relative to comma based on source position
+                            if let Some(cpos) = comma_pos {
+                                for comment in &pc.trailing_block {
+                                    if is_comment_before_comma(comment, cpos) {
+                                        arg_parts.push(doc::text(" "));
+                                        arg_parts.push(self.build_comment_doc(comment));
+                                    }
+                                }
+                            }
+                            arg_parts.push(doc::text(","));
+                            if let Some(cpos) = comma_pos {
+                                for comment in &pc.trailing_block {
+                                    if is_comment_after_comma(comment, cpos) {
+                                        arg_parts.push(doc::text(" "));
+                                        arg_parts.push(self.build_comment_doc(comment));
+                                    }
+                                }
+                            }
+                            arg_parts.push(doc::line());
+                        } else {
+                            // No trailing comments, add comma and line
+                            arg_parts.push(doc::text(","));
+                            arg_parts.push(doc::line());
+                        }
+
+                        // Add leading comments for next arg
+                        pc.emit_leading_comments_inline_aware(&mut arg_parts, self, next_arg_start);
+                    } else {
+                        // No comments, just comma and line
+                        arg_parts.push(doc::comma_line());
+                    }
+                }
+            }
+
+            let arg_doc = doc::concat(arg_parts);
+            return wrap_call_with_soft_breaks(callee_with_types, arg_doc);
+        }
+
         // Build args with line separators (one per line when broken)
         let arg_parts = doc::join_doc(
             new_expr
@@ -293,40 +471,5 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a new expression (for nested contexts)
     pub(super) fn build_new_doc(&self, new_expr: &internal::NewExpression) -> Doc {
         self.build_new_doc_with_wrapping(new_expr)
-    }
-}
-
-/// Check if second arg is short enough for "expand first arg" pattern in new expressions.
-///
-/// Allows: simple values (identifiers, literals, etc.) and empty {} or []
-/// Rejects: functions, ternaries, spreads, non-empty objects/arrays, objects/arrays with comments
-fn is_short_second_arg(arg: &internal::Expression, printer: &Printer) -> bool {
-    match arg {
-        // Functions, ternaries, spreads - these should expand all args
-        internal::Expression::ArrowFunctionExpression(_)
-        | internal::Expression::FunctionExpression(_)
-        | internal::Expression::ConditionalExpression(_)
-        | internal::Expression::SpreadElement(_) => false,
-        // Non-empty objects expand - use "expand all args" instead
-        internal::Expression::ObjectExpression(obj) if !obj.properties.is_empty() => false,
-        // Non-empty arrays expand - use "expand all args" instead
-        internal::Expression::ArrayExpression(arr) if !arr.elements.is_empty() => false,
-        // Empty {} or [] with comments inside should expand
-        internal::Expression::ObjectExpression(obj)
-            if printer.has_comments_between(obj.span.start, obj.span.end) =>
-        {
-            false
-        }
-        internal::Expression::ArrayExpression(arr)
-            if printer.has_comments_between(arr.span.start, arr.span.end) =>
-        {
-            false
-        }
-        // Truly empty {} and [] are short
-        internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_) => {
-            true
-        }
-        // Other args: check if "hopefully short"
-        _ => is_hopefully_short_arg(arg),
     }
 }

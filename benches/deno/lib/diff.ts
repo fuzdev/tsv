@@ -101,6 +101,94 @@ function computeLCS(a: string[], b: string[]): string[] {
 	return lcs;
 }
 
+/** A contiguous group of changed lines in a diff, with surrounding context. */
+export interface DiffHunk {
+	/** 0-based index of this hunk */
+	index: number;
+	/** All diff lines in this hunk (including context lines adjacent to changes) */
+	lines: DiffLine[];
+	/** Line range in "ours" (added side) that this hunk covers, or null if only removals */
+	oursRange: { start: number; end: number } | null;
+	/** Line range in "prettier" (removed side) that this hunk covers, or null if only additions */
+	prettierRange: { start: number; end: number } | null;
+	/** Lines added (ours-only) in this hunk */
+	addedLines: string[];
+	/** Lines removed (prettier-only) in this hunk */
+	removedLines: string[];
+}
+
+/**
+ * Extract diff hunks from a flat DiffLine array.
+ *
+ * A hunk is a contiguous group of changes (add/remove lines). Any context (same) line
+ * between changes separates hunks. Line numbers for both sides are tracked.
+ */
+export function extractHunks(diff: DiffLine[]): DiffHunk[] {
+	const hunks: DiffHunk[] = [];
+	let currentLines: DiffLine[] = [];
+	let addedLines: string[] = [];
+	let removedLines: string[] = [];
+
+	// Track line numbers for both sides
+	let oursLine = 0; // "add" lines increment this
+	let prettierLine = 0; // "remove" lines increment this
+
+	let hunkOursStart: number | null = null;
+	let hunkOursEnd: number | null = null;
+	let hunkPrettierStart: number | null = null;
+	let hunkPrettierEnd: number | null = null;
+
+	function flushHunk(): void {
+		if (currentLines.length === 0) return;
+
+		hunks.push({
+			index: hunks.length,
+			lines: currentLines,
+			oursRange: hunkOursStart !== null && hunkOursEnd !== null
+				? { start: hunkOursStart, end: hunkOursEnd }
+				: null,
+			prettierRange: hunkPrettierStart !== null && hunkPrettierEnd !== null
+				? { start: hunkPrettierStart, end: hunkPrettierEnd }
+				: null,
+			addedLines,
+			removedLines,
+		});
+
+		currentLines = [];
+		addedLines = [];
+		removedLines = [];
+		hunkOursStart = null;
+		hunkOursEnd = null;
+		hunkPrettierStart = null;
+		hunkPrettierEnd = null;
+	}
+
+	for (const d of diff) {
+		if (d.type === 'same') {
+			// Context line closes any open hunk
+			flushHunk();
+			oursLine++;
+			prettierLine++;
+		} else if (d.type === 'add') {
+			if (hunkOursStart === null) hunkOursStart = oursLine;
+			hunkOursEnd = oursLine;
+			currentLines.push(d);
+			addedLines.push(d.line);
+			oursLine++;
+		} else {
+			// remove
+			if (hunkPrettierStart === null) hunkPrettierStart = prettierLine;
+			hunkPrettierEnd = prettierLine;
+			currentLines.push(d);
+			removedLines.push(d.line);
+			prettierLine++;
+		}
+	}
+
+	flushHunk();
+	return hunks;
+}
+
 /**
  * Filter diff to only include lines within N lines of context around changes.
  *

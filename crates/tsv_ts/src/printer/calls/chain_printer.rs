@@ -201,6 +201,10 @@ impl<'a> ChainPrinter for Printer<'a> {
         doc::concat(parts)
     }
 
+    fn get_source(&self) -> &str {
+        self.source
+    }
+
     fn get_tab_width(&self) -> usize {
         self.config.tab_width
     }

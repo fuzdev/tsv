@@ -473,6 +473,7 @@ impl<'a> Printer<'a> {
     ///
     /// Returns the start and end positions of the operator string in the source,
     /// which is used to correctly split comments before/after the operator.
+    /// Skips over comments to avoid matching operators inside them.
     fn find_operator_position(
         &self,
         prev_span_end: u32,
@@ -481,12 +482,30 @@ impl<'a> Printer<'a> {
     ) -> OperatorPosition {
         let range_start = prev_span_end as usize;
         let range_end = next_span_start as usize;
-        let search_range = &self.source[range_start..range_end];
-        let op_offset = search_range.find(op_str).unwrap_or(0);
-        let op_start = (range_start + op_offset) as u32;
+        let bytes = self.source.as_bytes();
+        let op_bytes = op_str.as_bytes();
+        let op_len = op_bytes.len();
+        let mut i = range_start;
+
+        while i + op_len <= range_end {
+            // Skip comments
+            if let Some(new_i) = super::analysis::skip_comment(bytes, i, range_end) {
+                i = new_i;
+                continue;
+            }
+            // Check for operator match
+            if &bytes[i..i + op_len] == op_bytes {
+                return OperatorPosition {
+                    start: i as u32,
+                    end: (i + op_len) as u32,
+                };
+            }
+            i += 1;
+        }
+        // Fallback (shouldn't happen in valid code)
         OperatorPosition {
-            start: op_start,
-            end: op_start + op_str.len() as u32,
+            start: prev_span_end,
+            end: prev_span_end + op_str.len() as u32,
         }
     }
 

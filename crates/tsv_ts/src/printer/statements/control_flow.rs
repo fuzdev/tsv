@@ -994,28 +994,24 @@ impl<'a> Printer<'a> {
         // We need to search manually to avoid matching inside comment content
         let keyword_bytes = keyword.as_bytes();
         let bytes = search_range.as_bytes();
+        let len = bytes.len();
+        let kw_len = keyword.len();
         let mut i = 0;
 
-        while i + keyword.len() <= bytes.len() {
-            // Skip over block comments
-            if i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'*' {
-                // Find end of comment
-                i += 2;
-                while i + 1 < bytes.len() && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
-                    i += 1;
-                }
-                i += 2; // Skip past */
+        while i + kw_len <= len {
+            // Skip over comments
+            if let Some(new_i) = crate::printer::analysis::skip_comment(bytes, i, len) {
+                i = new_i;
                 continue;
             }
 
             // Check if we found the keyword
-            if &bytes[i..i + keyword.len()] == keyword_bytes {
+            if &bytes[i..i + kw_len] == keyword_bytes {
                 // Check it's not part of an identifier
                 let before_ok =
                     i == 0 || !bytes[i - 1].is_ascii_alphanumeric() && bytes[i - 1] != b'_';
-                let after_ok = i + keyword.len() >= bytes.len()
-                    || !bytes[i + keyword.len()].is_ascii_alphanumeric()
-                        && bytes[i + keyword.len()] != b'_';
+                let after_ok = i + kw_len >= len
+                    || !bytes[i + kw_len].is_ascii_alphanumeric() && bytes[i + kw_len] != b'_';
 
                 if before_ok && after_ok {
                     return Some(start + i as u32);

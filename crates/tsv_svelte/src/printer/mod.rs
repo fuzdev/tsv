@@ -142,6 +142,8 @@ pub struct Printer<'a> {
     interner: Rc<RefCell<DefaultStringInterner>>,
     /// Comments from scripts and template expressions
     comments: &'a [Comment],
+    /// Precomputed line break positions (byte offsets of '\n' in source)
+    line_breaks: Vec<u32>,
 }
 
 impl<'a> Printer<'a> {
@@ -161,6 +163,7 @@ impl<'a> Printer<'a> {
         comments: &'a [Comment],
         config: PrintConfig,
     ) -> Self {
+        let line_breaks = tsv_lang::printing::build_line_breaks(source);
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
@@ -168,6 +171,7 @@ impl<'a> Printer<'a> {
             source,
             interner,
             comments,
+            line_breaks,
         }
     }
 
@@ -209,11 +213,15 @@ impl<'a> Printer<'a> {
     /// must be preserved. Normal elements have trailing whitespace stripped during
     /// doc building, not rendering.
     pub(crate) fn render_doc_immediate(&mut self, doc: &tsv_lang::doc::Doc) {
+        // Convert Doc to arena then render for better performance
+        let arena = tsv_lang::doc::arena::DocArena::with_source_size_hint(256);
+        let doc_id = arena.convert_doc(doc);
         let col = self.buffer.current_column(self.config.tab_width);
         let output = {
             let interner = self.interner.borrow();
-            tsv_lang::doc::print_doc_with_indent_resolved_preserve_whitespace(
-                doc,
+            tsv_lang::doc::arena_print_doc_with_indent_resolved_preserve_whitespace(
+                &arena,
+                doc_id,
                 &self.config,
                 col,
                 self.indent_level,
@@ -261,7 +269,6 @@ impl<'a> Printer<'a> {
         }
 
         // Print comments that come before the first script
-        // These are attached to the script, so no blank line between them
         if let Some(script_start) = first_script_start {
             for (i, node) in root.fragment.nodes.iter().enumerate() {
                 if let FragmentNode::Comment(comment) = node
@@ -272,7 +279,11 @@ impl<'a> Printer<'a> {
                     }
                     self.print_comment(comment);
                     self.write("\n");
-                    // Don't set has_previous_section - comment is attached to script
+
+                    // Preserve authorial blank line between comment and next content
+                    let remaining = &self.source[comment.span.end as usize..script_start as usize];
+                    has_previous_section = remaining.leading_whitespace().has_blank_line();
+
                     printed_comment_indices.push(i);
                 }
             }

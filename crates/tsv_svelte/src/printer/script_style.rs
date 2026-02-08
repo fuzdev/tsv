@@ -53,9 +53,13 @@ impl<'a> Printer<'a> {
         //
         // start_column = tab_width (2) to account for the initial indent we'll add
         // start_indent_level = 1 to account for the Svelte wrapper indent
+        // Convert Doc to arena then render for better performance
+        let arena = doc::arena::DocArena::with_source_size_hint(256);
+        let script_doc_id = arena.convert_doc(&script_doc);
         let interner = script.content.interner.borrow();
-        let output = doc::print_doc_with_indent_resolved(
-            &script_doc,
+        let output = doc::arena_print_doc_with_indent_resolved(
+            &arena,
+            script_doc_id,
             &config,
             config.tab_width, // start column = 1 tab's visual width
             1,                // start indent level = 1 (accounts for Svelte wrapper)

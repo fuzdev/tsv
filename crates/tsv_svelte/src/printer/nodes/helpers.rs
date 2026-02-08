@@ -36,7 +36,7 @@ impl<'a> Printer<'a> {
     /// - Mixed logical operator grouping (&&, ||, ??)
     pub fn print_ts_expression(&mut self, expr: &tsv_ts::Expression) {
         let formatted =
-            tsv_ts::format_expression(expr, self.source(), std::rc::Rc::clone(&self.interner));
+            tsv_ts::format_expression(expr, self.source(), std::rc::Rc::clone(&self.interner), &self.line_breaks);
         self.write(&formatted);
     }
 
@@ -125,6 +125,7 @@ impl<'a> Printer<'a> {
             std::rc::Rc::clone(&self.interner),
             self.comments,
             config,
+            &self.line_breaks,
         );
         self.write(&formatted);
 

@@ -227,16 +227,27 @@ impl<'a> Printer<'a> {
         &self,
         decl: &internal::TSDeclareFunction,
     ) -> doc::Doc {
-        // Only print `declare` for top-level declare functions
-        // Inside `declare namespace`, the `declare` is implicit
-        let mut parts = if decl.declare {
-            vec![
-                doc::text("declare function "),
-                doc::symbol(decl.id.name.to_u32()),
-            ]
+        let mut parts = Vec::new();
+
+        // Handle async keyword
+        if decl.r#async {
+            parts.push(doc::text("async "));
+        }
+
+        // Handle declare keyword (only for top-level declare functions,
+        // not inside `declare namespace` where it's implicit)
+        if decl.declare {
+            parts.push(doc::text("declare "));
+        }
+
+        // Handle function/function* keyword
+        if decl.generator {
+            parts.push(doc::text("function* "));
         } else {
-            vec![doc::text("function "), doc::symbol(decl.id.name.to_u32())]
-        };
+            parts.push(doc::text("function "));
+        }
+
+        parts.push(doc::symbol(decl.id.name.to_u32()));
 
         // Type parameters with wrapping support
         if let Some(type_params) = &decl.type_parameters {

@@ -197,10 +197,24 @@ impl<'a> Printer<'a> {
             super::needs_parens(&spread.argument, super::ParenContext::SpreadArgument);
         let arg_doc = self.build_expression_doc(&spread.argument);
 
+        // Check for comments between `...` and the argument (e.g., `.../* comment */ arr`)
+        // The `...` is 3 chars, so comment region starts at span.start + 3
+        let dots_end = spread.span.start + 3;
+        let arg_start = spread.argument.span().start;
+        // Use trailing_space variant: `.../* comment */ arg` (space after comment, not before)
+        let comment_doc =
+            self.build_inline_comments_between_doc_trailing_space_opt(dots_end, arg_start);
+
         if needs_parens {
-            doc::concat(vec![doc::text("...("), arg_doc, doc::text(")")])
+            match comment_doc {
+                Some(c) => doc::concat(vec![doc::text("...("), c, arg_doc, doc::text(")")]),
+                None => doc::concat(vec![doc::text("...("), arg_doc, doc::text(")")]),
+            }
         } else {
-            doc::concat(vec![doc::text("..."), arg_doc])
+            match comment_doc {
+                Some(c) => doc::concat(vec![doc::text("..."), c, arg_doc]),
+                None => doc::concat(vec![doc::text("..."), arg_doc]),
+            }
         }
     }
 }

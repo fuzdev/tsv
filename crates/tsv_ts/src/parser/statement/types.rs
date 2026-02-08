@@ -2121,6 +2121,8 @@ impl<'a> Parser<'a> {
             params,
             return_type,
             declare: print_declare,
+            r#async: false,   // declare async function is a separate feature
+            generator: false, // generators not allowed in declare context
             span: Span::new(start as u32, end),
         }))
     }

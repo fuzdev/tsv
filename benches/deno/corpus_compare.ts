@@ -15,14 +15,20 @@
 import { parseArgs } from '@std/cli/parse-args';
 import { DevReposLoader, DirectoryLoader, groupByLanguage } from './lib/corpus.ts';
 import { CanonicalImplementation } from './lib/canonical.ts';
-import { diffLines, filterDiffContext, formatDiffForTerminal } from './lib/diff.ts';
+import {
+	type DiffHunk,
+	diffLines,
+	extractHunks,
+	filterDiffContext,
+	formatDiffForTerminal,
+} from './lib/diff.ts';
 import { NativeImplementation } from './lib/ffi.ts';
 import { type Language, LANGUAGES, type SourceFile } from './lib/types.ts';
 import { loadAllVersions } from './lib/versions.ts';
 import {
 	checkSafety,
 	detectDivergences,
-	type DivergenceMatch,
+	type HunkCoverageResult,
 	type SafetyViolation,
 } from './lib/divergence/mod.ts';
 
@@ -38,6 +44,7 @@ interface Args {
 	'safety-only'?: boolean;
 	explain?: boolean;
 	strict?: boolean;
+	'audit-patterns'?: boolean;
 	help?: boolean;
 }
 
@@ -45,6 +52,7 @@ interface LanguageStats {
 	total: number;
 	match: number;
 	knownDivergence: number;
+	partialDivergence: number;
 	unknownDiff: number;
 	safetyViolation: number;
 	errors: number;
@@ -52,11 +60,17 @@ interface LanguageStats {
 
 interface CompareResult {
 	file: SourceFile;
-	status: 'match' | 'known_divergence' | 'unknown_diff' | 'safety_violation' | 'error';
+	status:
+		| 'match'
+		| 'known_divergence'
+		| 'partial_divergence'
+		| 'unknown_diff'
+		| 'safety_violation'
+		| 'error';
 	error?: string;
 	ours?: string;
 	prettier?: string;
-	divergences?: DivergenceMatch[];
+	coverage?: HunkCoverageResult;
 	safetyViolations?: SafetyViolation[];
 }
 
@@ -71,6 +85,51 @@ function formatBytes(bytes: number): string {
 	const kb = bytes / 1024;
 	if (kb < 10) return `${kb.toFixed(1)}KB`;
 	return `${Math.round(kb)}KB`;
+}
+
+/** Get a brief diff summary for unknown differences (for agent comprehension) */
+function getDiffSummary(prettier: string, ours: string): string {
+	const diff = diffLines(prettier, ours);
+	const removals = diff.filter((d) => d.type === 'remove');
+	const additions = diff.filter((d) => d.type === 'add');
+
+	// Check for blank line differences
+	const blankRemovals = removals.filter((d) => !d.line.trim()).length;
+	const blankAdditions = additions.filter((d) => !d.line.trim()).length;
+
+	// Check for line count difference (we break more/less)
+	const prettierLineCount = prettier.split('\n').length;
+	const oursLineCount = ours.split('\n').length;
+	const lineDiff = oursLineCount - prettierLineCount;
+
+	// Find the first meaningful (non-empty) change
+	const firstRemoval = removals.find((d) => d.line.trim())?.line.trim();
+	const firstAddition = additions.find((d) => d.line.trim())?.line.trim();
+
+	// Describe the difference
+	if (lineDiff !== 0 && firstRemoval && firstAddition) {
+		// Line count changed - likely a breaking difference
+		const direction = lineDiff > 0 ? 'we break' : 'prettier breaks';
+		const snippet = firstRemoval.slice(0, 40);
+		return `${direction} (+${Math.abs(lineDiff)} lines): "${snippet}..."`;
+	} else if (firstRemoval && firstAddition) {
+		// Same line count, content differs
+		const r = firstRemoval.slice(0, 35);
+		const a = firstAddition.slice(0, 35);
+		return `"${r}..." → "${a}..."`;
+	} else if (blankRemovals !== blankAdditions) {
+		// Only blank line differences
+		if (blankAdditions > blankRemovals) {
+			return `prettier adds ${blankAdditions - blankRemovals} blank line(s)`;
+		} else {
+			return `ours adds ${blankRemovals - blankAdditions} blank line(s)`;
+		}
+	} else if (firstRemoval) {
+		return `prettier has: "${firstRemoval.slice(0, 50)}"`;
+	} else if (firstAddition) {
+		return `ours has: "${firstAddition.slice(0, 50)}"`;
+	}
+	return `${removals.length} line(s) differ`;
 }
 
 function printUsage(): void {
@@ -92,6 +151,7 @@ Options:
   --safety-only     Only check for safety violations (data loss), skip formatting comparison
   --explain         Show detected divergence patterns for each difference
   --strict          Fail on any difference (disable divergence detection)
+  --audit-patterns  Show per-pattern corpus coverage with sample diffs for spot-checking
   --help            Show this help message
 
 Examples:
@@ -102,6 +162,7 @@ Examples:
   deno task corpus:compare ~/dev/my-project --exit-on-first --diff
   deno task corpus:compare ~/dev/my-project --safety-only
   deno task corpus:compare ~/dev/my-project --explain
+  deno task corpus:compare --all --audit-patterns
 `);
 }
 
@@ -117,6 +178,7 @@ async function main(): Promise<void> {
 			'safety-only',
 			'explain',
 			'strict',
+			'audit-patterns',
 		],
 		alias: { h: 'help', v: 'verbose', f: 'filter', l: 'limit', d: 'diff', a: 'all' },
 	}) as Args;
@@ -155,6 +217,7 @@ async function main(): Promise<void> {
 	const safetyOnly = args['safety-only'] ?? false;
 	const explain = args.explain ?? false;
 	const strict = args.strict ?? false;
+	const auditPatterns = args['audit-patterns'] ?? false;
 
 	if (useAllRepos) {
 		console.log('Comparing: All SvelteKit repos from ~/dev');
@@ -166,6 +229,7 @@ async function main(): Promise<void> {
 	if (safetyOnly) console.log(`Mode: safety-only (checking for data loss)`);
 	if (strict) console.log(`Mode: strict (no divergence detection)`);
 	if (explain) console.log(`Mode: explain (show divergence patterns)`);
+	if (auditPatterns) console.log(`Mode: audit-patterns (per-pattern coverage report)`);
 	console.log();
 
 	// Load corpus
@@ -222,6 +286,7 @@ async function main(): Promise<void> {
 			total: 0,
 			match: 0,
 			knownDivergence: 0,
+			partialDivergence: 0,
 			unknownDiff: 0,
 			safetyViolation: 0,
 			errors: 0,
@@ -230,6 +295,33 @@ async function main(): Promise<void> {
 
 	// Track divergence pattern counts
 	const divergenceCounts: Map<string, number> = new Map();
+
+	// Track per-pattern file claims for audit (pattern → file samples with hunk info)
+	interface PatternAuditEntry {
+		path: string;
+		hunkIndices: number[];
+		hunkPreview: string; // first hunk's first changed line
+	}
+	const patternAuditMap: Map<string, PatternAuditEntry[]> = new Map();
+
+	/** Record a pattern match into the audit map */
+	function recordAuditEntry(
+		patternName: string,
+		filePath: string,
+		hunkIndices: number[],
+		hunks: DiffHunk[],
+	): void {
+		const entries = patternAuditMap.get(patternName) ?? [];
+		const firstHunk = hunks[hunkIndices[0]];
+		const preview = (firstHunk?.addedLines[0] || firstHunk?.removedLines[0] || '')
+			.trim().slice(0, 60);
+		entries.push({
+			path: relPath(filePath, resolvedPath),
+			hunkIndices,
+			hunkPreview: preview,
+		});
+		patternAuditMap.set(patternName, entries);
+	}
 
 	for (const lang of LANGUAGES) {
 		const langFiles = grouped[lang];
@@ -288,33 +380,54 @@ async function main(): Promise<void> {
 							shouldExit = true;
 						}
 					} else {
-						// Detect known divergence patterns
+						// Detect known divergence patterns (hunk-aware)
 						const diff = diffLines(prettier, ours);
-						const divergences = detectDivergences({
+						const hunks = extractHunks(diff);
+						const coverage = detectDivergences({
 							source: file.content,
 							ours,
 							prettier,
 							diff,
+							hunks,
 							language: lang,
 						});
 
-						if (divergences.length > 0) {
-							// Known divergence - track patterns
+						if (coverage.classification === 'all_explained') {
+							// All hunks explained by known patterns
 							langStats.knownDivergence++;
 							langResults.push({
 								file,
 								status: 'known_divergence',
 								ours,
 								prettier,
-								divergences,
+								coverage,
 							});
-							for (const d of divergences) {
+							for (const d of coverage.matches) {
 								divergenceCounts.set(d.pattern, (divergenceCounts.get(d.pattern) || 0) + 1);
+								if (auditPatterns) {
+									recordAuditEntry(d.pattern, file.path, d.hunkIndices, hunks);
+								}
+							}
+						} else if (coverage.classification === 'partial') {
+							// Some hunks explained, some not
+							langStats.partialDivergence++;
+							langResults.push({
+								file,
+								status: 'partial_divergence',
+								ours,
+								prettier,
+								coverage,
+							});
+							for (const d of coverage.matches) {
+								divergenceCounts.set(d.pattern, (divergenceCounts.get(d.pattern) || 0) + 1);
+								if (auditPatterns) {
+									recordAuditEntry(d.pattern, file.path, d.hunkIndices, hunks);
+								}
 							}
 						} else {
-							// Unknown difference - needs investigation
+							// No hunks explained - unknown difference
 							langStats.unknownDiff++;
-							langResults.push({ file, status: 'unknown_diff', ours, prettier });
+							langResults.push({ file, status: 'unknown_diff', ours, prettier, coverage });
 							if (exitOnFirst) {
 								console.log(`\nUnknown difference: ${rel}`);
 								if (showDiff) {
@@ -362,6 +475,7 @@ async function main(): Promise<void> {
 
 	let totalMatch = 0;
 	let totalKnownDivergence = 0;
+	let totalPartialDivergence = 0;
 	let totalUnknownDiff = 0;
 	let totalSafetyViolation = 0;
 	let totalErrors = 0;
@@ -373,6 +487,7 @@ async function main(): Promise<void> {
 
 		totalMatch += s.match;
 		totalKnownDivergence += s.knownDivergence;
+		totalPartialDivergence += s.partialDivergence;
 		totalUnknownDiff += s.unknownDiff;
 		totalSafetyViolation += s.safetyViolation;
 		totalErrors += s.errors;
@@ -383,6 +498,7 @@ async function main(): Promise<void> {
 
 		const parts: string[] = [];
 		if (s.knownDivergence > 0) parts.push(`${s.knownDivergence} known`);
+		if (s.partialDivergence > 0) parts.push(`\x1b[33m${s.partialDivergence} partial\x1b[0m`);
 		if (s.unknownDiff > 0) parts.push(`${s.unknownDiff} unknown`);
 		if (s.safetyViolation > 0) parts.push(`\x1b[31m${s.safetyViolation} SAFETY\x1b[0m`);
 		if (s.errors > 0) parts.push(`${s.errors} errors`);
@@ -398,6 +514,9 @@ async function main(): Promise<void> {
 
 		const parts: string[] = [];
 		if (totalKnownDivergence > 0) parts.push(`${totalKnownDivergence} known`);
+		if (totalPartialDivergence > 0) {
+			parts.push(`\x1b[33m${totalPartialDivergence} partial\x1b[0m`);
+		}
 		if (totalUnknownDiff > 0) parts.push(`${totalUnknownDiff} unknown`);
 		if (totalSafetyViolation > 0) parts.push(`\x1b[31m${totalSafetyViolation} SAFETY\x1b[0m`);
 		if (totalErrors > 0) parts.push(`${totalErrors} errors`);
@@ -415,6 +534,30 @@ async function main(): Promise<void> {
 		}
 	}
 
+	// Show per-pattern audit report with sample diffs
+	if (auditPatterns && patternAuditMap.size > 0) {
+		console.log('\nPattern Audit (per-pattern corpus coverage)');
+		console.log('─'.repeat(70));
+
+		const sorted = [...patternAuditMap.entries()].sort((a, b) => b[1].length - a[1].length);
+		for (const [pattern, entries] of sorted) {
+			console.log(`\n${pattern}: ${entries.length} files`);
+			const samples = entries.slice(0, 3);
+			for (const sample of samples) {
+				const hunkStr = sample.hunkIndices.length === 1
+					? `hunk ${sample.hunkIndices[0]}`
+					: `hunks ${sample.hunkIndices.join(',')}`;
+				console.log(`  ${sample.path} (${hunkStr})`);
+				if (sample.hunkPreview) {
+					console.log(`    "${sample.hunkPreview}"`);
+				}
+			}
+			if (entries.length > 3) {
+				console.log(`  ... and ${entries.length - 3} more`);
+			}
+		}
+	}
+
 	// Show safety violations (CRITICAL)
 	const allSafetyViolations = LANGUAGES.flatMap((lang) =>
 		results.get(lang)!.filter((r) => r.status === 'safety_violation')
@@ -426,6 +569,53 @@ async function main(): Promise<void> {
 			console.log(`  ${relPath(r.file.path, resolvedPath)}`);
 			for (const v of r.safetyViolations!) {
 				console.log(`    - ${v.type}: ${v.summary}`);
+			}
+		}
+	}
+
+	// Show partial divergences (some hunks unexplained)
+	const allPartial = LANGUAGES.flatMap((lang) =>
+		results.get(lang)!.filter((r) => r.status === 'partial_divergence')
+	).sort((a, b) => a.file.bytes - b.file.bytes);
+
+	if (allPartial.length > 0) {
+		if (explain) {
+			console.log(
+				`\nPartial Divergences (${allPartial.length} files - some hunks unexplained):`,
+			);
+			for (const r of allPartial) {
+				const coverage = r.coverage!;
+				const patterns = coverage.matches.map((d) => d.pattern).join(', ');
+				const explainedCount = coverage.explainedHunks.size;
+				const totalHunks = coverage.hunks.length;
+				console.log(`  ${relPath(r.file.path, resolvedPath)}:`);
+				console.log(
+					`    EXPLAINED (${explainedCount}/${totalHunks} hunks): ${patterns}`,
+				);
+				for (const idx of coverage.unexplainedHunks) {
+					const hunk = coverage.hunks[idx];
+					const lineCount = hunk.addedLines.length + hunk.removedLines.length;
+					const preview = (hunk.addedLines[0] || hunk.removedLines[0] || '').trim().slice(0, 50);
+					console.log(
+						`    UNEXPLAINED hunk ${idx}: "${preview}" (${lineCount} lines)`,
+					);
+				}
+			}
+		} else {
+			console.log(
+				`\nPartial Divergences (${allPartial.length} files - use --explain for details):`,
+			);
+			for (const r of allPartial.slice(0, 10)) {
+				const coverage = r.coverage!;
+				const patterns = coverage.matches.map((d) => d.pattern).join(', ');
+				console.log(
+					`  ${
+						relPath(r.file.path, resolvedPath)
+					}: ${patterns} (${coverage.unexplainedHunks.length} unexplained hunks)`,
+				);
+			}
+			if (allPartial.length > 10) {
+				console.log(`  ... and ${allPartial.length - 10} more`);
 			}
 		}
 	}
@@ -462,12 +652,14 @@ async function main(): Promise<void> {
 			}
 		} else {
 			console.log(`\nUnknown Differences (${allUnknown.length} files, needs investigation):`);
-			for (const r of allUnknown.slice(0, 5)) {
+			for (const r of allUnknown.slice(0, 10)) {
 				const sizeStr = formatBytes(r.file.bytes);
+				const summary = getDiffSummary(r.prettier!, r.ours!);
 				console.log(`  ${relPath(r.file.path, resolvedPath)} (${sizeStr})`);
+				console.log(`    ${summary}`);
 			}
-			if (allUnknown.length > 5) {
-				console.log(`  ... and ${allUnknown.length - 5} more`);
+			if (allUnknown.length > 10) {
+				console.log(`  ... and ${allUnknown.length - 10} more`);
 			}
 		}
 	}
@@ -480,12 +672,9 @@ async function main(): Promise<void> {
 
 		if (allKnown.length > 0) {
 			console.log(`\nKnown Divergences (${allKnown.length} files):`);
-			for (const r of allKnown.slice(0, 10)) {
-				const patterns = r.divergences!.map((d) => d.pattern).join(', ');
+			for (const r of allKnown) {
+				const patterns = r.coverage!.matches.map((d) => d.pattern).join(', ');
 				console.log(`  ${relPath(r.file.path, resolvedPath)}: ${patterns}`);
-			}
-			if (allKnown.length > 10) {
-				console.log(`  ... and ${allKnown.length - 10} more`);
 			}
 		}
 	}
@@ -515,14 +704,18 @@ async function main(): Promise<void> {
 		canonical.dispose();
 		native.dispose();
 		Deno.exit(1);
-	} else if (totalUnknownDiff > 0 && strict) {
-		console.log(`\x1b[31mFAIL: ${totalUnknownDiff} unknown differences (strict mode)\x1b[0m`);
+	} else if ((totalUnknownDiff > 0 || totalPartialDivergence > 0) && strict) {
+		const issues = totalUnknownDiff + totalPartialDivergence;
+		console.log(`\x1b[31mFAIL: ${issues} unexplained differences (strict mode)\x1b[0m`);
 		canonical.dispose();
 		native.dispose();
 		Deno.exit(1);
-	} else if (totalUnknownDiff > 0) {
+	} else if (totalUnknownDiff > 0 || totalPartialDivergence > 0) {
+		const parts: string[] = [];
+		if (totalUnknownDiff > 0) parts.push(`${totalUnknownDiff} unknown`);
+		if (totalPartialDivergence > 0) parts.push(`${totalPartialDivergence} partial`);
 		console.log(
-			`\x1b[33mWARN: ${totalUnknownDiff} unknown differences (may need investigation)\x1b[0m`,
+			`\x1b[33mWARN: ${parts.join(', ')} differences (may need investigation)\x1b[0m`,
 		);
 	} else if (totalErrors > 0) {
 		console.log(`\x1b[33mWARN: ${totalErrors} errors occurred\x1b[0m`);

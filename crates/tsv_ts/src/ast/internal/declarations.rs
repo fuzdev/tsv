@@ -37,7 +37,8 @@ pub struct TSInterfaceBody {
 
 /// Declare function: `declare function foo(): void`
 ///
-/// Also used for functions inside `declare namespace` where `declare` is implicit.
+/// Also used for functions inside `declare namespace` where `declare` is implicit,
+/// and for function overload signatures (no body).
 #[derive(Debug, Clone)]
 pub struct TSDeclareFunction {
     pub id: Identifier,
@@ -47,6 +48,10 @@ pub struct TSDeclareFunction {
     /// Whether to print the `declare` keyword.
     /// True for top-level `declare function`, false inside `declare namespace`.
     pub declare: bool,
+    /// Whether this is an async function.
+    pub r#async: bool,
+    /// Whether this is a generator function.
+    pub generator: bool,
     pub span: Span,
 }
 

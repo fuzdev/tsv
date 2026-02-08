@@ -63,7 +63,10 @@ use string_interner::DefaultStringInterner;
 use tsv_lang::{
     CommentPosition, OutputBuffer, PrintConfig, SymbolResolver, classify_comment_fast,
     comments_after, comments_in_range,
-    doc::{self, Doc},
+    doc::{
+        self, Doc,
+        arena::{DocArena, DocId},
+    },
     has_comments_in_range, has_line_comments_in_range, printing,
 };
 
@@ -75,6 +78,8 @@ pub struct Printer<'a> {
     pub(crate) indent_level: usize,
     /// Print configuration
     config: PrintConfig,
+    /// Arena allocator for doc nodes
+    pub(crate) arena: DocArena,
     /// Shared string interner for resolving symbols
     interner: Rc<RefCell<DefaultStringInterner>>,
     /// Original source code (for extracting raw values, preserving escape sequences, etc.)
@@ -122,6 +127,7 @@ impl<'a> Printer<'a> {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
             config,
+            arena: DocArena::with_source_size_hint(source.len()),
             interner,
             source,
             comments,
@@ -133,6 +139,12 @@ impl<'a> Printer<'a> {
             in_template_interpolation: Cell::new(false),
             in_curried_typed_arrow: Cell::new(false),
         }
+    }
+
+    /// Get a reference to the doc arena (convenience for `&self.arena`).
+    #[inline]
+    pub(crate) fn d(&self) -> &DocArena {
+        &self.arena
     }
 
     /// Write a string to the buffer
@@ -154,22 +166,51 @@ impl<'a> Printer<'a> {
     /// Use `write_doc` for expression statements where the semicolon
     /// (like semicolons) should be considered in width calculations.
     pub(crate) fn write_doc(&mut self, d: &Doc) {
-        // Calculate offset to account for outer context in width calculations
+        // Convert Doc tree to arena, then render from arena.
+        // The arena render avoids recursive drop and has better cache locality.
+        let arena = DocArena::with_source_size_hint(256);
+        let doc_id = arena.convert_doc(d);
+
         let context_offset = if self.config.first_line_offset > 0 {
-            // Inline embedded expression: first_line_offset includes visual width of outer indent
             if self.current_column() == 0 {
                 self.config.first_line_offset
             } else {
                 0
             }
         } else {
-            // Standalone block: account for outer indent not visible in our buffer
             self.config.base_indent_offset * self.config.tab_width
         };
         let current_col = self.current_column() + context_offset;
         let output = {
             let interner = self.interner.borrow();
-            doc::print_doc_with_indent_resolved(
+            doc::arena_print_doc_with_indent_resolved(
+                &arena,
+                doc_id,
+                &self.config,
+                current_col,
+                self.indent_level,
+                &*interner,
+            )
+        };
+        self.write(&output);
+    }
+
+    /// Write an arena-based DocId to the buffer
+    pub(crate) fn write_arena_doc(&mut self, d: DocId) {
+        let context_offset = if self.config.first_line_offset > 0 {
+            if self.current_column() == 0 {
+                self.config.first_line_offset
+            } else {
+                0
+            }
+        } else {
+            self.config.base_indent_offset * self.config.tab_width
+        };
+        let current_col = self.current_column() + context_offset;
+        let output = {
+            let interner = self.interner.borrow();
+            doc::arena_print_doc_with_indent_resolved(
+                &self.arena,
                 d,
                 &self.config,
                 current_col,
@@ -178,6 +219,16 @@ impl<'a> Printer<'a> {
             )
         };
         self.write(&output);
+    }
+
+    /// Render an arena DocId to a flat string with effectively infinite width.
+    pub(crate) fn render_arena_doc_flat(&self, d: DocId) -> String {
+        let flat_config = PrintConfig {
+            print_width: usize::MAX / 2,
+            ..self.config
+        };
+        let interner = self.interner.borrow();
+        doc::arena_print_doc_resolved(&self.arena, d, &flat_config, &*interner)
     }
 
     /// Write indentation based on current indent level
@@ -223,13 +274,14 @@ impl<'a> Printer<'a> {
     /// Used when we need to prevent a doc from breaking internally,
     /// such as expressions inside template literal interpolations.
     pub(crate) fn render_doc_flat(&self, d: &Doc) -> String {
-        // Use MAX/2 instead of MAX to avoid potential overflow in width calculations
+        let arena = DocArena::with_source_size_hint(256);
+        let doc_id = arena.convert_doc(d);
         let flat_config = PrintConfig {
             print_width: usize::MAX / 2,
             ..self.config
         };
         let interner = self.interner.borrow();
-        doc::print_doc_resolved(d, &flat_config, &*interner)
+        doc::arena_print_doc_resolved(&arena, doc_id, &flat_config, &*interner)
     }
 
     /// Wrap content and closing line with declaration indent depth handling
@@ -423,17 +475,27 @@ impl<'a> Printer<'a> {
     }
 
     /// Find the position of `=` character in the source between two positions
+    /// Skips over comments to avoid matching `=` inside them.
+    /// Also skips `==` and `===` comparison operators (we want assignment `=`).
     pub(crate) fn find_equals_position(&self, start: u32, end: u32) -> u32 {
-        let start = start as usize;
-        let end = end as usize;
-        let slice = &self.source[start..end];
+        let bytes = self.source.as_bytes();
+        let start_pos = start as usize;
+        let end_pos = end as usize;
+        let mut i = start_pos;
 
-        if let Some(offset) = slice.find('=') {
-            (start + offset) as u32
-        } else {
-            // Fallback: return midpoint if `=` not found
-            usize::midpoint(start, end) as u32
+        while i < end_pos {
+            if let Some(new_i) = analysis::skip_comment(bytes, i, end_pos) {
+                i = new_i;
+                continue;
+            }
+            // Check for assignment `=` (not `==` or `===`)
+            if bytes[i] == b'=' && (i + 1 >= end_pos || bytes[i + 1] != b'=') {
+                return i as u32;
+            }
+            i += 1;
         }
+        // Fallback: return midpoint if `=` not found
+        usize::midpoint(start_pos, end_pos) as u32
     }
 
     /// Check if there are comments between two positions (read-only check)

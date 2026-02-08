@@ -30,7 +30,9 @@
 		"corpus:compare": "deno task build:ffi && deno task corpus:compare:run",
 		"corpus:compare:run": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/corpus_compare.ts",
 
-		"divergence:audit": "deno run --allow-read benches/deno/divergence_audit.ts"
+		"divergence:audit": "deno run --allow-read benches/deno/divergence_audit.ts",
+
+		"test:divergence": "deno test --config benches/deno/deno.json benches/deno/lib/divergence/patterns_test.ts"
 	},
 	"fmt": {
 		"useTabs": true,

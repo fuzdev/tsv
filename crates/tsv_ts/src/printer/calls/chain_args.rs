@@ -5,8 +5,8 @@
 
 use super::super::Printer;
 use super::super::utils::{
-    could_expand_arrow_body, is_block_function, is_hopefully_short_arg,
-    last_arg_is_array_or_object, preceding_args_allow_hug,
+    arrow_has_trailing_param_comments, could_expand_arrow_body, is_block_function,
+    is_short_second_arg_for_expand_first, last_arg_is_array_or_object, preceding_args_allow_hug,
 };
 use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, find_comma_pos, has_inter_argument_comments,
@@ -129,9 +129,10 @@ fn build_call_args_doc_for_chain_impl(
     // Prettier always expands 2+ arrow function arguments, regardless of source formatting.
     // This matches Prettier's behavior: fn(() => x, () => y) → fn(\n  () => x,\n  () => y,\n)
     let all_args_are_arrows = call.arguments.len() >= 2
-        && call.arguments.iter().all(|arg| {
-            matches!(arg, internal::Expression::ArrowFunctionExpression(_))
-        });
+        && call
+            .arguments
+            .iter()
+            .all(|arg| matches!(arg, internal::Expression::ArrowFunctionExpression(_)));
 
     // Get paren_open position (after type args if present, otherwise after callee)
     let paren_open = call
@@ -566,6 +567,25 @@ fn build_call_args_doc_for_chain_impl(
                 (None, None) => arg_doc,
             };
 
+            // Check if it's a block arrow with trailing param comments
+            // These need soft-break wrapping to expand the call
+            let block_arrow_has_trailing_param_comments =
+                if let internal::Expression::ArrowFunctionExpression(arrow) = arg
+                    && !arrow.body.is_expression()
+                {
+                    arrow_has_trailing_param_comments(arrow, |start, end| {
+                        printer.has_comments_between(start, end)
+                    })
+                } else {
+                    false
+                };
+
+            if block_arrow_has_trailing_param_comments {
+                // Block arrow with trailing param comments - force expansion
+                parts.push(wrap_args_with_soft_breaks(prefix, arg_with_comments));
+                return doc::concat(parts);
+            }
+
             match classify_chain_arg(arg) {
                 ChainArgKind::NeedsSoftWrap => {
                     // Needs soft-break wrapping - e.g., long strings
@@ -796,46 +816,23 @@ fn build_call_args_doc_for_chain_impl(
         // "Expand first arg" pattern: first arg is block function, rest are short
         // e.g., `.reduce((acc, item) => { ... }, {})` - callback hugs, tail args stay inline
         // Matches prettier's shouldExpandFirstArg behavior
-        if call.arguments.len() == 2 && is_block_function(&call.arguments[0]) && !comments_force_expansion {
-            let second_arg = &call.arguments[1];
+        if call.arguments.len() == 2
+            && is_block_function(&call.arguments[0])
+            && !comments_force_expansion
+            && is_short_second_arg_for_expand_first(&call.arguments[1], |start, end| {
+                printer.has_comments_between(start, end)
+            })
+        {
+            // First arg (callback) expands, tail args stay inline
+            let first_arg_doc = printer.build_arg_expression_doc(&call.arguments[0]);
+            let second_arg_doc = printer.build_arg_expression_doc(&call.arguments[1]);
 
-            // Second arg must be short/simple - exclude things that would expand
-            let second_arg_is_short = match second_arg {
-                // Functions, ternaries, spreads should use full expansion
-                internal::Expression::ArrowFunctionExpression(_)
-                | internal::Expression::FunctionExpression(_)
-                | internal::Expression::ConditionalExpression(_)
-                | internal::Expression::SpreadElement(_) => false,
-                // Non-empty objects/arrays expand
-                internal::Expression::ObjectExpression(obj) if !obj.properties.is_empty() => false,
-                internal::Expression::ArrayExpression(arr) if !arr.elements.is_empty() => false,
-                // Empty {} or [] with comments inside should expand
-                internal::Expression::ObjectExpression(obj)
-                    if printer.has_comments_between(obj.span.start, obj.span.end) =>
-                {
-                    false
-                }
-                internal::Expression::ArrayExpression(arr)
-                    if printer.has_comments_between(arr.span.start, arr.span.end) =>
-                {
-                    false
-                }
-                // Otherwise check if it's a hopefully short argument
-                _ => is_hopefully_short_arg(second_arg),
-            };
-
-            if second_arg_is_short {
-                // First arg (callback) expands, tail args stay inline
-                let first_arg_doc = printer.build_arg_expression_doc(&call.arguments[0]);
-                let second_arg_doc = printer.build_arg_expression_doc(second_arg);
-
-                parts.push(doc::text(prefix));
-                parts.push(first_arg_doc);
-                parts.push(doc::text(", "));
-                parts.push(second_arg_doc);
-                parts.push(doc::text(")"));
-                return doc::concat(parts);
-            }
+            parts.push(doc::text(prefix));
+            parts.push(first_arg_doc);
+            parts.push(doc::text(", "));
+            parts.push(second_arg_doc);
+            parts.push(doc::text(")"));
+            return doc::concat(parts);
         }
 
         // Multiple arguments: wrap in group with softlines so they can break

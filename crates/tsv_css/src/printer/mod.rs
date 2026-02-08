@@ -160,8 +160,17 @@ impl<'a> Printer<'a> {
     /// Note: base_indent_offset is already accounted for in position tracking after newlines
     /// (see doc::render_single_doc line breaks). We should NOT add it again here.
     pub(crate) fn write_doc(&mut self, doc: &doc::Doc) {
+        // Convert Doc to arena then render for better performance
+        let arena = tsv_lang::doc::arena::DocArena::with_source_size_hint(256);
+        let doc_id = arena.convert_doc(doc);
         let current_col = self.current_column();
-        let output = doc::print_doc_with_indent(doc, &self.config, current_col, self.indent_level);
+        let output = doc::arena_print_doc_with_indent(
+            &arena,
+            doc_id,
+            &self.config,
+            current_col,
+            self.indent_level,
+        );
         self.write(&output);
     }
 

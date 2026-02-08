@@ -384,8 +384,8 @@ impl<'a> Printer<'a> {
             let key_start = prop.key.span().start;
             let key_end = prop.key.span().end;
 
-            // Find bracket positions
-            let bracket_start = self.find_opening_bracket_before(key_start);
+            // Find bracket positions (search from property start, not file start)
+            let bracket_start = self.find_opening_bracket_after(prop.span.start, key_start);
             let bracket_end = self.find_closing_bracket_after(key_end);
 
             let mut parts = vec![doc::text("[")];
@@ -480,16 +480,22 @@ impl<'a> Printer<'a> {
         } else {
             // Regular property: check for comments between key and value
             // Find colon position and check for comments
-            let colon_pos = self.find_colon_after(prop.key.span().end);
+            let key_end = prop.key.span().end;
+            let colon_pos = self.find_colon_after(key_end);
             let value_start = prop.value.span().start;
-            let colon_comments: Vec<_> =
+
+            // Comments between key and colon (e.g., {key /* comment */: value})
+            let pre_colon_comments: Vec<_> =
+                comments_in_range(self.comments, key_end, colon_pos).collect();
+            // Comments between colon and value (e.g., {key: /* comment */ value})
+            let post_colon_comments: Vec<_> =
                 comments_in_range(self.comments, colon_pos + 1, value_start).collect();
 
             // Check if value needs parens (e.g., assignment expressions)
             let needs_parens =
                 super::needs_parens(&prop.value, super::ParenContext::ObjectPropertyValue);
 
-            if colon_comments.is_empty() {
+            if pre_colon_comments.is_empty() && post_colon_comments.is_empty() {
                 if needs_parens {
                     // Build manually with parens
                     let value_doc = doc::concat(vec![
@@ -504,9 +510,19 @@ impl<'a> Printer<'a> {
                     self.build_assignment_layout(key_doc, ":", &prop.value, is_short_key)
                 }
             } else {
-                // Comments between colon and value: build manually to preserve them
-                let mut parts = vec![key_doc, doc::text(": ")];
-                for comment in &colon_comments {
+                // Comments around colon: build manually to preserve them
+                let mut parts = vec![key_doc];
+
+                // Add comments between key and colon
+                for comment in &pre_colon_comments {
+                    parts.push(doc::text(" "));
+                    parts.push(self.build_comment_doc(comment));
+                }
+
+                parts.push(doc::text(": "));
+
+                // Add comments between colon and value
+                for comment in &post_colon_comments {
                     parts.push(self.build_comment_doc(comment));
                     parts.push(doc::text(" "));
                 }
@@ -592,27 +608,38 @@ impl<'a> Printer<'a> {
     }
 
     /// Find the position of `:` after a position (for finding colon in property)
+    /// Skips over comments to avoid matching colons inside them.
     pub(super) fn find_colon_after(&self, start: u32) -> u32 {
-        let start = start as usize;
-        let slice = &self.source[start..];
-        if let Some(offset) = slice.find(':') {
-            (start + offset) as u32
-        } else {
-            start as u32
-        }
+        super::analysis::find_char_skipping_comments(
+            self.source.as_bytes(),
+            start as usize,
+            self.source.len(),
+            b':',
+        )
+        .map_or(start, |pos| pos as u32)
     }
 
-    /// Find the opening `[` bracket before a position (for computed properties)
-    fn find_opening_bracket_before(&self, pos: u32) -> u32 {
-        self.source[..pos as usize]
-            .rfind('[')
-            .map_or(pos - 1, |offset| offset as u32)
+    /// Find the opening `[` bracket between two positions (for computed properties).
+    /// Returns the first `[` found outside comments in the range [start, end).
+    fn find_opening_bracket_after(&self, start: u32, end: u32) -> u32 {
+        super::analysis::find_char_skipping_comments(
+            self.source.as_bytes(),
+            start as usize,
+            end as usize,
+            b'[',
+        )
+        .map_or(start, |pos| pos as u32)
     }
 
     /// Find the closing `]` bracket after a position (for computed properties)
+    /// Skips over comments to avoid matching brackets inside them.
     fn find_closing_bracket_after(&self, pos: u32) -> u32 {
-        self.source[pos as usize..]
-            .find(']')
-            .map_or(pos + 1, |offset| pos + offset as u32)
+        super::analysis::find_char_skipping_comments(
+            self.source.as_bytes(),
+            pos as usize,
+            self.source.len(),
+            b']',
+        )
+        .map_or(pos + 1, |p| p as u32)
     }
 }

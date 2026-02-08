@@ -333,28 +333,12 @@ impl<'a> Printer<'a> {
 
     /// Find the position of a character in source, skipping over comments
     fn find_char_position(&self, start: u32, end: u32, target: char) -> Option<u32> {
-        let search_range = &self.source[start as usize..end as usize];
-        let bytes = search_range.as_bytes();
-        let target_byte = target as u8;
-        let mut i = 0;
-
-        while i < bytes.len() {
-            // Skip over block comments
-            if i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'*' {
-                i += 2;
-                while i + 1 < bytes.len() && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
-                    i += 1;
-                }
-                i += 2;
-                continue;
-            }
-
-            if bytes[i] == target_byte {
-                return Some(start + i as u32);
-            }
-            i += 1;
-        }
-
-        None
+        super::analysis::find_char_skipping_comments(
+            self.source.as_bytes(),
+            start as usize,
+            end as usize,
+            target as u8,
+        )
+        .map(|pos| pos as u32)
     }
 }

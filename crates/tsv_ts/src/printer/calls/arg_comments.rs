@@ -18,20 +18,20 @@ use crate::ast::internal;
 ///
 /// Returns the absolute position of the comma in the source, or None if not found.
 #[inline]
-pub(super) fn find_comma_pos(source: &str, start: u32, end: u32) -> Option<usize> {
+pub(crate) fn find_comma_pos(source: &str, start: u32, end: u32) -> Option<usize> {
     let between = &source[start as usize..end as usize];
     between.find(',').map(|offset| start as usize + offset)
 }
 
 /// Check if a comment is before the comma position
 #[inline]
-pub(super) fn is_comment_before_comma(comment: &internal::Comment, comma_pos: usize) -> bool {
+pub(crate) fn is_comment_before_comma(comment: &internal::Comment, comma_pos: usize) -> bool {
     (comment.span.start as usize) < comma_pos
 }
 
 /// Check if a comment is after the comma position
 #[inline]
-pub(super) fn is_comment_after_comma(comment: &internal::Comment, comma_pos: usize) -> bool {
+pub(crate) fn is_comment_after_comma(comment: &internal::Comment, comma_pos: usize) -> bool {
     (comment.span.start as usize) > comma_pos
 }
 
@@ -191,6 +191,36 @@ pub(crate) fn has_trailing_line_comments_slice(
     call_span_end: u32,
     printer: &Printer,
 ) -> bool {
+    has_trailing_comments_slice_impl(arguments, call_span_end, |start, end| {
+        printer.has_line_comments_between(start, end)
+    })
+}
+
+/// Check if there are trailing comments (line OR block) on any arguments
+///
+/// Used when we need to detect ALL trailing comments, not just line comments.
+/// This is important for new expressions where block comments after arguments
+/// can also be lost if not handled properly.
+pub(crate) fn has_trailing_comments_slice(
+    arguments: &[internal::Expression],
+    call_span_end: u32,
+    printer: &Printer,
+) -> bool {
+    has_trailing_comments_slice_impl(arguments, call_span_end, |start, end| {
+        printer.has_comments_between(start, end)
+    })
+}
+
+/// Shared implementation for checking trailing comments on arguments.
+#[inline]
+fn has_trailing_comments_slice_impl<F>(
+    arguments: &[internal::Expression],
+    call_span_end: u32,
+    has_comments: F,
+) -> bool
+where
+    F: Fn(u32, u32) -> bool,
+{
     if arguments.is_empty() {
         return false;
     }
@@ -203,7 +233,7 @@ pub(crate) fn has_trailing_line_comments_slice(
             call_span_end
         };
 
-        if printer.has_line_comments_between(arg_end, next_boundary) {
+        if has_comments(arg_end, next_boundary) {
             return true;
         }
     }
@@ -265,17 +295,6 @@ impl<'a> PartitionedComments<'a> {
 
     pub fn has_trailing_block(&self) -> bool {
         !self.trailing_block.is_empty()
-    }
-
-    #[allow(dead_code)]
-    pub fn has_leading(&self) -> bool {
-        !self.leading.is_empty()
-    }
-
-    /// Check if there are any comments at all
-    #[allow(dead_code)]
-    pub fn is_empty(&self) -> bool {
-        self.trailing_line.is_empty() && self.trailing_block.is_empty() && self.leading.is_empty()
     }
 
     /// Emit trailing comments (block then line) with leading spaces to a parts vector.

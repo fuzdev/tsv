@@ -664,6 +664,31 @@ impl<'a> Printer<'a> {
         self.has_line_comments_in_chain(expr)
     }
 
+    /// Check if an expression contains an import expression with trailing comments.
+    ///
+    /// Import expressions with trailing comments (e.g., `import('./x' // comment)` or
+    /// `import('./x' /* comment */)` or `import('./x', {opts} // comment)`)
+    /// expand internally and should not use fluid layout. The import itself handles
+    /// its own expansion, so the assignment should use default layout.
+    /// Handles both direct imports and `await import(...)`.
+    pub(crate) fn has_import_with_trailing_comments(&self, expr: &Expression) -> bool {
+        match expr {
+            Expression::ImportExpression(import) => {
+                let paren_close = import.span.end;
+                // Check for comments after the last argument (source or options)
+                let last_arg_end = import
+                    .options
+                    .as_ref()
+                    .map_or_else(|| import.source.span().end, |opts| opts.span().end);
+                self.has_comments_between(last_arg_end, paren_close)
+            }
+            Expression::AwaitExpression(await_expr) => {
+                self.has_import_with_trailing_comments(&await_expr.argument)
+            }
+            _ => false,
+        }
+    }
+
     /// Recursively check for line comments in a chain (calls, members, non-null).
     fn has_line_comments_in_chain(&self, expr: &Expression) -> bool {
         match expr {

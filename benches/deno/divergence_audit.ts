@@ -10,8 +10,8 @@
  *   deno task divergence:audit --json
  */
 
-import {parseArgs} from '@std/cli/parse-args';
-import {generateAuditReport, formatAuditReport} from './lib/divergence/mod.ts';
+import { parseArgs } from '@std/cli/parse-args';
+import { formatAuditReport, generateAuditReport } from './lib/divergence/mod.ts';
 
 interface Args {
 	json?: boolean;
@@ -35,7 +35,7 @@ Examples:
 async function main(): Promise<void> {
 	const args = parseArgs(Deno.args, {
 		boolean: ['json', 'help'],
-		alias: {h: 'help'},
+		alias: { h: 'help' },
 	}) as Args;
 
 	if (args.help) {

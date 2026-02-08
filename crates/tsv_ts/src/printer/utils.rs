@@ -35,6 +35,37 @@ pub(super) fn is_expandable_object(expr: &Expression) -> bool {
     matches!(expr, Expression::ObjectExpression(obj) if !obj.properties.is_empty())
 }
 
+/// Check if a second argument is "short" enough for the "expand first arg" pattern.
+///
+/// Used when the first arg is a block function and we want to keep the second arg
+/// inline after the closing `}`. Returns false for expressions that would expand.
+///
+/// The `has_comments_between` closure checks for comments inside empty containers
+/// (typically `printer.has_comments_between`).
+pub(super) fn is_short_second_arg_for_expand_first<F>(arg: &Expression, has_comments: F) -> bool
+where
+    F: Fn(u32, u32) -> bool,
+{
+    match arg {
+        // Functions, ternaries, spreads - these should expand all args
+        Expression::ArrowFunctionExpression(_)
+        | Expression::FunctionExpression(_)
+        | Expression::ConditionalExpression(_)
+        | Expression::SpreadElement(_) => false,
+        // Non-empty objects expand - use "expand all args" instead
+        Expression::ObjectExpression(obj) if !obj.properties.is_empty() => false,
+        // Non-empty arrays expand - use "expand all args" instead
+        Expression::ArrayExpression(arr) if !arr.elements.is_empty() => false,
+        // Empty {} or [] with comments inside should expand
+        Expression::ObjectExpression(obj) if has_comments(obj.span.start, obj.span.end) => false,
+        Expression::ArrayExpression(arr) if has_comments(arr.span.start, arr.span.end) => false,
+        // Truly empty {} and [] are short
+        Expression::ObjectExpression(_) | Expression::ArrayExpression(_) => true,
+        // Other args: check if "hopefully short"
+        _ => is_hopefully_short_arg(arg),
+    }
+}
+
 /// Check if an arrow function body is a ternary expression
 ///
 /// Matches Prettier's `couldExpandArg` logic for conditional expressions in arrow bodies.
@@ -45,6 +76,37 @@ pub(super) fn could_expand_arrow_body(body: &Expression) -> bool {
     // Only ternary expressions need the special conditional paren treatment
     // Call expressions, objects, arrays are handled by other code paths
     matches!(body, Expression::ConditionalExpression(_))
+}
+
+/// Check if an arrow function has trailing comments after its last parameter.
+///
+/// Returns true if there are comments between the last param and the body, e.g.:
+/// ```text
+/// (a: string, // comment
+/// ) => {}
+/// ```
+///
+/// This is used to determine when arrow callbacks should force call expansion,
+/// and when nested arrows should use the curried alignment pattern.
+///
+/// The `has_comments_between` parameter is typically `printer.has_comments_between`.
+pub(crate) fn arrow_has_trailing_param_comments<F>(
+    arrow: &internal::ArrowFunctionExpression,
+    has_comments_between: F,
+) -> bool
+where
+    F: Fn(u32, u32) -> bool,
+{
+    let Some(last_param) = arrow.params.last() else {
+        return false;
+    };
+    let param_end = last_param.span().end;
+    let body_start = match &arrow.body {
+        internal::ArrowFunctionBody::BlockStatement(block) => block.span.start,
+        internal::ArrowFunctionBody::Expression(expr) => expr.span().start,
+    };
+
+    has_comments_between(param_end, body_start)
 }
 
 /// Check if the last argument is an array or object expression (unwrapping type assertions)

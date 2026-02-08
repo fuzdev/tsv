@@ -4,9 +4,9 @@
 // all the special cases for call expression formatting.
 
 use super::super::utils::{
-    could_expand_arrow_body, has_block_function_before_last, is_array_or_object_unwrapped,
-    is_block_function, is_function_composition_args, is_hopefully_short_arg,
-    last_arg_is_array_or_object, preceding_args_allow_hug,
+    arrow_has_trailing_param_comments, could_expand_arrow_body, has_block_function_before_last,
+    is_array_or_object_unwrapped, is_block_function, is_function_composition_args,
+    is_short_second_arg_for_expand_first, last_arg_is_array_or_object, preceding_args_allow_hug,
 };
 use super::super::{
     ParenContext, Printer, has_multiline_content, needs_parens, template_literal_has_newlines,
@@ -40,42 +40,15 @@ fn should_expand_first_arg(printer: &Printer, args: &[internal::Expression]) -> 
         return false;
     }
 
-    let first_arg = &args[0];
-    let second_arg = &args[1];
-
     // First arg must be a function with block body
-    if !is_block_function(first_arg) {
+    if !is_block_function(&args[0]) {
         return false;
     }
 
-    // Second arg must be short/simple (won't expand)
-    // Exclude: functions, ternaries, spreads - these should expand all args
-    // Also exclude non-empty objects/arrays (they expand), but allow empty {} and []
-    match second_arg {
-        internal::Expression::ArrowFunctionExpression(_)
-        | internal::Expression::FunctionExpression(_)
-        | internal::Expression::ConditionalExpression(_)
-        | internal::Expression::SpreadElement(_) => return false,
-        // Non-empty objects expand - use "expand all args" instead
-        internal::Expression::ObjectExpression(obj) if !obj.properties.is_empty() => return false,
-        // Non-empty arrays expand - use "expand all args" instead
-        internal::Expression::ArrayExpression(arr) if !arr.elements.is_empty() => return false,
-        // Empty {} or [] with comments inside should expand (comments will break)
-        internal::Expression::ObjectExpression(obj)
-            if printer.has_comments_between(obj.span.start, obj.span.end) =>
-        {
-            return false;
-        }
-        internal::Expression::ArrayExpression(arr)
-            if printer.has_comments_between(arr.span.start, arr.span.end) =>
-        {
-            return false;
-        }
-        // Truly empty {} and [] are short and don't expand - allow "expand first arg"
-        _ => {}
-    }
-
-    is_hopefully_short_arg(second_arg)
+    // Second arg must be short/simple
+    is_short_second_arg_for_expand_first(&args[1], |start, end| {
+        printer.has_comments_between(start, end)
+    })
 }
 
 /// Print a call expression: `foo()`, `obj.method(arg1, arg2)`
@@ -307,6 +280,29 @@ pub(super) fn build_call_doc_with_wrapping(
             // Block arrow: use conditional_group to let Doc decide hug vs wrap
             internal::Expression::ArrowFunctionExpression(arrow) if !arrow.body.is_expression() => {
                 let arrow_doc = printer.build_expression_doc(arg);
+
+                // If the arrow has trailing param comments, the params will be multiline,
+                // so we should force the wrapped state (prettier behavior)
+                let has_trailing_param_comments =
+                    arrow_has_trailing_param_comments(arrow, |start, end| {
+                        printer.has_comments_between(start, end)
+                    });
+
+                if has_trailing_param_comments {
+                    // Force wrapped state when arrow has trailing param comments
+                    return doc::concat(vec![
+                        callee,
+                        doc::text("("),
+                        doc::indent(doc::concat(vec![
+                            doc::softline(),
+                            arrow_doc,
+                            doc::text(","),
+                        ])),
+                        doc::softline(),
+                        doc::text(")"),
+                    ]);
+                }
+
                 return doc::conditional_group(vec![
                     // State 1: hugged - callee((arrow) => { body })
                     doc::concat(vec![
@@ -655,9 +651,10 @@ pub(super) fn build_call_doc_with_wrapping(
     // Prettier always expands 2+ arrow function arguments, regardless of source formatting.
     // This matches Prettier's behavior: fn(() => x, () => y) → fn(\n  () => x,\n  () => y,\n)
     let all_args_are_arrows = call.arguments.len() >= 2
-        && call.arguments.iter().all(|arg| {
-            matches!(arg, internal::Expression::ArrowFunctionExpression(_))
-        });
+        && call
+            .arguments
+            .iter()
+            .all(|arg| matches!(arg, internal::Expression::ArrowFunctionExpression(_)));
 
     if all_args_are_arrows && !has_trailing_comments_on_args(call, printer) {
         let arg_parts = doc::join_doc(

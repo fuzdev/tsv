@@ -114,6 +114,8 @@ impl<'a> Parser<'a> {
                 params,
                 return_type,
                 declare: false, // Not a `declare function`, just an overload
+                r#async: is_async,
+                generator: is_generator,
                 span: Span::new(start as u32, end),
             }))
         } else {
@@ -240,6 +242,8 @@ impl<'a> Parser<'a> {
                 params,
                 return_type,
                 declare: false,
+                r#async: is_async,
+                generator: is_generator,
                 span: Span::new(start as u32, end),
             }))
         } else {

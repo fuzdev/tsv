@@ -232,7 +232,7 @@ impl<'a> Printer<'a> {
                 // Used for fluid RHS or simple RHS when LHS can break.
                 let interner = self.interner.borrow();
 
-                // Calls with trailing comments expand internally and should not use fluid layout
+                // Calls and imports with trailing comments expand internally and should not use fluid layout
                 let is_call_with_trailing_comments = if let Expression::CallExpression(call) = init
                 {
                     call.arguments.last().is_some_and(|last_arg| {
@@ -242,11 +242,19 @@ impl<'a> Printer<'a> {
                     false
                 };
 
+                // Import expressions with trailing comments also expand internally
+                // (handles `await import('./x' // comment)`)
+                let is_import_with_trailing_comments = self.has_import_with_trailing_comments(init);
+
                 // Call chains with line comments should NOT be treated as fluid.
                 // The chain formatter handles breaking at the comment location.
                 // E.g., `const a = items // comment\n  .foo()` keeps `= items // comment` together.
                 let has_line_comments_in_chain = matches!(init, Expression::CallExpression(_))
                     && self.has_line_comments_in_call_chain(init);
+
+                // Combined flag for expressions with trailing comments that expand internally
+                let has_trailing_comment_expansion =
+                    is_call_with_trailing_comments || is_import_with_trailing_comments;
 
                 // Expressions that benefit from FLUID layout (Prettier's indentIfBreak pattern):
                 // The printer tries to break at `=` BEFORE evaluating the RHS's internal groups.
@@ -258,7 +266,7 @@ impl<'a> Printer<'a> {
                     || is_string_literal(init)
                     || matches!(init, Expression::RegexLiteral(_)))
                     && !is_self_expanding_value(init)
-                    && !is_call_with_trailing_comments
+                    && !has_trailing_comment_expansion
                     && !has_line_comments_in_chain;
 
                 // Single-call member chains with complex args (arrows, objects, arrays):
@@ -266,7 +274,7 @@ impl<'a> Printer<'a> {
                 // E.g., `const x = a.b.c.filter((x) => ...)` breaks at `=` if > print_width
                 let is_single_call_member_chain = is_call_on_member_chain(init)
                     && !is_self_expanding_value(init)
-                    && !is_call_with_trailing_comments
+                    && !has_trailing_comment_expansion
                     && !has_line_comments_in_chain;
 
                 // Expressions that need break-after-operator layout (old style):
@@ -276,7 +284,7 @@ impl<'a> Printer<'a> {
                 let needs_break_after_op_layout = (matches!(init, Expression::BinaryExpression(_))
                     || conditional_needs_fluid_layout(init))
                     && !is_self_expanding_value(init)
-                    && !is_call_with_trailing_comments
+                    && !has_trailing_comment_expansion
                     && !has_line_comments_in_chain;
 
                 // Combined flag for backward compatibility with existing logic

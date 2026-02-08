@@ -203,6 +203,9 @@ impl<'a> Printer<'a> {
     ///
     /// When `wrap_in_group` is true (default), wraps in its own group for
     /// independent breaking decisions. When false, inherits from parent.
+    ///
+    /// See also: `build_intersection_type_annotation_doc` in type_annotation.rs
+    /// for the `: Type` annotation variant (shares continuation logic).
     pub(in crate::printer) fn build_intersection_type_doc(
         &self,
         intersection: &TSIntersectionType,
@@ -334,8 +337,8 @@ impl<'a> Printer<'a> {
         // - No huggable at all: no indent
         //   Parent context provides indent (e.g., type alias wraps at =)
         let mut parts = first_parts;
+        let has_non_huggable_continuations = last_is_huggable && intersection.types.len() > 2;
         if !continuation_parts.is_empty() {
-            let has_non_huggable_continuations = last_is_huggable && intersection.types.len() > 2;
             if has_non_huggable_continuations {
                 // Multiple continuations with huggable at end - wrap in indent
                 parts.push(doc::indent(doc::concat(continuation_parts)));
@@ -345,11 +348,13 @@ impl<'a> Printer<'a> {
             }
         }
 
-        if wrap_in_group {
-            // Independent breaking decision
+        // Need a group when:
+        // - wrap_in_group requested by caller, OR
+        // - non-huggable continuations exist (line() between them needs a group
+        //   to go flat when content fits on one line)
+        if wrap_in_group || has_non_huggable_continuations {
             doc::group(doc::concat(parts))
         } else {
-            // Inherit breaking from parent group
             doc::concat(parts)
         }
     }

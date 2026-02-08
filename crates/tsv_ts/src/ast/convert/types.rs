@@ -1103,6 +1103,9 @@ pub(in crate::ast) fn convert_declare_function(
             type_annotation: None,
             decorators: Vec::new(),
         },
+        expression: false, // Always false for declarations
+        generator: func.generator,
+        is_async: func.r#async,
         params: Vec::new(), // TODO: convert params properly
         return_type: func
             .return_type

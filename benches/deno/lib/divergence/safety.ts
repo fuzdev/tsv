@@ -10,8 +10,10 @@
 
 export interface SafetyViolation {
 	type: 'content_lost';
-	/** Characters that were lost (with counts) */
-	lostChars: Map<string, number>;
+	/** Total characters lost */
+	totalLost: number;
+	/** Lines from source that appear to be missing in formatted output */
+	missingLines: string[];
 	/** Human-readable summary */
 	summary: string;
 }
@@ -52,11 +54,6 @@ const FORMATTING_CHARS = new Set([
  * Compares character frequencies for semantic characters (letters, digits, etc.).
  * If source has more of any semantic character than formatted output, content was lost.
  *
- * This approach:
- * - Catches lost comments, identifiers, string contents, numbers
- * - No false positives from formatting changes (whitespace, punctuation)
- * - No false positives from regex misunderstanding string boundaries
- *
  * @param source - Original source code
  * @param formatted - Our formatted output
  * @returns Array of safety violations (empty = safe)
@@ -79,27 +76,91 @@ export function checkSafety(source: string, formatted: string): SafetyViolation[
 		return [];
 	}
 
-	// Build human-readable summary
-	const charList = [...lostChars.entries()]
-		.sort((a, b) => b[1] - a[1]) // Sort by count descending
-		.slice(0, 10) // Limit to first 10 for readability
-		.map(([char, count]) => `'${char}' ×${count}`)
-		.join(', ');
-
 	const totalLost = [...lostChars.values()].reduce((a, b) => a + b, 0);
+
+	// Find lines that are likely missing (contain lost chars and not in formatted)
+	const missingLines = findMissingLines(source, formatted, lostChars);
+
+	// Build summary showing the actual missing content
+	let summary: string;
+	if (missingLines.length > 0) {
+		const preview = missingLines
+			.slice(0, 3)
+			.map((line) => line.trim().slice(0, 60))
+			.join(' | ');
+		summary = `${totalLost} chars lost. Missing: ${preview}${missingLines.length > 3 ? '...' : ''}`;
+	} else {
+		// Fallback to character list if we can't identify lines
+		const charList = [...lostChars.entries()]
+			.sort((a, b) => b[1] - a[1])
+			.slice(0, 5)
+			.map(([char, count]) => `'${char}'×${count}`)
+			.join(', ');
+		summary = `${totalLost} chars lost: ${charList}`;
+	}
 
 	return [
 		{
 			type: 'content_lost',
-			lostChars,
-			summary: `${totalLost} chars lost: ${charList}${lostChars.size > 10 ? '...' : ''}`,
+			totalLost,
+			missingLines,
+			summary,
 		},
 	];
 }
 
 /**
+ * Find lines from source that appear to be missing in formatted output.
+ * Looks for lines containing the lost characters that don't appear in formatted.
+ */
+function findMissingLines(
+	source: string,
+	formatted: string,
+	lostChars: Map<string, number>,
+): string[] {
+	const sourceLines = source.split('\n');
+	const formattedNormalized = normalizeForComparison(formatted);
+	const missing: string[] = [];
+
+	for (const line of sourceLines) {
+		const trimmed = line.trim();
+		if (!trimmed) continue;
+
+		// Check if line contains any lost characters
+		let hasLostChar = false;
+		for (const char of lostChars.keys()) {
+			if (trimmed.includes(char)) {
+				hasLostChar = true;
+				break;
+			}
+		}
+		if (!hasLostChar) continue;
+
+		// Check if this line's content appears in formatted output
+		const lineNormalized = normalizeForComparison(trimmed);
+		if (lineNormalized.length > 5 && !formattedNormalized.includes(lineNormalized)) {
+			missing.push(trimmed);
+		}
+	}
+
+	return missing;
+}
+
+/**
+ * Normalize text for comparison by removing formatting characters.
+ */
+function normalizeForComparison(text: string): string {
+	let result = '';
+	for (const char of text) {
+		if (!FORMATTING_CHARS.has(char)) {
+			result += char;
+		}
+	}
+	return result;
+}
+
+/**
  * Count semantic (non-formatting) character frequencies in a string.
- * Only counts characters that represent actual content, not formatting.
  */
 function countSemanticChars(text: string): Map<string, number> {
 	const counts = new Map<string, number>();

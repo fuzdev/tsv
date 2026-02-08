@@ -52,6 +52,7 @@ impl<'a> Printer<'a> {
             Rc::clone(&self.interner),
             self.indent_level,
             self.comments,
+            &self.line_breaks,
         );
         self.write(&formatted_id);
         self.write(" = ");
@@ -68,6 +69,7 @@ impl<'a> Printer<'a> {
             Rc::clone(&self.interner),
             self.indent_level,
             self.comments,
+            &self.line_breaks,
         );
         self.write(&formatted_init);
 
