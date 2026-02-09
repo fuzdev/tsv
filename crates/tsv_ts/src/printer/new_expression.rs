@@ -13,11 +13,12 @@ use super::utils::{
 };
 use super::{ParenContext, Printer, has_multiline_content, needs_parens};
 use crate::ast::internal;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a new expression with argument wrapping
-    pub(super) fn build_new_doc_with_wrapping(&self, new_expr: &internal::NewExpression) -> Doc {
+    pub(super) fn build_new_doc_with_wrapping(&self, new_expr: &internal::NewExpression) -> DocId {
+        let d = self.d();
         // Wrap callee in parens if needed (e.g., `new (a || b)()`, `new (a ? b : c)()`)
         let callee = if needs_parens(&new_expr.callee, ParenContext::NewCallee) {
             // For binary expressions (including logical), use a group with softlines
@@ -30,15 +31,15 @@ impl<'a> Printer<'a> {
             // group - the outer group controls whether to break after `(`.
             if let internal::Expression::BinaryExpression(binary) = &*new_expr.callee {
                 let inner_doc = self.build_binary_chain_doc_ungrouped(binary);
-                doc::group(doc::concat(vec![
-                    doc::text("("),
-                    doc::indent_softline(inner_doc),
-                    doc::softline(),
-                    doc::text(")"),
+                d.group(d.concat(&[
+                    d.text("("),
+                    d.indent_softline(inner_doc),
+                    d.softline(),
+                    d.text(")"),
                 ]))
             } else {
                 let callee_doc = self.build_expression_doc(&new_expr.callee);
-                doc::parens(callee_doc)
+                d.parens(callee_doc)
             }
         } else {
             self.build_expression_doc(&new_expr.callee)
@@ -60,18 +61,18 @@ impl<'a> Printer<'a> {
 
         // Empty args: just `new Foo()` or `new Foo<K, V>()`
         if new_expr.arguments.is_empty() {
-            let mut parts = vec![doc::text("new "), callee];
+            let mut parts = vec![d.text("new "), callee];
             if let Some(ta_doc) = type_args_doc {
                 parts.push(ta_doc);
             }
-            parts.push(doc::text("()"));
-            return doc::concat(parts);
+            parts.push(d.text("()"));
+            return d.concat(&parts);
         }
 
         // Build callee with type args: `new Foo<K, V>`
         let callee_with_types = match type_args_doc {
-            Some(ta_doc) => doc::concat(vec![doc::text("new "), callee, ta_doc]),
-            None => doc::concat(vec![doc::text("new "), callee]),
+            Some(ta_doc) => d.concat(&[d.text("new "), callee, ta_doc]),
+            None => d.concat(&[d.text("new "), callee]),
         };
 
         // Single huggable argument: object literal or function
@@ -84,20 +85,20 @@ impl<'a> Printer<'a> {
             match &new_expr.arguments[0] {
                 // Object literal: hug it
                 internal::Expression::ObjectExpression(_) => {
-                    return doc::concat(vec![
+                    return d.concat(&[
                         callee_with_types,
-                        doc::text("("),
+                        d.text("("),
                         self.build_expression_doc(&new_expr.arguments[0]),
-                        doc::text(")"),
+                        d.text(")"),
                     ]);
                 }
                 // Array literal: hug it
                 internal::Expression::ArrayExpression(_) => {
-                    return doc::concat(vec![
+                    return d.concat(&[
                         callee_with_types,
-                        doc::text("("),
+                        d.text("("),
                         self.build_expression_doc(&new_expr.arguments[0]),
-                        doc::text(")"),
+                        d.text(")"),
                     ]);
                 }
                 // Block arrow function: use conditional_group to let Doc decide hug vs wrap
@@ -113,48 +114,35 @@ impl<'a> Printer<'a> {
                         });
 
                     if has_trailing_param_comments {
-                        return doc::concat(vec![
+                        return d.concat(&[
                             callee_with_types,
-                            doc::text("("),
-                            doc::indent(doc::concat(vec![
-                                doc::softline(),
-                                arrow_doc,
-                                doc::text(","),
-                            ])),
-                            doc::softline(),
-                            doc::text(")"),
+                            d.text("("),
+                            d.indent(d.concat(&[d.softline(), arrow_doc, d.text(",")])),
+                            d.softline(),
+                            d.text(")"),
                         ]);
                     }
 
-                    return doc::conditional_group(vec![
+                    return d.conditional_group(&[
                         // State 1: hugged - new Callee((arrow) => { body })
-                        doc::concat(vec![
-                            callee_with_types.clone(),
-                            doc::text("("),
-                            arrow_doc.clone(),
-                            doc::text(")"),
-                        ]),
+                        d.concat(&[callee_with_types, d.text("("), arrow_doc, d.text(")")]),
                         // State 2: wrapped - new Callee(\n\t(arrow) => { body },\n)
-                        doc::concat(vec![
+                        d.concat(&[
                             callee_with_types,
-                            doc::text("("),
-                            doc::indent(doc::concat(vec![
-                                doc::softline(),
-                                arrow_doc,
-                                doc::text(","),
-                            ])),
-                            doc::softline(),
-                            doc::text(")"),
+                            d.text("("),
+                            d.indent(d.concat(&[d.softline(), arrow_doc, d.text(",")])),
+                            d.softline(),
+                            d.text(")"),
                         ]),
                     ]);
                 }
                 // Function expression: hug it
                 internal::Expression::FunctionExpression(_) => {
-                    return doc::concat(vec![
+                    return d.concat(&[
                         callee_with_types,
-                        doc::text("("),
+                        d.text("("),
                         self.build_expression_doc(&new_expr.arguments[0]),
-                        doc::text(")"),
+                        d.text(")"),
                     ]);
                 }
                 _ => {}
@@ -169,15 +157,15 @@ impl<'a> Printer<'a> {
         if is_function_composition_args(&new_expr.arguments)
             && !has_trailing_comments_slice(&new_expr.arguments, new_expr.span.end, self)
         {
-            let arg_parts = doc::join_doc(
+            let arg_parts = d.join_doc(
                 new_expr
                     .arguments
                     .iter()
                     .map(|arg| self.build_arg_expression_doc(arg)),
-                doc::comma_hardline(),
+                d.comma_hardline(),
             );
 
-            return wrap_call_with_hard_breaks(callee_with_types, arg_parts);
+            return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
         }
 
         // Check if any argument has multiline content
@@ -188,15 +176,15 @@ impl<'a> Printer<'a> {
 
         if has_multiline {
             // Force expansion with hardlines for multiline content
-            let arg_parts = doc::join_doc(
+            let arg_parts = d.join_doc(
                 new_expr
                     .arguments
                     .iter()
                     .map(|arg| self.build_arg_expression_doc(arg)),
-                doc::comma_hardline(),
+                d.comma_hardline(),
             );
 
-            return wrap_call_with_hard_breaks(callee_with_types, arg_parts);
+            return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
         }
 
         // "Expand first arg" pattern: callback first, short/empty container last
@@ -213,13 +201,13 @@ impl<'a> Printer<'a> {
                 let first_arg_doc = self.build_expression_doc(first_arg);
                 let second_arg_doc = self.build_expression_doc(second_arg);
 
-                return doc::concat(vec![
+                return d.concat(&[
                     callee_with_types,
-                    doc::text("("),
+                    d.text("("),
                     first_arg_doc,
-                    doc::text(", "),
+                    d.text(", "),
                     second_arg_doc,
-                    doc::text(")"),
+                    d.text(")"),
                 ]);
             }
         }
@@ -248,9 +236,9 @@ impl<'a> Printer<'a> {
                         next_arg_start,
                     );
 
-                    arg_parts.push(doc::text(","));
+                    arg_parts.push(d.text(","));
                     pc.emit_trailing_comments(&mut arg_parts, self);
-                    arg_parts.push(doc::hardline());
+                    arg_parts.push(d.hardline());
                     pc.emit_leading_comments(&mut arg_parts, self);
                 } else {
                     // Last argument - check for trailing comments before closing paren
@@ -269,12 +257,12 @@ impl<'a> Printer<'a> {
                         // If both block and line: `() => {} /* block */, // line`
                         // If only line: `() => {}, // line`
                         for comment in &pc.trailing_block {
-                            arg_parts.push(doc::text(" "));
+                            arg_parts.push(d.text(" "));
                             arg_parts.push(self.build_comment_doc(comment));
                         }
-                        arg_parts.push(doc::text(","));
+                        arg_parts.push(d.text(","));
                         for comment in &pc.trailing_line {
-                            arg_parts.push(doc::text(" "));
+                            arg_parts.push(d.text(" "));
                             arg_parts.push(self.build_comment_doc(comment));
                         }
                         has_trailing_comma_on_last = true;
@@ -287,19 +275,19 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            let arg_doc = doc::concat(arg_parts);
+            let arg_doc = d.concat(&arg_parts);
             let trailing = if has_trailing_comma_on_last {
-                doc::empty()
+                d.empty()
             } else {
-                doc::text(",")
+                d.text(",")
             };
 
-            return doc::concat(vec![
+            return d.concat(&[
                 callee_with_types,
-                doc::text("("),
-                doc::indent(doc::concat(vec![doc::hardline(), arg_doc, trailing])),
-                doc::hardline(),
-                doc::text(")"),
+                d.text("("),
+                d.indent(d.concat(&[d.hardline(), arg_doc, trailing])),
+                d.hardline(),
+                d.text(")"),
             ]);
         }
 
@@ -316,7 +304,7 @@ impl<'a> Printer<'a> {
         if has_trailing_block_only {
             // Build args with trailing block comment
             let last_idx = new_expr.arguments.len() - 1;
-            let mut arg_docs: Vec<Doc> = new_expr
+            let mut arg_docs: Vec<DocId> = new_expr
                 .arguments
                 .iter()
                 .map(|arg| self.build_arg_expression_doc(arg))
@@ -334,16 +322,16 @@ impl<'a> Printer<'a> {
             if let Some(last_doc) = arg_docs.pop() {
                 let mut last_with_comment = vec![last_doc];
                 pc.emit_trailing_comments(&mut last_with_comment, self);
-                arg_docs.push(doc::concat(last_with_comment));
+                arg_docs.push(d.concat(&last_with_comment));
 
                 // For function composition (multiple callbacks), use hardlines
                 // For simple args, use soft breaks (can stay inline)
                 if is_function_composition_args(&new_expr.arguments) {
-                    let arg_parts = doc::join_doc(arg_docs, doc::comma_hardline());
-                    return wrap_call_with_hard_breaks(callee_with_types, arg_parts);
+                    let arg_parts = d.join_doc(arg_docs, d.comma_hardline());
+                    return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
                 }
-                let arg_parts = doc::join_doc(arg_docs, doc::comma_line());
-                return wrap_call_with_soft_breaks(callee_with_types, arg_parts);
+                let arg_parts = d.join_doc(arg_docs, d.comma_line());
+                return wrap_call_with_soft_breaks(d, callee_with_types, arg_parts);
             }
         }
 
@@ -359,12 +347,12 @@ impl<'a> Printer<'a> {
             let (head_parts, last_arg_doc, _) = build_args_split_last(&new_expr.arguments, self);
 
             // Keep short args inline with last arg's opener
-            return doc::group(doc::concat(vec![
+            return d.group(d.concat(&[
                 callee_with_types,
-                doc::text("("),
-                doc::concat(head_parts),
+                d.text("("),
+                d.concat(&head_parts),
                 last_arg_doc,
-                doc::text(")"),
+                d.text(")"),
             ]));
         }
 
@@ -387,7 +375,7 @@ impl<'a> Printer<'a> {
                         paren_open,
                         first_arg_start,
                     ));
-                    arg_parts.push(doc::line());
+                    arg_parts.push(d.line());
                 }
 
                 // Build the argument
@@ -410,66 +398,66 @@ impl<'a> Printer<'a> {
 
                         if pc.has_trailing_line() {
                             // Trailing line comments: comma, comment, hardline
-                            arg_parts.push(doc::text(","));
+                            arg_parts.push(d.text(","));
                             for comment in &pc.trailing_line {
-                                arg_parts.push(doc::text(" "));
+                                arg_parts.push(d.text(" "));
                                 arg_parts.push(self.build_comment_doc(comment));
                             }
-                            arg_parts.push(doc::hardline());
+                            arg_parts.push(d.hardline());
                         } else if pc.has_trailing_block() {
                             // Trailing block comments: place relative to comma based on source position
                             if let Some(cpos) = comma_pos {
                                 for comment in &pc.trailing_block {
                                     if is_comment_before_comma(comment, cpos) {
-                                        arg_parts.push(doc::text(" "));
+                                        arg_parts.push(d.text(" "));
                                         arg_parts.push(self.build_comment_doc(comment));
                                     }
                                 }
                             }
-                            arg_parts.push(doc::text(","));
+                            arg_parts.push(d.text(","));
                             if let Some(cpos) = comma_pos {
                                 for comment in &pc.trailing_block {
                                     if is_comment_after_comma(comment, cpos) {
-                                        arg_parts.push(doc::text(" "));
+                                        arg_parts.push(d.text(" "));
                                         arg_parts.push(self.build_comment_doc(comment));
                                     }
                                 }
                             }
-                            arg_parts.push(doc::line());
+                            arg_parts.push(d.line());
                         } else {
                             // No trailing comments, add comma and line
-                            arg_parts.push(doc::text(","));
-                            arg_parts.push(doc::line());
+                            arg_parts.push(d.text(","));
+                            arg_parts.push(d.line());
                         }
 
                         // Add leading comments for next arg
                         pc.emit_leading_comments_inline_aware(&mut arg_parts, self, next_arg_start);
                     } else {
                         // No comments, just comma and line
-                        arg_parts.push(doc::comma_line());
+                        arg_parts.push(d.comma_line());
                     }
                 }
             }
 
-            let arg_doc = doc::concat(arg_parts);
-            return wrap_call_with_soft_breaks(callee_with_types, arg_doc);
+            let arg_doc = d.concat(&arg_parts);
+            return wrap_call_with_soft_breaks(d, callee_with_types, arg_doc);
         }
 
         // Build args with line separators (one per line when broken)
-        let arg_parts = doc::join_doc(
+        let arg_parts = d.join_doc(
             new_expr
                 .arguments
                 .iter()
                 .map(|arg| self.build_arg_expression_doc(arg)),
-            doc::comma_line(),
+            d.comma_line(),
         );
 
         // Wrap in group with parens
-        wrap_call_with_soft_breaks(callee_with_types, arg_parts)
+        wrap_call_with_soft_breaks(d, callee_with_types, arg_parts)
     }
 
     /// Build a Doc for a new expression (for nested contexts)
-    pub(super) fn build_new_doc(&self, new_expr: &internal::NewExpression) -> Doc {
+    pub(super) fn build_new_doc(&self, new_expr: &internal::NewExpression) -> DocId {
         self.build_new_doc_with_wrapping(new_expr)
     }
 }

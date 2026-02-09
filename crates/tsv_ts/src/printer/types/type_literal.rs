@@ -9,7 +9,7 @@ use super::super::comments_in_range;
 use super::Printer;
 use super::helpers::unwrap_parenthesized;
 use crate::ast::internal::{TSIntersectionType, TSType, TSTypeElement, TSTypeLiteral};
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 /// Mode for building type literal docs.
 enum TypeLiteralMode {
@@ -36,7 +36,8 @@ impl<'a> Printer<'a> {
         prev_end: u32,
         member_start: u32,
         is_first: bool,
-    ) -> Vec<Doc> {
+    ) -> Vec<DocId> {
+        let d = self.d();
         let all_comments: Vec<_> =
             comments_in_range(self.comments, prev_end, member_start).collect();
         let leading_comments: Vec<_> = if !is_first {
@@ -57,9 +58,9 @@ impl<'a> Printer<'a> {
 
         let mut docs = Vec::with_capacity(3);
         if has_blank && !is_first {
-            docs.push(doc::literalline());
+            docs.push(d.literalline());
         }
-        docs.push(doc::hardline());
+        docs.push(d.hardline());
         docs.extend(self.build_leading_comments_with_blank_lines(&leading_comments, member_start));
         docs
     }
@@ -76,7 +77,8 @@ impl<'a> Printer<'a> {
         comments: &[&tsv_lang::Comment],
         member_end: u32,
         upper_bound: u32,
-    ) -> Vec<Doc> {
+    ) -> Vec<DocId> {
+        let d = self.d();
         let source_slice = &self.source[member_end as usize..upper_bound as usize];
         let semi_offset = source_slice.find(';');
 
@@ -91,12 +93,12 @@ impl<'a> Printer<'a> {
 
         let mut docs = Vec::with_capacity(before_semi.len() + after_semi.len() + 1);
         for comment in before_semi {
-            docs.push(doc::text(" "));
+            docs.push(d.text(" "));
             docs.push(self.build_comment_doc(comment));
         }
-        docs.push(doc::text(";"));
+        docs.push(d.text(";"));
         for comment in after_semi {
-            docs.push(doc::text(" "));
+            docs.push(d.text(" "));
             docs.push(self.build_comment_doc(comment));
         }
         docs
@@ -118,7 +120,8 @@ impl<'a> Printer<'a> {
         &self,
         ts_type: &TSType,
         needs_parens: fn(&TSType) -> bool,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         if needs_parens(ts_type) {
             // Special case: intersection with trailing object type
             // Build custom doc for proper alignment of closing `})`
@@ -133,10 +136,10 @@ impl<'a> Printer<'a> {
             }
 
             // Default case: simple parenthesization
-            doc::concat(vec![
-                doc::text("("),
-                doc::align_spaces(2, doc::indent(self.build_type_doc(ts_type))),
-                doc::text(")"),
+            d.concat(&[
+                d.text("("),
+                d.align_spaces(2, d.indent(self.build_type_doc(ts_type))),
+                d.text(")"),
             ])
         } else {
             self.build_type_doc(ts_type)
@@ -166,23 +169,24 @@ impl<'a> Printer<'a> {
         &self,
         intersection: &TSIntersectionType,
         trailing_obj: &TSTypeLiteral,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         // Build opening: (A & B & {
-        let mut opening_parts = vec![doc::text("(")];
+        let mut opening_parts = vec![d.text("(")];
 
         // Build intersection types except the last one (the object)
         let types_before_object = &intersection.types[..intersection.types.len() - 1];
         for (i, t) in types_before_object.iter().enumerate() {
             if i > 0 {
-                opening_parts.push(doc::text(" & "));
+                opening_parts.push(d.text(" & "));
             }
             opening_parts.push(self.build_type_doc(t));
         }
 
         // Add ` & {`
-        opening_parts.push(doc::text(" & {"));
+        opening_parts.push(d.text(" & {"));
 
-        self.build_aligned_object_literal_doc(trailing_obj, doc::concat(opening_parts), "})")
+        self.build_aligned_object_literal_doc(trailing_obj, d.concat(&opening_parts), "})")
     }
 
     /// Build just the member content of a TypeLiteral, without `{` or `}`.
@@ -196,9 +200,10 @@ impl<'a> Printer<'a> {
         &self,
         t: &TSTypeLiteral,
         force_multiline: bool,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         if t.members.is_empty() {
-            return doc::empty();
+            return d.empty();
         }
 
         let mut member_parts = vec![];
@@ -233,7 +238,7 @@ impl<'a> Printer<'a> {
                 ));
             } else {
                 // Width-aware: softlines, conditional semicolons
-                member_parts.push(doc::softline());
+                member_parts.push(d.softline());
                 member_parts.push(self.build_type_member_doc_inner(m, false));
 
                 // Handle trailing comments - preserve position relative to semicolon
@@ -248,9 +253,9 @@ impl<'a> Printer<'a> {
                     // Last member: semicolon only when broken
                     // In flat mode there's no semicolon, so all comments are "after"
                     // In break mode semicolon is added, comments still come after
-                    member_parts.push(doc::if_break(doc::text(";"), doc::empty()));
+                    member_parts.push(d.if_break(d.text(";"), d.empty()));
                     for comment in &trailing {
-                        member_parts.push(doc::text(" "));
+                        member_parts.push(d.text(" "));
                         member_parts.push(self.build_comment_doc(comment));
                     }
                 } else {
@@ -261,7 +266,7 @@ impl<'a> Printer<'a> {
                         upper_bound,
                     ));
                     // Space before next member only when flat
-                    member_parts.push(doc::if_break(doc::empty(), doc::text(" ")));
+                    member_parts.push(d.if_break(d.empty(), d.text(" ")));
                 }
             }
 
@@ -274,7 +279,7 @@ impl<'a> Printer<'a> {
             member_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
         }
 
-        doc::concat(member_parts)
+        d.concat(&member_parts)
     }
 
     /// Check if a TypeLiteral should be forced to multiline format.
@@ -303,23 +308,24 @@ impl<'a> Printer<'a> {
     fn build_aligned_object_literal_doc(
         &self,
         obj: &TSTypeLiteral,
-        opening: Doc,
+        opening: DocId,
         closing: &'static str,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let force_multiline = self.type_literal_force_multiline(obj);
         let members_doc =
             self.build_type_literal_members_only_doc_for_alignment(obj, force_multiline);
 
         let line_doc = if force_multiline {
-            doc::hardline()
+            d.hardline()
         } else {
-            doc::softline()
+            d.softline()
         };
 
-        doc::group(doc::concat(vec![
+        d.group(d.concat(&[
             opening,
-            doc::indent(doc::indent(members_doc)),
-            doc::align_spaces(2, doc::concat(vec![line_doc, doc::text(closing)])),
+            d.indent(d.indent(members_doc)),
+            d.align_spaces(2, d.concat(&[line_doc, d.text(closing)])),
         ]))
     }
 
@@ -333,8 +339,8 @@ impl<'a> Printer<'a> {
     ///     }           // base indent + 2 spaces (aligns with "{")
     ///   | B;
     /// ```
-    pub(super) fn build_union_member_object_literal_doc(&self, obj: &TSTypeLiteral) -> Doc {
-        self.build_aligned_object_literal_doc(obj, doc::text("{"), "}")
+    pub(super) fn build_union_member_object_literal_doc(&self, obj: &TSTypeLiteral) -> DocId {
+        self.build_aligned_object_literal_doc(obj, self.d().text("{"), "}")
     }
 
     //
@@ -347,7 +353,7 @@ impl<'a> Printer<'a> {
     /// - Single-line source stays single-line if it fits: `{ a: T; b: U }`
     /// - Multi-line source (newline after `{`) stays multi-line
     /// - Comments force multi-line formatting
-    pub(super) fn build_type_literal_doc(&self, t: &TSTypeLiteral) -> Doc {
+    pub(super) fn build_type_literal_doc(&self, t: &TSTypeLiteral) -> DocId {
         self.build_type_literal_doc_inner(t, TypeLiteralMode::Standard)
     }
 
@@ -355,7 +361,7 @@ impl<'a> Printer<'a> {
     ///
     /// Used for type arguments where the type literal should "hug" and let
     /// the parent `<...>` group control breaking, matching Prettier's behavior.
-    pub(super) fn build_type_literal_doc_hugging(&self, t: &TSTypeLiteral) -> Doc {
+    pub(super) fn build_type_literal_doc_hugging(&self, t: &TSTypeLiteral) -> DocId {
         self.build_type_literal_doc_inner(t, TypeLiteralMode::Hugging)
     }
 
@@ -365,7 +371,8 @@ impl<'a> Printer<'a> {
     /// - `Hugging`: Inline `; ` separators, no softlines, no group (for type args)
     /// - `Standard`: Width-aware with softlines, wrapped in group
     /// - `NoGroup`: Width-aware with softlines, no group (parent controls breaking)
-    fn build_type_literal_doc_inner(&self, t: &TSTypeLiteral, mode: TypeLiteralMode) -> Doc {
+    fn build_type_literal_doc_inner(&self, t: &TSTypeLiteral, mode: TypeLiteralMode) -> DocId {
+        let d = self.d();
         use TypeLiteralMode::{Hugging, Standard};
         let hug = matches!(mode, Hugging);
         let wrap_in_group = matches!(mode, Standard);
@@ -375,13 +382,13 @@ impl<'a> Printer<'a> {
             // Empty type literal - handle comments inside
             let empty_doc = self.build_empty_body_with_comments_doc(t.span);
             return if wrap_in_group {
-                doc::group(empty_doc)
+                d.group(empty_doc)
             } else {
                 empty_doc
             };
         }
 
-        let mut parts = vec![doc::text("{")];
+        let mut parts = vec![d.text("{")];
         if force_multiline {
             // Multi-line format (same for both modes)
             let mut member_parts = vec![];
@@ -417,8 +424,8 @@ impl<'a> Printer<'a> {
             let body_end = t.span.end.saturating_sub(1);
             member_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
 
-            parts.push(doc::indent(doc::concat(member_parts)));
-            parts.push(doc::hardline());
+            parts.push(d.indent(d.concat(&member_parts)));
+            parts.push(d.hardline());
         } else if hug {
             // Hugging mode: inline content with `; ` separators
             // Preserve comment position relative to semicolon
@@ -441,11 +448,11 @@ impl<'a> Printer<'a> {
                         member_end,
                         upper_bound,
                     ));
-                    parts.push(doc::text(" "));
+                    parts.push(d.text(" "));
                 } else {
                     // Last member in hugging mode: no semicolon
                     for comment in &trailing {
-                        parts.push(doc::text(" "));
+                        parts.push(d.text(" "));
                         parts.push(self.build_comment_doc(comment));
                     }
                 }
@@ -458,7 +465,7 @@ impl<'a> Printer<'a> {
                 let is_last = i == t.members.len() - 1;
                 let member_end = m.span().end;
 
-                member_parts.push(doc::softline());
+                member_parts.push(d.softline());
                 member_parts.push(self.build_type_member_doc_inner(m, false));
 
                 let upper_bound = t
@@ -470,9 +477,9 @@ impl<'a> Printer<'a> {
 
                 if is_last {
                     // Last member: semicolon only when broken, comments after
-                    member_parts.push(doc::if_break(doc::text(";"), doc::empty()));
+                    member_parts.push(d.if_break(d.text(";"), d.empty()));
                     for comment in &trailing {
-                        member_parts.push(doc::text(" "));
+                        member_parts.push(d.text(" "));
                         member_parts.push(self.build_comment_doc(comment));
                     }
                 } else {
@@ -483,18 +490,18 @@ impl<'a> Printer<'a> {
                         upper_bound,
                     ));
                     // Space before next member only when flat
-                    member_parts.push(doc::if_break(doc::empty(), doc::text(" ")));
+                    member_parts.push(d.if_break(d.empty(), d.text(" ")));
                 }
             }
-            parts.push(doc::indent(doc::concat(member_parts)));
-            parts.push(doc::softline());
+            parts.push(d.indent(d.concat(&member_parts)));
+            parts.push(d.softline());
         }
-        parts.push(doc::text("}"));
+        parts.push(d.text("}"));
 
         if wrap_in_group {
-            doc::group(doc::concat(parts))
+            d.group(d.concat(&parts))
         } else {
-            doc::concat(parts)
+            d.concat(&parts)
         }
     }
 
@@ -505,7 +512,7 @@ impl<'a> Printer<'a> {
     ///
     /// When the function type group breaks (because line is too long), these
     /// softlines become newlines, expanding the param's object type.
-    pub(super) fn build_type_literal_doc_for_function_param(&self, t: &TSTypeLiteral) -> Doc {
+    pub(super) fn build_type_literal_doc_for_function_param(&self, t: &TSTypeLiteral) -> DocId {
         self.build_type_literal_doc_inner(t, TypeLiteralMode::NoGroup)
     }
 
@@ -513,7 +520,7 @@ impl<'a> Printer<'a> {
     ///
     /// Object type literals are built without groups ("hugging") so the parent
     /// `<...>` group controls breaking, matching Prettier's behavior.
-    pub(in crate::printer) fn build_type_doc_for_type_arg(&self, ts_type: &TSType) -> Doc {
+    pub(in crate::printer) fn build_type_doc_for_type_arg(&self, ts_type: &TSType) -> DocId {
         match ts_type {
             TSType::TypeLiteral(t) => self.build_type_literal_doc_hugging(t),
             TSType::Parenthesized(p) => {

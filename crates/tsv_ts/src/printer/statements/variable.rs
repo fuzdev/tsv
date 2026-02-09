@@ -9,12 +9,13 @@ use crate::printer::{
     is_simple_self_expanding, is_string_literal, is_type_assertion_call, needs_parens,
 };
 use tsv_lang::SymbolToU32;
-use tsv_lang::doc::{self, GroupId};
+use tsv_lang::doc::GroupId;
+use tsv_lang::doc::arena::{DocArena, DocId};
 
 /// Wrap a doc in parentheses if the expression needs them for variable init context
-fn wrap_init_doc(init_doc: doc::Doc, init: &Expression) -> doc::Doc {
+fn wrap_init_doc(d: &DocArena, init_doc: DocId, init: &Expression) -> DocId {
     if needs_parens(init, ParenContext::VariableInit) {
-        doc::parens(init_doc)
+        d.parens(init_doc)
     } else {
         init_doc
     }
@@ -25,7 +26,7 @@ impl<'a> Printer<'a> {
     ///
     /// For identifiers with `definite: true`, builds doc for `name!: type` instead of `name: type`.
     /// Uses wrapping type annotations so TypeReference type arguments break internally when needed.
-    fn build_variable_binding_doc(&self, id: &Expression, definite: bool) -> doc::Doc {
+    fn build_variable_binding_doc(&self, id: &Expression, definite: bool) -> DocId {
         if definite {
             if let Expression::Identifier(ident) = id {
                 self.build_typed_identifier_doc(ident, true, true)
@@ -49,13 +50,14 @@ impl<'a> Printer<'a> {
         ident: &internal::Identifier,
         definite: bool,
         wrap_type: bool,
-    ) -> doc::Doc {
-        let mut parts = vec![doc::symbol(ident.name.to_u32())];
+    ) -> DocId {
+        let d = self.d();
+        let mut parts = vec![d.symbol(ident.name.to_u32())];
         if definite {
-            parts.push(doc::text("!"));
+            parts.push(d.text("!"));
         }
         if ident.optional {
-            parts.push(doc::text("?"));
+            parts.push(d.text("?"));
         }
         if let Some(type_ann) = &ident.type_annotation {
             if wrap_type {
@@ -64,7 +66,7 @@ impl<'a> Printer<'a> {
                 parts.push(self.build_type_annotation_doc(type_ann));
             }
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for a variable declaration statement
@@ -74,16 +76,17 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_variable_declaration_doc(
         &self,
         decl: &internal::VariableDeclaration,
-    ) -> doc::Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         // Declare modifier
         if decl.declare {
-            parts.push(doc::text("declare "));
+            parts.push(d.text("declare "));
         }
 
         // Keyword (const, let, var)
-        parts.push(doc::text(decl.kind.as_str()));
+        parts.push(d.text(decl.kind.as_str()));
 
         // Handle comments between keyword and first declarator
         let keyword_end = if decl.declare {
@@ -99,7 +102,7 @@ impl<'a> Printer<'a> {
         {
             parts.push(comments_doc);
         }
-        parts.push(doc::text(" "));
+        parts.push(d.text(" "));
 
         let is_multi_declarator = decl.declarations.len() > 1;
         let has_any_init = decl.declarations.iter().any(|d| d.init.is_some());
@@ -131,39 +134,39 @@ impl<'a> Printer<'a> {
                 let has_block_comment = self.has_comments_between(prev_end, curr_start);
 
                 if should_break {
-                    parts.push(doc::text(","));
+                    parts.push(d.text(","));
                     if has_line_comment {
                         // Line comment: print on same line as comma, then break
                         parts.push(self.build_inline_comments_between_doc(prev_end, curr_start));
                     }
                     // Break to new line with indentation for initializers
-                    parts.push(doc::hardline());
-                    parts.push(doc::text(self.config.indent));
+                    parts.push(d.hardline());
+                    parts.push(d.text(self.config.indent));
                     if has_block_comment && !has_line_comment {
                         // Block comment: print on new line before declarator
                         parts.push(self.build_inline_comments_between_doc_no_leading_space(
                             prev_end, curr_start,
                         ));
-                        parts.push(doc::text(" "));
+                        parts.push(d.text(" "));
                     }
                 } else {
                     // For non-break case: first continuation gets comma in parts,
                     // subsequent continuations get comma in rest_parts
                     if i == 1 {
                         // First continuation: comma goes to parts (after first declarator)
-                        parts.push(doc::text(","));
+                        parts.push(d.text(","));
                     } else {
                         // Subsequent: comma goes to rest_parts (after previous continuation)
-                        rest_parts.push(doc::text(","));
+                        rest_parts.push(d.text(","));
                     }
 
                     // Soft break for declarations without initializers
-                    rest_parts.push(doc::line());
+                    rest_parts.push(d.line());
                     if has_block_comment {
                         rest_parts.push(self.build_inline_comments_between_doc_no_leading_space(
                             prev_end, curr_start,
                         ));
-                        rest_parts.push(doc::text(" "));
+                        rest_parts.push(d.text(" "));
                     }
                 }
             }
@@ -173,13 +176,13 @@ impl<'a> Printer<'a> {
 
             // Check if id doc can break (contains line elements like type annotations that wrap)
             // This matches Prettier's `canBreak(leftDoc)` check
-            let can_break_left = doc::can_break(&id_doc);
+            let can_break_left = d.can_break(id_doc);
 
             if should_break || i == 0 {
-                parts.push(id_doc.clone());
+                parts.push(id_doc);
             } else {
                 // Non-break continuation declarators go to rest_parts
-                rest_parts.push(id_doc.clone());
+                rest_parts.push(id_doc);
             }
 
             // Initializer with comment handling around =
@@ -303,7 +306,7 @@ impl<'a> Printer<'a> {
 
                 let needs_break_after_operator = !should_break
                     && (is_fluid_rhs || is_simple_rhs_with_breakable_lhs)
-                    && !doc::will_break(&id_doc)
+                    && !d.will_break(id_doc)
                     && !has_complex_type_annotation
                     && !has_complex_destructuring
                     && !is_arrow_with_breakable_left;
@@ -318,7 +321,7 @@ impl<'a> Printer<'a> {
 
                 if is_multiline_string || has_line_comments_after_eq {
                     // Multiline strings or line comments: mandatory break after `=`
-                    parts.push(doc::text(" ="));
+                    parts.push(d.text(" ="));
                     if has_comments_after_eq {
                         // For line comments, print them and break
                         for comment in
@@ -326,13 +329,13 @@ impl<'a> Printer<'a> {
                         {
                             if self.is_same_line(equals_pos, comment.span.start) {
                                 // Inline comment on same line as =
-                                parts.push(doc::text(" "));
+                                parts.push(d.text(" "));
                                 parts.push(self.build_comment_doc(comment));
                             }
                         }
                     }
-                    parts.push(doc::indent(doc::concat(vec![
-                        doc::hardline(),
+                    parts.push(d.indent(d.concat(&[
+                        d.hardline(),
                         // Leading comments (on their own line before value)
                         {
                             let mut leading = Vec::new();
@@ -343,20 +346,20 @@ impl<'a> Printer<'a> {
                             ) {
                                 if !self.is_same_line(equals_pos, comment.span.start) {
                                     leading.push(self.build_comment_doc(comment));
-                                    leading.push(doc::hardline());
+                                    leading.push(d.hardline());
                                 }
                             }
-                            doc::concat(leading)
+                            d.concat(&leading)
                         },
-                        wrap_init_doc(self.build_expression_doc(init), init),
+                        wrap_init_doc(d, self.build_expression_doc(init), init),
                     ])));
                 } else if is_curried_arrow {
                     // Curried arrow with return type: mandatory break after `=`
                     // The arrow expression formatter handles the rest of the breaking
-                    parts.push(doc::text(" ="));
-                    parts.push(doc::indent(doc::concat(vec![
-                        doc::hardline(),
-                        wrap_init_doc(self.build_expression_doc(init), init),
+                    parts.push(d.text(" ="));
+                    parts.push(d.indent(d.concat(&[
+                        d.hardline(),
+                        wrap_init_doc(d, self.build_expression_doc(init), init),
                     ])));
                 } else if (has_complex_type_annotation
                     || has_complex_destructuring
@@ -380,16 +383,13 @@ impl<'a> Printer<'a> {
                     }
 
                     // Add ` = rightDoc` (right side grouped)
-                    parts.push(doc::text(" = "));
-                    parts.push(doc::group(wrap_init_doc(
-                        self.build_expression_doc(init),
-                        init,
-                    )));
+                    parts.push(d.text(" = "));
+                    parts.push(d.group(wrap_init_doc(d, self.build_expression_doc(init), init)));
                 } else if has_comments_after_eq {
-                    parts.push(doc::text(" ="));
+                    parts.push(d.text(" ="));
                     parts.push(self.build_inline_comments_between_doc(equals_pos + 1, init_start));
-                    parts.push(doc::text(" "));
-                    parts.push(wrap_init_doc(self.build_expression_doc(init), init));
+                    parts.push(d.text(" "));
+                    parts.push(wrap_init_doc(d, self.build_expression_doc(init), init));
                 } else if is_type_assertion_with_lhs_type {
                     // Type assertion calls with LHS type annotation: use fluid layout
                     // with non-wrapping type so the LHS type stays together.
@@ -401,14 +401,11 @@ impl<'a> Printer<'a> {
                             false, // non-wrapping
                         ));
                     }
-                    parts.push(doc::text(" ="));
-                    parts.push(doc::group_with_id(
-                        doc::indent(doc::line()),
-                        GroupId::Assignment,
-                    ));
-                    parts.push(doc::line_suffix_boundary());
-                    parts.push(doc::indent_if_break(
-                        wrap_init_doc(self.build_expression_doc(init), init),
+                    parts.push(d.text(" ="));
+                    parts.push(d.group_with_id(d.indent(d.line()), GroupId::Assignment));
+                    parts.push(d.line_suffix_boundary());
+                    parts.push(d.indent_if_break(
+                        wrap_init_doc(d, self.build_expression_doc(init), init),
                         GroupId::Assignment,
                         false,
                     ));
@@ -420,14 +417,11 @@ impl<'a> Printer<'a> {
                     // break at `=` BEFORE evaluating init's internal groups. This gives
                     // Prettier-style behavior where long chains break at `=` instead of
                     // expanding call arguments.
-                    parts.push(doc::text(" ="));
-                    parts.push(doc::group_with_id(
-                        doc::indent(doc::line()),
-                        GroupId::Assignment,
-                    ));
-                    parts.push(doc::line_suffix_boundary());
-                    parts.push(doc::indent_if_break(
-                        wrap_init_doc(self.build_expression_doc(init), init),
+                    parts.push(d.text(" ="));
+                    parts.push(d.group_with_id(d.indent(d.line()), GroupId::Assignment));
+                    parts.push(d.line_suffix_boundary());
+                    parts.push(d.indent_if_break(
+                        wrap_init_doc(d, self.build_expression_doc(init), init),
                         GroupId::Assignment,
                         false,
                     ));
@@ -438,42 +432,42 @@ impl<'a> Printer<'a> {
                     // The init IS inside the group with the line. This allows the binary/conditional
                     // expression to control its own breaking at operators. The entire RHS is
                     // indented together after the `=` break.
-                    parts.push(doc::text(" ="));
-                    parts.push(doc::group(doc::indent(doc::concat(vec![
-                        doc::line(),
-                        wrap_init_doc(self.build_expression_doc(init), init),
+                    parts.push(d.text(" ="));
+                    parts.push(d.group(d.indent(d.concat(&[
+                        d.line(),
+                        wrap_init_doc(d, self.build_expression_doc(init), init),
                     ]))));
                 } else {
                     // Default layout - no line element
                     // The outer group (added at the end) handles whether the whole declaration breaks
                     // Individual expressions (calls, arrays, objects) handle their own internal breaking
-                    parts.push(doc::text(" = "));
-                    parts.push(wrap_init_doc(self.build_expression_doc(init), init));
+                    parts.push(d.text(" = "));
+                    parts.push(wrap_init_doc(d, self.build_expression_doc(init), init));
                 }
             }
         }
 
         // For non-break multi-declarator, add rest_parts wrapped in indent
         if !should_break && !rest_parts.is_empty() {
-            parts.push(doc::indent(doc::concat(rest_parts)));
+            parts.push(d.indent(d.concat(&rest_parts)));
         }
 
-        parts.push(doc::text(";"));
+        parts.push(d.text(";"));
 
         // Restore context flags
         self.declaration_indent_depth.set(old_indent_depth);
         self.in_top_level_assignment.set(false);
 
         if should_break {
-            doc::concat(parts)
+            d.concat(&parts)
         } else if is_multi_declarator {
             // Use group for soft line breaks without initializers
-            doc::group(doc::concat(parts))
+            d.group(d.concat(&parts))
         } else if has_any_init {
             // Single declarator with init: use group for width-based breaking
-            doc::group(doc::concat(parts))
+            d.group(d.concat(&parts))
         } else {
-            doc::concat(parts)
+            d.concat(&parts)
         }
     }
 }

@@ -45,7 +45,7 @@
 							"start": 21,
 							"end": 34,
 							"property": "content",
-							"value": "'\\\\  '"
+							"value": "'\\ '"
 						}
 					]
 				},
@@ -92,7 +92,7 @@
 							"start": 53,
 							"end": 66,
 							"property": "content",
-							"value": "'\\\\\\\\'"
+							"value": "'\\\\'"
 						}
 					]
 				},
@@ -139,7 +139,7 @@
 							"start": 85,
 							"end": 104,
 							"property": "content",
-							"value": "'\\\\\\\\ \\\\\\\\ \\\\\\\\'"
+							"value": "'\\\\ \\\\ \\\\'"
 						}
 					]
 				},
@@ -186,7 +186,7 @@
 							"start": 123,
 							"end": 145,
 							"property": "content",
-							"value": "'test\\\\\\\\slash'"
+							"value": "'test\\\\slash'"
 						}
 					]
 				},

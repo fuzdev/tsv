@@ -1,8 +1,7 @@
 {
 	"type": "StyleSheet",
 	"start": 0,
-	"end": 19,
-	"attributes": [],
+	"end": 20,
 	"children": [
 		{
 			"type": "Rule",
@@ -19,8 +18,6 @@
 							{
 								"type": "RelativeSelector",
 								"combinator": null,
-								"start": 0,
-								"end": 2,
 								"selectors": [
 									{
 										"type": "ClassSelector",
@@ -28,9 +25,21 @@
 										"start": 0,
 										"end": 2
 									}
-								]
+								],
+								"start": 0,
+								"end": 2,
+								"metadata": {
+									"is_global": false,
+									"is_global_like": false,
+									"scoped": false
+								}
 							}
-						]
+						],
+						"metadata": {
+							"rule": null,
+							"is_global": false,
+							"used": false
+						}
 					}
 				]
 			},
@@ -49,13 +58,13 @@
 				]
 			},
 			"start": 0,
-			"end": 19
+			"end": 19,
+			"metadata": {
+				"parent_rule": null,
+				"has_local_selectors": false,
+				"has_global_selectors": false,
+				"is_global_block": false
+			}
 		}
-	],
-	"content": {
-		"start": 0,
-		"end": 19,
-		"styles": ".a {\n\tcolor: red;\n}",
-		"comment": null
-	}
+	]
 }

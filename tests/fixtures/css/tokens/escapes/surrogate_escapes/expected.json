@@ -45,35 +45,35 @@
 							"start": 71,
 							"end": 87,
 							"property": "content",
-							"value": "'\\\\DD800'"
+							"value": "'\\D800'"
 						},
 						{
 							"type": "Declaration",
 							"start": 143,
 							"end": 159,
 							"property": "content",
-							"value": "'\\\\DDFFF'"
+							"value": "'\\DFFF'"
 						},
 						{
 							"type": "Declaration",
 							"start": 223,
 							"end": 244,
 							"property": "content",
-							"value": "'\\\\DD83D\\\\DDC69'"
+							"value": "'\\D83D\\DC69'"
 						},
 						{
 							"type": "Declaration",
 							"start": 308,
 							"end": 325,
 							"property": "content",
-							"value": "'\\\\11F469'"
+							"value": "'\\1F469'"
 						},
 						{
 							"type": "Declaration",
 							"start": 373,
 							"end": 389,
 							"property": "content",
-							"value": "'\\\\FFFFD'"
+							"value": "'\\FFFD'"
 						}
 					]
 				},

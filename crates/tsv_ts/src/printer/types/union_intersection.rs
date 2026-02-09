@@ -12,7 +12,7 @@ use super::helpers::{
 };
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{TSIntersectionType, TSType, TSUnionType};
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     //
@@ -36,9 +36,10 @@ impl<'a> Printer<'a> {
         &self,
         union: &TSUnionType,
         wrap_in_group: bool,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         if union.types.is_empty() {
-            return doc::empty();
+            return d.empty();
         }
 
         // Check for line comments between union members (force multiline)
@@ -65,10 +66,7 @@ impl<'a> Printer<'a> {
             if i > 0 {
                 // Between types: newline + "| " when broken, " | " when flat
                 // Use if_break with line() instead of hardline() to avoid triggering will_break
-                parts.push(doc::if_break(
-                    doc::concat(vec![doc::line(), doc::text("| ")]),
-                    doc::text(" | "),
-                ));
+                parts.push(d.if_break(d.concat(&[d.line(), d.text("| ")]), d.text(" | ")));
 
                 // Add leading block comments for this type (after the `|` separator)
                 let prev_type_end = union.types[i - 1].span().end;
@@ -84,7 +82,7 @@ impl<'a> Printer<'a> {
                 }
             } else {
                 // First type: "| " when broken, nothing when flat
-                parts.push(doc::if_break(doc::text("| "), doc::empty()));
+                parts.push(d.if_break(d.text("| "), d.empty()));
             }
 
             // Special handling for object type literals: use aligned indentation
@@ -120,10 +118,10 @@ impl<'a> Printer<'a> {
 
         if wrap_in_group {
             // Independent breaking decision
-            doc::group(doc::concat(parts))
+            d.group(d.concat(&parts))
         } else {
             // Inherit breaking from parent group
-            doc::concat(parts)
+            d.concat(&parts)
         }
     }
 
@@ -138,7 +136,8 @@ impl<'a> Printer<'a> {
     /// // comment before B
     /// | B
     /// ```
-    fn build_union_type_doc_with_line_comments(&self, union: &TSUnionType) -> Doc {
+    fn build_union_type_doc_with_line_comments(&self, union: &TSUnionType) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         for (i, t) in union.types.iter().enumerate() {
@@ -157,19 +156,19 @@ impl<'a> Printer<'a> {
                     parts.extend(self.build_trailing_comments_multiline(prev_type_end, pipe_pos));
 
                     // Newline before `| `
-                    parts.push(doc::hardline());
-                    parts.push(doc::text("| "));
+                    parts.push(d.hardline());
+                    parts.push(d.text("| "));
 
                     // Comments after the pipe (leading on this type)
                     parts.extend(self.build_leading_comments_multiline(pipe_pos + 1, type_start));
                 } else {
                     // No pipe found, just add separator
-                    parts.push(doc::hardline());
-                    parts.push(doc::text("| "));
+                    parts.push(d.hardline());
+                    parts.push(d.text("| "));
                 }
             } else {
                 // First type: always has `| ` prefix when multiline
-                parts.push(doc::text("| "));
+                parts.push(d.text("| "));
             }
 
             // Add the type
@@ -182,13 +181,13 @@ impl<'a> Printer<'a> {
             // Trailing comments on last type
             if i == union.types.len() - 1 {
                 for comment in comments_in_range(self.comments, type_end, union.span.end) {
-                    parts.push(doc::text(" "));
+                    parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
             }
         }
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     //
@@ -210,9 +209,10 @@ impl<'a> Printer<'a> {
         &self,
         intersection: &TSIntersectionType,
         wrap_in_group: bool,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         if intersection.types.is_empty() {
-            return doc::empty();
+            return d.empty();
         }
 
         // Check for line comments between intersection members (force multiline)
@@ -259,7 +259,7 @@ impl<'a> Printer<'a> {
                     CommentFilter::BlockOnly,
                 ));
             }
-            first_parts.push(doc::text(" &"));
+            first_parts.push(d.text(" &"));
         } else {
             // Single type - include trailing comments
             first_parts.push(self.build_comments_between_filtered(
@@ -281,9 +281,9 @@ impl<'a> Printer<'a> {
             // After separator: line when broken, space when flat
             // But for huggable last types (TypeLiteral), always use space to keep `& {` hugged
             if is_last && last_is_huggable {
-                continuation_parts.push(doc::text(" "));
+                continuation_parts.push(d.text(" "));
             } else {
-                continuation_parts.push(doc::line());
+                continuation_parts.push(d.line());
             }
 
             // Add leading block comments for this type (after the `&` separator)
@@ -315,7 +315,7 @@ impl<'a> Printer<'a> {
                         CommentFilter::BlockOnly,
                     ));
                 }
-                continuation_parts.push(doc::text(" &"));
+                continuation_parts.push(d.text(" &"));
             } else {
                 // Last type - include all trailing comments up to intersection span end
                 continuation_parts.push(self.build_comments_between_filtered(
@@ -341,7 +341,7 @@ impl<'a> Printer<'a> {
         if !continuation_parts.is_empty() {
             if has_non_huggable_continuations {
                 // Multiple continuations with huggable at end - wrap in indent
-                parts.push(doc::indent(doc::concat(continuation_parts)));
+                parts.push(d.indent(d.concat(&continuation_parts)));
             } else {
                 // Either huggable-only or no huggable - no internal indent
                 parts.extend(continuation_parts);
@@ -353,9 +353,9 @@ impl<'a> Printer<'a> {
         // - non-huggable continuations exist (line() between them needs a group
         //   to go flat when content fits on one line)
         if wrap_in_group || has_non_huggable_continuations {
-            doc::group(doc::concat(parts))
+            d.group(d.concat(&parts))
         } else {
-            doc::concat(parts)
+            d.concat(&parts)
         }
     }
 
@@ -376,7 +376,8 @@ impl<'a> Printer<'a> {
     fn build_intersection_type_doc_with_line_comments(
         &self,
         intersection: &TSIntersectionType,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         for (i, t) in intersection.types.iter().enumerate() {
@@ -402,12 +403,12 @@ impl<'a> Printer<'a> {
                         .iter()
                         .filter(|c| self.is_same_line(amp_pos, c.span.start))
                     {
-                        parts.push(doc::text(" "));
+                        parts.push(d.text(" "));
                         parts.push(self.build_comment_doc(comment));
                     }
 
                     // Newline for continuation
-                    parts.push(doc::hardline());
+                    parts.push(d.hardline());
 
                     // Leading comments on their own line (come after hardline)
                     for comment in comments_after_amp
@@ -416,14 +417,14 @@ impl<'a> Printer<'a> {
                     {
                         parts.push(self.build_comment_doc(comment));
                         if comment.is_block {
-                            parts.push(doc::text(" "));
+                            parts.push(d.text(" "));
                         } else {
-                            parts.push(doc::hardline());
+                            parts.push(d.hardline());
                         }
                     }
                 } else {
                     // No ampersand found, just add newline
-                    parts.push(doc::hardline());
+                    parts.push(d.hardline());
                 }
             }
 
@@ -432,16 +433,16 @@ impl<'a> Printer<'a> {
 
             // Add trailing `&` for all but last type
             if i < intersection.types.len() - 1 {
-                parts.push(doc::text(" &"));
+                parts.push(d.text(" &"));
             } else {
                 // Trailing comments on last type
                 for comment in comments_in_range(self.comments, type_end, intersection.span.end) {
-                    parts.push(doc::text(" "));
+                    parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
             }
         }
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 }

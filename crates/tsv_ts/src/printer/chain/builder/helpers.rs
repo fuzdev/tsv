@@ -10,18 +10,23 @@ use super::super::printing::{
     print_group_expanded_skip_first_comments, print_group_skip_first_comments,
 };
 use super::super::types::ChainGroup;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 /// Build a chain-break doc: first_doc followed by indented rest_docs on new lines
 ///
 /// Result: `first_doc + indent(hardline + rest[0] + hardline + rest[1] + ...)`
-pub(super) fn build_chain_break_doc(first_doc: Doc, rest_docs: &[Doc]) -> Doc {
+pub(super) fn build_chain_break_doc<P: ChainPrinter>(
+    first_doc: DocId,
+    rest_docs: &[DocId],
+    printer: &P,
+) -> DocId {
+    let d = printer.arena();
     let mut rest_parts = Vec::with_capacity(rest_docs.len() * 2);
-    for rest_doc in rest_docs {
-        rest_parts.push(doc::hardline());
-        rest_parts.push(rest_doc.clone());
+    for &rest_doc in rest_docs {
+        rest_parts.push(d.hardline());
+        rest_parts.push(rest_doc);
     }
-    doc::concat(vec![first_doc, doc::indent(doc::concat(rest_parts))])
+    d.concat(&[first_doc, d.indent(d.concat(&rest_parts))])
 }
 
 /// Builder for constructing chain parts with proper comment handling.
@@ -29,7 +34,7 @@ pub(super) fn build_chain_break_doc(first_doc: Doc, rest_docs: &[Doc]) -> Doc {
 /// Encapsulates the logic for interleaving comments, line breaks, and groups
 /// when building the rest of a chain (everything after the first group).
 pub(crate) struct ChainPartsBuilder<'a, 'p, P: ChainPrinter> {
-    parts: Vec<Doc>,
+    parts: Vec<DocId>,
     printer: &'p P,
     use_hardline: bool,
     use_expanded: bool,
@@ -153,10 +158,11 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
             );
         } else {
             // No member range - just add line break
+            let d = self.printer.arena();
             self.parts.push(if self.use_hardline {
-                doc::hardline()
+                d.hardline()
             } else {
-                doc::softline()
+                d.softline()
             });
         }
     }
@@ -173,7 +179,7 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
         });
     }
 
-    pub(crate) fn build(self) -> Vec<Doc> {
+    pub(crate) fn build(self) -> Vec<DocId> {
         self.parts
     }
 }
@@ -186,7 +192,7 @@ pub(crate) fn build_rest_parts_with_comments<'a, P: ChainPrinter>(
     printer: &P,
     use_hardline: bool,
     use_expanded: bool,
-) -> Vec<Doc> {
+) -> Vec<DocId> {
     // Check if last group is a simple member (no calls) - it should stay on same line as `})`
     // e.g., `.filter().map({...})).length` - `.length` stays on same line as `})`
     let last_is_simple_member = rest_groups.last().is_some_and(|g| {
@@ -232,19 +238,20 @@ pub(super) fn build_expanded_chain_doc<'a, P: ChainPrinter>(
     groups: &[ChainGroup<'a>],
     split_at: usize,
     printer: &P,
-) -> Doc {
+) -> DocId {
+    let d = printer.arena();
     if groups.is_empty() {
-        return doc::empty();
+        return d.empty();
     }
 
     let (first_groups, rest) = groups.split_at(split_at.min(groups.len()));
 
     // Print first group(s) inline
-    let first_docs: Vec<Doc> = first_groups
+    let first_docs: Vec<DocId> = first_groups
         .iter()
         .map(|g| print_group(g, printer))
         .collect();
-    let first_doc = doc::concat(first_docs);
+    let first_doc = d.concat(&first_docs);
 
     if rest.is_empty() {
         return first_doc;
@@ -253,7 +260,7 @@ pub(super) fn build_expanded_chain_doc<'a, P: ChainPrinter>(
     // Print rest with hardlines and indent (including trailing comments and blank line preservation)
     let rest_parts = build_rest_parts_with_comments(rest, printer, true, false);
 
-    doc::concat(vec![first_doc, doc::indent(doc::concat(rest_parts))])
+    d.concat(&[first_doc, d.indent(d.concat(&rest_parts))])
 }
 
 /// Build the expanded doc variant (first group(s) + indented rest)
@@ -261,7 +268,7 @@ pub(super) fn build_expanded_doc<'a, P: ChainPrinter>(
     groups: &[ChainGroup<'a>],
     should_merge: bool,
     printer: &P,
-) -> Doc {
+) -> DocId {
     let split_at = if should_merge { 2 } else { 1 };
     build_expanded_chain_doc(groups, split_at, printer)
 }
@@ -270,22 +277,24 @@ pub(super) fn build_expanded_doc<'a, P: ChainPrinter>(
 pub(super) fn build_first_groups_doc<'a, P: ChainPrinter>(
     first_groups: &[ChainGroup<'a>],
     printer: &P,
-) -> Doc {
-    let first_docs: Vec<Doc> = first_groups
+) -> DocId {
+    let d = printer.arena();
+    let first_docs: Vec<DocId> = first_groups
         .iter()
         .map(|g| print_group(g, printer))
         .collect();
-    doc::concat(first_docs)
+    d.concat(&first_docs)
 }
 
 /// Build first groups doc with expanded calls
 pub(super) fn build_first_groups_expanded_doc<'a, P: ChainPrinter>(
     first_groups: &[ChainGroup<'a>],
     printer: &P,
-) -> Doc {
-    let first_docs: Vec<Doc> = first_groups
+) -> DocId {
+    let d = printer.arena();
+    let first_docs: Vec<DocId> = first_groups
         .iter()
         .map(|g| print_group_expanded(g, printer))
         .collect();
-    doc::concat(first_docs)
+    d.concat(&first_docs)
 }

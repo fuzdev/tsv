@@ -22,11 +22,12 @@ pub(super) use super::{
 
 use super::{ParenContext, needs_parens};
 use crate::ast::internal::{self, Statement};
-use tsv_lang::doc;
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a statement
-    pub(super) fn build_statement_doc(&self, statement: &Statement) -> doc::Doc {
+    pub(super) fn build_statement_doc(&self, statement: &Statement) -> DocId {
+        let d = self.d();
         match statement {
             Statement::ExpressionStatement(stmt) => self.build_expression_statement_doc(stmt),
             Statement::VariableDeclaration(decl) => self.build_variable_declaration_doc(decl),
@@ -60,7 +61,7 @@ impl<'a> Printer<'a> {
             Statement::BreakStatement(stmt) => self.build_break_statement_doc(stmt),
             Statement::ContinueStatement(stmt) => self.build_continue_statement_doc(stmt),
             Statement::LabeledStatement(stmt) => self.build_labeled_statement_doc(stmt),
-            Statement::EmptyStatement(_) => doc::text(";"),
+            Statement::EmptyStatement(_) => d.text(";"),
             Statement::TSInterfaceDeclaration(decl) => self.build_interface_declaration_doc(decl),
             Statement::TSDeclareFunction(decl) => self.build_declare_function_doc(decl),
             Statement::TSEnumDeclaration(decl) => self.build_enum_declaration_doc(decl),
@@ -84,13 +85,14 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an expression statement
     ///
     /// Handles parentheses for object patterns and comments before semicolon.
-    fn build_expression_statement_doc(&self, stmt: &internal::ExpressionStatement) -> doc::Doc {
+    fn build_expression_statement_doc(&self, stmt: &internal::ExpressionStatement) -> DocId {
+        let d = self.d();
         let needs_parens = needs_parens(&stmt.expression, ParenContext::ExpressionStatement);
 
         let mut parts = Vec::new();
 
         if needs_parens {
-            parts.push(doc::text("("));
+            parts.push(d.text("("));
         }
 
         // Set context flags for chain handling
@@ -103,7 +105,7 @@ impl<'a> Printer<'a> {
         self.is_expression_statement.set(false);
 
         if needs_parens {
-            parts.push(doc::text(")"));
+            parts.push(d.text(")"));
         }
 
         // Handle comments before semicolon
@@ -116,8 +118,8 @@ impl<'a> Printer<'a> {
             parts.push(comments_doc);
         }
 
-        parts.push(doc::text(";"));
-        doc::concat(parts)
+        parts.push(d.text(";"));
+        d.concat(&parts)
     }
 
     /// Build a Doc for a return statement
@@ -133,9 +135,10 @@ impl<'a> Printer<'a> {
     ///     b
     /// );
     /// ```
-    fn build_return_statement_doc(&self, ret: &internal::ReturnStatement) -> doc::Doc {
+    fn build_return_statement_doc(&self, ret: &internal::ReturnStatement) -> DocId {
+        let d = self.d();
         let Some(arg) = &ret.argument else {
-            return doc::text("return;");
+            return d.text("return;");
         };
 
         // Check if the expression is a binary expression that might break
@@ -166,41 +169,37 @@ impl<'a> Printer<'a> {
             // The binary chain is wrapped in its own group so it can independently
             // decide whether to break. When the outer group breaks (to add parens),
             // the inner chain should still try to fit on one line if possible.
-            let broken_doc = doc::concat(vec![
-                doc::text(" ("),
-                doc::indent(doc::concat(vec![
-                    doc::softline(),
-                    doc::group(expr_doc.clone()),
-                    trailing_comments_doc.clone(),
-                ])),
-                doc::softline(),
-                doc::text(")"),
+            let broken_doc = d.concat(&[
+                d.text(" ("),
+                d.indent(d.concat(&[d.softline(), d.group(expr_doc), trailing_comments_doc])),
+                d.softline(),
+                d.text(")"),
             ]);
 
-            let flat_doc = doc::concat(vec![doc::text(" "), expr_doc, trailing_comments_doc]);
+            let flat_doc = d.concat(&[d.text(" "), expr_doc, trailing_comments_doc]);
 
-            return doc::group(doc::concat(vec![
-                doc::text("return"),
-                doc::if_break(broken_doc, flat_doc),
-                doc::text(";"),
+            return d.group(d.concat(&[
+                d.text("return"),
+                d.if_break(broken_doc, flat_doc),
+                d.text(";"),
             ]));
         }
 
         // Assignment expressions need parentheses: return (a = b);
         // This matches Prettier's behavior for clarity (assignment vs equality)
         if matches!(arg, internal::Expression::AssignmentExpression(_)) {
-            return doc::concat(vec![
-                doc::text("return ("),
+            return d.concat(&[
+                d.text("return ("),
                 self.build_expression_doc(arg),
-                doc::text(");"),
+                d.text(");"),
             ]);
         }
 
         // Standard case: no parenthesization needed
-        doc::concat(vec![
-            doc::text("return "),
+        d.concat(&[
+            d.text("return "),
             self.build_expression_doc(arg),
-            doc::text(";"),
+            d.text(";"),
         ])
     }
 }

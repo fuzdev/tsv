@@ -14,7 +14,7 @@
 
 use super::Printer;
 use crate::ast::internal;
-use tsv_lang::doc;
+use tsv_lang::doc::{self, Mode, arena::DocId};
 
 impl<'a> Printer<'a> {
     /// Get the string representation of a combinator
@@ -95,7 +95,14 @@ impl<'a> Printer<'a> {
         // and leave room for closing `) {` (3 chars)
         let current_col = self.current_column();
         let available_width = self.config.print_width.saturating_sub(current_col + 3);
-        let fits = doc::fits(&list_doc, available_width, doc::Mode::Flat, &self.config);
+        let fits = doc::arena_fits::<dyn doc::TextResolver>(
+            &self.arena,
+            list_doc,
+            available_width,
+            Mode::Flat,
+            &self.config,
+            None,
+        );
 
         if fits {
             // Print inline
@@ -180,11 +187,13 @@ impl<'a> Printer<'a> {
         // Account for: indent + trailing " {" (2 chars)
         let overhead = self.indent_width() + 2; // " {" or ", "
         let available_width = self.config.print_width.saturating_sub(overhead);
-        let fits = doc::fits(
-            &selector_doc,
+        let fits = doc::arena_fits::<dyn doc::TextResolver>(
+            &self.arena,
+            selector_doc,
             available_width,
-            doc::Mode::Flat,
+            Mode::Flat,
             &self.config,
+            None,
         );
 
         if fits {
@@ -213,24 +222,26 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc representation of a selector list for width checking
-    pub(crate) fn build_selector_list_doc(&self, list: &internal::SelectorList) -> doc::Doc {
-        doc::join_doc(
+    pub(crate) fn build_selector_list_doc(&self, list: &internal::SelectorList) -> DocId {
+        let d = self.d();
+        let sep = d.text(", ");
+        d.join_doc(
             list.selectors
                 .iter()
                 .map(|complex| self.build_complex_selector_doc(complex)),
-            doc::text(", "),
+            sep,
         )
     }
 
     /// Build a doc representation of a complex selector for width checking
-    fn build_complex_selector_doc(&self, complex: &internal::ComplexSelector) -> doc::Doc {
+    fn build_complex_selector_doc(&self, complex: &internal::ComplexSelector) -> DocId {
         let docs: Vec<_> = complex
             .children
             .iter()
             .enumerate()
             .map(|(i, relative)| self.build_relative_selector_doc(relative, i == 0))
             .collect();
-        doc::concat(docs)
+        self.d().concat(&docs)
     }
 
     //
@@ -240,23 +251,24 @@ impl<'a> Printer<'a> {
     /// Build a doc for a simple selector
     ///
     /// Uses source extraction where possible to preserve escapes.
-    pub(crate) fn build_simple_selector_doc(&self, simple: &internal::SimpleSelector) -> doc::Doc {
+    pub(crate) fn build_simple_selector_doc(&self, simple: &internal::SimpleSelector) -> DocId {
+        let d = self.d();
         match simple {
             internal::SimpleSelector::Type { span, .. } => {
-                doc::text_owned(span.extract(self.source).to_string())
+                d.text_owned(span.extract(self.source).to_string())
             }
             internal::SimpleSelector::Universal { namespace, .. } => {
                 if let Some(ns) = namespace {
-                    doc::text_owned(format!("{ns}|*"))
+                    d.text_owned(format!("{ns}|*"))
                 } else {
-                    doc::text("*")
+                    d.text("*")
                 }
             }
             internal::SimpleSelector::Class { span, .. } => {
-                doc::text_owned(span.extract(self.source).to_string())
+                d.text_owned(span.extract(self.source).to_string())
             }
             internal::SimpleSelector::Id { span, .. } => {
-                doc::text_owned(span.extract(self.source).to_string())
+                d.text_owned(span.extract(self.source).to_string())
             }
             internal::SimpleSelector::Attribute {
                 namespace,
@@ -285,20 +297,18 @@ impl<'a> Printer<'a> {
                     result.push_str(f);
                 }
                 result.push(']');
-                doc::text_owned(result)
+                d.text_owned(result)
             }
             internal::SimpleSelector::PseudoClass { span, .. } => {
                 // Extract from source to get accurate representation
-                doc::text_owned(span.extract(self.source).to_string())
+                d.text_owned(span.extract(self.source).to_string())
             }
             internal::SimpleSelector::PseudoElement { span, .. } => {
-                doc::text_owned(span.extract(self.source).to_string())
+                d.text_owned(span.extract(self.source).to_string())
             }
-            internal::SimpleSelector::Nesting { .. } => doc::text("&"),
-            internal::SimpleSelector::Percentage { value, .. } => {
-                doc::text_owned(format!("{value}%"))
-            }
-            internal::SimpleSelector::Invalid { raw, .. } => doc::text_owned(raw.to_string()),
+            internal::SimpleSelector::Nesting { .. } => d.text("&"),
+            internal::SimpleSelector::Percentage { value, .. } => d.text_owned(format!("{value}%")),
+            internal::SimpleSelector::Invalid { raw, .. } => d.text_owned(raw.to_string()),
         }
     }
 
@@ -309,14 +319,15 @@ impl<'a> Printer<'a> {
         &self,
         relative: &internal::RelativeSelector,
         is_first: bool,
-    ) -> doc::Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         // Add combinator if present
         if let Some(combinator) = relative.combinator {
             let combinator_text = Self::get_combinator_str(combinator, is_first);
             if !combinator_text.is_empty() {
-                parts.push(doc::text(combinator_text));
+                parts.push(d.text(combinator_text));
             }
         }
 
@@ -325,7 +336,7 @@ impl<'a> Printer<'a> {
             parts.push(self.build_simple_selector_doc(simple));
         }
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Internal helper to format a relative selector with context
@@ -556,7 +567,14 @@ impl<'a> Printer<'a> {
         // We need to leave room for `) {` (3 chars) at end of selector
         let current_col = self.current_column();
         let available_width = self.config.print_width.saturating_sub(current_col + 4);
-        let fits = doc::fits(&args_doc, available_width, doc::Mode::Flat, &self.config);
+        let fits = doc::arena_fits::<dyn doc::TextResolver>(
+            &self.arena,
+            args_doc,
+            available_width,
+            Mode::Flat,
+            &self.config,
+            None,
+        );
 
         // Also check if any nested content would need to break
         // If a selector list has complex selectors with >2 simple selectors,
@@ -620,7 +638,14 @@ impl<'a> Printer<'a> {
                         // Check if this pseudo-class's args would break
                         let args_doc = self.build_pseudo_class_args_doc(args);
                         // Use a conservative width check
-                        let fits = doc::fits(&args_doc, 60, doc::Mode::Flat, &self.config);
+                        let fits = doc::arena_fits::<dyn doc::TextResolver>(
+                            &self.arena,
+                            args_doc,
+                            60,
+                            Mode::Flat,
+                            &self.config,
+                            None,
+                        );
                         if !fits {
                             return true;
                         }
@@ -636,7 +661,8 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc for pseudo-class args to check if they fit
-    fn build_pseudo_class_args_doc(&self, args: &internal::PseudoClassArgs) -> doc::Doc {
+    fn build_pseudo_class_args_doc(&self, args: &internal::PseudoClassArgs) -> DocId {
+        let d = self.d();
         match args {
             internal::PseudoClassArgs::SelectorList { selectors, .. } => {
                 self.build_selector_list_doc(selectors)
@@ -646,23 +672,23 @@ impl<'a> Printer<'a> {
             } => {
                 let normalized = Self::normalize_an_plus_b(value);
                 if let Some(selectors) = of_selector {
-                    doc::concat(vec![
-                        doc::text_owned(normalized),
-                        doc::text(" of "),
-                        self.build_selector_list_doc(selectors),
-                    ])
+                    let norm_doc = d.text_owned(normalized);
+                    let of_doc = d.text(" of ");
+                    let sel_doc = self.build_selector_list_doc(selectors);
+                    d.concat(&[norm_doc, of_doc, sel_doc])
                 } else {
-                    doc::text_owned(normalized)
+                    d.text_owned(normalized)
                 }
             }
-            internal::PseudoClassArgs::Slotted { selectors, .. } => doc::concat(
-                selectors
+            internal::PseudoClassArgs::Slotted { selectors, .. } => {
+                let sel_docs: Vec<_> = selectors
                     .iter()
                     .map(|s| self.build_simple_selector_doc(s))
-                    .collect(),
-            ),
-            internal::PseudoClassArgs::Part { idents, .. } => doc::text_owned(idents.join(" ")),
-            internal::PseudoClassArgs::Identifier { value, .. } => doc::text_owned(value.clone()),
+                    .collect();
+                d.concat(&sel_docs)
+            }
+            internal::PseudoClassArgs::Part { idents, .. } => d.text_owned(idents.join(" ")),
+            internal::PseudoClassArgs::Identifier { value, .. } => d.text_owned(value.clone()),
         }
     }
 

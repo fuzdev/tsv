@@ -45,7 +45,7 @@
 							"start": 21,
 							"end": 36,
 							"property": "content",
-							"value": "'\\\\nn\\\\tt'"
+							"value": "'\\n\\t'"
 						}
 					]
 				},
@@ -92,7 +92,7 @@
 							"start": 55,
 							"end": 74,
 							"property": "content",
-							"value": "'\\\\rr\\\\bb\\\\ff\\\\vv'"
+							"value": "'\\r\\b\\f\\v'"
 						}
 					]
 				},
@@ -139,7 +139,7 @@
 							"start": 93,
 							"end": 114,
 							"property": "content",
-							"value": "'test\\\\nnline'"
+							"value": "'test\\nline'"
 						}
 					]
 				},

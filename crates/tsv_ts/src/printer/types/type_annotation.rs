@@ -11,7 +11,7 @@ use super::helpers::{
 };
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType};
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a type annotation (e.g., `: number`)
@@ -26,7 +26,8 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_type_annotation_doc(
         &self,
         annotation: &internal::TSTypeAnnotation,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         // Check for comments between `:` and the type
         let colon_end = annotation.span.start + 1; // After the `:`
         let type_start = annotation.type_annotation.span().start;
@@ -40,32 +41,32 @@ impl<'a> Printer<'a> {
             if is_union {
                 // Line comment stays before union, type on new INDENTED line
                 let comments_doc = self.build_inline_comments_between_doc(colon_end, type_start);
-                doc::concat(vec![
-                    doc::text(":"),
+                d.concat(&[
+                    d.text(":"),
                     comments_doc,
                     // Wrap hardline inside indent so the line break is at the indented level
-                    doc::indent(doc::concat(vec![
-                        doc::hardline(),
+                    d.indent(d.concat(&[
+                        d.hardline(),
                         self.build_type_doc(&annotation.type_annotation),
                     ])),
                 ])
             } else if is_intersection {
                 // Line comment stays before intersection, type on new line (NOT indented)
                 let comments_doc = self.build_inline_comments_between_doc(colon_end, type_start);
-                doc::concat(vec![
-                    doc::text(":"),
+                d.concat(&[
+                    d.text(":"),
                     comments_doc,
-                    doc::hardline(),
+                    d.hardline(),
                     self.build_type_doc(&annotation.type_annotation),
                 ])
             } else {
                 // Simple type: comment moves to after the type (prettier 3.7 behavior)
                 // Include semicolon here to ensure comment is before it
                 let comments_doc = self.build_inline_comments_between_doc(colon_end, type_start);
-                doc::concat(vec![
-                    doc::text(": "),
+                d.concat(&[
+                    d.text(": "),
                     self.build_type_doc(&annotation.type_annotation),
-                    doc::text(";"),
+                    d.text(";"),
                     comments_doc,
                 ])
             }
@@ -80,10 +81,10 @@ impl<'a> Printer<'a> {
             match annotation.type_annotation.as_ref() {
                 TSType::Union(u) => {
                     let type_doc = self.build_union_type_doc(u, false);
-                    doc::group(doc::concat(vec![
-                        doc::text(":"),
-                        doc::indent(doc::concat(vec![
-                            doc::line(), // space when flat, newline when broken
+                    d.group(d.concat(&[
+                        d.text(":"),
+                        d.indent(d.concat(&[
+                            d.line(), // space when flat, newline when broken
                             type_doc,
                         ])),
                     ]))
@@ -95,14 +96,14 @@ impl<'a> Printer<'a> {
                 }
                 _ => {
                     // Block comments stay inline: `: /* comment */ Type`
-                    let mut parts = vec![doc::text(": ")];
+                    let mut parts = vec![d.text(": ")];
                     parts.push(self.build_comments_between(
                         colon_end,
                         type_start,
                         CommentSpacing::Trailing,
                     ));
                     parts.push(self.build_type_doc(&annotation.type_annotation));
-                    doc::concat(parts)
+                    d.concat(&parts)
                 }
             }
         }
@@ -126,7 +127,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_type_annotation_doc_wrapping(
         &self,
         annotation: &internal::TSTypeAnnotation,
-    ) -> Doc {
+    ) -> DocId {
         self.build_type_annotation_doc_with_wrapping(annotation, true)
     }
 
@@ -140,7 +141,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_type_annotation_doc_for_return_type(
         &self,
         annotation: &internal::TSTypeAnnotation,
-    ) -> Doc {
+    ) -> DocId {
         self.build_type_annotation_doc_with_wrapping(annotation, false)
     }
 
@@ -152,7 +153,8 @@ impl<'a> Printer<'a> {
         &self,
         annotation: &internal::TSTypeAnnotation,
         always_wrap: bool,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         // First check for line comments between `:` and the type.
         // If there are comments, fall back to build_type_annotation_doc which handles them properly.
         let colon_end = annotation.span.start + 1; // After the `:`
@@ -166,9 +168,9 @@ impl<'a> Printer<'a> {
             && let Some(type_args) = &r.type_arguments
             && (always_wrap || type_args_should_wrap_for_return_type(type_args))
         {
-            return doc::concat(vec![
-                doc::text(": "),
-                super::super::build_entity_name_doc(&r.type_name),
+            return d.concat(&[
+                d.text(": "),
+                super::super::build_entity_name_doc(self.d(), &r.type_name),
                 self.build_type_arguments_doc_wrapping(type_args),
             ]);
         }
@@ -176,8 +178,8 @@ impl<'a> Printer<'a> {
         // Handle Union types - break after colon with indent when long
         if let TSType::Union(u) = annotation.type_annotation.as_ref() {
             let type_doc = self.build_union_type_doc(u, false);
-            let union_group = doc::group(doc::indent_line(type_doc));
-            return doc::concat(vec![doc::text(":"), union_group]);
+            let union_group = d.group(d.indent_line(type_doc));
+            return d.concat(&[d.text(":"), union_group]);
         }
 
         self.build_type_annotation_doc(annotation)
@@ -218,15 +220,16 @@ impl<'a> Printer<'a> {
     fn build_intersection_type_annotation_doc(
         &self,
         intersection: &internal::TSIntersectionType,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         if intersection.types.is_empty() {
-            return doc::text(": ");
+            return d.text(": ");
         }
 
         // Single type - just use the normal intersection doc
         if intersection.types.len() == 1 {
-            return doc::concat(vec![
-                doc::text(": "),
+            return d.concat(&[
+                d.text(": "),
                 self.build_type_doc_with_wrapping_type_args(&intersection.types[0]),
             ]);
         }
@@ -240,7 +243,7 @@ impl<'a> Printer<'a> {
         let first_type = &intersection.types[0];
         let first_type_doc = self.build_intersection_member_type_doc(first_type);
 
-        let mut first_parts = vec![doc::text(": "), first_type_doc];
+        let mut first_parts = vec![d.text(": "), first_type_doc];
 
         // Add trailing block comments after first type (before the `&`)
         let first_type_end = first_type.span().end;
@@ -255,7 +258,7 @@ impl<'a> Printer<'a> {
                 CommentFilter::BlockOnly,
             ));
         }
-        first_parts.push(doc::text(" &"));
+        first_parts.push(d.text(" &"));
 
         // Build continuation types (indented when breaking)
         let mut continuation_parts = Vec::new();
@@ -267,9 +270,9 @@ impl<'a> Printer<'a> {
             // Space/line before this type
             if is_last && last_is_huggable {
                 // Keep `& {` hugged
-                continuation_parts.push(doc::text(" "));
+                continuation_parts.push(d.text(" "));
             } else {
-                continuation_parts.push(doc::line());
+                continuation_parts.push(d.line());
             }
 
             // Add leading block comments (after `&`)
@@ -301,7 +304,7 @@ impl<'a> Printer<'a> {
                         CommentFilter::BlockOnly,
                     ));
                 }
-                continuation_parts.push(doc::text(" &"));
+                continuation_parts.push(d.text(" &"));
             } else {
                 // Last type - trailing comments
                 continuation_parts.push(self.build_comments_between_filtered(
@@ -321,26 +324,27 @@ impl<'a> Printer<'a> {
             if last_is_huggable && intersection.types.len() == 2 {
                 parts.extend(continuation_parts);
             } else {
-                parts.push(doc::indent(doc::concat(continuation_parts)));
+                parts.push(d.indent(d.concat(&continuation_parts)));
             }
         }
 
         // Huggable-only (A & {b}): no group needed, TypeLiteral expands itself.
         // All other cases: group controls line() flat/break behavior.
         if last_is_huggable && intersection.types.len() == 2 {
-            doc::concat(parts)
+            d.concat(&parts)
         } else {
-            doc::group(doc::concat(parts))
+            d.group(d.concat(&parts))
         }
     }
 
     /// Build intersection member type with optional parens and wrapping type args.
-    fn build_intersection_member_type_doc(&self, t: &TSType) -> Doc {
+    fn build_intersection_member_type_doc(&self, t: &TSType) -> DocId {
+        let d = self.d();
         if type_needs_parens_in_intersection(t) {
-            doc::concat(vec![
-                doc::text("("),
+            d.concat(&[
+                d.text("("),
                 self.build_type_doc_with_wrapping_type_args(t),
-                doc::text(")"),
+                d.text(")"),
             ])
         } else {
             self.build_type_doc_with_wrapping_type_args(t)

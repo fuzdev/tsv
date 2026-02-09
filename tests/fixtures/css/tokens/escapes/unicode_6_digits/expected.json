@@ -45,7 +45,7 @@
 							"start": 21,
 							"end": 39,
 							"property": "content",
-							"value": "'\\\\00000FF'"
+							"value": "'\\0000FF'"
 						}
 					]
 				},
@@ -92,7 +92,7 @@
 							"start": 58,
 							"end": 76,
 							"property": "content",
-							"value": "'\\\\110FFFF'"
+							"value": "'\\10FFFF'"
 						}
 					]
 				},
@@ -139,7 +139,7 @@
 							"start": 95,
 							"end": 109,
 							"property": "content",
-							"value": "'\\\\441'"
+							"value": "'\\41'"
 						}
 					]
 				},
@@ -186,7 +186,7 @@
 							"start": 128,
 							"end": 144,
 							"property": "content",
-							"value": "'\\\\220AC'"
+							"value": "'\\20AC'"
 						}
 					]
 				},
@@ -233,7 +233,7 @@
 							"start": 163,
 							"end": 180,
 							"property": "content",
-							"value": "'\\\\11F4A9'"
+							"value": "'\\1F4A9'"
 						}
 					]
 				},

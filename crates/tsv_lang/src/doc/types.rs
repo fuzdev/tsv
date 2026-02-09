@@ -56,17 +56,25 @@ pub trait TextResolver {
     fn resolve(&self, id: u32) -> &str;
 }
 
+/// Sentinel value for cached_width: text contains a newline.
+/// Used by fits to early-return without resolving the string.
+pub const TEXT_WIDTH_HAS_NEWLINE: u16 = u16::MAX;
+
+/// Sentinel value for cached_width: width not yet computed.
+/// Used for owned strings that may be expensive to measure upfront.
+pub const TEXT_WIDTH_NOT_COMPUTED: u16 = u16::MAX - 1;
+
 /// Text content in a Doc - static, owned, or a symbol to resolve at print time
 #[derive(Debug, Clone)]
 pub enum DocText {
-    /// Static string literal - no allocation, just stores pointer
-    /// Used for punctuation, keywords, and other compile-time known text
-    Static(&'static str),
-    /// Dynamically generated text - requires allocation
-    /// Used for formatted values, transformed content
-    Owned(String),
-    /// Symbol ID to be resolved at print time - no allocation during doc building
-    /// Used for identifiers and other interned strings
+    /// Static string literal - no allocation, just stores pointer.
+    /// Second field is precomputed visual width (u16::MAX = contains newline).
+    Static(&'static str, u16),
+    /// Dynamically generated text - requires allocation.
+    /// Second field is precomputed visual width (u16::MAX = contains newline).
+    Owned(String, u16),
+    /// Symbol ID to be resolved at print time - no allocation during doc building.
+    /// No cached width — identifiers are ASCII, fast path handles them.
     Symbol(u32),
 }
 
@@ -78,8 +86,8 @@ impl DocText {
     #[inline]
     pub fn try_as_str(&self) -> Option<&str> {
         match self {
-            DocText::Static(s) => Some(s),
-            DocText::Owned(s) => Some(s),
+            DocText::Static(s, _) => Some(s),
+            DocText::Owned(s, _) => Some(s),
             DocText::Symbol(_) => None,
         }
     }
@@ -91,8 +99,8 @@ impl DocText {
     #[inline]
     pub fn resolve<'a, R: TextResolver + ?Sized>(&'a self, resolver: &'a R) -> &'a str {
         match self {
-            DocText::Static(s) => s,
-            DocText::Owned(s) => s,
+            DocText::Static(s, _) => s,
+            DocText::Owned(s, _) => s,
             DocText::Symbol(id) => resolver.resolve(*id),
         }
     }
@@ -101,6 +109,24 @@ impl DocText {
     #[inline]
     pub const fn is_symbol(&self) -> bool {
         matches!(self, DocText::Symbol(_))
+    }
+
+    /// Get the cached visual width, if available.
+    ///
+    /// Returns `Some(w)` for Static/Owned with precomputed width (u16::MAX = newline).
+    /// Returns `None` for Symbol or when width was not precomputed (TEXT_WIDTH_NOT_COMPUTED).
+    #[inline]
+    pub const fn cached_width(&self) -> Option<u16> {
+        match self {
+            DocText::Static(_, w) | DocText::Owned(_, w) => {
+                if *w == TEXT_WIDTH_NOT_COMPUTED {
+                    None
+                } else {
+                    Some(*w)
+                }
+            }
+            DocText::Symbol(_) => None,
+        }
     }
 }
 
@@ -120,8 +146,8 @@ pub(super) fn resolve_text<'a, R: TextResolver + ?Sized>(
     resolver: Option<&'a R>,
 ) -> &'a str {
     match text {
-        DocText::Static(s) => s,
-        DocText::Owned(s) => s,
+        DocText::Static(s, _) => s,
+        DocText::Owned(s, _) => s,
         DocText::Symbol(id) => resolver
             .expect("Symbol encountered in Doc but no TextResolver provided")
             .resolve(*id),
@@ -142,158 +168,6 @@ pub enum LineKind {
     Literal,
 }
 
-/// Document primitive - abstract representation of formatted output
-#[derive(Debug, Clone)]
-pub enum Doc {
-    /// Text content to output (static or owned)
-    Text(DocText),
-
-    /// Line break - behavior depends on kind and mode
-    Line(LineKind),
-
-    /// Increase indentation level for nested content
-    Indent(Box<Doc>),
-
-    /// Decrease indentation level
-    Dedent(Box<Doc>),
-
-    /// Set absolute indentation level for nested content
-    ///
-    /// Unlike Indent/Dedent which are relative, Align sets the indent to an
-    /// absolute value. Used for template literal interpolations where we need
-    /// content indented to match the template's visual position regardless of
-    /// how deeply nested the template is in function bodies or other blocks.
-    Align { n: usize, contents: Box<Doc> },
-
-    /// Add alignment spaces to indentation (Prettier-style alignment)
-    ///
-    /// Unlike Indent which adds tab levels, AlignSpaces adds a fixed number
-    /// of spaces after the tabs. Used for aligning closing delimiters with
-    /// opening delimiters (e.g., `)` aligning with `(` in union types).
-    ///
-    /// Example: `| (A & {\n\t\t\t  })` - the `)` uses 2 spaces to align with `(`
-    AlignSpaces { spaces: usize, contents: Box<Doc> },
-
-    /// Try to fit content on one line; if doesn't fit, break ALL lines in group
-    /// This is the key primitive for prettier's "all-or-nothing" breaking
-    ///
-    /// When `expanded_states` is Some, this is a "conditional group" that tries
-    /// multiple alternative layouts (like prettier's `conditionalGroup`):
-    /// 1. First tries states[0] in flat mode
-    /// 2. If that doesn't fit, tries states[1], states[2], ... in flat mode
-    /// 3. If none fit, uses the last state in break mode
-    ///
-    /// When `id` is Some, the group's mode (Flat/Break) is tracked in groupModeMap,
-    /// allowing `IndentIfBreak` nodes to check if this specific group broke.
-    ///
-    /// Note: `expanded_states` is boxed to keep Doc enum small (32 bytes vs 40).
-    /// Only `conditional_group` uses this field; regular `group()` has None.
-    Group {
-        contents: Box<Doc>,
-        /// Alternative layouts to try before breaking (prettier's expandedStates)
-        /// Boxed to reduce Doc enum size - only conditional_group uses this.
-        expanded_states: Option<Box<Vec<Doc>>>,
-        /// Optional ID for tracking this group's mode (prettier's GroupId)
-        id: Option<GroupId>,
-        /// Force break mode during rendering while fits check measures flat content.
-        ///
-        /// When true, the group renders with break mode (softlines become hardlines)
-        /// but fits() still measures the flat content width. This is used when source
-        /// formatting indicates content should be expanded (e.g., objects with source
-        /// newlines) but we need accurate width measurement for outer groups.
-        should_break: bool,
-    },
-
-    /// Conditional rendering based on whether parent group breaks
-    /// - If parent breaks: render `break_doc`
-    /// - If parent fits: render `flat_doc`
-    IfBreak {
-        break_doc: Box<Doc>,
-        flat_doc: Box<Doc>,
-    },
-
-    /// Conditionally indent based on whether a specific group broke
-    /// (optimized version of `ifBreak(indent(doc), doc, { groupId })`)
-    ///
-    /// Matches Prettier's `indentIfBreak` (indent-if-break.js):
-    /// - If group[id] broke: indent(contents)
-    /// - If group[id] stayed flat: contents (no indent)
-    /// - If `negate` is true: reverse the logic
-    ///
-    /// This enables deferred indentation decisions - the indent is applied
-    /// only after we know whether the referenced group broke.
-    IndentIfBreak {
-        contents: Box<Doc>,
-        group_id: GroupId,
-        negate: bool,
-    },
-
-    /// Sequence of docs - rendered one after another
-    Concat(Vec<Doc>),
-
-    /// Greedy line packing - fills each line with as much as fits
-    ///
-    /// Unlike Group (all-or-nothing breaking), Fill packs items left-to-right,
-    /// breaking to a new line only when the next item wouldn't fit.
-    ///
-    /// Parts should alternate: [content, separator, content, separator, ...]
-    /// Separators are typically `line()` or `softline()`.
-    ///
-    /// Example: `fill(vec![text("a"), line(), text("b"), line(), text("c")])`
-    /// At width 5: "a b c" (all fit)
-    /// At width 3: "a b\nc" (c doesn't fit with b)
-    Fill(Vec<Doc>),
-
-    /// Wrap a doc with rendering context (hints for width and punctuation).
-    ///
-    /// This is primarily used with Fill docs to prevent greedy-fill bugs
-    /// where fills pack to exactly printWidth, then parent adds punctuation
-    /// causing overflow.
-    ///
-    /// Example:
-    /// ```ignore
-    /// // CSS: reserve 1 char for trailing semicolon
-    /// let context = DocContext { trailing_reserve: 1 };
-    /// with_context(fill(values), context)
-    /// ```
-    WithContext { doc: Box<Doc>, context: DocContext },
-
-    /// Content to print at the end of the current line.
-    ///
-    /// LineSuffix is NOT included in width calculations during `fits()`,
-    /// allowing lines to exceed print width when they have trailing comments.
-    /// The content is buffered and printed after the current line's content.
-    ///
-    /// This matches prettier's `lineSuffix` for trailing comments.
-    LineSuffix(Box<Doc>),
-
-    /// Force any pending LineSuffix content to be flushed.
-    ///
-    /// This prevents LineSuffix from one group from bleeding into another.
-    /// Typically placed before line breaks in sensitive contexts.
-    LineSuffixBoundary,
-
-    /// Force parent group to break.
-    ///
-    /// This propagates up through the doc tree during printing and marks
-    /// any enclosing group as broken, forcing it to use break mode.
-    ///
-    /// Used when a child element (like a trailing comment) should force
-    /// the entire parent construct to expand to multiple lines.
-    BreakParent,
-
-    /// A group that prevents hardline propagation to parent groups.
-    ///
-    /// Unlike regular `Group`, `will_break()` returns false for `IsolatedGroup`,
-    /// preventing internal hardlines from forcing parent groups into Break mode.
-    /// The content still renders normally - breaks happen internally as expected.
-    ///
-    /// Use for call arguments that may contain hardlines (template literals
-    /// with `${` breaks, multiline objects in arrow bodies) but should not force
-    /// the outer call to break at `(`.
-    IsolatedGroup { contents: Box<Doc> },
-}
-
 /// Rendering mode for a doc
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
@@ -301,88 +175,4 @@ pub enum Mode {
     Flat,
     /// Use line breaks (soft lines become newlines)
     Break,
-}
-
-/// A command in the printer's command stack.
-/// Holds the context (indent, mode) and reference to a doc to process.
-#[derive(Debug, Clone, Copy)]
-pub(super) struct Command<'a> {
-    pub indent: usize,
-    pub mode: Mode,
-    pub doc: &'a Doc,
-    /// Override for base_indent_offset in position calculations.
-    /// When Some(n), uses n instead of config.base_indent_offset.
-    /// Propagated to child commands when set via WithContext.
-    pub base_indent_override: Option<usize>,
-    /// Additional alignment spaces after tabs (Prettier-style alignment).
-    /// Used for aligning closing delimiters with opening delimiters.
-    pub align_spaces: usize,
-}
-
-impl<'a> Command<'a> {
-    /// Create a command with the same context but a different doc
-    #[inline]
-    pub fn with_doc(&self, doc: &'a Doc) -> Self {
-        Self { doc, ..*self }
-    }
-
-    /// Create a command with incremented indent
-    ///
-    /// Resets align_spaces to 0 because indent starts a new "scope" where
-    /// alignment is relative to the new indent level, not the parent's alignment.
-    #[inline]
-    pub fn indented(&self, doc: &'a Doc) -> Self {
-        Self {
-            indent: self.indent + 1,
-            align_spaces: 0, // Reset alignment when entering new indent level
-            doc,
-            ..*self
-        }
-    }
-
-    /// Create a command with decremented indent
-    #[inline]
-    pub fn dedented(&self, doc: &'a Doc) -> Self {
-        Self {
-            indent: self.indent.saturating_sub(1),
-            doc,
-            ..*self
-        }
-    }
-
-    /// Create a command with absolute indent level
-    #[inline]
-    pub fn with_indent(&self, indent: usize, doc: &'a Doc) -> Self {
-        Self {
-            indent,
-            doc,
-            ..*self
-        }
-    }
-
-    /// Create a command with a specific mode
-    #[inline]
-    pub fn with_mode(&self, mode: Mode, doc: &'a Doc) -> Self {
-        Self { mode, doc, ..*self }
-    }
-
-    /// Create a command with a base indent override
-    #[inline]
-    pub fn with_base_override(&self, base_indent_override: Option<usize>, doc: &'a Doc) -> Self {
-        Self {
-            doc,
-            base_indent_override,
-            ..*self
-        }
-    }
-
-    /// Create a command with additional alignment spaces
-    #[inline]
-    pub fn with_align_spaces(&self, spaces: usize, doc: &'a Doc) -> Self {
-        Self {
-            doc,
-            align_spaces: self.align_spaces + spaces,
-            ..*self
-        }
-    }
 }

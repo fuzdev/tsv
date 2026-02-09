@@ -1093,6 +1093,13 @@ pub fn parse_with_our_parser_to_string(content: &str, filepath: &str) -> Result<
             .map_err(|e| format!("Failed to serialize AST to JSON: {e}"))?;
         // Add trailing newline to match fixtures_update_parsed format
         Ok(format!("{json}\n"))
+    } else if filepath.ends_with(".css") {
+        let ast = tsv_css::parse(content).map_err(|e| format!("Parse error: {e:?}"))?;
+        let public_ast = tsv_css::convert_ast(&ast, content);
+        let json = to_json_with_tabs(&public_ast)
+            .map_err(|e| format!("Failed to serialize AST to JSON: {e}"))?;
+        // Add trailing newline to match fixtures_update_parsed format
+        Ok(format!("{json}\n"))
     } else {
         Err(format!("Unsupported file type for parsing: {filepath}"))
     }

@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 use crate::ast::internal;
 use crate::printer::Printer;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 use tsv_lang::{SymbolResolver, SymbolToU32};
 
 impl<'a> Printer<'a> {
@@ -25,18 +25,19 @@ impl<'a> Printer<'a> {
     ///
     /// Block comments: `/*content*/ ` (with trailing space)
     /// Line comments: `// content\n` (with hardline)
-    pub(super) fn build_leading_js_comment_doc(comment: &tsv_lang::Comment) -> Doc {
+    pub(super) fn build_leading_js_comment_doc(&self, comment: &tsv_lang::Comment) -> DocId {
+        let d = self.d();
         if comment.is_block {
-            doc::concat(vec![
-                doc::text("/*"),
-                doc::text_owned(comment.content.clone()),
-                doc::text("*/ "),
+            d.concat(&[
+                d.text("/*"),
+                d.text_owned(comment.content.clone()),
+                d.text("*/ "),
             ])
         } else {
-            doc::concat(vec![
-                doc::text("// "),
-                doc::text_owned(comment.content.clone()),
-                doc::hardline(),
+            d.concat(&[
+                d.text("// "),
+                d.text_owned(comment.content.clone()),
+                d.hardline(),
             ])
         }
     }
@@ -45,18 +46,16 @@ impl<'a> Printer<'a> {
     ///
     /// Block comments: ` /*content*/` (with leading space)
     /// Line comments: ` // content` (with leading space, no hardline)
-    pub(super) fn build_trailing_js_comment_doc(comment: &tsv_lang::Comment) -> Doc {
+    pub(super) fn build_trailing_js_comment_doc(&self, comment: &tsv_lang::Comment) -> DocId {
+        let d = self.d();
         if comment.is_block {
-            doc::concat(vec![
-                doc::text(" /*"),
-                doc::text_owned(comment.content.clone()),
-                doc::text("*/"),
+            d.concat(&[
+                d.text(" /*"),
+                d.text_owned(comment.content.clone()),
+                d.text("*/"),
             ])
         } else {
-            doc::concat(vec![
-                doc::text(" // "),
-                doc::text_owned(comment.content.clone()),
-            ])
+            d.concat(&[d.text(" // "), d.text_owned(comment.content.clone())])
         }
     }
 
@@ -69,11 +68,11 @@ impl<'a> Printer<'a> {
     /// All formatting goes through the Doc IR for consistency.
     pub(super) fn print_attribute_node(&mut self, node: &internal::AttributeNode) {
         let doc = self.build_attribute_node_doc(node);
-        self.render_doc_immediate(&doc);
+        self.render_doc_immediate(doc);
     }
 
     /// Build a Doc for an attribute node (used for line wrapping calculations)
-    pub(super) fn build_attribute_node_doc(&self, node: &internal::AttributeNode) -> Doc {
+    pub(super) fn build_attribute_node_doc(&self, node: &internal::AttributeNode) -> DocId {
         match node {
             internal::AttributeNode::Attribute(attr) => self.build_attribute_doc(attr),
             internal::AttributeNode::SpreadAttribute(spread) => {
@@ -98,24 +97,26 @@ impl<'a> Printer<'a> {
     //
 
     /// Build a Doc for a single attribute (name="value" or name or {shorthand})
-    pub(super) fn build_attribute_doc(&self, attr: &internal::Attribute) -> Doc {
+    pub(super) fn build_attribute_doc(&self, attr: &internal::Attribute) -> DocId {
+        let d = self.d();
         let name_sym = attr.name.to_u32();
 
         if let Some(value_parts) = &attr.value {
             // Check for shorthand: {name}
             if self.is_shorthand_attribute(attr.name, value_parts) {
-                return doc::braces(doc::symbol(name_sym));
+                let sym = d.symbol(name_sym);
+                return d.braces(sym);
             }
 
             let is_pure_expression = value_parts.len() == 1
                 && matches!(value_parts[0], internal::AttributeValue::ExpressionTag(_));
 
-            let mut parts = vec![doc::symbol(name_sym)];
+            let mut parts = vec![d.symbol(name_sym)];
 
             if is_pure_expression {
-                parts.push(doc::text("="));
+                parts.push(d.text("="));
             } else {
-                parts.push(doc::text("=\""));
+                parts.push(d.text("=\""));
             }
 
             for part in value_parts {
@@ -123,13 +124,13 @@ impl<'a> Printer<'a> {
             }
 
             if !is_pure_expression {
-                parts.push(doc::text("\""));
+                parts.push(d.text("\""));
             }
 
-            doc::concat(parts)
+            d.concat(&parts)
         } else {
             // Boolean attribute
-            doc::symbol(name_sym)
+            d.symbol(name_sym)
         }
     }
 
@@ -137,9 +138,9 @@ impl<'a> Printer<'a> {
     ///
     /// Uses `force_binary_breaks: true` for expression tags inside attribute strings,
     /// allowing binary expressions to break when the attribute value exceeds print width.
-    fn build_attribute_value_doc(&self, value: &internal::AttributeValue) -> Doc {
+    fn build_attribute_value_doc(&self, value: &internal::AttributeValue) -> DocId {
         match value {
-            internal::AttributeValue::Text(text) => doc::text_owned(text.raw.clone()),
+            internal::AttributeValue::Text(text) => self.d().text_owned(text.raw.clone()),
             internal::AttributeValue::ExpressionTag(expr_tag) => {
                 // Allow binary breaks in attribute string contexts
                 let config = tsv_lang::PrintConfig {
@@ -152,7 +153,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a spread attribute: `{...expr}`
-    fn build_spread_attribute_doc(&self, spread: &internal::SpreadAttribute) -> Doc {
+    fn build_spread_attribute_doc(&self, spread: &internal::SpreadAttribute) -> DocId {
         self.build_braced_expression_doc(
             "{...",
             &spread.expression,
@@ -162,7 +163,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an attach tag: `{@attach expr}`
-    fn build_attach_tag_doc(&self, tag: &internal::AttachTag) -> Doc {
+    fn build_attach_tag_doc(&self, tag: &internal::AttachTag) -> DocId {
         self.build_braced_expression_doc(
             "{@attach ",
             &tag.expression,
@@ -180,34 +181,27 @@ impl<'a> Printer<'a> {
         expr: &tsv_ts::ast::internal::Expression,
         comment_start: u32,
         span_end: u32,
-    ) -> Doc {
-        let mut parts = vec![doc::text(prefix)];
+    ) -> DocId {
+        let d = self.d();
+        let mut parts = vec![d.text(prefix)];
 
         // Leading comments (between prefix and expression)
         let expr_start = expr.span().start;
         for comment in tsv_lang::comments_in_range(self.comments, comment_start, expr_start) {
-            parts.push(Self::build_leading_js_comment_doc(comment));
+            parts.push(self.build_leading_js_comment_doc(comment));
         }
 
         // Expression doc with any nested comments
-        let expr_doc = tsv_ts::build_expression_doc_with_comments(
-            expr,
-            self.source,
-            Rc::clone(&self.interner),
-            &self.config,
-            self.comments,
-            &self.line_breaks,
-        );
-        parts.push(expr_doc);
+        parts.push(self.build_ts_expression_doc(expr));
 
         // Trailing comments (between expression and `}`)
         let expr_end = expr.span().end;
         for comment in tsv_lang::comments_in_range(self.comments, expr_end, span_end - 1) {
-            parts.push(Self::build_trailing_js_comment_doc(comment));
+            parts.push(self.build_trailing_js_comment_doc(comment));
         }
 
-        parts.push(doc::text("}"));
-        doc::concat(parts)
+        parts.push(d.text("}"));
+        d.concat(&parts)
     }
 
     //
@@ -215,100 +209,108 @@ impl<'a> Printer<'a> {
     //
 
     /// Build a Doc for on:event directive
-    fn build_on_directive_doc(&self, d: &internal::OnDirective) -> Doc {
-        let mut parts = vec![doc::text("on:"), doc::text_owned(d.name.clone())];
-        parts.extend(self.build_modifiers_doc(&d.modifiers));
-        if let Some(expr) = &d.expression {
-            parts.extend(self.build_expression_doc_parts_with_span(expr, d.expression_tag_span));
+    fn build_on_directive_doc(&self, dir: &internal::OnDirective) -> DocId {
+        let d = self.d();
+        let mut parts = vec![d.text("on:"), d.text_owned(dir.name.clone())];
+        parts.extend(self.build_modifiers_doc(&dir.modifiers));
+        if let Some(expr) = &dir.expression {
+            parts.extend(self.build_expression_doc_parts_with_span(expr, dir.expression_tag_span));
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for bind:prop directive
-    fn build_bind_directive_doc(&self, d: &internal::BindDirective) -> Doc {
-        let mut parts = vec![doc::text("bind:"), doc::text_owned(d.name.clone())];
+    fn build_bind_directive_doc(&self, dir: &internal::BindDirective) -> DocId {
+        let d = self.d();
+        let mut parts = vec![d.text("bind:"), d.text_owned(dir.name.clone())];
         // Only include expression if not shorthand
-        if !self.is_identifier_with_name(&d.expression, &d.name) {
+        if !self.is_identifier_with_name(&dir.expression, &dir.name) {
             // bind: uses {getter, setter} syntax where SequenceExpression is bare (no parens)
             parts.extend(self.build_expression_doc_parts_with_span_for_bind(
-                &d.expression,
-                d.expression_tag_span,
+                &dir.expression,
+                dir.expression_tag_span,
             ));
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for class:name directive
-    fn build_class_directive_doc(&self, d: &internal::ClassDirective) -> Doc {
-        let mut parts = vec![doc::text("class:"), doc::text_owned(d.name.clone())];
+    fn build_class_directive_doc(&self, dir: &internal::ClassDirective) -> DocId {
+        let d = self.d();
+        let mut parts = vec![d.text("class:"), d.text_owned(dir.name.clone())];
         // Only include expression if not shorthand
-        if !self.is_identifier_with_name(&d.expression, &d.name) {
+        if !self.is_identifier_with_name(&dir.expression, &dir.name) {
             parts.extend(
-                self.build_expression_doc_parts_with_span(&d.expression, d.expression_tag_span),
+                self.build_expression_doc_parts_with_span(&dir.expression, dir.expression_tag_span),
             );
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for style:prop directive
-    fn build_style_directive_doc(&self, d: &internal::StyleDirective) -> Doc {
-        let mut parts = vec![doc::text("style:"), doc::text_owned(d.name.clone())];
-        parts.extend(self.build_modifiers_doc(&d.modifiers));
-        match &d.value {
+    fn build_style_directive_doc(&self, dir: &internal::StyleDirective) -> DocId {
+        let d = self.d();
+        let mut parts = vec![d.text("style:"), d.text_owned(dir.name.clone())];
+        parts.extend(self.build_modifiers_doc(&dir.modifiers));
+        match &dir.value {
             internal::StyleDirectiveValue::True => {}
             internal::StyleDirectiveValue::ExpressionTag(tag) => {
-                parts.push(doc::text("="));
+                parts.push(d.text("="));
                 parts.push(self.build_expression_tag_doc(tag));
             }
             internal::StyleDirectiveValue::Parts(value_parts) => {
-                parts.push(doc::text("=\""));
+                parts.push(d.text("=\""));
                 for part in value_parts {
                     parts.push(self.build_attribute_value_doc(part));
                 }
-                parts.push(doc::text("\""));
+                parts.push(d.text("\""));
             }
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for use:action directive
-    fn build_use_directive_doc(&self, d: &internal::UseDirective) -> Doc {
-        let mut parts = vec![doc::text("use:"), doc::text_owned(d.name.clone())];
-        if let Some(expr) = &d.expression {
-            parts.extend(self.build_expression_doc_parts_with_span(expr, d.expression_tag_span));
+    fn build_use_directive_doc(&self, dir: &internal::UseDirective) -> DocId {
+        let d = self.d();
+        let mut parts = vec![d.text("use:"), d.text_owned(dir.name.clone())];
+        if let Some(expr) = &dir.expression {
+            parts.extend(self.build_expression_doc_parts_with_span(expr, dir.expression_tag_span));
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for transition/in/out directive
-    fn build_transition_directive_doc(&self, d: &internal::TransitionDirective) -> Doc {
+    fn build_transition_directive_doc(&self, dir: &internal::TransitionDirective) -> DocId {
+        let d = self.d();
         let mut parts = vec![
-            doc::text(d.direction.prefix_with_colon()),
-            doc::text_owned(d.name.clone()),
+            d.text(dir.direction.prefix_with_colon()),
+            d.text_owned(dir.name.clone()),
         ];
-        parts.extend(self.build_modifiers_doc(&d.modifiers));
-        if let Some(expr) = &d.expression {
-            parts.extend(self.build_expression_doc_parts_with_span(expr, d.expression_tag_span));
+        parts.extend(self.build_modifiers_doc(&dir.modifiers));
+        if let Some(expr) = &dir.expression {
+            parts.extend(self.build_expression_doc_parts_with_span(expr, dir.expression_tag_span));
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for animate:name directive
-    fn build_animate_directive_doc(&self, d: &internal::AnimateDirective) -> Doc {
-        let mut parts = vec![doc::text("animate:"), doc::text_owned(d.name.clone())];
-        if let Some(expr) = &d.expression {
-            parts.extend(self.build_expression_doc_parts_with_span(expr, d.expression_tag_span));
+    fn build_animate_directive_doc(&self, dir: &internal::AnimateDirective) -> DocId {
+        let d = self.d();
+        let mut parts = vec![d.text("animate:"), d.text_owned(dir.name.clone())];
+        if let Some(expr) = &dir.expression {
+            parts.extend(self.build_expression_doc_parts_with_span(expr, dir.expression_tag_span));
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for let:name directive
-    fn build_let_directive_doc(&self, d: &internal::LetDirective) -> Doc {
-        let mut parts = vec![doc::text("let:"), doc::text_owned(d.name.clone())];
-        if let Some(expr) = &d.expression {
-            parts.extend(self.build_expression_doc_parts_with_span(expr, d.expression_tag_span));
+    fn build_let_directive_doc(&self, dir: &internal::LetDirective) -> DocId {
+        let d = self.d();
+        let mut parts = vec![d.text("let:"), d.text_owned(dir.name.clone())];
+        if let Some(expr) = &dir.expression {
+            parts.extend(self.build_expression_doc_parts_with_span(expr, dir.expression_tag_span));
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     //
@@ -316,10 +318,10 @@ impl<'a> Printer<'a> {
     //
 
     /// Build Doc parts for modifiers: `|mod1|mod2`
-    fn build_modifiers_doc(&self, modifiers: &[String]) -> Vec<Doc> {
+    fn build_modifiers_doc(&self, modifiers: &[String]) -> Vec<DocId> {
         modifiers
             .iter()
-            .flat_map(|m| vec![doc::text("|"), doc::text_owned(m.clone())])
+            .flat_map(|m| vec![self.d().text("|"), self.d().text_owned(m.clone())])
             .collect()
     }
 
@@ -328,21 +330,25 @@ impl<'a> Printer<'a> {
         &self,
         expr: &tsv_ts::ast::internal::Expression,
         config: &tsv_lang::PrintConfig,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         // Assignment expressions need parens in attribute values: prop={(a = b)}
         if let tsv_ts::ast::internal::Expression::AssignmentExpression(_) = expr {
-            return doc::parens(tsv_ts::build_expression_doc_with_comments(
+            let inner = tsv_ts::build_expression_doc_with_comments(
+                d,
                 expr,
                 self.source,
                 Rc::clone(&self.interner),
                 config,
                 self.comments,
                 &self.line_breaks,
-            ));
+            );
+            return d.parens(inner);
         }
 
         if let tsv_ts::ast::internal::Expression::BinaryExpression(_) = expr {
             tsv_ts::build_expression_doc_with_continuation_indent(
+                d,
                 expr,
                 self.source,
                 Rc::clone(&self.interner),
@@ -352,6 +358,7 @@ impl<'a> Printer<'a> {
             )
         } else {
             tsv_ts::build_expression_doc_with_comments(
+                d,
                 expr,
                 self.source,
                 Rc::clone(&self.interner),
@@ -375,7 +382,7 @@ impl<'a> Printer<'a> {
         &self,
         expr: &tsv_ts::ast::internal::Expression,
         tag_span: Option<tsv_lang::Span>,
-    ) -> Vec<Doc> {
+    ) -> Vec<DocId> {
         let expr_content = self.build_expression_content_with_comments(expr, tag_span);
 
         // For expressions with internal group structure, keep them hugged with the braces.
@@ -413,35 +420,33 @@ impl<'a> Printer<'a> {
                 | tsv_ts::ast::internal::Expression::BinaryExpression(_)
         );
 
+        let d = self.d();
         let inner = if is_hugged {
             // Hugged: the expression's internal doc handles wrapping
-            doc::concat(vec![
-                doc::text("{"),
-                doc::concat(expr_content),
-                doc::text("}"),
-            ])
+            let content = d.concat(&expr_content);
+            d.concat(&[d.text("{"), content, d.text("}")])
         } else {
             // Block structure for other expressions
-            Self::wrap_in_block_structure(expr_content)
+            self.wrap_in_block_structure(expr_content)
         };
 
-        vec![doc::text("="), inner]
+        vec![d.text("="), inner]
     }
 
     /// Build expression content with leading/trailing comments
     ///
-    /// Returns a Vec<Doc> containing: leading comments + expression doc + trailing comments
+    /// Returns a Vec<DocId> containing: leading comments + expression doc + trailing comments
     fn build_expression_content_with_comments(
         &self,
         expr: &tsv_ts::ast::internal::Expression,
         tag_span: Option<tsv_lang::Span>,
-    ) -> Vec<Doc> {
+    ) -> Vec<DocId> {
         // Collect leading comments
         let mut leading_comments = Vec::new();
         if let Some(span) = tag_span {
             let expr_start = expr.span().start;
             for comment in tsv_lang::comments_in_range(self.comments, span.start + 1, expr_start) {
-                leading_comments.push(Self::build_leading_js_comment_doc(comment));
+                leading_comments.push(self.build_leading_js_comment_doc(comment));
             }
         }
 
@@ -452,7 +457,7 @@ impl<'a> Printer<'a> {
         if let Some(span) = tag_span {
             let expr_end = expr.span().end;
             for comment in tsv_lang::comments_in_range(self.comments, expr_end, span.end - 1) {
-                trailing_comments.push(Self::build_trailing_js_comment_doc(comment));
+                trailing_comments.push(self.build_trailing_js_comment_doc(comment));
             }
         }
 
@@ -464,16 +469,15 @@ impl<'a> Printer<'a> {
     }
 
     /// Wrap expression content in block structure: `{\n\texpr\n}`
-    fn wrap_in_block_structure(expr_content: Vec<Doc>) -> Doc {
-        doc::group(doc::concat(vec![
-            doc::text("{"),
-            doc::indent(doc::concat(vec![
-                doc::softline(),
-                doc::concat(expr_content),
-            ])),
-            doc::softline(),
-            doc::text("}"),
-        ]))
+    fn wrap_in_block_structure(&self, expr_content: Vec<DocId>) -> DocId {
+        let d = self.d();
+        let content = d.concat(&expr_content);
+        let softline = d.softline();
+        let inner = d.concat(&[softline, content]);
+        let indented = d.indent(inner);
+        let softline2 = d.softline();
+        let concat = d.concat(&[d.text("{"), indented, softline2, d.text("}")]);
+        d.group(concat)
     }
 
     /// Build Doc parts for bind directive expressions: `={expr}`
@@ -498,27 +502,22 @@ impl<'a> Printer<'a> {
         &self,
         expr: &tsv_ts::ast::internal::Expression,
         tag_span: Option<tsv_lang::Span>,
-    ) -> Vec<Doc> {
+    ) -> Vec<DocId> {
+        let d = self.d();
         // For SequenceExpression, use the bare (no parens) version for getter/setter syntax
         if let tsv_ts::ast::internal::Expression::SequenceExpression(seq) = expr {
             let len = seq.expressions.len();
 
             // Build items: each expression with trailing comma (except last)
-            let items: Vec<Doc> = seq
+            let items: Vec<DocId> = seq
                 .expressions
                 .iter()
                 .enumerate()
                 .map(|(i, sub_expr)| {
-                    let expr_doc = tsv_ts::build_expression_doc_with_comments(
-                        sub_expr,
-                        self.source,
-                        Rc::clone(&self.interner),
-                        &self.config,
-                        self.comments,
-                        &self.line_breaks,
-                    );
+                    let expr_doc = self.build_ts_expression_doc(sub_expr);
                     if i < len - 1 {
-                        doc::concat(vec![expr_doc, doc::text(",")])
+                        let comma = d.text(",");
+                        d.concat(&[expr_doc, comma])
                     } else {
                         expr_doc
                     }
@@ -526,19 +525,18 @@ impl<'a> Printer<'a> {
                 .collect();
 
             // Join with line() - becomes " " when flat, "\n" when broken
-            let items_doc = doc::join_doc(items, doc::line());
+            let line = d.line();
+            let items_doc = d.join_doc(items, line);
 
             // Use group/indent structure that expands when content is multiline:
             // Flat: ={getter, setter}
             // Broken: ={\n\tgetter,\n\tsetter\n}
-            let inner = doc::group(doc::concat(vec![
-                doc::text("{"),
-                doc::indent_softline(items_doc),
-                doc::softline(),
-                doc::text("}"),
-            ]));
+            let indent_softline = d.indent_softline(items_doc);
+            let softline = d.softline();
+            let concat = d.concat(&[d.text("{"), indent_softline, softline, d.text("}")]);
+            let inner = d.group(concat);
 
-            return vec![doc::text("="), inner];
+            return vec![d.text("="), inner];
         }
 
         // For bind: directives, BinaryExpression should use block structure (not hugging).
@@ -558,13 +556,16 @@ impl<'a> Printer<'a> {
         &self,
         expr: &tsv_ts::ast::internal::Expression,
         tag_span: Option<tsv_lang::Span>,
-    ) -> Vec<Doc> {
+    ) -> Vec<DocId> {
         let expr_content = self.build_expression_content_with_comments(expr, tag_span);
-        vec![doc::text("="), Self::wrap_in_block_structure(expr_content)]
+        vec![
+            self.d().text("="),
+            self.wrap_in_block_structure(expr_content),
+        ]
     }
 
     /// Build a Doc for an expression tag: `{expr}`
-    pub(super) fn build_expression_tag_doc(&self, tag: &internal::ExpressionTag) -> Doc {
+    pub(super) fn build_expression_tag_doc(&self, tag: &internal::ExpressionTag) -> DocId {
         self.build_expression_tag_doc_with_config(tag, &self.config)
     }
 
@@ -581,14 +582,15 @@ impl<'a> Printer<'a> {
         &self,
         tag: &internal::ExpressionTag,
         config: &tsv_lang::PrintConfig,
-    ) -> Doc {
-        let mut parts = vec![doc::text("{")];
+    ) -> DocId {
+        let d = self.d();
+        let mut parts = vec![d.text("{")];
 
         // Add leading comments (block comments only in expression tags)
         let expr_start = tag.expression.span().start;
         for comment in tsv_lang::comments_in_range(self.comments, tag.span.start + 1, expr_start) {
             if comment.is_block {
-                parts.push(doc::text_owned(format!("/*{}*/ ", comment.content)));
+                parts.push(d.text_owned(format!("/*{}*/ ", comment.content)));
             }
         }
 
@@ -598,12 +600,12 @@ impl<'a> Printer<'a> {
         let expr_end = tag.expression.span().end;
         for comment in tsv_lang::comments_in_range(self.comments, expr_end, tag.span.end - 1) {
             if comment.is_block {
-                parts.push(doc::text_owned(format!(" /*{}*/", comment.content)));
+                parts.push(d.text_owned(format!(" /*{}*/", comment.content)));
             }
         }
 
-        parts.push(doc::text("}"));
-        doc::concat(parts)
+        parts.push(d.text("}"));
+        d.concat(&parts)
     }
 
     /// Check if an attribute is a shorthand: {name} where value is ExpressionTag(Identifier(name))

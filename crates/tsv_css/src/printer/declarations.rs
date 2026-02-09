@@ -8,7 +8,7 @@
 
 use super::{Printer, has_wrappable_args, source_fidelity};
 use crate::ast::internal::{self, CssValue};
-use tsv_lang::doc;
+use tsv_lang::doc::{self, DocContext, Mode, arena::DocId};
 
 impl<'a> Printer<'a> {
     /// Write the declaration ending: optional !important and semicolon with newline
@@ -76,25 +76,37 @@ impl<'a> Printer<'a> {
             CssValue::CommaSeparated { .. } if is_custom_property => (false, false),
             CssValue::CommaSeparated { values, .. } => {
                 let doc = self.build_list_doc(values, ", ");
-                let context_offset = property.len() + 3; // property + ": " + ";"
-                let exceeds_width = !doc::fits_at(
-                    &doc,
+                let available = doc::available_width(
                     &self.config,
                     self.effective_indent(),
                     0,
-                    context_offset,
+                    property.len() + 3, // property + ": " + ";"
+                );
+                let exceeds_width = !doc::arena_fits::<dyn doc::TextResolver>(
+                    &self.arena,
+                    doc,
+                    available,
+                    Mode::Flat,
+                    &self.config,
+                    None,
                 );
                 (exceeds_width, true)
             }
             CssValue::List { values, .. } => {
                 let doc = self.build_list_doc(values, " ");
-                let context_offset = property.len() + 3; // property + ": " + ";"
-                let exceeds_width = !doc::fits_at(
-                    &doc,
+                let available = doc::available_width(
                     &self.config,
                     self.effective_indent(),
                     0,
-                    context_offset,
+                    property.len() + 3, // property + ": " + ";"
+                );
+                let exceeds_width = !doc::arena_fits::<dyn doc::TextResolver>(
+                    &self.arena,
+                    doc,
+                    available,
+                    Mode::Flat,
+                    &self.config,
+                    None,
                 );
                 (exceeds_width, false)
             }
@@ -105,8 +117,8 @@ impl<'a> Printer<'a> {
     /// Build doc representation of a list for width checking
     ///
     /// Consolidates comma-separated and space-separated list building.
-    fn build_list_doc(&self, values: &[CssValue], separator: &'static str) -> doc::Doc {
-        doc::join(
+    fn build_list_doc(&self, values: &[CssValue], separator: &'static str) -> DocId {
+        self.d().join(
             values.iter().map(|v| self.build_css_value_doc(v)),
             separator,
         )
@@ -132,24 +144,26 @@ impl<'a> Printer<'a> {
             return false;
         }
 
+        let d = self.d();
         // Build inline doc representation for width checking
         // url() uses comma without space; others use ", "
         let separator = if name == "url" { "," } else { ", " };
-        let arg_docs: Vec<_> = args
-            .iter()
-            .map(|arg| self.build_css_value_doc(arg))
-            .collect();
-        let func_doc = doc::concat(vec![
-            doc::text_owned(name.to_string()),
-            doc::parens(doc::join(arg_docs, separator)),
-        ]);
+        let args_doc = d.join(
+            args.iter().map(|arg| self.build_css_value_doc(arg)),
+            separator,
+        );
+        let name_doc = d.text_owned(name.to_string());
+        let func_doc = d.concat(&[name_doc, d.parens(args_doc)]);
 
-        !doc::fits_at(
-            &func_doc,
+        let available =
+            doc::available_width(&self.config, self.effective_indent(), 0, context_offset);
+        !doc::arena_fits::<dyn doc::TextResolver>(
+            &self.arena,
+            func_doc,
+            available,
+            Mode::Flat,
             &self.config,
-            self.effective_indent(),
-            0,
-            context_offset,
+            None,
         )
     }
 
@@ -282,7 +296,7 @@ impl<'a> Printer<'a> {
             {
                 self.indent_level += 1;
                 let fill_doc = self.build_space_fill_doc(values, 0);
-                self.write_doc(&fill_doc);
+                self.write_arena_doc(fill_doc);
                 self.indent_level -= 1;
             } else {
                 self.print_nested_value(arg);
@@ -376,7 +390,7 @@ impl<'a> Printer<'a> {
                     // Increment indent for continuation lines
                     self.indent_level += 1;
                     let fill_doc = self.build_space_fill_doc(list_values, 1);
-                    self.write_doc(&fill_doc);
+                    self.write_arena_doc(fill_doc);
                     self.indent_level -= 1;
                 } else {
                     self.print_nested_value(val);
@@ -407,7 +421,7 @@ impl<'a> Printer<'a> {
 
         // Write first line indentation, then let fill handle the rest
         self.write_indent();
-        self.write_doc(&fill_doc);
+        self.write_arena_doc(fill_doc);
     }
 
     /// Build a fill doc for comma-separated values
@@ -415,23 +429,27 @@ impl<'a> Printer<'a> {
     /// Creates a doc that packs values greedily:
     /// - In flat mode: `item1, item2, item3`
     /// - When broken: `item1, item2,\n  item3, item4,\n  item5`
-    fn build_comma_fill_doc(&self, values: &[CssValue]) -> doc::Doc {
+    fn build_comma_fill_doc(&self, values: &[CssValue]) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
         for (i, val) in values.iter().enumerate() {
             parts.push(self.build_css_value_doc(val));
             if i < values.len() - 1 {
                 // Separator: ", " in flat mode, ",\n" when broken
-                parts.push(doc::concat(vec![doc::text(","), doc::line()]));
+                let comma = d.text(",");
+                let line = d.line();
+                parts.push(d.concat(&[comma, line]));
             }
         }
 
         // Reserve 1 char for trailing semicolon to prevent fill from packing
         // to exactly printWidth and then exceeding when ';' is added
-        let context = doc::DocContext {
+        let context = DocContext {
             trailing_reserve: 1,
             base_indent_override: None,
         };
-        doc::with_context(doc::fill(parts), context)
+        let fill = d.fill(&parts);
+        d.with_context(fill, context)
     }
 
     /// Format a space-separated list with width-based wrapping using doc::fill
@@ -450,17 +468,18 @@ impl<'a> Printer<'a> {
         // Reserve 1 char for trailing semicolon
         let fill_doc = self.build_space_fill_doc(values, 1);
 
-        // First line is inline (no indent), write_doc uses current_column for width calc
-        self.write_doc(&fill_doc);
+        // First line is inline (no indent), write_arena_doc uses current_column for width calc
+        self.write_arena_doc(fill_doc);
     }
 
     /// Build fill parts for space-separated values (shared helper)
-    fn build_space_fill_parts(&self, values: &[CssValue]) -> Vec<doc::Doc> {
+    fn build_space_fill_parts(&self, values: &[CssValue]) -> Vec<DocId> {
+        let d = self.d();
         let mut parts = Vec::with_capacity(values.len() * 2);
         for (i, val) in values.iter().enumerate() {
             parts.push(self.build_css_value_doc(val));
             if i < values.len() - 1 {
-                parts.push(doc::line());
+                parts.push(d.line());
             }
         }
         parts
@@ -473,13 +492,15 @@ impl<'a> Printer<'a> {
     /// - When broken: `item1 item2\n  item3 item4\n  item5`
     ///
     /// `trailing_reserve` accounts for characters after the list (comma, semicolon).
-    fn build_space_fill_doc(&self, values: &[CssValue], trailing_reserve: usize) -> doc::Doc {
+    fn build_space_fill_doc(&self, values: &[CssValue], trailing_reserve: usize) -> DocId {
+        let d = self.d();
         let parts = self.build_space_fill_parts(values);
-        let context = doc::DocContext {
+        let context = DocContext {
             trailing_reserve,
             base_indent_override: None,
         };
-        doc::with_context(doc::fill(parts), context)
+        let fill = d.fill(&parts);
+        d.with_context(fill, context)
     }
 
     /// Check if a space-separated list would exceed width when printed inline
@@ -488,12 +509,15 @@ impl<'a> Printer<'a> {
     /// `trailing_reserve` accounts for characters after the list (comma, paren, semicolon).
     fn space_list_exceeds_width(&self, values: &[CssValue], trailing_reserve: usize) -> bool {
         let list_doc = self.build_list_doc(values, " ");
-        !doc::fits_at(
-            &list_doc,
+        let available =
+            doc::available_width(&self.config, self.effective_indent(), 0, trailing_reserve);
+        !doc::arena_fits::<dyn doc::TextResolver>(
+            &self.arena,
+            list_doc,
+            available,
+            Mode::Flat,
             &self.config,
-            self.effective_indent(),
-            0,
-            trailing_reserve,
+            None,
         )
     }
 
@@ -584,26 +608,27 @@ impl<'a> Printer<'a> {
             };
 
         // Build and write fill doc
-        let fill_doc = doc::fill(Self::build_fill_parts_from_strings(value_parts));
+        let fill_doc = self.build_fill_parts_from_strings(value_parts);
         if use_continuation {
             self.indent_level += 1;
         }
-        self.write_doc(&fill_doc);
+        self.write_arena_doc(fill_doc);
         if use_continuation {
             self.indent_level -= 1;
         }
     }
 
     /// Build fill doc parts from string slices
-    fn build_fill_parts_from_strings(parts: &[&str]) -> Vec<doc::Doc> {
+    fn build_fill_parts_from_strings(&self, parts: &[&str]) -> DocId {
+        let d = self.d();
         let mut doc_parts = Vec::with_capacity(parts.len() * 2);
         for (i, part) in parts.iter().enumerate() {
-            doc_parts.push(doc::text_owned((*part).to_string()));
+            doc_parts.push(d.text_owned((*part).to_string()));
             if i < parts.len() - 1 {
-                doc_parts.push(doc::line());
+                doc_parts.push(d.line());
             }
         }
-        doc_parts
+        d.fill(&doc_parts)
     }
 
     /// Print function arguments semantically (fallback when source extraction fails)

@@ -9,7 +9,7 @@ use super::analysis::SymbolLookup;
 use super::types::{ChainGroup, ChainNode};
 use crate::ast::internal::{self, Expression};
 use string_interner::DefaultSymbol;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::printing::has_blank_line_between_fast;
 use tsv_lang::{ClassifiedComments, Span, SymbolToU32};
 
@@ -19,22 +19,25 @@ use tsv_lang::{ClassifiedComments, Span, SymbolToU32};
 
 /// Trait for printing chain elements (abstraction over Printer)
 pub trait ChainPrinter: SymbolLookup {
-    /// Print an expression as a Doc
-    fn print_expression(&self, expr: &Expression) -> Doc;
+    /// Get a reference to the doc arena
+    fn arena(&self) -> &DocArena;
+
+    /// Print an expression as a DocId
+    fn print_expression(&self, expr: &Expression) -> DocId;
 
     /// Print a parenthesized base expression with indent-on-break behavior
-    fn print_parenthesized_base(&self, expr: &Expression) -> Doc;
+    fn print_parenthesized_base(&self, expr: &Expression) -> DocId;
 
     /// Print a parenthesized base expression with forced expansion (hardlines)
     /// Used for `args_break` state in conditional_group so fits() can measure correctly
-    fn print_parenthesized_base_expanded(&self, expr: &Expression) -> Doc;
+    fn print_parenthesized_base_expanded(&self, expr: &Expression) -> DocId;
 
     /// Print call arguments: () or (arg1, arg2)
-    fn print_call_args(&self, call: &internal::CallExpression, optional: bool) -> Doc;
+    fn print_call_args(&self, call: &internal::CallExpression, optional: bool) -> DocId;
 
     /// Print call arguments with forced expansion (hardlines)
     /// Used for the "args broken, chain inline" state in conditionalGroup
-    fn print_call_args_expanded(&self, call: &internal::CallExpression, optional: bool) -> Doc;
+    fn print_call_args_expanded(&self, call: &internal::CallExpression, optional: bool) -> DocId;
 
     /// Build a doc for inline block comments between two positions
     /// Returns a doc with block comments using the specified spacing
@@ -44,7 +47,7 @@ pub trait ChainPrinter: SymbolLookup {
         start: u32,
         end: u32,
         spacing: crate::printer::CommentSpacing,
-    ) -> Doc;
+    ) -> DocId;
 
     /// Get the span for a given expression
     fn get_property_span(&self, expr: &Expression) -> Span;
@@ -70,26 +73,26 @@ pub trait ChainPrinter: SymbolLookup {
 
     /// Build doc for trailing block comments from a pre-classified slice.
     /// Emits space before each comment: `method() /* c */`
-    fn build_trailing_block_doc(&self, comments: &[&tsv_lang::Comment]) -> Doc;
+    fn build_trailing_block_doc(&self, comments: &[&tsv_lang::Comment]) -> DocId;
 
     /// Build doc for trailing line comments from a pre-classified slice.
     /// Uses line_suffix to keep comments with preceding element.
-    fn build_trailing_line_doc(&self, comments: &[&tsv_lang::Comment]) -> Doc;
+    fn build_trailing_line_doc(&self, comments: &[&tsv_lang::Comment]) -> DocId;
 
     /// Build doc for leading block comments from a pre-classified slice.
     /// Comments are on their own lines, no surrounding spaces.
-    fn build_leading_block_doc(&self, comments: &[&tsv_lang::Comment]) -> Doc;
+    fn build_leading_block_doc(&self, comments: &[&tsv_lang::Comment]) -> DocId;
 
     /// Build doc for leading line comments from a pre-classified slice.
     /// Emits hardline after each comment.
-    fn build_leading_line_doc(&self, comments: &[&tsv_lang::Comment]) -> Doc;
+    fn build_leading_line_doc(&self, comments: &[&tsv_lang::Comment]) -> DocId;
 
     /// Build line_suffix docs for line comments WITHOUT a trailing boundary.
     ///
     /// Used for inline chain formatting where we want comments to defer to end
     /// of line without being flushed immediately. Unlike `build_trailing_line_doc`,
     /// this doesn't add a `line_suffix_boundary()` at the end.
-    fn build_line_comments_no_boundary(&self, comments: &[&tsv_lang::Comment]) -> Doc;
+    fn build_line_comments_no_boundary(&self, comments: &[&tsv_lang::Comment]) -> DocId;
 
     /// Get the source code string
     fn get_source(&self) -> &str;
@@ -110,7 +113,7 @@ pub trait ChainPrinter: SymbolLookup {
     ///
     /// Used when deciding between args_break and chain_break states.
     /// Performs accurate width measurement via fits() with symbol resolution.
-    fn fits_chain_tail(&self, doc: &Doc, available: usize) -> bool;
+    fn fits_chain_tail(&self, doc: DocId, available: usize) -> bool;
 }
 
 //
@@ -130,7 +133,8 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
     printer: &P,
     expanded: bool,
     skip_comments: bool,
-) -> Doc {
+) -> DocId {
+    let d = printer.arena();
     match node {
         ChainNode::Base { expr, needs_parens } => {
             if *needs_parens {
@@ -148,7 +152,7 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
                     printer.print_call_args(call, *optional)
                 }
             } else {
-                doc::text("()")
+                d.text("()")
             }
         }
 
@@ -227,15 +231,15 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
             );
 
             let inner_with_comments =
-                doc::concat(vec![leading_comments_doc, inner, trailing_comments_doc]);
+                d.concat(&[leading_comments_doc, inner, trailing_comments_doc]);
             let bracket_doc = if *optional {
-                doc::concat(vec![doc::text("?.["), inner_with_comments, doc::text("]")])
+                d.concat(&[d.text("?.["), inner_with_comments, d.text("]")])
             } else {
-                doc::brackets(inner_with_comments)
+                d.brackets(inner_with_comments)
             };
 
             // Emit: pre-bracket line comments, pre-bracket block comments, then brackets
-            doc::concat(vec![
+            d.concat(&[
                 pre_trailing_line,
                 pre_leading_line,
                 pre_bracket_block_doc,
@@ -243,12 +247,12 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
             ])
         }
 
-        ChainNode::NonNull => doc::text("!"),
+        ChainNode::NonNull => d.text("!"),
     }
 }
 
 /// Print a single chain node (normal mode)
-pub(crate) fn print_node<'a, P: ChainPrinter>(node: &ChainNode<'a>, printer: &P) -> Doc {
+pub(crate) fn print_node<'a, P: ChainPrinter>(node: &ChainNode<'a>, printer: &P) -> DocId {
     print_node_inner(node, printer, false, false)
 }
 
@@ -257,7 +261,7 @@ pub(crate) fn print_node<'a, P: ChainPrinter>(node: &ChainNode<'a>, printer: &P)
 //
 
 /// Print a single chain group
-pub(crate) fn print_group<'a, P: ChainPrinter>(group: &ChainGroup<'a>, printer: &P) -> Doc {
+pub(crate) fn print_group<'a, P: ChainPrinter>(group: &ChainGroup<'a>, printer: &P) -> DocId {
     print_group_inner(group, printer, false, false)
 }
 
@@ -265,7 +269,7 @@ pub(crate) fn print_group<'a, P: ChainPrinter>(group: &ChainGroup<'a>, printer: 
 pub(crate) fn print_group_expanded<'a, P: ChainPrinter>(
     group: &ChainGroup<'a>,
     printer: &P,
-) -> Doc {
+) -> DocId {
     print_group_inner(group, printer, true, false)
 }
 
@@ -276,7 +280,7 @@ pub(crate) fn print_group_expanded<'a, P: ChainPrinter>(
 pub(crate) fn print_group_skip_first_comments<'a, P: ChainPrinter>(
     group: &ChainGroup<'a>,
     printer: &P,
-) -> Doc {
+) -> DocId {
     print_group_inner(group, printer, false, true)
 }
 
@@ -284,7 +288,7 @@ pub(crate) fn print_group_skip_first_comments<'a, P: ChainPrinter>(
 pub(crate) fn print_group_expanded_skip_first_comments<'a, P: ChainPrinter>(
     group: &ChainGroup<'a>,
     printer: &P,
-) -> Doc {
+) -> DocId {
     print_group_inner(group, printer, true, true)
 }
 
@@ -294,8 +298,9 @@ fn print_group_inner<'a, P: ChainPrinter>(
     printer: &P,
     expanded: bool,
     skip_first_comments: bool,
-) -> Doc {
-    let docs: Vec<Doc> = group
+) -> DocId {
+    let d = printer.arena();
+    let docs: Vec<DocId> = group
         .nodes
         .iter()
         .enumerate()
@@ -305,7 +310,7 @@ fn print_group_inner<'a, P: ChainPrinter>(
             print_node_inner(n, printer, expanded, skip_comments)
         })
         .collect();
-    doc::concat(docs)
+    d.concat(&docs)
 }
 
 //
@@ -328,14 +333,15 @@ fn print_member_access<P: ChainPrinter>(
     property_start: u32,
     is_private: bool,
     skip_comments: bool,
-) -> Doc {
+) -> DocId {
+    let d = printer.arena();
     // Build member doc without format! allocation - use doc::symbol for deferred resolution
     let prop_id = property.to_u32();
     let member_doc = match (optional, is_private) {
-        (false, false) => doc::concat(vec![doc::text("."), doc::symbol(prop_id)]),
-        (true, false) => doc::concat(vec![doc::text("?."), doc::symbol(prop_id)]),
-        (false, true) => doc::concat(vec![doc::text(".#"), doc::symbol(prop_id)]),
-        (true, true) => doc::concat(vec![doc::text("?.#"), doc::symbol(prop_id)]),
+        (false, false) => d.concat(&[d.text("."), d.symbol(prop_id)]),
+        (true, false) => d.concat(&[d.text("?."), d.symbol(prop_id)]),
+        (false, true) => d.concat(&[d.text(".#"), d.symbol(prop_id)]),
+        (true, true) => d.concat(&[d.text("?.#"), d.symbol(prop_id)]),
     };
 
     if skip_comments {
@@ -359,7 +365,7 @@ fn print_member_access<P: ChainPrinter>(
     // Leading block comments on their own line - emit inline (rare case)
     let leading_block = printer.build_trailing_block_doc(&classified.leading_block);
 
-    doc::concat(vec![
+    d.concat(&[
         trailing_block,
         trailing_line,
         leading_block,
@@ -412,9 +418,10 @@ pub(crate) fn build_chain_line_break<P: ChainPrinter>(
     object_end: u32,
     property_start: u32,
     use_hardline: bool,
-) -> Doc {
+) -> DocId {
+    let d = printer.arena();
     if !use_hardline {
-        return doc::softline();
+        return d.softline();
     }
 
     // Check for blank line preservation (only when no comments - comments handle their own spacing)
@@ -425,8 +432,8 @@ pub(crate) fn build_chain_line_break<P: ChainPrinter>(
 
     if !has_comments && has_blank_line_between_fast(line_breaks, object_end, property_start) {
         // Preserve blank line: literalline (no indent) + hardline (with indent for next content)
-        doc::concat(vec![doc::literalline(), doc::hardline()])
+        d.concat(&[d.literalline(), d.hardline()])
     } else {
-        doc::hardline()
+        d.hardline()
     }
 }

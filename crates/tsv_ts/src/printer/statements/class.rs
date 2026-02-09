@@ -2,7 +2,8 @@
 
 use super::Printer;
 use crate::ast::internal;
-use tsv_lang::{SymbolToU32, comments_in_range, doc};
+use tsv_lang::doc::arena::DocId;
+use tsv_lang::{SymbolToU32, comments_in_range};
 
 impl<'a> Printer<'a> {
     /// Check if class should use "group mode" for heritage clauses
@@ -37,7 +38,8 @@ impl<'a> Printer<'a> {
     ///
     /// Prefix (modifiers, name, type params) is printed imperatively before this.
     /// Body is printed separately after. This doc handles width-aware param wrapping.
-    fn build_method_signature_doc(&self, method: &internal::MethodDefinition) -> doc::Doc {
+    fn build_method_signature_doc(&self, method: &internal::MethodDefinition) -> DocId {
+        let d = self.d();
         let func = &method.value;
 
         // Check if return type will break on its own (object type or multiline).
@@ -148,7 +150,7 @@ impl<'a> Printer<'a> {
 
         if should_group_params {
             // Wrap params in their own group - params break independently from return type
-            parts.push(doc::group(params_doc));
+            parts.push(d.group(params_doc));
         } else {
             // No nested group - outer signature group controls all breaking
             parts.push(params_doc);
@@ -162,15 +164,12 @@ impl<'a> Printer<'a> {
         // Single outer group for entire signature (params + return type).
         // When this group breaks, params' softlines become newlines while return type stays flat.
         // Matches Prettier's printMethodValue structure.
-        doc::group(doc::concat(parts))
+        d.group(d.concat(&parts))
     }
 
     /// Build a Doc for a class declaration
     #[inline]
-    pub(super) fn build_class_declaration_doc(
-        &self,
-        decl: &internal::ClassDeclaration,
-    ) -> doc::Doc {
+    pub(super) fn build_class_declaration_doc(&self, decl: &internal::ClassDeclaration) -> DocId {
         self.build_class_declaration_doc_inner(decl, true)
     }
 
@@ -182,7 +181,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_class_declaration_without_decorators_doc(
         &self,
         decl: &internal::ClassDeclaration,
-    ) -> doc::Doc {
+    ) -> DocId {
         self.build_class_declaration_doc_inner(decl, false)
     }
 
@@ -197,7 +196,8 @@ impl<'a> Printer<'a> {
         &self,
         decl: &internal::ClassDeclaration,
         include_decorators: bool,
-    ) -> doc::Doc {
+    ) -> DocId {
+        let d = self.d();
         let group_mode = self.should_class_group_mode(decl);
         let mut parts = vec![];
 
@@ -210,44 +210,44 @@ impl<'a> Printer<'a> {
 
         // declare modifier
         if decl.declare {
-            parts.push(doc::text("declare "));
+            parts.push(d.text("declare "));
         }
 
         // abstract modifier
         if decl.r#abstract {
-            parts.push(doc::text("abstract "));
+            parts.push(d.text("abstract "));
         }
 
-        parts.push(doc::text("class"));
+        parts.push(d.text("class"));
         if let Some(id) = &decl.id {
-            parts.push(doc::text(" "));
-            parts.push(doc::symbol(id.name.to_u32()));
+            parts.push(d.text(" "));
+            parts.push(d.symbol(id.name.to_u32()));
         }
 
         // Build heritage docs
         let extends_doc = if let Some(super_class) = &decl.super_class {
-            let mut ext_parts = vec![doc::text("extends ")];
-            ext_parts.push(doc::text_owned(self.expression_to_string(super_class)));
+            let mut ext_parts = vec![d.text("extends ")];
+            ext_parts.push(d.text_owned(self.expression_to_string(super_class)));
             if let Some(type_args) = &decl.super_type_parameters {
                 ext_parts.push(self.build_type_arguments_doc(type_args));
             }
-            Some(doc::concat(ext_parts))
+            Some(d.concat(&ext_parts))
         } else {
             None
         };
 
         let implements_doc = if !decl.implements.is_empty() {
-            let mut impl_parts = vec![doc::text("implements ")];
+            let mut impl_parts = vec![d.text("implements ")];
             for (i, heritage) in decl.implements.iter().enumerate() {
                 if i > 0 {
-                    impl_parts.push(doc::text(", "));
+                    impl_parts.push(d.text(", "));
                 }
                 impl_parts.push(self.build_entity_name_doc(&heritage.expression));
                 if let Some(type_args) = &heritage.type_arguments {
                     impl_parts.push(self.build_type_arguments_doc(type_args));
                 }
             }
-            Some(doc::concat(impl_parts))
+            Some(d.concat(&impl_parts))
         } else {
             None
         };
@@ -264,28 +264,28 @@ impl<'a> Printer<'a> {
             // Heritage clauses with line breaks
             let mut heritage_parts = Vec::new();
             if let Some(ext) = extends_doc {
-                heritage_parts.push(doc::line());
+                heritage_parts.push(d.line());
                 heritage_parts.push(ext);
             }
             if let Some(impl_doc) = implements_doc {
-                heritage_parts.push(doc::line());
+                heritage_parts.push(d.line());
                 heritage_parts.push(impl_doc);
             }
             if !heritage_parts.is_empty() {
-                parts.push(doc::indent(doc::concat(heritage_parts)));
+                parts.push(d.indent(d.concat(&heritage_parts)));
             }
 
             // Pre-brace behavior depends on body content:
             // - Empty body: always space (` {}` stays inline)
             // - Non-empty body: line() becomes space if fits, newline if breaks
             if decl.body.body.is_empty() {
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
             } else {
                 // line() at base indent (heritage is indented, brace is at class level)
-                parts.push(doc::line());
+                parts.push(d.line());
             }
 
-            doc::group(doc::concat(parts))
+            d.group(d.concat(&parts))
         } else {
             // Non-group mode: type params break independently, heritage stays inline
             if let Some(type_params) = &decl.type_parameters {
@@ -294,22 +294,22 @@ impl<'a> Printer<'a> {
 
             // Heritage clauses stay inline
             if let Some(ext) = extends_doc {
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
                 parts.push(ext);
             }
             if let Some(impl_doc) = implements_doc {
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
                 parts.push(impl_doc);
             }
 
             // Always space before brace in non-group mode
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
 
-            doc::concat(parts)
+            d.concat(&parts)
         };
 
         // Body is outside the header group (hardlines in body don't affect header fit check)
-        doc::concat(vec![
+        d.concat(&[
             header_doc,
             self.build_class_body_doc(&decl.body, decl.declare),
         ])
@@ -322,7 +322,8 @@ impl<'a> Printer<'a> {
         &self,
         body: &internal::ClassBody,
         _is_ambient: bool,
-    ) -> doc::Doc {
+    ) -> DocId {
+        let d = self.d();
         if body.body.is_empty() {
             return self.build_empty_body_with_comments_doc(body.span);
         }
@@ -359,9 +360,9 @@ impl<'a> Printer<'a> {
                 };
                 if self.has_blank_line_between(prev_end, check_pos) {
                     // Blank line before first comment or member
-                    member_parts.push(doc::literalline());
+                    member_parts.push(d.literalline());
                 }
-                member_parts.push(doc::hardline());
+                member_parts.push(d.hardline());
             }
 
             // Process comments before this member (with blank line preservation)
@@ -386,19 +387,16 @@ impl<'a> Printer<'a> {
         member_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
 
         // Wrap body content in indent
-        doc::concat(vec![
-            doc::text("{"),
-            doc::indent(doc::concat(vec![
-                doc::hardline(),
-                doc::concat(member_parts),
-            ])),
-            doc::hardline(),
-            doc::text("}"),
+        d.concat(&[
+            d.text("{"),
+            d.indent(d.concat(&[d.hardline(), d.concat(&member_parts)])),
+            d.hardline(),
+            d.text("}"),
         ])
     }
 
     /// Build a Doc for a class member
-    fn build_class_member_doc(&self, member: &internal::ClassMember) -> doc::Doc {
+    fn build_class_member_doc(&self, member: &internal::ClassMember) -> DocId {
         match member {
             internal::ClassMember::MethodDefinition(method) => {
                 self.build_method_definition_doc(method)
@@ -412,40 +410,43 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an index signature: `[key: Type]: ValueType;`
-    fn build_index_signature_doc(&self, sig: &internal::TSIndexSignature) -> doc::Doc {
+    fn build_index_signature_doc(&self, sig: &internal::TSIndexSignature) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         if sig.readonly {
-            parts.push(doc::text("readonly "));
+            parts.push(d.text("readonly "));
         }
 
-        parts.push(doc::text("["));
-        parts.push(doc::join(
+        parts.push(d.text("["));
+        parts.push(d.join(
             sig.parameters.iter().map(|p| self.build_identifier_doc(p)),
             ", ",
         ));
-        parts.push(doc::text("]"));
+        parts.push(d.text("]"));
         parts.push(self.build_type_annotation_doc(&sig.type_annotation));
-        parts.push(doc::text(";"));
+        parts.push(d.text(";"));
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for a static initialization block
-    fn build_static_block_doc(&self, block: &internal::StaticBlock) -> doc::Doc {
+    fn build_static_block_doc(&self, block: &internal::StaticBlock) -> DocId {
+        let d = self.d();
         // Create a BlockStatement wrapper to reuse existing doc building logic
         let block_stmt = internal::BlockStatement {
             body: block.body.clone(),
             span: block.span,
         };
-        doc::concat(vec![
-            doc::text("static "),
+        d.concat(&[
+            d.text("static "),
             self.build_block_statement_doc(&block_stmt),
         ])
     }
 
     /// Build a Doc for a property definition
-    fn build_property_definition_doc(&self, prop: &internal::PropertyDefinition) -> doc::Doc {
+    fn build_property_definition_doc(&self, prop: &internal::PropertyDefinition) -> DocId {
+        let d = self.d();
         let mut parts = vec![];
 
         // Decorators
@@ -455,53 +456,53 @@ impl<'a> Printer<'a> {
 
         // Declare modifier (comes first, before accessibility)
         if prop.declare {
-            parts.push(doc::text("declare "));
+            parts.push(d.text("declare "));
         }
 
         // Accessibility modifier
         if let Some(accessibility) = &prop.accessibility {
-            parts.push(doc::text(accessibility.as_str()));
-            parts.push(doc::text(" "));
+            parts.push(d.text(accessibility.as_str()));
+            parts.push(d.text(" "));
         }
 
         // Static modifier
         if prop.is_static {
-            parts.push(doc::text("static "));
+            parts.push(d.text("static "));
         }
 
         // Override modifier
         if prop.r#override {
-            parts.push(doc::text("override "));
+            parts.push(d.text("override "));
         }
 
         // Abstract modifier
         if prop.r#abstract {
-            parts.push(doc::text("abstract "));
+            parts.push(d.text("abstract "));
         }
 
         // Readonly modifier
         if prop.readonly {
-            parts.push(doc::text("readonly "));
+            parts.push(d.text("readonly "));
         }
 
         // Accessor keyword
         if prop.accessor {
-            parts.push(doc::text("accessor "));
+            parts.push(d.text("accessor "));
         }
 
         // Key
         if prop.computed {
-            parts.push(doc::text("["));
+            parts.push(d.text("["));
             parts.push(self.build_expression_doc(&prop.key));
-            parts.push(doc::text("]"));
+            parts.push(d.text("]"));
         } else {
             parts.push(self.build_expression_doc(&prop.key));
         }
 
         // Optional/definite modifier after key
         match prop.modifier {
-            internal::PropertyModifier::Optional => parts.push(doc::text("?")),
-            internal::PropertyModifier::Definite => parts.push(doc::text("!")),
+            internal::PropertyModifier::Optional => parts.push(d.text("?")),
+            internal::PropertyModifier::Definite => parts.push(d.text("!")),
             internal::PropertyModifier::None => {}
         }
 
@@ -512,7 +513,7 @@ impl<'a> Printer<'a> {
 
         // Value if present
         if let Some(value) = &prop.value {
-            parts.push(doc::text(" = "));
+            parts.push(d.text(" = "));
 
             // Check for comments between = and value (e.g., /* @__PURE__ */ annotations)
             // The = comes after the key (and type annotation if present)
@@ -530,13 +531,14 @@ impl<'a> Printer<'a> {
             parts.push(self.build_expression_doc(value));
         }
 
-        parts.push(doc::text(";"));
+        parts.push(d.text(";"));
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for a method definition
-    fn build_method_definition_doc(&self, method: &internal::MethodDefinition) -> doc::Doc {
+    fn build_method_definition_doc(&self, method: &internal::MethodDefinition) -> DocId {
+        let d = self.d();
         let mut parts = vec![];
 
         // Decorators
@@ -546,47 +548,47 @@ impl<'a> Printer<'a> {
 
         // Accessibility modifier
         if let Some(accessibility) = &method.accessibility {
-            parts.push(doc::text(accessibility.as_str()));
-            parts.push(doc::text(" "));
+            parts.push(d.text(accessibility.as_str()));
+            parts.push(d.text(" "));
         }
 
         // Static modifier
         if method.is_static {
-            parts.push(doc::text("static "));
+            parts.push(d.text("static "));
         }
 
         // Override modifier
         if method.r#override {
-            parts.push(doc::text("override "));
+            parts.push(d.text("override "));
         }
 
         // Abstract modifier
         if method.r#abstract {
-            parts.push(doc::text("abstract "));
+            parts.push(d.text("abstract "));
         }
 
         // Async modifier
         if method.value.r#async {
-            parts.push(doc::text("async "));
+            parts.push(d.text("async "));
         }
 
         // Generator marker
         if method.value.generator {
-            parts.push(doc::text("*"));
+            parts.push(d.text("*"));
         }
 
         // Get/set for accessors
         match method.kind {
-            internal::MethodKind::Get => parts.push(doc::text("get ")),
-            internal::MethodKind::Set => parts.push(doc::text("set ")),
+            internal::MethodKind::Get => parts.push(d.text("get ")),
+            internal::MethodKind::Set => parts.push(d.text("set ")),
             _ => {}
         }
 
         // Key
         if method.computed {
-            parts.push(doc::text("["));
+            parts.push(d.text("["));
             parts.push(self.build_expression_doc(&method.key));
-            parts.push(doc::text("]"));
+            parts.push(d.text("]"));
         } else {
             parts.push(self.build_expression_doc(&method.key));
         }
@@ -604,9 +606,9 @@ impl<'a> Printer<'a> {
 
         // For abstract methods or overload signatures, use semicolon instead of body
         if method.r#abstract || is_overload_signature {
-            parts.push(doc::text(";"));
+            parts.push(d.text(";"));
         } else {
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
             // Check for comments between signature and body (outer comments)
             // These need to be moved inside the block body
             let sig_end = if let Some(rt) = &method.value.return_type {
@@ -627,6 +629,6 @@ impl<'a> Printer<'a> {
             );
         }
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 }

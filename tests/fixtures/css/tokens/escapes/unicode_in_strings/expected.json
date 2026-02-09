@@ -45,7 +45,7 @@
 							"start": 17,
 							"end": 46,
 							"property": "content",
-							"value": "'Unicode: \\\\00001F4A9'"
+							"value": "'Unicode: \\0001F4A9'"
 						}
 					]
 				},

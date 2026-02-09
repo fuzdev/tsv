@@ -1,13 +1,13 @@
 use crate::cli::input_parser;
+use crate::deno;
 use crate::error;
-use crate::{deno, subprocess};
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
 use tsv_cli::cli::input::{Input, ParserType};
 use tsv_cli::json_utils::to_json_with_tabs;
 
 /// canonical_parse command - parse using canonical external parsers
-/// (Svelte's official parser, acorn+typescript, or our CSS parser)
+/// (Svelte's official parser, acorn+typescript, or Svelte's parseCss)
 pub struct CanonicalParseCommand;
 
 impl Command for CanonicalParseCommand {
@@ -65,13 +65,8 @@ async fn run(input: &Input, parser_type: ParserType) -> error::Result<String> {
             Ok(format!("{}\n", to_json_with_tabs(&ast)?))
         }
         ParserType::Css => {
-            // CSS uses our Rust parser (no external canonical parser available)
-            parse_css_with_rust(content)
+            let ast = deno::parse_css(content).await?;
+            Ok(format!("{}\n", to_json_with_tabs(&ast)?))
         }
     }
-}
-
-/// Parse CSS using our Rust parser (no external canonical parser available)
-fn parse_css_with_rust(content: &str) -> error::Result<String> {
-    subprocess::run_tsv_parse(content, false)
 }

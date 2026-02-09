@@ -30,7 +30,7 @@ const CANONICAL_PARSERS: Record<Language, string> = {
 const CANONICAL_FORMATTER = 'prettier';
 
 /** Internal parse variants (for measuring JSON overhead) */
-const INTERNAL_PARSE_VARIANTS = ['tsv-internal', 'tsv-wasm-internal'];
+const INTERNAL_PARSE_VARIANTS = ['tsv-internal', 'tsv_wasm-internal'];
 
 /**
  * Stable display order for implementations.
@@ -43,12 +43,12 @@ const DISPLAY_ORDER = [
 	'prettier',
 	// TSV variants
 	'tsv-json',
-	'tsv-wasm-json',
+	'tsv_wasm-json',
 	'tsv',
-	'tsv-wasm',
+	'tsv_wasm',
 	// Internal variants (shown separately)
 	'tsv-internal',
-	'tsv-wasm-internal',
+	'tsv_wasm-internal',
 	// Third-party alternatives (alphabetical)
 	'biome-wasm',
 	'oxc-parser',
@@ -156,7 +156,7 @@ export function generateSummaryReport(
 		// Show internal variants (JSON overhead measurement)
 		for (const internalResult of sortByDisplayOrder(internalResults)) {
 			// Find the corresponding JSON variant
-			const jsonName = internalResult.name.includes('wasm') ? 'tsv-wasm-json' : 'tsv-json';
+			const jsonName = internalResult.name.includes('wasm') ? 'tsv_wasm-json' : 'tsv-json';
 			const jsonResult = results.find((r) => r.name === jsonName);
 
 			if (jsonResult) {
@@ -345,6 +345,188 @@ export function generateCorpusInfo(
 	if (altVersions.length > 0) {
 		lines.push(`  ${altVersions.join(', ')}`);
 	}
+
+	return lines.join('\n');
+}
+
+/** A single comparison row (e.g., "format svelte: 13.6x prettier, 0.92x oxfmt") */
+interface ComparisonRow {
+	operation: 'format' | 'parse';
+	language: Language;
+	/** Comparisons to other implementations, e.g., [{name: "prettier", ratio: 13.6}] */
+	comparisons: { name: string; ratio: number }[];
+}
+
+/** Comparison data for a section (native or wasm) */
+interface ComparisonSection {
+	label: string;
+	rows: ComparisonRow[];
+}
+
+/** Format ratio as "Nx" (other_time / tsv_time) */
+function formatRatio(r: number): string {
+	return r >= 10 ? `${r.toFixed(1)}x` : `${r.toFixed(2)}x`;
+}
+
+/**
+ * Build comparison data from benchmark results.
+ * Extracts ratios for native and wasm sections.
+ */
+function buildComparisonData(
+	allGroupResults: GroupResults[],
+	languages: Language[],
+): ComparisonSection[] {
+	function getMeanNs(groupName: string, taskName: string): number | null {
+		const group = allGroupResults.find((g) => g.name === groupName);
+		if (!group) return null;
+		const result = group.results.find((r) => r.name === taskName);
+		return result?.stats.mean_ns ?? null;
+	}
+
+	function ratio(tsvNs: number, otherNs: number): number {
+		return otherNs / tsvNs;
+	}
+
+	const sections: ComparisonSection[] = [];
+
+	// Native comparisons
+	const nativeRows: ComparisonRow[] = [];
+
+	for (const lang of languages) {
+		const tsvNs = getMeanNs(`format/${lang}`, 'tsv');
+		const prettierNs = getMeanNs(`format/${lang}`, CANONICAL_FORMATTER);
+		if (tsvNs === null || prettierNs === null) continue;
+
+		const comparisons: ComparisonRow['comparisons'] = [
+			{ name: 'prettier', ratio: ratio(tsvNs, prettierNs) },
+		];
+		const oxfmtNs = getMeanNs(`format/${lang}`, 'oxfmt');
+		if (oxfmtNs !== null) comparisons.push({ name: 'oxfmt', ratio: ratio(tsvNs, oxfmtNs) });
+
+		nativeRows.push({ operation: 'format', language: lang, comparisons });
+	}
+
+	for (const lang of languages) {
+		const tsvNs = getMeanNs(`parse/${lang}`, 'tsv-json');
+		const canonicalParseName = CANONICAL_PARSERS[lang];
+		const canonicalNs = getMeanNs(`parse/${lang}`, canonicalParseName);
+		if (tsvNs === null || canonicalNs === null) continue;
+
+		const comparisons: ComparisonRow['comparisons'] = [
+			{ name: 'svelte', ratio: ratio(tsvNs, canonicalNs) },
+		];
+		const oxcNs = getMeanNs(`parse/${lang}`, 'oxc-parser');
+		if (oxcNs !== null) comparisons.push({ name: 'oxc-parser', ratio: ratio(tsvNs, oxcNs) });
+
+		nativeRows.push({ operation: 'parse', language: lang, comparisons });
+	}
+
+	if (nativeRows.length > 0) {
+		sections.push({ label: 'tsv (native)', rows: nativeRows });
+	}
+
+	// WASM comparisons
+	const wasmRows: ComparisonRow[] = [];
+
+	for (const lang of languages) {
+		const tsvWasmNs = getMeanNs(`format/${lang}`, 'tsv_wasm');
+		const prettierNs = getMeanNs(`format/${lang}`, CANONICAL_FORMATTER);
+		if (tsvWasmNs === null || prettierNs === null) continue;
+
+		const comparisons: ComparisonRow['comparisons'] = [
+			{ name: 'prettier', ratio: ratio(tsvWasmNs, prettierNs) },
+		];
+		const biomeNs = getMeanNs(`format/${lang}`, 'biome-wasm');
+		if (biomeNs !== null) {
+			comparisons.push({ name: 'biome-wasm', ratio: ratio(tsvWasmNs, biomeNs) });
+		}
+
+		wasmRows.push({ operation: 'format', language: lang, comparisons });
+	}
+
+	for (const lang of languages) {
+		const tsvWasmNs = getMeanNs(`parse/${lang}`, 'tsv_wasm-json');
+		const canonicalParseName = CANONICAL_PARSERS[lang];
+		const canonicalNs = getMeanNs(`parse/${lang}`, canonicalParseName);
+		if (tsvWasmNs === null || canonicalNs === null) continue;
+
+		wasmRows.push({
+			operation: 'parse',
+			language: lang,
+			comparisons: [{ name: 'svelte', ratio: ratio(tsvWasmNs, canonicalNs) }],
+		});
+	}
+
+	if (wasmRows.length > 0) {
+		sections.push({ label: 'tsv_wasm', rows: wasmRows });
+	}
+
+	return sections;
+}
+
+/**
+ * Generate compact comparison summary (plain text).
+ *
+ * Ratios are other_time/tsv_time: >1 means tsv is faster.
+ * Parse canonical is labeled "svelte" (wraps acorn-typescript for TS).
+ */
+export function generateComparisonSummary(
+	allGroupResults: GroupResults[],
+	languages: Language[],
+): string {
+	const sections = buildComparisonData(allGroupResults, languages);
+	const lines: string[] = [];
+	const labelWidth = 22;
+
+	for (const section of sections) {
+		lines.push('');
+		lines.push('-'.repeat(80));
+		lines.push(`COMPARISONS to ${section.label}:`);
+
+		for (const row of section.rows) {
+			const label = `  ${row.operation.padEnd(7)}${row.language}:`.padEnd(labelWidth);
+			const ratios = row.comparisons
+				.map((c) => `${formatRatio(c.ratio)} ${c.name}`)
+				.join(', ');
+			lines.push(label + ratios);
+		}
+	}
+
+	lines.push('');
+	lines.push('  (parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts)');
+
+	return lines.join('\n');
+}
+
+/**
+ * Generate comparison summary as markdown table.
+ */
+export function generateComparisonMarkdown(
+	allGroupResults: GroupResults[],
+	languages: Language[],
+): string | null {
+	const sections = buildComparisonData(allGroupResults, languages);
+	if (sections.length === 0) return null;
+
+	const lines: string[] = [];
+
+	for (const section of sections) {
+		lines.push(`## Comparisons to ${section.label}\n`);
+		lines.push('| Benchmark | Comparisons |');
+		lines.push('| --- | --- |');
+
+		for (const row of section.rows) {
+			const label = `${row.operation} ${row.language}`;
+			const ratios = row.comparisons
+				.map((c) => `**${formatRatio(c.ratio)}** ${c.name}`)
+				.join(', ');
+			lines.push(`| ${label} | ${ratios} |`);
+		}
+
+		lines.push('');
+	}
+
+	lines.push('_Parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts_');
 
 	return lines.join('\n');
 }

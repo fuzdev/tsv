@@ -5,7 +5,7 @@
 
 use super::super::printing::{ChainPrinter, print_node};
 use super::super::types::{ChainGroup, ChainNode};
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 /// Build doc for member-only chains using fill for greedy packing
 ///
@@ -26,7 +26,8 @@ use tsv_lang::doc::{self, Doc};
 pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
     groups: &[ChainGroup<'a>],
     printer: &P,
-) -> Doc {
+) -> DocId {
+    let d = printer.arena();
     // NOTE: We intentionally do NOT add break_parent for line comments here.
     // The break_parent approach causes issues with line_suffix flushing order -
     // the suffix gets flushed at the wrong line break. Instead, line comments
@@ -37,7 +38,7 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
     let all_nodes: Vec<&ChainNode<'a>> = groups.iter().flat_map(|g| g.nodes.iter()).collect();
 
     if all_nodes.is_empty() {
-        return doc::empty();
+        return d.empty();
     }
 
     // Note: We intentionally do NOT check for blank lines here.
@@ -62,15 +63,15 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
     }
 
     // Build first_doc from base + any trailing non-null assertions
-    let first_doc_nodes: Vec<Doc> = all_nodes
+    let first_doc_nodes: Vec<DocId> = all_nodes
         .iter()
         .take(first_doc_end)
         .map(|n| print_node(n, printer))
         .collect();
     let first_doc = if first_doc_nodes.is_empty() {
-        doc::empty()
+        d.empty()
     } else {
-        doc::concat(first_doc_nodes)
+        d.concat(&first_doc_nodes)
     };
 
     // If no remaining nodes after first_doc, just return it
@@ -93,15 +94,15 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
     // Each segment includes everything up to and including a member (+ trailing non-null)
     // Note: Block comments are handled by print_node for member nodes
     let remaining_nodes = &all_nodes[first_doc_end..];
-    let mut segments: Vec<Doc> = Vec::new();
-    let mut current_segment: Vec<Doc> = Vec::new();
+    let mut segments: Vec<DocId> = Vec::new();
+    let mut current_segment: Vec<DocId> = Vec::new();
     let mut seen_member = false;
 
     for (i, node) in remaining_nodes.iter().enumerate() {
         // Check if this is a member and we already have content that includes a member
         // If so, flush before adding this member
         if node.is_member() && seen_member {
-            segments.push(doc::concat(std::mem::take(&mut current_segment)));
+            segments.push(d.concat(&std::mem::take(&mut current_segment)));
             seen_member = false;
         }
 
@@ -114,7 +115,7 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
 
         // If this is the last node, flush
         if i == remaining_nodes.len() - 1 && !current_segment.is_empty() {
-            segments.push(doc::concat(std::mem::take(&mut current_segment)));
+            segments.push(d.concat(&std::mem::take(&mut current_segment)));
         }
     }
 
@@ -128,7 +129,7 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
         let Some(segment) = segments.pop() else {
             return first_doc;
         };
-        return doc::concat(vec![first_doc, segment]);
+        return d.concat(&[first_doc, segment]);
     }
 
     // For 2+ segments: use conditional_group for proper break decisions
@@ -146,30 +147,30 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
     // Note: on_line does NOT need trailing_reserve because fits_with_lookahead
     // already sees trailing content (comma, etc.) in rest_commands with the
     // correct mode (Break → "," is counted).
-    let mut on_line_parts = vec![first_doc.clone()];
-    for segment in &segments {
-        on_line_parts.push(segment.clone());
+    let mut on_line_parts = vec![first_doc];
+    for &segment in &segments {
+        on_line_parts.push(segment);
     }
-    let on_line = doc::concat(on_line_parts);
+    let on_line = d.concat(&on_line_parts);
 
     // Build fill_parts with softlines between segments
     let mut fill_parts = Vec::new();
-    for segment in &segments {
+    for &segment in &segments {
         if !fill_parts.is_empty() {
-            fill_parts.push(doc::softline());
+            fill_parts.push(d.softline());
         }
-        fill_parts.push(segment.clone());
+        fill_parts.push(segment);
     }
 
     // Build fill with segments - this packs greedily at the current position.
     // Note: The fill now uses rest_commands for width calculation, so we don't
     // need to set a trailing_reserve here. The fill will see the actual trailing
     // content in the document tree.
-    let fill_doc = doc::fill(fill_parts);
+    let fill_doc = d.fill(&fill_parts);
 
     // Use conditional_group with on_line (flat) and expanded (fill-based) variants.
     // The fill packs greedily, respecting print width including trailing content.
-    let expanded = doc::concat(vec![first_doc, doc::indent(fill_doc)]);
+    let expanded = d.concat(&[first_doc, d.indent(fill_doc)]);
 
-    doc::conditional_group(vec![on_line, expanded])
+    d.conditional_group(&[on_line, expanded])
 }

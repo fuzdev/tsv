@@ -11,7 +11,7 @@
 use super::Printer;
 use crate::ast::internal::{self, LiteralValue};
 use tsv_lang::SymbolToU32;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::{StringFormatOptions, format_string_literal};
 
 /// Format a string literal from the AST to its printed form.
@@ -102,34 +102,36 @@ pub fn sort_regex_flags(flags: &str) -> String {
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a literal
-    pub(in crate::printer) fn build_literal_doc(&self, literal: &internal::Literal) -> Doc {
+    pub(in crate::printer) fn build_literal_doc(&self, literal: &internal::Literal) -> DocId {
+        let d = self.d();
         match &literal.value {
             LiteralValue::Number(_) => {
                 // Extract raw literal and normalize it
                 let raw = literal.span.extract(self.source);
-                doc::text_owned(normalize_number_literal(raw))
+                d.text_owned(normalize_number_literal(raw))
             }
             LiteralValue::String { .. } => {
-                doc::text_owned(format_string_literal_from_ast(literal, self.source))
+                d.text_owned(format_string_literal_from_ast(literal, self.source))
             }
             LiteralValue::BigInt(_) => {
                 // Extract raw literal and normalize it (lowercases hex digits)
                 let raw = literal.span.extract(self.source);
-                doc::text_owned(normalize_number_literal(raw))
+                d.text_owned(normalize_number_literal(raw))
             }
-            LiteralValue::Boolean(b) => doc::text(if *b { "true" } else { "false" }),
-            LiteralValue::Null => doc::text("null"),
-            LiteralValue::Undefined => doc::text("undefined"),
+            LiteralValue::Boolean(b) => d.text(if *b { "true" } else { "false" }),
+            LiteralValue::Null => d.text("null"),
+            LiteralValue::Undefined => d.text("undefined"),
         }
     }
 
     /// Build a Doc for a private identifier
-    pub(super) fn build_private_identifier_doc(&self, pid: &internal::PrivateIdentifier) -> Doc {
-        doc::concat(vec![doc::text("#"), doc::symbol(pid.name.to_u32())])
+    pub(super) fn build_private_identifier_doc(&self, pid: &internal::PrivateIdentifier) -> DocId {
+        let d = self.d();
+        d.concat(&[d.text("#"), d.symbol(pid.name.to_u32())])
     }
 
     /// Build a Doc for an identifier
-    pub(in crate::printer) fn build_identifier_doc(&self, id: &internal::Identifier) -> Doc {
+    pub(in crate::printer) fn build_identifier_doc(&self, id: &internal::Identifier) -> DocId {
         self.build_identifier_doc_inner(id, false)
     }
 
@@ -140,29 +142,30 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_identifier_doc_with_wrapping_type(
         &self,
         id: &internal::Identifier,
-    ) -> Doc {
+    ) -> DocId {
         self.build_identifier_doc_inner(id, true)
     }
 
     /// Inner implementation for identifier doc building.
-    fn build_identifier_doc_inner(&self, id: &internal::Identifier, wrap_type_args: bool) -> Doc {
+    fn build_identifier_doc_inner(&self, id: &internal::Identifier, wrap_type_args: bool) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         // Handle decorators (for parameter decorators)
         if let Some(decorators) = &id.decorators {
             for decorator in decorators {
-                parts.push(doc::text("@"));
+                parts.push(d.text("@"));
                 parts.push(self.build_expression_doc(&decorator.expression));
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
             }
         }
 
         // Add identifier name
-        parts.push(doc::symbol(id.name.to_u32()));
+        parts.push(d.symbol(id.name.to_u32()));
 
         // Handle optional marker (e.g., `a?` in `function fn(a?: number) {}`)
         if id.optional {
-            parts.push(doc::text("?"));
+            parts.push(d.text("?"));
         }
 
         // Handle type annotations
@@ -175,16 +178,17 @@ impl<'a> Printer<'a> {
         }
 
         // Optimize for common case: single part (just the name)
-        match &parts[..] {
-            [single] => single.clone(),
-            _ => doc::concat(parts),
+        if parts.len() == 1 {
+            parts[0]
+        } else {
+            d.concat(&parts)
         }
     }
 
     /// Build a Doc for a regex literal
     /// Flags are sorted alphabetically to match prettier's output.
-    pub(super) fn build_regex_doc(&self, regex: &internal::RegexLiteral) -> Doc {
-        doc::text_owned(format!(
+    pub(super) fn build_regex_doc(&self, regex: &internal::RegexLiteral) -> DocId {
+        self.d().text_owned(format!(
             "/{}/{}",
             regex.pattern,
             sort_regex_flags(&regex.flags)
@@ -192,7 +196,8 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a spread element
-    pub(in crate::printer) fn build_spread_doc(&self, spread: &internal::SpreadElement) -> Doc {
+    pub(in crate::printer) fn build_spread_doc(&self, spread: &internal::SpreadElement) -> DocId {
+        let d = self.d();
         let needs_parens =
             super::needs_parens(&spread.argument, super::ParenContext::SpreadArgument);
         let arg_doc = self.build_expression_doc(&spread.argument);
@@ -207,13 +212,13 @@ impl<'a> Printer<'a> {
 
         if needs_parens {
             match comment_doc {
-                Some(c) => doc::concat(vec![doc::text("...("), c, arg_doc, doc::text(")")]),
-                None => doc::concat(vec![doc::text("...("), arg_doc, doc::text(")")]),
+                Some(c) => d.concat(&[d.text("...("), c, arg_doc, d.text(")")]),
+                None => d.concat(&[d.text("...("), arg_doc, d.text(")")]),
             }
         } else {
             match comment_doc {
-                Some(c) => doc::concat(vec![doc::text("..."), c, arg_doc]),
-                None => doc::concat(vec![doc::text("..."), arg_doc]),
+                Some(c) => d.concat(&[d.text("..."), c, arg_doc]),
+                None => d.concat(&[d.text("..."), arg_doc]),
             }
         }
     }

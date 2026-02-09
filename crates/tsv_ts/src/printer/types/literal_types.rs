@@ -9,11 +9,12 @@
 
 use super::Printer;
 use crate::ast::internal::{TSLiteralType, TSType, TemplateLiteralType};
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a literal type
-    pub(super) fn build_literal_type_doc(&self, lit: &TSLiteralType) -> Doc {
+    pub(super) fn build_literal_type_doc(&self, lit: &TSLiteralType) -> DocId {
+        let d = self.d();
         match lit {
             TSLiteralType::TemplateLiteral(template) => {
                 self.build_template_literal_type_doc(template)
@@ -23,9 +24,9 @@ impl<'a> Printer<'a> {
             TSLiteralType::BigInt(literal) => self.build_literal_doc(literal),
             TSLiteralType::UnaryExpression(unary) => {
                 // For negative number types like `-1`
-                let op = doc::text(unary.operator.as_str());
+                let op = d.text(unary.operator.as_str());
                 let arg = self.build_expression_doc(&unary.argument);
-                doc::concat(vec![op, arg])
+                d.concat(&[op, arg])
             }
         }
     }
@@ -40,12 +41,13 @@ impl<'a> Printer<'a> {
     /// would exceed print width in flat mode, then break all of those. This ensures consistent
     /// formatting - types that would exceed at their original positions break, even if earlier
     /// breaks would have given them more room.
-    pub(super) fn build_template_literal_type_doc(&self, template: &TemplateLiteralType) -> Doc {
+    pub(super) fn build_template_literal_type_doc(&self, template: &TemplateLiteralType) -> DocId {
+        let d = self.d();
         let print_width = self.config.print_width;
 
         // First pass: analyze types and determine which exceed print width at their flat positions
         // Store as (doc, flat_str, is_conditional, exceeds_width)
-        let mut type_data: Vec<(Doc, String, bool, bool)> =
+        let mut type_data: Vec<(DocId, String, bool, bool)> =
             Vec::with_capacity(template.types.len());
         let mut pos: usize = 1; // Start after backtick
 
@@ -55,7 +57,7 @@ impl<'a> Printer<'a> {
                 let t = &template.types[i];
                 let is_conditional = matches!(t, TSType::Conditional(_));
                 let type_doc = self.build_type_doc(t);
-                let flat_str = self.render_doc_flat(&type_doc);
+                let flat_str = self.render_arena_doc_flat(type_doc);
 
                 // Position includes: current pos + "${" (2) + type + "}" (1)
                 let interp_end = pos + 2 + flat_str.len() + 1;
@@ -67,11 +69,11 @@ impl<'a> Printer<'a> {
         }
 
         // Second pass: build doc with breaking decisions already made
-        let mut parts = vec![doc::text("`")];
+        let mut parts = vec![d.text("`")];
         let mut type_iter = type_data.into_iter();
 
         for quasi in &template.quasis {
-            parts.push(doc::text_owned(quasi.raw.clone()));
+            parts.push(d.text_owned(quasi.raw.clone()));
             if let Some((type_doc, flat_str, is_conditional, exceeds_width)) = type_iter.next() {
                 // Use relative indent() for positioning within the current context.
                 // The template is already at some indent level (e.g., after = break in type alias).
@@ -79,35 +81,26 @@ impl<'a> Printer<'a> {
                 let interp_doc = if is_conditional {
                     // Conditional types: wrap in group - breaks happen at ?/: operators
                     // Don't add extra indent - conditional type's own formatting handles branch indentation
-                    doc::concat(vec![doc::text("${"), doc::group(type_doc), doc::text("}")])
+                    d.concat(&[d.text("${"), d.group(type_doc), d.text("}")])
                 } else if exceeds_width {
                     // Exceeds print width at flat position - always break
-                    doc::concat(vec![
-                        doc::text("${"),
-                        doc::indent(doc::concat(vec![doc::hardline(), type_doc])),
-                        doc::hardline(),
-                        doc::text("}"),
+                    d.concat(&[
+                        d.text("${"),
+                        d.indent(d.concat(&[d.hardline(), type_doc])),
+                        d.hardline(),
+                        d.text("}"),
                     ])
                 } else {
                     // Short enough - try flat first, break if doesn't fit at actual position
-                    doc::conditional_group(vec![
-                        doc::concat(vec![
-                            doc::text("${"),
-                            doc::text_owned(flat_str),
-                            doc::text("}"),
-                        ]),
-                        doc::concat(vec![
-                            doc::text("${"),
-                            doc::indent_line(type_doc),
-                            doc::line(),
-                            doc::text("}"),
-                        ]),
+                    d.conditional_group(&[
+                        d.concat(&[d.text("${"), d.text_owned(flat_str), d.text("}")]),
+                        d.concat(&[d.text("${"), d.indent_line(type_doc), d.line(), d.text("}")]),
                     ])
                 };
                 parts.push(interp_doc);
             }
         }
-        parts.push(doc::text("`"));
-        doc::concat(parts)
+        parts.push(d.text("`"));
+        d.concat(&parts)
     }
 }

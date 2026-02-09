@@ -2,7 +2,7 @@
 name = "tsv_wasm"
 version.workspace = true
 edition.workspace = true
-description = "TypeScript and Svelte tools - WebAssembly bindings"
+description = "formatter and parser for TypeScript, Svelte, and CSS"
 license.workspace = true
 repository.workspace = true
 

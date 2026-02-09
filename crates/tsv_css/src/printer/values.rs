@@ -16,7 +16,8 @@
 
 use super::{Printer, has_wrappable_args, source_fidelity};
 use crate::ast::internal::CssValue;
-use tsv_lang::{Span, doc};
+use tsv_lang::Span;
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Format a CSS value
@@ -24,7 +25,7 @@ impl<'a> Printer<'a> {
     /// Uses the doc builder which handles source fidelity and proper formatting.
     pub(super) fn print_css_value(&mut self, value: &CssValue) {
         let doc = self.build_css_value_doc(value);
-        self.write_doc(&doc);
+        self.write_arena_doc(doc);
     }
 
     /// Format a nested value (function arg, list item)
@@ -44,7 +45,7 @@ impl<'a> Printer<'a> {
     /// Main entry point for value formatting. Dispatches to specialized doc
     /// builders for each value type. Handles source fidelity by extracting
     /// from source where appropriate.
-    pub(super) fn build_css_value_doc(&self, value: &CssValue) -> doc::Doc {
+    pub(super) fn build_css_value_doc(&self, value: &CssValue) -> DocId {
         match value {
             CssValue::Identifier { name, span } => self.build_identifier_doc(name, *span),
             CssValue::String {
@@ -66,7 +67,8 @@ impl<'a> Printer<'a> {
     ///
     /// Uses source extraction to preserve escapes, with whitespace normalization
     /// for parenthesized expressions (like calc sub-expressions).
-    fn build_identifier_doc(&self, name: &str, span: Span) -> doc::Doc {
+    fn build_identifier_doc(&self, name: &str, span: Span) -> DocId {
+        let d = self.d();
         // Try source extraction first to preserve any escapes
         if span.end_usize() <= self.source.len() {
             let raw = span.extract(self.source);
@@ -74,40 +76,40 @@ impl<'a> Printer<'a> {
                 // Normalize whitespace for parenthesized expressions
                 // (e.g., "(  100%  -  40px  )" → "(100% - 40px)")
                 let normalized = source_fidelity::normalize_css_whitespace(raw);
-                return doc::text_owned(normalized);
+                return d.text_owned(normalized);
             }
         }
         // Fallback: semantic formatting
         let formatted = source_fidelity::format_identifier_value(name);
-        doc::text_owned(formatted)
+        d.text_owned(formatted)
     }
 
     /// Build a doc for a string value
     ///
     /// Always uses semantic formatting to normalize quotes (double → single).
     /// Prettier prefers single quotes in CSS strings for consistency.
-    fn build_string_doc(&self, content: &str, quote: char, _span: Span) -> doc::Doc {
+    fn build_string_doc(&self, content: &str, quote: char, _span: Span) -> DocId {
         // Use semantic formatting which normalizes quotes (prefers single quotes)
         let formatted = source_fidelity::format_string_value(content, quote);
-        doc::text_owned(formatted)
+        self.d().text_owned(formatted)
     }
 
     /// Build a doc for a dimension value (number + unit)
     ///
     /// Normalizes trailing zeros and adds leading zeros, preserving source
     /// characteristics like leading zeros and signs.
-    fn build_dimension_doc(&self, span: Span) -> doc::Doc {
+    fn build_dimension_doc(&self, span: Span) -> DocId {
         let raw = span.extract(self.source);
         let normalized = source_fidelity::normalize_dimension_from_source(raw);
-        doc::text_owned(normalized)
+        self.d().text_owned(normalized)
     }
 
     /// Build a doc for a color value
     ///
     /// Preserves color syntax (hex, rgb, hsl, etc.) from source.
-    fn build_color_doc(&self, color: &crate::ast::internal::Color, span: Span) -> doc::Doc {
+    fn build_color_doc(&self, color: &crate::ast::internal::Color, span: Span) -> DocId {
         let formatted = source_fidelity::format_color_from_source(color, self.source, span);
-        doc::text_owned(formatted)
+        self.d().text_owned(formatted)
     }
 
     /// Build a doc for a function value with automatic wrapping
@@ -118,11 +120,12 @@ impl<'a> Printer<'a> {
     /// - Multi-arg functions: wrap each arg on its own line when exceeds width
     /// - Single-arg List (e.g., drop-shadow): wrap on space separators
     /// - Single-arg non-List (e.g., url): never wraps
-    fn build_value_function_doc(&self, name: &str, args: &[CssValue], span: Span) -> doc::Doc {
+    fn build_value_function_doc(&self, name: &str, args: &[CssValue], span: Span) -> DocId {
+        let d = self.d();
         // For functions with no parsed args (like supports()), extract from source
         if args.is_empty() && span.end_usize() <= self.source.len() {
             let raw = span.extract(self.source);
-            return doc::text_owned(raw.to_string());
+            return d.text_owned(raw.to_string());
         }
 
         // WORKAROUND: url() data URIs contain commas that our parser incorrectly treats as
@@ -130,22 +133,20 @@ impl<'a> Printer<'a> {
         // url() also never wraps since it has no natural break points.
         let is_url = name == "url";
         if is_url {
-            return doc::concat(vec![
-                doc::text_owned(name.to_string()),
-                doc::text("("),
-                doc::join(args.iter().map(|arg| self.build_css_value_doc(arg)), ","),
-                doc::text(")"),
-            ]);
+            let name_doc = d.text_owned(name.to_string());
+            let open = d.text("(");
+            let args_doc = d.join(args.iter().map(|arg| self.build_css_value_doc(arg)), ",");
+            let close = d.text(")");
+            return d.concat(&[name_doc, open, args_doc, close]);
         }
 
         if !has_wrappable_args(args) {
             // Single simple arg - inline only, no break points
-            return doc::concat(vec![
-                doc::text_owned(name.to_string()),
-                doc::text("("),
-                doc::join(args.iter().map(|arg| self.build_css_value_doc(arg)), ", "),
-                doc::text(")"),
-            ]);
+            let name_doc = d.text_owned(name.to_string());
+            let open = d.text("(");
+            let args_doc = d.join(args.iter().map(|arg| self.build_css_value_doc(arg)), ", ");
+            let close = d.text(")");
+            return d.concat(&[name_doc, open, args_doc, close]);
         }
 
         // Build with group/softline structure for automatic wrapping
@@ -159,30 +160,31 @@ impl<'a> Printer<'a> {
         for (i, arg) in args.iter().enumerate() {
             inner_parts.push(self.build_css_value_doc(arg));
             if i < args.len() - 1 {
-                inner_parts.push(doc::text(","));
-                inner_parts.push(doc::line()); // space when flat, newline when broken
+                inner_parts.push(d.text(","));
+                inner_parts.push(d.line()); // space when flat, newline when broken
             }
         }
 
-        doc::group(doc::concat(vec![
-            doc::text_owned(name.to_string()),
-            doc::text("("),
-            doc::indent(doc::concat(vec![
-                doc::softline(), // nothing when flat, newline when broken
-                doc::concat(inner_parts),
-            ])),
-            doc::softline(), // nothing when flat, newline when broken
-            doc::text(")"),
-        ]))
+        let name_doc = d.text_owned(name.to_string());
+        let open = d.text("(");
+        let softline1 = d.softline(); // nothing when flat, newline when broken
+        let inner = d.concat(&inner_parts);
+        let indent_content = d.concat(&[softline1, inner]);
+        let indented = d.indent(indent_content);
+        let softline2 = d.softline(); // nothing when flat, newline when broken
+        let close = d.text(")");
+        d.group(d.concat(&[name_doc, open, indented, softline2, close]))
     }
 
     /// Build a doc for space-separated values
-    fn build_space_separated_doc(&self, values: &[CssValue]) -> doc::Doc {
-        doc::join(values.iter().map(|v| self.build_css_value_doc(v)), " ")
+    fn build_space_separated_doc(&self, values: &[CssValue]) -> DocId {
+        self.d()
+            .join(values.iter().map(|v| self.build_css_value_doc(v)), " ")
     }
 
     /// Build a doc for comma-separated values
-    fn build_comma_separated_doc(&self, values: &[CssValue]) -> doc::Doc {
-        doc::join(values.iter().map(|v| self.build_css_value_doc(v)), ", ")
+    fn build_comma_separated_doc(&self, values: &[CssValue]) -> DocId {
+        self.d()
+            .join(values.iter().map(|v| self.build_css_value_doc(v)), ", ")
     }
 }

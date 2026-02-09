@@ -9,7 +9,7 @@ use crate::ast::internal::Expression;
 use super::super::printing::{ChainPrinter, print_group, print_node};
 use super::super::types::{ChainGroup, ChainNode};
 use super::helpers::build_chain_break_doc;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 /// Check if chain starts with "(complex)!" pattern that needs chain-preferring breaks
 ///
@@ -65,7 +65,8 @@ pub(super) fn is_parenthesized_non_null_head(groups: &[ChainGroup]) -> bool {
 pub(super) fn build_parenthesized_non_null_chain_doc<'a, P: ChainPrinter>(
     groups: &[ChainGroup<'a>],
     printer: &P,
-) -> Doc {
+) -> DocId {
+    let d = printer.arena();
     // Check if base is await/yield - these use simple parens and no chain breaking
     let is_await_yield = matches!(
         groups[0].nodes.first(),
@@ -80,14 +81,14 @@ pub(super) fn build_parenthesized_non_null_chain_doc<'a, P: ChainPrinter>(
             unreachable!()
         };
         let inner_doc = printer.print_expression(expr);
-        let parens_doc = doc::parens(inner_doc);
+        let parens_doc = d.parens(inner_doc);
 
         // Build the full first group: (expr)! + any trailing nodes (members, etc.)
         let mut parts = vec![parens_doc];
         for node in groups[0].nodes.iter().skip(1) {
             parts.push(print_node(node, printer));
         }
-        doc::concat(parts)
+        d.concat(&parts)
     } else {
         print_group(&groups[0], printer)
     };
@@ -97,28 +98,26 @@ pub(super) fn build_parenthesized_non_null_chain_doc<'a, P: ChainPrinter>(
     }
 
     // Rest: .method().prop etc
-    let rest_docs: Vec<Doc> = groups[1..]
+    let rest_docs: Vec<DocId> = groups[1..]
         .iter()
         .map(|g| print_group(g, printer))
         .collect();
 
     // oneLine: everything concatenated flat
-    let on_line = doc::concat(
-        std::iter::once(first_group_doc.clone())
-            .chain(rest_docs.clone())
-            .collect(),
-    );
+    let mut on_line_parts = vec![first_group_doc];
+    on_line_parts.extend(rest_docs.iter().copied());
+    let on_line = d.concat(&on_line_parts);
 
     // If the first group will break internally (e.g., binary || expression),
     // just use group(oneLine) and let the inner expression break naturally.
     // For expressions that don't break internally, use conditionalGroup to
     // prefer chain breaks over inner group breaks.
-    if doc::will_break(&first_group_doc) {
-        return doc::group(on_line);
+    if d.will_break(first_group_doc) {
+        return d.group(on_line);
     }
 
     // expanded: chain breaks after !, keeping inner expression flat
-    let expanded = build_chain_break_doc(first_group_doc, &rest_docs);
+    let expanded = build_chain_break_doc(first_group_doc, &rest_docs, printer);
 
-    doc::conditional_group(vec![on_line, expanded])
+    d.conditional_group(&[on_line, expanded])
 }

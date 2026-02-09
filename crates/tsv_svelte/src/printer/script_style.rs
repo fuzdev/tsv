@@ -44,7 +44,8 @@ impl<'a> Printer<'a> {
         // Template indent fallback (when source has no whitespace) is handled separately
         // in the TypeScript printer with a hardcoded default of 1 for Svelte context.
         let config = tsv_lang::PrintConfig::default();
-        let script_doc = tsv_ts::build_program_doc(&script.content, self.source(), config);
+        let script_doc_id =
+            tsv_ts::build_program_doc(self.d(), &script.content, self.source(), config);
 
         // Render with indent
         // The Doc system naturally handles template literals: text() newlines are NOT indented
@@ -53,12 +54,9 @@ impl<'a> Printer<'a> {
         //
         // start_column = tab_width (2) to account for the initial indent we'll add
         // start_indent_level = 1 to account for the Svelte wrapper indent
-        // Convert Doc to arena then render for better performance
-        let arena = doc::arena::DocArena::with_source_size_hint(256);
-        let script_doc_id = arena.convert_doc(&script_doc);
         let interner = script.content.interner.borrow();
         let output = doc::arena_print_doc_with_indent_resolved(
-            &arena,
+            self.d(),
             script_doc_id,
             &config,
             config.tab_width, // start column = 1 tab's visual width

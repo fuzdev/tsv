@@ -51,7 +51,7 @@
 							"start": 288,
 							"end": 304,
 							"property": "content",
-							"value": "'e\\\\3301'"
+							"value": "'e\\301'"
 						}
 					]
 				},
@@ -104,7 +104,7 @@
 							"start": 331,
 							"end": 347,
 							"property": "content",
-							"value": "'a\\\\3300'"
+							"value": "'a\\300'"
 						}
 					]
 				},
@@ -157,7 +157,7 @@
 							"start": 374,
 							"end": 390,
 							"property": "content",
-							"value": "'n\\\\3303'"
+							"value": "'n\\303'"
 						}
 					]
 				},
@@ -210,7 +210,7 @@
 							"start": 417,
 							"end": 433,
 							"property": "content",
-							"value": "'c\\\\3327'"
+							"value": "'c\\327'"
 						}
 					]
 				},
@@ -411,7 +411,7 @@
 				},
 				"end": {
 					"line": 6,
-					"column": 0
+					"column": 9
 				}
 			},
 			"body": [

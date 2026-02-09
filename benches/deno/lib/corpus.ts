@@ -5,12 +5,12 @@
  * The default implementation loads from ~/dev/ repos.
  */
 
-import { walk } from '@std/fs/walk';
-import { basename, extname } from '@std/path';
+import {walk} from '@std/fs/walk';
+import {basename, extname} from '@std/path';
 
-import type { CorpusStats, Language, Logger, SourceFile } from './types.ts';
+import type {CorpusStats, Language, Logger, SourceFile} from './types.ts';
 
-export type { Logger };
+export type {Logger};
 
 /**
  * Interface for loading benchmark corpus from different sources.
@@ -31,7 +31,7 @@ export interface CorpusLoader {
 	 * @param logger Optional logger for progress output
 	 * @returns Loaded files and statistics
 	 */
-	load(logger?: Logger): Promise<{ files: SourceFile[]; stats: CorpusStats }>;
+	load(logger?: Logger): Promise<{files: SourceFile[]; stats: CorpusStats}>;
 }
 
 //
@@ -85,9 +85,9 @@ export function computeStats(files: SourceFile[], source: string): CorpusStats {
 		totalFiles: files.length,
 		totalBytes: files.reduce((sum, f) => sum + f.bytes, 0),
 		byLanguage: {
-			svelte: { files: 0, bytes: 0 },
-			typescript: { files: 0, bytes: 0 },
-			css: { files: 0, bytes: 0 },
+			svelte: {files: 0, bytes: 0},
+			typescript: {files: 0, bytes: 0},
+			css: {files: 0, bytes: 0},
 		},
 		repos: [source],
 	};
@@ -186,8 +186,8 @@ export class DevReposLoader implements CorpusLoader {
 		};
 	}
 
-	async load(logger: Logger = console.log): Promise<{ files: SourceFile[]; stats: CorpusStats }> {
-		const { baseDir, repos, srcDir, extensions, exclusions } = this.#options;
+	async load(logger: Logger = console.log): Promise<{files: SourceFile[]; stats: CorpusStats}> {
+		const {baseDir, repos, srcDir, extensions, exclusions} = this.#options;
 
 		logger(`Loading ${repos.length} repos from ${baseDir}`);
 
@@ -217,7 +217,7 @@ export class DevReposLoader implements CorpusLoader {
 		stats.repos = loadedRepos;
 		logStats(stats, logger);
 
-		return { files: allFiles, stats };
+		return {files: allFiles, stats};
 	}
 
 	async #loadDirectory(
@@ -227,7 +227,7 @@ export class DevReposLoader implements CorpusLoader {
 	): Promise<SourceFile[]> {
 		const files: SourceFile[] = [];
 
-		for await (const entry of walk(dirPath, { exts: extensions, includeDirs: false })) {
+		for await (const entry of walk(dirPath, {exts: extensions, includeDirs: false})) {
 			if (shouldExclude(entry.path, exclusions)) continue;
 
 			const language = detectLanguage(entry.path);
@@ -284,8 +284,8 @@ export class DirectoryLoader implements CorpusLoader {
 		};
 	}
 
-	async load(logger: Logger = console.log): Promise<{ files: SourceFile[]; stats: CorpusStats }> {
-		const { path, extensions, exclusions, recursive } = this.#options;
+	async load(logger: Logger = console.log): Promise<{files: SourceFile[]; stats: CorpusStats}> {
+		const {path, extensions, exclusions, recursive} = this.#options;
 
 		logger(`Loading from ${path}`);
 
@@ -298,7 +298,7 @@ export class DirectoryLoader implements CorpusLoader {
 		}
 
 		if (recursive) {
-			for await (const entry of walk(path, { exts: extensions, includeDirs: false })) {
+			for await (const entry of walk(path, {exts: extensions, includeDirs: false})) {
 				if (shouldExclude(entry.path, exclusions)) continue;
 
 				const language = detectLanguage(entry.path);
@@ -348,6 +348,6 @@ export class DirectoryLoader implements CorpusLoader {
 		const stats = computeStats(files, path);
 		logStats(stats, logger);
 
-		return { files, stats };
+		return {files, stats};
 	}
 }

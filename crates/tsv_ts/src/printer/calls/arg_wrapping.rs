@@ -10,7 +10,7 @@ use super::arg_comments::{
     find_comma_pos, is_inline_block_after_comma, is_inline_block_before_comma,
 };
 use crate::ast::internal;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::{DocArena, DocId};
 
 /// Build an inline arrow function signature without break points.
 ///
@@ -20,25 +20,28 @@ use tsv_lang::doc::{self, Doc};
 pub(super) fn build_arrow_inline_signature(
     printer: &Printer,
     arrow: &internal::ArrowFunctionExpression,
-) -> Doc {
+) -> DocId {
+    let d = printer.d();
     let mut sig_parts = Vec::new();
     if arrow.r#async {
-        sig_parts.push(doc::text("async "));
+        sig_parts.push(d.text("async "));
     }
     if arrow.params.is_empty() {
-        sig_parts.push(doc::text("()"));
+        sig_parts.push(d.text("()"));
     } else {
-        sig_parts.push(doc::text("("));
-        sig_parts.push(doc::join(
-            arrow
-                .params
-                .iter()
-                .map(|p| printer.build_function_parameter_doc(p)),
-            ", ",
-        ));
-        sig_parts.push(doc::text(")"));
+        sig_parts.push(d.text("("));
+        sig_parts.push(
+            d.join(
+                arrow
+                    .params
+                    .iter()
+                    .map(|p| printer.build_function_parameter_doc(p)),
+                ", ",
+            ),
+        );
+        sig_parts.push(d.text(")"));
     }
-    doc::concat(sig_parts)
+    d.concat(&sig_parts)
 }
 
 /// Break style for call expression wrapping
@@ -58,23 +61,23 @@ pub(super) enum CallBreakStyle {
 /// that if the callee contains hardlines (e.g., multiline array), they don't
 /// force the arguments to break. The args make their own flat/break decision.
 #[inline]
-fn wrap_call(callee: Doc, args: Doc, style: CallBreakStyle) -> Doc {
+fn wrap_call(d: &DocArena, callee: DocId, args: DocId, style: CallBreakStyle) -> DocId {
     match style {
-        CallBreakStyle::Soft => doc::concat(vec![
+        CallBreakStyle::Soft => d.concat(&[
             callee,
-            doc::group(doc::concat(vec![
-                doc::text("("),
-                doc::indent_softline(doc::concat(vec![args, doc::trailing_comma()])),
-                doc::softline(),
-                doc::text(")"),
+            d.group(d.concat(&[
+                d.text("("),
+                d.indent_softline(d.concat(&[args, d.trailing_comma()])),
+                d.softline(),
+                d.text(")"),
             ])),
         ]),
-        CallBreakStyle::Hard => doc::concat(vec![
+        CallBreakStyle::Hard => d.concat(&[
             callee,
-            doc::text("("),
-            doc::indent(doc::concat(vec![doc::hardline(), args, doc::text(",")])),
-            doc::hardline(),
-            doc::text(")"),
+            d.text("("),
+            d.indent(d.concat(&[d.hardline(), args, d.text(",")])),
+            d.hardline(),
+            d.text(")"),
         ]),
     }
 }
@@ -82,15 +85,15 @@ fn wrap_call(callee: Doc, args: Doc, style: CallBreakStyle) -> Doc {
 /// Wrap arguments in a groupable call expression: `callee(args)`
 /// Uses soft breaks so the call can collapse to a single line if it fits
 #[inline]
-pub(crate) fn wrap_call_with_soft_breaks(callee: Doc, args: Doc) -> Doc {
-    wrap_call(callee, args, CallBreakStyle::Soft)
+pub(crate) fn wrap_call_with_soft_breaks(d: &DocArena, callee: DocId, args: DocId) -> DocId {
+    wrap_call(d, callee, args, CallBreakStyle::Soft)
 }
 
 /// Wrap arguments in an expanded call expression: `callee(\n\targs,\n)`
 /// Uses hard breaks to force multi-line layout
 #[inline]
-pub(crate) fn wrap_call_with_hard_breaks(callee: Doc, args: Doc) -> Doc {
-    wrap_call(callee, args, CallBreakStyle::Hard)
+pub(crate) fn wrap_call_with_hard_breaks(d: &DocArena, callee: DocId, args: DocId) -> DocId {
+    wrap_call(d, callee, args, CallBreakStyle::Hard)
 }
 
 /// Check if a single argument needs soft-break wrapping (not huggable)
@@ -212,12 +215,12 @@ fn classify_expression_body(expr: &internal::Expression) -> ChainArgKind {
 /// Used in chain context where the callee is handled separately.
 /// Structure: `prefix + softline + args + trailing_comma + softline + ")"`
 #[inline]
-pub(super) fn wrap_args_with_soft_breaks(prefix: &'static str, args: Doc) -> Doc {
-    doc::group(doc::concat(vec![
-        doc::text(prefix),
-        doc::indent_softline(doc::concat(vec![args, doc::trailing_comma()])),
-        doc::softline(),
-        doc::text(")"),
+pub(super) fn wrap_args_with_soft_breaks(d: &DocArena, prefix: &'static str, args: DocId) -> DocId {
+    d.group(d.concat(&[
+        d.text(prefix),
+        d.indent_softline(d.concat(&[args, d.trailing_comma()])),
+        d.softline(),
+        d.text(")"),
     ]))
 }
 
@@ -228,12 +231,12 @@ pub(super) fn wrap_args_with_soft_breaks(prefix: &'static str, args: Doc) -> Doc
 /// that should hug the opening paren but still get proper trailing comma handling.
 /// Structure: `prefix + arg + if_break(",\n") + ")"`
 #[inline]
-pub(super) fn wrap_huggable_arg(prefix: &'static str, arg: Doc) -> Doc {
-    doc::group(doc::concat(vec![
-        doc::text(prefix),
+pub(super) fn wrap_huggable_arg(d: &DocArena, prefix: &'static str, arg: DocId) -> DocId {
+    d.group(d.concat(&[
+        d.text(prefix),
         arg,
-        doc::if_break(doc::concat(vec![doc::text(","), doc::line()]), doc::empty()),
-        doc::text(")"),
+        d.if_break(d.concat(&[d.text(","), d.line()]), d.empty()),
+        d.text(")"),
     ]))
 }
 
@@ -247,7 +250,8 @@ pub(super) fn wrap_huggable_arg(prefix: &'static str, arg: Doc) -> Doc {
 pub(crate) fn build_args_split_last(
     arguments: &[internal::Expression],
     printer: &Printer,
-) -> (Vec<Doc>, Doc, Doc) {
+) -> (Vec<DocId>, DocId, DocId) {
+    let d = printer.d();
     // Build all args (using build_huggable_expression_doc for proper parens on assignments
     // and isolated_group wrapping for templates)
     let arg_docs: Vec<_> = arguments
@@ -259,7 +263,7 @@ pub(crate) fn build_args_split_last(
     // Comments are placed relative to the comma based on their source position
     let mut head_parts = Vec::new();
     for (i, doc) in arg_docs.iter().take(arg_docs.len() - 1).enumerate() {
-        head_parts.push(doc.clone());
+        head_parts.push(*doc);
 
         let arg_end = arguments[i].span().end;
         let next_arg_start = arguments[i + 1].span().start;
@@ -269,32 +273,32 @@ pub(crate) fn build_args_split_last(
         if let Some(cpos) = comma_pos {
             for comment in tsv_lang::comments_in_range(printer.comments, arg_end, next_arg_start) {
                 if is_inline_block_before_comma(comment, cpos, printer.line_breaks, arg_end) {
-                    head_parts.push(doc::text(" "));
+                    head_parts.push(d.text(" "));
                     head_parts.push(printer.build_comment_doc(comment));
                 }
             }
         }
 
-        head_parts.push(doc::text(", "));
+        head_parts.push(d.text(", "));
 
         if let Some(cpos) = comma_pos {
             for comment in tsv_lang::comments_in_range(printer.comments, arg_end, next_arg_start) {
                 if is_inline_block_after_comma(comment, cpos, printer.line_breaks, arg_end) {
                     head_parts.push(printer.build_comment_doc(comment));
-                    head_parts.push(doc::text(" "));
+                    head_parts.push(d.text(" "));
                 }
             }
         }
     }
-    let last_arg_doc = arg_docs[arg_docs.len() - 1].clone();
+    let last_arg_doc = arg_docs[arg_docs.len() - 1];
 
     // Build all_args_broken with inline block comments (same comma-aware logic)
     let mut all_args_parts = Vec::new();
     for (i, doc) in arg_docs.iter().enumerate() {
         if i > 0 {
-            all_args_parts.push(doc::comma_line());
+            all_args_parts.push(d.comma_line());
         }
-        all_args_parts.push(doc.clone());
+        all_args_parts.push(*doc);
 
         // Add trailing inline block comments (except after last arg)
         if i < arguments.len() - 1 {
@@ -308,14 +312,14 @@ pub(crate) fn build_args_split_last(
                     tsv_lang::comments_in_range(printer.comments, arg_end, next_arg_start)
                 {
                     if is_inline_block_before_comma(comment, cpos, printer.line_breaks, arg_end) {
-                        all_args_parts.push(doc::text(" "));
+                        all_args_parts.push(d.text(" "));
                         all_args_parts.push(printer.build_comment_doc(comment));
                     }
                 }
             }
         }
     }
-    let all_args_broken = doc::concat(all_args_parts);
+    let all_args_broken = d.concat(&all_args_parts);
 
     (head_parts, last_arg_doc, all_args_broken)
 }
@@ -324,17 +328,13 @@ pub(crate) fn build_args_split_last(
 ///
 /// Used when all arguments must be expanded to separate lines.
 #[inline]
-pub(super) fn build_expand_all_args(callee: Doc, all_args_broken: Doc) -> Doc {
-    doc::concat(vec![
+pub(super) fn build_expand_all_args(d: &DocArena, callee: DocId, all_args_broken: DocId) -> DocId {
+    d.concat(&[
         callee,
-        doc::text("("),
-        doc::indent(doc::concat(vec![
-            doc::line(),
-            all_args_broken,
-            doc::text(","),
-        ])),
-        doc::line(),
-        doc::text(")"),
+        d.text("("),
+        d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
+        d.line(),
+        d.text(")"),
     ])
 }
 
@@ -342,13 +342,18 @@ pub(super) fn build_expand_all_args(callee: Doc, all_args_broken: Doc) -> Doc {
 ///
 /// Used as the first state in conditional groups where we try to fit everything inline.
 #[inline]
-pub(super) fn build_inline_args(callee: Doc, head_parts: Vec<Doc>, last_arg_doc: Doc) -> Doc {
-    doc::concat(vec![
+pub(super) fn build_inline_args(
+    d: &DocArena,
+    callee: DocId,
+    head_parts: Vec<DocId>,
+    last_arg_doc: DocId,
+) -> DocId {
+    d.concat(&[
         callee,
-        doc::text("("),
-        doc::concat(head_parts),
+        d.text("("),
+        d.concat(&head_parts),
         last_arg_doc,
-        doc::text(")"),
+        d.text(")"),
     ])
 }
 
@@ -364,14 +369,15 @@ pub(super) fn build_inline_args(callee: Doc, head_parts: Vec<Doc>, last_arg_doc:
 /// rather than break_parent(). This keeps the break local to the array/object group,
 /// allowing state 1 to work when head args fit inline and only the last arg needs to break.
 pub(super) fn build_inline_or_expand_all(
-    callee: Doc,
-    head_parts: Vec<Doc>,
-    last_arg_doc: Doc,
-    all_args_broken: Doc,
-) -> Doc {
-    doc::conditional_group(vec![
-        build_inline_args(callee.clone(), head_parts, last_arg_doc),
-        build_expand_all_args(callee, all_args_broken),
+    d: &DocArena,
+    callee: DocId,
+    head_parts: Vec<DocId>,
+    last_arg_doc: DocId,
+    all_args_broken: DocId,
+) -> DocId {
+    d.conditional_group(&[
+        build_inline_args(d, callee, head_parts, last_arg_doc),
+        build_expand_all_args(d, callee, all_args_broken),
     ])
 }
 
@@ -389,28 +395,24 @@ pub(super) fn build_inline_or_expand_all(
 /// - `body_doc`: The arrow body expression doc
 #[inline]
 pub(super) fn build_arrow_call_body_states(
-    callee: Doc,
-    arrow_doc: Doc,
-    inline_sig: Doc,
-    body_doc: Doc,
-) -> Doc {
-    doc::conditional_group(vec![
+    d: &DocArena,
+    callee: DocId,
+    arrow_doc: DocId,
+    inline_sig: DocId,
+    body_doc: DocId,
+) -> DocId {
+    d.conditional_group(&[
         // Flat: callee((params) => body)
-        doc::concat(vec![
-            callee.clone(),
-            doc::text("("),
-            arrow_doc,
-            doc::text(")"),
-        ]),
+        d.concat(&[callee, d.text("("), arrow_doc, d.text(")")]),
         // Break: callee((params) =>\n  body,\n)
-        doc::concat(vec![
+        d.concat(&[
             callee,
-            doc::text("("),
+            d.text("("),
             inline_sig,
-            doc::text(" =>"),
-            doc::indent(doc::concat(vec![doc::hardline(), body_doc, doc::text(",")])),
-            doc::hardline(),
-            doc::text(")"),
+            d.text(" =>"),
+            d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+            d.hardline(),
+            d.text(")"),
         ]),
     ])
 }

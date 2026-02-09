@@ -15,8 +15,10 @@
  * CLI options:
  *   --json              Output results as JSON
  *   --markdown          Output results as Markdown
- *   --save-baseline     Save results as baseline for regression detection
+ *   --save-baseline     Also save results as baseline for regression detection
  *   --compare-baseline  Compare against saved baseline
+ *
+ * Results are always saved to benches/deno/results/<timestamp>_<commit>.{json,md}.
  *
  * Environment variables:
  *   BENCH_LIMIT         Limit files per language (default: all)
@@ -30,6 +32,8 @@ declare global {
 	var gc: (() => void) | undefined;
 }
 
+import { z } from 'zod';
+import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.js';
 import { Benchmark } from '@fuzdev/fuz_util/benchmark.js';
 import { benchmark_format_markdown } from '@fuzdev/fuz_util/benchmark_format.js';
 import { DevReposLoader, groupByLanguage } from './lib/corpus.ts';
@@ -41,23 +45,61 @@ import {
 	initImplementations,
 } from './lib/implementations.ts';
 import {
+	generateComparisonMarkdown,
+	generateComparisonSummary,
 	generateCorpusInfo,
 	generateEffectiveCorpusReport,
 	generateSkippedFilesReport,
 	generateSummaryReport,
 	type GroupResults,
 } from './lib/report.ts';
+import {
+	type BinarySize,
+	collectBinarySizes,
+	generateBinarySizeMarkdown,
+	generateBinarySizeReport,
+} from './lib/binary_sizes.ts';
 import type { Language, SourceFile } from './lib/types.ts';
 
 //
 // CLI Arguments
 //
 
+const Args_schema = z.strictObject({
+	_: z.array(z.string()).default([]),
+	json: z.boolean().default(false),
+	markdown: z.boolean().default(false),
+	'save-baseline': z.boolean().default(false),
+	'compare-baseline': z.boolean().default(false),
+});
+
+// Strip leading -- from deno task passthrough
+const raw_argv = Deno.args[0] === '--' ? Deno.args.slice(1) : Deno.args;
+const parsed_argv = argv_parse(raw_argv);
+const parsed = args_parse(parsed_argv, Args_schema);
+
+if (!parsed.success) {
+	const known = Object.keys(Args_schema.shape)
+		.filter((k) => k !== '_')
+		.map((k) => `--${k}`);
+	console.error(
+		'Invalid arguments:',
+		parsed.error.issues.map((i: { message: string }) => i.message).join(', '),
+	);
+	console.error(`Known flags: ${known.join(', ')}`);
+	Deno.exit(1);
+}
+
+if (parsed.data._.length > 0) {
+	console.error(`Unexpected positional arguments: ${parsed.data._.join(', ')}`);
+	Deno.exit(1);
+}
+
 const args = {
-	json: Deno.args.includes('--json'),
-	markdown: Deno.args.includes('--markdown'),
-	saveBaseline: Deno.args.includes('--save-baseline'),
-	compareBaseline: Deno.args.includes('--compare-baseline'),
+	json: parsed.data.json,
+	markdown: parsed.data.markdown,
+	saveBaseline: parsed.data['save-baseline'],
+	compareBaseline: parsed.data['compare-baseline'],
 };
 
 // In JSON/markdown mode, progress goes to stderr so stdout is clean structured output
@@ -100,7 +142,10 @@ const MAX_ERROR_MESSAGE_LENGTH = 200;
 const LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
 
 /** Baseline file path */
-const BASELINE_PATH = 'benches/deno/baseline.json';
+const BASELINE_PATH = './benches/deno/baseline.json';
+
+/** Results directory for comparison JSON files */
+const RESULTS_DIR = './benches/deno/results';
 
 //
 // Setup
@@ -395,9 +440,28 @@ interface BaselineEntry {
 	group: string;
 	mean_ns: number;
 	p50_ns: number;
+	p75_ns: number;
+	p90_ns: number;
+	p95_ns: number;
+	p99_ns: number;
+	min_ns: number;
+	max_ns: number;
 	std_dev_ns: number;
+	cv: number;
 	ops_per_second: number;
 	sample_size: number;
+}
+
+/** Package versions used in the benchmark run */
+interface BaselineVersions {
+	svelte: string;
+	acorn: string;
+	acornTs: string;
+	prettier: string;
+	prettierSvelte: string;
+	oxcParser?: string;
+	oxfmt?: string;
+	biome?: string;
 }
 
 interface Baseline {
@@ -409,7 +473,17 @@ interface Baseline {
 		typescript: number;
 		css: number;
 	};
+	versions: BaselineVersions;
+	binary_sizes: BinarySize[];
 	entries: BaselineEntry[];
+}
+
+interface BaselineComparison {
+	name: string;
+	group: string;
+	ratio: number;
+	baseline: number;
+	current: number;
 }
 
 /** Get current git commit hash */
@@ -430,45 +504,144 @@ async function getGitCommit(): Promise<string | null> {
 	return null;
 }
 
-/** Save current results as baseline */
-async function saveBaseline(): Promise<void> {
+/** Build results data from current benchmark run */
+async function buildResultsData(
+	groups: GroupResults[],
+	corpus: { svelte: number; typescript: number; css: number },
+	versions: BaselineVersions,
+	binarySizes: BinarySize[],
+): Promise<Baseline> {
 	const entries: BaselineEntry[] = [];
-	for (const group of allGroupResults) {
+	for (const group of groups) {
 		for (const result of group.results) {
 			entries.push({
 				name: result.name,
 				group: group.name,
 				mean_ns: result.stats.mean_ns,
 				p50_ns: result.stats.p50_ns,
+				p75_ns: result.stats.p75_ns,
+				p90_ns: result.stats.p90_ns,
+				p95_ns: result.stats.p95_ns,
+				p99_ns: result.stats.p99_ns,
+				min_ns: result.stats.min_ns,
+				max_ns: result.stats.max_ns,
 				std_dev_ns: result.stats.std_dev_ns,
+				cv: result.stats.cv,
 				ops_per_second: result.stats.ops_per_second,
 				sample_size: result.stats.sample_size,
 			});
 		}
 	}
 
-	const baseline: Baseline = {
-		version: 1,
+	return {
+		version: 2,
 		timestamp: new Date().toISOString(),
 		git_commit: await getGitCommit(),
-		corpus: {
-			svelte: svelteFiles.length,
-			typescript: tsFiles.length,
-			css: cssFiles.length,
-		},
+		corpus,
+		versions,
+		binary_sizes: binarySizes,
 		entries,
 	};
+}
 
-	await Deno.writeTextFile(BASELINE_PATH, JSON.stringify(baseline, null, '\t'));
-	log(`\nBaseline saved to ${BASELINE_PATH}`);
+/** Generate a full markdown report from benchmark data */
+function generateMarkdownReport(
+	groups: GroupResults[],
+	binarySizes: BinarySize[],
+	corpus: { svelte: number; typescript: number; css: number },
+	versions: BaselineVersions,
+	timestamp: string,
+	gitCommit: string | null,
+): string {
+	const lines: string[] = [];
+	lines.push('# TSV Benchmark Results\n');
+	const commitStr = gitCommit ? ` (${gitCommit})` : '';
+	lines.push(`**Date:** ${timestamp}${commitStr}\n`);
+	lines.push(
+		`**Corpus:** ${corpus.svelte} Svelte, ${corpus.typescript} TypeScript, ${corpus.css} CSS files\n`,
+	);
+
+	// Versions
+	const versionParts = [
+		`svelte@${versions.svelte}`,
+		`acorn@${versions.acorn}`,
+		`acorn-typescript@${versions.acornTs}`,
+		`prettier@${versions.prettier}`,
+		`prettier-plugin-svelte@${versions.prettierSvelte}`,
+	];
+	if (versions.oxcParser) versionParts.push(`oxc-parser@${versions.oxcParser}`);
+	if (versions.oxfmt) versionParts.push(`oxfmt@${versions.oxfmt}`);
+	if (versions.biome) versionParts.push(`@biomejs/wasm-bundler@${versions.biome}`);
+	lines.push(`**Versions:** ${versionParts.join(', ')}\n`);
+
+	for (const group of groups) {
+		if (group.results.length === 0) continue;
+		lines.push(`## ${group.name}\n`);
+		lines.push(benchmark_format_markdown(group.results));
+		lines.push('');
+	}
+
+	const binarySizeMarkdown = generateBinarySizeMarkdown(binarySizes);
+	if (binarySizeMarkdown) {
+		lines.push(binarySizeMarkdown);
+		lines.push('');
+	}
+
+	const comparisonMarkdown = generateComparisonMarkdown(groups, LANGUAGES);
+	if (comparisonMarkdown) {
+		lines.push(comparisonMarkdown);
+		lines.push('');
+	}
+
+	return lines.join('\n');
+}
+
+/** Save results to the results directory (always called) */
+async function saveResults(
+	data: Baseline,
+	groups: GroupResults[],
+	binarySizes: BinarySize[],
+): Promise<string> {
+	await Deno.mkdir(RESULTS_DIR, { recursive: true });
+	const timestamp = data.timestamp.replace(/[:.]/g, '-').slice(0, 19);
+	const commit = data.git_commit ?? 'unknown';
+	const basePath = `${RESULTS_DIR}/${timestamp}_${commit}`;
+
+	const markdown = generateMarkdownReport(
+		groups,
+		binarySizes,
+		data.corpus,
+		data.versions,
+		data.timestamp,
+		data.git_commit,
+	);
+
+	await Promise.all([
+		Deno.writeTextFile(`${basePath}.json`, JSON.stringify(data, null, '\t')),
+		Deno.writeTextFile(`${basePath}.md`, markdown),
+	]);
+
+	return basePath;
+}
+
+/** Save current results as baseline */
+async function saveBaseline(data: Baseline): Promise<void> {
+	await Deno.writeTextFile(BASELINE_PATH, JSON.stringify(data, null, '\t'));
+	log(`Baseline saved to ${BASELINE_PATH}`);
 }
 
 /** Load and compare against baseline */
-async function compareBaseline(): Promise<void> {
+async function compareBaseline(current: Baseline): Promise<void> {
 	let baseline: Baseline;
 	try {
 		const content = await Deno.readTextFile(BASELINE_PATH);
-		baseline = JSON.parse(content);
+		const parsed = JSON.parse(content);
+		// Backward compat: v1 baselines don't have binary_sizes or versions
+		baseline = {
+			...parsed,
+			binary_sizes: parsed.binary_sizes ?? [],
+			versions: parsed.versions ?? {},
+		};
 	} catch {
 		console.error(`\nNo baseline found at ${BASELINE_PATH}. Run with --save-baseline first.`);
 		return;
@@ -483,67 +656,59 @@ async function compareBaseline(): Promise<void> {
 	}
 
 	// Check corpus size match
-	const corpusMatch = baseline.corpus.svelte === svelteFiles.length &&
-		baseline.corpus.typescript === tsFiles.length &&
-		baseline.corpus.css === cssFiles.length;
+	const corpusMatch = baseline.corpus.svelte === current.corpus.svelte &&
+		baseline.corpus.typescript === current.corpus.typescript &&
+		baseline.corpus.css === current.corpus.css;
 
 	if (!corpusMatch) {
 		log(`\n⚠️  Corpus size differs from baseline:`);
 		log(
 			`   Baseline: svelte=${baseline.corpus.svelte}, ts=${baseline.corpus.typescript}, css=${baseline.corpus.css}`,
 		);
-		log(`   Current:  svelte=${svelteFiles.length}, ts=${tsFiles.length}, css=${cssFiles.length}`);
+		log(
+			`   Current:  svelte=${current.corpus.svelte}, ts=${current.corpus.typescript}, css=${current.corpus.css}`,
+		);
 	}
 
-	// Build lookup map
+	// Build lookup maps
 	const baselineMap = new Map<string, BaselineEntry>();
 	for (const entry of baseline.entries) {
 		baselineMap.set(`${entry.group}/${entry.name}`, entry);
 	}
 
+	const currentMap = new Map<string, BaselineEntry>();
+	for (const entry of current.entries) {
+		currentMap.set(`${entry.group}/${entry.name}`, entry);
+	}
+
 	// Compare results
-	const regressions: Array<{
-		name: string;
-		group: string;
-		ratio: number;
-		baseline: number;
-		current: number;
-	}> = [];
-	const improvements: Array<{
-		name: string;
-		group: string;
-		ratio: number;
-		baseline: number;
-		current: number;
-	}> = [];
+	const regressions: BaselineComparison[] = [];
+	const improvements: BaselineComparison[] = [];
 
-	for (const group of allGroupResults) {
-		for (const result of group.results) {
-			const key = `${group.name}/${result.name}`;
-			const baselineEntry = baselineMap.get(key);
-			if (!baselineEntry) continue;
+	for (const [key, baselineEntry] of baselineMap) {
+		const currentEntry = currentMap.get(key);
+		if (!currentEntry) continue;
 
-			const ratio = result.stats.ops_per_second / baselineEntry.ops_per_second;
+		const ratio = currentEntry.ops_per_second / baselineEntry.ops_per_second;
 
-			if (ratio < 0.95) {
-				// More than 5% slower
-				regressions.push({
-					name: result.name,
-					group: group.name,
-					ratio,
-					baseline: baselineEntry.ops_per_second,
-					current: result.stats.ops_per_second,
-				});
-			} else if (ratio > 1.05) {
-				// More than 5% faster
-				improvements.push({
-					name: result.name,
-					group: group.name,
-					ratio,
-					baseline: baselineEntry.ops_per_second,
-					current: result.stats.ops_per_second,
-				});
-			}
+		if (ratio < 0.95) {
+			// More than 5% slower
+			regressions.push({
+				name: currentEntry.name,
+				group: currentEntry.group,
+				ratio,
+				baseline: baselineEntry.ops_per_second,
+				current: currentEntry.ops_per_second,
+			});
+		} else if (ratio > 1.05) {
+			// More than 5% faster
+			improvements.push({
+				name: currentEntry.name,
+				group: currentEntry.group,
+				ratio,
+				baseline: baselineEntry.ops_per_second,
+				current: currentEntry.ops_per_second,
+			});
 		}
 	}
 
@@ -584,56 +749,55 @@ async function compareBaseline(): Promise<void> {
 // Output
 //
 
-if (args.json) {
-	// JSON output
-	const output = {
-		timestamp: new Date().toISOString(),
-		corpus: {
-			svelte: svelteFiles.length,
-			typescript: tsFiles.length,
-			css: cssFiles.length,
-		},
-		groups: allGroupResults.map((g) => ({
-			name: g.name,
-			results: g.results.map((r) => ({
-				name: r.name,
-				stats: r.stats,
-			})),
-		})),
-	};
-	console.log(JSON.stringify(output, null, '\t'));
-} else if (args.markdown) {
-	// Markdown output using fuz_util's formatter
-	console.log('# TSV Benchmark Results\n');
-	console.log(`**Date:** ${new Date().toISOString()}\n`);
-	console.log(
-		`**Corpus:** ${svelteFiles.length} Svelte, ${tsFiles.length} TypeScript, ${cssFiles.length} CSS files\n`,
-	);
+// Collect binary sizes once (used by all output paths)
+const binarySizes = await collectBinarySizes(impls.versions, {
+	hasNative: !!impls.native,
+	hasWasm: !!impls.wasm,
+	hasOxc: !!impls.oxc,
+	hasBiome: !!impls.biome,
+});
 
-	for (const group of allGroupResults) {
-		if (group.results.length === 0) continue;
-		console.log(`## ${group.name}\n`);
-		console.log(benchmark_format_markdown(group.results));
-		console.log('');
-	}
+// Build results data (used by all output paths and always saved)
+const corpus = {
+	svelte: svelteFiles.length,
+	typescript: tsFiles.length,
+	css: cssFiles.length,
+};
+const altVersions = getAlternativeVersions(impls);
+const v = impls.versions.canonical;
+const versions: BaselineVersions = {
+	svelte: v.svelte,
+	acorn: v.acorn,
+	acornTs: v['@sveltejs/acorn-typescript'],
+	prettier: v.prettier,
+	prettierSvelte: v['prettier-plugin-svelte'],
+	...altVersions,
+};
+const resultsData = await buildResultsData(allGroupResults, corpus, versions, binarySizes);
+
+if (args.json) {
+	// JSON output (same structure as saved results)
+	console.log(JSON.stringify(resultsData, null, '\t'));
+} else if (args.markdown) {
+	console.log(
+		generateMarkdownReport(
+			allGroupResults,
+			binarySizes,
+			corpus,
+			versions,
+			resultsData.timestamp,
+			resultsData.git_commit,
+		),
+	);
 } else {
 	// Standard text output
 	console.log(generateSummaryReport(allGroupResults, LANGUAGES));
 
-	const altVersions = getAlternativeVersions(impls);
-	const v = impls.versions.canonical;
 	console.log(
 		generateCorpusInfo(
-			{ svelte: svelteFiles.length, typescript: tsFiles.length, css: cssFiles.length },
+			corpus,
 			isLimited ? totalFileCounts : undefined,
-			{
-				svelte: v.svelte,
-				acorn: v.acorn,
-				acornTs: v['@sveltejs/acorn-typescript'],
-				prettier: v.prettier,
-				prettierSvelte: v['prettier-plugin-svelte'],
-				...altVersions,
-			},
+			versions,
 		),
 	);
 
@@ -647,14 +811,26 @@ if (args.json) {
 		console.log(skippedReport);
 	}
 
+	const binarySizeReport = generateBinarySizeReport(binarySizes);
+	if (binarySizeReport) {
+		console.log(binarySizeReport);
+	}
+
+	// Compact comparison summary
+	console.log(generateComparisonSummary(allGroupResults, LANGUAGES));
+
 	console.log('\n' + '='.repeat(80));
 }
 
+// Always save results (JSON + Markdown)
+const resultsPath = await saveResults(resultsData, allGroupResults, binarySizes);
+log(`\nResults saved to ${resultsPath}.json and ${resultsPath}.md`);
+
 // Handle baseline operations
 if (args.saveBaseline) {
-	await saveBaseline();
+	await saveBaseline(resultsData);
 }
 
 if (args.compareBaseline) {
-	await compareBaseline();
+	await compareBaseline(resultsData);
 }

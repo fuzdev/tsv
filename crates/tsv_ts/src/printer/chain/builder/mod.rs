@@ -35,7 +35,7 @@ use super::printing::{ChainPrinter, print_group, print_group_expanded};
 use super::types::{ChainGroup, ChainNode};
 use crate::ast::internal::{ArrowFunctionBody, Expression};
 use crate::printer::utils::contains_call_expression;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 /// Cutoff for short chains when groups should NOT be merged
 const SHORT_CHAIN_CUTOFF: usize = 2;
@@ -50,7 +50,7 @@ const SHORT_CHAIN_CUTOFF_MERGED: usize = 3;
 fn build_rest_expanded_docs<'a, P: ChainPrinter>(
     rest_groups: &[ChainGroup<'a>],
     printer: &P,
-) -> Vec<Doc> {
+) -> Vec<DocId> {
     rest_groups
         .iter()
         .map(|g| print_group_expanded(g, printer))
@@ -58,7 +58,10 @@ fn build_rest_expanded_docs<'a, P: ChainPrinter>(
 }
 
 /// Build flat docs for groups
-fn build_groups_flat_docs<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> Vec<Doc> {
+fn build_groups_flat_docs<'a, P: ChainPrinter>(
+    groups: &[ChainGroup<'a>],
+    printer: &P,
+) -> Vec<DocId> {
     groups.iter().map(|g| print_group(g, printer)).collect()
 }
 
@@ -70,10 +73,11 @@ fn call_has_breaking_single_arg<P: ChainPrinter>(
     if call.arguments.len() != 1 {
         return false;
     }
+    let d = printer.arena();
     match &call.arguments[0] {
         Expression::ObjectExpression(_) | Expression::ArrayExpression(_) => {
             let arg_doc = printer.print_expression(&call.arguments[0]);
-            doc::will_break(&arg_doc)
+            d.will_break(arg_doc)
         }
         // Arrow with type annotations and breaking object/array body
         Expression::ArrowFunctionExpression(arrow)
@@ -88,7 +92,7 @@ fn call_has_breaking_single_arg<P: ChainPrinter>(
                 )
             {
                 let body_doc = printer.print_expression(body);
-                doc::will_break(&body_doc)
+                d.will_break(body_doc)
             } else {
                 false
             }
@@ -105,9 +109,10 @@ fn call_has_breaking_single_arg<P: ChainPrinter>(
 /// - Short chains (≤cutoff groups): simple group with softlines
 /// - Longer chains: conditionalGroup([oneLine, expanded])
 /// - 3+ calls with complex args: force expanded (no width-based decision)
-pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> Doc {
+pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> DocId {
+    let d = printer.arena();
     if groups.is_empty() {
-        return doc::empty();
+        return d.empty();
     }
 
     // Single group: just print it
@@ -224,12 +229,13 @@ fn should_force_chain_expand<'a, P: ChainPrinter>(
 fn build_short_chain_doc<'a, P: ChainPrinter>(
     first_groups: &[ChainGroup<'a>],
     rest_groups: &[ChainGroup<'a>],
-    first_doc: Doc,
+    first_doc: DocId,
     should_merge: bool,
     printer: &P,
-) -> Doc {
+) -> DocId {
+    let d = printer.arena();
     if rest_groups.is_empty() {
-        return doc::group(first_doc);
+        return d.group(first_doc);
     }
 
     // Check if first groups contain calls with multiple args that might need expansion
@@ -243,15 +249,13 @@ fn build_short_chain_doc<'a, P: ChainPrinter>(
 
     // For short chains, prettier just concatenates groups directly WITHOUT softlines.
     // This ensures hardlines inside groups don't cause breaks between groups.
-    let rest_docs: Vec<Doc> = rest_groups
+    let rest_docs: Vec<DocId> = rest_groups
         .iter()
         .map(|g| print_group(g, printer))
         .collect();
-    let on_line = doc::concat(
-        std::iter::once(first_doc.clone())
-            .chain(rest_docs.clone())
-            .collect(),
-    );
+    let mut on_line_parts = vec![first_doc];
+    on_line_parts.extend(rest_docs.iter().copied());
+    let on_line = d.concat(&on_line_parts);
 
     // Check if first groups contain any calls (regardless of arg count)
     let first_has_calls = first_groups
@@ -278,18 +282,16 @@ fn build_short_chain_doc<'a, P: ChainPrinter>(
     // first groups' call args over breaking the chain.
     if first_has_calls && chain_ends_with_member {
         let first_expanded_doc = build_first_groups_expanded_doc(first_groups, printer);
-        let state_first_expanded = doc::concat(
-            std::iter::once(first_expanded_doc)
-                .chain(rest_docs)
-                .collect(),
-        );
-        return doc::conditional_group(vec![on_line, state_first_expanded]);
+        let mut state_first_expanded_parts = vec![first_expanded_doc];
+        state_first_expanded_parts.extend(rest_docs.iter().copied());
+        let state_first_expanded = d.concat(&state_first_expanded_parts);
+        return d.conditional_group(&[on_line, state_first_expanded]);
     }
 
     // Prettier's short chain behavior (member-chain.js lines 351-360):
     // For chains with groups.length <= cutoff, just return group(oneLine).
     if !first_has_calls {
-        return doc::group(on_line);
+        return d.group(on_line);
     }
 
     // Check for nested calls in first call's args
@@ -302,60 +304,57 @@ fn build_short_chain_doc<'a, P: ChainPrinter>(
     if !first_call_arg_contains_call {
         // For factory patterns (shouldMerge), use simple group
         if should_merge {
-            return doc::group(on_line);
+            return d.group(on_line);
         }
 
         let rest_expanded = build_rest_expanded_docs(rest_groups, printer);
-        let state_last_expanded =
-            doc::concat(std::iter::once(first_doc).chain(rest_expanded).collect());
-        return doc::conditional_group(vec![on_line, state_last_expanded]);
+        let mut state_last_expanded_parts = vec![first_doc];
+        state_last_expanded_parts.extend(rest_expanded);
+        let state_last_expanded = d.concat(&state_last_expanded_parts);
+        return d.conditional_group(&[on_line, state_last_expanded]);
     }
 
     // When first call's arg contains calls, try both expansion directions
     let rest_expanded = build_rest_expanded_docs(rest_groups, printer);
-    let state_last_expanded =
-        doc::concat(std::iter::once(first_doc).chain(rest_expanded).collect());
+    let mut state_last_expanded_parts = vec![first_doc];
+    state_last_expanded_parts.extend(rest_expanded);
+    let state_last_expanded = d.concat(&state_last_expanded_parts);
 
     let first_expanded_doc = build_first_groups_expanded_doc(first_groups, printer);
-    let state_first_expanded = doc::concat(
-        std::iter::once(first_expanded_doc)
-            .chain(rest_docs)
-            .collect(),
-    );
+    let mut state_first_expanded_parts = vec![first_expanded_doc];
+    state_first_expanded_parts.extend(rest_docs.iter().copied());
+    let state_first_expanded = d.concat(&state_first_expanded_parts);
 
-    doc::conditional_group(vec![on_line, state_last_expanded, state_first_expanded])
+    d.conditional_group(&[on_line, state_last_expanded, state_first_expanded])
 }
 
 /// Build doc for short chains with multi-arg calls in first groups
 fn build_multiarg_short_chain_doc<'a, P: ChainPrinter>(
     first_groups: &[ChainGroup<'a>],
     rest_groups: &[ChainGroup<'a>],
-    first_doc: Doc,
-    on_line: Doc,
-    rest_docs: &[Doc],
+    first_doc: DocId,
+    on_line: DocId,
+    rest_docs: &[DocId],
     printer: &P,
-) -> Doc {
+) -> DocId {
+    let d = printer.arena();
     // State 1: First args inline, rest groups with expanded call args
     let rest_expanded = build_rest_expanded_docs(rest_groups, printer);
-    let state_last_expanded =
-        doc::concat(std::iter::once(first_doc).chain(rest_expanded).collect());
+    let mut state_last_expanded_parts = vec![first_doc];
+    state_last_expanded_parts.extend(rest_expanded);
+    let state_last_expanded = d.concat(&state_last_expanded_parts);
 
     // State 2: First call's args expanded, rest groups flexible
     let first_expanded_doc = build_first_groups_expanded_doc(first_groups, printer);
-    let state_first_expanded = doc::concat(
-        std::iter::once(first_expanded_doc.clone())
-            .chain(rest_docs.iter().cloned())
-            .collect(),
-    );
+    let mut state_first_expanded_parts = vec![first_expanded_doc];
+    state_first_expanded_parts.extend(rest_docs.iter().copied());
+    let state_first_expanded = d.concat(&state_first_expanded_parts);
 
     // State 3: Everything expanded (first args broken, chain broken)
     let rest_parts_hard = build_rest_parts_with_comments(rest_groups, printer, true, true);
-    let state_all_expanded = doc::concat(vec![
-        first_expanded_doc,
-        doc::indent(doc::concat(rest_parts_hard)),
-    ]);
+    let state_all_expanded = d.concat(&[first_expanded_doc, d.indent(d.concat(&rest_parts_hard))]);
 
-    doc::conditional_group(vec![
+    d.conditional_group(&[
         on_line,
         state_last_expanded,
         state_first_expanded,
@@ -371,11 +370,12 @@ fn build_long_chain_doc<'a, P: ChainPrinter>(
     should_merge: bool,
     force_expand: bool,
     printer: &P,
-) -> Doc {
+) -> DocId {
+    let d = printer.arena();
     // Check if any group except the last will break
     let any_non_last_breaks = groups[..groups.len() - 1].iter().any(|g| {
         let doc = print_group(g, printer);
-        doc::will_break(&doc)
+        d.will_break(doc)
     });
 
     // Check if this chain ends with member access (not a call)
@@ -401,8 +401,8 @@ fn build_long_chain_doc<'a, P: ChainPrinter>(
     }
 
     // Print all groups inline (for oneLine variant)
-    let on_line: Vec<Doc> = groups.iter().map(|g| print_group(g, printer)).collect();
-    let on_line_doc = doc::concat(on_line);
+    let on_line: Vec<DocId> = groups.iter().map(|g| print_group(g, printer)).collect();
+    let on_line_doc = d.concat(&on_line);
 
     // Handle chains ending with member access with exactly one call in rest
     if chain_ends_with_member && rest_call_count == 1 {
@@ -419,21 +419,22 @@ fn build_long_chain_doc<'a, P: ChainPrinter>(
     if let Some(args_expanded_doc) =
         build_breaking_object_chain_doc(first_groups, rest_groups, printer)
     {
-        return doc::conditional_group(vec![on_line_doc, args_expanded_doc, expanded]);
+        return d.conditional_group(&[on_line_doc, args_expanded_doc, expanded]);
     }
 
     // Default: two-state conditional group
-    doc::conditional_group(vec![on_line_doc, expanded])
+    d.conditional_group(&[on_line_doc, expanded])
 }
 
 /// Build doc for chains ending with member access (e.g., `.length`)
 fn build_member_ending_chain_doc<'a, P: ChainPrinter>(
     first_groups: &[ChainGroup<'a>],
     rest_groups: &[ChainGroup<'a>],
-    on_line_doc: Doc,
-    expanded: Doc,
+    on_line_doc: DocId,
+    expanded: DocId,
     printer: &P,
-) -> Doc {
+) -> DocId {
+    let d = printer.arena();
     // Check if the call's single arg needs expansion
     let rest_has_breaking_arg = rest_groups.iter().any(|g| {
         g.nodes
@@ -445,7 +446,9 @@ fn build_member_ending_chain_doc<'a, P: ChainPrinter>(
     // First groups stay flat, rest groups have calls expanded
     let first_docs = build_groups_flat_docs(first_groups, printer);
     let rest_expanded = build_rest_expanded_docs(rest_groups, printer);
-    let args_expanded_doc = doc::concat(first_docs.into_iter().chain(rest_expanded).collect());
+    let mut args_expanded_parts = first_docs;
+    args_expanded_parts.extend(rest_expanded);
+    let args_expanded_doc = d.concat(&args_expanded_parts);
 
     // When the arg will break internally, directly use args_expanded_doc
     if rest_has_breaking_arg {
@@ -453,7 +456,7 @@ fn build_member_ending_chain_doc<'a, P: ChainPrinter>(
     }
 
     // Try: 1. Everything inline, 2. Args expanded chain inline, 3. Chain expanded
-    doc::conditional_group(vec![on_line_doc, args_expanded_doc, expanded])
+    d.conditional_group(&[on_line_doc, args_expanded_doc, expanded])
 }
 
 /// Build doc for chains where last call has a breaking object/array argument
@@ -461,7 +464,8 @@ fn build_breaking_object_chain_doc<'a, P: ChainPrinter>(
     first_groups: &[ChainGroup<'a>],
     rest_groups: &[ChainGroup<'a>],
     printer: &P,
-) -> Option<Doc> {
+) -> Option<DocId> {
+    let d = printer.arena();
     // Check if the last call has a single object/array argument that will break
     // Note: We use a simpler check here (direct object/array only, no arrow functions)
     // because this is specifically for the last call's object literal expansion
@@ -478,7 +482,7 @@ fn build_breaking_object_chain_doc<'a, P: ChainPrinter>(
                     )
                     && {
                         let arg_doc = printer.print_expression(&call.arguments[0]);
-                        doc::will_break(&arg_doc)
+                        d.will_break(arg_doc)
                     }
             })
     });
@@ -491,7 +495,7 @@ fn build_breaking_object_chain_doc<'a, P: ChainPrinter>(
     let first_docs = build_groups_flat_docs(first_groups, printer);
     // Rest groups: all but last stay flat, last is expanded
     let rest_len = rest_groups.len();
-    let rest_docs: Vec<Doc> = rest_groups
+    let rest_docs: Vec<DocId> = rest_groups
         .iter()
         .enumerate()
         .map(|(i, g)| {
@@ -503,7 +507,7 @@ fn build_breaking_object_chain_doc<'a, P: ChainPrinter>(
         })
         .collect();
 
-    Some(doc::concat(
-        first_docs.into_iter().chain(rest_docs).collect(),
-    ))
+    let mut all_parts = first_docs;
+    all_parts.extend(rest_docs);
+    Some(d.concat(&all_parts))
 }

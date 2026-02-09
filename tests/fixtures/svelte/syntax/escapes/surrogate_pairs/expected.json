@@ -45,7 +45,7 @@
 							"start": 242,
 							"end": 259,
 							"property": "content",
-							"value": "'\\\\11F4A9'"
+							"value": "'\\1F4A9'"
 						}
 					]
 				},
@@ -92,7 +92,7 @@
 							"start": 277,
 							"end": 294,
 							"property": "content",
-							"value": "'\\\\11F496'"
+							"value": "'\\1F496'"
 						}
 					]
 				},
@@ -139,7 +139,7 @@
 							"start": 311,
 							"end": 328,
 							"property": "content",
-							"value": "'\\\\11F31F'"
+							"value": "'\\1F31F'"
 						}
 					]
 				},
@@ -302,7 +302,7 @@
 				},
 				"end": {
 					"line": 5,
-					"column": 0
+					"column": 9
 				}
 			},
 			"body": [

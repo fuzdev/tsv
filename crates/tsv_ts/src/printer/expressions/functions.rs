@@ -10,7 +10,7 @@ use super::super::utils::arrow_has_trailing_param_comments;
 use super::{ParenContext, Printer, needs_parens, unwrap_parenthesized};
 use crate::ast::internal;
 use crate::printer::types::helpers::is_huggable_type;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 /// Check if an expression is directly an object literal (needs parentheses in arrow body)
 /// Only returns true for direct ObjectExpression - TSAsExpression etc. are handled separately
@@ -123,12 +123,13 @@ impl<'a> Printer<'a> {
     /// ])
     /// " " + body
     /// ```
-    fn build_arrow_doc_wrapping(&self, arrow: &internal::ArrowFunctionExpression) -> Doc {
+    fn build_arrow_doc_wrapping(&self, arrow: &internal::ArrowFunctionExpression) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         // Async keyword if present
         if arrow.r#async {
-            parts.push(doc::text("async "));
+            parts.push(d.text("async "));
         }
 
         // Build signature parts (will be wrapped in a group)
@@ -177,15 +178,15 @@ impl<'a> Printer<'a> {
         // Check for comments between signature and `=>` (e.g., `(x) /* c */ =>`)
         // Single binary search via comments_in_range
         for comment in tsv_lang::comments_in_range(self.comments, sig_end, arrow_pos) {
-            sig_parts.push(doc::text(" "));
+            sig_parts.push(d.text(" "));
             sig_parts.push(self.build_comment_doc(comment));
         }
 
         // Include " =>" in the signature group for width calculation
-        sig_parts.push(doc::text(" =>"));
+        sig_parts.push(d.text(" =>"));
 
         // Wrap entire signature in a group
-        parts.push(doc::group(doc::concat(sig_parts)));
+        parts.push(d.group(d.concat(&sig_parts)));
 
         // Body - expression bodies can break to new line with indent
         match &arrow.body {
@@ -228,15 +229,12 @@ impl<'a> Printer<'a> {
                     // Build body doc with leading comments - always breaks
                     let body_with_comments =
                         self.build_arrow_body_with_comments_doc(expr, arrow_end, body_start);
-                    parts.push(doc::group(doc::indent(doc::concat(vec![
-                        doc::line(),
-                        body_with_comments,
-                    ]))));
+                    parts.push(d.group(d.indent(d.concat(&[d.line(), body_with_comments]))));
                 } else if should_hug {
                     // Hugged body: simple space, no line break option
                     // `() => ({...})` stays on same line regardless of object's internal breaks
                     let body_doc = self.build_arrow_body_doc(expr);
-                    parts.push(doc::text(" "));
+                    parts.push(d.text(" "));
                     parts.push(body_doc);
                 } else if is_arrow_body
                     && (chain_has_return_type || self.in_curried_typed_arrow.get())
@@ -257,7 +255,7 @@ impl<'a> Printer<'a> {
                     }
                     let body_doc = self.build_arrow_body_doc(expr);
                     self.in_curried_typed_arrow.set(was_in_curried);
-                    parts.push(doc::concat(vec![doc::hardline(), body_doc]));
+                    parts.push(d.concat(&[d.hardline(), body_doc]));
                 } else if is_arrow_body && body_arrow_has_trailing_param_comments {
                     // Nested arrow with trailing param comments - first level gets indent,
                     // subsequent levels align (use curried pattern)
@@ -270,12 +268,12 @@ impl<'a> Printer<'a> {
                     self.in_curried_typed_arrow.set(true);
                     let body_doc = self.build_arrow_body_doc(expr);
                     self.in_curried_typed_arrow.set(was_in_curried);
-                    parts.push(doc::indent(doc::concat(vec![doc::hardline(), body_doc])));
+                    parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
                 } else if self.in_curried_typed_arrow.get() {
                     // Innermost arrow in curried chain - body is NOT another arrow.
                     // This needs indent since it's the final expression.
                     let body_doc = self.build_arrow_body_doc(expr);
-                    parts.push(doc::indent(doc::concat(vec![doc::hardline(), body_doc])));
+                    parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
                 } else {
                     // Normal expression: can break after => with indentation
                     // Short: (x) => x + 1
@@ -295,14 +293,11 @@ impl<'a> Printer<'a> {
                         internal::Expression::TemplateLiteral(_)
                             | internal::Expression::TaggedTemplateExpression(_)
                     ) {
-                        doc::isolated_group(body_doc)
+                        d.isolated_group(body_doc)
                     } else {
                         body_doc
                     };
-                    parts.push(doc::group(doc::indent(doc::concat(vec![
-                        doc::line(),
-                        body_doc,
-                    ]))));
+                    parts.push(d.group(d.indent(d.concat(&[d.line(), body_doc]))));
                 }
             }
             internal::ArrowFunctionBody::BlockStatement(block) => {
@@ -319,18 +314,18 @@ impl<'a> Printer<'a> {
                     let mut comment_parts = Vec::new();
                     for comment in tsv_lang::comments_in_range(self.comments, arrow_end, body_start)
                     {
-                        comment_parts.push(doc::text(" "));
+                        comment_parts.push(d.text(" "));
                         comment_parts.push(self.build_comment_doc(comment));
                     }
-                    parts.push(doc::concat(comment_parts));
+                    parts.push(d.concat(&comment_parts));
                 }
 
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
                 parts.push(self.build_block_statement_doc(block));
             }
         }
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build doc for return type annotation in arrow function context
@@ -344,14 +339,15 @@ impl<'a> Printer<'a> {
     ///
     /// Function types as return types get wrapped in parentheses for disambiguation:
     /// `(x: T): ((y: T) => U) =>` not `(x: T): (y: T) => U =>`
-    fn build_arrow_return_type_doc(&self, annotation: &internal::TSTypeAnnotation) -> Doc {
+    fn build_arrow_return_type_doc(&self, annotation: &internal::TSTypeAnnotation) -> DocId {
+        let d = self.d();
         // Function types need parentheses to disambiguate from the arrow's `=>`
         // Example: `(x: T): ((y: T) => U) =>` not `(x: T): (y: T) => U =>`
         // Unwrap any explicit parenthesized types to check the inner type
         let inner_type = unwrap_parenthesized(&annotation.type_annotation);
         if matches!(inner_type, internal::TSType::Function(_)) {
             let type_doc = self.build_type_doc(inner_type);
-            return doc::concat(vec![doc::text(": ("), type_doc, doc::text(")")]);
+            return d.concat(&[d.text(": ("), type_doc, d.text(")")]);
         }
 
         // Use return type version - only wraps for complex type args (unions/intersections)
@@ -367,9 +363,10 @@ impl<'a> Printer<'a> {
         &self,
         decl: &internal::TSTypeParameterDeclaration,
         grouped: bool,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         if decl.params.is_empty() {
-            return doc::text("<>");
+            return d.text("<>");
         }
 
         let param_docs: Vec<_> = decl
@@ -385,20 +382,20 @@ impl<'a> Printer<'a> {
             && decl.params.len() == 1
             && decl.params[0].constraint.is_none();
         let inner_parts = if needs_trailing_comma {
-            doc::concat(vec![doc::join(param_docs, ", "), doc::text(",")])
+            d.concat(&[d.join(param_docs, ", "), d.text(",")])
         } else {
-            doc::join_trailing(param_docs, doc::comma_line())
+            d.join_trailing(param_docs, d.comma_line())
         };
 
-        let brackets_doc = doc::concat(vec![
-            doc::text("<"),
-            doc::indent_softline(inner_parts),
-            doc::softline(),
-            doc::text(">"),
+        let brackets_doc = d.concat(&[
+            d.text("<"),
+            d.indent_softline(inner_parts),
+            d.softline(),
+            d.text(">"),
         ]);
 
         if grouped {
-            doc::group(brackets_doc)
+            d.group(brackets_doc)
         } else {
             brackets_doc
         }
@@ -408,7 +405,7 @@ impl<'a> Printer<'a> {
     ///
     /// Structure matches prettier's function-parameters.js:
     /// `[typeParams, "(", indent([softline, ...params]), ifBreak(","), softline, ")"]`
-    fn build_arrow_params_doc_ungrouped(&self, arrow: &internal::ArrowFunctionExpression) -> Doc {
+    fn build_arrow_params_doc_ungrouped(&self, arrow: &internal::ArrowFunctionExpression) -> DocId {
         let params_start = arrow.params_start;
 
         // Compute trailing comments boundary for params
@@ -435,12 +432,13 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_arrow_signature_doc(
         &self,
         arrow: &internal::ArrowFunctionExpression,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         // Async keyword if present
         if arrow.r#async {
-            parts.push(doc::text("async "));
+            parts.push(d.text("async "));
         }
 
         let has_params = !arrow.params.is_empty();
@@ -458,7 +456,7 @@ impl<'a> Printer<'a> {
             parts.push(self.build_arrow_return_type_doc(return_type));
         }
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Check if any param has a trailing line comment
@@ -488,21 +486,22 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for arrow function body expression.
-    fn build_arrow_body_doc(&self, expr: &internal::Expression) -> Doc {
+    fn build_arrow_body_doc(&self, expr: &internal::Expression) -> DocId {
+        let d = self.d();
         // Special case: type assertion wrapping object - parens go around inner object only
         // `() => ({}) as T` not `() => (({}) as T)`
         if let Some(assertion) = get_type_assertion_with_object(expr) {
             return match assertion {
-                TypeAssertionWithObject::As(as_expr) => doc::concat(vec![
-                    doc::text("("),
+                TypeAssertionWithObject::As(as_expr) => d.concat(&[
+                    d.text("("),
                     self.build_expression_doc(&as_expr.expression),
-                    doc::text(") as "),
+                    d.text(") as "),
                     self.build_type_doc_with_wrapping_type_args(&as_expr.type_annotation),
                 ]),
-                TypeAssertionWithObject::Satisfies(sat_expr) => doc::concat(vec![
-                    doc::text("("),
+                TypeAssertionWithObject::Satisfies(sat_expr) => d.concat(&[
+                    d.text("("),
                     self.build_expression_doc(&sat_expr.expression),
-                    doc::text(") satisfies "),
+                    d.text(") satisfies "),
                     self.build_type_doc_with_wrapping_type_args(&sat_expr.type_annotation),
                 ]),
             };
@@ -518,16 +517,16 @@ impl<'a> Printer<'a> {
         if matches!(expr, internal::Expression::ConditionalExpression(_)) {
             let body_doc = self.build_expression_doc(expr);
             // If body contains hardlines (will definitely break), no parens
-            if doc::will_break(&body_doc) {
+            if d.will_break(body_doc) {
                 return body_doc;
             }
             // Otherwise, use if_break to check enclosing group
-            return doc::if_break(body_doc.clone(), doc::parens(body_doc));
+            return d.if_break(body_doc, d.parens(body_doc));
         }
 
         // Standard cases: objects and assignments always need parens
         if needs_parens(expr, ParenContext::ArrowBody) {
-            doc::parens(self.build_expression_doc(expr))
+            d.parens(self.build_expression_doc(expr))
         } else {
             self.build_expression_doc(expr)
         }
@@ -547,7 +546,8 @@ impl<'a> Printer<'a> {
         expr: &internal::Expression,
         sig_end: u32,
         body_start: u32,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         // Print leading comments
@@ -565,21 +565,21 @@ impl<'a> Printer<'a> {
 
             if is_line_comment || (is_multi_line_block && i == comments.len() - 1) {
                 // Line comment or multi-line block as last → put next content on new line
-                parts.push(doc::hardline());
+                parts.push(d.hardline());
             } else {
                 // Single-line block comment → space
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
             }
         }
 
         // Add the body expression
         parts.push(self.build_arrow_body_doc(expr));
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for an arrow function (simple, non-wrapping version for nested contexts)
-    pub(super) fn build_arrow_doc(&self, arrow: &internal::ArrowFunctionExpression) -> Doc {
+    pub(super) fn build_arrow_doc(&self, arrow: &internal::ArrowFunctionExpression) -> DocId {
         // For nested contexts where we don't want independent wrapping decisions,
         // use the wrapping version which will be evaluated in context
         self.build_arrow_doc_wrapping(arrow)
@@ -587,7 +587,11 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for just the function expression signature (type params, params, return type).
     /// Body is printed separately via imperative printer to preserve comments.
-    fn build_function_expression_signature_doc(&self, func: &internal::FunctionExpression) -> Doc {
+    fn build_function_expression_signature_doc(
+        &self,
+        func: &internal::FunctionExpression,
+    ) -> DocId {
+        let d = self.d();
         let mut sig_parts = Vec::new();
 
         // Type parameters (TypeScript generics): <T, U>
@@ -606,7 +610,7 @@ impl<'a> Printer<'a> {
         }
 
         // Wrap signature in a group for width-aware breaking
-        doc::group(doc::concat(sig_parts))
+        d.group(d.concat(&sig_parts))
     }
 
     /// Build a Doc for function expression body (type params, params, return type, body).
@@ -616,7 +620,8 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_function_doc_body(
         &self,
         func: &internal::FunctionExpression,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let sig_doc = self.build_function_expression_signature_doc(func);
 
         // Find signature end for outer comment detection
@@ -633,9 +638,9 @@ impl<'a> Printer<'a> {
         let outer_comments = self.build_outer_comments_for_block(sig_end, &func.body);
 
         // Body - always on same line as signature close
-        doc::concat(vec![
+        d.concat(&[
             sig_doc,
-            doc::text(" "),
+            d.text(" "),
             self.build_block_statement_with_outer_comments_doc(&func.body, outer_comments),
         ])
     }
@@ -653,25 +658,26 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_function_doc(
         &self,
         func: &internal::FunctionExpression,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         // Async keyword if present
         if func.r#async {
-            parts.push(doc::text("async "));
+            parts.push(d.text("async "));
         }
 
         // Function keyword
-        parts.push(doc::text("function"));
+        parts.push(d.text("function"));
 
         // Generator asterisk
         if func.generator {
-            parts.push(doc::text("*"));
+            parts.push(d.text("*"));
         }
 
         // Optional function name
         if let Some(id) = &func.id {
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
             // Comments between keywords and the name (same as FunctionDeclaration)
             parts.push(
                 self.build_inline_comments_between_doc_trailing_space(
@@ -684,13 +690,13 @@ impl<'a> Printer<'a> {
 
         // Space before type params or params if no name: `function <T>` or `function ()`
         if func.id.is_none() {
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
         }
 
         // Type params, params, return type, and body (signature_doc handles type params)
         parts.push(self.build_function_doc_body(func));
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build doc for function/method params NOT in their own group
@@ -701,7 +707,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_method_params_doc_ungrouped(
         &self,
         func: &internal::FunctionExpression,
-    ) -> Doc {
+    ) -> DocId {
         let params = &func.params;
         let params_start = Some(func.params_start);
 
@@ -724,7 +730,7 @@ impl<'a> Printer<'a> {
         params: &[internal::Expression],
         params_start: Option<u32>,
         trailing_comments_end: Option<u32>,
-    ) -> Doc {
+    ) -> DocId {
         self.build_params_doc_with_comments_ext(params, params_start, trailing_comments_end, false)
     }
 
@@ -737,9 +743,10 @@ impl<'a> Printer<'a> {
         params_start: Option<u32>,
         trailing_comments_end: Option<u32>,
         force_break_external: bool,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         if params.is_empty() {
-            return doc::text("()");
+            return d.text("()");
         }
 
         // Prettier's shouldHugFunctionParameters: single param that's an object/array pattern
@@ -773,7 +780,7 @@ impl<'a> Printer<'a> {
         if should_hug_single_pattern {
             // Hug mode: just ( + pattern + optional trailing comma + )
             let param_doc = self.build_function_parameter_doc(&params[0]);
-            return doc::parens(param_doc);
+            return d.parens(param_doc);
         }
 
         // Check if any trailing line comments exist on params
@@ -822,9 +829,9 @@ impl<'a> Printer<'a> {
             if i > 0 {
                 // Use hardline when forcing break (trailing line comments or param properties)
                 if force_break {
-                    inner_parts.push(doc::hardline());
+                    inner_parts.push(d.hardline());
                 } else {
-                    inner_parts.push(doc::line());
+                    inner_parts.push(d.line());
                 }
             }
 
@@ -870,7 +877,7 @@ impl<'a> Printer<'a> {
                 .iter()
                 .filter(|c| c.is_block && comma_pos.is_none_or(|pos| c.span.start < pos))
             {
-                inner_parts.push(doc::text(" "));
+                inner_parts.push(d.text(" "));
                 inner_parts.push(self.build_comment_doc(comment));
             }
 
@@ -879,7 +886,7 @@ impl<'a> Printer<'a> {
             // For last param: add comma if forcing break and not rest param
             let needs_comma = !is_last || (force_break && !has_rest_param);
             if needs_comma {
-                inner_parts.push(doc::text(","));
+                inner_parts.push(d.text(","));
             }
 
             // Line comments (same-line) go after comma (excluded from width)
@@ -896,34 +903,31 @@ impl<'a> Printer<'a> {
                         |c| !c.is_block && !self.is_same_line(param.span().end, c.span.start),
                     )
                 {
-                    inner_parts.push(doc::hardline());
+                    inner_parts.push(d.hardline());
                     inner_parts.push(self.build_comment_doc(comment));
                 }
             }
         }
 
         // No group - outer signature group controls breaking
-        let mut result = vec![doc::text("(")];
+        let mut result = vec![d.text("(")];
 
         if force_break {
             // When forcing break (trailing comments or param properties), use hardlines
-            result.push(doc::indent(doc::concat(vec![
-                doc::hardline(),
-                doc::concat(inner_parts),
-            ])));
-            result.push(doc::hardline());
+            result.push(d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])));
+            result.push(d.hardline());
         } else {
-            result.push(doc::indent_softline(doc::concat(inner_parts)));
+            result.push(d.indent_softline(d.concat(&inner_parts)));
             // Trailing comma when broken, unless there's a rest param
             if !has_rest_param {
-                result.push(doc::trailing_comma());
+                result.push(d.trailing_comma());
             }
-            result.push(doc::softline());
+            result.push(d.softline());
         }
 
-        result.push(doc::text(")"));
+        result.push(d.text(")"));
 
-        doc::concat(result)
+        d.concat(&result)
     }
 
     /// Check if any param has a leading line comment on its own line
@@ -971,7 +975,8 @@ impl<'a> Printer<'a> {
         start: u32,
         end: u32,
         prev_comma_pos: Option<u32>,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let comments: Vec<_> = tsv_lang::comments_in_range(self.comments, start, end)
             .filter(|c| {
                 let Some(comma) = prev_comma_pos else {
@@ -987,7 +992,7 @@ impl<'a> Printer<'a> {
             })
             .collect();
         if comments.is_empty() {
-            return doc::empty();
+            return d.empty();
         }
 
         let mut parts = Vec::new();
@@ -1003,7 +1008,7 @@ impl<'a> Printer<'a> {
 
             if on_own_line && i > 0 {
                 // Comment on its own line (not first) - add hardline before it
-                parts.push(doc::hardline());
+                parts.push(d.hardline());
             }
             parts.push(self.build_comment_doc(comment));
         }
@@ -1013,28 +1018,29 @@ impl<'a> Printer<'a> {
         let param_on_own_line = !self.is_same_line(last_comment_end, end);
 
         if param_on_own_line {
-            parts.push(doc::hardline());
+            parts.push(d.hardline());
         } else {
             // Inline - add space after comment
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
         }
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for a class expression
     pub(in crate::printer) fn build_class_expression_doc(
         &self,
         class_expr: &internal::ClassExpression,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         // 'class' keyword
-        parts.push(doc::text("class"));
+        parts.push(d.text("class"));
 
         // Optional class name
         if let Some(id) = &class_expr.id {
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
             parts.push(self.build_identifier_doc(id));
         }
 
@@ -1046,7 +1052,7 @@ impl<'a> Printer<'a> {
 
         // Optional extends clause
         if let Some(super_class) = &class_expr.super_class {
-            parts.push(doc::text(" extends "));
+            parts.push(d.text(" extends "));
             parts.push(self.build_expression_doc(super_class));
             // Type arguments: extends Base<T>
             if let Some(super_type_params) = &class_expr.super_type_parameters {
@@ -1056,21 +1062,21 @@ impl<'a> Printer<'a> {
 
         // Implements clause (extract from source for simplicity)
         if !class_expr.implements.is_empty() {
-            parts.push(doc::text(" implements "));
+            parts.push(d.text(" implements "));
             let first_impl = &class_expr.implements[0];
             let last_impl = &class_expr.implements[class_expr.implements.len() - 1];
             let impl_start = first_impl.span.start_usize();
             let impl_end = last_impl.span.end_usize();
             let impl_str = &self.source[impl_start..impl_end];
-            parts.push(doc::text_owned(impl_str.to_string()));
+            parts.push(d.text_owned(impl_str.to_string()));
         }
 
         // Space before body
-        parts.push(doc::text(" "));
+        parts.push(d.text(" "));
 
         // Class body
         parts.push(self.build_class_body_doc(&class_expr.body, false));
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 }

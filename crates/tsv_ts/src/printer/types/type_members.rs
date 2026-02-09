@@ -12,7 +12,7 @@ use super::Printer;
 use super::helpers::intersection_has_huggable_last_type;
 use crate::ast::internal::{self, TSType, TSTypeElement};
 use tsv_lang::SymbolToU32;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Build doc for type member with optional trailing semicolon
@@ -20,17 +20,18 @@ impl<'a> Printer<'a> {
         &self,
         member: &TSTypeElement,
         with_semicolon: bool,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         match member {
             TSTypeElement::PropertySignature(prop) => {
                 let mut parts = vec![];
                 if prop.readonly {
-                    parts.push(doc::text("readonly "));
+                    parts.push(d.text("readonly "));
                 }
                 if prop.computed {
-                    parts.push(doc::text("["));
+                    parts.push(d.text("["));
                     parts.push(self.build_expression_doc(&prop.key));
-                    parts.push(doc::text("]"));
+                    parts.push(d.text("]"));
                 } else {
                     parts.push(self.build_expression_doc(&prop.key));
                 }
@@ -40,13 +41,13 @@ impl<'a> Printer<'a> {
                 if let Some(type_ann) = &prop.type_annotation {
                     let type_ann_start = type_ann.span.start;
                     for comment in comments_in_range(self.comments, key_end, type_ann_start) {
-                        parts.push(doc::text(" "));
+                        parts.push(d.text(" "));
                         parts.push(self.build_comment_doc(comment));
                     }
                 }
 
                 if prop.optional {
-                    parts.push(doc::text("?"));
+                    parts.push(d.text("?"));
                 }
                 if let Some(type_ann) = &prop.type_annotation {
                     // Use width-aware wrapping for TypeReference with type arguments
@@ -56,7 +57,7 @@ impl<'a> Printer<'a> {
                     let type_end = type_ann.span.end;
                     let prop_end = prop.span.end;
                     for comment in comments_in_range(self.comments, type_end, prop_end) {
-                        parts.push(doc::text(" "));
+                        parts.push(d.text(" "));
                         parts.push(self.build_comment_doc(comment));
                     }
 
@@ -64,25 +65,25 @@ impl<'a> Printer<'a> {
                     let has_trailing_comment =
                         self.type_annotation_has_trailing_comment_doc(type_ann);
                     if with_semicolon && !has_trailing_comment {
-                        parts.push(doc::text(";"));
+                        parts.push(d.text(";"));
                     }
                 } else if with_semicolon {
-                    parts.push(doc::text(";"));
+                    parts.push(d.text(";"));
                 }
-                doc::concat(parts)
+                d.concat(&parts)
             }
             TSTypeElement::MethodSignature(method) => {
                 let mut parts = vec![];
                 // Print accessor keyword for get/set signatures
                 match method.kind {
-                    internal::MethodKind::Get => parts.push(doc::text("get ")),
-                    internal::MethodKind::Set => parts.push(doc::text("set ")),
+                    internal::MethodKind::Get => parts.push(d.text("get ")),
+                    internal::MethodKind::Set => parts.push(d.text("set ")),
                     _ => {}
                 }
                 if method.computed {
-                    parts.push(doc::text("["));
+                    parts.push(d.text("["));
                     parts.push(self.build_expression_doc(&method.key));
-                    parts.push(doc::text("]"));
+                    parts.push(d.text("]"));
                 } else {
                     parts.push(self.build_expression_doc(&method.key));
                 }
@@ -102,12 +103,12 @@ impl<'a> Printer<'a> {
                 // Comments between key and type_params (or `(` if no type_params) go before `?`
                 let comments_before_boundary = type_params_end.or(paren_pos).unwrap_or(key_end);
                 for comment in comments_in_range(self.comments, key_end, comments_before_boundary) {
-                    parts.push(doc::text(" "));
+                    parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
 
                 if method.optional {
-                    parts.push(doc::text("?"));
+                    parts.push(d.text("?"));
                 }
                 // Print type parameters if present: `<T>` or `<T, U>`
                 if let Some(type_params) = &method.type_parameters {
@@ -117,7 +118,7 @@ impl<'a> Printer<'a> {
                 // Comments between type_params and `(` go after type_params
                 if let (Some(tp_end), Some(paren_pos)) = (type_params_end, paren_pos) {
                     for comment in comments_in_range(self.comments, tp_end, paren_pos) {
-                        parts.push(doc::text(" "));
+                        parts.push(d.text(" "));
                         parts.push(self.build_comment_doc(comment));
                     }
                 }
@@ -127,9 +128,9 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
                 }
                 if with_semicolon {
-                    parts.push(doc::text(";"));
+                    parts.push(d.text(";"));
                 }
-                doc::group(doc::concat(parts))
+                d.group(d.concat(&parts))
             }
             TSTypeElement::CallSignature(call) => {
                 let mut parts = vec![];
@@ -152,12 +153,12 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
                 }
                 if with_semicolon {
-                    parts.push(doc::text(";"));
+                    parts.push(d.text(";"));
                 }
-                doc::group(doc::concat(parts))
+                d.group(d.concat(&parts))
             }
             TSTypeElement::ConstructSignature(ctor) => {
-                let mut parts = vec![doc::text("new ")];
+                let mut parts = vec![d.text("new ")];
                 // Print type parameters if present: `<T>` or `<T, U>`
                 if let Some(type_params) = &ctor.type_parameters {
                     parts.push(self.build_type_parameter_declaration_doc(type_params));
@@ -177,9 +178,9 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
                 }
                 if with_semicolon {
-                    parts.push(doc::text(";"));
+                    parts.push(d.text(";"));
                 }
-                doc::group(doc::concat(parts))
+                d.group(d.concat(&parts))
             }
             TSTypeElement::IndexSignature(idx) => {
                 self.build_type_element_index_signature_doc(idx, with_semicolon)
@@ -192,10 +193,11 @@ impl<'a> Printer<'a> {
         &self,
         idx: &internal::TSIndexSignature,
         with_semicolon: bool,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut parts = vec![];
         if idx.readonly {
-            parts.push(doc::text("readonly "));
+            parts.push(d.text("readonly "));
         }
 
         // Build the key parameter docs
@@ -205,26 +207,20 @@ impl<'a> Printer<'a> {
             .parameters
             .iter()
             .map(|param| {
-                let mut param_parts = vec![doc::symbol(param.name.to_u32())];
+                let mut param_parts = vec![d.symbol(param.name.to_u32())];
                 if let Some(type_ann) = &param.type_annotation {
                     match type_ann.type_annotation.as_ref() {
                         TSType::Union(u) => {
                             // Union key type: break after `:` with leading `|`
                             let type_doc = self.build_union_type_doc(u, false);
-                            param_parts.push(doc::text(":"));
-                            param_parts.push(doc::group(doc::indent(doc::concat(vec![
-                                doc::line(),
-                                type_doc,
-                            ]))));
+                            param_parts.push(d.text(":"));
+                            param_parts.push(d.group(d.indent(d.concat(&[d.line(), type_doc]))));
                         }
                         TSType::Intersection(i) => {
                             // Intersection key type: break after `:` with trailing `&`
                             let type_doc = self.build_intersection_type_doc(i, false);
-                            param_parts.push(doc::text(":"));
-                            param_parts.push(doc::group(doc::indent(doc::concat(vec![
-                                doc::line(),
-                                type_doc,
-                            ]))));
+                            param_parts.push(d.text(":"));
+                            param_parts.push(d.group(d.indent(d.concat(&[d.line(), type_doc]))));
                         }
                         _ => {
                             // Regular key type: use standard annotation
@@ -232,19 +228,19 @@ impl<'a> Printer<'a> {
                         }
                     }
                 }
-                doc::concat(param_parts)
+                d.concat(&param_parts)
             })
             .collect();
 
         // Build `[key: type]` as a group that can break when key type is long
         // Flat: [key: type]
         // Break: [\n\tkey: type\n]
-        let bracket_contents = doc::join(param_docs, ", ");
-        let bracket_group = doc::group(doc::concat(vec![
-            doc::text("["),
-            doc::indent_softline(bracket_contents),
-            doc::softline(),
-            doc::text("]"),
+        let bracket_contents = d.join(param_docs, ", ");
+        let bracket_group = d.group(d.concat(&[
+            d.text("["),
+            d.indent_softline(bracket_contents),
+            d.softline(),
+            d.text("]"),
         ]));
         parts.push(bracket_group);
 
@@ -259,7 +255,7 @@ impl<'a> Printer<'a> {
         if let Some(close_pos) = bracket_close_pos {
             // Search up to the type's span start, not the annotation's
             for comment in comments_in_range(self.comments, close_pos + 1, type_start) {
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
                 has_comment = true;
             }
@@ -270,16 +266,16 @@ impl<'a> Printer<'a> {
         // build_type_annotation_doc outputting the comment again.
         if has_comment {
             // We already output the comment, now just add ` : Type`
-            parts.push(doc::text(" : "));
+            parts.push(d.text(" : "));
             parts.push(self.build_type_doc(&idx.type_annotation.type_annotation));
         } else {
             // No comment before `:`, use normal type annotation handling
             match idx.type_annotation.type_annotation.as_ref() {
                 TSType::Union(u) => {
                     let type_doc = self.build_union_type_doc(u, false);
-                    parts.push(doc::text(":"));
-                    parts.push(doc::group(doc::indent(doc::concat(vec![
-                        doc::line(), // space when flat, newline when broken
+                    parts.push(d.text(":"));
+                    parts.push(d.group(d.indent(d.concat(&[
+                        d.line(), // space when flat, newline when broken
                         type_doc,
                     ]))));
                 }
@@ -287,14 +283,11 @@ impl<'a> Printer<'a> {
                     let type_doc = self.build_intersection_type_doc(i, false);
                     if intersection_has_huggable_last_type(i) {
                         // No indent/line - keep `: Type & {` hugged
-                        parts.push(doc::text(": "));
+                        parts.push(d.text(": "));
                         parts.push(type_doc);
                     } else {
-                        parts.push(doc::text(":"));
-                        parts.push(doc::group(doc::indent(doc::concat(vec![
-                            doc::line(),
-                            type_doc,
-                        ]))));
+                        parts.push(d.text(":"));
+                        parts.push(d.group(d.indent(d.concat(&[d.line(), type_doc]))));
                     }
                 }
                 _ => {
@@ -304,8 +297,8 @@ impl<'a> Printer<'a> {
         }
 
         if with_semicolon {
-            parts.push(doc::text(";"));
+            parts.push(d.text(";"));
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 }

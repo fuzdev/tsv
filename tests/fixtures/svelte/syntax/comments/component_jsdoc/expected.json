@@ -87,12 +87,12 @@
 			"end": 124,
 			"loc": {
 				"start": {
-					"line": 1,
+					"line": 7,
 					"column": 0
 				},
 				"end": {
 					"line": 9,
-					"column": 0
+					"column": 9
 				}
 			},
 			"body": [

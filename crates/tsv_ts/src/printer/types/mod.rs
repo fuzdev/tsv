@@ -36,7 +36,7 @@ use crate::ast::internal::TSType;
 use helpers::type_needs_parens_for_indexed_access_object;
 use helpers::type_needs_parens_for_prefix_operator;
 use tsv_lang::SymbolToU32;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     //
@@ -44,7 +44,7 @@ impl<'a> Printer<'a> {
     //
 
     /// Build a Doc for a TypeScript type expression
-    pub(in crate::printer) fn build_type_doc(&self, ts_type: &TSType) -> Doc {
+    pub(in crate::printer) fn build_type_doc(&self, ts_type: &TSType) -> DocId {
         self.build_type_doc_inner(ts_type, false)
     }
 
@@ -55,15 +55,16 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_type_doc_with_wrapping_type_args(
         &self,
         ts_type: &TSType,
-    ) -> Doc {
+    ) -> DocId {
         self.build_type_doc_inner(ts_type, true)
     }
 
     /// Inner implementation for type doc building.
     /// When `wrap_type_args` is true, TypeReference uses wrapping type arguments.
-    pub(super) fn build_type_doc_inner(&self, ts_type: &TSType, wrap_type_args: bool) -> Doc {
+    pub(super) fn build_type_doc_inner(&self, ts_type: &TSType, wrap_type_args: bool) -> DocId {
+        let d = self.d();
         match ts_type {
-            TSType::Keyword(kw) => doc::text_owned(kw.kind.as_str().to_string()),
+            TSType::Keyword(kw) => d.text_owned(kw.kind.as_str().to_string()),
             TSType::Literal(lit) => self.build_literal_type_doc(lit),
             TSType::Array(arr) => self.build_array_type_doc(arr),
             TSType::Union(u) => self.build_union_type_doc(u, true),
@@ -77,7 +78,7 @@ impl<'a> Printer<'a> {
                         parts.push(self.build_type_arguments_doc(type_args));
                     }
                 }
-                doc::concat(parts)
+                d.concat(&parts)
             }
             TSType::TypeLiteral(t) => self.build_type_literal_doc(t),
             TSType::Function(f) => self.build_function_type_doc(f),
@@ -89,14 +90,14 @@ impl<'a> Printer<'a> {
             TSType::TypePredicate(p) => {
                 let mut parts = vec![];
                 if p.asserts {
-                    parts.push(doc::text("asserts "));
+                    parts.push(d.text("asserts "));
                 }
-                parts.push(doc::symbol(p.parameter_name.name.to_u32()));
+                parts.push(d.symbol(p.parameter_name.name.to_u32()));
                 if let Some(type_ann) = &p.type_annotation {
-                    parts.push(doc::text(" is "));
+                    parts.push(d.text(" is "));
                     parts.push(self.build_type_doc(type_ann));
                 }
-                doc::concat(parts)
+                d.concat(&parts)
             }
             TSType::Conditional(c) => {
                 // Conditional types use width-aware wrapping:
@@ -108,93 +109,85 @@ impl<'a> Printer<'a> {
                 // The outer-most conditional is wrapped in a group. Nested conditionals
                 // (in true_type or false_type) are NOT wrapped in their own group - they
                 // inherit breaking from the parent. This matches prettier's behavior.
-                doc::group(self.build_conditional_type_doc_inner(c))
+                d.group(self.build_conditional_type_doc_inner(c))
             }
             TSType::Mapped(m) => self.build_mapped_type_doc(m),
             TSType::TypeOperator(o) => {
                 let needs_parens = type_needs_parens_for_prefix_operator(&o.type_annotation);
                 let operand_doc = self.build_type_doc(&o.type_annotation);
                 if needs_parens {
-                    doc::concat(vec![
-                        doc::text(o.operator.as_str()),
-                        doc::text(" ("),
+                    d.concat(&[
+                        d.text(o.operator.as_str()),
+                        d.text(" ("),
                         operand_doc,
-                        doc::text(")"),
+                        d.text(")"),
                     ])
                 } else {
-                    doc::concat(vec![
-                        doc::text(o.operator.as_str()),
-                        doc::text(" "),
-                        operand_doc,
-                    ])
+                    d.concat(&[d.text(o.operator.as_str()), d.text(" "), operand_doc])
                 }
             }
             TSType::Import(i) => {
-                let mut parts = vec![doc::text("import(")];
+                let mut parts = vec![d.text("import(")];
                 parts.push(self.build_literal_doc(&i.argument));
                 // Import type options
                 if let Some(options) = &i.options {
-                    parts.push(doc::text(", "));
+                    parts.push(d.text(", "));
                     parts.push(self.build_expression_doc(options));
                 }
-                parts.push(doc::text(")"));
+                parts.push(d.text(")"));
                 if let Some(qualifier) = &i.qualifier {
-                    parts.push(doc::text("."));
+                    parts.push(d.text("."));
                     parts.push(self.build_type_entity_name_doc(qualifier));
                 }
                 if let Some(type_args) = &i.type_arguments {
                     parts.push(self.build_type_arguments_doc(type_args));
                 }
-                doc::concat(parts)
+                d.concat(&parts)
             }
             TSType::TypeQuery(q) => {
-                let mut parts = vec![doc::text("typeof ")];
+                let mut parts = vec![d.text("typeof ")];
                 parts.push(self.build_type_query_expr_name_doc(&q.expr_name));
                 if let Some(type_args) = &q.type_arguments {
                     parts.push(self.build_type_arguments_doc(type_args));
                 }
-                doc::concat(parts)
+                d.concat(&parts)
             }
             TSType::IndexedAccess(i) => {
                 let object_doc = self.build_type_doc(&i.object_type);
                 let needs_parens = type_needs_parens_for_indexed_access_object(&i.object_type);
                 if needs_parens {
-                    doc::concat(vec![
-                        doc::text("("),
+                    d.concat(&[
+                        d.text("("),
                         object_doc,
-                        doc::text(")["),
+                        d.text(")["),
                         self.build_type_doc(&i.index_type),
-                        doc::text("]"),
+                        d.text("]"),
                     ])
                 } else {
-                    doc::concat(vec![
+                    d.concat(&[
                         object_doc,
-                        doc::text("["),
+                        d.text("["),
                         self.build_type_doc(&i.index_type),
-                        doc::text("]"),
+                        d.text("]"),
                     ])
                 }
             }
-            TSType::Rest(r) => doc::concat(vec![
-                doc::text("..."),
-                self.build_type_doc(&r.type_annotation),
-            ]),
-            TSType::Optional(o) => doc::concat(vec![
-                self.build_type_doc(&o.type_annotation),
-                doc::text("?"),
-            ]),
-            TSType::NamedTupleMember(n) => {
-                let mut parts = vec![doc::symbol(n.label.name.to_u32())];
-                if n.optional {
-                    parts.push(doc::text("?"));
-                }
-                parts.push(doc::text(": "));
-                parts.push(self.build_type_doc(&n.element_type));
-                doc::concat(parts)
+            TSType::Rest(r) => d.concat(&[d.text("..."), self.build_type_doc(&r.type_annotation)]),
+            TSType::Optional(o) => {
+                d.concat(&[self.build_type_doc(&o.type_annotation), d.text("?")])
             }
-            TSType::Infer(i) => doc::concat(vec![
-                doc::text("infer "),
-                doc::symbol(i.type_parameter.name.name.to_u32()),
+            TSType::NamedTupleMember(n) => {
+                let mut parts = vec![d.symbol(n.label.name.to_u32())];
+                if n.optional {
+                    parts.push(d.text("?"));
+                }
+                parts.push(d.text(": "));
+                parts.push(self.build_type_doc(&n.element_type));
+                d.concat(&parts)
+            }
+            TSType::Infer(i) => d.concat(&[
+                d.text("infer "),
+                d.symbol(i.type_parameter.name.name.to_u32()),
             ]),
         }
     }

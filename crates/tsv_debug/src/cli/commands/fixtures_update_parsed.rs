@@ -1,4 +1,4 @@
-use crate::deno::{parse_svelte, parse_typescript};
+use crate::deno::{parse_css, parse_svelte, parse_typescript};
 use crate::fixtures;
 use crate::fixtures::InputType;
 use std::path::Path;
@@ -215,17 +215,15 @@ async fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult
             }
         }
         InputType::Css => {
-            // CSS fixtures use our own parser (no external canonical source)
-            let ast = match tsv_css::parse(&source) {
-                Ok(ast) => ast,
-                Err(e) => return FixtureResult::Failed(format!("CSS parse error: {e:?}")),
-            };
-            let public_ast = tsv_css::convert_ast(&ast, &source);
-            match to_json_with_tabs(&public_ast) {
-                Ok(json) => format!("{json}\n"),
-                Err(e) => {
-                    return FixtureResult::Failed(format!("Failed to serialize CSS AST: {e}"));
-                }
+            // CSS fixtures use Svelte's parseCss (external canonical source)
+            match parse_css(&source).await {
+                Ok(ast) => match to_json_with_tabs(&ast) {
+                    Ok(json) => format!("{json}\n"),
+                    Err(e) => {
+                        return FixtureResult::Failed(format!("Failed to serialize CSS AST: {e}"));
+                    }
+                },
+                Err(e) => return FixtureResult::Failed(format!("CSS parse error: {e}")),
             }
         }
         InputType::Svelte => {

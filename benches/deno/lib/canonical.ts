@@ -125,9 +125,8 @@ export class CanonicalImplementation implements TsvImplementation {
 				});
 			},
 			css: (source) => {
-				// Wrap CSS in <style> tags and parse as Svelte to get CSS AST
 				if (!this.#svelteCompiler) throw new Error('Svelte compiler not initialized');
-				return this.#svelteCompiler.parse(`<style>${source}</style>`, { modern: true });
+				return this.#svelteCompiler.parseCss(source);
 			},
 		};
 	}

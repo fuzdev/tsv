@@ -11,7 +11,8 @@
 
 use super::Printer;
 use crate::ast::internal;
-use tsv_lang::{comments_in_range, doc};
+use tsv_lang::comments_in_range;
+use tsv_lang::doc::{self, Mode, arena::DocId};
 
 /// Convert a supports connector to its string representation
 fn connector_str(conn: internal::SupportsConnector) -> &'static str {
@@ -360,7 +361,14 @@ impl<'a> Printer<'a> {
             .config
             .print_width
             .saturating_sub(current_col + suffix_len);
-        let fits = doc::fits(&prelude_doc, available, doc::Mode::Flat, &self.config);
+        let fits = doc::arena_fits::<dyn doc::TextResolver>(
+            &self.arena,
+            prelude_doc,
+            available,
+            Mode::Flat,
+            &self.config,
+            None,
+        );
 
         if fits {
             // Print inline with comments between parts
@@ -615,20 +623,21 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc representation of condition query for width checking
-    fn build_condition_doc(&self, parts: &[internal::SupportsPart]) -> doc::Doc {
+    fn build_condition_doc(&self, parts: &[internal::SupportsPart]) -> DocId {
+        let d = self.d();
         let mut docs = Vec::new();
         for (i, part) in parts.iter().enumerate() {
             if i > 0 {
-                docs.push(doc::text(" "));
+                docs.push(d.text(" "));
             }
             if let Some(conn) = part.connector {
-                docs.push(doc::text(connector_str(conn)));
-                docs.push(doc::text(" "));
+                docs.push(d.text(connector_str(conn)));
+                docs.push(d.text(" "));
             }
-            docs.push(doc::text_owned(part.content.clone()));
+            docs.push(d.text_owned(part.content.clone()));
         }
 
-        doc::concat(docs)
+        d.concat(&docs)
     }
 
     /// Format @import media query with line-width wrapping at `and`/`or` boundaries

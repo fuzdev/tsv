@@ -17,7 +17,8 @@ use super::Printer;
 use super::expressions::format_string_literal_from_ast;
 use super::is_string_literal;
 use crate::ast::internal::{self, Expression};
-use tsv_lang::doc::{self, Doc, GroupId};
+use tsv_lang::doc::GroupId;
+use tsv_lang::doc::arena::DocId;
 
 /// Prettier's heuristic for "short" property keys.
 ///
@@ -65,7 +66,7 @@ pub fn choose_layout(
     // The value expands internally: `key: { ... }` not `key:\n{ ... }`
     //
     // Call expressions use conditional_group to try multiple states during fits().
-    // With the updated fits.rs logic, calls can "fit" even when they break internally,
+    // With the fits logic, calls can "fit" even when they break internally,
     // allowing the call to handle breaking before the assignment does.
     if is_self_expanding_value(right_expr) {
         return AssignmentLayout::NeverBreakAfterOperator;
@@ -565,11 +566,12 @@ impl<'a> Printer<'a> {
     /// For non-property assignments (e.g., `x = value`), pass `false`.
     pub fn build_assignment_layout(
         &self,
-        left_doc: Doc,
+        left_doc: DocId,
         operator: &'static str,
         right_expr: &Expression,
         is_short_key: bool,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut layout = choose_layout(
             right_expr,
             is_short_key,
@@ -603,10 +605,10 @@ impl<'a> Printer<'a> {
                 // Break after operator with nested groups - matches prettier exactly
                 // Structure: group([group(left), op, group(indent([line, right]))])
                 // Each inner group can break independently based on remaining width
-                doc::group(doc::concat(vec![
-                    doc::group(left_doc),
-                    doc::text(operator),
-                    doc::group(doc::indent_line(right_doc)),
+                d.group(d.concat(&[
+                    d.group(left_doc),
+                    d.text(operator),
+                    d.group(d.indent_line(right_doc)),
                 ]))
             }
 
@@ -614,12 +616,7 @@ impl<'a> Printer<'a> {
                 // Never break after operator - matches prettier: group([group(left), op, " ", right])
                 // Wrapping left_doc in a group allows right_doc's conditional_groups to expand independently
                 // Structure: group([group(left), op, " ", right])
-                doc::group(doc::concat(vec![
-                    doc::group(left_doc),
-                    doc::text(operator),
-                    doc::text(" "),
-                    right_doc,
-                ]))
+                d.group(d.concat(&[d.group(left_doc), d.text(operator), d.text(" "), right_doc]))
             }
 
             AssignmentLayout::Fluid => {
@@ -632,12 +629,12 @@ impl<'a> Printer<'a> {
                 //   lineSuffixBoundary,
                 //   indentIfBreak(rightDoc, { groupId }),      // Conditional indent
                 // ])
-                doc::group(doc::concat(vec![
-                    doc::group(left_doc),
-                    doc::text(operator),
-                    doc::group_with_id(doc::indent(doc::line()), GroupId::Assignment),
-                    doc::line_suffix_boundary(),
-                    doc::indent_if_break(right_doc, GroupId::Assignment, false),
+                d.group(d.concat(&[
+                    d.group(left_doc),
+                    d.text(operator),
+                    d.group_with_id(d.indent(d.line()), GroupId::Assignment),
+                    d.line_suffix_boundary(),
+                    d.indent_if_break(right_doc, GroupId::Assignment, false),
                 ]))
             }
         }

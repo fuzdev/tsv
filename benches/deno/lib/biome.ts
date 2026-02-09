@@ -1,11 +1,7 @@
 /**
  * Biome implementation wrapper (via WASM)
  *
- * Supports: TypeScript, JavaScript, CSS
- *
- * NOTE: Svelte is disabled because biome's WASM module crashes on Svelte 5
- * syntax ({@render} in {#if} blocks, etc.) and accumulates internal corruption
- * after repeated panics, eventually failing on all files.
+ * Supports: TypeScript, JavaScript, CSS, Svelte
  */
 
 import { type Language, LANGUAGE_EXTENSIONS, type TsvImplementation } from './types.ts';
@@ -19,7 +15,7 @@ import { Biome } from '@biomejs/js-api/bundler';
  * Biome implementation using WASM.
  *
  * Supports:
- * - Format: TypeScript, JavaScript, CSS (Svelte disabled due to WASM crashes)
+ * - Format: Svelte, TypeScript, JavaScript, CSS
  * - Parse: Not implemented in benchmarks
  */
 export class BiomeImplementation implements TsvImplementation {
@@ -31,8 +27,8 @@ export class BiomeImplementation implements TsvImplementation {
 	/** Languages supported for parsing (none - not implemented) */
 	static readonly PARSE_LANGUAGES: Language[] = [];
 
-	/** Languages supported for formatting (Svelte disabled - causes WASM corruption) */
-	static readonly FORMAT_LANGUAGES: Language[] = ['typescript', 'css'];
+	/** Languages supported for formatting */
+	static readonly FORMAT_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
 
 	constructor(versions: BiomeVersions) {
 		this.versions = versions;
@@ -44,7 +40,7 @@ export class BiomeImplementation implements TsvImplementation {
 		const { projectKey } = this._biome.openProject('/tmp');
 		this._projectKey = projectKey;
 
-		// Configure to match prettier defaults (useTabs) and enable Svelte
+		// Configure to match prettier defaults (useTabs) and enable Svelte/HTML
 		this._biome.applyConfiguration(projectKey, {
 			formatter: {
 				indentStyle: 'tab',

@@ -32,6 +32,7 @@ use crate::ast::internal::{self, FragmentNode};
 use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::DefaultStringInterner;
+use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{Comment, OutputBuffer, PrintConfig, SymbolResolver};
 
 /// Pending whitespace state - buffers whitespace decisions until next node is known
@@ -136,6 +137,8 @@ pub struct Printer<'a> {
     pub(crate) indent_level: usize,
     /// Print configuration
     config: PrintConfig,
+    /// Arena allocator for doc nodes
+    pub(crate) arena: DocArena,
     /// Source code (needed for preserving whitespace semantics)
     pub(crate) source: &'a str,
     /// Shared string interner for resolving symbols
@@ -168,11 +171,18 @@ impl<'a> Printer<'a> {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
             config,
+            arena: DocArena::with_source_size_hint(source.len(), config.tab_width),
             source,
             interner,
             comments,
             line_breaks,
         }
+    }
+
+    /// Get a reference to the doc arena (convenience for `&self.arena`).
+    #[inline]
+    pub(crate) fn d(&self) -> &DocArena {
+        &self.arena
     }
 
     /// Write a string to the buffer
@@ -199,7 +209,7 @@ impl<'a> Printer<'a> {
         self.buffer.into_string()
     }
 
-    /// Render a doc immediately at current buffer position
+    /// Render a DocId immediately at current buffer position
     ///
     /// This is the foundation for doc-first formatting. Instead of using
     /// imperative printing, callers build a Doc and render it in one step.
@@ -212,16 +222,13 @@ impl<'a> Printer<'a> {
     /// whitespace-sensitive elements (<pre>, <textarea>) whose trailing whitespace
     /// must be preserved. Normal elements have trailing whitespace stripped during
     /// doc building, not rendering.
-    pub(crate) fn render_doc_immediate(&mut self, doc: &tsv_lang::doc::Doc) {
-        // Convert Doc to arena then render for better performance
-        let arena = tsv_lang::doc::arena::DocArena::with_source_size_hint(256);
-        let doc_id = arena.convert_doc(doc);
+    pub(crate) fn render_doc_immediate(&mut self, d: DocId) {
         let col = self.buffer.current_column(self.config.tab_width);
         let output = {
             let interner = self.interner.borrow();
             tsv_lang::doc::arena_print_doc_with_indent_resolved_preserve_whitespace(
-                &arena,
-                doc_id,
+                &self.arena,
+                d,
                 &self.config,
                 col,
                 self.indent_level,
@@ -229,6 +236,52 @@ impl<'a> Printer<'a> {
             )
         };
         self.write(&output);
+    }
+}
+
+impl<'a> Printer<'a> {
+    /// Build a DocId for a TS expression (with comments) in our arena.
+    ///
+    /// Uses the standard parameters: self.comments, self.config, self.line_breaks.
+    /// For calls that need custom config or empty comments, use the tsv_ts functions directly.
+    pub(crate) fn build_ts_expression_doc(&self, expr: &tsv_ts::Expression) -> DocId {
+        tsv_ts::build_expression_doc_with_comments(
+            self.d(),
+            expr,
+            self.source,
+            Rc::clone(&self.interner),
+            &self.config,
+            self.comments,
+            &self.line_breaks,
+        )
+    }
+
+    /// Build a DocId for a TS expression without comments.
+    ///
+    /// Used for contexts like @const patterns or this={expr} where no comments
+    /// are expected between the expression and its container.
+    pub(crate) fn build_ts_expression_doc_no_comments(&self, expr: &tsv_ts::Expression) -> DocId {
+        tsv_ts::build_expression_doc_with_comments(
+            self.d(),
+            expr,
+            self.source,
+            Rc::clone(&self.interner),
+            &self.config,
+            &[],
+            &self.line_breaks,
+        )
+    }
+
+    /// Format a TS expression to a string.
+    ///
+    /// Returns a simple formatted string with no indent context or comments.
+    pub(crate) fn format_ts_expression(&self, expr: &tsv_ts::Expression) -> String {
+        tsv_ts::format_expression(
+            expr,
+            self.source,
+            Rc::clone(&self.interner),
+            &self.line_breaks,
+        )
     }
 }
 

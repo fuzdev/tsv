@@ -43,7 +43,7 @@ use super::chain;
 use super::utils::{is_block_function, preceding_args_allow_hug};
 use crate::ast::internal;
 use arg_comments::any_comment_forces_expansion;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 /// Check if a chain expression contains any call expressions
 fn chain_has_calls(expr: &internal::Expression) -> bool {
@@ -73,7 +73,7 @@ fn is_memberish(expr: &internal::Expression) -> bool {
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a call expression with argument wrapping (not chain-aware)
-    pub(super) fn build_call_doc_with_wrapping(&self, call: &internal::CallExpression) -> Doc {
+    pub(super) fn build_call_doc_with_wrapping(&self, call: &internal::CallExpression) -> DocId {
         call_formatting::build_call_doc_with_wrapping(self, call)
     }
 
@@ -81,7 +81,7 @@ impl<'a> Printer<'a> {
     ///
     /// Uses the chain module's grouping and doc building logic for proper
     /// member chain formatting, including the 3+ calls rule.
-    fn build_chain_doc_with_wrapping(&self, expr: &internal::Expression) -> Doc {
+    fn build_chain_doc_with_wrapping(&self, expr: &internal::Expression) -> DocId {
         let nodes = chain::linearize_chain(expr);
         let groups = chain::group_chain_nodes(nodes);
         let chain_doc = chain::build_chain_doc(&groups, self);
@@ -100,7 +100,7 @@ impl<'a> Printer<'a> {
     ///
     /// Simple calls like `obj.method()` use the simple call path unless they have
     /// comments between member segments.
-    pub(super) fn build_call_doc(&self, call: &internal::CallExpression) -> Doc {
+    pub(super) fn build_call_doc(&self, call: &internal::CallExpression) -> DocId {
         // Curried call with callback pattern: fn()('arg', () => { ... })
         // When the callee is a call expression (curried call) and the last argument
         // is a block function, keep args hugged (always inline, no conditional_group).
@@ -121,6 +121,7 @@ impl<'a> Printer<'a> {
             && !any_comment_forces_expansion(call, self, paren_open)
         {
             // Build curried callback doc directly - always hugged, with leading comments
+            let d = self.d();
             let callee_doc = self.build_expression_doc(&call.callee);
             let first_arg_start = call.arguments[0].span().start;
 
@@ -131,15 +132,15 @@ impl<'a> Printer<'a> {
             // Uses _opt variant to avoid double binary search
             let leading_comments = self
                 .build_inline_comments_between_doc_trailing_space_opt(paren_open, first_arg_start);
-            let inner = doc::concat(
-                leading_comments
-                    .into_iter()
-                    .chain(head_parts)
-                    .chain(std::iter::once(last_arg_doc))
-                    .collect(),
-            );
+            let mut inner_parts: Vec<DocId> = Vec::new();
+            if let Some(comment) = leading_comments {
+                inner_parts.push(comment);
+            }
+            inner_parts.extend(head_parts);
+            inner_parts.push(last_arg_doc);
+            let inner = d.concat(&inner_parts);
 
-            return doc::concat(vec![callee_doc, doc::text("("), inner, doc::text(")")]);
+            return d.concat(&[callee_doc, d.text("("), inner, d.text(")")]);
         }
 
         // Check if this is a true chain (callee contains calls, like `a().b()`)
@@ -170,7 +171,7 @@ impl<'a> Printer<'a> {
     /// 1. Linearize AST into flat list of chain nodes
     /// 2. Group nodes by natural break points
     /// 3. Build doc with conditionalGroup for oneLine/expanded alternatives
-    pub(super) fn build_member_doc(&self, member: &internal::MemberExpression) -> Doc {
+    pub(super) fn build_member_doc(&self, member: &internal::MemberExpression) -> DocId {
         // Use chain-based implementation
         let expr = internal::Expression::MemberExpression(member.clone());
         let nodes = chain::linearize_chain(&expr);
@@ -187,12 +188,12 @@ impl<'a> Printer<'a> {
     pub(super) fn build_import_expression_doc(
         &self,
         import_expr: &internal::ImportExpression,
-    ) -> Doc {
+    ) -> DocId {
         import_expr::build_import_expression_doc(self, import_expr)
     }
 
     /// Build a Doc for a meta property: `import.meta`, `new.target`
-    pub(super) fn build_meta_property_doc(&self, meta: &internal::MetaProperty) -> Doc {
+    pub(super) fn build_meta_property_doc(&self, meta: &internal::MetaProperty) -> DocId {
         import_expr::build_meta_property_doc(self, meta)
     }
 
@@ -203,7 +204,7 @@ impl<'a> Printer<'a> {
         &self,
         call: &internal::CallExpression,
         optional: bool,
-    ) -> Doc {
+    ) -> DocId {
         chain_args::build_call_args_doc_for_chain(self, call, optional)
     }
 
@@ -214,7 +215,7 @@ impl<'a> Printer<'a> {
         &self,
         call: &internal::CallExpression,
         optional: bool,
-    ) -> Doc {
+    ) -> DocId {
         chain_args::build_call_args_doc_for_chain_expanded(self, call, optional)
     }
 }

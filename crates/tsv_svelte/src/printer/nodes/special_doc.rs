@@ -6,13 +6,11 @@
 // - svelte:fragment, svelte:boundary
 // - slot, title
 
-use std::rc::Rc;
-
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
 use crate::printer::helpers::has_multiline_template_literal;
 use crate::printer::text::TextAnalysis;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Build a doc for a special element (svelte:component, svelte:element, etc.)
@@ -23,7 +21,8 @@ impl<'a> Printer<'a> {
     /// - Inline children: `<slot name="x">text</slot>`
     /// - Hug mode: attrs fit, children force break
     /// - Full multiline: attrs wrapped, children on new lines
-    pub(crate) fn build_special_element_doc(&self, element: &internal::SpecialElement) -> Doc {
+    pub(crate) fn build_special_element_doc(&self, element: &internal::SpecialElement) -> DocId {
+        let d = self.d();
         use internal::SpecialElementKind;
 
         let tag_name = element.kind.tag_name();
@@ -75,21 +74,22 @@ impl<'a> Printer<'a> {
         // Handle self-closing elements
         if is_self_closing {
             return if !has_attrs {
-                doc::concat(vec![doc::text("<"), doc::text(tag_name), doc::text(" />")])
+                d.concat(&[d.text("<"), d.text(tag_name), d.text(" />")])
             } else {
                 // Self-closing with attrs - use group for proper wrapping
-                let inner = doc::concat(vec![
-                    doc::text("<"),
-                    doc::text(tag_name),
-                    doc::indent(doc::concat(attr_docs)),
-                    doc::line(),
-                    doc::text("/>"),
+                let attr_concat = d.concat(&attr_docs);
+                let inner = d.concat(&[
+                    d.text("<"),
+                    d.text(tag_name),
+                    d.indent(attr_concat),
+                    d.line(),
+                    d.text("/>"),
                 ]);
 
                 if has_multiline_template {
-                    doc::group_break(inner)
+                    d.group_break(inner)
                 } else {
-                    doc::group(inner)
+                    d.group(inner)
                 }
             };
         }
@@ -97,46 +97,48 @@ impl<'a> Printer<'a> {
         // Handle empty elements (not self-closing)
         if element.fragment.nodes.is_empty() {
             return if !has_attrs {
-                doc::concat(vec![
-                    doc::text("<"),
-                    doc::text(tag_name),
-                    doc::text("></"),
-                    doc::text(tag_name),
-                    doc::text(">"),
+                d.concat(&[
+                    d.text("<"),
+                    d.text(tag_name),
+                    d.text("></"),
+                    d.text(tag_name),
+                    d.text(">"),
                 ])
             } else {
                 // Empty with attrs - use conditional_group for hug mode
-                let closing =
-                    doc::concat(vec![doc::text("></"), doc::text(tag_name), doc::text(">")]);
+                let closing = d.concat(&[d.text("></"), d.text(tag_name), d.text(">")]);
 
                 // State 1: All inline
-                let inline_state = doc::concat(vec![
-                    doc::text("<"),
-                    doc::text(tag_name),
-                    doc::indent(doc::concat(attr_docs.clone())),
-                    closing.clone(),
+                let attr_concat_inline = d.concat(&attr_docs);
+                let inline_state = d.concat(&[
+                    d.text("<"),
+                    d.text(tag_name),
+                    d.indent(attr_concat_inline),
+                    closing,
                 ]);
 
                 // State 2: Hug mode - attrs inline (space-separated), > on new line
                 let hug_attrs = self.build_special_element_attrs_doc_spaces(element);
-                let hug_state = doc::concat(vec![
-                    doc::text("<"),
-                    doc::text(tag_name),
-                    doc::concat(hug_attrs),
-                    doc::hardline(),
-                    closing.clone(),
-                ]);
-
-                // State 3: Full multiline - attrs on separate lines
-                let multiline_state = doc::concat(vec![
-                    doc::text("<"),
-                    doc::text(tag_name),
-                    doc::indent(doc::concat(attr_docs)),
-                    doc::hardline(),
+                let hug_attrs_concat = d.concat(&hug_attrs);
+                let hug_state = d.concat(&[
+                    d.text("<"),
+                    d.text(tag_name),
+                    hug_attrs_concat,
+                    d.hardline(),
                     closing,
                 ]);
 
-                doc::conditional_group(vec![inline_state, hug_state, multiline_state])
+                // State 3: Full multiline - attrs on separate lines
+                let attr_concat_multiline = d.concat(&attr_docs);
+                let multiline_state = d.concat(&[
+                    d.text("<"),
+                    d.text(tag_name),
+                    d.indent(attr_concat_multiline),
+                    d.hardline(),
+                    closing,
+                ]);
+
+                d.conditional_group(&[inline_state, hug_state, multiline_state])
             };
         }
 
@@ -207,13 +209,14 @@ impl<'a> Printer<'a> {
 
         // Build children doc based on formatting mode
         // Special elements are block-level, so always trim boundaries
-        let children_doc = if needs_multiline {
+        let children_doc_tree = if needs_multiline {
             self.build_nodes_doc_multiline(&element.fragment.nodes)
         } else if is_simple_content {
             self.build_nodes_doc_trimmed(&element.fragment.nodes, true)
         } else {
             self.build_fragment_doc(&element.fragment)
         };
+        let children_doc = children_doc_tree;
 
         // Hug mode detection (like regular elements)
         // svelte:boundary with snippets disables hug mode
@@ -229,158 +232,145 @@ impl<'a> Printer<'a> {
         if !has_attrs {
             // No attrs - simpler structure
             if needs_multiline {
-                doc::concat(vec![
-                    doc::text("<"),
-                    doc::text(tag_name),
-                    doc::text(">"),
-                    doc::indent(doc::concat(vec![doc::hardline(), children_doc])),
-                    doc::hardline(),
-                    doc::text("</"),
-                    doc::text(tag_name),
-                    doc::text(">"),
+                let inner = d.concat(&[d.hardline(), children_doc]);
+                d.concat(&[
+                    d.text("<"),
+                    d.text(tag_name),
+                    d.text(">"),
+                    d.indent(inner),
+                    d.hardline(),
+                    d.text("</"),
+                    d.text(tag_name),
+                    d.text(">"),
                 ])
             } else if forces_hug_mode {
                 // Expanding blocks force hug mode with hardlines
                 // <slot
                 //   >{#if c}text{/if}</slot
                 // >
-                doc::group(doc::concat(vec![
-                    doc::text("<"),
-                    doc::text(tag_name),
-                    doc::indent(doc::concat(vec![
-                        doc::hardline(),
-                        doc::group(doc::concat(vec![
-                            doc::text(">"),
-                            children_doc,
-                            doc::text("</"),
-                            doc::text(tag_name),
-                        ])),
-                    ])),
-                    doc::hardline(),
-                    doc::text(">"),
+                let inner_group =
+                    d.concat(&[d.text(">"), children_doc, d.text("</"), d.text(tag_name)]);
+                let inner_group = d.group(inner_group);
+                let indent_content = d.concat(&[d.hardline(), inner_group]);
+                d.group(d.concat(&[
+                    d.text("<"),
+                    d.text(tag_name),
+                    d.indent(indent_content),
+                    d.hardline(),
+                    d.text(">"),
                 ]))
             } else if hug_start && hug_end {
                 // Hug both - use group with softlines
-                doc::group(doc::concat(vec![
-                    doc::text("<"),
-                    doc::text(tag_name),
-                    doc::indent(doc::concat(vec![
-                        doc::softline(),
-                        doc::group(doc::concat(vec![
-                            doc::text(">"),
-                            children_doc,
-                            doc::text("</"),
-                            doc::text(tag_name),
-                        ])),
-                    ])),
-                    doc::softline(),
-                    doc::text(">"),
+                let inner_group =
+                    d.concat(&[d.text(">"), children_doc, d.text("</"), d.text(tag_name)]);
+                let inner_group = d.group(inner_group);
+                let indent_content = d.concat(&[d.softline(), inner_group]);
+                d.group(d.concat(&[
+                    d.text("<"),
+                    d.text(tag_name),
+                    d.indent(indent_content),
+                    d.softline(),
+                    d.text(">"),
                 ]))
             } else {
                 // Inline
-                doc::concat(vec![
-                    doc::text("<"),
-                    doc::text(tag_name),
-                    doc::text(">"),
+                d.concat(&[
+                    d.text("<"),
+                    d.text(tag_name),
+                    d.text(">"),
                     children_doc,
-                    doc::text("</"),
-                    doc::text(tag_name),
-                    doc::text(">"),
+                    d.text("</"),
+                    d.text(tag_name),
+                    d.text(">"),
                 ])
             }
         } else if needs_multiline {
             // With attrs, multiline children
-            doc::concat(vec![
-                doc::text("<"),
-                doc::text(tag_name),
-                doc::group(doc::indent(doc::concat(attr_docs))),
-                doc::text(">"),
-                doc::indent(doc::concat(vec![doc::hardline(), children_doc])),
-                doc::hardline(),
-                doc::text("</"),
-                doc::text(tag_name),
-                doc::text(">"),
+            let attr_concat = d.concat(&attr_docs);
+            let inner = d.concat(&[d.hardline(), children_doc]);
+            d.concat(&[
+                d.text("<"),
+                d.text(tag_name),
+                d.group(d.indent(attr_concat)),
+                d.text(">"),
+                d.indent(inner),
+                d.hardline(),
+                d.text("</"),
+                d.text(tag_name),
+                d.text(">"),
             ])
         } else if forces_hug_mode {
             // Expanding blocks force hug mode with hardlines (with attrs)
             // <slot name="x"
             //   >{#if c}text{/if}</slot
             // >
-            let body = doc::concat(vec![
-                doc::text(">"),
-                children_doc,
-                doc::text("</"),
-                doc::text(tag_name),
-            ]);
+            let body = d.concat(&[d.text(">"), children_doc, d.text("</"), d.text(tag_name)]);
 
-            doc::group(doc::concat(vec![
-                doc::text("<"),
-                doc::text(tag_name),
-                doc::indent(doc::group(doc::concat(attr_docs))),
-                doc::indent(doc::concat(vec![doc::hardline(), body])),
-                doc::hardline(),
-                doc::text(">"),
+            let attr_concat = d.concat(&attr_docs);
+            let body_indent = d.concat(&[d.hardline(), body]);
+            d.group(d.concat(&[
+                d.text("<"),
+                d.text(tag_name),
+                d.indent(d.group(attr_concat)),
+                d.indent(body_indent),
+                d.hardline(),
+                d.text(">"),
             ]))
         } else if hug_start && hug_end {
             // With attrs, hug mode - use nested groups like regular elements
             // Outer group: controls whether content goes on new line
             // Inner group (around attrs): controls whether attrs break
-            let body = doc::concat(vec![
-                doc::text(">"),
-                children_doc,
-                doc::text("</"),
-                doc::text(tag_name),
-            ]);
+            let body = d.concat(&[d.text(">"), children_doc, d.text("</"), d.text(tag_name)]);
 
+            let attr_concat = d.concat(&attr_docs);
             let attr_group = if has_multiline_template {
-                doc::group_break(doc::concat(attr_docs))
+                d.group_break(attr_concat)
             } else {
-                doc::group(doc::concat(attr_docs))
+                d.group(attr_concat)
             };
 
-            let inner = doc::concat(vec![
-                doc::text("<"),
-                doc::text(tag_name),
-                doc::indent(attr_group),
-                doc::group(doc::indent_softline(body)),
-                doc::softline(),
-                doc::text(">"),
+            let body_indent_softline = d.indent_softline(body);
+            let inner = d.concat(&[
+                d.text("<"),
+                d.text(tag_name),
+                d.indent(attr_group),
+                d.group(body_indent_softline),
+                d.softline(),
+                d.text(">"),
             ]);
 
             if has_multiline_template {
-                doc::group_break(inner)
+                d.group_break(inner)
             } else {
-                doc::group(inner)
+                d.group(inner)
             }
         } else if has_multiline_template {
             // With attrs containing multiline template, inline children
             // Force attrs to break and use hug structure like Prettier
-            let body = doc::concat(vec![
-                doc::text(">"),
-                children_doc,
-                doc::text("</"),
-                doc::text(tag_name),
-            ]);
+            let body = d.concat(&[d.text(">"), children_doc, d.text("</"), d.text(tag_name)]);
 
-            doc::group_break(doc::concat(vec![
-                doc::text("<"),
-                doc::text(tag_name),
-                doc::indent(doc::concat(attr_docs)),
-                doc::group(doc::indent_softline(body)),
-                doc::softline(),
-                doc::text(">"),
+            let attr_concat = d.concat(&attr_docs);
+            let body_indent_softline = d.indent_softline(body);
+            d.group_break(d.concat(&[
+                d.text("<"),
+                d.text(tag_name),
+                d.indent(attr_concat),
+                d.group(body_indent_softline),
+                d.softline(),
+                d.text(">"),
             ]))
         } else {
             // With attrs, inline children
-            doc::group(doc::concat(vec![
-                doc::text("<"),
-                doc::text(tag_name),
-                doc::indent(doc::concat(attr_docs)),
-                doc::text(">"),
+            let attr_concat = d.concat(&attr_docs);
+            d.group(d.concat(&[
+                d.text("<"),
+                d.text(tag_name),
+                d.indent(attr_concat),
+                d.text(">"),
                 children_doc,
-                doc::text("</"),
-                doc::text(tag_name),
-                doc::text(">"),
+                d.text("</"),
+                d.text(tag_name),
+                d.text(">"),
             ]))
         }
     }
@@ -389,24 +379,24 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_special_element_attrs_doc(
         &self,
         element: &internal::SpecialElement,
-    ) -> Vec<Doc> {
-        self.build_special_element_attrs_doc_impl(element, doc::line())
+    ) -> Vec<DocId> {
+        self.build_special_element_attrs_doc_impl(element, self.d().line())
     }
 
     /// Build docs for special element attributes (space-separated, for hug mode)
     pub(crate) fn build_special_element_attrs_doc_spaces(
         &self,
         element: &internal::SpecialElement,
-    ) -> Vec<Doc> {
-        self.build_special_element_attrs_doc_impl(element, doc::text(" "))
+    ) -> Vec<DocId> {
+        self.build_special_element_attrs_doc_impl(element, self.d().text(" "))
     }
 
     /// Build docs for special element attributes with configurable separator
     fn build_special_element_attrs_doc_impl(
         &self,
         element: &internal::SpecialElement,
-        separator: Doc,
-    ) -> Vec<Doc> {
+        separator: DocId,
+    ) -> Vec<DocId> {
         // Pre-allocate: 2 docs per attr (separator + attr), plus potential this={} attr
         let has_this = matches!(
             element.kind,
@@ -419,11 +409,11 @@ impl<'a> Printer<'a> {
         // Add this={...} for component/element
         match &element.kind {
             internal::SpecialElementKind::SvelteComponent { expression } => {
-                docs.push(separator.clone());
+                docs.push(separator);
                 docs.push(self.build_this_attr_doc_for_inline(expression));
             }
             internal::SpecialElementKind::SvelteElement { tag } => {
-                docs.push(separator.clone());
+                docs.push(separator);
                 docs.push(self.build_this_attr_doc_for_inline(tag));
             }
             _ => {}
@@ -431,7 +421,7 @@ impl<'a> Printer<'a> {
 
         // Add regular attributes
         for attr in &element.attributes {
-            docs.push(separator.clone());
+            docs.push(separator);
             docs.push(self.build_attribute_node_doc(attr));
         }
 
@@ -439,25 +429,20 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for this={expression} attribute (for inline doc building)
-    fn build_this_attr_doc_for_inline(&self, expr: &tsv_ts::Expression) -> Doc {
+    fn build_this_attr_doc_for_inline(&self, expr: &tsv_ts::Expression) -> DocId {
+        let d = self.d();
         use tsv_ts::ast::internal::{Expression, LiteralValue};
 
         // Handle string literal: this="value" (without braces)
         if let Expression::Literal(lit) = expr
             && let LiteralValue::String { content, .. } = &lit.value
         {
-            return doc::text_owned(format!("this=\"{content}\""));
+            return d.text_owned(format!("this=\"{content}\""));
         }
 
         // Expression: this={expr}
-        let expr_doc = tsv_ts::build_expression_doc(
-            expr,
-            self.source,
-            Rc::clone(&self.interner),
-            &self.config,
-            &self.line_breaks,
-        );
-        doc::concat(vec![doc::text("this={"), expr_doc, doc::text("}")])
+        let expr_doc_id = self.build_ts_expression_doc_no_comments(expr);
+        d.concat(&[d.text("this={"), expr_doc_id, d.text("}")])
     }
 
     /// Check if special element should hug the start (no leading whitespace)

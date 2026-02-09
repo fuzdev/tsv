@@ -13,7 +13,7 @@ use super::{PatternContext, Printer, object_pattern_should_expand};
 use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
 use tsv_lang::Comment;
 use tsv_lang::comments_in_range;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 /// Context for assignment expression printing (chain detection)
 ///
@@ -54,35 +54,36 @@ fn is_nested_arrow_function(expr: &Expression) -> bool {
 
 /// Build chain formatting doc: [group(left), op, ...right parts]
 fn build_chain_doc(
-    left_doc: Doc,
+    d: &tsv_lang::doc::arena::DocArena,
+    left_doc: DocId,
     operator: String,
-    right_doc: Doc,
+    right_doc: DocId,
     is_tail: bool,
     is_arrow_chain: bool,
-) -> Doc {
-    let mut parts = vec![doc::group(left_doc), doc::text_owned(operator)];
+) -> DocId {
+    let mut parts = vec![d.group(left_doc), d.text_owned(operator)];
 
     if is_tail {
         if is_arrow_chain {
             // Chain-tail-arrow-chain: (x) => (y) => x + y
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
             parts.push(right_doc);
         } else {
             // Standard chain tail: indent the final value
-            parts.push(doc::indent_line(right_doc));
+            parts.push(d.indent_line(right_doc));
         }
     } else {
         // Chain middle: soft line break, no indent
-        parts.push(doc::line());
+        parts.push(d.line());
         parts.push(right_doc);
     }
 
-    doc::concat(parts)
+    d.concat(&parts)
 }
 
 impl<'a> Printer<'a> {
     /// Build a Doc for an assignment expression
-    pub(super) fn build_assignment_doc(&self, assign: &internal::AssignmentExpression) -> Doc {
+    pub(super) fn build_assignment_doc(&self, assign: &internal::AssignmentExpression) -> DocId {
         // Determine initial context based on whether we're at top level
         let initial_context = if self.in_top_level_assignment.get() {
             AssignmentContext::TopLevel
@@ -97,7 +98,8 @@ impl<'a> Printer<'a> {
         &self,
         assign: &internal::AssignmentExpression,
         context: AssignmentContext,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         // Check if RHS is an assignment (determines if we're in a chain)
         let rhs_is_assignment =
             matches!(assign.right.as_ref(), Expression::AssignmentExpression(_));
@@ -122,7 +124,7 @@ impl<'a> Printer<'a> {
             let operator = format!(" {}", assign.operator.as_str());
             let is_tail = !rhs_is_assignment;
             let is_arrow_chain = is_tail && is_nested_arrow_function(assign.right.as_ref());
-            build_chain_doc(left_doc, operator, right_doc, is_tail, is_arrow_chain)
+            build_chain_doc(d, left_doc, operator, right_doc, is_tail, is_arrow_chain)
         } else {
             // Non-chain formatting
             let left_doc = self.build_expression_doc(&assign.left);
@@ -141,21 +143,21 @@ impl<'a> Printer<'a> {
             // Object patterns on LHS need special handling - never break after operator
             // The object pattern handles its own expansion
             if matches!(assign.left.as_ref(), Expression::ObjectPattern(_)) {
-                doc::concat(vec![
+                d.concat(&[
                     left_doc,
-                    doc::text(" "),
-                    doc::text(assign.operator.as_str()),
-                    doc::text(" "),
+                    d.text(" "),
+                    d.text(assign.operator.as_str()),
+                    d.text(" "),
                     right_doc,
                 ])
             } else if rhs_is_assignment {
                 // RHS is a chain - don't use assignment layout, just group + indent
                 // The right_doc already has chain formatting from recursive call
-                doc::group(doc::concat(vec![
+                d.group(d.concat(&[
                     left_doc,
-                    doc::text(" "),
-                    doc::text(assign.operator.as_str()),
-                    doc::indent_line(right_doc),
+                    d.text(" "),
+                    d.text(assign.operator.as_str()),
+                    d.indent_line(right_doc),
                 ]))
             } else {
                 // Use unified assignment layout system (matches Prettier)
@@ -190,7 +192,7 @@ impl<'a> Printer<'a> {
     /// Prettier expands object patterns when:
     /// 1. Any property has a nested pattern value (always expand)
     /// 2. The pattern exceeds print width (width-based expansion)
-    pub(super) fn build_object_pattern_doc(&self, obj: &internal::ObjectPattern) -> Doc {
+    pub(super) fn build_object_pattern_doc(&self, obj: &internal::ObjectPattern) -> DocId {
         self.build_object_pattern_doc_with_context(obj, PatternContext::Standalone)
     }
 
@@ -199,7 +201,8 @@ impl<'a> Printer<'a> {
         &self,
         obj: &internal::ObjectPattern,
         context: PatternContext,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         if obj.properties.is_empty() {
             self.build_empty_object_pattern_doc(obj)
         } else {
@@ -247,9 +250,9 @@ impl<'a> Printer<'a> {
 
                     // Add comma
                     if !is_last {
-                        parts.push(doc::text(","));
+                        parts.push(d.text(","));
                     } else if !last_is_rest {
-                        parts.push(doc::trailing_comma());
+                        parts.push(d.trailing_comma());
                     }
 
                     // Line comments go after comma
@@ -257,7 +260,7 @@ impl<'a> Printer<'a> {
 
                     // Add line break between properties
                     if !is_last {
-                        parts.push(doc::line());
+                        parts.push(d.line());
                     }
 
                     prev_end = trailing.end_pos;
@@ -270,10 +273,10 @@ impl<'a> Printer<'a> {
 
                 // Build group contents: { + properties + }
                 let mut group_parts = vec![
-                    doc::text("{"),
-                    doc::indent_softline(doc::concat(parts)),
-                    doc::softline(),
-                    doc::text("}"),
+                    d.text("{"),
+                    d.indent_softline(d.concat(&parts)),
+                    d.softline(),
+                    d.text("}"),
                 ];
 
                 // Include type annotation in the group for width calculation
@@ -281,7 +284,7 @@ impl<'a> Printer<'a> {
                     group_parts.push(self.build_type_annotation_doc(type_annotation));
                 }
 
-                doc::group(doc::concat(group_parts))
+                d.group(d.concat(&group_parts))
             }
         }
     }
@@ -290,7 +293,8 @@ impl<'a> Printer<'a> {
     ///
     /// Only captures comments on NEW lines (not same-line trailing comments,
     /// which are handled in the main loop).
-    fn build_object_pattern_trailing_comments(&self, obj: &internal::ObjectPattern) -> Doc {
+    fn build_object_pattern_trailing_comments(&self, obj: &internal::ObjectPattern) -> DocId {
+        let d = self.d();
         if let Some(last_prop) = obj.properties.last() {
             let prop_end = last_prop.span().end;
             let boundary = obj
@@ -303,13 +307,13 @@ impl<'a> Printer<'a> {
             let mut parts = Vec::new();
             for comment in comments_in_range(self.comments, prop_end, boundary) {
                 if !self.is_same_line(prop_end, comment.span.start) {
-                    parts.push(doc::text(" "));
+                    parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
             }
-            doc::concat(parts)
+            d.concat(&parts)
         } else {
-            doc::empty()
+            d.empty()
         }
     }
 
@@ -411,39 +415,40 @@ impl<'a> Printer<'a> {
     }
 
     /// Build docs for block comments (go before comma)
-    fn build_block_comments_doc(&self, comments: &[&Comment]) -> Doc {
+    fn build_block_comments_doc(&self, comments: &[&Comment]) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
         for comment in comments {
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build docs for line comments (go after comma, excluded from width)
-    fn build_line_comments_suffix_doc(&self, comments: &[&Comment]) -> Doc {
+    fn build_line_comments_suffix_doc(&self, comments: &[&Comment]) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
         for comment in comments {
             parts.push(self.build_trailing_line_comment_doc(comment));
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build doc for empty object pattern: `{}` with optional type annotation
-    fn build_empty_object_pattern_doc(&self, obj: &internal::ObjectPattern) -> Doc {
+    fn build_empty_object_pattern_doc(&self, obj: &internal::ObjectPattern) -> DocId {
+        let d = self.d();
         let body_doc = self.build_empty_body_with_comments_doc(obj.span);
         if let Some(type_annotation) = &obj.type_annotation {
-            doc::concat(vec![
-                body_doc,
-                self.build_type_annotation_doc(type_annotation),
-            ])
+            d.concat(&[body_doc, self.build_type_annotation_doc(type_annotation)])
         } else {
             body_doc
         }
     }
 
     /// Build expanded doc for object pattern with hardlines (always multiline)
-    fn build_expanded_object_pattern_doc(&self, obj: &internal::ObjectPattern) -> Doc {
+    fn build_expanded_object_pattern_doc(&self, obj: &internal::ObjectPattern) -> DocId {
+        let d = self.d();
         let last_is_rest = matches!(
             obj.properties.last(),
             Some(ObjectPatternProperty::RestElement(_))
@@ -482,7 +487,7 @@ impl<'a> Printer<'a> {
 
             // Add trailing comma unless it's a rest element (syntax error)
             if !is_last || !last_is_rest {
-                prop_parts.push(doc::text(","));
+                prop_parts.push(d.text(","));
             }
 
             // Line comments go after comma
@@ -500,9 +505,9 @@ impl<'a> Printer<'a> {
 
                 if self.has_blank_line_between(trailing.end_pos, check_pos) {
                     // Preserve blank line: literalline (no indent) + hardline (with indent)
-                    prop_parts.push(doc::literalline());
+                    prop_parts.push(d.literalline());
                 }
-                prop_parts.push(doc::hardline());
+                prop_parts.push(d.hardline());
             }
 
             prev_end = trailing.end_pos;
@@ -514,24 +519,25 @@ impl<'a> Printer<'a> {
 
         // Structure: { + indent(hardline + props) + hardline + } + type_annotation
         let mut result_parts = vec![
-            doc::text("{"),
-            doc::indent(doc::concat(vec![doc::hardline(), doc::concat(prop_parts)])),
-            doc::hardline(),
-            doc::text("}"),
+            d.text("{"),
+            d.indent(d.concat(&[d.hardline(), d.concat(&prop_parts)])),
+            d.hardline(),
+            d.text("}"),
         ];
 
         if let Some(type_annotation) = &obj.type_annotation {
             result_parts.push(self.build_type_annotation_doc(type_annotation));
         }
 
-        doc::concat(result_parts)
+        d.concat(&result_parts)
     }
 
     /// Build a Doc for an object pattern property
     ///
     /// String keys that are valid identifiers are normalized to unquoted form:
     /// `{"key": value}` → `{key: value}`
-    fn build_object_pattern_property_doc(&self, prop: &ObjectPatternProperty) -> Doc {
+    fn build_object_pattern_property_doc(&self, prop: &ObjectPatternProperty) -> DocId {
+        let d = self.d();
         match prop {
             ObjectPatternProperty::Property(p) => {
                 if p.shorthand {
@@ -549,9 +555,9 @@ impl<'a> Printer<'a> {
                             p.key.span().end,
                             rhs.span().start,
                         );
-                        doc::concat(vec![
+                        d.concat(&[
                             self.build_expression_doc(&p.key),
-                            doc::text(" = "),
+                            d.text(" = "),
                             comments,
                             self.build_expression_doc(rhs),
                         ])
@@ -563,7 +569,7 @@ impl<'a> Printer<'a> {
                     // Handle computed keys: {[key]: value}
                     // For regular keys, use property_key_doc to normalize string keys to identifiers
                     let key_doc = if p.computed {
-                        doc::brackets(self.build_expression_doc(&p.key))
+                        d.brackets(self.build_expression_doc(&p.key))
                     } else {
                         self.build_property_key_doc(&p.key)
                     };
@@ -573,9 +579,9 @@ impl<'a> Printer<'a> {
                     let value_start = p.value.span().start;
                     let comments =
                         self.build_inline_comments_between_doc_trailing_space(key_end, value_start);
-                    doc::concat(vec![
+                    d.concat(&[
                         key_doc,
-                        doc::text(": "),
+                        d.text(": "),
                         comments,
                         self.build_expression_doc(&p.value),
                     ])
@@ -586,7 +592,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an array pattern
-    pub(super) fn build_array_pattern_doc(&self, arr: &internal::ArrayPattern) -> Doc {
+    pub(super) fn build_array_pattern_doc(&self, arr: &internal::ArrayPattern) -> DocId {
         if arr.elements.is_empty() {
             return self.build_empty_array_pattern_doc(arr);
         }
@@ -602,7 +608,8 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for empty array pattern: `[]` with optional type annotation
-    fn build_empty_array_pattern_doc(&self, arr: &internal::ArrayPattern) -> Doc {
+    fn build_empty_array_pattern_doc(&self, arr: &internal::ArrayPattern) -> DocId {
+        let d = self.d();
         // For array patterns with type annotations, the body ends before the annotation
         let body_end = arr
             .type_annotation
@@ -612,10 +619,7 @@ impl<'a> Printer<'a> {
         let body_doc = self.build_empty_brackets_with_comments_doc_range(arr.span.start, body_end);
 
         if let Some(type_annotation) = &arr.type_annotation {
-            doc::concat(vec![
-                body_doc,
-                self.build_type_annotation_doc(type_annotation),
-            ])
+            d.concat(&[body_doc, self.build_type_annotation_doc(type_annotation)])
         } else {
             body_doc
         }
@@ -638,7 +642,8 @@ impl<'a> Printer<'a> {
     }
 
     /// Build grouped array pattern doc (width-based expansion)
-    fn build_grouped_array_pattern_doc(&self, arr: &internal::ArrayPattern) -> Doc {
+    fn build_grouped_array_pattern_doc(&self, arr: &internal::ArrayPattern) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
         let mut prev_end = arr.span.start + 1;
 
@@ -669,28 +674,28 @@ impl<'a> Printer<'a> {
 
                 // Add comma
                 if !is_last {
-                    parts.push(doc::text(","));
-                    parts.push(doc::line());
+                    parts.push(d.text(","));
+                    parts.push(d.line());
                 } else {
-                    parts.push(doc::trailing_comma());
+                    parts.push(d.trailing_comma());
                 }
 
                 prev_end = trailing.end_pos;
             } else {
                 // Hole in array pattern
                 if !is_last {
-                    parts.push(doc::text(","));
-                    parts.push(doc::line());
+                    parts.push(d.text(","));
+                    parts.push(d.line());
                 }
             }
         }
 
         // Build group contents
         let mut group_parts = vec![
-            doc::text("["),
-            doc::indent_softline(doc::concat(parts)),
-            doc::softline(),
-            doc::text("]"),
+            d.text("["),
+            d.indent_softline(d.concat(&parts)),
+            d.softline(),
+            d.text("]"),
         ];
 
         // Include type annotation in the group
@@ -698,11 +703,12 @@ impl<'a> Printer<'a> {
             group_parts.push(self.build_type_annotation_doc(type_annotation));
         }
 
-        doc::group(doc::concat(group_parts))
+        d.group(d.concat(&group_parts))
     }
 
     /// Build expanded array pattern doc (always multiline)
-    fn build_expanded_array_pattern_doc(&self, arr: &internal::ArrayPattern) -> Doc {
+    fn build_expanded_array_pattern_doc(&self, arr: &internal::ArrayPattern) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
         let mut prev_end = arr.span.start + 1;
 
@@ -742,7 +748,7 @@ impl<'a> Printer<'a> {
 
                 // Add comma (unless it's the last element AND it's a rest element)
                 if !is_last || !last_is_rest {
-                    parts.push(doc::text(","));
+                    parts.push(d.text(","));
                 }
 
                 // Line comments go after comma
@@ -758,54 +764,53 @@ impl<'a> Printer<'a> {
                                 .next()
                                 .map_or(next_start, |c| c.span.start);
                         if self.has_blank_line_between(trailing.end_pos, check_pos) {
-                            parts.push(doc::literalline());
+                            parts.push(d.literalline());
                         }
                     }
-                    parts.push(doc::hardline());
+                    parts.push(d.hardline());
                 }
 
                 prev_end = trailing.end_pos;
             } else {
                 // Hole in array pattern
-                parts.push(doc::text(","));
+                parts.push(d.text(","));
                 if !is_last {
-                    parts.push(doc::hardline());
+                    parts.push(d.hardline());
                 }
             }
         }
 
         // Structure: [ + indent(hardline + elements) + hardline + ] + type_annotation
         let mut result_parts = vec![
-            doc::text("["),
-            doc::indent(doc::concat(vec![doc::hardline(), doc::concat(parts)])),
-            doc::hardline(),
-            doc::text("]"),
+            d.text("["),
+            d.indent(d.concat(&[d.hardline(), d.concat(&parts)])),
+            d.hardline(),
+            d.text("]"),
         ];
 
         if let Some(type_annotation) = &arr.type_annotation {
             result_parts.push(self.build_type_annotation_doc(type_annotation));
         }
 
-        doc::concat(result_parts)
+        d.concat(&result_parts)
     }
 
     /// Build a Doc for an assignment pattern
     pub(super) fn build_assignment_pattern_doc(
         &self,
         pattern: &internal::AssignmentPattern,
-    ) -> Doc {
-        doc::concat(vec![
+    ) -> DocId {
+        let d = self.d();
+        d.concat(&[
             self.build_expression_doc(&pattern.left),
-            doc::text(" = "),
+            d.text(" = "),
             self.build_expression_doc(&pattern.right),
         ])
     }
 
     /// Build a Doc for a rest element
-    pub(super) fn build_rest_element_doc(&self, rest: &internal::RestElement) -> Doc {
-        doc::concat(vec![
-            doc::text("..."),
-            self.build_expression_doc(&rest.argument),
-        ])
+    pub(super) fn build_rest_element_doc(&self, rest: &internal::RestElement) -> DocId {
+        let d = self.d();
+        d.concat(&[d.text("..."), self.build_expression_doc(&rest.argument)])
     }
 }

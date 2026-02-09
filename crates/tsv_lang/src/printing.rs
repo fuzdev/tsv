@@ -595,6 +595,12 @@ pub fn strip_comment_indentation(source: &str, content: &str, comment_start: u32
 /// ```
 #[inline]
 pub fn visual_width(s: &str, tab_width: usize) -> usize {
+    if s.is_ascii() {
+        // Fast path: each ASCII byte is 1 column, tabs are tab_width columns.
+        #[allow(clippy::naive_bytecount)]
+        let tab_count = s.as_bytes().iter().filter(|&&b| b == b'\t').count();
+        return s.len() + tab_count * (tab_width - 1);
+    }
     s.graphemes(true)
         .map(|g| grapheme_width(g, tab_width))
         .sum()
@@ -701,5 +707,36 @@ mod tests {
         let result = format_string_literal(content, '"', StringFormatOptions::default());
         // Expected: single quote wrapper, double quotes unescaped, single quote escaped
         assert_eq!(result, "'a \"b\" \"c\" \"d\" e\\'s'");
+    }
+
+    #[test]
+    fn test_visual_width_ascii_fast_path() {
+        // Pure ASCII - hits fast path
+        assert_eq!(visual_width("hello", 2), 5);
+        assert_eq!(visual_width("hello world", 2), 11);
+        assert_eq!(visual_width("", 2), 0);
+        assert_eq!(visual_width(" ", 2), 1);
+    }
+
+    #[test]
+    fn test_visual_width_ascii_tabs() {
+        // Tabs in ASCII strings
+        assert_eq!(visual_width("\t", 2), 2);
+        assert_eq!(visual_width("\t", 4), 4);
+        assert_eq!(visual_width("\thello", 2), 7);
+        assert_eq!(visual_width("\thello", 4), 9);
+        assert_eq!(visual_width("\t\t", 2), 4);
+        assert_eq!(visual_width("a\tb", 2), 4);
+    }
+
+    #[test]
+    fn test_visual_width_unicode_path() {
+        // Non-ASCII - uses Unicode grapheme path
+        assert_eq!(visual_width("⭐", 2), 2);
+        assert_eq!(visual_width("中文", 2), 4);
+        assert_eq!(visual_width("👋🏽", 2), 2);
+        assert_eq!(visual_width("👨\u{200d}👩\u{200d}👧", 2), 2);
+        // Mixed ASCII + non-ASCII
+        assert_eq!(visual_width("hi⭐", 2), 4);
     }
 }

@@ -9,7 +9,7 @@
 use super::{Printer, has_multiline_content};
 use crate::ast::internal::{self, Expression, LiteralValue};
 use tsv_lang::comments_in_range;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Check if array should force break based on Prettier's heuristic
@@ -66,11 +66,12 @@ impl<'a> Printer<'a> {
     ///
     /// - `leading: true` for comments before elements → space after: `/*c*/ elem`
     /// - `leading: false` for comments after elements → space before: `elem /*c*/`
-    fn format_inline_block_comment(&self, comment: &tsv_lang::Comment, leading: bool) -> Doc {
+    fn format_inline_block_comment(&self, comment: &tsv_lang::Comment, leading: bool) -> DocId {
+        let d = self.d();
         if leading {
-            doc::text_owned(format!("/*{}*/ ", comment.content))
+            d.text_owned(format!("/*{}*/ ", comment.content))
         } else {
-            doc::text_owned(format!(" /*{}*/", comment.content))
+            d.text_owned(format!(" /*{}*/", comment.content))
         }
     }
 
@@ -78,7 +79,7 @@ impl<'a> Printer<'a> {
     ///
     /// This prevents internal breaks from propagating to parent groups,
     /// enabling arrays to stay hugged (matching Prettier behavior).
-    fn build_array_element_doc(&self, expr: &Expression) -> Doc {
+    fn build_array_element_doc(&self, expr: &Expression) -> DocId {
         self.build_huggable_expression_doc(expr)
     }
 
@@ -87,7 +88,7 @@ impl<'a> Printer<'a> {
         &self,
         arr: &internal::ArrayExpression,
         first_elem: Option<&Expression>,
-        parts: &mut Vec<Doc>,
+        parts: &mut Vec<DocId>,
     ) {
         let first_elem_start = first_elem.map_or(arr.span.end - 1, |e| e.span().start);
         for comment in comments_in_range(self.comments, arr.span.start + 1, first_elem_start) {
@@ -115,7 +116,7 @@ impl<'a> Printer<'a> {
         arr: &internal::ArrayExpression,
         elem_start: u32,
         current_index: usize,
-        parts: &mut Vec<Doc>,
+        parts: &mut Vec<DocId>,
     ) {
         let prev_end = self.element_end_position(arr.elements[current_index - 1].as_ref(), arr);
 
@@ -140,7 +141,7 @@ impl<'a> Printer<'a> {
         arr: &internal::ArrayExpression,
         elem_end: u32,
         current_index: usize,
-        parts: &mut Vec<Doc>,
+        parts: &mut Vec<DocId>,
     ) {
         let next_boundary = self.next_element_boundary(arr, current_index);
         let comma_pos = self.find_comma_after(elem_end);
@@ -156,7 +157,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an array with proper wrapping behavior
-    pub(super) fn build_array_doc_with_wrapping(&self, arr: &internal::ArrayExpression) -> Doc {
+    pub(super) fn build_array_doc_with_wrapping(&self, arr: &internal::ArrayExpression) -> DocId {
         if arr.elements.is_empty() {
             return self.build_empty_brackets_with_comments_doc(arr.span);
         }
@@ -216,7 +217,8 @@ impl<'a> Printer<'a> {
     ///
     /// Includes inline block comments between elements.
     /// Uses binary search to find comments: O(log n + k)
-    fn build_array_fill_doc(&self, arr: &internal::ArrayExpression) -> Doc {
+    fn build_array_fill_doc(&self, arr: &internal::ArrayExpression) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         for (i, elem) in arr.elements.iter().enumerate() {
@@ -242,23 +244,14 @@ impl<'a> Printer<'a> {
             }
 
             if i < arr.elements.len() - 1 {
-                parts.push(doc::comma_line());
+                parts.push(d.comma_line());
             }
         }
 
-        let inner = doc::concat(vec![
-            doc::softline(),
-            doc::fill(parts),
-            doc::trailing_comma(),
-        ]);
-        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, doc::softline());
+        let inner = d.concat(&[d.softline(), d.fill(&parts), d.trailing_comma()]);
+        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.softline());
 
-        doc::group(doc::concat(vec![
-            doc::text("["),
-            indented_content,
-            closing_line,
-            doc::text("]"),
-        ]))
+        d.group(d.concat(&[d.text("["), indented_content, closing_line, d.text("]")]))
     }
 
     /// Build group doc for non-numeric arrays (one per line when broken)
@@ -267,7 +260,8 @@ impl<'a> Printer<'a> {
     /// Uses binary search to find comments: O(log n + k)
     ///
     /// Note: Arrays with blank lines between elements use build_array_doc_with_line_comments instead.
-    fn build_array_group_doc(&self, arr: &internal::ArrayExpression) -> Doc {
+    fn build_array_group_doc(&self, arr: &internal::ArrayExpression) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         // Check if last element is an elision (requires mandatory trailing comma)
@@ -307,42 +301,34 @@ impl<'a> Printer<'a> {
                 let has_blank_after = self.has_blank_line_between(elem_end, next_start);
 
                 // Separator comma between elements
-                parts.push(doc::text(","));
+                parts.push(d.text(","));
                 if has_blank_after {
                     // Blank line preservation: empty line (no indent) then content line (with indent)
                     // Flat mode: just a space (blank line collapses)
                     // Break mode: literalline (empty) + hardline (indented)
-                    parts.push(doc::if_break(
-                        doc::concat(vec![doc::literalline(), doc::hardline()]),
-                        doc::text(" "),
-                    ));
+                    parts.push(d.if_break(d.concat(&[d.literalline(), d.hardline()]), d.text(" ")));
                 } else {
-                    parts.push(doc::line());
+                    parts.push(d.line());
                 }
             } else if has_trailing_elision {
                 // Trailing comma for elision - MUST be preserved (semantically significant)
-                parts.push(doc::text(","));
+                parts.push(d.text(","));
             }
         }
 
         // Use trailing_comma() only if last element is NOT an elision
         // (elision trailing comma was already added unconditionally above)
         let trailing = if has_trailing_elision {
-            doc::empty()
+            d.empty()
         } else {
-            doc::trailing_comma()
+            d.trailing_comma()
         };
 
-        let inner = doc::concat(vec![doc::softline(), doc::concat(parts), trailing]);
-        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, doc::softline());
+        let inner = d.concat(&[d.softline(), d.concat(&parts), trailing]);
+        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.softline());
 
         // Build group contents
-        let group_contents = doc::concat(vec![
-            doc::text("["),
-            indented_content,
-            closing_line,
-            doc::text("]"),
-        ]);
+        let group_contents = d.concat(&[d.text("["), indented_content, closing_line, d.text("]")]);
 
         // Use group_break() when shouldBreak heuristic matched.
         // This sets shouldBreak on the GROUP ITSELF rather than using break_parent().
@@ -350,14 +336,15 @@ impl<'a> Printer<'a> {
         // propagates up and forces enclosing groups to break.
         // Prettier uses shouldBreak for this heuristic (array.js lines 89-106, 143).
         if should_break {
-            doc::group_break(group_contents)
+            d.group_break(group_contents)
         } else {
-            doc::group(group_contents)
+            d.group(group_contents)
         }
     }
 
     /// Build group doc for arrays with multiline content (forced expansion with hardlines)
-    fn build_array_group_doc_forced(&self, arr: &internal::ArrayExpression) -> Doc {
+    fn build_array_group_doc_forced(&self, arr: &internal::ArrayExpression) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         for (i, elem) in arr.elements.iter().enumerate() {
@@ -374,7 +361,7 @@ impl<'a> Printer<'a> {
 
             if has_blank_before {
                 // Blank line preservation
-                parts.push(doc::literalline());
+                parts.push(d.literalline());
             }
 
             if let Some(expr) = elem {
@@ -382,27 +369,23 @@ impl<'a> Printer<'a> {
             }
 
             if i < arr.elements.len() - 1 {
-                parts.push(doc::text(","));
-                parts.push(doc::hardline());
+                parts.push(d.text(","));
+                parts.push(d.hardline());
             }
         }
 
-        let inner = doc::concat(vec![doc::hardline(), doc::concat(parts), doc::text(",")]);
-        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, doc::hardline());
+        let inner = d.concat(&[d.hardline(), d.concat(&parts), d.text(",")]);
+        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.hardline());
 
-        doc::concat(vec![
-            doc::text("["),
-            indented_content,
-            closing_line,
-            doc::text("]"),
-        ])
+        d.concat(&[d.text("["), indented_content, closing_line, d.text("]")])
     }
 
     /// Build a Doc for an array with line comments (forced expansion)
     ///
     /// Arrays with line comments always expand to multiline because line comments
     /// cannot appear on the same line as subsequent content.
-    fn build_array_doc_with_line_comments(&self, arr: &internal::ArrayExpression) -> Doc {
+    fn build_array_doc_with_line_comments(&self, arr: &internal::ArrayExpression) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
         let mut prev_end = arr.span.start + 1; // After opening bracket
 
@@ -434,8 +417,8 @@ impl<'a> Printer<'a> {
                     .first()
                     .map_or(elem_start, |c| c.span.start);
                 if self.has_blank_line_between(prev_end, blank_check_end) {
-                    parts.push(doc::literalline());
-                    parts.push(doc::hardline());
+                    parts.push(d.literalline());
+                    parts.push(d.hardline());
                 }
             }
 
@@ -445,9 +428,9 @@ impl<'a> Printer<'a> {
                 // Line comments always need hardline after
                 // Block comments: hardline if NOT on same line as element, space otherwise
                 if !comment.is_block || !self.is_same_line(comment.span.end, elem_start) {
-                    parts.push(doc::hardline());
+                    parts.push(d.hardline());
                 } else {
-                    parts.push(doc::text(" "));
+                    parts.push(d.text(" "));
                 }
             }
 
@@ -466,11 +449,11 @@ impl<'a> Printer<'a> {
 
             // Block comments go before comma
             for comment in trailing.iter().filter(|c| c.is_block) {
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
             }
 
-            parts.push(doc::text(","));
+            parts.push(d.text(","));
 
             // Line comments go after comma (excluded from width calculations)
             for comment in trailing.iter().filter(|c| !c.is_block) {
@@ -502,7 +485,7 @@ impl<'a> Printer<'a> {
             };
 
             if i < arr.elements.len() - 1 && !next_has_blank_before {
-                parts.push(doc::hardline());
+                parts.push(d.hardline());
             }
 
             prev_end = elem_end;
@@ -511,27 +494,22 @@ impl<'a> Printer<'a> {
         // Add any final comments before closing bracket
         for comment in comments_in_range(self.comments, prev_end, arr.span.end - 1) {
             if !self.is_same_line(prev_end, comment.span.start) {
-                parts.push(doc::hardline());
+                parts.push(d.hardline());
                 parts.push(self.build_comment_doc(comment));
             }
         }
 
-        let inner = doc::concat(vec![doc::hardline(), doc::concat(parts)]);
-        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, doc::hardline());
+        let inner = d.concat(&[d.hardline(), d.concat(&parts)]);
+        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.hardline());
 
-        doc::concat(vec![
-            doc::text("["),
-            indented_content,
-            closing_line,
-            doc::text("]"),
-        ])
+        d.concat(&[d.text("["), indented_content, closing_line, d.text("]")])
     }
 
     /// Build a Doc for an array expression (for nested contexts)
     ///
     /// Delegates to `build_array_doc_with_wrapping` to ensure multiline content
     /// triggers proper expansion even in nested contexts.
-    pub(super) fn build_array_doc(&self, arr: &internal::ArrayExpression) -> Doc {
+    pub(super) fn build_array_doc(&self, arr: &internal::ArrayExpression) -> DocId {
         // Use the same wrapping logic as top-level arrays to handle multiline content
         self.build_array_doc_with_wrapping(arr)
     }
@@ -541,9 +519,10 @@ impl<'a> Printer<'a> {
     /// Used by chain arg formatting when we need the array to expand internally
     /// with hardlines so fits() can correctly measure the first line.
     /// Produces: `[\n  elem,\n]` with actual hardlines.
-    pub(super) fn build_array_doc_expanded(&self, arr: &internal::ArrayExpression) -> Doc {
+    pub(super) fn build_array_doc_expanded(&self, arr: &internal::ArrayExpression) -> DocId {
+        let d = self.d();
         if arr.elements.is_empty() {
-            return doc::text("[]");
+            return d.text("[]");
         }
 
         let mut parts = Vec::new();
@@ -555,19 +534,19 @@ impl<'a> Printer<'a> {
             // Holes are represented by just a comma (no element content)
 
             if i < arr.elements.len() - 1 {
-                parts.push(doc::text(","));
-                parts.push(doc::hardline());
+                parts.push(d.text(","));
+                parts.push(d.hardline());
             } else {
                 // Trailing comma on last element
-                parts.push(doc::text(","));
+                parts.push(d.text(","));
             }
         }
 
-        doc::concat(vec![
-            doc::text("["),
-            doc::indent(doc::concat(vec![doc::hardline(), doc::concat(parts)])),
-            doc::hardline(),
-            doc::text("]"),
+        d.concat(&[
+            d.text("["),
+            d.indent(d.concat(&[d.hardline(), d.concat(&parts)])),
+            d.hardline(),
+            d.text("]"),
         ])
     }
 }

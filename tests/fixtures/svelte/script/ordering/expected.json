@@ -309,7 +309,7 @@
 				},
 				"end": {
 					"line": 3,
-					"column": 0
+					"column": 9
 				}
 			},
 			"body": [
@@ -415,12 +415,12 @@
 			"end": 83,
 			"loc": {
 				"start": {
-					"line": 1,
+					"line": 5,
 					"column": 0
 				},
 				"end": {
 					"line": 7,
-					"column": 0
+					"column": 9
 				}
 			},
 			"body": [

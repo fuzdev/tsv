@@ -64,7 +64,7 @@ use tsv_lang::{
     CommentPosition, OutputBuffer, PrintConfig, SymbolResolver, classify_comment_fast,
     comments_after, comments_in_range,
     doc::{
-        self, Doc,
+        self,
         arena::{DocArena, DocId},
     },
     has_comments_in_range, has_line_comments_in_range, printing,
@@ -78,8 +78,8 @@ pub struct Printer<'a> {
     pub(crate) indent_level: usize,
     /// Print configuration
     config: PrintConfig,
-    /// Arena allocator for doc nodes
-    pub(crate) arena: DocArena,
+    /// Arena allocator for doc nodes (borrowed from caller or locally owned)
+    pub(crate) arena: &'a DocArena,
     /// Shared string interner for resolving symbols
     interner: Rc<RefCell<DefaultStringInterner>>,
     /// Original source code (for extracting raw values, preserving escape sequences, etc.)
@@ -115,8 +115,9 @@ pub struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    /// Create a new printer with the given interner, source, comments, line_breaks, and config
+    /// Create a new printer with the given arena, interner, source, comments, line_breaks, and config
     pub fn with_config(
+        arena: &'a DocArena,
         interner: Rc<RefCell<DefaultStringInterner>>,
         source: &'a str,
         comments: &'a [internal::Comment],
@@ -127,7 +128,7 @@ impl<'a> Printer<'a> {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
             config,
-            arena: DocArena::with_source_size_hint(source.len()),
+            arena,
             interner,
             source,
             comments,
@@ -141,10 +142,10 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Get a reference to the doc arena (convenience for `&self.arena`).
+    /// Get a reference to the doc arena.
     #[inline]
     pub(crate) fn d(&self) -> &DocArena {
-        &self.arena
+        self.arena
     }
 
     /// Write a string to the buffer
@@ -152,7 +153,7 @@ impl<'a> Printer<'a> {
         self.buffer.write(s);
     }
 
-    /// Write a Doc to the buffer, accounting for current column and indent level
+    /// Write a DocId to the buffer, accounting for current column and indent level
     ///
     /// This handles the common pattern of:
     /// 1. Calculate current column with context offset
@@ -162,40 +163,6 @@ impl<'a> Printer<'a> {
     /// For width calculations, we account for outer context in two ways:
     /// - If `first_line_offset > 0`: expression is embedded inline (e.g., Svelte block), use it directly
     /// - If `first_line_offset == 0`: standalone block (e.g., `<script>`), use `base_indent_offset * tab_width`
-    ///
-    /// Use `write_doc` for expression statements where the semicolon
-    /// (like semicolons) should be considered in width calculations.
-    pub(crate) fn write_doc(&mut self, d: &Doc) {
-        // Convert Doc tree to arena, then render from arena.
-        // The arena render avoids recursive drop and has better cache locality.
-        let arena = DocArena::with_source_size_hint(256);
-        let doc_id = arena.convert_doc(d);
-
-        let context_offset = if self.config.first_line_offset > 0 {
-            if self.current_column() == 0 {
-                self.config.first_line_offset
-            } else {
-                0
-            }
-        } else {
-            self.config.base_indent_offset * self.config.tab_width
-        };
-        let current_col = self.current_column() + context_offset;
-        let output = {
-            let interner = self.interner.borrow();
-            doc::arena_print_doc_with_indent_resolved(
-                &arena,
-                doc_id,
-                &self.config,
-                current_col,
-                self.indent_level,
-                &*interner,
-            )
-        };
-        self.write(&output);
-    }
-
-    /// Write an arena-based DocId to the buffer
     pub(crate) fn write_arena_doc(&mut self, d: DocId) {
         let context_offset = if self.config.first_line_offset > 0 {
             if self.current_column() == 0 {
@@ -210,7 +177,7 @@ impl<'a> Printer<'a> {
         let output = {
             let interner = self.interner.borrow();
             doc::arena_print_doc_with_indent_resolved(
-                &self.arena,
+                self.arena,
                 d,
                 &self.config,
                 current_col,
@@ -228,7 +195,7 @@ impl<'a> Printer<'a> {
             ..self.config
         };
         let interner = self.interner.borrow();
-        doc::arena_print_doc_resolved(&self.arena, d, &flat_config, &*interner)
+        doc::arena_print_doc_resolved(self.arena, d, &flat_config, &*interner)
     }
 
     /// Write indentation based on current indent level
@@ -269,21 +236,6 @@ impl<'a> Printer<'a> {
         printing::has_newline_between_fast(self.line_breaks, start, end)
     }
 
-    /// Render a Doc to a flat string with effectively infinite width.
-    ///
-    /// Used when we need to prevent a doc from breaking internally,
-    /// such as expressions inside template literal interpolations.
-    pub(crate) fn render_doc_flat(&self, d: &Doc) -> String {
-        let arena = DocArena::with_source_size_hint(256);
-        let doc_id = arena.convert_doc(d);
-        let flat_config = PrintConfig {
-            print_width: usize::MAX / 2,
-            ..self.config
-        };
-        let interner = self.interner.borrow();
-        doc::arena_print_doc_resolved(&arena, doc_id, &flat_config, &*interner)
-    }
-
     /// Wrap content and closing line with declaration indent depth handling
     ///
     /// In multi-declarator contexts (declaration_indent_depth > 0), content gets
@@ -295,19 +247,24 @@ impl<'a> Printer<'a> {
     ///     },
     ///     b = 2;
     /// ```
-    pub(crate) fn wrap_with_decl_indent(&self, inner: Doc, closing_line: Doc) -> (Doc, Doc) {
+    pub(crate) fn wrap_with_decl_indent(
+        &self,
+        inner: DocId,
+        closing_line: DocId,
+    ) -> (DocId, DocId) {
+        let d = self.d();
         if self.declaration_indent_depth.get() > 0 {
-            (doc::indent(doc::indent(inner)), doc::indent(closing_line))
+            (d.indent(d.indent(inner)), d.indent(closing_line))
         } else {
-            (doc::indent(inner), closing_line)
+            (d.indent(inner), closing_line)
         }
     }
 
-    /// Build a Doc for an expression (public wrapper for doc-based formatting)
+    /// Build a DocId for an expression (public wrapper for doc-based formatting)
     ///
-    /// This returns a Doc tree that can be used for line wrapping decisions
+    /// This returns a DocId that can be used for line wrapping decisions
     /// when embedding TS expressions in larger documents (e.g., Svelte attributes).
-    pub fn build_expression_doc_public(&self, expr: &internal::Expression) -> Doc {
+    pub fn build_expression_doc_public(&self, expr: &internal::Expression) -> DocId {
         self.build_expression_doc(expr)
     }
 
@@ -315,34 +272,17 @@ impl<'a> Printer<'a> {
     ///
     /// Wraps templates and arrow-with-template-body in `isolated_group` to prevent
     /// internal breaks from forcing parent calls/arrays to break (enables hugging).
-    pub(crate) fn build_huggable_expression_doc(&self, expr: &internal::Expression) -> Doc {
+    pub(crate) fn build_huggable_expression_doc(&self, expr: &internal::Expression) -> DocId {
+        let d = self.d();
         let base_doc = self.build_arg_expression_doc(expr);
         if needs_isolation_for_hugging(expr) {
-            doc::isolated_group(base_doc)
+            d.isolated_group(base_doc)
         } else {
             base_doc
         }
     }
 
-    /// Build a Doc for a condition expression (if/while/for test) in an isolated context.
-    ///
-    /// For binary expressions, uses an ungrouped version so the parent group controls
-    /// whether the condition breaks to multiple lines. This matches Prettier's behavior
-    /// where all operands break together when the condition exceeds print width.
-    ///
-    /// Used for Svelte block conditions ({#if}, {:else if}) where the surrounding
-    /// Svelte syntax provides the grouping context.
-    pub fn build_condition_doc_public(&self, expr: &internal::Expression) -> Doc {
-        match expr {
-            internal::Expression::BinaryExpression(binary) => {
-                // Use ungrouped version so parent group controls breaking
-                self.build_binary_chain_doc_ungrouped(binary)
-            }
-            _ => self.build_expression_doc(expr),
-        }
-    }
-
-    /// Build a Doc for an expression with continuation indent for binary expressions.
+    /// Build a DocId for an expression with continuation indent for binary expressions.
     ///
     /// For binary expressions, produces:
     /// ```text
@@ -355,7 +295,7 @@ impl<'a> Printer<'a> {
     pub fn build_expression_doc_with_continuation_indent_public(
         &self,
         expr: &internal::Expression,
-    ) -> Doc {
+    ) -> DocId {
         match expr {
             internal::Expression::BinaryExpression(binary) => {
                 self.build_binary_chain_doc_with_continuation_indent(binary)
@@ -624,18 +564,19 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_decorators_doc(
         &self,
         decorators: Option<&Vec<internal::Decorator>>,
-    ) -> Option<Doc> {
+    ) -> Option<DocId> {
         let decorators = decorators?;
         if decorators.is_empty() {
             return None;
         }
+        let d = self.d();
         let mut parts = Vec::new();
         for decorator in decorators {
-            parts.push(doc::text("@"));
+            parts.push(d.text("@"));
             parts.push(self.build_expression_doc(&decorator.expression));
-            parts.push(doc::hardline());
+            parts.push(d.hardline());
         }
-        Some(doc::concat(parts))
+        Some(d.concat(&parts))
     }
 
     /// Print a TypeScript program
@@ -692,7 +633,7 @@ impl<'a> Printer<'a> {
             self.print_leading_comments(prev_end, statement.span().start, is_first);
 
             let doc = self.build_statement_doc(statement);
-            self.write_doc(&doc);
+            self.write_arena_doc(doc);
 
             // Print trailing same-line comments after the statement
             self.print_trailing_same_line_comments(statement.span().end);
@@ -745,19 +686,10 @@ impl<'a> Printer<'a> {
     }
 }
 
-/// Check if a doc is effectively empty (empty text or empty concat)
-fn is_empty_doc(d: &Doc) -> bool {
-    match d {
-        Doc::Text(text) => text.try_as_str().is_some_and(str::is_empty),
-        Doc::Concat(docs) => docs.is_empty() || docs.iter().all(is_empty_doc),
-        _ => false,
-    }
-}
-
 impl<'a> Printer<'a> {
-    /// Build a Doc tree for a TypeScript program
+    /// Build a DocId tree for a TypeScript program
     ///
-    /// Returns a Doc that can be wrapped with `indent()` and rendered.
+    /// Returns a DocId that can be wrapped with `indent()` and rendered.
     /// Used when embedding TypeScript in other formats like Svelte's `<script>`.
     ///
     /// The Doc structure preserves:
@@ -766,7 +698,8 @@ impl<'a> Printer<'a> {
     /// - Leading comments with proper spacing
     /// - Trailing same-line comments using line_suffix
     /// - Program trailing comments after the last statement
-    pub fn build_program_doc(&self, program: &internal::Program) -> Doc {
+    pub fn build_program_doc(&self, program: &internal::Program) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
         let mut prev_end = 0u32;
         let mut has_output = false;
@@ -782,7 +715,7 @@ impl<'a> Printer<'a> {
                     !has_output,
                     true,
                 );
-                if !is_empty_doc(&comments_doc) {
+                if let Some(comments_doc) = comments_doc {
                     if has_output {
                         // Check for blank line before the first comment (same as regular statements)
                         let first_comment_start =
@@ -792,9 +725,9 @@ impl<'a> Printer<'a> {
                         let check_end = first_comment_start.unwrap_or_else(|| statement.span().end);
 
                         if self.has_blank_line_between(prev_end, check_end) {
-                            parts.push(doc::literalline()); // Blank line at column 0
+                            parts.push(d.literalline()); // Blank line at column 0
                         }
-                        parts.push(doc::hardline()); // Separator with indent
+                        parts.push(d.hardline()); // Separator with indent
                     }
                     parts.push(comments_doc);
                     has_output = true;
@@ -815,20 +748,19 @@ impl<'a> Printer<'a> {
                 let check_end = first_comment_start.unwrap_or_else(|| statement.span().start);
 
                 if self.has_blank_line_between(prev_end, check_end) {
-                    parts.push(doc::literalline()); // Blank line at column 0
+                    parts.push(d.literalline()); // Blank line at column 0
                 }
 
-                parts.push(doc::hardline()); // Separator with indent
+                parts.push(d.hardline()); // Separator with indent
             }
 
             // Leading comments (allow inline comments since statement will be printed)
-            let leading_doc = self.build_leading_comments_doc(
+            if let Some(leading_doc) = self.build_leading_comments_doc(
                 prev_end,
                 statement.span().start,
                 !has_output,
                 false,
-            );
-            if !is_empty_doc(&leading_doc) {
+            ) {
                 parts.push(leading_doc);
             }
 
@@ -850,9 +782,9 @@ impl<'a> Printer<'a> {
         parts.extend(trailing_comments_doc);
 
         // Trailing newline
-        parts.push(doc::hardline());
+        parts.push(d.hardline());
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build doc for leading comments between prev_end and curr_start
@@ -873,7 +805,8 @@ impl<'a> Printer<'a> {
         curr_start: u32,
         is_first: bool,
         force_non_inline: bool,
-    ) -> Doc {
+    ) -> Option<DocId> {
+        let d = self.d();
         let mut parts = Vec::new();
         let mut last_comment_end = prev_end;
         let mut printed_any = false;
@@ -892,7 +825,7 @@ impl<'a> Printer<'a> {
             // Skip this behavior when force_non_inline is true (e.g., empty statements being skipped)
             if !force_non_inline && matches!(position, CommentPosition::LeadingInline) {
                 parts.push(self.build_comment_doc(comment));
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
                 // DON'T set printed_any - inline comments don't need separators
                 last_comment_end = comment.span.end;
                 continue;
@@ -907,10 +840,10 @@ impl<'a> Printer<'a> {
 
             // Add separator BEFORE this comment (first comment has no separator - parent's hardline handles it)
             if has_blank_before {
-                parts.push(doc::literalline()); // Blank line at column 0
-                parts.push(doc::hardline()); // Indent for this comment
+                parts.push(d.literalline()); // Blank line at column 0
+                parts.push(d.hardline()); // Indent for this comment
             } else if printed_any {
-                parts.push(doc::hardline()); // Separator from previous comment
+                parts.push(d.hardline()); // Separator from previous comment
             }
 
             parts.push(self.build_comment_doc(comment));
@@ -929,18 +862,23 @@ impl<'a> Printer<'a> {
                 && self.has_blank_line_between(last_comment_end, curr_start);
 
             if has_blank_after {
-                parts.push(doc::literalline()); // Blank line at column 0
+                parts.push(d.literalline()); // Blank line at column 0
             }
-            parts.push(doc::hardline()); // Indent for statement
+            parts.push(d.hardline()); // Indent for statement
         }
 
-        doc::concat(parts)
+        if parts.is_empty() {
+            None
+        } else {
+            Some(d.concat(&parts))
+        }
     }
 
     /// Build docs for trailing same-line comments after a node
     ///
     /// Returns a Vec of docs to append to the current parts.
-    fn build_trailing_same_line_comments_doc(&self, after_pos: u32) -> Vec<Doc> {
+    fn build_trailing_same_line_comments_doc(&self, after_pos: u32) -> Vec<DocId> {
+        let d = self.d();
         let first_idx = tsv_lang::find_first_comment_from(self.comments, after_pos);
         let mut docs = Vec::new();
 
@@ -948,7 +886,7 @@ impl<'a> Printer<'a> {
             if self.is_same_line(after_pos, comment.span.start) {
                 if comment.is_block {
                     // Block comments are inline, affect width
-                    docs.push(doc::text(" "));
+                    docs.push(d.text(" "));
                     docs.push(self.build_comment_doc(comment));
                 } else {
                     // Line comments go in line_suffix, don't affect width
@@ -982,7 +920,8 @@ impl<'a> Printer<'a> {
     /// Build docs for trailing comments at the end of the program
     ///
     /// Handles comments that appear after all statements but before end of file.
-    fn build_program_trailing_comments_doc(&self, prev_end: u32) -> Vec<Doc> {
+    fn build_program_trailing_comments_doc(&self, prev_end: u32) -> Vec<DocId> {
+        let d = self.d();
         let mut docs = Vec::new();
         let mut last_comment_end = prev_end;
         let mut is_first_comment = true;
@@ -1001,10 +940,10 @@ impl<'a> Printer<'a> {
             if prev_end > 0 || !is_first_comment {
                 // Blank line before this comment (add literalline BEFORE hardline)
                 if self.has_blank_line_between(last_comment_end, comment.span.start) {
-                    docs.push(doc::literalline());
+                    docs.push(d.literalline());
                 }
 
-                docs.push(doc::hardline());
+                docs.push(d.hardline());
             }
 
             docs.push(self.build_comment_doc(comment));

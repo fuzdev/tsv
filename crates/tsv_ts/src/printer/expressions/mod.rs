@@ -28,18 +28,19 @@ pub(super) use super::{
     unwrap_parenthesized,
 };
 use crate::ast::internal::{BinaryExpression, BinaryOperator, Expression};
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
 
 impl<'a> Printer<'a> {
     /// Print an expression using doc-based formatting
     pub fn print_expression(&mut self, expression: &Expression) {
         let doc = self.build_expression_doc(expression);
-        self.write_doc(&doc);
+        self.write_arena_doc(doc);
     }
 
     /// Build a Doc for an expression (for use in object/array contexts and statements)
-    pub(super) fn build_expression_doc(&self, expr: &Expression) -> Doc {
+    pub(super) fn build_expression_doc(&self, expr: &Expression) -> DocId {
+        let d = self.d();
         match expr {
             Expression::Literal(lit) => self.build_literal_doc(lit),
             Expression::Identifier(id) => self.build_identifier_doc(id),
@@ -65,7 +66,7 @@ impl<'a> Printer<'a> {
             Expression::YieldExpression(yield_expr) => self.build_yield_doc(yield_expr),
             Expression::SequenceExpression(seq) => self.build_sequence_doc(seq),
             Expression::RegexLiteral(regex) => self.build_regex_doc(regex),
-            Expression::Super(_) => doc::text("super"),
+            Expression::Super(_) => d.text("super"),
             Expression::AssignmentExpression(assign) => self.build_assignment_doc(assign),
             Expression::ObjectPattern(obj) => self.build_object_pattern_doc(obj),
             Expression::ArrayPattern(arr) => self.build_array_pattern_doc(arr),
@@ -93,7 +94,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for function parameter expression, using FunctionParameter context for patterns
-    pub(super) fn build_function_parameter_doc(&self, expr: &Expression) -> Doc {
+    pub(super) fn build_function_parameter_doc(&self, expr: &Expression) -> DocId {
         match expr {
             Expression::ObjectPattern(obj) => {
                 self.build_object_pattern_doc_with_context(obj, PatternContext::FunctionParameter)
@@ -115,10 +116,11 @@ impl<'a> Printer<'a> {
     ///
     /// Assignment expressions are wrapped in parens for clarity:
     /// `fn((a = b))` not `fn(a = b)`
-    pub(super) fn build_arg_expression_doc(&self, expr: &Expression) -> Doc {
+    pub(super) fn build_arg_expression_doc(&self, expr: &Expression) -> DocId {
+        let d = self.d();
         // Assignment expressions need parens in argument context for clarity
         if needs_parens(expr, ParenContext::Argument) {
-            return doc::parens(self.build_expression_doc(expr));
+            return d.parens(self.build_expression_doc(expr));
         }
 
         match expr {
@@ -136,7 +138,7 @@ impl<'a> Printer<'a> {
     /// Used by chain arg formatting when we need the object/array to expand
     /// internally with hardlines so fits() can correctly measure the first line.
     /// For example, `.fn({prop})` should become `.fn({\n  prop,\n})` when expanded.
-    pub(super) fn build_arg_expression_doc_expanded(&self, expr: &Expression) -> Doc {
+    pub(super) fn build_arg_expression_doc_expanded(&self, expr: &Expression) -> DocId {
         match expr {
             Expression::ObjectExpression(obj) => self.build_object_doc_expanded(obj),
             Expression::ArrayExpression(arr) => self.build_array_doc_expanded(arr),
@@ -153,37 +155,39 @@ impl<'a> Printer<'a> {
     fn build_ts_type_assertion_doc(
         &self,
         type_assert: &crate::ast::internal::TSTypeAssertion,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let expr_needs_parens =
             needs_parens(&type_assert.expression, ParenContext::AngleBracketAssertion);
         let mut parts = vec![
-            doc::text("<"),
+            d.text("<"),
             self.build_type_doc_with_wrapping_type_args(&type_assert.type_annotation),
-            doc::text(">"),
+            d.text(">"),
         ];
         if expr_needs_parens {
-            parts.push(doc::text("("));
+            parts.push(d.text("("));
         }
         parts.push(self.build_expression_doc(&type_assert.expression));
         if expr_needs_parens {
-            parts.push(doc::text(")"));
+            parts.push(d.text(")"));
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for a TypeScript `as` expression
     ///
     /// Preserves comments between expression and `as` keyword (Prettier 3.7 #18161)
     /// Comments between `as` and type are moved to after the type (Prettier normalization)
-    fn build_ts_as_doc(&self, as_expr: &crate::ast::internal::TSAsExpression) -> Doc {
+    fn build_ts_as_doc(&self, as_expr: &crate::ast::internal::TSAsExpression) -> DocId {
+        let d = self.d();
         let needs_parens = needs_parens(&as_expr.expression, ParenContext::TypeAssertion);
         let mut parts = Vec::new();
         if needs_parens {
-            parts.push(doc::text("("));
+            parts.push(d.text("("));
         }
         parts.push(self.build_expression_doc(&as_expr.expression));
         if needs_parens {
-            parts.push(doc::text(")"));
+            parts.push(d.text(")"));
         }
 
         // Find the `as` keyword position
@@ -196,7 +200,7 @@ impl<'a> Printer<'a> {
             parts.push(self.build_inline_comments_between_doc(expr_end, as_pos));
         }
 
-        parts.push(doc::text(" as "));
+        parts.push(d.text(" as "));
         parts.push(self.build_type_doc_with_wrapping_type_args(&as_expr.type_annotation));
 
         // Comments between `as` keyword and type → place after the type
@@ -205,7 +209,7 @@ impl<'a> Printer<'a> {
             parts.push(self.build_inline_comments_between_doc(as_end, type_start));
         }
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for a TypeScript `satisfies` expression
@@ -214,15 +218,16 @@ impl<'a> Printer<'a> {
     fn build_ts_satisfies_doc(
         &self,
         sat_expr: &crate::ast::internal::TSSatisfiesExpression,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let needs_parens = needs_parens(&sat_expr.expression, ParenContext::TypeAssertion);
         let mut parts = Vec::new();
         if needs_parens {
-            parts.push(doc::text("("));
+            parts.push(d.text("("));
         }
         parts.push(self.build_expression_doc(&sat_expr.expression));
         if needs_parens {
-            parts.push(doc::text(")"));
+            parts.push(d.text(")"));
         }
 
         // Include comments between expression and `satisfies` keyword
@@ -230,28 +235,29 @@ impl<'a> Printer<'a> {
         let type_start = sat_expr.type_annotation.span().start;
         parts.push(self.build_inline_comments_between_doc(expr_end, type_start));
 
-        parts.push(doc::text(" satisfies "));
+        parts.push(d.text(" satisfies "));
         parts.push(self.build_type_doc_with_wrapping_type_args(&sat_expr.type_annotation));
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for a TypeScript instantiation expression
     fn build_ts_instantiation_doc(
         &self,
         inst_expr: &crate::ast::internal::TSInstantiationExpression,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
         let needs_parens =
             needs_parens(&inst_expr.expression, ParenContext::InstantiationExpression);
         if needs_parens {
-            parts.push(doc::text("("));
+            parts.push(d.text("("));
         }
         parts.push(self.build_expression_doc(&inst_expr.expression));
         if needs_parens {
-            parts.push(doc::text(")"));
+            parts.push(d.text(")"));
         }
         parts.push(self.build_type_parameter_instantiation_doc(&inst_expr.type_arguments));
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for a TypeScript non-null assertion expression
@@ -265,7 +271,8 @@ impl<'a> Printer<'a> {
     fn build_ts_non_null_doc(
         &self,
         non_null_expr: &crate::ast::internal::TSNonNullExpression,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let needs_parens = needs_parens(&non_null_expr.expression, ParenContext::NonNull);
 
         if needs_parens {
@@ -273,7 +280,7 @@ impl<'a> Printer<'a> {
             // that indents continuations when breaking
             let inner_doc =
                 self.build_expression_doc_with_indent_on_break(&non_null_expr.expression);
-            doc::concat(vec![doc::text("("), inner_doc, doc::text(")!")])
+            d.concat(&[d.text("("), inner_doc, d.text(")!")])
         } else if Self::is_chain_expression(&non_null_expr.expression) {
             // When inner expression is a chain (member or call), use chain architecture
             // to properly handle breaking. This ensures the outer `!` is included
@@ -284,7 +291,7 @@ impl<'a> Printer<'a> {
             chain::build_chain_doc(&groups, self)
         } else {
             let inner_doc = self.build_expression_doc(&non_null_expr.expression);
-            doc::concat(vec![inner_doc, doc::text("!")])
+            d.concat(&[inner_doc, d.text("!")])
         }
     }
 
@@ -300,7 +307,7 @@ impl<'a> Printer<'a> {
 
     /// Build expression doc with indentation added to line breaks
     /// Used when expression is inside inline parens like `(expr)!`
-    pub(crate) fn build_expression_doc_with_indent_on_break(&self, expr: &Expression) -> Doc {
+    pub(crate) fn build_expression_doc_with_indent_on_break(&self, expr: &Expression) -> DocId {
         match expr {
             Expression::BinaryExpression(binary) => {
                 // Build binary chain with indented continuations
@@ -312,15 +319,17 @@ impl<'a> Printer<'a> {
 
     /// Build binary chain doc with indented continuations
     /// Used when the binary expression is inside inline parens
-    fn build_binary_chain_doc_indented(&self, binary: &BinaryExpression) -> Doc {
-        doc::group(self.build_binary_chain_parts_indented(binary))
+    fn build_binary_chain_doc_indented(&self, binary: &BinaryExpression) -> DocId {
+        let d = self.d();
+        d.group(self.build_binary_chain_parts_indented(binary))
     }
 
     /// Build binary chain parts with indented continuations (no group wrapper)
     ///
     /// Returns the concat without a group wrapper, for cases where the caller
     /// wants to control the grouping (e.g., chain printing).
-    pub(crate) fn build_binary_chain_parts_indented(&self, binary: &BinaryExpression) -> Doc {
+    pub(crate) fn build_binary_chain_parts_indented(&self, binary: &BinaryExpression) -> DocId {
+        let d = self.d();
         // If there are comments within the binary expression, use the comment-aware
         // implementation from operators.rs which preserves comments and their line breaks.
         // This handles cases like: fn(a && // comment\n    b)
@@ -347,15 +356,15 @@ impl<'a> Printer<'a> {
 
         for (i, operand) in operands.iter().enumerate() {
             if i == 0 {
-                parts.push(operand.clone());
+                parts.push(*operand);
             } else {
-                parts.push(doc::text(" "));
-                parts.push(doc::text(operators[i - 1].as_str()));
-                parts.push(doc::indent_line(operand.clone()));
+                parts.push(d.text(" "));
+                parts.push(d.text(operators[i - 1].as_str()));
+                parts.push(d.indent_line(*operand));
             }
         }
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Collect operands and operators from a binary chain (helper for indented version)
@@ -365,7 +374,7 @@ impl<'a> Printer<'a> {
     fn collect_binary_operands_for_indent(
         &self,
         expr: &BinaryExpression,
-        operands: &mut Vec<Doc>,
+        operands: &mut Vec<DocId>,
         operators: &mut Vec<BinaryOperator>,
     ) {
         // Recursively flatten left side if it can be chained with current operator
@@ -403,7 +412,8 @@ impl<'a> Printer<'a> {
     /// Structure: operand1 " /", line, operand2 " /", line, operand3
     /// In flat: `a / b / c`
     /// In break: `a /\nb /\nc` (with outer indent providing indentation)
-    pub(crate) fn build_binary_chain_for_parens(&self, binary: &BinaryExpression) -> Doc {
+    pub(crate) fn build_binary_chain_for_parens(&self, binary: &BinaryExpression) -> DocId {
+        let d = self.d();
         // Collect all operands and operators in the chain
         let mut operands = Vec::new();
         let mut operators = Vec::new();
@@ -417,12 +427,12 @@ impl<'a> Printer<'a> {
         // For 2-operand non-logical chains, use flat formatting (no line breaks)
         // to avoid ugly breaks like `(a /\nb)`. Logical operators can still break.
         if operands.len() == 2 && !operators[0].is_logical() {
-            return doc::concat(vec![
-                operands[0].clone(),
-                doc::text(" "),
-                doc::text(operators[0].as_str()),
-                doc::text(" "),
-                operands[1].clone(),
+            return d.concat(&[
+                operands[0],
+                d.text(" "),
+                d.text(operators[0].as_str()),
+                d.text(" "),
+                operands[1],
             ]);
         }
 
@@ -433,21 +443,21 @@ impl<'a> Printer<'a> {
         for (i, operand) in operands.iter().enumerate() {
             if i == 0 {
                 // First operand
-                parts.push(operand.clone());
+                parts.push(*operand);
             } else {
                 // Subsequent operands: line break then operand
-                parts.push(doc::line()); // space in flat, newline in break
-                parts.push(operand.clone());
+                parts.push(d.line()); // space in flat, newline in break
+                parts.push(*operand);
             }
 
             // Add operator after operand (except for last)
             if i < operators.len() {
-                parts.push(doc::text(" "));
-                parts.push(doc::text(operators[i].as_str()));
+                parts.push(d.text(" "));
+                parts.push(d.text(operators[i].as_str()));
             }
         }
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     //
@@ -466,13 +476,17 @@ impl<'a> Printer<'a> {
     /// - We expand compact overflow where Prettier keeps inline
     ///
     /// Both add structure rather than remove it.
-    fn build_template_literal_doc(&self, template: &crate::ast::internal::TemplateLiteral) -> Doc {
+    fn build_template_literal_doc(
+        &self,
+        template: &crate::ast::internal::TemplateLiteral,
+    ) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
-        parts.push(doc::text("`"));
+        parts.push(d.text("`"));
 
         for (i, quasi) in template.quasis.iter().enumerate() {
             // Template content (raw, preserving escape sequences verbatim)
-            parts.push(doc::text_owned(quasi.raw.clone()));
+            parts.push(d.text_owned(quasi.raw.clone()));
 
             // Interpolation
             if i < template.expressions.len() {
@@ -492,7 +506,7 @@ impl<'a> Printer<'a> {
                 self.in_template_interpolation.set(true);
                 // Assignment expressions need parens in template literals: `${(a = b)}`
                 let expr_doc = if needs_parens(expr, ParenContext::TemplateLiteralExpression) {
-                    doc::parens(self.build_expression_doc(expr))
+                    d.parens(self.build_expression_doc(expr))
                 } else {
                     self.build_expression_doc(expr)
                 };
@@ -663,7 +677,7 @@ impl<'a> Printer<'a> {
                             &trailing_comments,
                         )
                     } else {
-                        doc::concat(vec![leading_comments_doc, expr_doc, trailing_comments_doc])
+                        d.concat(&[leading_comments_doc, expr_doc, trailing_comments_doc])
                     };
 
                     let base_indent = if let Some(ws) = line_start_whitespace {
@@ -674,14 +688,14 @@ impl<'a> Printer<'a> {
                         self.determine_inline_template_base_indent(quasi.span.start as usize)
                     };
 
-                    parts.push(Self::build_aligned_interpolation(content, base_indent));
+                    parts.push(self.build_aligned_interpolation(content, base_indent));
                 } else {
                     // Inline: ${content}
                     // Use align() to set ABSOLUTE indent level for expression's internal hardlines.
                     // This is needed because the Svelte wrapper uses start_indent_level=1 for ALL
                     // hardlines, so we must use absolute positioning to avoid double indentation.
                     let content =
-                        doc::concat(vec![leading_comments_doc, expr_doc, trailing_comments_doc]);
+                        d.concat(&[leading_comments_doc, expr_doc, trailing_comments_doc]);
 
                     if has_internal_breaks {
                         // Expression has internal breaks - need to account for template's visual position
@@ -696,10 +710,10 @@ impl<'a> Printer<'a> {
                             1
                         };
 
-                        let indented_content = doc::align(indent_levels, content);
+                        let indented_content = d.align(indent_levels, content);
                         // Wrap with base_indent_override=0 for correct width calculations
-                        parts.push(doc::with_base_indent_override(
-                            doc::concat(vec![doc::text("${"), indented_content, doc::text("}")]),
+                        parts.push(d.with_base_indent_override(
+                            d.concat(&[d.text("${"), indented_content, d.text("}")]),
                             0,
                         ));
                     } else {
@@ -711,12 +725,8 @@ impl<'a> Printer<'a> {
                             1
                         };
                         // Wrap with base_indent_override=0 for correct width calculations
-                        parts.push(doc::with_base_indent_override(
-                            doc::concat(vec![
-                                doc::text("${"),
-                                doc::align(indent_levels, content),
-                                doc::text("}"),
-                            ]),
+                        parts.push(d.with_base_indent_override(
+                            d.concat(&[d.text("${"), d.align(indent_levels, content), d.text("}")]),
                             0,
                         ));
                     }
@@ -724,8 +734,8 @@ impl<'a> Printer<'a> {
             }
         }
 
-        parts.push(doc::text("`"));
-        doc::concat(parts)
+        parts.push(d.text("`"));
+        d.concat(&parts)
     }
 
     /// Calculate accumulated line width for multi-interpolation templates.
@@ -841,28 +851,25 @@ impl<'a> Printer<'a> {
     ///
     /// Creates: `${\n<tabs>content\n<closing_tabs>}`
     /// Uses absolute positioning via doc::align for consistent indentation.
-    fn build_aligned_interpolation(content: Doc, base_indent: usize) -> Doc {
+    fn build_aligned_interpolation(&self, content: DocId, base_indent: usize) -> DocId {
+        let d = self.d();
         let content_indent = base_indent + 1;
         let content_tabs = "\t".repeat(content_indent);
         let closing_tabs = "\t".repeat(base_indent);
 
-        let content_doc = doc::align(
+        let content_doc = d.align(
             content_indent,
-            doc::concat(vec![
-                doc::literalline(),
-                doc::text_owned(content_tabs),
-                content,
-            ]),
+            d.concat(&[d.literalline(), d.text_owned(content_tabs), content]),
         );
 
         // Build the interpolation group without isolation.
         // IsolatedGroup is applied at the call/array level where hugging is needed,
         // not here - this allows ternaries and binary expressions to see the breaks.
-        doc::group(doc::concat(vec![
-            doc::text("${"),
+        d.group(d.concat(&[
+            d.text("${"),
             content_doc,
-            doc::literalline(),
-            doc::text_owned(format!("{closing_tabs}}}")),
+            d.literalline(),
+            d.text_owned(format!("{closing_tabs}}}")),
         ]))
     }
 
@@ -1003,9 +1010,10 @@ impl<'a> Printer<'a> {
         &self,
         comments: &[&crate::ast::internal::Comment],
         is_leading: bool,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         if comments.is_empty() {
-            return doc::empty();
+            return d.empty();
         }
 
         let mut parts = Vec::new();
@@ -1014,22 +1022,22 @@ impl<'a> Printer<'a> {
                 // Leading comments: comment then separator
                 parts.push(self.build_comment_doc(comment));
                 if comment.is_block {
-                    parts.push(doc::text(" "));
+                    parts.push(d.text(" "));
                 } else {
                     // Line comment requires hardline after
-                    parts.push(doc::hardline());
+                    parts.push(d.hardline());
                 }
             } else {
                 // Trailing comments: space then comment
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
                 // Line comments at the end still need hardline for proper formatting
                 if !comment.is_block {
-                    parts.push(doc::hardline());
+                    parts.push(d.hardline());
                 }
             }
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build comments and expression doc for template interpolation with line comments.
@@ -1040,18 +1048,19 @@ impl<'a> Printer<'a> {
     fn build_template_comments_and_expr_doc(
         &self,
         leading_comments: &[&crate::ast::internal::Comment],
-        expr_doc: Doc,
+        expr_doc: DocId,
         trailing_comments: &[&crate::ast::internal::Comment],
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         // Leading comments
         for comment in leading_comments {
             parts.push(self.build_comment_doc(comment));
             if comment.is_block {
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
             } else {
-                parts.push(doc::hardline());
+                parts.push(d.hardline());
             }
         }
 
@@ -1062,27 +1071,28 @@ impl<'a> Printer<'a> {
         // closing `}` has its own literalline that provides the newline
         let last_idx = trailing_comments.len().saturating_sub(1);
         for (i, comment) in trailing_comments.iter().enumerate() {
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
             if !comment.is_block && i < last_idx {
-                parts.push(doc::hardline());
+                parts.push(d.hardline());
             }
         }
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build a Doc for a tagged template expression
     fn build_tagged_template_doc(
         &self,
         tagged: &crate::ast::internal::TaggedTemplateExpression,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let tag_doc = self.build_expression_doc(&tagged.tag);
 
         // Wrap tag in parens if needed (e.g., ternary: `(a ? b : c)`template``)
         // This must happen BEFORE adding removed-paren comments so comments stay outside
         let tag_doc = if needs_parens(&tagged.tag, ParenContext::Callee) {
-            doc::parens(tag_doc)
+            d.parens(tag_doc)
         } else {
             tag_doc
         };
@@ -1095,33 +1105,31 @@ impl<'a> Printer<'a> {
             tag_doc,
         );
 
-        doc::concat(vec![
-            tag_doc,
-            self.build_template_literal_doc(&tagged.quasi),
-        ])
+        d.concat(&[tag_doc, self.build_template_literal_doc(&tagged.quasi)])
     }
 
     /// Build a Doc for a TypeScript parameter property
     fn build_ts_parameter_property_doc(
         &self,
         param_prop: &crate::ast::internal::TSParameterProperty,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         // Print accessibility modifier
         if let Some(acc) = &param_prop.accessibility {
-            parts.push(doc::text(acc.as_str()));
-            parts.push(doc::text(" "));
+            parts.push(d.text(acc.as_str()));
+            parts.push(d.text(" "));
         }
 
         // Print readonly modifier
         if param_prop.readonly {
-            parts.push(doc::text("readonly "));
+            parts.push(d.text("readonly "));
         }
 
         // Print the parameter (identifier or assignment pattern)
         parts.push(self.build_expression_doc(&param_prop.parameter));
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 }

@@ -658,8 +658,8 @@ fn convert_simple_selector(simple: &internal::SimpleSelector) -> serde_json::Val
     }
 }
 
-/// Convert a list of CSS nodes to a StyleSheet JSON structure
-pub fn convert_css_nodes(nodes: &[internal::CssNode], source: &str) -> serde_json::Value {
+/// Convert a list of CSS nodes to a typed StyleSheet structure
+pub fn convert_css_nodes(nodes: &[internal::CssNode], source: &str) -> super::public::StyleSheet {
     // Convert all nodes (comments are stored separately and not included in JSON output)
     let children: Vec<serde_json::Value> = nodes
         .iter()
@@ -672,17 +672,17 @@ pub fn convert_css_nodes(nodes: &[internal::CssNode], source: &str) -> serde_jso
         _ => (0, 0),
     };
 
-    serde_json::json!({
-        "type": "StyleSheet",
-        "start": content_start,
-        "end": content_end,
-        "attributes": [],
-        "children": children,
-        "content": {
-            "start": content_start,
-            "end": content_end,
-            "styles": source[content_start as usize..content_end as usize].to_string(),
-            "comment": serde_json::Value::Null,
-        }
-    })
+    super::public::StyleSheet {
+        node_type: "StyleSheet".to_string(),
+        start: content_start,
+        end: content_end,
+        attributes: Vec::new(),
+        children,
+        content: super::public::StyleContent {
+            start: content_start,
+            end: content_end,
+            styles: source[content_start as usize..content_end as usize].to_string(),
+            comment: None,
+        },
+    }
 }

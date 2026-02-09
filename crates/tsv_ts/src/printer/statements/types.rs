@@ -4,7 +4,8 @@ use super::{
     Printer, build_entity_name_doc, intersection_has_huggable_last_type, unwrap_parenthesized,
 };
 use crate::ast::internal::{self, TSType};
-use tsv_lang::{Comment, SymbolToU32, comments_in_range, doc};
+use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::{Comment, SymbolToU32, comments_in_range};
 
 /// Check if a type is "generic" - i.e., has type parameters.
 /// This matches prettier's `isGeneric` function in assignment.js.
@@ -40,8 +41,8 @@ fn type_has_internal_breaking(ts_type: &TSType) -> bool {
 
 /// Build a fluid-style doc that can break after `=` when the line is too long.
 /// Flat: ` <type>`, Broken: `\n\t<type>`
-fn fluid_assignment_doc(type_doc: doc::Doc) -> doc::Doc {
-    doc::group(doc::indent_line(type_doc))
+fn fluid_assignment_doc(d: &DocArena, type_doc: DocId) -> DocId {
+    d.group(d.indent_line(type_doc))
 }
 
 impl<'a> Printer<'a> {
@@ -69,9 +70,10 @@ impl<'a> Printer<'a> {
     pub(super) fn build_type_alias_declaration_doc(
         &self,
         decl: &internal::TSTypeAliasDeclaration,
-    ) -> doc::Doc {
-        let mut parts = vec![doc::text("type ")];
-        parts.push(doc::symbol(decl.id.name.to_u32()));
+    ) -> DocId {
+        let d = self.d();
+        let mut parts = vec![d.text("type ")];
+        parts.push(d.symbol(decl.id.name.to_u32()));
 
         // Check if type parameters are complex (>1 param with constraints/defaults)
         // Complex type params use break-lhs layout: params break, not the RHS
@@ -81,7 +83,7 @@ impl<'a> Printer<'a> {
             parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
         }
 
-        parts.push(doc::text(" ="));
+        parts.push(d.text(" ="));
 
         // Check the type kind for different formatting rules
         // For union/intersection types, build without their own group so they inherit
@@ -89,31 +91,31 @@ impl<'a> Printer<'a> {
         if let TSType::Union(u) = &decl.type_annotation {
             // Union types: break after `=` with leading `| `
             let type_doc = self.build_union_type_doc(u, false);
-            parts.push(fluid_assignment_doc(type_doc));
+            parts.push(fluid_assignment_doc(d, type_doc));
         } else if let TSType::Intersection(i) = &decl.type_annotation {
             // Intersection types: first element stays inline, subsequent wrap with indent
             // Special case: when the last type is a TypeLiteral (huggable), don't add indent
             let type_doc = self.build_intersection_type_doc(i, false);
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
             if intersection_has_huggable_last_type(i) {
                 parts.push(type_doc);
             } else {
-                parts.push(doc::group(doc::indent(type_doc)));
+                parts.push(d.group(d.indent(type_doc)));
             }
         } else if let TSType::Conditional(cond) = &decl.type_annotation {
             // Conditional types: break after `=` only if check/extends has type parameters
             let type_doc = self.build_type_doc(&decl.type_annotation);
             if should_break_before_conditional_type(cond) {
-                parts.push(fluid_assignment_doc(type_doc));
+                parts.push(fluid_assignment_doc(d, type_doc));
             } else {
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
                 parts.push(type_doc);
             }
         } else if type_has_internal_breaking(&decl.type_annotation) {
             // Types with internal breaking (braces, brackets, parens, angle brackets) stay hugged
             // Use wrapping version so TypeReference type args break internally when too long
             let type_doc = self.build_type_doc_with_wrapping_type_args(&decl.type_annotation);
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
             parts.push(type_doc);
         } else if has_complex_params {
             // Complex type parameters: use break-lhs layout
@@ -125,17 +127,17 @@ impl<'a> Printer<'a> {
             //     U = number,
             //   > = SomeLongType;
             let type_doc = self.build_type_doc(&decl.type_annotation);
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
             parts.push(type_doc);
         } else {
             // Other types: fluid layout - can break after `=` when line is too long
             let type_doc = self.build_type_doc(&decl.type_annotation);
-            parts.push(fluid_assignment_doc(type_doc));
+            parts.push(fluid_assignment_doc(d, type_doc));
         }
 
-        parts.push(doc::text(";"));
+        parts.push(d.text(";"));
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build doc for interface declaration
@@ -144,12 +146,13 @@ impl<'a> Printer<'a> {
     pub(super) fn build_interface_declaration_doc(
         &self,
         decl: &internal::TSInterfaceDeclaration,
-    ) -> doc::Doc {
+    ) -> DocId {
+        let d = self.d();
         // Group mode: multiple extends items
         let group_mode = decl.extends.len() > 1;
 
-        let mut header_parts = vec![doc::text("interface ")];
-        header_parts.push(doc::symbol(decl.id.name.to_u32()));
+        let mut header_parts = vec![d.text("interface ")];
+        header_parts.push(d.symbol(decl.id.name.to_u32()));
 
         // Build extends doc
         let extends_doc = if !decl.extends.is_empty() {
@@ -161,13 +164,10 @@ impl<'a> Printer<'a> {
                     if let Some(type_args) = &heritage.type_arguments {
                         h_parts.push(self.build_type_arguments_doc(type_args));
                     }
-                    doc::concat(h_parts)
+                    d.concat(&h_parts)
                 })
                 .collect();
-            Some(doc::concat(vec![
-                doc::text("extends "),
-                doc::join(heritage_docs, ", "),
-            ]))
+            Some(d.concat(&[d.text("extends "), d.join(heritage_docs, ", ")]))
         } else {
             None
         };
@@ -182,10 +182,10 @@ impl<'a> Printer<'a> {
 
             // Extends clause with line break
             if let Some(ext_doc) = extends_doc {
-                header_parts.push(doc::indent_line(ext_doc));
+                header_parts.push(d.indent_line(ext_doc));
             }
 
-            doc::group(doc::concat(header_parts))
+            d.group(d.concat(&header_parts))
         } else {
             // Non-group mode: type params break independently, extends stays inline
             if let Some(type_params) = &decl.type_parameters {
@@ -194,60 +194,56 @@ impl<'a> Printer<'a> {
 
             // Extends clause stays inline
             if let Some(ext_doc) = extends_doc {
-                header_parts.push(doc::text(" "));
+                header_parts.push(d.text(" "));
                 header_parts.push(ext_doc);
             }
 
-            doc::concat(header_parts)
+            d.concat(&header_parts)
         };
 
         // Build body separately (outside the header group)
-        let mut parts = vec![header_doc, doc::text(" ")];
+        let mut parts = vec![header_doc, d.text(" ")];
 
         if decl.body.body.is_empty() {
             parts.push(self.build_empty_body_with_comments_doc(decl.body.span));
         } else {
-            parts.push(doc::text("{"));
-            parts.push(doc::indent(doc::concat(vec![
-                self.build_type_elements_doc(
-                    &decl.body.body,
-                    decl.body.span.start,
-                    decl.body.span.end,
-                ),
-            ])));
-            parts.push(doc::hardline());
-            parts.push(doc::text("}"));
+            parts.push(d.text("{"));
+            parts.push(d.indent(d.concat(&[self.build_type_elements_doc(
+                &decl.body.body,
+                decl.body.span.start,
+                decl.body.span.end,
+            )])));
+            parts.push(d.hardline());
+            parts.push(d.text("}"));
         }
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build doc for declare function with wrapping support for type parameters
-    pub(super) fn build_declare_function_doc(
-        &self,
-        decl: &internal::TSDeclareFunction,
-    ) -> doc::Doc {
+    pub(super) fn build_declare_function_doc(&self, decl: &internal::TSDeclareFunction) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         // Handle async keyword
         if decl.r#async {
-            parts.push(doc::text("async "));
+            parts.push(d.text("async "));
         }
 
         // Handle declare keyword (only for top-level declare functions,
         // not inside `declare namespace` where it's implicit)
         if decl.declare {
-            parts.push(doc::text("declare "));
+            parts.push(d.text("declare "));
         }
 
         // Handle function/function* keyword
         if decl.generator {
-            parts.push(doc::text("function* "));
+            parts.push(d.text("function* "));
         } else {
-            parts.push(doc::text("function "));
+            parts.push(d.text("function "));
         }
 
-        parts.push(doc::symbol(decl.id.name.to_u32()));
+        parts.push(d.symbol(decl.id.name.to_u32()));
 
         // Type parameters with wrapping support
         if let Some(type_params) = &decl.type_parameters {
@@ -267,26 +263,26 @@ impl<'a> Printer<'a> {
 
         // Return type
         if let Some(return_type) = &decl.return_type {
-            parts.push(doc::text(": "));
+            parts.push(d.text(": "));
             parts.push(self.build_type_doc(&return_type.type_annotation));
         }
 
-        parts.push(doc::text(";"));
+        parts.push(d.text(";"));
 
-        doc::group(doc::concat(parts))
+        d.group(d.concat(&parts))
     }
 
     /// Build doc for entity name
-    pub(super) fn build_entity_name_doc(&self, name: &internal::TSEntityName) -> doc::Doc {
+    pub(super) fn build_entity_name_doc(&self, name: &internal::TSEntityName) -> DocId {
         // Delegate to standalone function - doesn't need printer state
-        build_entity_name_doc(name)
+        build_entity_name_doc(self.d(), name)
     }
 
     /// Build doc for a type used as a type argument.
     ///
     /// For single type arg contexts, uses normal doc (allows object types to break).
     /// For multiple type arg contexts, uses hugging (objects don't break independently).
-    fn build_type_arg_doc(&self, param: &TSType, is_multi_arg: bool) -> doc::Doc {
+    fn build_type_arg_doc(&self, param: &TSType, is_multi_arg: bool) -> DocId {
         if is_multi_arg {
             self.build_type_doc_for_type_arg(param)
         } else {
@@ -301,9 +297,10 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_type_arguments_doc(
         &self,
         args: &internal::TSTypeParameterInstantiation,
-    ) -> doc::Doc {
+    ) -> DocId {
+        let d = self.d();
         if args.params.is_empty() {
-            return doc::text("<>");
+            return d.text("<>");
         }
 
         // Check for line comments between arguments or after last argument (force multiline)
@@ -318,13 +315,13 @@ impl<'a> Printer<'a> {
             let param_start = param.span().start;
 
             if i > 0 {
-                parts.push(doc::text(", "));
+                parts.push(d.text(", "));
             }
 
             // Add leading block comments before this type argument
             for comment in comments_in_range(self.comments, prev_end, param_start) {
                 if comment.is_block {
-                    parts.push(doc::text_owned(format!("/*{}*/ ", comment.content)));
+                    parts.push(d.text_owned(format!("/*{}*/ ", comment.content)));
                 }
             }
 
@@ -339,7 +336,7 @@ impl<'a> Printer<'a> {
             };
             for comment in comments_in_range(self.comments, param_end, next_boundary) {
                 if comment.is_block {
-                    parts.push(doc::text_owned(format!(" /*{}*/", comment.content)));
+                    parts.push(d.text_owned(format!(" /*{}*/", comment.content)));
                 }
             }
 
@@ -347,7 +344,7 @@ impl<'a> Printer<'a> {
             prev_end = next_boundary;
         }
 
-        doc::concat(vec![doc::text("<"), doc::concat(parts), doc::text(">")])
+        d.concat(&[d.text("<"), d.concat(&parts), d.text(">")])
     }
 
     /// Build doc for type arguments with width-based wrapping support.
@@ -368,9 +365,10 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_type_arguments_doc_wrapping(
         &self,
         args: &internal::TSTypeParameterInstantiation,
-    ) -> doc::Doc {
+    ) -> DocId {
+        let d = self.d();
         if args.params.is_empty() {
-            return doc::text("<>");
+            return d.text("<>");
         }
 
         // Check for line comments between arguments or after last argument (force multiline)
@@ -387,7 +385,7 @@ impl<'a> Printer<'a> {
                 TSType::TypeLiteral(_) | TSType::Mapped(_)
             );
             if is_huggable {
-                let mut parts = vec![doc::text("<")];
+                let mut parts = vec![d.text("<")];
 
                 // Include leading comments: `Array</* comment */ {...}>`
                 let param_start = args.params[0].span().start;
@@ -396,7 +394,7 @@ impl<'a> Printer<'a> {
                 let before_close = args.span.end - 1; // Before the closing `>`
                 for comment in comments_in_range(self.comments, after_open, param_start) {
                     if comment.is_block {
-                        parts.push(doc::text_owned(format!("/*{}*/ ", comment.content)));
+                        parts.push(d.text_owned(format!("/*{}*/ ", comment.content)));
                     }
                 }
 
@@ -405,12 +403,12 @@ impl<'a> Printer<'a> {
                 // Include trailing comments: `Array<{...} /* trailing */>`
                 for comment in comments_in_range(self.comments, param_end, before_close) {
                     if comment.is_block {
-                        parts.push(doc::text_owned(format!(" /*{}*/", comment.content)));
+                        parts.push(d.text_owned(format!(" /*{}*/", comment.content)));
                     }
                 }
 
-                parts.push(doc::text(">"));
-                return doc::concat(parts);
+                parts.push(d.text(">"));
+                return d.concat(&parts);
             }
         }
 
@@ -427,7 +425,7 @@ impl<'a> Printer<'a> {
             // Add leading block comments before this type argument
             for comment in comments_in_range(self.comments, prev_end, param_start) {
                 if comment.is_block {
-                    arg_parts.push(doc::text_owned(format!("/*{}*/ ", comment.content)));
+                    arg_parts.push(d.text_owned(format!("/*{}*/ ", comment.content)));
                 }
             }
 
@@ -442,7 +440,7 @@ impl<'a> Printer<'a> {
             };
             for comment in comments_in_range(self.comments, param_end, next_boundary) {
                 if comment.is_block {
-                    arg_parts.push(doc::text_owned(format!(" /*{}*/", comment.content)));
+                    arg_parts.push(d.text_owned(format!(" /*{}*/", comment.content)));
                 }
             }
 
@@ -451,22 +449,22 @@ impl<'a> Printer<'a> {
 
             // Add separator before non-first arguments
             if i > 0 {
-                inner_parts.push(doc::line());
+                inner_parts.push(d.line());
             }
-            inner_parts.push(doc::concat(arg_parts));
+            inner_parts.push(d.concat(&arg_parts));
             // Add comma separator after non-last elements
             if !is_last {
-                inner_parts.push(doc::text(","));
+                inner_parts.push(d.text(","));
             }
             // Note: type arguments don't get trailing commas (unlike params)
         }
 
         // Wrap in group with proper indentation for width-based breaking
-        doc::group(doc::concat(vec![
-            doc::text("<"),
-            doc::indent_softline(doc::concat(inner_parts)),
-            doc::softline(),
-            doc::text(">"),
+        d.group(d.concat(&[
+            d.text("<"),
+            d.indent_softline(d.concat(&inner_parts)),
+            d.softline(),
+            d.text(">"),
         ]))
     }
 
@@ -476,7 +474,8 @@ impl<'a> Printer<'a> {
     fn build_type_arguments_doc_with_line_comments(
         &self,
         args: &internal::TSTypeParameterInstantiation,
-    ) -> doc::Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut inner_parts = Vec::new();
         let mut prev_end = args.span.start + 1; // After the opening `<`
 
@@ -498,7 +497,7 @@ impl<'a> Printer<'a> {
 
             // Comma (not for last element in type args)
             if !is_last {
-                inner_parts.push(doc::text(","));
+                inner_parts.push(d.text(","));
             }
 
             // Trailing comments
@@ -506,17 +505,17 @@ impl<'a> Printer<'a> {
 
             // Hardline to separate from next element
             if !is_last {
-                inner_parts.push(doc::hardline());
+                inner_parts.push(d.hardline());
             }
 
             prev_end = next_boundary;
         }
 
-        doc::concat(vec![
-            doc::text("<"),
-            doc::indent(doc::concat(vec![doc::hardline(), doc::concat(inner_parts)])),
-            doc::hardline(),
-            doc::text(">"),
+        d.concat(&[
+            d.text("<"),
+            d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])),
+            d.hardline(),
+            d.text(">"),
         ])
     }
 
@@ -526,7 +525,8 @@ impl<'a> Printer<'a> {
         members: &[internal::TSTypeElement],
         body_start: u32,
         body_end: u32,
-    ) -> doc::Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
         let mut prev_end = body_start + 1; // after opening brace
 
@@ -566,11 +566,11 @@ impl<'a> Printer<'a> {
                     leading_comments[0].span.start
                 };
                 if self.has_blank_line_between(prev_end, check_pos) {
-                    parts.push(doc::literalline());
+                    parts.push(d.literalline());
                 }
             }
             // Always add hardline before member (or its leading comments)
-            parts.push(doc::hardline());
+            parts.push(d.hardline());
 
             // Print leading comments with blank line preservation
             parts.extend(
@@ -593,7 +593,7 @@ impl<'a> Printer<'a> {
 
                     if comment.is_block {
                         // Single-line block comments are inline, affect width
-                        parts.push(doc::text(" "));
+                        parts.push(d.text(" "));
                         parts.push(self.build_comment_doc(comment));
                     } else {
                         // Line comments go in line_suffix, don't affect width
@@ -610,53 +610,54 @@ impl<'a> Printer<'a> {
         // Handle trailing comments after the last member (before closing `}`)
         parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end.saturating_sub(1)));
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build doc for a single type element
-    fn build_type_element_doc(&self, elem: &internal::TSTypeElement) -> doc::Doc {
+    fn build_type_element_doc(&self, elem: &internal::TSTypeElement) -> DocId {
+        let d = self.d();
         match elem {
             internal::TSTypeElement::PropertySignature(p) => {
                 let mut parts = Vec::new();
                 if p.readonly {
-                    parts.push(doc::text("readonly "));
+                    parts.push(d.text("readonly "));
                 }
                 // Handle computed property keys: [key]: type
                 if p.computed {
-                    parts.push(doc::text("["));
+                    parts.push(d.text("["));
                     parts.push(self.build_expression_doc(&p.key));
-                    parts.push(doc::text("]"));
+                    parts.push(d.text("]"));
                 } else {
                     parts.push(self.build_expression_doc(&p.key));
                 }
                 if p.optional {
-                    parts.push(doc::text("?"));
+                    parts.push(d.text("?"));
                 }
                 if let Some(ta) = &p.type_annotation {
                     // Use width-aware wrapping for generic type arguments
                     parts.push(self.build_type_annotation_doc_wrapping(ta));
                 }
-                parts.push(doc::text(";"));
-                doc::concat(parts)
+                parts.push(d.text(";"));
+                d.concat(&parts)
             }
             internal::TSTypeElement::MethodSignature(m) => {
                 let mut parts = Vec::new();
                 // Print accessor keyword for get/set signatures
                 match m.kind {
-                    internal::MethodKind::Get => parts.push(doc::text("get ")),
-                    internal::MethodKind::Set => parts.push(doc::text("set ")),
+                    internal::MethodKind::Get => parts.push(d.text("get ")),
+                    internal::MethodKind::Set => parts.push(d.text("set ")),
                     _ => {}
                 }
                 // Handle computed method keys: [key](): type
                 if m.computed {
-                    parts.push(doc::text("["));
+                    parts.push(d.text("["));
                     parts.push(self.build_expression_doc(&m.key));
-                    parts.push(doc::text("]"));
+                    parts.push(d.text("]"));
                 } else {
                     parts.push(self.build_expression_doc(&m.key));
                 }
                 if m.optional {
-                    parts.push(doc::text("?"));
+                    parts.push(d.text("?"));
                 }
                 // Print type parameters if present: `<T>` or `<T, U>`
                 if let Some(type_params) = &m.type_parameters {
@@ -665,11 +666,11 @@ impl<'a> Printer<'a> {
                 // Width-based breaking for params
                 parts.push(self.build_signature_params_doc(&m.params, None));
                 if let Some(rt) = &m.return_type {
-                    parts.push(doc::text(": "));
+                    parts.push(d.text(": "));
                     parts.push(self.build_type_doc(&rt.type_annotation));
                 }
-                parts.push(doc::text(";"));
-                doc::group(doc::concat(parts))
+                parts.push(d.text(";"));
+                d.group(d.concat(&parts))
             }
             internal::TSTypeElement::CallSignature(c) => {
                 let mut parts = Vec::new();
@@ -680,14 +681,14 @@ impl<'a> Printer<'a> {
                 // Width-based breaking for params
                 parts.push(self.build_signature_params_doc(&c.params, None));
                 if let Some(rt) = &c.return_type {
-                    parts.push(doc::text(": "));
+                    parts.push(d.text(": "));
                     parts.push(self.build_type_doc(&rt.type_annotation));
                 }
-                parts.push(doc::text(";"));
-                doc::group(doc::concat(parts))
+                parts.push(d.text(";"));
+                d.group(d.concat(&parts))
             }
             internal::TSTypeElement::ConstructSignature(c) => {
-                let mut parts = vec![doc::text("new ")];
+                let mut parts = vec![d.text("new ")];
                 // Type parameters: `<T>` or `<T, U>`
                 if let Some(type_params) = &c.type_parameters {
                     parts.push(self.build_type_parameter_declaration_doc(type_params));
@@ -695,32 +696,32 @@ impl<'a> Printer<'a> {
                 // Width-based breaking for params
                 parts.push(self.build_signature_params_doc(&c.params, None));
                 if let Some(rt) = &c.return_type {
-                    parts.push(doc::text(": "));
+                    parts.push(d.text(": "));
                     parts.push(self.build_type_doc(&rt.type_annotation));
                 }
-                parts.push(doc::text(";"));
-                doc::group(doc::concat(parts))
+                parts.push(d.text(";"));
+                d.group(d.concat(&parts))
             }
             internal::TSTypeElement::IndexSignature(i) => {
                 let mut parts = Vec::new();
                 if i.readonly {
-                    parts.push(doc::text("readonly "));
+                    parts.push(d.text("readonly "));
                 }
-                parts.push(doc::text("["));
+                parts.push(d.text("["));
                 for (idx, param) in i.parameters.iter().enumerate() {
                     if idx > 0 {
-                        parts.push(doc::text(", "));
+                        parts.push(d.text(", "));
                     }
-                    parts.push(doc::symbol(param.name.to_u32()));
+                    parts.push(d.symbol(param.name.to_u32()));
                     if let Some(ta) = &param.type_annotation {
-                        parts.push(doc::text(": "));
+                        parts.push(d.text(": "));
                         parts.push(self.build_type_doc(&ta.type_annotation));
                     }
                 }
-                parts.push(doc::text("]: "));
+                parts.push(d.text("]: "));
                 parts.push(self.build_type_doc(&i.type_annotation.type_annotation));
-                parts.push(doc::text(";"));
-                doc::concat(parts)
+                parts.push(d.text(";"));
+                d.concat(&parts)
             }
         }
     }
@@ -737,25 +738,23 @@ impl<'a> Printer<'a> {
     ///     Blue,
     /// }
     /// ```
-    pub(super) fn build_enum_declaration_doc(
-        &self,
-        decl: &internal::TSEnumDeclaration,
-    ) -> doc::Doc {
+    pub(super) fn build_enum_declaration_doc(&self, decl: &internal::TSEnumDeclaration) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         // `declare` prefix if ambient declaration
         if decl.declare {
-            parts.push(doc::text("declare "));
+            parts.push(d.text("declare "));
         }
 
         // `const` prefix if const enum
         if decl.r#const {
-            parts.push(doc::text("const "));
+            parts.push(d.text("const "));
         }
 
-        parts.push(doc::text("enum "));
-        parts.push(doc::symbol(decl.id.name.to_u32()));
-        parts.push(doc::text(" "));
+        parts.push(d.text("enum "));
+        parts.push(d.symbol(decl.id.name.to_u32()));
+        parts.push(d.text(" "));
 
         // Find body start (after '{')
         let body_start = self.source[decl.span.start as usize..decl.span.end as usize]
@@ -768,7 +767,7 @@ impl<'a> Printer<'a> {
             // Empty enum body - handle comments inside
             parts.push(self.build_empty_body_with_comments_doc(body_span));
         } else {
-            parts.push(doc::text("{"));
+            parts.push(d.text("{"));
             // Build member docs with comment handling
             let mut member_parts = Vec::new();
             let mut prev_end = body_start;
@@ -790,9 +789,9 @@ impl<'a> Printer<'a> {
                         comments[0].span.start
                     };
                     if self.has_blank_line_between(prev_end, check_pos) {
-                        member_parts.push(doc::literalline());
+                        member_parts.push(d.literalline());
                     }
-                    member_parts.push(doc::hardline());
+                    member_parts.push(d.hardline());
                 }
 
                 // Process leading comments
@@ -800,16 +799,16 @@ impl<'a> Printer<'a> {
                     member_parts.push(self.build_comment_doc(comment));
                     // Block comment on same line as member gets space, otherwise hardline
                     if comment.is_block && self.is_same_line(comment.span.end, member_start) {
-                        member_parts.push(doc::text(" "));
+                        member_parts.push(d.text(" "));
                     } else {
-                        member_parts.push(doc::hardline());
+                        member_parts.push(d.hardline());
                     }
                 }
 
                 member_parts.push(self.build_enum_member_doc(member));
 
                 // Add comma (trailing comma for last member)
-                member_parts.push(doc::text(","));
+                member_parts.push(d.text(","));
 
                 // Handle trailing same-line comments
                 let upper_bound = decl
@@ -826,22 +825,20 @@ impl<'a> Printer<'a> {
             // Handle trailing comments after the last member
             member_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
 
-            parts.push(doc::indent(doc::concat(vec![
-                doc::hardline(),
-                doc::concat(member_parts),
-            ])));
-            parts.push(doc::hardline());
-            parts.push(doc::text("}"));
+            parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&member_parts)])));
+            parts.push(d.hardline());
+            parts.push(d.text("}"));
         }
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Build doc for a single enum member
-    fn build_enum_member_doc(&self, member: &internal::TSEnumMember) -> doc::Doc {
+    fn build_enum_member_doc(&self, member: &internal::TSEnumMember) -> DocId {
+        let d = self.d();
         // Member id (identifier or string literal)
         let id_doc = match &member.id {
-            internal::TSEnumMemberId::Identifier(id) => doc::symbol(id.name.to_u32()),
+            internal::TSEnumMemberId::Identifier(id) => d.symbol(id.name.to_u32()),
             internal::TSEnumMemberId::String(lit) => {
                 // String literal member name: `"hello"` in `enum { "hello" = 1 }`
                 self.build_literal_doc(lit)
@@ -858,9 +855,9 @@ impl<'a> Printer<'a> {
             if matches!(init, internal::Expression::BinaryExpression(_)) {
                 // Use indent() instead of indent_line() to avoid double-grouping.
                 // The binary expression's own group will decide when to break.
-                doc::concat(vec![id_doc, doc::text(" = "), doc::indent(init_doc)])
+                d.concat(&[id_doc, d.text(" = "), d.indent(init_doc)])
             } else {
-                doc::concat(vec![id_doc, doc::text(" = "), init_doc])
+                d.concat(&[id_doc, d.text(" = "), init_doc])
             }
         } else {
             id_doc
@@ -878,7 +875,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_module_declaration_doc(
         &self,
         decl: &internal::TSModuleDeclaration,
-    ) -> doc::Doc {
+    ) -> DocId {
         self.build_module_declaration_doc_inner(decl, true)
     }
 
@@ -888,27 +885,28 @@ impl<'a> Printer<'a> {
         &self,
         decl: &internal::TSModuleDeclaration,
         is_root: bool,
-    ) -> doc::Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         // Only print keywords for root declaration
         if is_root {
             // `declare` prefix if ambient declaration
             if decl.declare {
-                parts.push(doc::text("declare "));
+                parts.push(d.text("declare "));
             }
 
             // `global` is special - it replaces namespace/module keyword
             if decl.global {
-                parts.push(doc::text("global"));
+                parts.push(d.text("global"));
             } else {
                 // Use the original keyword (namespace or module)
                 match decl.kind {
                     internal::TSModuleDeclarationKind::Namespace => {
-                        parts.push(doc::text("namespace "));
+                        parts.push(d.text("namespace "));
                     }
                     internal::TSModuleDeclarationKind::Module => {
-                        parts.push(doc::text("module "));
+                        parts.push(d.text("module "));
                     }
                 }
             }
@@ -918,7 +916,7 @@ impl<'a> Printer<'a> {
         if !decl.global {
             match &decl.id {
                 internal::TSModuleName::Identifier(id) => {
-                    parts.push(doc::symbol(id.name.to_u32()));
+                    parts.push(d.symbol(id.name.to_u32()));
                 }
                 internal::TSModuleName::Literal(lit) => {
                     parts.push(self.build_literal_doc(lit));
@@ -929,13 +927,13 @@ impl<'a> Printer<'a> {
         // Body (may be None for shorthand: `declare module 'name';`)
         match &decl.body {
             Some(internal::TSModuleDeclarationBody::TSModuleBlock(block)) => {
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
 
                 if block.body.is_empty() {
                     // Empty namespace body - handle comments inside
                     parts.push(self.build_empty_body_with_comments_doc(block.span));
                 } else {
-                    parts.push(doc::text("{"));
+                    parts.push(d.text("{"));
 
                     // Build statement docs with blank line preservation
                     let mut stmt_parts = Vec::new();
@@ -948,10 +946,10 @@ impl<'a> Printer<'a> {
                         // literalline() produces a bare newline (no indent), preserving truly blank lines
                         if !stmt_parts.is_empty() {
                             if self.has_blank_line_between(prev_end, curr_start) {
-                                stmt_parts.push(doc::literalline()); // blank line (no indent)
-                                stmt_parts.push(doc::hardline()); // next statement with indent
+                                stmt_parts.push(d.literalline()); // blank line (no indent)
+                                stmt_parts.push(d.hardline()); // next statement with indent
                             } else {
-                                stmt_parts.push(doc::hardline());
+                                stmt_parts.push(d.hardline());
                             }
                         }
 
@@ -963,26 +961,23 @@ impl<'a> Printer<'a> {
                     let body_end = block.span.end.saturating_sub(1);
                     stmt_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
 
-                    parts.push(doc::indent(doc::concat(vec![
-                        doc::hardline(),
-                        doc::concat(stmt_parts),
-                    ])));
-                    parts.push(doc::hardline());
-                    parts.push(doc::text("}"));
+                    parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&stmt_parts)])));
+                    parts.push(d.hardline());
+                    parts.push(d.text("}"));
                 }
             }
             Some(internal::TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
                 // Nested namespace: `namespace Outer.Inner { }`
                 // Print as `Outer.Inner` (dot-separated)
-                parts.push(doc::text("."));
+                parts.push(d.text("."));
                 parts.push(self.build_module_declaration_doc_inner(nested, false));
             }
             None => {
                 // Shorthand ambient module: `declare module 'name';`
-                parts.push(doc::text(";"));
+                parts.push(d.text(";"));
             }
         }
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 }

@@ -114,11 +114,7 @@ async fn parse_to_value(
     match parser_type {
         ParserType::Svelte => Ok(deno::parse_svelte(content).await?),
         ParserType::TypeScript => Ok(deno::parse_typescript(content).await?),
-        ParserType::Css => {
-            // CSS subprocess returns JSON string, parse to Value
-            let json_str = subprocess::run_tsv_parse(content, true)?;
-            Ok(serde_json::from_str(&json_str)?)
-        }
+        ParserType::Css => Ok(deno::parse_css(content).await?),
     }
 }
 

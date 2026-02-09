@@ -13,14 +13,14 @@ impl<'a> Printer<'a> {
     /// Format an if block: {#if test}...{:else}...{/if}
     ///
     /// Uses the doc-based builder which handles:
-    /// - Comments in expressions (via build_expression_with_context_doc)
-    /// - Method chain wrapping (via suffix_width-aware formatting)
+    /// - Comments in expressions (via build_expression_with_comments_doc)
+    /// - Method chain wrapping (via first_line_offset-aware doc building)
     /// - Inline vs multiline formatting (via is_inline_fragment detection)
     /// - Else/else-if chains (via build_if_alternate_doc)
     /// - Nested style/script elements (via build_raw_content_element_doc)
     pub(super) fn print_if_block(&mut self, block: &internal::IfBlock) {
         let doc = self.build_if_block_doc(block);
-        self.render_doc_immediate(&doc);
+        self.render_doc_immediate(doc);
     }
 
     //
@@ -30,13 +30,13 @@ impl<'a> Printer<'a> {
     /// Format an each block: {#each items as item, index (key)}...{:else}...{/each}
     ///
     /// Uses the doc-based builder which handles:
-    /// - Comments in expressions (via build_expression_with_context_doc)
-    /// - Method chain wrapping (via suffix_width-aware formatting)
+    /// - Comments in expressions (via build_expression_with_comments_doc)
+    /// - Method chain wrapping (via first_line_offset-aware doc building)
     /// - Inline vs multiline formatting (via is_inline_fragment detection)
     /// - Nested style/script elements (via build_raw_content_element_doc)
     pub(super) fn print_each_block(&mut self, block: &internal::EachBlock) {
         let doc = self.build_each_block_doc(block);
-        self.render_doc_immediate(&doc);
+        self.render_doc_immediate(doc);
     }
 
     //
@@ -46,14 +46,14 @@ impl<'a> Printer<'a> {
     /// Format an await block: {#await expr}...{:then value}...{:catch error}...{/await}
     ///
     /// Uses the doc-based builder which handles:
-    /// - Comments in expressions (via build_expression_with_context_doc)
-    /// - Method chain wrapping (via suffix_width-aware formatting)
+    /// - Comments in expressions (via build_expression_with_comments_doc)
+    /// - Method chain wrapping (via first_line_offset-aware doc building)
     /// - Inline vs multiline formatting (via is_inline_fragment detection)
     /// - Shorthand forms ({#await expr then value}, {#await expr catch error})
     /// - Nested style/script elements (via build_raw_content_element_doc)
     pub(super) fn print_await_block(&mut self, block: &internal::AwaitBlock) {
         let doc = self.build_await_block_doc(block);
-        self.render_doc_immediate(&doc);
+        self.render_doc_immediate(doc);
     }
 
     //
@@ -63,13 +63,13 @@ impl<'a> Printer<'a> {
     /// Format a key block: {#key expr}...{/key}
     ///
     /// Uses the doc-based builder which handles:
-    /// - Comments in expressions (via build_expression_with_context_doc)
-    /// - Method chain wrapping (via suffix_width-aware formatting)
+    /// - Comments in expressions (via build_expression_with_comments_doc)
+    /// - Method chain wrapping (via first_line_offset-aware doc building)
     /// - Inline vs multiline formatting (via is_inline_fragment detection)
     /// - Nested style/script elements (via build_raw_content_element_doc)
     pub(super) fn print_key_block(&mut self, block: &internal::KeyBlock) {
         let doc = self.build_key_block_doc(block);
-        self.render_doc_immediate(&doc);
+        self.render_doc_immediate(doc);
     }
 
     //
@@ -84,6 +84,6 @@ impl<'a> Printer<'a> {
     /// - Nested style/script elements (via build_raw_content_element_doc)
     pub(super) fn print_snippet_block(&mut self, block: &internal::SnippetBlock) {
         let doc = self.build_snippet_block_doc(block);
-        self.render_doc_immediate(&doc);
+        self.render_doc_immediate(doc);
     }
 }

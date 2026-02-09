@@ -4,7 +4,7 @@
 
 use super::{Printer, template_literal_has_newlines};
 use crate::ast::internal;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 /// Check if an expression is a nullish coalescing expression (`??`)
 ///
@@ -31,7 +31,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_conditional_doc_with_wrapping(
         &self,
         cond: &internal::ConditionalExpression,
-    ) -> Doc {
+    ) -> DocId {
         self.build_conditional_doc_impl(cond, false)
     }
 
@@ -44,7 +44,8 @@ impl<'a> Printer<'a> {
         &self,
         cond: &internal::ConditionalExpression,
         is_chained: bool,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let test_end = cond.test.span().end;
         let consequent_start = cond.consequent.span().start;
         let consequent_end = cond.consequent.span().end;
@@ -82,7 +83,7 @@ impl<'a> Printer<'a> {
         let test = if is_nullish_coalescing(&cond.test)
             || matches!(&*cond.test, internal::Expression::AssignmentExpression(_))
         {
-            doc::parens(test)
+            d.parens(test)
         } else {
             test
         };
@@ -102,11 +103,11 @@ impl<'a> Printer<'a> {
         let consequent_doc =
             if let internal::Expression::ConditionalExpression(nested) = &*cond.consequent {
                 // Flat version: parens around the nested conditional
-                let flat_consequent = doc::parens(consequent);
+                let flat_consequent = d.parens(consequent);
                 // Broken version: continue chain without parens
                 let broken_consequent = self.build_conditional_doc_impl(nested, true);
                 // No indent wrapper - nested conditional has its own structure
-                doc::if_break(broken_consequent, flat_consequent)
+                d.if_break(broken_consequent, flat_consequent)
             } else if matches!(
                 &*cond.consequent,
                 internal::Expression::TSAsExpression(_)
@@ -114,9 +115,9 @@ impl<'a> Printer<'a> {
                     | internal::Expression::AssignmentExpression(_)
             ) || is_nullish_coalescing(&cond.consequent)
             {
-                doc::indent(doc::parens(consequent))
+                d.indent(d.parens(consequent))
             } else {
-                doc::indent(consequent)
+                d.indent(consequent)
             };
 
         // Handle nested conditional in alternate: continue the chain
@@ -138,29 +139,29 @@ impl<'a> Printer<'a> {
                         | internal::Expression::AssignmentExpression(_)
                 ) || is_nullish_coalescing(&cond.alternate)
                 {
-                    doc::parens(alternate)
+                    d.parens(alternate)
                 } else {
                     alternate
                 };
-                doc::indent(alternate)
+                d.indent(alternate)
             };
 
-        let inner = doc::concat(vec![
+        let inner = d.concat(&[
             test,
             comments_after_test,
-            doc::indent(doc::concat(vec![
-                doc::line(),
-                doc::text("? "),
+            d.indent(d.concat(&[
+                d.line(),
+                d.text("? "),
                 consequent_doc,
-                doc::line(),
-                doc::text(": "),
+                d.line(),
+                d.text(": "),
                 alternate_doc,
             ])),
         ]);
 
         // If chained (nested in another conditional), don't wrap in group
         // This allows the parent's break decision to cascade
-        if is_chained { inner } else { doc::group(inner) }
+        if is_chained { inner } else { d.group(inner) }
     }
 
     /// Build a conditional expression doc when there are line comments
@@ -178,7 +179,8 @@ impl<'a> Printer<'a> {
         &self,
         cond: &internal::ConditionalExpression,
         _is_chained: bool,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let test_end = cond.test.span().end;
         let consequent_start = cond.consequent.span().start;
         let consequent_end = cond.consequent.span().end;
@@ -189,7 +191,7 @@ impl<'a> Printer<'a> {
         let test = if is_nullish_coalescing(&cond.test)
             || matches!(&*cond.test, internal::Expression::AssignmentExpression(_))
         {
-            doc::parens(test)
+            d.parens(test)
         } else {
             test
         };
@@ -203,18 +205,18 @@ impl<'a> Printer<'a> {
         // Comments between test and ? (inline after test)
         let comments_before_q_end = question_pos.unwrap_or(consequent_start);
         for comment in tsv_lang::comments_in_range(self.comments, test_end, comments_before_q_end) {
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
         }
 
         // Start the indented part with ? on new line
-        let mut q_parts = vec![doc::hardline(), doc::text("?")];
+        let mut q_parts = vec![d.hardline(), d.text("?")];
 
         // Comments between ? and consequent
         let mut has_line_comment_before_consequent = false;
         if let Some(q_pos) = question_pos {
             for comment in tsv_lang::comments_in_range(self.comments, q_pos + 1, consequent_start) {
-                q_parts.push(doc::text(" "));
+                q_parts.push(d.text(" "));
                 q_parts.push(self.build_comment_doc(comment));
                 if !comment.is_block {
                     has_line_comment_before_consequent = true;
@@ -226,13 +228,13 @@ impl<'a> Printer<'a> {
         let consequent = self.build_expression_doc(&cond.consequent);
         if has_line_comment_before_consequent {
             // Line comment needs hardline before consequent
-            q_parts.push(doc::hardline());
-            q_parts.push(doc::text(self.config.indent));
+            q_parts.push(d.hardline());
+            q_parts.push(d.text(self.config.indent));
             q_parts.push(consequent);
         } else {
             // Block comment or no comment - space then consequent
-            q_parts.push(doc::text(" "));
-            q_parts.push(doc::indent(consequent));
+            q_parts.push(d.text(" "));
+            q_parts.push(d.indent(consequent));
         }
 
         // Comments between consequent and : (inline after consequent)
@@ -242,7 +244,7 @@ impl<'a> Printer<'a> {
         {
             if comment.is_block {
                 // Block comments count toward width
-                q_parts.push(doc::text(" "));
+                q_parts.push(d.text(" "));
                 q_parts.push(self.build_comment_doc(comment));
             } else {
                 // Line comments use line_suffix to exclude from width calculations
@@ -251,14 +253,14 @@ impl<'a> Printer<'a> {
         }
 
         // : on new line
-        q_parts.push(doc::hardline());
-        q_parts.push(doc::text(":"));
+        q_parts.push(d.hardline());
+        q_parts.push(d.text(":"));
 
         // Comments between : and alternate
         let mut has_line_comment_before_alternate = false;
         if let Some(c_pos) = colon_pos {
             for comment in tsv_lang::comments_in_range(self.comments, c_pos + 1, alternate_start) {
-                q_parts.push(doc::text(" "));
+                q_parts.push(d.text(" "));
                 q_parts.push(self.build_comment_doc(comment));
                 if !comment.is_block {
                     has_line_comment_before_alternate = true;
@@ -273,20 +275,20 @@ impl<'a> Printer<'a> {
                 self.build_conditional_doc_with_line_comments(nested, true)
             } else {
                 // Regular expressions get indent wrapper
-                doc::indent(self.build_expression_doc(&cond.alternate))
+                d.indent(self.build_expression_doc(&cond.alternate))
             };
 
         if has_line_comment_before_alternate {
-            q_parts.push(doc::hardline());
-            q_parts.push(doc::text(self.config.indent));
+            q_parts.push(d.hardline());
+            q_parts.push(d.text(self.config.indent));
         } else {
-            q_parts.push(doc::text(" "));
+            q_parts.push(d.text(" "));
         }
         q_parts.push(alternate_doc);
 
-        parts.push(doc::indent(doc::concat(q_parts)));
+        parts.push(d.indent(d.concat(&q_parts)));
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     /// Check if there are comments between ternary operators and their operands

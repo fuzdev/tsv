@@ -7,7 +7,7 @@
 use crate::ast::internal;
 use string_interner::DefaultStringInterner;
 use tsv_lang::SymbolToU32;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::{DocArena, DocId};
 
 /// Skip over a comment (line or block) starting at position `i`.
 ///
@@ -510,14 +510,14 @@ pub(crate) fn has_multiline_content(expr: &internal::Expression, source: &str) -
 /// Build doc for TSEntityName (qualified names like `A.B.C`)
 ///
 /// This is a standalone function since it doesn't need printer state -
-/// it only uses `doc::symbol()` for deferred symbol resolution.
-pub(crate) fn build_entity_name_doc(name: &internal::TSEntityName) -> Doc {
+/// it only uses `d.symbol()` for deferred symbol resolution.
+pub(crate) fn build_entity_name_doc(d: &DocArena, name: &internal::TSEntityName) -> DocId {
     match name {
-        internal::TSEntityName::Identifier(id) => doc::symbol(id.name.to_u32()),
-        internal::TSEntityName::QualifiedName(qn) => doc::concat(vec![
-            build_entity_name_doc(&qn.left),
-            doc::text("."),
-            doc::symbol(qn.right.name.to_u32()),
+        internal::TSEntityName::Identifier(id) => d.symbol(id.name.to_u32()),
+        internal::TSEntityName::QualifiedName(qn) => d.concat(&[
+            build_entity_name_doc(d, &qn.left),
+            d.text("."),
+            d.symbol(qn.right.name.to_u32()),
         ]),
     }
 }

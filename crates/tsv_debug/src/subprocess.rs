@@ -3,39 +3,6 @@
 use crate::error::{DebugError, Result};
 use std::process::Command;
 
-/// Run tsv_cli parse command with content
-pub fn run_tsv_parse(content: &str, pretty: bool) -> Result<String> {
-    let mut cmd = Command::new("cargo");
-    cmd.args([
-        "run",
-        "-p",
-        "tsv_cli",
-        "--quiet",
-        "--",
-        "parse",
-        "--content",
-    ]);
-    cmd.arg(content);
-
-    if pretty {
-        cmd.arg("--pretty");
-    }
-
-    cmd.stderr(std::process::Stdio::inherit());
-    cmd.stdout(std::process::Stdio::piped());
-
-    let child = cmd.spawn()?;
-    let output = child.wait_with_output()?;
-
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    } else {
-        Err(DebugError::Command(
-            "Command failed (see stderr above)".to_string(),
-        ))
-    }
-}
-
 /// Run tsv_cli format command with content and parser type
 pub fn run_tsv_format(content: &str, parser: &str) -> Result<String> {
     let child = Command::new("cargo")

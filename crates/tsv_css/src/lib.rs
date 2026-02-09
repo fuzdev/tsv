@@ -1,7 +1,7 @@
-// tsv_css - CSS parsing and formatting library
-//
-// Provides CSS parsing, formatting, and AST conversion functionality.
-// Part of the tsv (TypeScript and Svelte tools in Rust) project.
+//! CSS parsing and formatting library
+//!
+//! Provides CSS parsing, formatting, and AST conversion functionality.
+//! Part of the tsv (formatter and parser for TypeScript, Svelte, and CSS) project.
 
 pub mod ast;
 pub mod escapes;
@@ -9,11 +9,9 @@ pub mod lexer;
 pub mod parser;
 pub mod printer;
 
-// Re-export commonly used types and functions
+// Re-export commonly used types
 pub use ast::{CssDeclaration, CssNode, CssRule, CssStyleSheet, StyleContent, StyleSheet};
-pub use parser::parse_css;
-pub use printer::{Printer, format_css};
-pub use tsv_lang::{ParseError, PrintConfig, Result, Span};
+pub use tsv_lang::{ParseError, Result};
 
 /// Parse CSS source into internal AST
 ///
@@ -32,7 +30,7 @@ pub use tsv_lang::{ParseError, PrintConfig, Result, Span};
 /// let stylesheet = parse(css).expect("Failed to parse CSS");
 /// ```
 pub fn parse(source: &str) -> Result<CssStyleSheet> {
-    parse_css(source, 0).map_err(|e| e.with_context(source))
+    parser::parse_css(source, 0).map_err(|e| e.with_context(source))
 }
 
 /// Parse embedded CSS source into internal AST
@@ -48,7 +46,7 @@ pub fn parse(source: &str) -> Result<CssStyleSheet> {
 /// * `Ok(CssStyleSheet)` - Parsed AST with nodes and value comments
 /// * `Err(ParseError)` - Parse error with position and context
 pub fn parse_embedded(source: &str, base_offset: usize) -> Result<CssStyleSheet> {
-    parse_css(source, base_offset).map_err(|e| e.with_context(source))
+    parser::parse_css(source, base_offset).map_err(|e| e.with_context(source))
 }
 
 /// Format CSS stylesheet to a formatted string
@@ -70,7 +68,7 @@ pub fn parse_embedded(source: &str, base_offset: usize) -> Result<CssStyleSheet>
 /// assert_eq!(formatted, "div {\n\tcolor: red;\n}\n");
 /// ```
 pub fn format(stylesheet: &CssStyleSheet, source: &str) -> String {
-    format_css(stylesheet, source)
+    printer::format_css(stylesheet, source)
 }
 
 /// Format CSS stylesheet with custom configuration
@@ -93,18 +91,22 @@ pub fn format(stylesheet: &CssStyleSheet, source: &str) -> String {
 /// let config = PrintConfig { base_indent_offset: 1, ..Default::default() };
 /// let formatted = format_with_config(&stylesheet, css, config);
 /// ```
-pub fn format_with_config(stylesheet: &CssStyleSheet, source: &str, config: PrintConfig) -> String {
+pub fn format_with_config(
+    stylesheet: &CssStyleSheet,
+    source: &str,
+    config: tsv_lang::PrintConfig,
+) -> String {
     printer::format_css_with_config(stylesheet, source, config)
 }
 
-/// Convert CSS AST to JSON representation
+/// Convert CSS AST to public JSON-compatible AST
 ///
 /// # Arguments
 /// * `stylesheet` - CSS stylesheet (nodes + value comments)
 /// * `source` - Original CSS source code
 ///
 /// # Returns
-/// * JSON value representing the StyleSheet
+/// A public AST that can be serialized to JSON
 ///
 /// # Example
 /// ```
@@ -112,8 +114,9 @@ pub fn format_with_config(stylesheet: &CssStyleSheet, source: &str, config: Prin
 ///
 /// let css = "div { color: red; }";
 /// let stylesheet = parse(css).expect("Failed to parse CSS");
-/// let json = convert_ast(&stylesheet, css);
+/// let public_ast = convert_ast(&stylesheet, css);
+/// let json = serde_json::to_string_pretty(&public_ast).unwrap();
 /// ```
-pub fn convert_ast(stylesheet: &CssStyleSheet, source: &str) -> serde_json::Value {
+pub fn convert_ast(stylesheet: &CssStyleSheet, source: &str) -> StyleSheet {
     ast::convert::convert_css_nodes(&stylesheet.nodes, source)
 }

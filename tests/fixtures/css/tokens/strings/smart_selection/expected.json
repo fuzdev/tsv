@@ -139,7 +139,7 @@
 							"start": 119,
 							"end": 150,
 							"property": "content",
-							"value": "'has \\\\''both\\\\'' \"types\"'"
+							"value": "'has \\'both\\' \"types\"'"
 						}
 					]
 				},

@@ -14,7 +14,7 @@ impl<'a> Printer<'a> {
     /// - all others: handled by build_element_doc()
     pub fn print_element(&mut self, element: &internal::Element) {
         let doc = self.build_element_doc(element);
-        self.render_doc_immediate(&doc);
+        self.render_doc_immediate(doc);
     }
 
     /// Format a Svelte special element
@@ -22,7 +22,7 @@ impl<'a> Printer<'a> {
     /// Doc-based path for all special elements (svelte:*, slot, title).
     pub fn print_special_element(&mut self, element: &internal::SpecialElement) {
         let doc = self.build_special_element_doc(element);
-        self.render_doc_immediate(&doc);
+        self.render_doc_immediate(doc);
     }
 
     //

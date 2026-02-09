@@ -9,7 +9,7 @@ use super::super::utils::is_expandable_object;
 use super::arg_comments::PartitionedComments;
 use crate::ast::internal;
 use tsv_lang::SymbolResolver;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 /// Build a Doc for a dynamic import expression: `import('module')` or `import('module', options)`
 ///
@@ -19,7 +19,8 @@ use tsv_lang::doc::{self, Doc};
 pub(super) fn build_import_expression_doc(
     printer: &Printer,
     import_expr: &internal::ImportExpression,
-) -> Doc {
+) -> DocId {
+    let d = printer.d();
     let source_doc = printer.build_expression_doc(&import_expr.source);
 
     // If no options, check for trailing comments on the source arg
@@ -47,25 +48,21 @@ pub(super) fn build_import_expression_doc(
                 // Wrap with hardlines for line comments
                 // Note: NOT using isolated_group because it causes indent issues
                 // Instead, variable.rs handles preventing assignment break via special casing
-                return doc::concat(vec![
-                    doc::text("import("),
-                    doc::indent(doc::concat(vec![doc::hardline(), doc::concat(parts)])),
-                    doc::hardline(),
-                    doc::text(")"),
+                return d.concat(&[
+                    d.text("import("),
+                    d.indent(d.concat(&[d.hardline(), d.concat(&parts)])),
+                    d.hardline(),
+                    d.text(")"),
                 ]);
             }
 
             // Block comments only - keep inline
             let mut parts = vec![source_doc];
             pc.emit_trailing_comments(&mut parts, printer);
-            return doc::concat(vec![
-                doc::text("import("),
-                doc::concat(parts),
-                doc::text(")"),
-            ]);
+            return d.concat(&[d.text("import("), d.concat(&parts), d.text(")")]);
         }
 
-        return doc::concat(vec![doc::text("import"), doc::parens(source_doc)]);
+        return d.concat(&[d.text("import"), d.parens(source_doc)]);
     };
 
     let options_doc = printer.build_expression_doc(options);
@@ -92,17 +89,17 @@ pub(super) fn build_import_expression_doc(
             let mut parts = vec![options_doc];
             pc.emit_trailing_comments(&mut parts, printer);
 
-            doc::concat(vec![
-                doc::text("import("),
-                doc::indent(doc::concat(vec![
-                    doc::hardline(),
+            d.concat(&[
+                d.text("import("),
+                d.indent(d.concat(&[
+                    d.hardline(),
                     source_doc,
-                    doc::text(","),
-                    doc::hardline(),
-                    doc::concat(parts),
+                    d.text(","),
+                    d.hardline(),
+                    d.concat(&parts),
                 ])),
-                doc::hardline(),
-                doc::text(")"),
+                d.hardline(),
+                d.text(")"),
             ])
         } else if has_trailing_comments {
             // Block comments only - keep inline
@@ -113,22 +110,18 @@ pub(super) fn build_import_expression_doc(
                 paren_close,
             );
 
-            let mut parts = vec![source_doc, doc::text(", "), options_doc];
+            let mut parts = vec![source_doc, d.text(", "), options_doc];
             pc.emit_trailing_comments(&mut parts, printer);
 
-            doc::concat(vec![
-                doc::text("import("),
-                doc::concat(parts),
-                doc::text(")"),
-            ])
+            d.concat(&[d.text("import("), d.concat(&parts), d.text(")")])
         } else {
-            doc::concat(vec![
-                doc::text("import"),
-                doc::text("("),
+            d.concat(&[
+                d.text("import"),
+                d.text("("),
                 source_doc,
-                doc::text(", "),
+                d.text(", "),
                 options_doc,
-                doc::text(")"),
+                d.text(")"),
             ])
         }
     } else {
@@ -145,17 +138,17 @@ pub(super) fn build_import_expression_doc(
             let mut parts = vec![options_doc];
             pc.emit_trailing_comments(&mut parts, printer);
 
-            doc::concat(vec![
-                doc::text("import("),
-                doc::indent(doc::concat(vec![
-                    doc::hardline(),
+            d.concat(&[
+                d.text("import("),
+                d.indent(d.concat(&[
+                    d.hardline(),
                     source_doc,
-                    doc::text(","),
-                    doc::hardline(),
-                    doc::concat(parts),
+                    d.text(","),
+                    d.hardline(),
+                    d.concat(&parts),
                 ])),
-                doc::hardline(),
-                doc::text(")"),
+                d.hardline(),
+                d.text(")"),
             ])
         } else if has_trailing_comments {
             let pc = PartitionedComments::new(
@@ -168,30 +161,31 @@ pub(super) fn build_import_expression_doc(
             let mut parts = vec![options_doc];
             pc.emit_trailing_comments(&mut parts, printer);
 
-            let arg_parts = doc::join_doc([source_doc, doc::concat(parts)], doc::comma_line());
-            doc::group(doc::concat(vec![
-                doc::text("import"),
-                doc::text("("),
-                doc::indent_softline(arg_parts),
-                doc::softline(),
-                doc::text(")"),
+            let arg_parts = d.join_doc([source_doc, d.concat(&parts)], d.comma_line());
+            d.group(d.concat(&[
+                d.text("import"),
+                d.text("("),
+                d.indent_softline(arg_parts),
+                d.softline(),
+                d.text(")"),
             ]))
         } else {
-            let arg_parts = doc::join_doc([source_doc, options_doc], doc::comma_line());
-            doc::group(doc::concat(vec![
-                doc::text("import"),
-                doc::text("("),
-                doc::indent_softline(arg_parts),
-                doc::softline(),
-                doc::text(")"),
+            let arg_parts = d.join_doc([source_doc, options_doc], d.comma_line());
+            d.group(d.concat(&[
+                d.text("import"),
+                d.text("("),
+                d.indent_softline(arg_parts),
+                d.softline(),
+                d.text(")"),
             ]))
         }
     }
 }
 
 /// Build a Doc for a meta property: `import.meta`, `new.target`
-pub(super) fn build_meta_property_doc(printer: &Printer, meta: &internal::MetaProperty) -> Doc {
+pub(super) fn build_meta_property_doc(printer: &Printer, meta: &internal::MetaProperty) -> DocId {
+    let d = printer.d();
     let meta_name = printer.resolve_symbol(meta.meta.name);
     let prop_name = printer.resolve_symbol(meta.property.name);
-    doc::text_owned(format!("{meta_name}.{prop_name}"))
+    d.text_owned(format!("{meta_name}.{prop_name}"))
 }

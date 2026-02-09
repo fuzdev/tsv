@@ -26,7 +26,7 @@ use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_modul
 use super::test_patterns::{get_member_chain_parts, is_test_call};
 use crate::ast::internal;
 use tsv_lang::SymbolResolver;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 /// Check if call should use "expand first arg" pattern
 ///
@@ -74,13 +74,14 @@ fn should_expand_first_arg(printer: &Printer, args: &[internal::Expression]) -> 
 pub(super) fn build_call_doc_with_wrapping(
     printer: &Printer,
     call: &internal::CallExpression,
-) -> Doc {
+) -> DocId {
+    let d = printer.d();
     let callee_doc = printer.build_expression_doc(&call.callee);
 
     // Wrap callee in parens if needed (e.g., ternary: `(a ? b : c)()`)
     // This must happen BEFORE adding removed-paren comments so comments stay outside
     let callee_doc = if needs_parens(&call.callee, ParenContext::Callee) {
-        doc::parens(callee_doc)
+        d.parens(callee_doc)
     } else {
         callee_doc
     };
@@ -97,7 +98,7 @@ pub(super) fn build_call_doc_with_wrapping(
 
     // Handle optional chaining
     let callee = if call.optional {
-        doc::concat(vec![callee, doc::text("?.")])
+        d.concat(&[callee, d.text("?.")])
     } else {
         callee
     };
@@ -110,13 +111,13 @@ pub(super) fn build_call_doc_with_wrapping(
 
     // Combine callee with type arguments
     let callee = match type_args_doc {
-        Some(ta_doc) => doc::concat(vec![callee, ta_doc]),
+        Some(ta_doc) => d.concat(&[callee, ta_doc]),
         None => callee,
     };
 
     // Empty args: just `fn()` or `fn<T>()`
     if call.arguments.is_empty() {
-        return doc::concat(vec![callee, doc::text("()")]);
+        return d.concat(&[callee, d.text("()")]);
     }
 
     // Check for comments inside call arguments (e.g., require(/* comment */ 'a'))
@@ -135,15 +136,15 @@ pub(super) fn build_call_doc_with_wrapping(
             let mut comment_parts = Vec::new();
             for comment in tsv_lang::comments_in_range(printer.comments, paren_open, arg_start) {
                 comment_parts.push(printer.build_comment_doc(comment));
-                comment_parts.push(doc::hardline());
+                comment_parts.push(d.hardline());
             }
 
-            let arg_doc = doc::concat(vec![
-                doc::concat(comment_parts),
+            let arg_doc = d.concat(&[
+                d.concat(&comment_parts),
                 printer.build_expression_doc(first_arg),
             ]);
 
-            return wrap_call_with_hard_breaks(callee, arg_doc);
+            return wrap_call_with_hard_breaks(d, callee, arg_doc);
         }
 
         // Check for inline block comments (single binary search via _opt)
@@ -154,21 +155,21 @@ pub(super) fn build_call_doc_with_wrapping(
 
             // If the arg will break internally (multiline content), use expanded format
             // e.g., fn(/* c */ {\n  prop,\n}) → fn(\n  /* c */ {\n    prop,\n  },\n)
-            if doc::will_break(&arg_doc) {
-                let arg_with_comment = doc::concat(vec![inline_comments, doc::text(" "), arg_doc]);
-                return wrap_call_with_hard_breaks(callee, arg_with_comment);
+            if d.will_break(arg_doc) {
+                let arg_with_comment = d.concat(&[inline_comments, d.text(" "), arg_doc]);
+                return wrap_call_with_hard_breaks(d, callee, arg_with_comment);
             }
 
             // Otherwise keep everything inline: fn(/* c */ {short})
-            return doc::concat(vec![
+            return d.concat(&[
                 callee,
-                doc::text("("),
+                d.text("("),
                 inline_comments,
-                doc::text(" "),
+                d.text(" "),
                 arg_doc,
                 // Check for trailing comments
                 printer.build_inline_comments_between_doc(arg_end, paren_close),
-                doc::text(")"),
+                d.text(")"),
             ]);
         }
     }
@@ -185,7 +186,7 @@ pub(super) fn build_call_doc_with_wrapping(
                 .map(|sym| printer.resolve_symbol(*sym))
                 .collect::<Vec<_>>()
                 .join(".");
-            doc::text_owned(callee_str)
+            d.text_owned(callee_str)
         } else {
             callee
         };
@@ -197,14 +198,14 @@ pub(super) fn build_call_doc_with_wrapping(
         let paren_close = call.span.end;
         let mut parts = vec![
             flat_callee,
-            doc::text("("),
-            doc::join(
+            d.text("("),
+            d.join(
                 call.arguments
                     .iter()
                     .map(|arg| printer.build_expression_doc(arg)),
                 ", ",
             ),
-            doc::text(")"),
+            d.text(")"),
         ];
 
         // Add trailing comments as line suffix (stays on same line)
@@ -214,22 +215,22 @@ pub(super) fn build_call_doc_with_wrapping(
             parts.push(suffix);
         }
 
-        return doc::concat(parts);
+        return d.concat(&parts);
     }
 
     // Module path calls that should not break at arguments (e.g., require.resolve)
     // Keep the call on one line; let assignment/parent break instead
     if is_module_path_no_break(call, printer) && !has_trailing_comments_on_args(call, printer) {
-        return doc::concat(vec![
+        return d.concat(&[
             callee,
-            doc::text("("),
-            doc::join(
+            d.text("("),
+            d.join(
                 call.arguments
                     .iter()
                     .map(|arg| printer.build_expression_doc(arg)),
                 ", ",
             ),
-            doc::text(")"),
+            d.text(")"),
         ]);
     }
 
@@ -244,12 +245,12 @@ pub(super) fn build_call_doc_with_wrapping(
 
         // Format: base\n\t.method(arg)
         // When it fits on one line, don't break
-        return doc::group(doc::concat(vec![
+        return d.group(d.concat(&[
             base_doc,
-            doc::indent_softline(doc::concat(vec![
-                doc::text_owned(format!(".{method_str}(")),
+            d.indent_softline(d.concat(&[
+                d.text_owned(format!(".{method_str}(")),
                 arg_doc,
-                doc::text(")"),
+                d.text(")"),
             ])),
         ]));
     }
@@ -273,7 +274,7 @@ pub(super) fn build_call_doc_with_wrapping(
         // (call expressions, member expressions, new expressions, identifiers, conditionals)
         if arg_needs_soft_wrap(arg) {
             let arg_doc = printer.build_expression_doc(arg);
-            return wrap_call_with_soft_breaks(callee, arg_doc);
+            return wrap_call_with_soft_breaks(d, callee, arg_doc);
         }
 
         match arg {
@@ -290,60 +291,47 @@ pub(super) fn build_call_doc_with_wrapping(
 
                 if has_trailing_param_comments {
                     // Force wrapped state when arrow has trailing param comments
-                    return doc::concat(vec![
+                    return d.concat(&[
                         callee,
-                        doc::text("("),
-                        doc::indent(doc::concat(vec![
-                            doc::softline(),
-                            arrow_doc,
-                            doc::text(","),
-                        ])),
-                        doc::softline(),
-                        doc::text(")"),
+                        d.text("("),
+                        d.indent(d.concat(&[d.softline(), arrow_doc, d.text(",")])),
+                        d.softline(),
+                        d.text(")"),
                     ]);
                 }
 
-                return doc::conditional_group(vec![
+                return d.conditional_group(&[
                     // State 1: hugged - callee((arrow) => { body })
-                    doc::concat(vec![
-                        callee.clone(),
-                        doc::text("("),
-                        arrow_doc.clone(),
-                        doc::text(")"),
-                    ]),
+                    d.concat(&[callee, d.text("("), arrow_doc, d.text(")")]),
                     // State 2: wrapped - callee(\n\t(arrow) => { body },\n)
-                    doc::concat(vec![
+                    d.concat(&[
                         callee,
-                        doc::text("("),
-                        doc::indent(doc::concat(vec![
-                            doc::softline(),
-                            arrow_doc,
-                            doc::text(","),
-                        ])),
-                        doc::softline(),
-                        doc::text(")"),
+                        d.text("("),
+                        d.indent(d.concat(&[d.softline(), arrow_doc, d.text(",")])),
+                        d.softline(),
+                        d.text(")"),
                     ]),
                 ]);
             }
 
             // Regular function expression: keep hugged (block body handles own formatting)
             internal::Expression::FunctionExpression(_) => {
-                return doc::concat(vec![
+                return d.concat(&[
                     callee,
-                    doc::text("("),
+                    d.text("("),
                     printer.build_expression_doc(arg),
-                    doc::text(")"),
+                    d.text(")"),
                 ]);
             }
 
             // Object/array literals (or type assertions wrapping them): hug them
             // e.g., @decorator({...}), fn([item]), fn({...} as T), fn([...] satisfies T)
             _ if is_array_or_object_unwrapped(arg) => {
-                return doc::concat(vec![
+                return d.concat(&[
                     callee,
-                    doc::text("("),
+                    d.text("("),
                     printer.build_expression_doc(arg),
-                    doc::text(")"),
+                    d.text(")"),
                 ]);
             }
 
@@ -355,11 +343,11 @@ pub(super) fn build_call_doc_with_wrapping(
                 let is_multiline = raw.contains('\n');
                 // Hug short, single-line literals (<=25 chars)
                 if span_len <= 25 && !is_multiline {
-                    return doc::concat(vec![
+                    return d.concat(&[
                         callee,
-                        doc::text("("),
+                        d.text("("),
                         printer.build_expression_doc(arg),
-                        doc::text(")"),
+                        d.text(")"),
                     ]);
                 }
                 // Long or multiline string - fall through to standard wrapping
@@ -374,11 +362,11 @@ pub(super) fn build_call_doc_with_wrapping(
                         internal::Expression::ObjectExpression(_)
                             | internal::Expression::ArrayExpression(_)
                     ) {
-                        return doc::concat(vec![
+                        return d.concat(&[
                             callee,
-                            doc::text("("),
+                            d.text("("),
                             printer.build_expression_doc(arg),
-                            doc::text(")"),
+                            d.text(")"),
                         ]);
                     }
 
@@ -427,24 +415,21 @@ pub(super) fn build_call_doc_with_wrapping(
                         // If the body already has hardlines (e.g., nested callback with block body),
                         // use the standard group-based approach - the body's own structure handles formatting.
                         // Only use conditional_group when the body fits on one line (no hardlines).
-                        if doc::will_break(&body_doc) {
-                            return doc::group(doc::concat(vec![
+                        if d.will_break(body_doc) {
+                            return d.group(d.concat(&[
                                 callee,
-                                doc::text("("),
-                                doc::concat(vec![inline_sig, doc::text(" =>")]),
-                                doc::group(doc::concat(vec![
-                                    doc::indent_line(body_doc),
-                                    doc::trailing_comma(),
-                                ])),
-                                doc::softline(),
-                                doc::text(")"),
+                                d.text("("),
+                                d.concat(&[inline_sig, d.text(" =>")]),
+                                d.group(d.concat(&[d.indent_line(body_doc), d.trailing_comma()])),
+                                d.softline(),
+                                d.text(")"),
                             ]));
                         }
 
                         // Body fits on one line - use conditional_group to properly handle
                         // the case where total line exceeds print width
                         return build_arrow_call_body_states(
-                            callee, arrow_doc, inline_sig, body_doc,
+                            d, callee, arrow_doc, inline_sig, body_doc,
                         );
                     }
 
@@ -456,7 +441,7 @@ pub(super) fn build_call_doc_with_wrapping(
                         // Build arrow signature with grouping
                         // The group allows params to break when needed, but assignment logic
                         // uses is_complex_call_expression to decide layout strategy
-                        let sig_doc = doc::group(printer.build_arrow_signature_doc(arrow));
+                        let sig_doc = d.group(printer.build_arrow_signature_doc(arrow));
 
                         // Build body expression
                         let body_doc = printer.build_expression_doc(body_expr);
@@ -464,13 +449,13 @@ pub(super) fn build_call_doc_with_wrapping(
                         // Build state 0: fully flat version including call wrapping
                         // Structure: callee + "(" + sig + " => (" + body + ")" + ")"
                         // This includes the full context so conditional_group can measure correctly
-                        let state_flat = doc::concat(vec![
-                            callee.clone(),
-                            doc::text("("),
-                            sig_doc.clone(),
-                            doc::text(" => ("),
-                            body_doc.clone(),
-                            doc::text("))"), // Close both arrow body and call
+                        let state_flat = d.concat(&[
+                            callee,
+                            d.text("("),
+                            sig_doc,
+                            d.text(" => ("),
+                            body_doc,
+                            d.text("))"), // Close both arrow body and call
                         ]);
 
                         // Build state 1: break version with params on call line, body breaks
@@ -478,49 +463,37 @@ pub(super) fn build_call_doc_with_wrapping(
                         // First hardline: breaks after "=>"
                         // Second hardline: breaks before ")" to put closing paren on its own line
                         // Note: Use literal "," not trailing_comma() because state[1] is used in Flat mode
-                        let state_break = doc::concat(vec![
-                            callee.clone(),
-                            doc::text("("),
-                            sig_doc.clone(),
-                            doc::text(" =>"),
-                            doc::indent(doc::concat(vec![
-                                doc::hardline(),
-                                body_doc.clone(),
-                                doc::text(","),
-                            ])),
-                            doc::hardline(),
-                            doc::text(")"),
+                        let state_break = d.concat(&[
+                            callee,
+                            d.text("("),
+                            sig_doc,
+                            d.text(" =>"),
+                            d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+                            d.hardline(),
+                            d.text(")"),
                         ]);
 
                         // Build state 2: all args broken out (fallback for Break mode)
                         // This is used when the parent group breaks and we need maximum expansion
                         // Structure: callee + "(\n" + indent([sig + " =>" + indent([hardline, body, ","]) + softline]) + "\n)"
-                        let state_all_broken = doc::concat(vec![
-                            callee, // Last use, no clone needed
-                            doc::text("("),
-                            doc::indent(doc::concat(vec![
-                                doc::hardline(),
-                                sig_doc, // Last use, no clone needed
-                                doc::text(" =>"),
-                                doc::indent(doc::concat(vec![
-                                    doc::hardline(),
-                                    body_doc, // Last use, no clone needed
-                                    doc::trailing_comma(),
-                                ])),
+                        let state_all_broken = d.concat(&[
+                            callee,
+                            d.text("("),
+                            d.indent(d.concat(&[
+                                d.hardline(),
+                                sig_doc,
+                                d.text(" =>"),
+                                d.indent(d.concat(&[d.hardline(), body_doc, d.trailing_comma()])),
                             ])),
-                            doc::hardline(),
-                            doc::text(")"),
+                            d.hardline(),
+                            d.text(")"),
                         ]);
 
                         // Use conditional_group with 3 states to match Prettier
                         // State 0: fully flat
                         // State 1: arrow breaks (checked during fits())
                         // State 2: all broken (only used in Break mode)
-                        return doc::conditional_group(vec![
-                            state_flat,
-                            state_break,
-                            state_all_broken,
-                        ]);
+                        return d.conditional_group(&[state_flat, state_break, state_all_broken]);
                     }
                 }
                 // Other expression arrows: fall through to wrap
@@ -544,13 +517,15 @@ pub(super) fn build_call_doc_with_wrapping(
                     let body_doc = printer.build_expression_doc(body_expr);
                     let inline_sig = build_arrow_inline_signature(printer, arrow);
 
-                    return build_arrow_call_body_states(callee, arrow_doc, inline_sig, body_doc);
+                    return build_arrow_call_body_states(
+                        d, callee, arrow_doc, inline_sig, body_doc,
+                    );
                 }
                 // Other expression types: fall through to standard wrapping
             }
             // Block arrow or non-call expression body: standard wrapping
             let arg_doc = printer.build_expression_doc(&call.arguments[0]);
-            return wrap_call_with_soft_breaks(callee, arg_doc);
+            return wrap_call_with_soft_breaks(d, callee, arg_doc);
         }
     }
 
@@ -570,7 +545,7 @@ pub(super) fn build_call_doc_with_wrapping(
 
         if has_template_with_newlines {
             let arg_doc = printer.build_expression_doc(&call.arguments[0]);
-            let mut parts = vec![callee, doc::text("("), arg_doc, doc::text(")")];
+            let mut parts = vec![callee, d.text("("), arg_doc, d.text(")")];
 
             // Add trailing comments as line suffix (moves outside call, like test calls)
             let last_arg = &call.arguments[0];
@@ -581,7 +556,7 @@ pub(super) fn build_call_doc_with_wrapping(
                 parts.push(suffix);
             }
 
-            return doc::concat(parts);
+            return d.concat(&parts);
         }
     }
 
@@ -594,14 +569,14 @@ pub(super) fn build_call_doc_with_wrapping(
 
     if has_multiline {
         // Force expansion with hardlines for multiline content
-        let arg_parts = doc::join_doc(
+        let arg_parts = d.join_doc(
             call.arguments
                 .iter()
                 .map(|arg| printer.build_expression_doc(arg)),
-            doc::comma_hardline(),
+            d.comma_hardline(),
         );
 
-        return wrap_call_with_hard_breaks(callee, arg_parts);
+        return wrap_call_with_hard_breaks(d, callee, arg_parts);
     }
 
     // Function composition pattern: when any argument is a call containing a callback
@@ -611,14 +586,14 @@ pub(super) fn build_call_doc_with_wrapping(
     if is_function_composition_args(&call.arguments)
         && !has_trailing_comments_on_args(call, printer)
     {
-        let arg_parts = doc::join_doc(
+        let arg_parts = d.join_doc(
             call.arguments
                 .iter()
                 .map(|arg| printer.build_expression_doc(arg)),
-            doc::comma_hardline(),
+            d.comma_hardline(),
         );
 
-        return wrap_call_with_hard_breaks(callee, arg_parts);
+        return wrap_call_with_hard_breaks(d, callee, arg_parts);
     }
 
     // "Expand first arg" pattern: when first arg is a function with block body
@@ -632,18 +607,18 @@ pub(super) fn build_call_doc_with_wrapping(
         // Build tail args (everything after first)
         let mut tail_parts = Vec::new();
         for arg in call.arguments.iter().skip(1) {
-            tail_parts.push(doc::text(", "));
+            tail_parts.push(d.text(", "));
             tail_parts.push(printer.build_expression_doc(arg));
         }
 
         // Structure: callee + ( + first_arg_with_breaks + , + tail_args + )
         // The first arg can expand internally, but tail args stay inline
-        return doc::concat(vec![
+        return d.concat(&[
             callee,
-            doc::text("("),
+            d.text("("),
             first_arg_doc,
-            doc::concat(tail_parts),
-            doc::text(")"),
+            d.concat(&tail_parts),
+            d.text(")"),
         ]);
     }
 
@@ -657,13 +632,13 @@ pub(super) fn build_call_doc_with_wrapping(
             .all(|arg| matches!(arg, internal::Expression::ArrowFunctionExpression(_)));
 
     if all_args_are_arrows && !has_trailing_comments_on_args(call, printer) {
-        let arg_parts = doc::join_doc(
+        let arg_parts = d.join_doc(
             call.arguments
                 .iter()
                 .map(|arg| printer.build_expression_doc(arg)),
-            doc::comma_hardline(),
+            d.comma_hardline(),
         );
-        return wrap_call_with_hard_breaks(callee, arg_parts);
+        return wrap_call_with_hard_breaks(d, callee, arg_parts);
     }
 
     // Expand last arg pattern: N args with last being arrow/function
@@ -703,29 +678,24 @@ pub(super) fn build_call_doc_with_wrapping(
                 let body_doc = printer.build_expression_doc(body_expr);
 
                 // State 1: all inline (reuse existing helper)
-                let state_inline =
-                    build_inline_args(callee.clone(), head_parts.clone(), last_arg_doc);
+                let state_inline = build_inline_args(d, callee, head_parts.clone(), last_arg_doc);
 
                 // State 2: preceding args inline, arrow body breaks after =>
-                let state_break_body = doc::concat(vec![
-                    callee.clone(),
-                    doc::text("("),
-                    doc::concat(head_parts),
+                let state_break_body = d.concat(&[
+                    callee,
+                    d.text("("),
+                    d.concat(&head_parts),
                     inline_sig,
-                    doc::text(" =>"),
-                    doc::indent(doc::concat(vec![doc::hardline(), body_doc, doc::text(",")])),
-                    doc::hardline(),
-                    doc::text(")"),
+                    d.text(" =>"),
+                    d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+                    d.hardline(),
+                    d.text(")"),
                 ]);
 
                 // State 3: all args expanded (reuse existing helper)
-                let state_expand_all = build_expand_all_args(callee, all_args_broken);
+                let state_expand_all = build_expand_all_args(d, callee, all_args_broken);
 
-                return doc::conditional_group(vec![
-                    state_inline,
-                    state_break_body,
-                    state_expand_all,
-                ]);
+                return d.conditional_group(&[state_inline, state_break_body, state_expand_all]);
             }
 
             // Special case: expression arrow with object/array body
@@ -743,33 +713,38 @@ pub(super) fn build_call_doc_with_wrapping(
             {
                 let inline_sig = build_arrow_inline_signature(printer, arrow);
                 // Object/array in arrow body needs parens: (x) => ({ ... })
-                let body_doc = doc::parens(printer.build_expression_doc(body_expr));
+                let body_doc = d.parens(printer.build_expression_doc(body_expr));
 
                 // State 0: all inline
-                let state_inline =
-                    build_inline_args(callee.clone(), head_parts.clone(), last_arg_doc);
+                let state_inline = build_inline_args(d, callee, head_parts.clone(), last_arg_doc);
 
                 // State 1: hug - head inline, object/array expands internally
-                let state_hug = doc::concat(vec![
-                    callee.clone(),
-                    doc::text("("),
-                    doc::concat(head_parts),
+                let state_hug = d.concat(&[
+                    callee,
+                    d.text("("),
+                    d.concat(&head_parts),
                     inline_sig,
-                    doc::text(" => "),
-                    doc::group_break(body_doc),
-                    doc::text(")"),
+                    d.text(" => "),
+                    d.group_break(body_doc),
+                    d.text(")"),
                 ]);
 
                 // State 2: expand all args
-                let state_expand_all = build_expand_all_args(callee, all_args_broken);
+                let state_expand_all = build_expand_all_args(d, callee, all_args_broken);
 
-                return doc::conditional_group(vec![state_inline, state_hug, state_expand_all]);
+                return d.conditional_group(&[state_inline, state_hug, state_expand_all]);
             }
 
             // Try: inline, or break all args
             // Note: last arg contains hardlines, so state 1 only succeeds if the whole
             // line (including arrow signature) fits within print_width
-            return build_inline_or_expand_all(callee, head_parts, last_arg_doc, all_args_broken);
+            return build_inline_or_expand_all(
+                d,
+                callee,
+                head_parts,
+                last_arg_doc,
+                all_args_broken,
+            );
         }
     }
 
@@ -801,7 +776,7 @@ pub(super) fn build_call_doc_with_wrapping(
                     paren_open,
                     first_arg_start,
                 ));
-                arg_parts.push(doc::line());
+                arg_parts.push(d.line());
             }
 
             // Build the argument
@@ -829,43 +804,43 @@ pub(super) fn build_call_doc_with_wrapping(
                     if pc.has_trailing_line() {
                         // Trailing line comments: comma, comment, hardline
                         force_expansion = true;
-                        arg_parts.push(doc::text(","));
+                        arg_parts.push(d.text(","));
                         for comment in &pc.trailing_line {
-                            arg_parts.push(doc::text(" "));
+                            arg_parts.push(d.text(" "));
                             arg_parts.push(printer.build_comment_doc(comment));
                         }
-                        arg_parts.push(doc::hardline());
+                        arg_parts.push(d.hardline());
                     } else if pc.has_trailing_block() {
                         // Trailing block comments: place relative to comma based on source position
                         if let Some(cpos) = comma_pos {
                             for comment in &pc.trailing_block {
                                 if is_comment_before_comma(comment, cpos) {
-                                    arg_parts.push(doc::text(" "));
+                                    arg_parts.push(d.text(" "));
                                     arg_parts.push(printer.build_comment_doc(comment));
                                 }
                             }
                         }
-                        arg_parts.push(doc::text(","));
+                        arg_parts.push(d.text(","));
                         if let Some(cpos) = comma_pos {
                             for comment in &pc.trailing_block {
                                 if is_comment_after_comma(comment, cpos) {
-                                    arg_parts.push(doc::text(" "));
+                                    arg_parts.push(d.text(" "));
                                     arg_parts.push(printer.build_comment_doc(comment));
                                 }
                             }
                         }
-                        arg_parts.push(doc::line());
+                        arg_parts.push(d.line());
                     } else {
                         // No trailing comments, add comma and line
-                        arg_parts.push(doc::text(","));
-                        arg_parts.push(doc::line());
+                        arg_parts.push(d.text(","));
+                        arg_parts.push(d.line());
                     }
 
                     // Add leading comments - inline with next arg if on same line
                     pc.emit_leading_comments_inline_aware(&mut arg_parts, printer, next_arg_start);
                 } else {
                     // No comments, just comma and line
-                    arg_parts.push(doc::comma_line());
+                    arg_parts.push(d.comma_line());
                 }
             } else {
                 // Last argument - check for trailing line comments before closing paren
@@ -880,15 +855,15 @@ pub(super) fn build_call_doc_with_wrapping(
                 );
 
                 if pc.has_trailing_line() {
-                    arg_parts.push(doc::text(","));
+                    arg_parts.push(d.text(","));
 
                     // Build comment docs: " // comment" for each
                     let comment_docs: Vec<_> = pc
                         .trailing_line
                         .iter()
-                        .flat_map(|c| [doc::text(" "), printer.build_comment_doc(c)])
+                        .flat_map(|c| [d.text(" "), printer.build_comment_doc(c)])
                         .collect();
-                    let comments = doc::concat(comment_docs);
+                    let comments = d.concat(&comment_docs);
 
                     // Line comments always force the CALL to expand - the newline after the
                     // comment means the call must break to multiple lines.
@@ -899,7 +874,7 @@ pub(super) fn build_call_doc_with_wrapping(
                     // the array/object can stay inline even when the comment exceeds print_width.
                     // The force_expansion above ensures the call itself expands.
                     if is_array_or_object_unwrapped(arg) {
-                        arg_parts.push(doc::line_suffix(comments));
+                        arg_parts.push(d.line_suffix(comments));
                     } else {
                         arg_parts.push(comments);
                     }
@@ -909,14 +884,14 @@ pub(super) fn build_call_doc_with_wrapping(
                     // Don't force expansion - let the content decide based on width/source newlines
                     // e.g., fn({short} /* c */) stays inline, fn({long...} /* c */) expands
                     for comment in &pc.trailing_block {
-                        arg_parts.push(doc::text(" "));
+                        arg_parts.push(d.text(" "));
                         arg_parts.push(printer.build_comment_doc(comment));
                     }
                 }
             }
         }
 
-        let arg_doc = doc::concat(arg_parts);
+        let arg_doc = d.concat(&arg_parts);
 
         // Force expansion if needed, otherwise allow collapsing.
         // Use a group with break_parent instead of literal hardlines to avoid
@@ -925,18 +900,18 @@ pub(super) fn build_call_doc_with_wrapping(
             // Build manually when we have trailing comments (we already added our commas)
             // Add trailing comma after last arg ONLY if we didn't already add one
             let trailing = if has_trailing_comma_on_last {
-                doc::empty()
+                d.empty()
             } else {
-                doc::text(",")
+                d.text(",")
             };
             // Use hardlines for the expansion. The assignment should use NeverBreakAfterOperator
             // for calls since they handle their own expansion.
-            return doc::concat(vec![
+            return d.concat(&[
                 callee,
-                doc::text("("),
-                doc::indent(doc::concat(vec![doc::hardline(), arg_doc, trailing])),
-                doc::hardline(),
-                doc::text(")"),
+                d.text("("),
+                d.indent(d.concat(&[d.hardline(), arg_doc, trailing])),
+                d.hardline(),
+                d.text(")"),
             ]);
         }
 
@@ -944,30 +919,30 @@ pub(super) fn build_call_doc_with_wrapping(
         // before the comment. Use a custom soft-break structure that doesn't add
         // another trailing comma.
         if has_trailing_comma_on_last {
-            return doc::concat(vec![
+            return d.concat(&[
                 callee,
-                doc::group(doc::concat(vec![
-                    doc::text("("),
-                    doc::indent_softline(arg_doc),
-                    doc::softline(),
-                    doc::text(")"),
+                d.group(d.concat(&[
+                    d.text("("),
+                    d.indent_softline(arg_doc),
+                    d.softline(),
+                    d.text(")"),
                 ])),
             ]);
         }
 
-        return wrap_call_with_soft_breaks(callee, arg_doc);
+        return wrap_call_with_soft_breaks(d, callee, arg_doc);
     }
 
     // Block function before last arg: force expansion
     // e.g., fn((x) => { ... }, {a: 1}) → all args on separate lines
     if call.arguments.len() >= 2 && has_block_function_before_last(&call.arguments) {
-        let arg_parts = doc::join_doc(
+        let arg_parts = d.join_doc(
             call.arguments
                 .iter()
                 .map(|arg| printer.build_expression_doc(arg)),
-            doc::comma_hardline(),
+            d.comma_hardline(),
         );
-        return wrap_call_with_hard_breaks(callee, arg_parts);
+        return wrap_call_with_hard_breaks(d, callee, arg_parts);
     }
 
     // "Expand last arg" pattern (Prettier's shouldExpandLastArg):
@@ -1008,11 +983,17 @@ pub(super) fn build_call_doc_with_wrapping(
             // and go directly to expand-all (state 1 would be selected incorrectly).
             // Note: Use has_forced_break() not will_break() - objects with source newlines
             // use group_break() which makes will_break() true, but they should still hug.
-            if doc::has_forced_break(&last_arg_doc) {
-                return build_expand_all_args(callee, all_args_broken);
+            if d.has_forced_break(last_arg_doc) {
+                return build_expand_all_args(d, callee, all_args_broken);
             }
 
-            return build_inline_or_expand_all(callee, head_parts, last_arg_doc, all_args_broken);
+            return build_inline_or_expand_all(
+                d,
+                callee,
+                head_parts,
+                last_arg_doc,
+                all_args_broken,
+            );
         }
 
         // Different types: check if last arg has hardlines (e.g., comments)
@@ -1022,8 +1003,14 @@ pub(super) fn build_call_doc_with_wrapping(
 
         // If last arg has forced breaks (hardlines), use expand-all instead of hug.
         // Note: Use has_forced_break() not will_break() - see comment above.
-        if doc::has_forced_break(&last_arg_doc) {
-            return build_inline_or_expand_all(callee, head_parts, last_arg_doc, all_args_broken);
+        if d.has_forced_break(last_arg_doc) {
+            return build_inline_or_expand_all(
+                d,
+                callee,
+                head_parts,
+                last_arg_doc,
+                all_args_broken,
+            );
         }
 
         // No hardlines: build 3-state conditional_group
@@ -1040,17 +1027,16 @@ pub(super) fn build_call_doc_with_wrapping(
         // to break. This makes fits() return true when it hits the first line inside,
         // allowing the hug state to be selected when head args + opening bracket fit.
         // Matches Prettier: group(lastArg, { shouldBreak: true })
-        let state_inline =
-            build_inline_args(callee.clone(), head_parts.clone(), last_arg_doc.clone());
-        let state_hug = doc::concat(vec![
-            callee.clone(),
-            doc::text("("),
-            doc::concat(head_parts),
-            doc::group_break(last_arg_doc),
-            doc::text(")"),
+        let state_inline = build_inline_args(d, callee, head_parts.clone(), last_arg_doc);
+        let state_hug = d.concat(&[
+            callee,
+            d.text("("),
+            d.concat(&head_parts),
+            d.group_break(last_arg_doc),
+            d.text(")"),
         ]);
-        let state_expand_all = build_expand_all_args(callee, all_args_broken);
-        return doc::conditional_group(vec![state_inline, state_hug, state_expand_all]);
+        let state_expand_all = build_expand_all_args(d, callee, all_args_broken);
+        return d.conditional_group(&[state_inline, state_hug, state_expand_all]);
     }
 
     // Check for blank lines between arguments (forces expansion and preservation)
@@ -1069,8 +1055,8 @@ pub(super) fn build_call_doc_with_wrapping(
                 let prev_end = call.arguments[i - 1].span().end;
                 let curr_start = arg.span().start;
                 if printer.has_blank_line_between(prev_end, curr_start) {
-                    arg_parts.push(doc::literalline());
-                    arg_parts.push(doc::hardline());
+                    arg_parts.push(d.literalline());
+                    arg_parts.push(d.hardline());
                 }
             }
 
@@ -1078,26 +1064,26 @@ pub(super) fn build_call_doc_with_wrapping(
 
             // Add comma+hardline after each arg except the last
             if i < call.arguments.len() - 1 {
-                arg_parts.push(doc::text(","));
+                arg_parts.push(d.text(","));
 
                 // Check if next arg has blank line before it
                 // If not, add hardline here
                 let next_start = call.arguments[i + 1].span().start;
                 let curr_end = arg.span().end;
                 if !printer.has_blank_line_between(curr_end, next_start) {
-                    arg_parts.push(doc::hardline());
+                    arg_parts.push(d.hardline());
                 }
             }
         }
 
-        let arg_doc = doc::concat(arg_parts);
-        return wrap_call_with_hard_breaks(callee, arg_doc);
+        let arg_doc = d.concat(&arg_parts);
+        return wrap_call_with_hard_breaks(d, callee, arg_doc);
     }
 
     // Build args with line separators (one per line when broken)
     // Boolean() calls don't get extra indent on binary continuation lines
     let use_arg_indent = !is_boolean_call(call, printer);
-    let arg_parts = doc::join_doc(
+    let arg_parts = d.join_doc(
         call.arguments.iter().map(|arg| {
             if use_arg_indent {
                 printer.build_arg_expression_doc(arg)
@@ -1105,9 +1091,9 @@ pub(super) fn build_call_doc_with_wrapping(
                 printer.build_expression_doc(arg)
             }
         }),
-        doc::comma_line(),
+        d.comma_line(),
     );
 
     // Wrap in group with parens
-    wrap_call_with_soft_breaks(callee, arg_parts)
+    wrap_call_with_soft_breaks(d, callee, arg_parts)
 }

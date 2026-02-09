@@ -200,7 +200,7 @@ export function getBenchmarkTasks(
 		// WASM parser (with JSON serialization)
 		if (impls.wasm) {
 			tasks.push({
-				name: 'tsv-wasm-json',
+				name: 'tsv_wasm-json',
 				trackingKey: `${groupName}/wasm`,
 				isAsync: false,
 				run: (source) => impls.wasm!.parse(source, language),
@@ -219,7 +219,7 @@ export function getBenchmarkTasks(
 
 		if (impls.wasm?.parseInternal) {
 			tasks.push({
-				name: 'tsv-wasm-internal',
+				name: 'tsv_wasm-internal',
 				trackingKey: `${groupName}/wasm-internal`,
 				isAsync: false,
 				run: (source) => impls.wasm!.parseInternal!(source, language),
@@ -260,7 +260,7 @@ export function getBenchmarkTasks(
 		// WASM formatter
 		if (impls.wasm?.format) {
 			tasks.push({
-				name: 'tsv-wasm',
+				name: 'tsv_wasm',
 				trackingKey: `${groupName}/wasm`,
 				isAsync: false,
 				run: (source) => impls.wasm!.format!(source, language),
@@ -343,7 +343,7 @@ export function getFormattersForValidation(impls: InitializedImplementations): F
 	// WASM - sync
 	if (impls.wasm?.format) {
 		formatters.push({
-			name: 'tsv-wasm',
+			name: 'tsv_wasm',
 			isAsync: false,
 			format: (source, lang) => impls.wasm!.format!(source, lang),
 			supportsLanguage: () => true,

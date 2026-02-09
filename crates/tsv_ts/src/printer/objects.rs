@@ -12,13 +12,14 @@ use super::expression_stringifier::{escape_single_quote_string, is_valid_js_iden
 use crate::ast::internal::{self, Expression, Literal, LiteralValue};
 use tsv_lang::SymbolResolver;
 use tsv_lang::comments_in_range;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Build a Doc for an object expression
     ///
     /// Handles comments between properties, blank line preservation, and trailing comments.
-    pub(super) fn build_object_doc(&self, obj: &internal::ObjectExpression) -> Doc {
+    pub(super) fn build_object_doc(&self, obj: &internal::ObjectExpression) -> DocId {
+        let d = self.d();
         // Check for comments inside the object
         let has_comments = self.has_comments_between(obj.span.start, obj.span.end);
 
@@ -95,12 +96,12 @@ impl<'a> Printer<'a> {
                             comments[0].span.start
                         };
                         if self.has_blank_line_between(search_start, check_pos) {
-                            parts.push(doc::literalline());
+                            parts.push(d.literalline());
                         }
-                        parts.push(doc::hardline());
+                        parts.push(d.hardline());
                     } else {
                         // May stay inline: use line() for group-based breaking
-                        parts.push(doc::line());
+                        parts.push(d.line());
                     }
                 }
 
@@ -125,24 +126,24 @@ impl<'a> Printer<'a> {
                         && j > 0
                         && self.has_blank_line_between(last_pos, comment.span.start)
                     {
-                        parts.push(doc::literalline());
-                        parts.push(doc::hardline());
+                        parts.push(d.literalline());
+                        parts.push(d.hardline());
                     }
 
                     parts.push(self.build_comment_doc(comment));
                     if !comment.is_block {
                         // Line comments need a hardline after (unless blank line follows in must_break)
                         if !has_blank_after {
-                            parts.push(doc::hardline());
+                            parts.push(d.hardline());
                         }
                     } else if must_break && !self.is_same_line(comment.span.end, prop_start) {
                         // Block comment on its own line - hardline after (unless blank line follows)
                         if !has_blank_after {
-                            parts.push(doc::hardline());
+                            parts.push(d.hardline());
                         }
                     } else {
                         // Block comment on same line as property - space after
-                        parts.push(doc::text(" "));
+                        parts.push(d.text(" "));
                     }
                     last_pos = comment.span.end;
                 }
@@ -152,8 +153,8 @@ impl<'a> Printer<'a> {
                     && !comments.is_empty()
                     && self.has_blank_line_between(last_pos, prop_start)
                 {
-                    parts.push(doc::literalline());
-                    parts.push(doc::hardline());
+                    parts.push(d.literalline());
+                    parts.push(d.hardline());
                 }
 
                 // Build property doc
@@ -182,21 +183,21 @@ impl<'a> Printer<'a> {
 
                 // Block comments go before comma
                 for comment in trailing.iter().filter(|c| c.is_block) {
-                    parts.push(doc::text(" "));
+                    parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
 
                 // Add comma
                 if i < obj.properties.len() - 1 {
-                    parts.push(doc::text(","));
+                    parts.push(d.text(","));
                 } else if must_break {
                     // Last property in must_break: always add comma
                     // (trailing_comma() uses if_break which needs a group, but
                     // must_break objects don't create a group)
-                    parts.push(doc::text(","));
+                    parts.push(d.text(","));
                 } else {
                     // Last property: trailing comma only when broken
-                    parts.push(doc::trailing_comma());
+                    parts.push(d.trailing_comma());
                 }
 
                 // Line comments go after comma (excluded from width calculations)
@@ -218,7 +219,7 @@ impl<'a> Printer<'a> {
                 // Check for blank line before the first trailing comment
                 let first_comment = trailing_comments[0];
                 if must_break && self.has_blank_line_between(prev_end, first_comment.span.start) {
-                    parts.push(doc::literalline());
+                    parts.push(d.literalline());
                 }
 
                 let mut last_pos = prev_end;
@@ -228,13 +229,13 @@ impl<'a> Printer<'a> {
                         && j > 0
                         && self.has_blank_line_between(last_pos, comment.span.start)
                     {
-                        parts.push(doc::literalline());
+                        parts.push(d.literalline());
                     }
 
                     if must_break {
-                        parts.push(doc::hardline());
+                        parts.push(d.hardline());
                     } else {
-                        parts.push(doc::line());
+                        parts.push(d.line());
                     }
                     parts.push(self.build_comment_doc(comment));
                     last_pos = comment.span.end;
@@ -243,21 +244,16 @@ impl<'a> Printer<'a> {
 
             if must_break {
                 // Forced multiline - use hardlines for predictable formatting
-                let inner = doc::concat(vec![doc::hardline(), doc::concat(parts)]);
+                let inner = d.concat(&[d.hardline(), d.concat(&parts)]);
                 let (indented_content, closing_line) =
-                    self.wrap_with_decl_indent(inner, doc::hardline());
+                    self.wrap_with_decl_indent(inner, d.hardline());
 
-                doc::concat(vec![
-                    doc::text("{"),
-                    indented_content,
-                    closing_line,
-                    doc::text("}"),
-                ])
+                d.concat(&[d.text("{"), indented_content, closing_line, d.text("}")])
             } else {
                 // May stay inline - use group with softlines for width-based breaking
-                let inner = doc::concat(vec![doc::softline(), doc::concat(parts)]);
+                let inner = d.concat(&[d.softline(), d.concat(&parts)]);
                 let (indented_content, closing_line) =
-                    self.wrap_with_decl_indent(inner, doc::softline());
+                    self.wrap_with_decl_indent(inner, d.softline());
 
                 self.wrap_object_braces(indented_content, closing_line, has_source_newline)
             }
@@ -277,8 +273,8 @@ impl<'a> Printer<'a> {
 
                 if has_blank_before {
                     // Blank line preservation
-                    parts.push(doc::literalline());
-                    parts.push(doc::hardline());
+                    parts.push(d.literalline());
+                    parts.push(d.hardline());
                 }
 
                 // Build property doc
@@ -287,7 +283,7 @@ impl<'a> Printer<'a> {
 
                 // Add comma and line break
                 if i < obj.properties.len() - 1 {
-                    parts.push(doc::text(","));
+                    parts.push(d.text(","));
                     // Only add line break if next property doesn't have blank line before it
                     let next_prop = &obj.properties[i + 1];
                     let curr_end = prop.value_end();
@@ -295,18 +291,17 @@ impl<'a> Printer<'a> {
                         self.has_blank_line_between(curr_end, next_prop.span().start);
 
                     if !next_has_blank {
-                        parts.push(doc::line());
+                        parts.push(d.line());
                     }
                 } else {
                     // Last property: trailing comma only when broken
-                    parts.push(doc::trailing_comma());
+                    parts.push(d.trailing_comma());
                 }
             }
 
             // Width-based wrapping
-            let inner = doc::concat(vec![doc::softline(), doc::concat(parts)]);
-            let (indented_content, closing_line) =
-                self.wrap_with_decl_indent(inner, doc::softline());
+            let inner = d.concat(&[d.softline(), d.concat(&parts)]);
+            let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.softline());
 
             self.wrap_object_braces(indented_content, closing_line, has_source_newline)
         }
@@ -318,20 +313,16 @@ impl<'a> Printer<'a> {
     /// otherwise uses `group` for width-based breaking.
     fn wrap_object_braces(
         &self,
-        indented_content: Doc,
-        closing_line: Doc,
+        indented_content: DocId,
+        closing_line: DocId,
         has_source_newline: bool,
-    ) -> Doc {
-        let object_doc = doc::concat(vec![
-            doc::text("{"),
-            indented_content,
-            closing_line,
-            doc::text("}"),
-        ]);
+    ) -> DocId {
+        let d = self.d();
+        let object_doc = d.concat(&[d.text("{"), indented_content, closing_line, d.text("}")]);
         if has_source_newline {
-            doc::group_break(object_doc)
+            d.group_break(object_doc)
         } else {
-            doc::group(object_doc)
+            d.group(object_doc)
         }
     }
 
@@ -340,9 +331,10 @@ impl<'a> Printer<'a> {
     /// Used by chain arg formatting when we need the object to expand internally
     /// with hardlines so fits() can correctly measure the first line.
     /// Produces: `{\n  prop,\n}` with actual hardlines.
-    pub(super) fn build_object_doc_expanded(&self, obj: &internal::ObjectExpression) -> Doc {
+    pub(super) fn build_object_doc_expanded(&self, obj: &internal::ObjectExpression) -> DocId {
+        let d = self.d();
         if obj.properties.is_empty() {
-            return doc::text("{}");
+            return d.text("{}");
         }
 
         let mut parts = Vec::new();
@@ -351,24 +343,24 @@ impl<'a> Printer<'a> {
             parts.push(prop_doc);
 
             if i < obj.properties.len() - 1 {
-                parts.push(doc::text(","));
-                parts.push(doc::hardline());
+                parts.push(d.text(","));
+                parts.push(d.hardline());
             } else {
                 // Trailing comma on last property
-                parts.push(doc::text(","));
+                parts.push(d.text(","));
             }
         }
 
-        doc::concat(vec![
-            doc::text("{"),
-            doc::indent(doc::concat(vec![doc::hardline(), doc::concat(parts)])),
-            doc::hardline(),
-            doc::text("}"),
+        d.concat(&[
+            d.text("{"),
+            d.indent(d.concat(&[d.hardline(), d.concat(&parts)])),
+            d.hardline(),
+            d.text("}"),
         ])
     }
 
     /// Build a Doc for an object property (either Property or SpreadElement)
-    fn build_object_property_doc(&self, prop: &internal::ObjectProperty) -> Doc {
+    fn build_object_property_doc(&self, prop: &internal::ObjectProperty) -> DocId {
         match prop {
             internal::ObjectProperty::Property(p) => self.build_property_doc(p),
             internal::ObjectProperty::SpreadElement(s) => self.build_spread_doc(s),
@@ -376,7 +368,8 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a single property
-    fn build_property_doc(&self, prop: &internal::Property) -> Doc {
+    fn build_property_doc(&self, prop: &internal::Property) -> DocId {
+        let d = self.d();
         // For computed keys, use expression doc (preserves string quotes)
         // For regular keys, use property key doc (converts strings to bare identifiers when valid)
         let key_doc = if prop.computed {
@@ -388,18 +381,18 @@ impl<'a> Printer<'a> {
             let bracket_start = self.find_opening_bracket_after(prop.span.start, key_start);
             let bracket_end = self.find_closing_bracket_after(key_end);
 
-            let mut parts = vec![doc::text("[")];
+            let mut parts = vec![d.text("[")];
 
             // Add comments between [ and key
             for comment in comments_in_range(self.comments, bracket_start + 1, key_start) {
                 parts.push(self.build_comment_doc(comment));
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
             }
 
             // Assignment expressions need parens in computed keys: {[(a = b)]: c}
             let key_expr_doc =
                 if super::needs_parens(&prop.key, super::ParenContext::ComputedPropertyKey) {
-                    doc::parens(self.build_expression_doc(&prop.key))
+                    d.parens(self.build_expression_doc(&prop.key))
                 } else {
                     self.build_expression_doc(&prop.key)
                 };
@@ -407,20 +400,20 @@ impl<'a> Printer<'a> {
 
             // Add comments between key and ]
             for comment in comments_in_range(self.comments, key_end, bracket_end) {
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
             }
 
-            parts.push(doc::text("]"));
-            doc::concat(parts)
+            parts.push(d.text("]"));
+            d.concat(&parts)
         } else {
             self.build_property_key_doc(&prop.key)
         };
 
         // Add getter/setter prefix if applicable
         let key_doc = match prop.kind {
-            internal::PropertyKind::Get => doc::concat(vec![doc::text("get "), key_doc]),
-            internal::PropertyKind::Set => doc::concat(vec![doc::text("set "), key_doc]),
+            internal::PropertyKind::Get => d.concat(&[d.text("get "), key_doc]),
+            internal::PropertyKind::Set => d.concat(&[d.text("set "), key_doc]),
             internal::PropertyKind::Init => key_doc,
         };
 
@@ -432,7 +425,7 @@ impl<'a> Printer<'a> {
             // Getter/setter: `get x() {}` or `set x(v) {}`
             if let Expression::FunctionExpression(func) = &prop.value {
                 let func_doc = self.build_function_doc_body(func);
-                doc::concat(vec![key_doc, func_doc])
+                d.concat(&[key_doc, func_doc])
             } else {
                 key_doc
             }
@@ -443,10 +436,10 @@ impl<'a> Printer<'a> {
                 // Build prefix: async? + *?
                 let mut parts = Vec::new();
                 if func.r#async {
-                    parts.push(doc::text("async "));
+                    parts.push(d.text("async "));
                 }
                 if func.generator {
-                    parts.push(doc::text("*"));
+                    parts.push(d.text("*"));
                 }
                 parts.push(key_doc);
 
@@ -454,26 +447,26 @@ impl<'a> Printer<'a> {
                 let key_end = prop.key.span().end;
                 let params_start = func.params_start;
                 for comment in comments_in_range(self.comments, key_end, params_start) {
-                    parts.push(doc::text(" "));
+                    parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
 
                 parts.push(func_doc);
-                doc::concat(parts)
+                d.concat(&parts)
             } else {
                 // Fallback for malformed AST
                 let value_doc = self.build_expression_doc(&prop.value);
-                doc::concat(vec![key_doc, doc::text(": "), value_doc])
+                d.concat(&[key_doc, d.text(": "), value_doc])
             }
         } else if prop.shorthand {
             // Handle shorthand with default value: {a = 1}
             // The value is an AssignmentExpression (or AssignmentPattern in proper patterns)
             if let Expression::AssignmentExpression(assign) = &prop.value {
                 let default_doc = self.build_expression_doc(&assign.right);
-                doc::concat(vec![key_doc, doc::text(" = "), default_doc])
+                d.concat(&[key_doc, d.text(" = "), default_doc])
             } else if let Expression::AssignmentPattern(pattern) = &prop.value {
                 let default_doc = self.build_expression_doc(&pattern.right);
-                doc::concat(vec![key_doc, doc::text(" = "), default_doc])
+                d.concat(&[key_doc, d.text(" = "), default_doc])
             } else {
                 key_doc
             }
@@ -498,12 +491,12 @@ impl<'a> Printer<'a> {
             if pre_colon_comments.is_empty() && post_colon_comments.is_empty() {
                 if needs_parens {
                     // Build manually with parens
-                    let value_doc = doc::concat(vec![
-                        doc::text("("),
+                    let value_doc = d.concat(&[
+                        d.text("("),
                         self.build_expression_doc(&prop.value),
-                        doc::text(")"),
+                        d.text(")"),
                     ]);
-                    doc::concat(vec![key_doc, doc::text(": "), value_doc])
+                    d.concat(&[key_doc, d.text(": "), value_doc])
                 } else {
                     // No parens needed: use unified assignment layout
                     let is_short_key = self.is_short_property_key(&prop.key, prop.computed);
@@ -515,28 +508,28 @@ impl<'a> Printer<'a> {
 
                 // Add comments between key and colon
                 for comment in &pre_colon_comments {
-                    parts.push(doc::text(" "));
+                    parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
 
-                parts.push(doc::text(": "));
+                parts.push(d.text(": "));
 
                 // Add comments between colon and value
                 for comment in &post_colon_comments {
                     parts.push(self.build_comment_doc(comment));
-                    parts.push(doc::text(" "));
+                    parts.push(d.text(" "));
                 }
 
                 // Add parens around assignment expressions
                 if needs_parens {
-                    parts.push(doc::text("("));
+                    parts.push(d.text("("));
                 }
                 parts.push(self.build_expression_doc(&prop.value));
                 if needs_parens {
-                    parts.push(doc::text(")"));
+                    parts.push(d.text(")"));
                 }
 
-                doc::concat(parts)
+                d.concat(&parts)
             }
         }
     }
@@ -588,7 +581,8 @@ impl<'a> Printer<'a> {
     ///
     /// String literal keys that are valid identifiers are output without quotes.
     /// Example: `{"key": 1}` → `{key: 1}`, but `{"kebab-case": 1}` keeps quotes.
-    pub(super) fn build_property_key_doc(&self, key: &Expression) -> Doc {
+    pub(super) fn build_property_key_doc(&self, key: &Expression) -> DocId {
+        let d = self.d();
         match key {
             Expression::Literal(Literal {
                 value: LiteralValue::String { content, quote: _ },
@@ -597,10 +591,10 @@ impl<'a> Printer<'a> {
                 // Check if the string content is a valid JS identifier
                 if is_valid_js_identifier(content) {
                     // Output without quotes
-                    doc::text_owned(content.clone())
+                    d.text_owned(content.clone())
                 } else {
                     // Keep as quoted string (normalized to single quotes)
-                    doc::text_owned(format!("'{}'", escape_single_quote_string(content)))
+                    d.text_owned(format!("'{}'", escape_single_quote_string(content)))
                 }
             }
             _ => self.build_expression_doc(key),

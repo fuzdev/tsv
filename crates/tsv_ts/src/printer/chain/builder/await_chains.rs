@@ -9,7 +9,7 @@ use crate::ast::internal::Expression;
 use super::super::printing::{ChainPrinter, print_group, print_node};
 use super::super::types::{ChainGroup, ChainNode};
 use super::helpers::build_chain_break_doc;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 /// Check if chain starts with "(await ...)" pattern that needs chain-preferring breaks
 ///
@@ -87,7 +87,8 @@ pub(super) fn is_parenthesized_await_head(groups: &[ChainGroup]) -> bool {
 pub(super) fn build_parenthesized_await_chain_doc<'a, P: ChainPrinter>(
     groups: &[ChainGroup<'a>],
     printer: &P,
-) -> Doc {
+) -> DocId {
+    let d = printer.arena();
     // First group: (await ...)
     // print_group calls print_parenthesized_base which returns the indent-on-break structure
     let first_group_doc = print_group(&groups[0], printer);
@@ -100,7 +101,7 @@ pub(super) fn build_parenthesized_await_chain_doc<'a, P: ChainPrinter>(
     let first_group_expanded = print_first_group_with_expanded_parens(&groups[0], printer);
 
     // Rest: .method().prop etc
-    let rest_docs: Vec<Doc> = groups[1..]
+    let rest_docs: Vec<DocId> = groups[1..]
         .iter()
         .map(|g| print_group(g, printer))
         .collect();
@@ -108,7 +109,7 @@ pub(super) fn build_parenthesized_await_chain_doc<'a, P: ChainPrinter>(
     // Check if first group will break (e.g., objects with group_break have should_break=true).
     // When will_break is true, conditional_group won't work correctly because fits() measures
     // flat content but the actual render will be expanded. Use direct fits() check instead.
-    let first_will_break = doc::will_break(&first_group_doc);
+    let first_will_break = d.will_break(first_group_doc);
 
     if first_will_break {
         // Count calls to determine threshold: multi-call breaks at >= print_width, single at >
@@ -122,18 +123,16 @@ pub(super) fn build_parenthesized_await_chain_doc<'a, P: ChainPrinter>(
 
         // Build chain tail doc: ")" + trailing nodes from first group + rest groups
         // This contains no should_break groups, so fits() measures it accurately.
-        let first_group_trailing: Vec<Doc> = groups[0]
+        let first_group_trailing: Vec<DocId> = groups[0]
             .nodes
             .iter()
             .skip(1)
             .map(|n| print_node(n, printer))
             .collect();
-        let chain_tail_doc = doc::concat(
-            std::iter::once(doc::text(")"))
-                .chain(first_group_trailing)
-                .chain(rest_docs.iter().cloned())
-                .collect(),
-        );
+        let mut chain_tail_parts = vec![d.text(")")];
+        chain_tail_parts.extend(first_group_trailing);
+        chain_tail_parts.extend(rest_docs.iter().copied());
+        let chain_tail_doc = d.concat(&chain_tail_parts);
 
         // Available width = print_width - base_indent - threshold_adjustment
         // base_indent: 2 tabs (function body + assignment) = 4 visual chars
@@ -144,14 +143,12 @@ pub(super) fn build_parenthesized_await_chain_doc<'a, P: ChainPrinter>(
         let available = print_width.saturating_sub(base_indent + threshold_adj);
 
         // Choose between args_break (chain inline) and chain_break (chain on new lines)
-        let args_break = doc::concat(
-            std::iter::once(first_group_expanded.clone())
-                .chain(rest_docs.clone())
-                .collect(),
-        );
-        let chain_break = build_chain_break_doc(first_group_expanded, &rest_docs);
+        let mut args_break_parts = vec![first_group_expanded];
+        args_break_parts.extend(rest_docs.iter().copied());
+        let args_break = d.concat(&args_break_parts);
+        let chain_break = build_chain_break_doc(first_group_expanded, &rest_docs, printer);
 
-        return if printer.fits_chain_tail(&chain_tail_doc, available) {
+        return if printer.fits_chain_tail(chain_tail_doc, available) {
             args_break
         } else {
             chain_break
@@ -167,24 +164,20 @@ pub(super) fn build_parenthesized_await_chain_doc<'a, P: ChainPrinter>(
     // 3. chain_break: parens expanded, chain also breaks
 
     // State 1: Everything on one line
-    let on_line = doc::concat(
-        std::iter::once(first_group_doc)
-            .chain(rest_docs.clone())
-            .collect(),
-    );
+    let mut on_line_parts = vec![first_group_doc];
+    on_line_parts.extend(rest_docs.iter().copied());
+    let on_line = d.concat(&on_line_parts);
 
     // State 2: Parens expanded (hardlines), chain stays together
-    let args_break = doc::concat(
-        std::iter::once(first_group_expanded.clone())
-            .chain(rest_docs.clone())
-            .collect(),
-    );
+    let mut args_break_parts = vec![first_group_expanded];
+    args_break_parts.extend(rest_docs.iter().copied());
+    let args_break = d.concat(&args_break_parts);
 
     // State 3: Chain breaks after first group
-    let chain_break = build_chain_break_doc(first_group_expanded, &rest_docs);
+    let chain_break = build_chain_break_doc(first_group_expanded, &rest_docs, printer);
 
     // Let conditional_group decide via fits()
-    doc::conditional_group(vec![on_line, args_break, chain_break])
+    d.conditional_group(&[on_line, args_break, chain_break])
 }
 
 /// Print the first group with hardline-expanded parens for the base expression.
@@ -193,7 +186,8 @@ pub(super) fn build_parenthesized_await_chain_doc<'a, P: ChainPrinter>(
 fn print_first_group_with_expanded_parens<'a, P: ChainPrinter>(
     group: &ChainGroup<'a>,
     printer: &P,
-) -> Doc {
+) -> DocId {
+    let d = printer.arena();
     let mut docs = Vec::with_capacity(group.nodes.len());
     for (i, node) in group.nodes.iter().enumerate() {
         if i == 0 {
@@ -211,5 +205,5 @@ fn print_first_group_with_expanded_parens<'a, P: ChainPrinter>(
             docs.push(print_node(node, printer));
         }
     }
-    doc::concat(docs)
+    d.concat(&docs)
 }

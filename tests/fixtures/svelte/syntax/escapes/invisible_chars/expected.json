@@ -45,7 +45,7 @@
 							"start": 351,
 							"end": 367,
 							"property": "content",
-							"value": "'\\\\2200B'"
+							"value": "'\\200B'"
 						}
 					]
 				},
@@ -92,7 +92,7 @@
 							"start": 386,
 							"end": 400,
 							"property": "content",
-							"value": "'\\\\AA0'"
+							"value": "'\\A0'"
 						}
 					]
 				},
@@ -139,7 +139,7 @@
 							"start": 419,
 							"end": 435,
 							"property": "content",
-							"value": "'\\\\2200C'"
+							"value": "'\\200C'"
 						}
 					]
 				},
@@ -186,7 +186,7 @@
 							"start": 454,
 							"end": 470,
 							"property": "content",
-							"value": "'\\\\2200D'"
+							"value": "'\\200D'"
 						}
 					]
 				},
@@ -233,7 +233,7 @@
 							"start": 489,
 							"end": 505,
 							"property": "content",
-							"value": "'\\\\2200E'"
+							"value": "'\\200E'"
 						}
 					]
 				},
@@ -280,7 +280,7 @@
 							"start": 524,
 							"end": 540,
 							"property": "content",
-							"value": "'\\\\2200F'"
+							"value": "'\\200F'"
 						}
 					]
 				},
@@ -519,7 +519,7 @@
 				},
 				"end": {
 					"line": 7,
-					"column": 0
+					"column": 9
 				}
 			},
 			"body": [

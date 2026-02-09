@@ -1,8 +1,8 @@
 //! Embedded Deno sidecar for JS tool access
 //!
-//! Provides access to prettier, Svelte parser, and acorn-typescript parser
-//! via a lazily-spawned Deno process. The process is only started when
-//! one of these functions is first called.
+//! Provides access to prettier, Svelte parser, acorn-typescript parser, and
+//! Svelte's CSS parser (parseCss) via a lazily-spawned Deno process. The
+//! process is only started when one of these functions is first called.
 //!
 //! # Example
 //!
@@ -98,6 +98,20 @@ pub async fn parse_typescript(source: &str) -> Result<serde_json::Value, DenoErr
         .await
 }
 
+/// Parse CSS source code using Svelte's `parseCss`
+///
+/// # Arguments
+/// * `source` - The CSS source code
+///
+/// # Returns
+/// AST as a JSON Value (caller serializes with desired formatting)
+///
+/// # Errors
+/// Returns an error if Deno is not available or parsing fails.
+pub async fn parse_css(source: &str) -> Result<serde_json::Value, DenoError> {
+    get_actor().await?.call("css-parse", source, None).await
+}
+
 /// Version information from the Deno sidecar
 #[derive(Debug, Clone)]
 pub struct VersionInfo {
@@ -182,5 +196,11 @@ mod tests {
         assert!(result.is_ok(), "parse_typescript failed: {result:?}");
         let ast = result.unwrap();
         assert_eq!(ast.get("type").and_then(|v| v.as_str()), Some("Program"));
+
+        // Test CSS parser
+        let result = parse_css(".a { color: red; }").await;
+        assert!(result.is_ok(), "parse_css failed: {result:?}");
+        let ast = result.unwrap();
+        assert_eq!(ast.get("type").and_then(|v| v.as_str()), Some("StyleSheet"));
     }
 }

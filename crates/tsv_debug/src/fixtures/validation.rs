@@ -3,7 +3,7 @@
 //! All validation errors for a single fixture are collected together,
 //! enabling better DX with grouped error reporting.
 
-use crate::deno::{PrettierParser, parse_svelte, parse_typescript, run_prettier};
+use crate::deno::{PrettierParser, parse_css, parse_svelte, parse_typescript, run_prettier};
 use crate::diff;
 use crate::fixtures::{
     self, Fixture, InputType, discover_invalid_variants, discover_prettier_intermediate_variants,
@@ -146,6 +146,8 @@ pub enum ValidationError {
     InvalidSyntaxParsedByAcorn(String),
     #[error("{0} parsed successfully by our CSS parser (should fail)")]
     InvalidSyntaxParsedByOurCss(String),
+    #[error("{0} parsed successfully by parseCss (should fail)")]
+    InvalidSyntaxParsedByParseCss(String),
 
     // Unknown files
     #[error("Unknown file: {0}")]
@@ -274,6 +276,9 @@ impl ValidationError {
             Self::InvalidSyntaxParsedByOurCss(_) => {
                 "Our CSS parser is too permissive - it accepts invalid syntax. Fix the parser."
             }
+            Self::InvalidSyntaxParsedByParseCss(_) => {
+                "parseCss accepts this syntax - it's not actually invalid. Remove the file or fix the syntax."
+            }
             Self::UnknownFile(_) => {
                 "Remove or rename the file. Check for typos (e.g., 'unformated' vs 'unformatted')."
             }
@@ -334,7 +339,8 @@ impl ValidationError {
             Self::InvalidSyntaxParsedByOurs(_)
             | Self::InvalidSyntaxParsedBySvelte(_)
             | Self::InvalidSyntaxParsedByAcorn(_)
-            | Self::InvalidSyntaxParsedByOurCss(_) => "InvalidSyntax",
+            | Self::InvalidSyntaxParsedByOurCss(_)
+            | Self::InvalidSyntaxParsedByParseCss(_) => "InvalidSyntax",
 
             Self::UnknownFile(_) => "Structure",
         }
@@ -792,9 +798,38 @@ async fn validate_parser_external(
     _is_svelte_divergence_dir: bool,
     input_type: InputType,
 ) {
-    // CSS fixtures use our own parser (no external canonical source)
-    // Skip external parser validation - only our parser validation applies
+    // CSS fixtures use Svelte's parseCss as the external canonical source
     if input_type == InputType::Css {
+        let expected_path = fixture.expected_path();
+        if !expected_path.exists() {
+            return;
+        }
+        let Ok(expected_content) = read_file(&expected_path) else {
+            return;
+        };
+        match parse_css(input).await {
+            Ok(css_ast) => {
+                let css_ast_json = match to_json_with_tabs(&css_ast) {
+                    Ok(json) => format!("{json}\n"),
+                    Err(e) => {
+                        result.add_error(ValidationError::ParserError(format!(
+                            "Failed to serialize CSS AST: {e}"
+                        )));
+                        return;
+                    }
+                };
+                if expected_content != css_ast_json {
+                    result.add_error(ValidationError::ParserExpectedJsonOutdated);
+                } else {
+                    result.add_success(ValidationSuccess::ParserExpectedJsonMatches);
+                }
+            }
+            Err(e) => {
+                result.add_error(ValidationError::ParserError(format!(
+                    "CSS parser (parseCss) failed: {e}"
+                )));
+            }
+        }
         return;
     }
     let expected_path = fixture.expected_path();
@@ -1263,10 +1298,7 @@ async fn validate_invalid_syntax(
             InputType::SvelteTs | InputType::TypeScript => {
                 parse_typescript(&variant_content).await.is_err()
             }
-            InputType::Css => {
-                let wrapped = format!("<style>{variant_content}</style>");
-                parse_svelte(&wrapped).await.is_err()
-            }
+            InputType::Css => parse_css(&variant_content).await.is_err(),
         };
 
         // Evaluate results - both must fail for a valid invalid-syntax test
@@ -1287,8 +1319,11 @@ async fn validate_invalid_syntax(
             (true, false) => {
                 // Canonical accepts it - file isn't actually invalid
                 let error = match input_type {
-                    InputType::Svelte | InputType::Css => {
+                    InputType::Svelte => {
                         ValidationError::InvalidSyntaxParsedBySvelte(variant_name.clone())
+                    }
+                    InputType::Css => {
+                        ValidationError::InvalidSyntaxParsedByParseCss(variant_name.clone())
                     }
                     InputType::SvelteTs | InputType::TypeScript => {
                         ValidationError::InvalidSyntaxParsedByAcorn(variant_name.clone())
@@ -1300,8 +1335,11 @@ async fn validate_invalid_syntax(
                 // Both accept it - file isn't actually invalid
                 // Report the canonical parser accepting it (more authoritative)
                 let error = match input_type {
-                    InputType::Svelte | InputType::Css => {
+                    InputType::Svelte => {
                         ValidationError::InvalidSyntaxParsedBySvelte(variant_name.clone())
+                    }
+                    InputType::Css => {
+                        ValidationError::InvalidSyntaxParsedByParseCss(variant_name.clone())
                     }
                     InputType::SvelteTs | InputType::TypeScript => {
                         ValidationError::InvalidSyntaxParsedByAcorn(variant_name.clone())

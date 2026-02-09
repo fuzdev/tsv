@@ -45,7 +45,7 @@
 							"start": 20,
 							"end": 36,
 							"property": "content",
-							"value": "'\\\\441 B'"
+							"value": "'\\41 B'"
 						}
 					]
 				},
@@ -92,7 +92,7 @@
 							"start": 54,
 							"end": 69,
 							"property": "content",
-							"value": "'\\\\441B'"
+							"value": "'\\41B'"
 						}
 					]
 				},
@@ -139,7 +139,7 @@
 							"start": 87,
 							"end": 108,
 							"property": "content",
-							"value": "'\\\\220AC euro'"
+							"value": "'\\20AC euro'"
 						}
 					]
 				},
@@ -186,7 +186,7 @@
 							"start": 126,
 							"end": 147,
 							"property": "content",
-							"value": "'\\\\11F4A9\ttab'"
+							"value": "'\\1F4A9\ttab'"
 						}
 					]
 				},

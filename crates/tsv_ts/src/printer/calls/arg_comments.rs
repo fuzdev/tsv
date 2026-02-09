@@ -9,6 +9,7 @@ use smallvec::SmallVec;
 
 use super::super::Printer;
 use crate::ast::internal;
+use tsv_lang::doc::arena::DocId;
 
 //
 // Comma-relative comment helpers
@@ -300,13 +301,14 @@ impl<'a> PartitionedComments<'a> {
     /// Emit trailing comments (block then line) with leading spaces to a parts vector.
     ///
     /// Used for comments that follow an argument, formatted as ` /* block */ // line`.
-    pub fn emit_trailing_comments(&self, parts: &mut Vec<tsv_lang::doc::Doc>, printer: &Printer) {
+    pub fn emit_trailing_comments(&self, parts: &mut Vec<DocId>, printer: &Printer) {
+        let d = printer.d();
         for comment in &self.trailing_block {
-            parts.push(tsv_lang::doc::text(" "));
+            parts.push(d.text(" "));
             parts.push(printer.build_comment_doc(comment));
         }
         for comment in &self.trailing_line {
-            parts.push(tsv_lang::doc::text(" "));
+            parts.push(d.text(" "));
             parts.push(printer.build_comment_doc(comment));
         }
     }
@@ -314,10 +316,11 @@ impl<'a> PartitionedComments<'a> {
     /// Emit leading comments (on their own lines) with hardlines after each.
     ///
     /// Used for comments that precede an argument on separate lines.
-    pub fn emit_leading_comments(&self, parts: &mut Vec<tsv_lang::doc::Doc>, printer: &Printer) {
+    pub fn emit_leading_comments(&self, parts: &mut Vec<DocId>, printer: &Printer) {
+        let d = printer.d();
         for comment in &self.leading {
             parts.push(printer.build_comment_doc(comment));
-            parts.push(tsv_lang::doc::hardline());
+            parts.push(d.hardline());
         }
     }
 
@@ -327,10 +330,11 @@ impl<'a> PartitionedComments<'a> {
     /// For comments on their own line, emits them with hardline after.
     pub fn emit_leading_comments_inline_aware(
         &self,
-        parts: &mut Vec<tsv_lang::doc::Doc>,
+        parts: &mut Vec<DocId>,
         printer: &Printer,
         next_pos: u32,
     ) {
+        let d = printer.d();
         for comment in &self.leading {
             parts.push(printer.build_comment_doc(comment));
             // If comment is on same line as next element, keep it inline
@@ -341,9 +345,9 @@ impl<'a> PartitionedComments<'a> {
                     next_pos,
                 )
             {
-                parts.push(tsv_lang::doc::text(" "));
+                parts.push(d.text(" "));
             } else {
-                parts.push(tsv_lang::doc::hardline());
+                parts.push(d.hardline());
             }
         }
     }

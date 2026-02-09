@@ -436,29 +436,6 @@ pub struct Token {
     pub decoded: Option<String>,
 }
 
-impl Token {
-    /// Extract raw source text for this token
-    ///
-    /// Currently unused but available as a utility method if needed in the future.
-    /// Raw text extraction is typically done directly via `source[token.start..token.end]`.
-    ///
-    /// TODO: Consider removing this method if it remains unused long-term.
-    /// The direct extraction pattern is preferred and already used throughout the codebase.
-    ///
-    /// # Example
-    /// ```ignore
-    /// let source = "const x = 42;";
-    /// let mut lexer = Lexer::new(source);
-    /// let token = lexer.next_token().unwrap();
-    /// assert_eq!(token.raw(source), "const");
-    /// ```
-    #[inline]
-    #[allow(dead_code)]
-    pub fn raw<'a>(&self, source: &'a str) -> &'a str {
-        &source[self.start..self.end]
-    }
-}
-
 /// Perfect hash map for O(1) keyword lookup
 static KEYWORDS: phf::Map<&'static str, KeywordKind> = phf_map! {
     // Declaration keywords

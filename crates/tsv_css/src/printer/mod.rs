@@ -27,7 +27,14 @@ pub mod source_fidelity;
 mod values;
 
 use crate::ast::internal::{Comment, CssBlockChild, CssNode, CssStyleSheet, CssValue};
-use tsv_lang::{CommentPosition, OutputBuffer, PrintConfig, classify_comment_fast, doc, printing};
+use tsv_lang::{
+    CommentPosition, OutputBuffer, PrintConfig, classify_comment_fast,
+    doc::{
+        self,
+        arena::{DocArena, DocId},
+    },
+    printing,
+};
 
 /// Check if function args have wrappable content (break points)
 ///
@@ -48,6 +55,8 @@ pub struct Printer<'a> {
     pub(crate) indent_level: usize,
     /// Print configuration
     config: PrintConfig,
+    /// Arena allocator for doc nodes
+    pub(crate) arena: DocArena,
     /// Original source (for blank line detection and raw value extraction)
     pub(crate) source: &'a str,
     /// All comments sorted by span.start
@@ -73,10 +82,17 @@ impl<'a> Printer<'a> {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
             config,
+            arena: DocArena::with_source_size_hint(source.len(), config.tab_width),
             source,
             comments,
             line_breaks,
         }
+    }
+
+    /// Get a reference to the doc arena (convenience for `&self.arena`).
+    #[inline]
+    pub(crate) fn d(&self) -> &DocArena {
+        &self.arena
     }
 
     /// Check if two positions are on the same line (O(log n) binary search)
@@ -150,7 +166,7 @@ impl<'a> Printer<'a> {
         self.effective_indent() * self.config.tab_width
     }
 
-    /// Write a Doc to the buffer, accounting for current column and indent level
+    /// Write a DocId to the buffer, accounting for current column and indent level
     ///
     /// This handles the common pattern of:
     /// 1. Get current column position (which already includes base_indent_offset after newlines)
@@ -159,14 +175,11 @@ impl<'a> Printer<'a> {
     ///
     /// Note: base_indent_offset is already accounted for in position tracking after newlines
     /// (see doc::render_single_doc line breaks). We should NOT add it again here.
-    pub(crate) fn write_doc(&mut self, doc: &doc::Doc) {
-        // Convert Doc to arena then render for better performance
-        let arena = tsv_lang::doc::arena::DocArena::with_source_size_hint(256);
-        let doc_id = arena.convert_doc(doc);
+    pub(crate) fn write_arena_doc(&mut self, d: DocId) {
         let current_col = self.current_column();
         let output = doc::arena_print_doc_with_indent(
-            &arena,
-            doc_id,
+            &self.arena,
+            d,
             &self.config,
             current_col,
             self.indent_level,

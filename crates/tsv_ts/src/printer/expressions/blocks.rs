@@ -14,14 +14,14 @@ use smallvec::SmallVec;
 
 use super::Printer;
 use crate::ast::internal;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a block statement
     pub(in crate::printer) fn build_block_statement_doc(
         &self,
         block: &internal::BlockStatement,
-    ) -> Doc {
+    ) -> DocId {
         self.build_block_statement_doc_core(block, false)
     }
 
@@ -31,7 +31,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_block_statement_expand_empty_doc(
         &self,
         block: &internal::BlockStatement,
-    ) -> Doc {
+    ) -> DocId {
         self.build_block_statement_doc_core(block, true)
     }
 
@@ -43,7 +43,7 @@ impl<'a> Printer<'a> {
         &self,
         block: &internal::BlockStatement,
         expand_empty: bool,
-    ) -> Doc {
+    ) -> DocId {
         // Reset is_expression_statement when entering a block body.
         // This ensures chains inside function bodies don't incorrectly inherit
         // the expression statement context from their parent call (e.g., fn(() => { ... })).
@@ -60,12 +60,13 @@ impl<'a> Printer<'a> {
         &self,
         block: &internal::BlockStatement,
         expand_empty: bool,
-    ) -> Doc {
+    ) -> DocId {
         self.build_block_body_doc(block, expand_empty, Vec::new())
     }
 
     /// Build inner comments doc for empty block
-    fn build_inner_comments_for_empty_block(&self, block: &internal::BlockStatement) -> Vec<Doc> {
+    fn build_inner_comments_for_empty_block(&self, block: &internal::BlockStatement) -> Vec<DocId> {
+        let d = self.d();
         let block_start = block.span.start + 1; // After '{'
         let block_end = block.span.end - 1; // Before '}'
         let comments: Vec<_> =
@@ -76,7 +77,7 @@ impl<'a> Printer<'a> {
             // Add hardline after line comments, except for the last one
             // (the hardline before `}` handles that)
             if !comment.is_block && i < comments.len() - 1 {
-                comment_parts.push(doc::hardline());
+                comment_parts.push(d.hardline());
             }
         }
         comment_parts
@@ -90,8 +91,9 @@ impl<'a> Printer<'a> {
         &self,
         block: &internal::BlockStatement,
         expand_empty: bool,
-        leading_content: Vec<Doc>,
-    ) -> Doc {
+        leading_content: Vec<DocId>,
+    ) -> DocId {
+        let d = self.d();
         let has_leading = !leading_content.is_empty();
         let block_start = block.span.start + 1; // After '{'
         let block_end = block.span.end - 1; // Before '}'
@@ -105,23 +107,23 @@ impl<'a> Printer<'a> {
                 let mut all_content = leading_content;
                 if has_inner_comments {
                     if has_leading {
-                        all_content.push(doc::hardline());
+                        all_content.push(d.hardline());
                     }
                     all_content.extend(inner_comments);
                 }
-                return doc::concat(vec![
-                    doc::text("{"),
-                    doc::indent(doc::concat(vec![doc::hardline(), doc::concat(all_content)])),
-                    doc::hardline(),
-                    doc::text("}"),
+                return d.concat(&[
+                    d.text("{"),
+                    d.indent(d.concat(&[d.hardline(), d.concat(&all_content)])),
+                    d.hardline(),
+                    d.text("}"),
                 ]);
             }
 
             // Empty block without any comments
             return if expand_empty {
-                doc::concat(vec![doc::text("{"), doc::hardline(), doc::text("}")])
+                d.concat(&[d.text("{"), d.hardline(), d.text("}")])
             } else {
-                doc::text("{}")
+                d.text("{}")
             };
         }
 
@@ -148,7 +150,7 @@ impl<'a> Printer<'a> {
             // Handle blank lines and separators
             if is_first && has_leading {
                 // First statement after leading content - always need separator
-                body_parts.push(doc::hardline());
+                body_parts.push(d.hardline());
             } else if !is_first {
                 // Check for blank lines between statements
                 let blank_line_check_end = if !leading_comments.is_empty() {
@@ -159,9 +161,9 @@ impl<'a> Printer<'a> {
                 if !self.in_template_interpolation.get()
                     && self.has_blank_line_between(prev_end, blank_line_check_end)
                 {
-                    body_parts.push(doc::literalline());
+                    body_parts.push(d.literalline());
                 }
-                body_parts.push(doc::hardline());
+                body_parts.push(d.hardline());
             }
 
             // Print leading comments before this statement (with blank line preservation)
@@ -191,19 +193,19 @@ impl<'a> Printer<'a> {
                 if !self.in_template_interpolation.get()
                     && self.has_blank_line_between(trailing_prev_end, comment.span.start)
                 {
-                    body_parts.push(doc::literalline());
+                    body_parts.push(d.literalline());
                 }
-                body_parts.push(doc::hardline());
+                body_parts.push(d.hardline());
                 body_parts.push(self.build_comment_doc(comment));
                 trailing_prev_end = comment.span.end;
             }
         }
 
-        doc::concat(vec![
-            doc::text("{"),
-            doc::indent(doc::concat(vec![doc::hardline(), doc::concat(body_parts)])),
-            doc::hardline(),
-            doc::text("}"),
+        d.concat(&[
+            d.text("{"),
+            d.indent(d.concat(&[d.hardline(), d.concat(&body_parts)])),
+            d.hardline(),
+            d.text("}"),
         ])
     }
 
@@ -239,7 +241,7 @@ impl<'a> Printer<'a> {
         &self,
         sig_end: u32,
         block: &internal::BlockStatement,
-    ) -> Vec<Doc> {
+    ) -> Vec<DocId> {
         tsv_lang::comments_in_range(self.comments, sig_end, block.span.start)
             .map(|c| self.build_comment_doc(c))
             .collect()
@@ -252,17 +254,18 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_block_statement_with_outer_comments_doc(
         &self,
         block: &internal::BlockStatement,
-        outer_comments: Vec<Doc>,
-    ) -> Doc {
+        outer_comments: Vec<DocId>,
+    ) -> DocId {
         if outer_comments.is_empty() {
             return self.build_block_statement_doc(block);
         }
 
+        let d = self.d();
         // Build outer comments as leading content
         let mut leading_content = Vec::new();
         for (i, comment_doc) in outer_comments.into_iter().enumerate() {
             if i > 0 {
-                leading_content.push(doc::hardline());
+                leading_content.push(d.hardline());
             }
             leading_content.push(comment_doc);
         }

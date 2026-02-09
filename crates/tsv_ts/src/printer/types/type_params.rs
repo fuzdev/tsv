@@ -7,7 +7,7 @@
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
 use tsv_lang::SymbolToU32;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     //
@@ -19,17 +19,14 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_type_parameter_declaration_doc(
         &self,
         decl: &TSTypeParameterDeclaration,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let param_docs: Vec<_> = decl
             .params
             .iter()
             .map(|param| self.build_type_parameter_doc(param))
             .collect();
-        doc::concat(vec![
-            doc::text("<"),
-            doc::join(param_docs, ", "),
-            doc::text(">"),
-        ])
+        d.concat(&[d.text("<"), d.join(param_docs, ", "), d.text(">")])
     }
 
     /// Build doc for type parameter declaration with wrapping support
@@ -37,8 +34,9 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_type_parameter_declaration_doc_wrapping(
         &self,
         decl: &TSTypeParameterDeclaration,
-    ) -> Doc {
-        doc::group(self.build_type_parameter_declaration_doc_inner(decl))
+    ) -> DocId {
+        self.d()
+            .group(self.build_type_parameter_declaration_doc_inner(decl))
     }
 
     /// Build doc for type parameter declaration - inner version without group wrapper
@@ -46,9 +44,10 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_type_parameter_declaration_doc_inner(
         &self,
         decl: &TSTypeParameterDeclaration,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         if decl.params.is_empty() {
-            return doc::text("<>");
+            return d.text("<>");
         }
 
         // Check for line comments between parameters or after last parameter (force multiline)
@@ -56,18 +55,18 @@ impl<'a> Printer<'a> {
             return self.build_type_parameter_declaration_doc_with_line_comments(decl);
         }
 
-        let inner_parts = doc::join_trailing(
+        let inner_parts = d.join_trailing(
             decl.params
                 .iter()
                 .map(|param| self.build_type_parameter_doc(param)),
-            doc::comma_line(),
+            d.comma_line(),
         );
 
-        doc::concat(vec![
-            doc::text("<"),
-            doc::indent_softline(inner_parts),
-            doc::softline(),
-            doc::text(">"),
+        d.concat(&[
+            d.text("<"),
+            d.indent_softline(inner_parts),
+            d.softline(),
+            d.text(">"),
         ])
     }
 
@@ -75,7 +74,8 @@ impl<'a> Printer<'a> {
     fn build_type_parameter_declaration_doc_with_line_comments(
         &self,
         decl: &TSTypeParameterDeclaration,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut inner_parts = Vec::new();
         let mut prev_end = decl.span.start + 1; // After the opening `<`
 
@@ -96,24 +96,24 @@ impl<'a> Printer<'a> {
             };
 
             // Trailing comma for all params
-            inner_parts.push(doc::text(","));
+            inner_parts.push(d.text(","));
 
             // Trailing comments
             inner_parts.extend(self.build_trailing_comments_multiline(param_end, next_boundary));
 
             // Hardline to separate from next element
             if !is_last {
-                inner_parts.push(doc::hardline());
+                inner_parts.push(d.hardline());
             }
 
             prev_end = next_boundary;
         }
 
-        doc::concat(vec![
-            doc::text("<"),
-            doc::indent(doc::concat(vec![doc::hardline(), doc::concat(inner_parts)])),
-            doc::hardline(),
-            doc::text(">"),
+        d.concat(&[
+            d.text("<"),
+            d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])),
+            d.hardline(),
+            d.text(">"),
         ])
     }
 
@@ -123,39 +123,40 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_type_parameter_declaration_doc_inline_group(
         &self,
         decl: &TSTypeParameterDeclaration,
-    ) -> Doc {
+    ) -> DocId {
         self.build_type_parameter_declaration_doc_inner(decl)
     }
 
     /// Build doc for a single type parameter
     /// With optional modifiers: `const T`, `in T`, `out T`, `in out T`
-    pub(in crate::printer) fn build_type_parameter_doc(&self, param: &TSTypeParameter) -> Doc {
+    pub(in crate::printer) fn build_type_parameter_doc(&self, param: &TSTypeParameter) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
 
         // Add modifiers in order: const, in, out
         if param.is_const {
-            parts.push(doc::text("const "));
+            parts.push(d.text("const "));
         }
         if param.is_in {
-            parts.push(doc::text("in "));
+            parts.push(d.text("in "));
         }
         if param.is_out {
-            parts.push(doc::text("out "));
+            parts.push(d.text("out "));
         }
 
-        parts.push(doc::symbol(param.name.name.to_u32()));
+        parts.push(d.symbol(param.name.name.to_u32()));
 
         if let Some(constraint) = &param.constraint {
-            parts.push(doc::text(" extends "));
+            parts.push(d.text(" extends "));
             parts.push(self.build_type_doc(constraint));
         }
 
         if let Some(default) = &param.default {
-            parts.push(doc::text(" = "));
+            parts.push(d.text(" = "));
             parts.push(self.build_type_doc(default));
         }
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     //
@@ -184,9 +185,10 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_type_parameter_instantiation_doc(
         &self,
         inst: &internal::TSTypeParameterInstantiation,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         if inst.params.is_empty() {
-            return doc::text("<>");
+            return d.text("<>");
         }
 
         // Check for line comments between params or after last param (force multiline)
@@ -199,7 +201,7 @@ impl<'a> Printer<'a> {
         if inst.params.len() == 1
             && let Some(type_doc) = self.try_build_hugging_curly_type_doc(&inst.params[0])
         {
-            return doc::concat(vec![doc::text("<"), type_doc, doc::text(">")]);
+            return d.concat(&[d.text("<"), type_doc, d.text(">")]);
         }
 
         // Build params with commas and line breaks
@@ -212,8 +214,8 @@ impl<'a> Printer<'a> {
             let param_start = param.span().start;
 
             if i > 0 {
-                param_parts.push(doc::text(","));
-                param_parts.push(doc::line());
+                param_parts.push(d.text(","));
+                param_parts.push(d.line());
             }
 
             // Add leading block comments before this type argument
@@ -245,11 +247,11 @@ impl<'a> Printer<'a> {
         }
 
         // Wrap in group with angle brackets and optional breaks
-        doc::group(doc::concat(vec![
-            doc::text("<"),
-            doc::indent_softline(doc::concat(param_parts)),
-            doc::softline(),
-            doc::text(">"),
+        d.group(d.concat(&[
+            d.text("<"),
+            d.indent_softline(d.concat(&param_parts)),
+            d.softline(),
+            d.text(">"),
         ]))
     }
 
@@ -257,7 +259,8 @@ impl<'a> Printer<'a> {
     fn build_type_parameter_instantiation_doc_with_line_comments(
         &self,
         inst: &internal::TSTypeParameterInstantiation,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut inner_parts = Vec::new();
         let mut prev_end = inst.span.start + 1; // After the opening `<`
 
@@ -279,7 +282,7 @@ impl<'a> Printer<'a> {
 
             // Comma (not on last element for type arguments - no trailing comma)
             if !is_last {
-                inner_parts.push(doc::text(","));
+                inner_parts.push(d.text(","));
             }
 
             // Trailing comments
@@ -287,17 +290,17 @@ impl<'a> Printer<'a> {
 
             // Hardline to separate from next element
             if !is_last {
-                inner_parts.push(doc::hardline());
+                inner_parts.push(d.hardline());
             }
 
             prev_end = next_boundary;
         }
 
-        doc::concat(vec![
-            doc::text("<"),
-            doc::indent(doc::concat(vec![doc::hardline(), doc::concat(inner_parts)])),
-            doc::hardline(),
-            doc::text(">"),
+        d.concat(&[
+            d.text("<"),
+            d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])),
+            d.hardline(),
+            d.text(">"),
         ])
     }
 
@@ -306,7 +309,7 @@ impl<'a> Printer<'a> {
     /// Returns `Some(doc)` if the type is a curly-brace type that should hug `<{`,
     /// `None` otherwise. Used for single type arguments where Prettier keeps
     /// the opening angle bracket hugged with the opening curly brace.
-    fn try_build_hugging_curly_type_doc(&self, ty: &TSType) -> Option<Doc> {
+    fn try_build_hugging_curly_type_doc(&self, ty: &TSType) -> Option<DocId> {
         match ty {
             // Object type literal: { a: number; b: string } or { /* comment */ }
             // Hug if it has members OR comments inside (will be multiline)

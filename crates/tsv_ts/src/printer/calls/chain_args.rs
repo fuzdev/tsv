@@ -17,7 +17,7 @@ use super::arg_wrapping::{
     classify_chain_arg, wrap_args_with_soft_breaks, wrap_huggable_arg,
 };
 use crate::ast::internal;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 /// Build inline leading block comments for the first argument (non-expansion path).
 ///
@@ -28,7 +28,8 @@ fn build_inline_leading_comments(
     printer: &Printer,
     paren_open: u32,
     arg_start: u32,
-) -> Option<Doc> {
+) -> Option<DocId> {
+    let d = printer.d();
     let pc = PartitionedComments::new(printer.comments, printer.line_breaks, paren_open, arg_start);
 
     let mut parts = Vec::new();
@@ -36,21 +37,21 @@ fn build_inline_leading_comments(
     // Block comments on same line as paren
     for comment in &pc.trailing_block {
         parts.push(printer.build_comment_doc(comment));
-        parts.push(doc::text(" "));
+        parts.push(d.text(" "));
     }
 
     // Block comments on same line as first arg
     for comment in &pc.leading {
         if comment.is_block && printer.is_same_line(comment.span.start, arg_start) {
             parts.push(printer.build_comment_doc(comment));
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
         }
     }
 
     if parts.is_empty() {
         None
     } else {
-        Some(doc::concat(parts))
+        Some(d.concat(&parts))
     }
 }
 
@@ -59,7 +60,8 @@ fn build_inline_trailing_comments(
     printer: &Printer,
     arg_end: u32,
     next_boundary: u32,
-) -> Option<Doc> {
+) -> Option<DocId> {
+    let d = printer.d();
     let pc = PartitionedComments::new(
         printer.comments,
         printer.line_breaks,
@@ -73,10 +75,10 @@ fn build_inline_trailing_comments(
 
     let mut parts = Vec::new();
     for comment in &pc.trailing_block {
-        parts.push(doc::text(" "));
+        parts.push(d.text(" "));
         parts.push(printer.build_comment_doc(comment));
     }
-    Some(doc::concat(parts))
+    Some(d.concat(&parts))
 }
 
 /// Build a Doc for call arguments only (for chain printing)
@@ -90,7 +92,7 @@ pub(super) fn build_call_args_doc_for_chain(
     printer: &Printer,
     call: &internal::CallExpression,
     optional: bool,
-) -> Doc {
+) -> DocId {
     build_call_args_doc_for_chain_impl(printer, call, optional, false)
 }
 
@@ -101,7 +103,7 @@ pub(super) fn build_call_args_doc_for_chain_expanded(
     printer: &Printer,
     call: &internal::CallExpression,
     optional: bool,
-) -> Doc {
+) -> DocId {
     build_call_args_doc_for_chain_impl(printer, call, optional, true)
 }
 
@@ -111,7 +113,8 @@ fn build_call_args_doc_for_chain_impl(
     call: &internal::CallExpression,
     optional: bool,
     force_expand: bool,
-) -> Doc {
+) -> DocId {
+    let d = printer.d();
     // Build type arguments if present: `<T, U>`
     let type_args_doc = call
         .type_arguments
@@ -180,17 +183,17 @@ fn build_call_args_doc_for_chain_impl(
             for comment in tsv_lang::comments_in_range(printer.comments, paren_open, call.span.end)
             {
                 if !inner_parts.is_empty() {
-                    inner_parts.push(doc::text(" "));
+                    inner_parts.push(d.text(" "));
                 }
                 inner_parts.push(printer.build_comment_doc(comment));
             }
-            parts.push(doc::text(prefix));
-            parts.push(doc::concat(inner_parts));
-            parts.push(doc::text(")"));
+            parts.push(d.text(prefix));
+            parts.push(d.concat(&inner_parts));
+            parts.push(d.text(")"));
         } else {
-            parts.push(doc::text_owned(format!("{prefix})")));
+            parts.push(d.text_owned(format!("{prefix})")));
         }
-        doc::concat(parts)
+        d.concat(&parts)
     } else if force_expand {
         // Special case: single object/array arg should hug the parens
         // and expand internally with hardlines, not softlines around it.
@@ -212,10 +215,10 @@ fn build_call_args_doc_for_chain_impl(
             ) {
                 // Build the object/array with forced internal expansion (hardlines)
                 let arg_doc = printer.build_arg_expression_doc_expanded(arg);
-                parts.push(doc::text(prefix));
+                parts.push(d.text(prefix));
                 parts.push(arg_doc);
-                parts.push(doc::text(")"));
-                return doc::concat(parts);
+                parts.push(d.text(")"));
+                return d.concat(&parts);
             }
         }
 
@@ -243,22 +246,22 @@ fn build_call_args_doc_for_chain_impl(
                     if comment.is_block && printer.is_same_line(comment.span.start, arg_start) {
                         // Inline with first arg
                         arg_parts.push(printer.build_comment_doc(comment));
-                        arg_parts.push(doc::text(" "));
+                        arg_parts.push(d.text(" "));
                     } else {
                         // On own line
                         arg_parts.push(printer.build_comment_doc(comment));
-                        arg_parts.push(doc::hardline());
+                        arg_parts.push(d.hardline());
                     }
                 }
 
                 // Emit trailing comments from paren (inline block comments)
                 for comment in &first_pc.trailing_block {
                     arg_parts.push(printer.build_comment_doc(comment));
-                    arg_parts.push(doc::text(" "));
+                    arg_parts.push(d.text(" "));
                 }
                 for comment in &first_pc.trailing_line {
                     arg_parts.push(printer.build_comment_doc(comment));
-                    arg_parts.push(doc::hardline());
+                    arg_parts.push(d.hardline());
                 }
             }
 
@@ -269,8 +272,8 @@ fn build_call_args_doc_for_chain_impl(
                 let prev_end = call.arguments[i - 1].span().end;
                 let has_comments_before = printer.has_comments_between(prev_end, arg_start);
                 if !has_comments_before && printer.has_blank_line_between(prev_end, arg_start) {
-                    arg_parts.push(doc::literalline());
-                    arg_parts.push(doc::hardline());
+                    arg_parts.push(d.literalline());
+                    arg_parts.push(d.hardline());
                 }
             }
 
@@ -300,17 +303,17 @@ fn build_call_args_doc_for_chain_impl(
                 if let Some(cpos) = comma_pos {
                     for comment in &pc.trailing_block {
                         if is_comment_before_comma(comment, cpos) {
-                            arg_parts.push(doc::text(" "));
+                            arg_parts.push(d.text(" "));
                             arg_parts.push(printer.build_comment_doc(comment));
                         }
                     }
                 }
 
-                arg_parts.push(doc::text(","));
+                arg_parts.push(d.text(","));
 
                 // Emit trailing line comments (always after comma)
                 for comment in &pc.trailing_line {
-                    arg_parts.push(doc::text(" "));
+                    arg_parts.push(d.text(" "));
                     arg_parts.push(printer.build_comment_doc(comment));
                 }
 
@@ -318,7 +321,7 @@ fn build_call_args_doc_for_chain_impl(
                 if let Some(cpos) = comma_pos {
                     for comment in &pc.trailing_block {
                         if is_comment_after_comma(comment, cpos) {
-                            arg_parts.push(doc::text(" "));
+                            arg_parts.push(d.text(" "));
                             arg_parts.push(printer.build_comment_doc(comment));
                         }
                     }
@@ -331,33 +334,29 @@ fn build_call_args_doc_for_chain_impl(
                 let next_has_blank = !has_comments_before_next
                     && printer.has_blank_line_between(arg_end, next_arg_start);
                 if !next_has_blank {
-                    arg_parts.push(doc::hardline());
+                    arg_parts.push(d.hardline());
                 }
                 pc.emit_leading_comments_inline_aware(&mut arg_parts, printer, next_arg_start);
             } else {
                 // Last argument - check for trailing comments before closing paren
                 if pc.has_trailing_line() || pc.has_trailing_block() {
-                    arg_parts.push(doc::text(","));
+                    arg_parts.push(d.text(","));
                     pc.emit_trailing_comments(&mut arg_parts, printer);
                     trailing_comma_already_added = true;
                 }
             }
         }
 
-        parts.push(doc::text(prefix));
+        parts.push(d.text(prefix));
         let trailing = if trailing_comma_already_added {
-            doc::empty()
+            d.empty()
         } else {
-            doc::text(",")
+            d.text(",")
         };
-        parts.push(doc::indent(doc::concat(vec![
-            doc::hardline(),
-            doc::concat(arg_parts),
-            trailing,
-        ])));
-        parts.push(doc::hardline());
-        parts.push(doc::text(")"));
-        doc::concat(parts)
+        parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&arg_parts), trailing])));
+        parts.push(d.hardline());
+        parts.push(d.text(")"));
+        d.concat(&parts)
     } else {
         // Single argument handling
         if call.arguments.len() == 1 {
@@ -399,37 +398,33 @@ fn build_call_args_doc_for_chain_impl(
                 if has_typed_annotations && is_complex_call_body {
                     let arrow_doc = printer.build_arg_expression_doc(arg);
                     let body_doc = printer.build_expression_doc(body_expr);
-                    let sig_doc = doc::group(printer.build_arrow_signature_doc(arrow));
+                    let sig_doc = d.group(printer.build_arrow_signature_doc(arrow));
 
                     // Expanded state with signature on its own line
-                    let expanded_state = doc::concat(vec![
-                        doc::text(prefix),
-                        doc::indent(doc::concat(vec![
-                            doc::hardline(),
+                    let expanded_state = d.concat(&[
+                        d.text(prefix),
+                        d.indent(d.concat(&[
+                            d.hardline(),
                             sig_doc,
-                            doc::text(" =>"),
-                            doc::indent(doc::concat(vec![
-                                doc::hardline(),
-                                body_doc.clone(),
-                                doc::text(","),
-                            ])),
+                            d.text(" =>"),
+                            d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
                         ])),
-                        doc::hardline(),
-                        doc::text(")"),
+                        d.hardline(),
+                        d.text(")"),
                     ]);
 
                     // If body will break, use expanded directly
-                    if doc::will_break(&body_doc) {
+                    if d.will_break(body_doc) {
                         parts.push(expanded_state);
                     } else {
-                        parts.push(doc::conditional_group(vec![
+                        parts.push(d.conditional_group(&[
                             // Flat: (arrow)
-                            doc::concat(vec![doc::text(prefix), arrow_doc, doc::text(")")]),
+                            d.concat(&[d.text(prefix), arrow_doc, d.text(")")]),
                             // Expanded: (\n  sig =>\n    body,\n)
                             expanded_state,
                         ]));
                     }
-                    return doc::concat(parts);
+                    return d.concat(&parts);
                 }
 
                 // Untyped arrow or typed without complex body: use hugged pattern
@@ -439,38 +434,34 @@ fn build_call_args_doc_for_chain_impl(
                 // For typed arrows, use full signature; for untyped, use inline signature
                 // Wrap in group so the signature stays flat even when the outer group breaks
                 let sig_doc = if has_typed_annotations {
-                    doc::group(printer.build_arrow_signature_doc(arrow))
+                    d.group(printer.build_arrow_signature_doc(arrow))
                 } else {
                     build_arrow_inline_signature(printer, arrow)
                 };
 
                 // Build the break state (always used when body has hardlines)
-                let break_state = doc::concat(vec![
-                    doc::text(prefix),
+                let break_state = d.concat(&[
+                    d.text(prefix),
                     sig_doc,
-                    doc::text(" =>"),
-                    doc::indent(doc::concat(vec![
-                        doc::hardline(),
-                        body_doc.clone(),
-                        doc::text(","),
-                    ])),
-                    doc::hardline(),
-                    doc::text(")"),
+                    d.text(" =>"),
+                    d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+                    d.hardline(),
+                    d.text(")"),
                 ]);
 
                 // If body will break (multiline content), use break state directly
                 // This ensures trailing comma is present when content is multiline
-                if doc::will_break(&body_doc) {
+                if d.will_break(body_doc) {
                     parts.push(break_state);
                 } else {
-                    parts.push(doc::conditional_group(vec![
+                    parts.push(d.conditional_group(&[
                         // Flat: (arrow)
-                        doc::concat(vec![doc::text(prefix), arrow_doc, doc::text(")")]),
+                        d.concat(&[d.text(prefix), arrow_doc, d.text(")")]),
                         // Break: (sig =>\n  body,\n)
                         break_state,
                     ]));
                 }
-                return doc::concat(parts);
+                return d.concat(&parts);
             }
 
             // Special case: arrow function with ternary body
@@ -483,60 +474,48 @@ fn build_call_args_doc_for_chain_impl(
             {
                 let arrow_doc = printer.build_arg_expression_doc(arg);
                 let body_doc = printer.build_expression_doc(body_expr);
-                let sig_doc = doc::group(printer.build_arrow_signature_doc(arrow));
+                let sig_doc = d.group(printer.build_arrow_signature_doc(arrow));
 
                 // State 0: Flat - with parens around ternary
-                let state_flat = doc::concat(vec![
-                    doc::text(prefix),
-                    sig_doc.clone(),
-                    doc::text(" => ("),
-                    body_doc.clone(),
-                    doc::text("))"),
+                let state_flat = d.concat(&[
+                    d.text(prefix),
+                    sig_doc,
+                    d.text(" => ("),
+                    body_doc,
+                    d.text("))"),
                 ]);
 
                 // State 1: Break - no parens, body indented
-                let state_break = doc::concat(vec![
-                    doc::text(prefix),
-                    sig_doc.clone(),
-                    doc::text(" =>"),
-                    doc::indent(doc::concat(vec![
-                        doc::hardline(),
-                        body_doc.clone(),
-                        doc::text(","),
-                    ])),
-                    doc::hardline(),
-                    doc::text(")"),
+                let state_break = d.concat(&[
+                    d.text(prefix),
+                    sig_doc,
+                    d.text(" =>"),
+                    d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+                    d.hardline(),
+                    d.text(")"),
                 ]);
 
                 // State 2: All broken - signature and body both indented
-                let state_all_broken = doc::concat(vec![
-                    doc::text(prefix),
-                    doc::indent(doc::concat(vec![
-                        doc::hardline(),
+                let state_all_broken = d.concat(&[
+                    d.text(prefix),
+                    d.indent(d.concat(&[
+                        d.hardline(),
                         sig_doc,
-                        doc::text(" =>"),
-                        doc::indent(doc::concat(vec![
-                            doc::hardline(),
-                            body_doc,
-                            doc::trailing_comma(),
-                        ])),
+                        d.text(" =>"),
+                        d.indent(d.concat(&[d.hardline(), body_doc, d.trailing_comma()])),
                     ])),
-                    doc::hardline(),
-                    doc::text(")"),
+                    d.hardline(),
+                    d.text(")"),
                 ]);
 
                 // If arrow is already flat (no breaking content), try all states
                 // If it has breaking content, use state_break directly
-                if doc::will_break(&arrow_doc) {
+                if d.will_break(arrow_doc) {
                     parts.push(state_break);
                 } else {
-                    parts.push(doc::conditional_group(vec![
-                        state_flat,
-                        state_break,
-                        state_all_broken,
-                    ]));
+                    parts.push(d.conditional_group(&[state_flat, state_break, state_all_broken]));
                 }
-                return doc::concat(parts);
+                return d.concat(&parts);
             }
 
             // Build arg doc, wrapping certain expressions in isolated_group to prevent
@@ -561,9 +540,9 @@ fn build_call_args_doc_for_chain_impl(
 
             // Build combined arg doc with leading/trailing comments
             let arg_with_comments = match (leading_comments_doc, trailing_comments_doc) {
-                (Some(leading), Some(trailing)) => doc::concat(vec![leading, arg_doc, trailing]),
-                (Some(leading), None) => doc::concat(vec![leading, arg_doc]),
-                (None, Some(trailing)) => doc::concat(vec![arg_doc, trailing]),
+                (Some(leading), Some(trailing)) => d.concat(&[leading, arg_doc, trailing]),
+                (Some(leading), None) => d.concat(&[leading, arg_doc]),
+                (None, Some(trailing)) => d.concat(&[arg_doc, trailing]),
                 (None, None) => arg_doc,
             };
 
@@ -582,28 +561,28 @@ fn build_call_args_doc_for_chain_impl(
 
             if block_arrow_has_trailing_param_comments {
                 // Block arrow with trailing param comments - force expansion
-                parts.push(wrap_args_with_soft_breaks(prefix, arg_with_comments));
-                return doc::concat(parts);
+                parts.push(wrap_args_with_soft_breaks(d, prefix, arg_with_comments));
+                return d.concat(&parts);
             }
 
             match classify_chain_arg(arg) {
                 ChainArgKind::NeedsSoftWrap => {
                     // Needs soft-break wrapping - e.g., long strings
-                    parts.push(wrap_args_with_soft_breaks(prefix, arg_with_comments));
+                    parts.push(wrap_args_with_soft_breaks(d, prefix, arg_with_comments));
                 }
                 ChainArgKind::NeedsWrapper => {
                     // Huggable with internal break points (ternary, etc.)
                     // Hugs opening paren but adds trailing comma when content breaks
-                    parts.push(wrap_huggable_arg(prefix, arg_with_comments));
+                    parts.push(wrap_huggable_arg(d, prefix, arg_with_comments));
                 }
                 ChainArgKind::HugsNaturally => {
                     // Objects/arrays/blocks that hug naturally
-                    parts.push(doc::text(prefix));
+                    parts.push(d.text(prefix));
                     parts.push(arg_with_comments);
-                    parts.push(doc::text(")"));
+                    parts.push(d.text(")"));
                 }
             }
-            return doc::concat(parts);
+            return d.concat(&parts);
         }
 
         // Multiple arguments with callback hugging pattern:
@@ -615,16 +594,15 @@ fn build_call_args_doc_for_chain_impl(
             && !comments_force_expansion
         {
             let (head_parts, last_arg_doc, _) = build_args_split_last(&call.arguments, printer);
-            let inner = doc::concat(
-                head_parts
-                    .into_iter()
-                    .chain(std::iter::once(last_arg_doc))
-                    .collect(),
-            );
-            parts.push(doc::text(prefix));
+            let all_parts: Vec<_> = head_parts
+                .into_iter()
+                .chain(std::iter::once(last_arg_doc))
+                .collect();
+            let inner = d.concat(&all_parts);
+            parts.push(d.text(prefix));
             parts.push(inner);
-            parts.push(doc::text(")"));
-            return doc::concat(parts);
+            parts.push(d.text(")"));
+            return d.concat(&parts);
         }
 
         // Expression arrow with call expression body
@@ -645,42 +623,34 @@ fn build_call_args_doc_for_chain_impl(
             let body_doc = printer.build_expression_doc(body_expr);
 
             // State 0: all inline
-            let state_inline = doc::concat(vec![
-                doc::text(prefix),
-                doc::concat(head_parts.clone()),
+            let state_inline = d.concat(&[
+                d.text(prefix),
+                d.concat(&head_parts),
                 last_arg_doc,
-                doc::text(")"),
+                d.text(")"),
             ]);
 
             // State 1: hug - head inline, arrow body breaks after =>
-            let state_break_body = doc::concat(vec![
-                doc::text(prefix),
-                doc::concat(head_parts),
+            let state_break_body = d.concat(&[
+                d.text(prefix),
+                d.concat(&head_parts),
                 inline_sig,
-                doc::text(" =>"),
-                doc::indent(doc::concat(vec![doc::hardline(), body_doc, doc::text(",")])),
-                doc::hardline(),
-                doc::text(")"),
+                d.text(" =>"),
+                d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+                d.hardline(),
+                d.text(")"),
             ]);
 
             // State 2: expand all args
-            let state_expand_all = doc::concat(vec![
-                doc::text(prefix),
-                doc::indent(doc::concat(vec![
-                    doc::line(),
-                    all_args_broken,
-                    doc::text(","),
-                ])),
-                doc::line(),
-                doc::text(")"),
+            let state_expand_all = d.concat(&[
+                d.text(prefix),
+                d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
+                d.line(),
+                d.text(")"),
             ]);
 
-            parts.push(doc::conditional_group(vec![
-                state_inline,
-                state_break_body,
-                state_expand_all,
-            ]));
-            return doc::concat(parts);
+            parts.push(d.conditional_group(&[state_inline, state_break_body, state_expand_all]));
+            return d.concat(&parts);
         }
 
         // Expression arrow with object/array body
@@ -703,44 +673,36 @@ fn build_call_args_doc_for_chain_impl(
                 build_args_split_last(&call.arguments, printer);
             let inline_sig = build_arrow_inline_signature(printer, arrow);
             // Object/array in arrow body needs parens: (x) => ({ ... })
-            let body_doc = doc::parens(printer.build_expression_doc(body_expr));
+            let body_doc = d.parens(printer.build_expression_doc(body_expr));
 
             // State 0: all inline
-            let state_inline = doc::concat(vec![
-                doc::text(prefix),
-                doc::concat(head_parts.clone()),
+            let state_inline = d.concat(&[
+                d.text(prefix),
+                d.concat(&head_parts),
                 last_arg_doc,
-                doc::text(")"),
+                d.text(")"),
             ]);
 
             // State 1: hug - head inline, object/array expands internally
-            let state_hug = doc::concat(vec![
-                doc::text(prefix),
-                doc::concat(head_parts),
+            let state_hug = d.concat(&[
+                d.text(prefix),
+                d.concat(&head_parts),
                 inline_sig,
-                doc::text(" => "),
-                doc::group_break(body_doc),
-                doc::text(")"),
+                d.text(" => "),
+                d.group_break(body_doc),
+                d.text(")"),
             ]);
 
             // State 2: expand all args
-            let state_expand_all = doc::concat(vec![
-                doc::text(prefix),
-                doc::indent(doc::concat(vec![
-                    doc::line(),
-                    all_args_broken,
-                    doc::text(","),
-                ])),
-                doc::line(),
-                doc::text(")"),
+            let state_expand_all = d.concat(&[
+                d.text(prefix),
+                d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
+                d.line(),
+                d.text(")"),
             ]);
 
-            parts.push(doc::conditional_group(vec![
-                state_inline,
-                state_hug,
-                state_expand_all,
-            ]));
-            return doc::concat(parts);
+            parts.push(d.conditional_group(&[state_inline, state_hug, state_expand_all]));
+            return d.concat(&parts);
         }
 
         // "Expand last arg" pattern for arrays/objects:
@@ -776,40 +738,32 @@ fn build_call_args_doc_for_chain_impl(
                     build_args_split_last(&call.arguments, printer);
 
                 // State 0: inline - all args on one line
-                let state_inline = doc::concat(vec![
-                    doc::text(prefix),
-                    doc::concat(head_parts.clone()),
-                    last_arg_doc.clone(),
-                    doc::text(")"),
+                let state_inline = d.concat(&[
+                    d.text(prefix),
+                    d.concat(&head_parts),
+                    last_arg_doc,
+                    d.text(")"),
                 ]);
 
                 // State 1: hug - head inline, last expands with group_break
                 // group_break forces the array/object to break internally
-                let state_hug = doc::concat(vec![
-                    doc::text(prefix),
-                    doc::concat(head_parts),
-                    doc::group_break(last_arg_doc),
-                    doc::text(")"),
+                let state_hug = d.concat(&[
+                    d.text(prefix),
+                    d.concat(&head_parts),
+                    d.group_break(last_arg_doc),
+                    d.text(")"),
                 ]);
 
                 // State 2: expand all - all args on separate lines
-                let state_expand_all = doc::concat(vec![
-                    doc::text(prefix),
-                    doc::indent(doc::concat(vec![
-                        doc::line(),
-                        all_args_broken,
-                        doc::text(","),
-                    ])),
-                    doc::line(),
-                    doc::text(")"),
+                let state_expand_all = d.concat(&[
+                    d.text(prefix),
+                    d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
+                    d.line(),
+                    d.text(")"),
                 ]);
 
-                parts.push(doc::conditional_group(vec![
-                    state_inline,
-                    state_hug,
-                    state_expand_all,
-                ]));
-                return doc::concat(parts);
+                parts.push(d.conditional_group(&[state_inline, state_hug, state_expand_all]));
+                return d.concat(&parts);
             }
         }
 
@@ -827,12 +781,12 @@ fn build_call_args_doc_for_chain_impl(
             let first_arg_doc = printer.build_arg_expression_doc(&call.arguments[0]);
             let second_arg_doc = printer.build_arg_expression_doc(&call.arguments[1]);
 
-            parts.push(doc::text(prefix));
+            parts.push(d.text(prefix));
             parts.push(first_arg_doc);
-            parts.push(doc::text(", "));
+            parts.push(d.text(", "));
             parts.push(second_arg_doc);
-            parts.push(doc::text(")"));
-            return doc::concat(parts);
+            parts.push(d.text(")"));
+            return d.concat(&parts);
         }
 
         // Multiple arguments: wrap in group with softlines so they can break
@@ -847,7 +801,7 @@ fn build_call_args_doc_for_chain_impl(
             let with_leading = if i == 0 && has_leading_comments {
                 if let Some(leading) = build_inline_leading_comments(printer, paren_open, arg_start)
                 {
-                    doc::concat(vec![leading, arg_doc])
+                    d.concat(&[leading, arg_doc])
                 } else {
                     arg_doc
                 }
@@ -866,7 +820,7 @@ fn build_call_args_doc_for_chain_impl(
                 if let Some(trailing) =
                     build_inline_trailing_comments(printer, arg_end, next_boundary)
                 {
-                    arg_docs_with_comments.push(doc::concat(vec![with_leading, trailing]));
+                    arg_docs_with_comments.push(d.concat(&[with_leading, trailing]));
                 } else {
                     arg_docs_with_comments.push(with_leading);
                 }
@@ -874,8 +828,8 @@ fn build_call_args_doc_for_chain_impl(
                 arg_docs_with_comments.push(with_leading);
             }
         }
-        let arg_parts = doc::join_doc(arg_docs_with_comments, doc::comma_line());
-        parts.push(wrap_args_with_soft_breaks(prefix, arg_parts));
-        doc::concat(parts)
+        let arg_parts = d.join_doc(arg_docs_with_comments, d.comma_line());
+        parts.push(wrap_args_with_soft_breaks(d, prefix, arg_parts));
+        d.concat(&parts)
     }
 }

@@ -45,7 +45,7 @@
 							"start": 22,
 							"end": 36,
 							"property": "content",
-							"value": "'\\\\441'"
+							"value": "'\\41'"
 						}
 					]
 				},
@@ -92,7 +92,7 @@
 							"start": 58,
 							"end": 75,
 							"property": "content",
-							"value": "'\\\\11F4A9'"
+							"value": "'\\1F4A9'"
 						}
 					]
 				},
@@ -139,7 +139,7 @@
 							"start": 96,
 							"end": 112,
 							"property": "content",
-							"value": "'\\\\220AC'"
+							"value": "'\\20AC'"
 						}
 					]
 				},

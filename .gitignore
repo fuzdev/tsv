@@ -1,5 +1,6 @@
 # Deps
 node_modules
+.deno
 
 # Output
 /target
@@ -15,6 +16,7 @@ node_modules
 
 # Benchmark results
 /benches/deno/results/*.json
+/benches/deno/results/*.md
 /benches/deno/baseline.json
 
 # Env

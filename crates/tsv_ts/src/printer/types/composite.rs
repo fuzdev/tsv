@@ -14,7 +14,7 @@ use super::helpers::{type_needs_parens_for_array_element, unwrap_parenthesized};
 use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSTupleType, TSType,
 };
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     //
@@ -25,7 +25,8 @@ impl<'a> Printer<'a> {
     /// This is used for nested conditionals which should inherit breaking from their parent.
     ///
     /// Structure: `check extends extends_type [indent: line, "? ", true_type, line, ": ", false_type]`
-    pub(super) fn build_conditional_type_doc_inner(&self, c: &TSConditionalType) -> Doc {
+    pub(super) fn build_conditional_type_doc_inner(&self, c: &TSConditionalType) -> DocId {
+        let d = self.d();
         // Build true_type doc: if it's a conditional (possibly wrapped in parens), don't wrap in group
         // Add parens for readability only when flat (single-line), not when broken (multi-line)
         let true_type_doc =
@@ -34,7 +35,7 @@ impl<'a> Printer<'a> {
                 // - Flat: add parens for readability: `T extends A ? (T extends B ? C : D) : E`
                 // - Broken: no parens (the line breaks provide clarity)
                 let inner_doc = self.build_conditional_type_doc_inner(inner);
-                doc::if_break(inner_doc.clone(), doc::parens(inner_doc))
+                d.if_break(inner_doc, d.parens(inner_doc))
             } else {
                 self.build_type_doc(&c.true_type)
             };
@@ -52,40 +53,34 @@ impl<'a> Printer<'a> {
         // after "extends" when the union breaks (e.g., `T extends\n\t| A\n\t| B`)
         let extends_type_doc = if let TSType::Union(union) = c.extends_type.as_ref() {
             if union.types.is_empty() {
-                doc::text(" ")
+                d.text(" ")
             } else {
                 let mut parts = Vec::new();
                 for (i, t) in union.types.iter().enumerate() {
                     if i > 0 {
-                        parts.push(doc::if_break(
-                            doc::concat(vec![doc::line(), doc::text("| ")]),
-                            doc::text(" | "),
-                        ));
+                        parts.push(d.if_break(d.concat(&[d.line(), d.text("| ")]), d.text(" | ")));
                     } else {
                         // First type: line() + "| " when broken, space when flat
-                        parts.push(doc::if_break(
-                            doc::concat(vec![doc::line(), doc::text("| ")]),
-                            doc::text(" "),
-                        ));
+                        parts.push(d.if_break(d.concat(&[d.line(), d.text("| ")]), d.text(" ")));
                     }
                     parts.push(self.build_type_doc(t));
                 }
-                doc::group(doc::indent(doc::concat(parts)))
+                d.group(d.indent(d.concat(&parts)))
             }
         } else {
-            doc::concat(vec![doc::text(" "), self.build_type_doc(&c.extends_type)])
+            d.concat(&[d.text(" "), self.build_type_doc(&c.extends_type)])
         };
 
-        doc::concat(vec![
+        d.concat(&[
             self.build_type_doc(&c.check_type),
-            doc::text(" extends"),
+            d.text(" extends"),
             extends_type_doc,
-            doc::indent(doc::concat(vec![
-                doc::line(),
-                doc::text("? "),
+            d.indent(d.concat(&[
+                d.line(),
+                d.text("? "),
                 true_type_doc,
-                doc::line(),
-                doc::text(": "),
+                d.line(),
+                d.text(": "),
                 false_type_doc,
             ])),
         ])
@@ -101,7 +96,8 @@ impl<'a> Printer<'a> {
     /// - Source one-line, fits: `{[K in keyof T]: T[K]}`
     /// - Source one-line, long: `{\n\t[K in keyof T]: T[K];\n}`
     /// - Source multi-line: `{\n\t[K in keyof T]: T[K];\n}` (always)
-    pub(super) fn build_mapped_type_doc(&self, m: &TSMappedType) -> Doc {
+    pub(super) fn build_mapped_type_doc(&self, m: &TSMappedType) -> DocId {
+        let d = self.d();
         // Check if source was multi-line (preserve author's formatting choice)
         let source_is_multiline = super::super::is_brace_block_multiline(self.source, m.span);
 
@@ -120,35 +116,35 @@ impl<'a> Printer<'a> {
 
         // readonly modifier: `readonly` or `-readonly`
         if let Some(readonly) = m.readonly {
-            body_parts.push(doc::text(if readonly { "readonly " } else { "-readonly " }));
+            body_parts.push(d.text(if readonly { "readonly " } else { "-readonly " }));
         }
 
         // [K in constraint]
-        body_parts.push(doc::text("["));
+        body_parts.push(d.text("["));
 
         // For single-line: comments go after `[`
         if !source_is_multiline {
             for comment in &comments_before_mapping {
                 body_parts.push(self.build_comment_doc(comment));
-                body_parts.push(doc::text(" "));
+                body_parts.push(d.text(" "));
             }
         }
 
-        body_parts.push(doc::text_owned(m.type_parameter.name.clone()));
-        body_parts.push(doc::text(" in "));
+        body_parts.push(d.text_owned(m.type_parameter.name.clone()));
+        body_parts.push(d.text(" in "));
         body_parts.push(self.build_type_doc(&m.type_parameter.constraint));
 
         // as clause: `as NewKeyType`
         if let Some(name_type) = &m.name_type {
-            body_parts.push(doc::text(" as "));
+            body_parts.push(d.text(" as "));
             body_parts.push(self.build_type_doc(name_type));
         }
 
-        body_parts.push(doc::text("]"));
+        body_parts.push(d.text("]"));
 
         // optional modifier: `?` or `-?`
         if let Some(optional) = m.optional {
-            body_parts.push(doc::text(if optional { "?" } else { "-?" }));
+            body_parts.push(d.text(if optional { "?" } else { "-?" }));
         }
 
         // Comments and value type
@@ -167,23 +163,23 @@ impl<'a> Printer<'a> {
             let comments_before_value: Vec<_> =
                 comments_in_range(self.comments, after_bracket_area, type_start).collect();
 
-            body_parts.push(doc::text(":"));
+            body_parts.push(d.text(":"));
             for comment in &comments_before_value {
-                body_parts.push(doc::text(" "));
+                body_parts.push(d.text(" "));
                 body_parts.push(self.build_comment_doc(comment));
             }
 
-            body_parts.push(doc::text(" "));
+            body_parts.push(d.text(" "));
             body_parts.push(self.build_type_doc(type_ann));
 
             // Trailing comments after value type (before `;` or `}`)
             let body_end = m.span.end.saturating_sub(1); // before `}`
             for comment in comments_in_range(self.comments, type_end, body_end) {
-                body_parts.push(doc::text(" "));
+                body_parts.push(d.text(" "));
                 body_parts.push(self.build_comment_doc(comment));
             }
         } else {
-            body_parts.push(doc::text(": "));
+            body_parts.push(d.text(": "));
         }
 
         if source_is_multiline {
@@ -191,30 +187,30 @@ impl<'a> Printer<'a> {
             // Comments before mapping go on their own line
             let mut inner_parts = vec![];
             for comment in &comments_before_mapping {
-                inner_parts.push(doc::hardline());
+                inner_parts.push(d.hardline());
                 inner_parts.push(self.build_comment_doc(comment));
             }
-            inner_parts.push(doc::hardline());
-            inner_parts.push(doc::concat(body_parts));
-            inner_parts.push(doc::text(";"));
+            inner_parts.push(d.hardline());
+            inner_parts.push(d.concat(&body_parts));
+            inner_parts.push(d.text(";"));
 
-            doc::concat(vec![
-                doc::text("{"),
-                doc::indent(doc::concat(inner_parts)),
-                doc::hardline(),
-                doc::text("}"),
+            d.concat(&[
+                d.text("{"),
+                d.indent(d.concat(&inner_parts)),
+                d.hardline(),
+                d.text("}"),
             ])
         } else {
             // One-line source: width-aware (stays inline if fits, wraps if too long)
-            let mut all_parts = vec![doc::softline()];
+            let mut all_parts = vec![d.softline()];
             all_parts.extend(body_parts);
-            all_parts.push(doc::if_break(doc::text(";"), doc::empty()));
+            all_parts.push(d.if_break(d.text(";"), d.empty()));
 
-            doc::group(doc::concat(vec![
-                doc::text("{"),
-                doc::indent(doc::concat(all_parts)),
-                doc::softline(),
-                doc::text("}"),
+            d.group(d.concat(&[
+                d.text("{"),
+                d.indent(d.concat(&all_parts)),
+                d.softline(),
+                d.text("}"),
             ]))
         }
     }
@@ -226,7 +222,8 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a tuple type: `[A, B, C]`
     ///
     /// Uses width-aware breaking: inline if fits, one element per line if not.
-    pub(super) fn build_tuple_type_doc(&self, t: &TSTupleType) -> Doc {
+    pub(super) fn build_tuple_type_doc(&self, t: &TSTupleType) -> DocId {
+        let d = self.d();
         if t.element_types.is_empty() {
             return self.build_empty_brackets_with_comments_doc(t.span);
         }
@@ -241,29 +238,21 @@ impl<'a> Printer<'a> {
         let mut parts = Vec::new();
         for (i, elem) in t.element_types.iter().enumerate() {
             if i > 0 {
-                parts.push(doc::text(","));
-                parts.push(doc::line());
+                parts.push(d.text(","));
+                parts.push(d.line());
             }
             parts.push(self.build_type_doc(elem));
         }
 
         // Width-aware breaking: inline if fits, one-per-line if not
-        let inner = doc::concat(vec![
-            doc::softline(),
-            doc::concat(parts),
-            doc::trailing_comma(),
-        ]);
+        let inner = d.concat(&[d.softline(), d.concat(&parts), d.trailing_comma()]);
 
-        doc::group(doc::concat(vec![
-            doc::text("["),
-            doc::indent(inner),
-            doc::softline(),
-            doc::text("]"),
-        ]))
+        d.group(d.concat(&[d.text("["), d.indent(inner), d.softline(), d.text("]")]))
     }
 
     /// Build tuple type with line comments between elements
-    fn build_tuple_type_doc_with_line_comments(&self, t: &TSTupleType) -> Doc {
+    fn build_tuple_type_doc_with_line_comments(&self, t: &TSTupleType) -> DocId {
+        let d = self.d();
         let mut inner_parts = Vec::new();
         let mut prev_end = t.span.start + 1; // After the opening `[`
 
@@ -284,24 +273,24 @@ impl<'a> Printer<'a> {
             };
 
             // Trailing comma for all elements
-            inner_parts.push(doc::text(","));
+            inner_parts.push(d.text(","));
 
             // Trailing comments
             inner_parts.extend(self.build_trailing_comments_multiline(elem_end, next_boundary));
 
             // Hardline to separate from next element
             if !is_last {
-                inner_parts.push(doc::hardline());
+                inner_parts.push(d.hardline());
             }
 
             prev_end = next_boundary;
         }
 
-        doc::concat(vec![
-            doc::text("["),
-            doc::indent(doc::concat(vec![doc::hardline(), doc::concat(inner_parts)])),
-            doc::hardline(),
-            doc::text("]"),
+        d.concat(&[
+            d.text("["),
+            d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])),
+            d.hardline(),
+            d.text("]"),
         ])
     }
 
@@ -310,13 +299,14 @@ impl<'a> Printer<'a> {
     //
 
     /// Build a Doc for an array type (e.g., `number[]`)
-    pub(super) fn build_array_type_doc(&self, arr: &TSArrayType) -> Doc {
+    pub(super) fn build_array_type_doc(&self, arr: &TSArrayType) -> DocId {
+        let d = self.d();
         let needs_parens = type_needs_parens_for_array_element(&arr.element_type);
         let element_doc = self.build_type_doc(&arr.element_type);
         if needs_parens {
-            doc::concat(vec![doc::text("("), element_doc, doc::text(")[]")])
+            d.concat(&[d.text("("), element_doc, d.text(")[]")])
         } else {
-            doc::concat(vec![element_doc, doc::text("[]")])
+            d.concat(&[element_doc, d.text("[]")])
         }
     }
 
@@ -328,30 +318,31 @@ impl<'a> Printer<'a> {
     pub(super) fn build_type_query_expr_name_doc(
         &self,
         expr_name: &internal::TSTypeQueryExprName,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         match expr_name {
             internal::TSTypeQueryExprName::EntityName(entity) => {
                 self.build_type_entity_name_doc(entity)
             }
             internal::TSTypeQueryExprName::Import(i) => {
-                let mut parts = vec![doc::text("import(")];
+                let mut parts = vec![d.text("import(")];
                 parts.push(self.build_literal_doc(&i.argument));
-                parts.push(doc::text(")"));
+                parts.push(d.text(")"));
                 if let Some(qualifier) = &i.qualifier {
-                    parts.push(doc::text("."));
+                    parts.push(d.text("."));
                     parts.push(self.build_type_entity_name_doc(qualifier));
                 }
                 if let Some(type_args) = &i.type_arguments {
                     parts.push(self.build_type_parameter_instantiation_doc(type_args));
                 }
-                doc::concat(parts)
+                d.concat(&parts)
             }
         }
     }
 
     /// Build doc for type entity name
-    pub(super) fn build_type_entity_name_doc(&self, name: &internal::TSEntityName) -> Doc {
+    pub(super) fn build_type_entity_name_doc(&self, name: &internal::TSEntityName) -> DocId {
         // Delegate to standalone function - doesn't need printer state
-        super::super::build_entity_name_doc(name)
+        super::super::build_entity_name_doc(self.d(), name)
     }
 }

@@ -9,7 +9,7 @@
 use super::Printer;
 use super::analysis::skip_string_or_comment;
 use crate::ast::internal;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 use tsv_lang::{CommentPosition, classify_comment_fast, comments_in_range, printing};
 
 /// Spacing style for comments in doc building
@@ -234,7 +234,7 @@ impl<'a> Printer<'a> {
         start: u32,
         end: u32,
         spacing: CommentSpacing,
-    ) -> Doc {
+    ) -> DocId {
         self.build_comments_between_filtered(start, end, spacing, CommentFilter::All)
     }
 
@@ -245,9 +245,9 @@ impl<'a> Printer<'a> {
         end: u32,
         spacing: CommentSpacing,
         filter: CommentFilter,
-    ) -> Doc {
+    ) -> DocId {
         self.build_comments_between_filtered_opt(start, end, spacing, filter)
-            .unwrap_or_else(doc::empty)
+            .unwrap_or_else(|| self.d().empty())
     }
 
     /// Build a Doc for inline comments with filtering, returning None if no comments.
@@ -260,7 +260,8 @@ impl<'a> Printer<'a> {
         end: u32,
         spacing: CommentSpacing,
         filter: CommentFilter,
-    ) -> Option<Doc> {
+    ) -> Option<DocId> {
+        let d = self.d();
         // Single binary search to find first comment
         let first_idx = tsv_lang::find_first_comment_from(self.comments, start);
 
@@ -287,24 +288,24 @@ impl<'a> Printer<'a> {
 
             match spacing {
                 CommentSpacing::Leading => {
-                    parts.push(doc::text(" "));
+                    parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
                 CommentSpacing::Trailing => {
                     parts.push(self.build_comment_doc(comment));
-                    parts.push(doc::text(" "));
+                    parts.push(d.text(" "));
                 }
                 CommentSpacing::None => {
                     parts.push(self.build_comment_doc(comment));
                 }
             }
         }
-        Some(doc::concat(parts))
+        Some(d.concat(&parts))
     }
 
     /// Build a Doc for inline comments between two positions (leading space)
     #[inline]
-    pub(crate) fn build_inline_comments_between_doc(&self, start: u32, end: u32) -> Doc {
+    pub(crate) fn build_inline_comments_between_doc(&self, start: u32, end: u32) -> DocId {
         self.build_comments_between(start, end, CommentSpacing::Leading)
     }
 
@@ -317,7 +318,7 @@ impl<'a> Printer<'a> {
         &self,
         start: u32,
         end: u32,
-    ) -> Option<Doc> {
+    ) -> Option<DocId> {
         self.build_comments_between_filtered_opt(
             start,
             end,
@@ -332,7 +333,7 @@ impl<'a> Printer<'a> {
         &self,
         start: u32,
         end: u32,
-    ) -> Doc {
+    ) -> DocId {
         self.build_comments_between(start, end, CommentSpacing::None)
     }
 
@@ -345,7 +346,7 @@ impl<'a> Printer<'a> {
         &self,
         start: u32,
         end: u32,
-    ) -> Option<Doc> {
+    ) -> Option<DocId> {
         self.build_comments_between_filtered_opt(
             start,
             end,
@@ -363,7 +364,7 @@ impl<'a> Printer<'a> {
         &self,
         start: u32,
         end: u32,
-    ) -> Doc {
+    ) -> DocId {
         self.build_comments_between(start, end, CommentSpacing::Trailing)
     }
 
@@ -373,7 +374,7 @@ impl<'a> Printer<'a> {
         &self,
         start: u32,
         end: u32,
-    ) -> Option<Doc> {
+    ) -> Option<DocId> {
         self.build_comments_between_filtered_opt(
             start,
             end,
@@ -394,13 +395,14 @@ impl<'a> Printer<'a> {
         &self,
         outer_start: u32,
         inner_start: u32,
-        doc: Doc,
-    ) -> Doc {
+        doc: DocId,
+    ) -> DocId {
         if outer_start < inner_start {
             if let Some(comments) =
                 self.build_inline_comments_between_doc_trailing_space_opt(outer_start, inner_start)
             {
-                doc::concat(vec![comments, doc])
+                let d = self.d();
+                d.concat(&[comments, doc])
             } else {
                 doc
             }
@@ -415,14 +417,15 @@ impl<'a> Printer<'a> {
     /// Line comments: `//content` + hardline (on own line)
     ///
     /// Used when line comments force multiline formatting (unions, tuples, etc.)
-    pub(crate) fn build_leading_comments_multiline(&self, start: u32, end: u32) -> Vec<Doc> {
+    pub(crate) fn build_leading_comments_multiline(&self, start: u32, end: u32) -> Vec<DocId> {
+        let d = self.d();
         let mut parts = Vec::new();
         for comment in comments_in_range(self.comments, start, end) {
             parts.push(self.build_comment_doc(comment));
             if comment.is_block {
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
             } else {
-                parts.push(doc::hardline());
+                parts.push(d.hardline());
             }
         }
         parts
@@ -434,16 +437,17 @@ impl<'a> Printer<'a> {
     /// Own-line comments: hardline + comment (on their own line)
     ///
     /// Used when line comments force multiline formatting (unions, tuples, etc.)
-    pub(crate) fn build_trailing_comments_multiline(&self, start: u32, end: u32) -> Vec<Doc> {
+    pub(crate) fn build_trailing_comments_multiline(&self, start: u32, end: u32) -> Vec<DocId> {
+        let d = self.d();
         let mut parts = Vec::new();
         for comment in comments_in_range(self.comments, start, end) {
             if self.is_same_line(start, comment.span.start) {
                 // Same line as start: trailing comment (both block and line)
-                parts.push(doc::text(" "));
+                parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
             } else {
                 // Own line comment (block or line)
-                parts.push(doc::hardline());
+                parts.push(d.hardline());
                 parts.push(self.build_comment_doc(comment));
             }
         }
@@ -522,13 +526,14 @@ impl<'a> Printer<'a> {
         &self,
         after_pos: u32,
         upper_bound: u32,
-    ) -> Vec<Doc> {
+    ) -> Vec<DocId> {
+        let d = self.d();
         let mut docs = Vec::new();
         for comment in comments_in_range(self.comments, after_pos, upper_bound) {
             if self.is_same_line(after_pos, comment.span.start) {
                 if comment.is_block {
                     // Block comments are inline, affect width
-                    docs.push(doc::text(" "));
+                    docs.push(d.text(" "));
                     docs.push(self.build_comment_doc(comment));
                 } else {
                     // Line comments go in line_suffix, don't affect width
@@ -552,10 +557,12 @@ impl<'a> Printer<'a> {
         &self,
         comments: &[&internal::Comment],
         target_start: u32,
-    ) -> Vec<Doc> {
+    ) -> Vec<DocId> {
         if comments.is_empty() {
             return Vec::new();
         }
+
+        let d = self.d();
 
         // Check if there's a blank line after the last comment
         let has_blank_after_last_comment = comments
@@ -578,8 +585,8 @@ impl<'a> Printer<'a> {
 
             // For subsequent comments, check for blank lines between them
             if j > 0 && self.has_blank_line_between(last_pos, comment.span.start) {
-                docs.push(doc::literalline());
-                docs.push(doc::hardline());
+                docs.push(d.literalline());
+                docs.push(d.hardline());
             }
 
             docs.push(self.build_comment_doc(comment));
@@ -588,24 +595,24 @@ impl<'a> Printer<'a> {
                 // Line comment: add hardline after unless there's a blank line after
                 // (the blank line separator will handle it)
                 if !has_blank_after {
-                    docs.push(doc::hardline());
+                    docs.push(d.hardline());
                 }
             } else if !self.is_same_line(comment.span.end, target_start) {
                 // Block comment on its own line: add hardline unless there's blank after
                 if !has_blank_after {
-                    docs.push(doc::hardline());
+                    docs.push(d.hardline());
                 }
             } else {
                 // Block comment on same line as target - space before
-                docs.push(doc::text(" "));
+                docs.push(d.text(" "));
             }
             last_pos = comment.span.end;
         }
 
         // Add blank line after last comment if present
         if has_blank_after_last_comment {
-            docs.push(doc::literalline());
-            docs.push(doc::hardline());
+            docs.push(d.literalline());
+            docs.push(d.hardline());
         }
 
         docs
@@ -621,7 +628,7 @@ impl<'a> Printer<'a> {
         &self,
         prev_end: u32,
         body_end: u32,
-    ) -> Vec<Doc> {
+    ) -> Vec<DocId> {
         let trailing_comments: Vec<_> = comments_in_range(self.comments, prev_end, body_end)
             .filter(|c| !self.is_same_line(prev_end, c.span.start))
             .collect();
@@ -630,14 +637,15 @@ impl<'a> Printer<'a> {
             return Vec::new();
         }
 
+        let d = self.d();
         let mut docs = Vec::new();
 
         // Check for blank line before the first trailing comment
         let first_comment = trailing_comments[0];
         if self.has_blank_line_between(prev_end, first_comment.span.start) {
-            docs.push(doc::literalline());
+            docs.push(d.literalline());
         }
-        docs.push(doc::hardline());
+        docs.push(d.hardline());
 
         // Process each trailing comment
         let mut last_pos = prev_end;
@@ -646,8 +654,8 @@ impl<'a> Printer<'a> {
 
             // Check for blank lines between comments
             if j > 0 && self.has_blank_line_between(last_pos, comment.span.start) {
-                docs.push(doc::literalline());
-                docs.push(doc::hardline());
+                docs.push(d.literalline());
+                docs.push(d.hardline());
             }
 
             // Check if there's a blank line after this comment (to next comment)
@@ -661,7 +669,7 @@ impl<'a> Printer<'a> {
             // - It's the last comment (closing brace follows)
             // - There's a blank line after (the blank line separator handles it)
             if !comment.is_block && !is_last && !has_blank_after {
-                docs.push(doc::hardline());
+                docs.push(d.hardline());
             }
             // Block comments don't need hardline after in this context
             // (the closing brace follows immediately)
@@ -677,7 +685,8 @@ impl<'a> Printer<'a> {
     /// For multi-line block comments:
     /// - JSDoc comments (/**) always use hardline to apply context indent
     /// - Other comments: if continuation lines had indentation, use hardline; otherwise literalline
-    pub(crate) fn build_comment_doc(&self, comment: &internal::Comment) -> Doc {
+    pub(crate) fn build_comment_doc(&self, comment: &internal::Comment) -> DocId {
+        let d = self.d();
         if comment.is_block {
             // Block comment: /* content */
             if comment.content.contains('\n') {
@@ -702,30 +711,30 @@ impl<'a> Printer<'a> {
                         // Blank lines inside comments should be truly empty (no indentation)
                         // But the closing line (last line before */) needs context indent
                         if line.is_empty() && !is_last {
-                            line_docs.push(doc::literalline());
+                            line_docs.push(d.literalline());
                         } else if use_context_indent {
                             // Apply context indent for content lines and closing line
-                            line_docs.push(doc::hardline());
+                            line_docs.push(d.hardline());
                         } else {
                             // Preserve at column 0
-                            line_docs.push(doc::literalline());
+                            line_docs.push(d.literalline());
                         }
                     }
                     if i == 0 {
-                        line_docs.push(doc::text_owned(format!("/*{line}")));
+                        line_docs.push(d.text_owned(format!("/*{line}")));
                     } else {
-                        line_docs.push(doc::text_owned((*line).to_string()));
+                        line_docs.push(d.text_owned((*line).to_string()));
                     }
                 }
-                line_docs.push(doc::text("*/"));
-                doc::concat(line_docs)
+                line_docs.push(d.text("*/"));
+                d.concat(&line_docs)
             } else {
                 // Single-line block comment
-                doc::text_owned(format!("/*{}*/", comment.content))
+                d.text_owned(format!("/*{}*/", comment.content))
             }
         } else {
             // Line comment: // content
-            doc::text_owned(format!("//{}", comment.content))
+            d.text_owned(format!("//{}", comment.content))
         }
     }
 
@@ -734,11 +743,9 @@ impl<'a> Printer<'a> {
     /// Wrapping in line_suffix excludes the comment from width calculations,
     /// so elements can stay compact even when the trailing comment would push
     /// the line over print_width.
-    pub(crate) fn build_trailing_line_comment_doc(&self, comment: &internal::Comment) -> Doc {
-        doc::line_suffix(doc::concat(vec![
-            doc::text(" "),
-            self.build_comment_doc(comment),
-        ]))
+    pub(crate) fn build_trailing_line_comment_doc(&self, comment: &internal::Comment) -> DocId {
+        let d = self.d();
+        d.line_suffix(d.concat(&[d.text(" "), self.build_comment_doc(comment)]))
     }
 
     /// Build a line_suffix doc for all comments between two positions
@@ -748,7 +755,12 @@ impl<'a> Printer<'a> {
     /// Returns None if no comments exist in the range.
     ///
     /// Example: `fn(arg // comment)` - the comment becomes a line_suffix
-    pub(crate) fn build_trailing_comments_line_suffix(&self, start: u32, end: u32) -> Option<Doc> {
+    pub(crate) fn build_trailing_comments_line_suffix(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> Option<DocId> {
+        let d = self.d();
         // Single binary search to find first comment
         let first_idx = tsv_lang::find_first_comment_from(self.comments, start);
         let first = self.comments.get(first_idx).filter(|c| c.span.end <= end)?;
@@ -760,11 +772,11 @@ impl<'a> Printer<'a> {
                 .iter()
                 .take_while(|c| c.span.end <= end),
         ) {
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
         }
 
-        Some(doc::line_suffix(doc::concat(parts)))
+        Some(d.line_suffix(d.concat(&parts)))
     }
 
     /// Build a Doc for an empty body (`{}`) that may contain comments.
@@ -779,7 +791,7 @@ impl<'a> Printer<'a> {
     /// If no comments, returns `{}`.
     ///
     /// Used by: interface body, class body, enum body, namespace body, object literal, object pattern.
-    pub(crate) fn build_empty_body_with_comments_doc(&self, body_span: tsv_lang::Span) -> Doc {
+    pub(crate) fn build_empty_body_with_comments_doc(&self, body_span: tsv_lang::Span) -> DocId {
         self.build_empty_delimited_with_comments_doc(body_span.start, body_span.end, "{", "}")
     }
 
@@ -795,7 +807,7 @@ impl<'a> Printer<'a> {
     /// If no comments, returns `[]`.
     ///
     /// Used by: array literal, tuple type.
-    pub(crate) fn build_empty_brackets_with_comments_doc(&self, span: tsv_lang::Span) -> Doc {
+    pub(crate) fn build_empty_brackets_with_comments_doc(&self, span: tsv_lang::Span) -> DocId {
         self.build_empty_delimited_with_comments_doc(span.start, span.end, "[", "]")
     }
 
@@ -806,7 +818,7 @@ impl<'a> Printer<'a> {
         &self,
         body_start: u32,
         body_end: u32,
-    ) -> Doc {
+    ) -> DocId {
         self.build_empty_delimited_with_comments_doc(body_start, body_end, "[", "]")
     }
 
@@ -819,7 +831,8 @@ impl<'a> Printer<'a> {
         span_end: u32,
         open: &'static str,
         close: &'static str,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let body_start = span_start + 1; // After opening delimiter
         let body_end = span_end.saturating_sub(1); // Before closing delimiter
 
@@ -831,7 +844,7 @@ impl<'a> Printer<'a> {
             .collect();
 
         if comments.is_empty() {
-            return doc::text_owned(format!("{open}{close}"));
+            return d.text_owned(format!("{open}{close}"));
         }
         let mut comment_parts = Vec::new();
 
@@ -840,18 +853,15 @@ impl<'a> Printer<'a> {
             // Add hardline after line comments, except for the last one
             // (the hardline before closing delimiter handles that)
             if !comment.is_block && i < comments.len() - 1 {
-                comment_parts.push(doc::hardline());
+                comment_parts.push(d.hardline());
             }
         }
 
-        doc::concat(vec![
-            doc::text(open),
-            doc::indent(doc::concat(vec![
-                doc::hardline(),
-                doc::concat(comment_parts),
-            ])),
-            doc::hardline(),
-            doc::text(close),
+        d.concat(&[
+            d.text(open),
+            d.indent(d.concat(&[d.hardline(), d.concat(&comment_parts)])),
+            d.hardline(),
+            d.text(close),
         ])
     }
 }

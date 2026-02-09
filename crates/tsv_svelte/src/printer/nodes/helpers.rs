@@ -35,8 +35,7 @@ impl<'a> Printer<'a> {
     /// - IIFE parenthesization
     /// - Mixed logical operator grouping (&&, ||, ??)
     pub fn print_ts_expression(&mut self, expr: &tsv_ts::Expression) {
-        let formatted =
-            tsv_ts::format_expression(expr, self.source(), std::rc::Rc::clone(&self.interner), &self.line_breaks);
+        let formatted = self.format_ts_expression(expr);
         self.write(&formatted);
     }
 

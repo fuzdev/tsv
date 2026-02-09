@@ -8,7 +8,7 @@ use super::super::chain::{ChainPrinter, SymbolLookup};
 use super::super::{CommentSpacing, Printer, comments_in_range};
 use crate::ast::internal;
 use string_interner::DefaultSymbol;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{ClassifiedComments, Comment};
 
 impl<'a> SymbolLookup for Printer<'a> {
@@ -21,11 +21,16 @@ impl<'a> SymbolLookup for Printer<'a> {
 }
 
 impl<'a> ChainPrinter for Printer<'a> {
-    fn print_expression(&self, expr: &internal::Expression) -> Doc {
+    fn arena(&self) -> &DocArena {
+        self.arena
+    }
+
+    fn print_expression(&self, expr: &internal::Expression) -> DocId {
         self.build_expression_doc(expr)
     }
 
-    fn print_parenthesized_base(&self, expr: &internal::Expression) -> Doc {
+    fn print_parenthesized_base(&self, expr: &internal::Expression) -> DocId {
+        let d = self.d();
         // Build the inner expression with proper grouping for parenthesized chains
         match expr {
             internal::Expression::BinaryExpression(binary) => {
@@ -34,10 +39,10 @@ impl<'a> ChainPrinter for Printer<'a> {
                 // - Logical (&&, ||): Keep original structure with continuation indent
                 if binary.operator.is_logical() {
                     let inner = self.build_binary_chain_parts_indented(binary);
-                    doc::group(doc::parens(inner))
+                    d.group(d.parens(inner))
                 } else {
                     let inner = self.build_binary_chain_for_parens(binary);
-                    doc::parens_break(inner)
+                    d.parens_break(inner)
                 }
             }
             // Await in chain base: (await fn(...)).method()
@@ -45,33 +50,35 @@ impl<'a> ChainPrinter for Printer<'a> {
             // Note: YieldExpression uses simple parens - Prettier treats yield differently
             internal::Expression::AwaitExpression(_) => {
                 let inner = self.build_expression_doc(expr);
-                doc::parens_break(inner)
+                d.parens_break(inner)
             }
-            _ => doc::parens(self.build_expression_doc(expr)),
+            _ => d.parens(self.build_expression_doc(expr)),
         }
     }
 
-    fn print_parenthesized_base_expanded(&self, expr: &internal::Expression) -> Doc {
+    fn print_parenthesized_base_expanded(&self, expr: &internal::Expression) -> DocId {
+        let d = self.d();
         // Expanded version with hardlines so fits() can measure actual line widths.
         // Used for args_break state in conditional_group.
         let inner = self.build_expression_doc(expr);
-        doc::concat(vec![
-            doc::text("("),
-            doc::indent(doc::concat(vec![doc::hardline(), inner])),
-            doc::hardline(),
-            doc::text(")"),
+        d.concat(&[
+            d.text("("),
+            d.indent(d.concat(&[d.hardline(), inner])),
+            d.hardline(),
+            d.text(")"),
         ])
     }
 
-    fn print_call_args(&self, call: &internal::CallExpression, optional: bool) -> Doc {
+    fn print_call_args(&self, call: &internal::CallExpression, optional: bool) -> DocId {
         self.build_call_args_doc_for_chain(call, optional)
     }
 
-    fn print_call_args_expanded(&self, call: &internal::CallExpression, optional: bool) -> Doc {
+    fn print_call_args_expanded(&self, call: &internal::CallExpression, optional: bool) -> DocId {
         self.build_call_args_doc_for_chain_expanded(call, optional)
     }
 
-    fn build_block_comments_doc(&self, start: u32, end: u32, spacing: CommentSpacing) -> Doc {
+    fn build_block_comments_doc(&self, start: u32, end: u32, spacing: CommentSpacing) -> DocId {
+        let d = self.d();
         // Filter block comments based on position:
         // - Leading spacing: typically used for trailing position (same line as start)
         // - Trailing spacing: typically used for inside brackets (space after comment)
@@ -82,7 +89,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         let block_comments = self.filter_block_comments(start, end, same_line);
 
         if block_comments.is_empty() {
-            return doc::empty();
+            return d.empty();
         }
 
         let mut parts = Vec::new();
@@ -90,13 +97,13 @@ impl<'a> ChainPrinter for Printer<'a> {
             match spacing {
                 CommentSpacing::Leading => {
                     // Space before comment (for inline trailing comments: `method() /* c */`)
-                    parts.push(doc::text(" "));
+                    parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
                 CommentSpacing::Trailing => {
                     // Space after comment (for inside brackets: `[/* c */ key]`)
                     parts.push(self.build_comment_doc(comment));
-                    parts.push(doc::text(" "));
+                    parts.push(d.text(" "));
                 }
                 CommentSpacing::None => {
                     // Different line comments - filter gave us nothing since same_line=false
@@ -104,7 +111,7 @@ impl<'a> ChainPrinter for Printer<'a> {
                 }
             }
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     fn get_property_span(&self, expr: &internal::Expression) -> tsv_lang::Span {
@@ -129,23 +136,25 @@ impl<'a> ChainPrinter for Printer<'a> {
         ClassifiedComments::from_range(self.comments, start, end, self.line_breaks)
     }
 
-    fn build_trailing_block_doc(&self, comments: &[&Comment]) -> Doc {
+    fn build_trailing_block_doc(&self, comments: &[&Comment]) -> DocId {
+        let d = self.d();
         if comments.is_empty() {
-            return doc::empty();
+            return d.empty();
         }
 
         let mut parts = Vec::with_capacity(comments.len() * 2);
         for comment in comments {
             // Space before comment (for inline trailing comments: `method() /* c */`)
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
-    fn build_trailing_line_doc(&self, comments: &[&Comment]) -> Doc {
+    fn build_trailing_line_doc(&self, comments: &[&Comment]) -> DocId {
+        let d = self.d();
         if comments.is_empty() {
-            return doc::empty();
+            return d.empty();
         }
 
         // Line comments in chains need special handling:
@@ -156,13 +165,14 @@ impl<'a> ChainPrinter for Printer<'a> {
             parts.push(self.build_trailing_line_comment_doc(comment));
         }
         // Add boundary to flush the line_suffix before any following softline
-        parts.push(doc::line_suffix_boundary());
-        doc::concat(parts)
+        parts.push(d.line_suffix_boundary());
+        d.concat(&parts)
     }
 
-    fn build_leading_block_doc(&self, comments: &[&Comment]) -> Doc {
+    fn build_leading_block_doc(&self, comments: &[&Comment]) -> DocId {
+        let d = self.d();
         if comments.is_empty() {
-            return doc::empty();
+            return d.empty();
         }
 
         let mut parts = Vec::with_capacity(comments.len());
@@ -170,26 +180,28 @@ impl<'a> ChainPrinter for Printer<'a> {
             // Different line block comments - no surrounding spaces
             parts.push(self.build_comment_doc(comment));
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
-    fn build_leading_line_doc(&self, comments: &[&Comment]) -> Doc {
+    fn build_leading_line_doc(&self, comments: &[&Comment]) -> DocId {
+        let d = self.d();
         if comments.is_empty() {
-            return doc::empty();
+            return d.empty();
         }
 
         // Emit line comments on their own lines (with hardline after each)
         let mut parts = Vec::with_capacity(comments.len() * 2);
         for comment in comments {
             parts.push(self.build_comment_doc(comment));
-            parts.push(doc::hardline());
+            parts.push(d.hardline());
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
-    fn build_line_comments_no_boundary(&self, comments: &[&Comment]) -> Doc {
+    fn build_line_comments_no_boundary(&self, comments: &[&Comment]) -> DocId {
+        let d = self.d();
         if comments.is_empty() {
-            return doc::empty();
+            return d.empty();
         }
 
         // Build line_suffix docs WITHOUT a trailing boundary.
@@ -198,7 +210,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         for comment in comments {
             parts.push(self.build_trailing_line_comment_doc(comment));
         }
-        doc::concat(parts)
+        d.concat(&parts)
     }
 
     fn get_source(&self) -> &str {
@@ -217,13 +229,15 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.force_chain_expand.get()
     }
 
-    fn fits_chain_tail(&self, doc: &Doc, available: usize) -> bool {
-        doc::fits_resolved(
+    fn fits_chain_tail(&self, doc: DocId, available: usize) -> bool {
+        use tsv_lang::doc::{Mode, arena_fits};
+        arena_fits(
+            self.arena,
             doc,
             available,
-            doc::Mode::Flat,
+            Mode::Flat,
             &self.config,
-            &*self.interner.borrow(),
+            Some(&*self.interner.borrow()),
         )
     }
 }

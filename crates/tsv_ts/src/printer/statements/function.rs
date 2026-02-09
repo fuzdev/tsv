@@ -3,14 +3,15 @@
 use super::Printer;
 use crate::ast::internal;
 use tsv_lang::SymbolToU32;
-use tsv_lang::doc::{self, Doc};
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Build doc for function signature (params + return type) with comment handling.
     ///
     /// Returns a single group containing both params and return type.
     /// This ensures params break BEFORE return type when signature exceeds width.
-    fn build_function_signature_doc(&self, decl: &internal::FunctionDeclaration) -> Doc {
+    fn build_function_signature_doc(&self, decl: &internal::FunctionDeclaration) -> DocId {
+        let d = self.d();
         let params_start = Some(decl.params_start);
 
         // Compute trailing comments boundary
@@ -37,24 +38,25 @@ impl<'a> Printer<'a> {
 
         // Single outer group for entire signature (params + return type).
         // When this group breaks, params' softlines become newlines while return type stays flat.
-        doc::group(doc::concat(sig_parts))
+        d.group(d.concat(&sig_parts))
     }
 
     /// Build a Doc for a function declaration
     pub(super) fn build_function_declaration_doc(
         &self,
         decl: &internal::FunctionDeclaration,
-    ) -> Doc {
+    ) -> DocId {
+        let d = self.d();
         let mut parts = Vec::new();
         if decl.r#async {
-            parts.push(doc::text("async "));
+            parts.push(d.text("async "));
         }
-        parts.push(doc::text("function"));
+        parts.push(d.text("function"));
         if decl.generator {
-            parts.push(doc::text("*"));
+            parts.push(d.text("*"));
         }
         if let Some(id) = &decl.id {
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
             // Comments between keywords and the name: `async /* a */ function* /* b */ F()`
             // Search from span start to find all comments before the name
             // (prettier normalizes them to after `function*`)
@@ -64,10 +66,10 @@ impl<'a> Printer<'a> {
                     id.span.start,
                 ),
             );
-            parts.push(doc::symbol(id.name.to_u32()));
+            parts.push(d.symbol(id.name.to_u32()));
         } else {
             // Prettier adds a space before () for anonymous functions
-            parts.push(doc::text(" "));
+            parts.push(d.text(" "));
         }
         // Type parameters (TypeScript generics): function foo<T>()
         if let Some(type_params) = &decl.type_parameters {
@@ -77,9 +79,9 @@ impl<'a> Printer<'a> {
         // Signature (params + return type) in a single group
         parts.push(self.build_function_signature_doc(decl));
 
-        parts.push(doc::text(" "));
+        parts.push(d.text(" "));
         parts.push(self.build_block_statement_doc(&decl.body));
 
-        doc::concat(parts)
+        d.concat(&parts)
     }
 }
