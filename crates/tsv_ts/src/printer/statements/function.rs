@@ -3,13 +3,54 @@
 use super::Printer;
 use crate::ast::internal;
 use tsv_lang::SymbolToU32;
-use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::arena::{DocArena, DocId};
+
+/// Prettier's `shouldGroupFunctionParameters`: wrap params in their own group
+/// when there's 1 param and the return type is an object type or will break.
+///
+/// This lets params stay flat even when the outer signature group breaks
+/// due to a multiline return type.
+fn should_group_function_parameters(
+    decl: &internal::FunctionDeclaration,
+    return_type_doc: Option<DocId>,
+    d: &DocArena,
+) -> bool {
+    if decl.params.len() != 1 {
+        return false;
+    }
+    let Some(rt_doc) = return_type_doc else {
+        return false;
+    };
+
+    // Type params: 0 or 1 without constraint/default
+    if let Some(tp) = &decl.type_parameters {
+        if tp.params.len() > 1 {
+            return false;
+        }
+        if tp
+            .params
+            .first()
+            .is_some_and(|p| p.constraint.is_some() || p.default.is_some())
+        {
+            return false;
+        }
+    }
+
+    // Return type must be an object type or will break
+    decl.return_type.as_ref().is_some_and(|rt| {
+        matches!(
+            &*rt.type_annotation,
+            internal::TSType::TypeLiteral(_) | internal::TSType::Mapped(_)
+        ) || d.will_break(rt_doc)
+    })
+}
 
 impl<'a> Printer<'a> {
     /// Build doc for function signature (params + return type) with comment handling.
     ///
-    /// Returns a single group containing both params and return type.
-    /// This ensures params break BEFORE return type when signature exceeds width.
+    /// When `should_group_function_parameters` is true, params are wrapped in their
+    /// own inner group so they can stay flat even when the outer group breaks due to
+    /// the return type's hardlines.
     fn build_function_signature_doc(&self, decl: &internal::FunctionDeclaration) -> DocId {
         let d = self.d();
         let params_start = Some(decl.params_start);
@@ -21,7 +62,6 @@ impl<'a> Printer<'a> {
             Some(decl.body.span.start)
         };
 
-        // Build params doc without wrapping in a group
         let params_doc = self.build_params_doc_with_comments_ext(
             &decl.params,
             params_start,
@@ -29,15 +69,22 @@ impl<'a> Printer<'a> {
             false,
         );
 
-        let mut sig_parts = vec![params_doc];
+        let return_type_doc = decl
+            .return_type
+            .as_ref()
+            .map(|rt| self.build_type_annotation_doc_for_return_type(rt));
 
-        // Return type annotation
-        if let Some(return_type) = &decl.return_type {
-            sig_parts.push(self.build_type_annotation_doc_for_return_type(return_type));
+        let params_doc = if should_group_function_parameters(decl, return_type_doc, d) {
+            d.group(params_doc)
+        } else {
+            params_doc
+        };
+
+        let mut sig_parts = vec![params_doc];
+        if let Some(rt_doc) = return_type_doc {
+            sig_parts.push(rt_doc);
         }
 
-        // Single outer group for entire signature (params + return type).
-        // When this group breaks, params' softlines become newlines while return type stays flat.
         d.group(d.concat(&sig_parts))
     }
 

@@ -20,24 +20,28 @@ static INLINE_ELEMENTS: phf::Set<&'static str> = phf_set! {
     "strong", "sub", "sup", "textarea", "time", "u", "var",
 };
 
-// Block elements for formatting purposes (matches prettier-plugin-svelte)
+// Block elements for formatting purposes.
 // Elements NOT in this list are treated as inline for formatting (including table cells).
 // This matches prettier's logic: isInlineElement = !isBlockElement.
+// Intentionally absent: <center>, <select>, <svg>, <math> — prettier-plugin-svelte
+// omits these. <svg>/<math> are handled separately as foreign elements.
+// NOTE: <menu> is included here (spec compliance) but prettier-plugin-svelte omits it.
+// The HTML spec treats <menu> identically to <ul> (display: block, same CSS rules).
+// See tests/fixtures/svelte/elements/menu_block_prettier_divergence/README.md for details.
 static BLOCK_ELEMENTS: phf::Set<&'static str> = phf_set! {
     "address",
     "article",
     "aside",
     "blockquote",
-    "center",
     "details",
     "dialog",
+    "dd",
     "div",
     "dl",
-    "dd",
     "dt",
     "fieldset",
-    "figure",
     "figcaption",
+    "figure",
     "footer",
     "form",
     "h1",
@@ -57,11 +61,8 @@ static BLOCK_ELEMENTS: phf::Set<&'static str> = phf_set! {
     "p",
     "pre",
     "section",
-    "select",
     "table",
     "ul",
-    "svg",
-    "math",
 };
 
 static VOID_ELEMENTS: phf::Set<&'static str> = phf_set! {

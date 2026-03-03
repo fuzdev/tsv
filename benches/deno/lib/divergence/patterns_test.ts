@@ -34,6 +34,15 @@ function makeContext(
 	};
 }
 
+/** Calculate visual width of a line (tabs = 2 spaces). */
+function visualWidth(line: string): number {
+	let width = 0;
+	for (const char of line) {
+		width += char === '\t' ? 2 : 1;
+	}
+	return width;
+}
+
 /** Run a single pattern's detect() on a context. */
 function runPattern(patternId: string, ctx: DetectionContext): DivergenceMatch | null {
 	const pattern = PATTERNS.find((p) => p.id === patternId);
@@ -55,6 +64,27 @@ Deno.test('template_literal_width: positive - }` closing on own line', () => {
 	const match = runPattern('template_literal_width', ctx);
 	assertNotEquals(match, null);
 	assertEquals(match!.pattern, 'template_literal_width');
+});
+
+Deno.test('template_literal_width: positive - ${ at end of line in ours', () => {
+	// We break after ${ (end of line), prettier keeps ${expr} inline
+	const prettier = '\t\tconsole.error(\n\t\t\t`msg "${VALUE}", got "${fixture.prop}"`,\n\t\t);';
+	const ours = '\t\tconsole.error(`msg "${VALUE}", got "${\n\t\t\t\tfixture.prop\n\t\t\t}"`);\n';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	ctx.source = 'console.error(`msg "${VALUE}", got "${fixture.prop}"`);';
+	const match = runPattern('template_literal_width', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'template_literal_width');
+});
+
+Deno.test('template_literal_width: negative - inline ${ on both sides', () => {
+	// Both sides have ${expr} inline (not at end of line) — not a template break divergence
+	const prettier = '\t\tconsole.log(`hello ${name}`);\n\t\tconsole.log(`bye ${name}`);';
+	const ours = '\t\tconsole.log(`hello ${name}`);\n\t\tconsole.log(`goodbye ${name}`);';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	ctx.source = 'console.log(`hello ${name}`);';
+	const match = runPattern('template_literal_width', ctx);
+	assertEquals(match, null);
 });
 
 Deno.test('template_literal_width: negative - no ${ in source', () => {
@@ -130,11 +160,48 @@ Deno.test('fill_101_boundary: negative - we have fewer lines (not a break)', () 
 	assertEquals(match, null);
 });
 
+// ─── menu_block ─────────────────────────────────────────────────────────────
+
+Deno.test('menu_block: positive - prettier hugs menu content, we expand', () => {
+	const prettier = '<menu\n\tdata-attr1="value1"\n\tdata-attr2="value2">{@render fn()}</menu\n>';
+	const ours = '<menu\n\tdata-attr1="value1"\n\tdata-attr2="value2"\n>\n\t{@render fn()}\n</menu>';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('menu_block', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'menu_block');
+	assertEquals(match!.confidence, 'certain');
+});
+
+Deno.test('menu_block: negative - not svelte', () => {
+	const prettier = '<menu\n\tclass="nav">{@render fn()}</menu\n>';
+	const ours = '<menu\n\tclass="nav"\n>\n\t{@render fn()}\n</menu>';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('menu_block', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('menu_block: negative - not a menu element', () => {
+	const prettier = '<div\n\tclass="nav">content</div>';
+	const ours = '<div\n\tclass="nav"\n>\n\tcontent\n</div>';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('menu_block', ctx);
+	assertEquals(match, null);
+});
+
 // ─── inline_content_hug ─────────────────────────────────────────────────────
 
 Deno.test('inline_content_hug: positive - we hug >{, prettier breaks >', () => {
 	const prettier = '<span\n\tclass="long"\n>\n\t{content}\n</span>';
 	const ours = '<span\n\tclass="long"\n>{content}\n</span>';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('inline_content_hug', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('inline_content_hug: positive - prettier >content on same line, we break ternary', () => {
+	const prettier =
+		"<small\n\t>no action history{show ? '' : ', showing only write actions'}</small";
+	const ours = "<small>no action history{show\n\t? ''\n\t: ', showing only write actions'}</small";
 	const ctx = makeContext(ours, prettier, 'svelte');
 	const match = runPattern('inline_content_hug', ctx);
 	assertNotEquals(match, null);
@@ -335,17 +402,15 @@ Deno.test('block_multiline_attrs_hug: negative - not ws-sensitive element', () =
 // ─── short_expr_100 ─────────────────────────────────────────────────────────
 
 Deno.test('short_expr_100: positive - block expr slightly over 100', () => {
-	// Create a block expression that's 103 chars in prettier
-	const expr = 'a'.repeat(85);
+	// Create a block expression that's 105 chars in prettier (within 100-110 range)
+	const expr = 'a'.repeat(65);
 	const prettier = `{#if typeof ${expr} === 'string'}content{/if}`;
 	const ours = `{#if\n\ttypeof ${expr} === 'string'\n}content{/if}`;
 	const ctx = makeContext(ours, prettier, 'svelte');
+	const vw = visualWidth(prettier);
+	assertEquals(vw > 100 && vw <= 110, true, `Expected visual width 101-110, got ${vw}`);
 	const match = runPattern('short_expr_100', ctx);
-	// Check if visual width > 100 and <= 110
-	const vw = prettier.replace(/\t/g, '  ').length;
-	if (vw > 100 && vw <= 110) {
-		assertNotEquals(match, null);
-	}
+	assertNotEquals(match, null);
 });
 
 Deno.test('short_expr_100: negative - not svelte', () => {

@@ -691,6 +691,47 @@ impl DocArena {
         }
     }
 
+    /// Like `will_break`, but also traverses into `IsolatedGroup`.
+    ///
+    /// Use this for doc analysis (e.g., chain expansion decisions) where
+    /// rendering isolation is irrelevant — we need to know if the content
+    /// actually contains forced breaks regardless of group isolation.
+    pub fn will_break_deep(&self, id: DocId) -> bool {
+        let nodes = self.nodes.borrow();
+        self.will_break_deep_inner(id, &nodes)
+    }
+
+    fn will_break_deep_inner(&self, id: DocId, nodes: &[DocNode]) -> bool {
+        match &nodes[id.index()] {
+            DocNode::IsolatedGroup { contents, .. } => self.will_break_deep_inner(*contents, nodes),
+            DocNode::Text(_) => false,
+            DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
+            DocNode::Indent(inner) | DocNode::Dedent(inner) => {
+                self.will_break_deep_inner(*inner, nodes)
+            }
+            DocNode::Align { contents, .. } | DocNode::AlignSpaces { contents, .. } => {
+                self.will_break_deep_inner(*contents, nodes)
+            }
+            DocNode::IndentIfBreak { contents, .. } => self.will_break_deep_inner(*contents, nodes),
+            DocNode::Group {
+                contents,
+                should_break,
+                ..
+            } => *should_break || self.will_break_deep_inner(*contents, nodes),
+            DocNode::IfBreak { .. } => false,
+            DocNode::Concat(range) | DocNode::Fill(range) => {
+                let children = self.children.borrow();
+                let kids = range.resolve(&children);
+                kids.iter()
+                    .any(|&kid| self.will_break_deep_inner(kid, nodes))
+            }
+            DocNode::WithContext { doc, .. } => self.will_break_deep_inner(*doc, nodes),
+            DocNode::LineSuffix(_) => false,
+            DocNode::LineSuffixBoundary => false,
+            DocNode::BreakParent => true,
+        }
+    }
+
     /// Check if a doc has forced breaks (hardlines only, no should_break groups).
     pub fn has_forced_break(&self, id: DocId) -> bool {
         let nodes = self.nodes.borrow();

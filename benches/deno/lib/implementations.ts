@@ -14,6 +14,7 @@ import { CanonicalImplementation } from './canonical.ts';
 import { NativeImplementation } from './ffi.ts';
 import { WasmImplementation } from './wasm.ts';
 import { OxcImplementation } from './oxc.ts';
+import { OxcWasmImplementation } from './oxc_wasm.ts';
 import { BiomeImplementation } from './biome.ts';
 import { type AllVersions, loadAllVersions } from './versions.ts';
 
@@ -31,6 +32,8 @@ export interface InitializedImplementations {
 	wasm: WasmImplementation | undefined;
 	/** OXC implementation (oxc-parser + oxfmt) - undefined if not available */
 	oxc: OxcImplementation | undefined;
+	/** OXC WASM implementation (oxc-parser via wasm32-wasi) - undefined if not available */
+	oxcWasm: OxcWasmImplementation | undefined;
 	/** Biome implementation (via WASM) - undefined if not available */
 	biome: BiomeImplementation | undefined;
 }
@@ -125,6 +128,21 @@ export async function initImplementations(
 		}
 	}
 
+	// Initialize OXC WASM (optional)
+	let oxcWasmImpl: OxcWasmImplementation | undefined;
+	const oxcWasm = new OxcWasmImplementation(versions.oxc);
+	try {
+		await oxcWasm.init();
+		logger('  ✓ OXC WASM (oxc-parser)');
+		oxcWasmImpl = oxcWasm;
+	} catch (e) {
+		if (skipMissing) {
+			logger(`  ⚠ OXC WASM: not available`);
+		} else {
+			throw e;
+		}
+	}
+
 	// Initialize Biome (optional)
 	let biomeImpl: BiomeImplementation | undefined;
 	const biome = new BiomeImplementation(versions.biome);
@@ -148,6 +166,7 @@ export async function initImplementations(
 		native: nativeImpl,
 		wasm: wasmImpl,
 		oxc: oxcImpl,
+		oxcWasm: oxcWasmImpl,
 		biome: biomeImpl,
 	};
 }
@@ -233,6 +252,16 @@ export function getBenchmarkTasks(
 				trackingKey: `${groupName}/oxc`,
 				isAsync: false,
 				run: (source) => impls.oxc!.parse(source, language),
+			});
+		}
+
+		// OXC WASM parser (TypeScript/JS only)
+		if (impls.oxcWasm?.supportsParseLanguage(language)) {
+			tasks.push({
+				name: 'oxc-parser-wasm',
+				trackingKey: `${groupName}/oxc-wasm`,
+				isAsync: false,
+				run: (source) => impls.oxcWasm!.parse(source, language),
 			});
 		}
 	} else {

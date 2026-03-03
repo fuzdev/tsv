@@ -18,17 +18,21 @@
 		"check": "deno task typecheck && deno task test && deno task lint && deno fmt --check",
 		"format": "cargo fmt && deno fmt",
 
+		"fixture:init": "cargo run -p tsv_debug --quiet fixture_init",
 		"fixtures:list": "cargo run -p tsv_debug --quiet fixtures_update_parsed --list",
 		"fixtures:validate": "cargo run -p tsv_debug --quiet fixtures_validate",
 		"fixtures:update": "cargo run -p tsv_debug --quiet fixtures_update",
 		"fixtures:update:parsed": "cargo run -p tsv_debug --quiet fixtures_update_parsed",
 		"fixtures:update:formatted": "cargo run -p tsv_debug --quiet fixtures_update_formatted",
+		"fixtures:audit": "cargo run -p tsv_debug --quiet fixtures_audit",
 
 		"bench": "deno task build:ffi && deno task build:wasm:deno && deno task bench:run",
 		"bench:run": "deno run --v8-flags=--expose-gc --allow-ffi --allow-read --allow-write=benches/deno/results,benches/deno/baseline.json --allow-run=git --allow-env --allow-net --allow-sys benches/deno/bench.ts",
 
 		"corpus:compare": "deno task build:ffi && deno task corpus:compare:run",
 		"corpus:compare:run": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/corpus_compare.ts",
+
+		"metrics": "cargo run -p tsv_debug --quiet metrics",
 
 		"divergence:audit": "deno run --allow-read benches/deno/divergence_audit.ts",
 

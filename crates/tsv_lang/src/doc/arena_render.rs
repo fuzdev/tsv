@@ -386,72 +386,89 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 drop(children_vec);
 
                 if !expanded_states.is_empty() {
-                    // conditionalGroup: try each state until one fits
-                    let suffix = if *pos >= config.first_line_offset {
-                        config.suffix_width
-                    } else {
-                        0
-                    };
-                    let effective_width = config.print_width.saturating_sub(suffix);
-                    let remaining_width = effective_width.saturating_sub(*pos) as isize;
-
-                    let contents_fit = arena_fits_with_lookahead(
-                        arena,
-                        contents,
-                        Mode::Flat,
-                        &commands,
-                        remaining_width,
-                        config,
-                        resolver,
-                    );
-
-                    let mut chosen_mode: Mode = Mode::Break;
-
-                    if contents_fit {
-                        chosen_mode = Mode::Flat;
-                        commands.push(cmd.with_mode(chosen_mode, contents));
-                    } else {
+                    // conditionalGroup: try each state until one fits.
+                    // Prettier: only use most expanded when group's OWN should_break is true.
+                    // Parent mode being Break does NOT skip the fits check — conditional
+                    // groups always try flat first, even inside a MODE_BREAK parent.
+                    if should_break {
+                        // Prettier: if (doc.break) → use most expanded in break mode
                         let children_vec = arena.borrow_children();
                         let states = expanded_states.resolve(&children_vec).to_vec();
                         drop(children_vec);
+                        let most_expanded = states.last().copied().unwrap_or(contents);
+                        let chosen_mode = Mode::Break;
+                        commands.push(cmd.with_mode(chosen_mode, most_expanded));
+                        if let Some(group_id) = id {
+                            group_mode_map.insert(group_id, chosen_mode);
+                        }
+                    } else {
+                        // Fits check regardless of parent mode — matches Prettier
+                        let suffix = if *pos >= config.first_line_offset {
+                            config.suffix_width
+                        } else {
+                            0
+                        };
+                        let effective_width = config.print_width.saturating_sub(suffix);
+                        let remaining_width = effective_width.saturating_sub(*pos) as isize;
 
-                        let mut found = false;
-                        for i in 0..states.len() {
-                            if i == states.len() - 1 {
+                        let contents_fit = arena_fits_with_lookahead(
+                            arena,
+                            contents,
+                            Mode::Flat,
+                            &commands,
+                            remaining_width,
+                            config,
+                            resolver,
+                        );
+
+                        let mut chosen_mode: Mode = Mode::Break;
+
+                        if contents_fit {
+                            chosen_mode = Mode::Flat;
+                            commands.push(cmd.with_mode(chosen_mode, contents));
+                        } else {
+                            let children_vec = arena.borrow_children();
+                            let states = expanded_states.resolve(&children_vec).to_vec();
+                            drop(children_vec);
+
+                            let mut found = false;
+                            for i in 0..states.len() {
+                                if i == states.len() - 1 {
+                                    chosen_mode = Mode::Break;
+                                    commands.push(cmd.with_mode(Mode::Break, states[i]));
+                                    found = true;
+                                    break;
+                                }
+                                let state_fits = arena_fits_with_lookahead(
+                                    arena,
+                                    states[i],
+                                    Mode::Flat,
+                                    &commands,
+                                    remaining_width,
+                                    config,
+                                    resolver,
+                                );
+                                if state_fits {
+                                    chosen_mode = Mode::Flat;
+                                    commands.push(cmd.with_mode(Mode::Flat, states[i]));
+                                    found = true;
+                                    break;
+                                }
+                            }
+
+                            if !found {
                                 chosen_mode = Mode::Break;
-                                commands.push(cmd.with_mode(Mode::Break, states[i]));
-                                found = true;
-                                break;
-                            }
-                            let state_fits = arena_fits_with_lookahead(
-                                arena,
-                                states[i],
-                                Mode::Flat,
-                                &commands,
-                                remaining_width,
-                                config,
-                                resolver,
-                            );
-                            if state_fits {
-                                chosen_mode = Mode::Flat;
-                                commands.push(cmd.with_mode(Mode::Flat, states[i]));
-                                found = true;
-                                break;
+                                commands.push(cmd.with_mode(
+                                    Mode::Break,
+                                    states.last().copied().unwrap_or(contents),
+                                ));
                             }
                         }
 
-                        if !found {
-                            chosen_mode = Mode::Break;
-                            commands.push(cmd.with_mode(
-                                Mode::Break,
-                                states.last().copied().unwrap_or(contents),
-                            ));
+                        if let Some(group_id) = id {
+                            group_mode_map.insert(group_id, chosen_mode);
                         }
-                    }
-
-                    if let Some(group_id) = id {
-                        group_mode_map.insert(group_id, chosen_mode);
-                    }
+                    } // close else (fits check branch)
                 } else if should_break || arena.will_break(contents) {
                     let chosen_mode = Mode::Break;
                     commands.push(cmd.with_mode(chosen_mode, contents));

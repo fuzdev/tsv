@@ -11,7 +11,7 @@ use tsv_lang::printing::has_newline_between_fast;
 /// - Binary expressions check both sides with depth=1
 ///
 /// Used to determine if tail args can stay inline after a function callback.
-pub(super) fn is_hopefully_short_arg(expr: &Expression) -> bool {
+fn is_hopefully_short_arg(expr: &Expression) -> bool {
     match expr {
         // Prettier: if (isCallLikeExpression(node) && getCallArguments(node).length > 1) return false
         Expression::CallExpression(call) if call.arguments.len() > 1 => false,
@@ -33,6 +33,38 @@ pub(super) fn is_hopefully_short_arg(expr: &Expression) -> bool {
 /// Used for "expand last arg" pattern in import expressions
 pub(super) fn is_expandable_object(expr: &Expression) -> bool {
     matches!(expr, Expression::ObjectExpression(obj) if !obj.properties.is_empty())
+}
+
+/// Check if an array is "concisely printed" — all elements are numeric literals.
+///
+/// Prettier formats these arrays with fill layout, which prevents the
+/// expand-last-arg pattern from working (the expanded doc has different
+/// break characteristics). When true, the array should NOT use expand-last-arg
+/// and instead falls through to the normal inline-or-expand-all path.
+pub(super) fn is_concise_numeric_array(expr: &Expression) -> bool {
+    if let Expression::ArrayExpression(arr) = expr {
+        !arr.elements.is_empty()
+            && arr
+                .elements
+                .iter()
+                .all(|elem| elem.as_ref().is_some_and(is_numeric_expression))
+    } else {
+        false
+    }
+}
+
+/// Check if an expression is a numeric literal (including unary +/- prefix).
+fn is_numeric_expression(expr: &Expression) -> bool {
+    match expr {
+        Expression::Literal(lit) => matches!(lit.value, internal::LiteralValue::Number(_)),
+        Expression::UnaryExpression(unary) => {
+            matches!(
+                unary.operator,
+                internal::UnaryOperator::Minus | internal::UnaryOperator::Plus
+            ) && is_numeric_expression(&unary.argument)
+        }
+        _ => false,
+    }
 }
 
 /// Check if a second argument is "short" enough for the "expand first arg" pattern.
@@ -146,28 +178,19 @@ fn get_ts_type_wrapper_inner(expr: &Expression) -> Option<&Expression> {
     }
 }
 
-/// Check if all arguments before the last are short/simple
+/// Check if preceding args allow the "expand last arg" conditional group pattern.
 ///
-/// Used to determine if we can keep short args inline with a complex last arg.
+/// Only checks for multiline objects — the conditional group's fits() mechanism
+/// handles width naturally. If preceding args don't fit on one line, the inline
+/// state fails and we fall through to expand-all.
+///
+/// Matches Prettier's `shouldExpandLastArg` which doesn't check preceding arg complexity.
 #[inline]
-fn preceding_args_are_short(arguments: &[Expression]) -> bool {
-    arguments
-        .iter()
-        .take(arguments.len().saturating_sub(1))
-        .all(is_hopefully_short_arg)
-}
-
-/// Check if preceding args allow the "hug" pattern (inline with last arg).
-///
-/// Returns true when:
-/// - All preceding args are short/simple
-/// - No preceding arg is a multiline object in source
-///
-/// Note: Block functions are handled by explicit early checks in calls.rs,
-/// and arrow functions already fail the "short" check.
-#[inline]
-pub(super) fn preceding_args_allow_hug(arguments: &[Expression], line_breaks: &[u32]) -> bool {
-    preceding_args_are_short(arguments) && !has_multiline_object_before_last(arguments, line_breaks)
+pub(super) fn preceding_args_allow_expand_last(
+    arguments: &[Expression],
+    line_breaks: &[u32],
+) -> bool {
+    !has_multiline_object_before_last(arguments, line_breaks)
 }
 
 /// Check if an expression is a function with a block body.

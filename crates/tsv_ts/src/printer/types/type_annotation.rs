@@ -6,8 +6,9 @@
 // - Return type annotations
 
 use super::helpers::{
-    find_separator_position, intersection_has_huggable_last_type,
-    type_args_should_wrap_for_return_type, type_needs_parens_in_intersection,
+    find_separator_position, intersection_has_expanding_first_type,
+    intersection_has_huggable_last_type, type_args_should_wrap_for_return_type,
+    type_needs_parens_in_intersection,
 };
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType};
@@ -215,8 +216,9 @@ impl<'a> Printer<'a> {
     /// The first type stays on the same line as `:`, continuation types are indented.
     /// This differs from `build_intersection_type_doc` (in union_intersection.rs) which
     /// doesn't add internal indentation (expecting the parent context to provide it).
-    /// Both functions share the same grouping rule: huggable-only (2-type with
-    /// TypeLiteral last) skips the group; all other cases need one.
+    /// Both functions share the same grouping rule: 2-type with a huggable/expanding
+    /// boundary (TypeLiteral/MappedType at first or last position) skips the group;
+    /// all other cases need one.
     fn build_intersection_type_annotation_doc(
         &self,
         intersection: &internal::TSIntersectionType,
@@ -234,8 +236,11 @@ impl<'a> Printer<'a> {
             ]);
         }
 
-        // Check for huggable last type (TypeLiteral)
+        // Check for huggable boundary types (TypeLiteral/MappedType at first or last position)
         let last_is_huggable = intersection_has_huggable_last_type(intersection);
+        let first_is_expanding = intersection_has_expanding_first_type(intersection);
+        let is_huggable_pair =
+            intersection.types.len() == 2 && (last_is_huggable || first_is_expanding);
         let last_idx = intersection.types.len() - 1;
 
         // Build first type (stays on same line as `:`)
@@ -268,8 +273,9 @@ impl<'a> Printer<'a> {
             let is_last = i == last_idx;
 
             // Space/line before this type
-            if is_last && last_is_huggable {
-                // Keep `& {` hugged
+            // Huggable pair: always space (TypeLiteral handles its own expansion)
+            // Multi-type with huggable last: space only for the last type
+            if is_huggable_pair || (is_last && last_is_huggable) {
                 continuation_parts.push(d.text(" "));
             } else {
                 continuation_parts.push(d.line());
@@ -319,18 +325,18 @@ impl<'a> Printer<'a> {
         // Combine: first_parts + indented continuation
         let mut parts = first_parts;
         if !continuation_parts.is_empty() {
-            // Huggable-only (A & {b}): no indent, TypeLiteral handles its own expansion
+            // Huggable pair: no indent, TypeLiteral handles its own expansion
             // All other cases: wrap continuation in indent
-            if last_is_huggable && intersection.types.len() == 2 {
+            if is_huggable_pair {
                 parts.extend(continuation_parts);
             } else {
                 parts.push(d.indent(d.concat(&continuation_parts)));
             }
         }
 
-        // Huggable-only (A & {b}): no group needed, TypeLiteral expands itself.
+        // Huggable pair: no group needed, TypeLiteral expands itself.
         // All other cases: group controls line() flat/break behavior.
-        if last_is_huggable && intersection.types.len() == 2 {
+        if is_huggable_pair {
             d.concat(&parts)
         } else {
             d.group(d.concat(&parts))

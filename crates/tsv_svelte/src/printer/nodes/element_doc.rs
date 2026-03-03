@@ -362,13 +362,29 @@ impl<'a> Printer<'a> {
             }
             _ => {
                 // Standard: soft breaks that can harden based on source
+                //
+                // For inline elements with trim_boundaries, boundary whitespace was
+                // removed from the text. Use line (space in flat) instead of softline
+                // (nothing in flat) to preserve the space that was trimmed.
                 let leading_break = if start_mode == BoundaryMode::Hard {
                     d.hardline()
+                } else if ctx.kind.is_inline() && ctx.trim_boundaries {
+                    // Check if first child text had leading whitespace
+                    let has_ws = element.fragment.nodes.first().is_some_and(|n| {
+                        matches!(n, FragmentNode::Text(t) if !t.raw.leading_whitespace().is_empty())
+                    });
+                    if has_ws { d.line() } else { d.softline() }
                 } else {
                     d.softline()
                 };
                 let trailing_break = if end_mode == BoundaryMode::Hard {
                     d.hardline()
+                } else if ctx.kind.is_inline() && ctx.trim_boundaries {
+                    // Check if last child text had trailing whitespace
+                    let has_ws = element.fragment.nodes.last().is_some_and(|n| {
+                        matches!(n, FragmentNode::Text(t) if !t.raw.trailing_whitespace().is_empty())
+                    });
+                    if has_ws { d.line() } else { d.softline() }
                 } else {
                     d.softline()
                 };
@@ -466,23 +482,12 @@ impl<'a> Printer<'a> {
                 // Check if any expression has internal break points (ternary, &&, ||, +, etc.)
                 // When breakable expressions exist, keep opening bracket hugging so expression
                 // breaks are preferred over bracket breaks (reduces indentation drift).
-                // When expressions are simple or text-only, allow opening bracket to break.
                 let has_breakable_expressions = element.fragment.nodes.iter().any(|n| {
                     if let FragmentNode::ExpressionTag(tag) = n {
                         Self::expression_has_break_points(&tag.expression)
                     } else {
                         false
                     }
-                });
-
-                // Check if content has any expressions (breakable or not)
-                let has_expressions = element.fragment.nodes.iter().any(|n| {
-                    matches!(
-                        n,
-                        FragmentNode::ExpressionTag(_)
-                            | FragmentNode::HtmlTag(_)
-                            | FragmentNode::RenderTag(_)
-                    )
                 });
 
                 if has_breakable_expressions {
@@ -498,24 +503,16 @@ impl<'a> Printer<'a> {
                         d.softline(),
                         d.text(">"),
                     ]))
-                } else if has_expressions {
-                    // Simple expressions (identifiers, member access): Prettier-like structure
-                    let indent_inner = d.indent(d.concat(&[
-                        d.softline(),
-                        d.text(">"),
-                        children_doc,
-                        d.text("</"),
-                        d.symbol(tag_sym),
-                    ]));
-                    d.group(d.concat(&[
-                        d.text("<"),
-                        d.symbol(tag_sym),
-                        indent_inner,
-                        d.softline(),
-                        d.text(">"),
-                    ]))
                 } else {
-                    // Text-only: inner group allows closing > to break independently
+                    // Text or simple expressions: inner group keeps content together,
+                    // outer group allows closing > to break independently.
+                    //
+                    // The inner group has a softline before ">content</tag" which is
+                    // critical for fits(): when trailing content (e.g., an IfBlock) is
+                    // on the rest-commands stack in Break mode, fits() hits this softline
+                    // early and returns true, keeping the element flat. When the element's
+                    // own group breaks, the inner group stays flat (content fits) while
+                    // the outer softline breaks the closing > to a new line.
                     let inner_group = d.group(d.concat(&[
                         d.softline(),
                         d.text(">"),

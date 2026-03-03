@@ -3,11 +3,13 @@ pub mod input_parser;
 
 use commands::{
     ast_diff::AstDiffCommand, canonical_parse::CanonicalParseCommand, check::CheckCommand,
-    compare::CompareCommand, fixtures_update::FixturesUpdateCommand,
+    compare::CompareCommand, fixture_init::FixtureInitCommand,
+    fixtures_audit::FixturesAuditCommand, fixtures_update::FixturesUpdateCommand,
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
     fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
-    line_width::LineWidthCommand, profile::ProfileCommand, test262::Test262Command,
+    line_width::LineWidthCommand, metrics::MetricsCommand, profile::ProfileCommand,
+    test262::Test262Command,
 };
 use tsv_cli::cli::commands::CommandRegistry;
 
@@ -28,13 +30,18 @@ pub fn build_registry() -> CommandRegistry {
     registry.register(Box::new(FormatPrettierCommand));
 
     // Register fixture management commands
+    registry.register(Box::new(FixtureInitCommand));
     registry.register(Box::new(FixturesUpdateCommand));
     registry.register(Box::new(FixturesUpdateParsedCommand));
     registry.register(Box::new(FixturesUpdateFormattedCommand));
     registry.register(Box::new(FixturesValidateCommand));
+    registry.register(Box::new(FixturesAuditCommand));
 
     // Register performance commands
     registry.register(Box::new(ProfileCommand));
+
+    // Register analysis commands
+    registry.register(Box::new(MetricsCommand));
 
     // Register test262 command
     registry.register(Box::new(Test262Command));

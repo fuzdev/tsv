@@ -22,7 +22,7 @@
 		}
 	}
 
-	/* 102 chars - we wrap, Prettier stays inline */
+	/* 102 chars - we wrap, Prettier stays inline or preserves wrapping */
 	@media  (  min-width:  
 	1000px  )  and  (  max-width: 
 	 2000px  )  and  (  height  >  

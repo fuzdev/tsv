@@ -17,7 +17,7 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 /// Used when we want the signature to stay on one line (e.g., `(x) =>`).
 /// Does NOT include the ` =>` - caller adds that.
 /// Only handles untyped arrows (no type params, no return type, no param types).
-pub(super) fn build_arrow_inline_signature(
+pub(crate) fn build_arrow_inline_signature(
     printer: &Printer,
     arrow: &internal::ArrowFunctionExpression,
 ) -> DocId {
@@ -129,29 +129,28 @@ pub(super) enum ChainArgKind {
 
 /// Classify how a single argument should be formatted in chain context.
 ///
-/// Returns the `ChainArgKind` for arrow functions, or `NeedsSoftWrap` for
-/// other expression types that need soft wrapping (calls, members, binaries).
+/// Most expressions need soft wrapping so the call can break before the argument.
+/// Only block-like expressions (objects, arrays, functions, classes) hug naturally,
+/// including when wrapped in TS type assertions (`{...} as T`, `[...] satisfies T`).
+/// Arrow functions are classified by their body type.
 pub(super) fn classify_chain_arg(arg: &internal::Expression) -> ChainArgKind {
     match arg {
-        // These expression types need soft wrapping so the call can break
-        // before the argument, giving the argument a fresh line to fit on
-        internal::Expression::CallExpression(_)
-        | internal::Expression::MemberExpression(_)
-        | internal::Expression::NewExpression(_)
-        | internal::Expression::Identifier(_)
-        | internal::Expression::BinaryExpression(_)
-        | internal::Expression::ConditionalExpression(_) => ChainArgKind::NeedsSoftWrap,
-        // Template literals need soft wrap so long lines can break at the call's (
-        internal::Expression::TemplateLiteral(_) => ChainArgKind::NeedsSoftWrap,
-        // Tagged templates need soft wrap too
-        internal::Expression::TaggedTemplateExpression(_) => ChainArgKind::NeedsSoftWrap,
-        // Literals need soft wrapping so chains can break at the last call
-        // This allows e.g. `fn1(fn2()).fn3('short')` to break at fn3 instead of fn2
-        internal::Expression::Literal(_) => ChainArgKind::NeedsSoftWrap,
+        // Block-like expressions hug the call parens naturally
+        internal::Expression::ObjectExpression(_)
+        | internal::Expression::ArrayExpression(_)
+        | internal::Expression::FunctionExpression(_)
+        | internal::Expression::ClassExpression(_) => ChainArgKind::HugsNaturally,
+        // TS type wrappers: classify based on the inner expression
+        // e.g., `{...} as any` hugs, `longExpr as T` soft-wraps
+        internal::Expression::TSAsExpression(e) => classify_chain_arg(&e.expression),
+        internal::Expression::TSSatisfiesExpression(e) => classify_chain_arg(&e.expression),
+        internal::Expression::TSTypeAssertion(e) => classify_chain_arg(&e.expression),
+        internal::Expression::TSNonNullExpression(e) => classify_chain_arg(&e.expression),
         // Arrow functions are classified by their body
         internal::Expression::ArrowFunctionExpression(arrow) => classify_arrow_body(arrow),
-        // Everything else hugs naturally (objects, arrays as direct args)
-        _ => ChainArgKind::HugsNaturally,
+        // Everything else needs soft wrapping so the call can break
+        // before the argument, giving the argument a fresh line to fit on
+        _ => ChainArgKind::NeedsSoftWrap,
     }
 }
 
@@ -159,7 +158,7 @@ pub(super) fn classify_chain_arg(arg: &internal::Expression) -> ChainArgKind {
 ///
 /// Used to determine formatting behavior - arrows with type annotations often need
 /// different breaking strategies than untyped arrows.
-pub(super) fn arrow_has_type_annotations(arrow: &internal::ArrowFunctionExpression) -> bool {
+pub(crate) fn arrow_has_type_annotations(arrow: &internal::ArrowFunctionExpression) -> bool {
     arrow.return_type.is_some()
         || arrow.type_parameters.is_some()
         || arrow.params.iter().any(param_has_type_annotation)
@@ -338,6 +337,24 @@ pub(super) fn build_expand_all_args(d: &DocArena, callee: DocId, all_args_broken
     ])
 }
 
+/// Build the "expand all args" doc for chain context: `prefix\n\tall_args,\n)`
+///
+/// Like `build_expand_all_args` but takes a string prefix (e.g., `"("` or `"?.("`)
+/// instead of a callee DocId, since chain contexts handle the callee separately.
+#[inline]
+pub(super) fn build_chain_expand_all_args(
+    d: &DocArena,
+    prefix: &'static str,
+    all_args_broken: DocId,
+) -> DocId {
+    d.concat(&[
+        d.text(prefix),
+        d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
+        d.line(),
+        d.text(")"),
+    ])
+}
+
 /// Build the "inline" doc structure: `callee(head_parts + last_arg)`
 ///
 /// Used as the first state in conditional groups where we try to fit everything inline.
@@ -394,7 +411,7 @@ pub(super) fn build_inline_or_expand_all(
 /// - `inline_sig`: The arrow's inline signature (for break state)
 /// - `body_doc`: The arrow body expression doc
 #[inline]
-pub(super) fn build_arrow_call_body_states(
+pub(crate) fn build_arrow_call_body_states(
     d: &DocArena,
     callee: DocId,
     arrow_doc: DocId,

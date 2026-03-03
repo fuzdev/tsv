@@ -6,7 +6,8 @@ use crate::printer::{
     ParenContext, conditional_needs_fluid_layout, is_call_on_member_chain,
     is_curried_arrow_with_return_type, is_module_path_fluid_call, is_multiline_string_literal,
     is_poorly_breakable_chain, is_pure_property_chain, is_self_expanding_value,
-    is_simple_self_expanding, is_string_literal, is_type_assertion_call, needs_parens,
+    is_simple_self_expanding, is_single_call_on_member_chain, is_string_literal,
+    is_type_assertion_call, needs_parens,
 };
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::GroupId;
@@ -293,6 +294,48 @@ impl<'a> Printer<'a> {
                 // Combined flag for backward compatibility with existing logic
                 let is_fluid_rhs = needs_fluid_layout || needs_break_after_op_layout;
 
+                // Member-chain call (a.fn(...)) where the call head fits within print_width:
+                // Use default layout and let the call expand its own args rather than breaking
+                // at `=`. E.g., `const {a, b} = vi.mocked(longArg)` with short LHS keeps
+                // `= vi.mocked(` on line 1 and expands the arg — matching Prettier's behavior.
+                // Only fires when call head (decl_start to callee_end + "(") fits in print_width.
+                let is_expandable_member_call = if is_single_call_on_member_chain(init) {
+                    if let Expression::CallExpression(call) = init {
+                        let indent_visual_width =
+                            (self.config.base_indent_offset
+                                + self.declaration_indent_depth.get())
+                                * self.config.tab_width;
+                        // +1 for the "(" after callee
+                        let call_head_width = indent_visual_width
+                            + (call.callee.span().end as usize - decl.span.start as usize)
+                            + 1;
+                        call_head_width < self.config.print_width
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+
+                // Breakable LHS (destructuring patterns) with non-self-expanding RHS:
+                // Use fluid layout so the printer breaks at `=` before expanding the
+                // destructuring pattern. Matches Prettier's `canBreak(leftDoc) → "fluid"`.
+                // E.g., `const {a, b, c} = resolve(x, y, z)` breaks after `=`, not inside `{}`
+                //
+                // Excludes is_fluid_rhs cases (binary, conditional, strings, chains) — those
+                // go through needs_break_after_operator with their own break-after-operator layout.
+                // In Prettier, shouldBreakAfterOperator() handles those before the canBreak fallback.
+                //
+                // Excludes is_expandable_member_call: when the call head fits, the call's own
+                // arg-expansion handles line breaking via default layout.
+                let needs_fluid_for_breakable_lhs = can_break_left
+                    && !is_self_expanding_value(init)
+                    && !has_trailing_comment_expansion
+                    && !has_line_comments_in_chain
+                    && !should_break
+                    && !is_fluid_rhs
+                    && !is_expandable_member_call;
+
                 // Type assertion calls with LHS type annotation need special fluid handling
                 // (handled separately below because they need non-wrapping LHS type)
                 let is_type_assertion_with_lhs_type = is_type_assertion_call(
@@ -409,14 +452,19 @@ impl<'a> Printer<'a> {
                         GroupId::Assignment,
                         false,
                     ));
-                } else if is_single_call_member_chain {
-                    // TRUE fluid layout for single-call member chains with complex args:
-                    // Structure: [" =", group(indent(line)), lineSuffixBoundary, indentIfBreak(init)]
+                } else if is_single_call_member_chain || needs_fluid_for_breakable_lhs {
+                    // TRUE fluid layout: [" =", group(indent(line)), lineSuffixBoundary, indentIfBreak(init)]
                     //
                     // The init is NOT inside the line group. This means the printer tries to
                     // break at `=` BEFORE evaluating init's internal groups. This gives
                     // Prettier-style behavior where long chains break at `=` instead of
                     // expanding call arguments.
+                    //
+                    // Used for:
+                    // 1. Single-call member chains with complex args (arrows, objects, arrays)
+                    //    E.g., `const x = a.b.c.filter((x) => ...)` breaks at `=` if > print_width
+                    // 2. Breakable LHS (destructuring patterns) with non-self-expanding RHS
+                    //    E.g., `const {a, b, c} = resolve(x, y, z)` breaks after `=`, not inside `{}`
                     parts.push(d.text(" ="));
                     parts.push(d.group_with_id(d.indent(d.line()), GroupId::Assignment));
                     parts.push(d.line_suffix_boundary());

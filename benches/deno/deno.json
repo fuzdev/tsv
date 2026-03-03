@@ -10,6 +10,7 @@
 		"@biomejs/js-api": "npm:@biomejs/js-api@4.0.0",
 		"@biomejs/wasm-bundler": "npm:@biomejs/wasm-bundler@2.3.14",
 		"oxc-parser": "npm:oxc-parser@0.112.0",
+		"@oxc-parser/binding-wasm32-wasi/parser.wasi-browser.js": "npm:@oxc-parser/binding-wasm32-wasi@0.112.0/parser.wasi-browser.js",
 		"oxfmt": "npm:oxfmt@0.28.0",
 		"zod": "npm:zod@4",
 		"@fuzdev/fuz_util": "npm:@fuzdev/fuz_util@0.50.1",

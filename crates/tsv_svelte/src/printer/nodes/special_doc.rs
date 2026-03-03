@@ -287,11 +287,16 @@ impl<'a> Printer<'a> {
         } else if needs_multiline {
             // With attrs, multiline children
             let attr_concat = d.concat(&attr_docs);
+            let sl = d.softline();
+            let trailing = d.dedent(sl);
+            let attr_inner = d.concat(&[attr_concat, trailing]);
+            let attr_group = d.group(attr_inner);
+            let attr_indent = d.indent(attr_group);
             let inner = d.concat(&[d.hardline(), children_doc]);
             d.concat(&[
                 d.text("<"),
                 d.text(tag_name),
-                d.group(d.indent(attr_concat)),
+                attr_indent,
                 d.text(">"),
                 d.indent(inner),
                 d.hardline(),

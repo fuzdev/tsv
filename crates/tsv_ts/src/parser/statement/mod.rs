@@ -45,15 +45,7 @@ impl<'a> Parser<'a> {
                     // `import(...)` is a dynamic import expression
                     // `import ...` is an import declaration
                     if self.peek_kind() == TokenKind::ParenOpen {
-                        // Dynamic import expression
-                        let expr = self.parse_expression()?;
-                        let start = expr.span().start;
-                        self.semicolon()?;
-                        let end = self.prev_token_end() as u32;
-                        Ok(Statement::ExpressionStatement(ExpressionStatement {
-                            expression: expr,
-                            span: Span::new(start, end),
-                        }))
+                        self.parse_expression_statement()
                     } else {
                         self.parse_import_declaration()
                     }
@@ -66,14 +58,7 @@ impl<'a> Parser<'a> {
                         self.parse_async_function_declaration()
                     } else {
                         // Async arrow function expression
-                        let expr = self.parse_expression()?;
-                        let start = expr.span().start;
-                        self.semicolon()?;
-                        let end = self.prev_token_end() as u32;
-                        Ok(Statement::ExpressionStatement(ExpressionStatement {
-                            expression: expr,
-                            span: Span::new(start, end),
-                        }))
+                        self.parse_expression_statement()
                     }
                 }
                 KeywordKind::Await => {
@@ -82,14 +67,7 @@ impl<'a> Parser<'a> {
                         return self.parse_await_using_declaration();
                     }
                     // Regular await expression
-                    let expr = self.parse_expression()?;
-                    let start = expr.span().start;
-                    self.semicolon()?;
-                    let end = self.prev_token_end() as u32;
-                    Ok(Statement::ExpressionStatement(ExpressionStatement {
-                        expression: expr,
-                        span: Span::new(start, end),
-                    }))
+                    self.parse_expression_statement()
                 }
                 KeywordKind::True
                 | KeywordKind::False
@@ -102,14 +80,7 @@ impl<'a> Parser<'a> {
                 | KeywordKind::Yield
                 | KeywordKind::Super => {
                     // These are literals or expression-starting keywords, parse as expression statement
-                    let expr = self.parse_expression()?;
-                    let start = expr.span().start;
-                    self.semicolon()?;
-                    let end = self.prev_token_end() as u32;
-                    Ok(Statement::ExpressionStatement(ExpressionStatement {
-                        expression: expr,
-                        span: Span::new(start, end),
-                    }))
+                    self.parse_expression_statement()
                 }
                 // Control flow statements
                 KeywordKind::If => self.parse_if_statement(),
@@ -146,14 +117,7 @@ impl<'a> Parser<'a> {
                 | KeywordKind::Symbol
                 | KeywordKind::Bigint => {
                     // These keywords can be identifiers, so parse as expression statement
-                    let expr = self.parse_expression()?;
-                    let start = expr.span().start;
-                    self.semicolon()?;
-                    let end = self.prev_token_end() as u32;
-                    Ok(Statement::ExpressionStatement(ExpressionStatement {
-                        expression: expr,
-                        span: Span::new(start, end),
-                    }))
+                    self.parse_expression_statement()
                 }
             },
             TokenKind::Identifier => {
@@ -190,14 +154,7 @@ impl<'a> Parser<'a> {
                     return self.parse_labeled_statement();
                 }
                 // Regular expression statement
-                let expr = self.parse_expression()?;
-                let start = expr.span().start;
-                self.semicolon()?;
-                let end = self.prev_token_end() as u32;
-                Ok(Statement::ExpressionStatement(ExpressionStatement {
-                    expression: expr,
-                    span: Span::new(start, end),
-                }))
+                self.parse_expression_statement()
             }
             TokenKind::Semicolon => {
                 // Empty statement: `;`
@@ -216,17 +173,22 @@ impl<'a> Parser<'a> {
                 // Decorator: `@expression class Foo { }`
                 self.parse_decorated_class()
             }
-            _ => {
-                // Expression statement
-                let expr = self.parse_expression()?;
-                let start = expr.span().start;
-                self.semicolon()?;
-                let end = self.prev_token_end() as u32;
-                Ok(Statement::ExpressionStatement(ExpressionStatement {
-                    expression: expr,
-                    span: Span::new(start, end),
-                }))
-            }
+            _ => self.parse_expression_statement(),
         }
+    }
+
+    /// Parse an expression statement: `<expr>;`
+    ///
+    /// Captures the start position before parsing so the span includes any
+    /// surrounding parens: `('hello');` → span starts at `(`, not `'`.
+    fn parse_expression_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.current_pos().0 as u32;
+        let expr = self.parse_expression()?;
+        self.semicolon()?;
+        let end = self.prev_token_end() as u32;
+        Ok(Statement::ExpressionStatement(ExpressionStatement {
+            expression: expr,
+            span: Span::new(start, end),
+        }))
     }
 }

@@ -53,7 +53,7 @@ ${aaaaaaaa.bbbbbbb_cccccccc_ssssssssssssssssssssssssss
 	`;
 	};
 
-	// Case 8: 3 spaces template indent → base 2 (rounded up), content 3 tabs, closing 2 tabs
+	// Case 8: 3 spaces template indent → base 1 tab + 1 space, content 2 tabs + 1 space, closing 1 tab + 1 space
 	const gen8 = () => {
 		return `
    export const C = ffffff([${aaaaaaaa.bbbbbbb_cccccccc_sssss
@@ -87,14 +87,14 @@ ${aaaaaaaa.bbbbbbb_cccccccc_ssssssssssssssssssssssssss
 		.join(',')}]);
 `;
 
-	// Case 12: 5 spaces template indent → base 3 (rounded up), content 4 tabs, closing 3 tabs
+	// Case 12: 5 spaces template indent → base 2 tabs + 1 space, content 3 tabs + 1 space, closing 2 tabs + 1 space
 	const gen12 = () => {
 		return `
      content prefix [${aaaaaaaa.bbbbbbb_cccccccc_sssss.map((ssss) => `'${ssss.tttttt}'`).join(',')}]
 	`;
 	};
 
-	// Case 13: 2 tabs + 5 spaces template indent → base 5 (rounded up), content 6 tabs, closing 5 tabs
+	// Case 13: 2 tabs + 5 spaces template indent → base 4 tabs + 1 space, content 5 tabs + 1 space, closing 4 tabs + 1 space
 	const gen13 = () => {
 		return `
 		     deeply indented content [${aaaaaaaa.bbbbbbb_cccccccc_sssss
@@ -157,9 +157,9 @@ ${aaaaaaaa.bbbbbbb_cccccccc_ssssssssssssssssssssssssss
 													}',
 													// Block comment inline - no forced break
 													g6: '${ssss.val /* block comment */}',
-													// Inner ternary at 100 chars - stays inline
+													// Inner ternary exceeds print_width (108 visual) - wraps
 													g7: '${ssss.flagAAAAAAAAAAAAAAAA ? 'valXXXXXXXXXXXXXXXX' : 'valYYYYYYYYYYYYYYY'}',
-													// Inner ternary at 101 chars - exceeds, breaks
+													// Inner ternary exceeds more (109 visual) - wraps and breaks
 													g8: '${ssss.flagAAAAAAAAAAAAAAAAA ? 'valXXXXXXXXXXXXXXXX' : 'valYYYYYYYYYYYYYYY'}',
 												}`;
 										})

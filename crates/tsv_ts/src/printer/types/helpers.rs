@@ -96,6 +96,19 @@ pub fn intersection_has_huggable_last_type(intersection: &TSIntersectionType) ->
         .is_some_and(|t| is_huggable_type(unwrap_parenthesized(t)))
 }
 
+/// Check if the first type in an intersection is "expanding" (like TypeLiteral or MappedType).
+///
+/// When the first type expands (contains hardlines from multiline object body),
+/// the continuation should use space instead of line to keep `} & Type` together.
+/// This is the mirror of `intersection_has_huggable_last_type` for the first position.
+#[inline]
+pub fn intersection_has_expanding_first_type(intersection: &TSIntersectionType) -> bool {
+    intersection
+        .types
+        .first()
+        .is_some_and(|t| is_huggable_type(unwrap_parenthesized(t)))
+}
+
 //
 // Type parenthesization predicates
 //

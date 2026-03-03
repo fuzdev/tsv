@@ -5,11 +5,13 @@
 
 use super::super::utils::{
     arrow_has_trailing_param_comments, could_expand_arrow_body, has_block_function_before_last,
-    is_array_or_object_unwrapped, is_block_function, is_function_composition_args,
-    is_short_second_arg_for_expand_first, last_arg_is_array_or_object, preceding_args_allow_hug,
+    is_array_or_object_unwrapped, is_block_function, is_concise_numeric_array,
+    is_function_composition_args, is_short_second_arg_for_expand_first,
+    last_arg_is_array_or_object, preceding_args_allow_expand_last,
 };
 use super::super::{
-    ParenContext, Printer, has_multiline_content, needs_parens, template_literal_has_newlines,
+    ParenContext, Printer, has_multiline_content, has_newline_before_position,
+    is_multiline_template_expression, needs_parens,
 };
 use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, find_comma_pos, has_inter_argument_comments,
@@ -446,18 +448,6 @@ pub(super) fn build_call_doc_with_wrapping(
                         // Build body expression
                         let body_doc = printer.build_expression_doc(body_expr);
 
-                        // Build state 0: fully flat version including call wrapping
-                        // Structure: callee + "(" + sig + " => (" + body + ")" + ")"
-                        // This includes the full context so conditional_group can measure correctly
-                        let state_flat = d.concat(&[
-                            callee,
-                            d.text("("),
-                            sig_doc,
-                            d.text(" => ("),
-                            body_doc,
-                            d.text("))"), // Close both arrow body and call
-                        ]);
-
                         // Build state 1: break version with params on call line, body breaks
                         // Structure: callee + "(" + sig + " =>" + indent([hardline, body, ","]) + hardline + ")"
                         // First hardline: breaks after "=>"
@@ -471,6 +461,26 @@ pub(super) fn build_call_doc_with_wrapping(
                             d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
                             d.hardline(),
                             d.text(")"),
+                        ]);
+
+                        // If body has hardlines (e.g., ternary branches with block arrow bodies),
+                        // state 0 (flat with parens) would be incorrectly selected by fits()
+                        // because hardlines truncate the fit check. Use state_break directly.
+                        // (Matches the will_break guard in chain_args.rs)
+                        if d.will_break(body_doc) {
+                            return state_break;
+                        }
+
+                        // Build state 0: fully flat version including call wrapping
+                        // Structure: callee + "(" + sig + " => (" + body + ")" + ")"
+                        // This includes the full context so conditional_group can measure correctly
+                        let state_flat = d.concat(&[
+                            callee,
+                            d.text("("),
+                            sig_doc,
+                            d.text(" => ("),
+                            body_doc,
+                            d.text("))"), // Close both arrow body and call
                         ]);
 
                         // Build state 2: all args broken out (fallback for Break mode)
@@ -529,21 +539,15 @@ pub(super) fn build_call_doc_with_wrapping(
         }
     }
 
-    // Single template literal argument with embedded newlines: never break
-    // Prettier keeps these inline: `someFunction(\`a\nb\`)`
-    // Only applies when the template itself contains newlines
-    if call.arguments.len() == 1 {
-        let has_template_with_newlines = match &call.arguments[0] {
-            internal::Expression::TemplateLiteral(template) => {
-                template_literal_has_newlines(template)
-            }
-            internal::Expression::TaggedTemplateExpression(tagged) => {
-                template_literal_has_newlines(&tagged.quasi)
-            }
-            _ => false,
-        };
-
-        if has_template_with_newlines {
+    // Single template literal argument with embedded newlines:
+    // Prettier has source-position-dependent behavior (isTemplateOnItsOwnLine):
+    // - Hugged: `fn(\`line1\nline2\`)` → keep inline (no groups)
+    // - Expanded: `fn(\n\t\`line1\nline2\`,\n)` → preserve expanded form
+    // The check walks backwards from the template backtick to see if there's a newline.
+    if call.arguments.len() == 1 && is_multiline_template_expression(&call.arguments[0]) {
+        let template_start = call.arguments[0].span().start;
+        if !has_newline_before_position(printer.source, template_start) {
+            // Template on same line as ( — hug it
             let arg_doc = printer.build_expression_doc(&call.arguments[0]);
             let mut parts = vec![callee, d.text("("), arg_doc, d.text(")")];
 
@@ -558,6 +562,8 @@ pub(super) fn build_call_doc_with_wrapping(
 
             return d.concat(&parts);
         }
+        // Template on its own line — fall through to has_multiline_content
+        // which produces the expanded form via wrap_call_with_hard_breaks
     }
 
     // Check if any argument has multiline content (e.g., line continuation strings)
@@ -611,6 +617,18 @@ pub(super) fn build_call_doc_with_wrapping(
             tail_parts.push(printer.build_expression_doc(arg));
         }
 
+        // Prettier: if (tailArgs.some(willBreak)) return allArgsBrokenOut()
+        // When any tail arg's doc will break, the inline tail won't work.
+        if tail_parts.iter().any(|&id| d.will_break(id)) {
+            let arg_parts = d.join_doc(
+                call.arguments
+                    .iter()
+                    .map(|arg| printer.build_expression_doc(arg)),
+                d.comma_hardline(),
+            );
+            return wrap_call_with_hard_breaks(d, callee, arg_parts);
+        }
+
         // Structure: callee + ( + first_arg_with_breaks + , + tail_args + )
         // The first arg can expand internally, but tail args stay inline
         return d.concat(&[
@@ -641,10 +659,15 @@ pub(super) fn build_call_doc_with_wrapping(
         return wrap_call_with_hard_breaks(d, callee, arg_parts);
     }
 
-    // Expand last arg pattern: N args with last being arrow/function
-    // Prettier wraps the arrow in its own group to isolate hardlines,
-    // then uses conditional_group to try inline first
-    // e.g., fn('a', (x) => { ... }) stays inline, fn('long...', (x) => { ... }) breaks all
+    // Expand last arg pattern for function/arrow last arguments.
+    //
+    // Expression-body arrows get special hug/break-body states (call body, object body).
+    // Block-body arrows and function expressions use conditional_group (inline vs expand-all).
+    //
+    // IMPORTANT: Block-body functions CANNOT use the normal group path (wrap_call_with_soft_breaks)
+    // because will_break() recurses into nested groups and finds hardlines in the block body,
+    // forcing the parent group to break without trying fits(). conditional_group uses fits()
+    // directly, correctly measuring the first line including `(x) => {`.
     if call.arguments.len() >= 2 {
         let last_is_function = matches!(
             call.arguments.last(),
@@ -654,97 +677,101 @@ pub(super) fn build_call_doc_with_wrapping(
             )
         );
 
-        // Check for comments that force expansion (line comments or block comments on own line).
-        // Inline block comments are allowed without forcing expansion.
-        let paren_open = call.callee.span().end;
+        if last_is_function {
+            let paren_open = call.callee.span().end;
 
-        if last_is_function
-            && preceding_args_allow_hug(&call.arguments, printer.line_breaks)
-            && !any_comment_forces_expansion(call, printer, paren_open)
-        {
-            let (head_parts, last_arg_doc, all_args_broken) =
-                build_args_split_last(&call.arguments, printer);
-
-            // Special case: expression arrow with call expression body
-            // Prettier keeps preceding args inline and only breaks arrow body after =>
-            // e.g., fn({a: 1}, (x) =>\n  call(x, ...),\n)
-            if let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
-                call.arguments.last()
-                && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-                && matches!(&**body_expr, internal::Expression::CallExpression(_))
-                && !arrow_has_type_annotations(arrow)
+            if preceding_args_allow_expand_last(&call.arguments, printer.line_breaks)
+                && !any_comment_forces_expansion(call, printer, paren_open)
             {
-                let inline_sig = build_arrow_inline_signature(printer, arrow);
-                let body_doc = printer.build_expression_doc(body_expr);
+                let (head_parts, last_arg_doc, all_args_broken) =
+                    build_args_split_last(&call.arguments, printer);
 
-                // State 1: all inline (reuse existing helper)
-                let state_inline = build_inline_args(d, callee, head_parts.clone(), last_arg_doc);
+                // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
+                // When any head arg's doc will break (e.g., new Map([...multiline...])),
+                // the hug/inline states won't work — fall through to expand-all.
+                if head_parts.iter().any(|&id| d.will_break(id)) {
+                    return build_expand_all_args(d, callee, all_args_broken);
+                }
 
-                // State 2: preceding args inline, arrow body breaks after =>
-                let state_break_body = d.concat(&[
+                // Special case: expression arrow with call expression body
+                // Prettier keeps preceding args inline and only breaks arrow body after =>
+                // e.g., fn({a: 1}, (x) =>\n  call(x, ...),\n)
+                if let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
+                    call.arguments.last()
+                    && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+                    && matches!(&**body_expr, internal::Expression::CallExpression(_))
+                    && !arrow_has_type_annotations(arrow)
+                {
+                    let inline_sig = build_arrow_inline_signature(printer, arrow);
+                    let body_doc = printer.build_expression_doc(body_expr);
+
+                    let state_inline =
+                        build_inline_args(d, callee, head_parts.clone(), last_arg_doc);
+
+                    let state_break_body = d.concat(&[
+                        callee,
+                        d.text("("),
+                        d.concat(&head_parts),
+                        inline_sig,
+                        d.text(" =>"),
+                        d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+                        d.hardline(),
+                        d.text(")"),
+                    ]);
+
+                    let state_expand_all = build_expand_all_args(d, callee, all_args_broken);
+
+                    return d.conditional_group(&[
+                        state_inline,
+                        state_break_body,
+                        state_expand_all,
+                    ]);
+                }
+
+                // Special case: expression arrow with object/array body
+                // Prettier keeps preceding args inline and expands object/array internally
+                // e.g., fn(arg, (x) => ({\n  a: x,\n}));
+                if let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
+                    call.arguments.last()
+                    && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+                    && matches!(
+                        &**body_expr,
+                        internal::Expression::ObjectExpression(_)
+                            | internal::Expression::ArrayExpression(_)
+                    )
+                    && !arrow_has_type_annotations(arrow)
+                {
+                    let inline_sig = build_arrow_inline_signature(printer, arrow);
+                    let body_doc = d.parens(printer.build_expression_doc(body_expr));
+
+                    let state_inline =
+                        build_inline_args(d, callee, head_parts.clone(), last_arg_doc);
+
+                    let state_hug = d.concat(&[
+                        callee,
+                        d.text("("),
+                        d.concat(&head_parts),
+                        inline_sig,
+                        d.text(" => "),
+                        d.group_break(body_doc),
+                        d.text(")"),
+                    ]);
+
+                    let state_expand_all = build_expand_all_args(d, callee, all_args_broken);
+
+                    return d.conditional_group(&[state_inline, state_hug, state_expand_all]);
+                }
+
+                // All other function/arrow last args (block-body arrows, function expressions,
+                // general expression arrows): inline or expand all via conditional_group.
+                return build_inline_or_expand_all(
+                    d,
                     callee,
-                    d.text("("),
-                    d.concat(&head_parts),
-                    inline_sig,
-                    d.text(" =>"),
-                    d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
-                    d.hardline(),
-                    d.text(")"),
-                ]);
-
-                // State 3: all args expanded (reuse existing helper)
-                let state_expand_all = build_expand_all_args(d, callee, all_args_broken);
-
-                return d.conditional_group(&[state_inline, state_break_body, state_expand_all]);
+                    head_parts,
+                    last_arg_doc,
+                    all_args_broken,
+                );
             }
-
-            // Special case: expression arrow with object/array body
-            // Prettier keeps preceding args inline and expands object/array internally
-            // e.g., fn(arg, (x) => ({\n  a: x,\n}));
-            if let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
-                call.arguments.last()
-                && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-                && matches!(
-                    &**body_expr,
-                    internal::Expression::ObjectExpression(_)
-                        | internal::Expression::ArrayExpression(_)
-                )
-                && !arrow_has_type_annotations(arrow)
-            {
-                let inline_sig = build_arrow_inline_signature(printer, arrow);
-                // Object/array in arrow body needs parens: (x) => ({ ... })
-                let body_doc = d.parens(printer.build_expression_doc(body_expr));
-
-                // State 0: all inline
-                let state_inline = build_inline_args(d, callee, head_parts.clone(), last_arg_doc);
-
-                // State 1: hug - head inline, object/array expands internally
-                let state_hug = d.concat(&[
-                    callee,
-                    d.text("("),
-                    d.concat(&head_parts),
-                    inline_sig,
-                    d.text(" => "),
-                    d.group_break(body_doc),
-                    d.text(")"),
-                ]);
-
-                // State 2: expand all args
-                let state_expand_all = build_expand_all_args(d, callee, all_args_broken);
-
-                return d.conditional_group(&[state_inline, state_hug, state_expand_all]);
-            }
-
-            // Try: inline, or break all args
-            // Note: last arg contains hardlines, so state 1 only succeeds if the whole
-            // line (including arrow signature) fits within print_width
-            return build_inline_or_expand_all(
-                d,
-                callee,
-                head_parts,
-                last_arg_doc,
-                all_args_broken,
-            );
         }
     }
 
@@ -946,14 +973,18 @@ pub(super) fn build_call_doc_with_wrapping(
     }
 
     // "Expand last arg" pattern (Prettier's shouldExpandLastArg):
-    // When last arg is array/object and preceding args are short,
+    // When last arg is array/object and preceding args allow it,
     // use different strategies based on whether last two args have same type.
     //
     // Prettier disables expand-last-arg when the last two arguments have the
     // same type (e.g., both arrays). In that case, it uses expand-all instead.
+    //
+    // Prettier also excludes "concise" arrays (all numeric literals) — these use
+    // fill layout which has different break characteristics and don't hug.
     if call.arguments.len() >= 2
         && last_arg_is_array_or_object(&call.arguments)
-        && preceding_args_allow_hug(&call.arguments, printer.line_breaks)
+        && !call.arguments.last().is_some_and(is_concise_numeric_array)
+        && preceding_args_allow_expand_last(&call.arguments, printer.line_breaks)
         && !has_inter_argument_comments(call, printer)
     {
         // Check if last two args have the same "expandable" type (both arrays or both objects)
@@ -979,11 +1010,17 @@ pub(super) fn build_call_doc_with_wrapping(
             let (head_parts, last_arg_doc, all_args_broken) =
                 build_args_split_last(&call.arguments, printer);
 
-            // If last arg has forced breaks (e.g., line comments), skip the conditional_group
-            // and go directly to expand-all (state 1 would be selected incorrectly).
-            // Note: Use has_forced_break() not will_break() - objects with source newlines
-            // use group_break() which makes will_break() true, but they should still hug.
-            if d.has_forced_break(last_arg_doc) {
+            // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
+            if head_parts.iter().any(|&id| d.will_break(id)) {
+                return build_expand_all_args(d, callee, all_args_broken);
+            }
+
+            // Prettier: group(args, { shouldBreak: args.some(willBreak) })
+            // When same-type args and any will break, force expand-all.
+            // Note: will_break() catches both hardlines and group_break() (source-multiline
+            // objects). The different-type path below uses has_forced_break() instead because
+            // it has a hug state where group_break objects should still hug.
+            if d.will_break(last_arg_doc) {
                 return build_expand_all_args(d, callee, all_args_broken);
             }
 
@@ -1000,6 +1037,11 @@ pub(super) fn build_call_doc_with_wrapping(
         // If it does, Prettier uses expand-all instead of hug
         let (head_parts, last_arg_doc, all_args_broken) =
             build_args_split_last(&call.arguments, printer);
+
+        // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
+        if head_parts.iter().any(|&id| d.will_break(id)) {
+            return build_expand_all_args(d, callee, all_args_broken);
+        }
 
         // If last arg has forced breaks (hardlines), use expand-all instead of hug.
         // Note: Use has_forced_break() not will_break() - see comment above.

@@ -4,8 +4,8 @@
  * Collects file sizes for each implementation's compiled binary:
  * - tsv: native (.so/.dylib/.dll) and WASM (.wasm)
  * - biome: WASM (.wasm) from npm cache
- * - oxc-parser: native (.node) from npm cache
- * - oxfmt: native (.node) from npm cache
+ * - oxc-parser: native (.node) and WASM (.wasm via binding-wasm32-wasi) from npm cache
+ * - oxfmt: native (.node) from npm cache (no WASM variant)
  */
 
 import type { AllVersions } from './versions.ts';
@@ -154,6 +154,13 @@ export async function collectBinarySizes(
 		);
 		if (oxfmtBytes !== null) {
 			sizes.push({ label: 'oxfmt (native)', bytes: oxfmtBytes, kind: 'native' });
+		}
+
+		// oxc-parser WASM binding (@oxc-parser/binding-wasm32-wasi)
+		const oxcWasmDir = `${npmCache}/@oxc-parser/binding-wasm32-wasi/${versions.oxc['oxc-parser']}`;
+		const oxcWasmBytes = await findFileByExtension(oxcWasmDir, '.wasm');
+		if (oxcWasmBytes !== null) {
+			sizes.push({ label: 'oxc-parser (wasm)', bytes: oxcWasmBytes, kind: 'wasm' });
 		}
 	}
 

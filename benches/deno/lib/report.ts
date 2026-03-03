@@ -52,6 +52,7 @@ const DISPLAY_ORDER = [
 	// Third-party alternatives (alphabetical)
 	'biome-wasm',
 	'oxc-parser',
+	'oxc-parser-wasm',
 	'oxfmt',
 ];
 
@@ -450,11 +451,15 @@ function buildComparisonData(
 		const canonicalNs = getMeanNs(`parse/${lang}`, canonicalParseName);
 		if (tsvWasmNs === null || canonicalNs === null) continue;
 
-		wasmRows.push({
-			operation: 'parse',
-			language: lang,
-			comparisons: [{ name: 'svelte', ratio: ratio(tsvWasmNs, canonicalNs) }],
-		});
+		const comparisons: ComparisonRow['comparisons'] = [
+			{ name: 'svelte', ratio: ratio(tsvWasmNs, canonicalNs) },
+		];
+		const oxcWasmNs = getMeanNs(`parse/${lang}`, 'oxc-parser-wasm');
+		if (oxcWasmNs !== null) {
+			comparisons.push({ name: 'oxc-parser-wasm', ratio: ratio(tsvWasmNs, oxcWasmNs) });
+		}
+
+		wasmRows.push({ operation: 'parse', language: lang, comparisons });
 	}
 
 	if (wasmRows.length > 0) {
@@ -492,8 +497,28 @@ export function generateComparisonSummary(
 		}
 	}
 
+	// Fairness notes (only shown when oxc-parser data is present)
+	const hasNativeOxc = sections.some((s) =>
+		s.label === 'tsv (native)' &&
+		s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser'))
+	);
+	const hasWasmOxc = sections.some((s) =>
+		s.label === 'tsv_wasm' &&
+		s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser-wasm'))
+	);
+
 	lines.push('');
 	lines.push('  (parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts)');
+	if (hasNativeOxc) {
+		lines.push(
+			'  (parse native: oxc-parser uses raw transfer, tsv-json includes JSON serialization)',
+		);
+	}
+	if (hasWasmOxc) {
+		lines.push(
+			'  (parse WASM: oxc-parser-wasm and tsv_wasm-json both serialize to JSON — fair comparison)',
+		);
+	}
 
 	return lines.join('\n');
 }
@@ -526,7 +551,31 @@ export function generateComparisonMarkdown(
 		lines.push('');
 	}
 
-	lines.push('_Parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts_');
+	// Fairness notes (only shown when oxc-parser data is present)
+	const hasNativeOxc = sections.some((s) =>
+		s.label === 'tsv (native)' &&
+		s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser'))
+	);
+	const hasWasmOxc = sections.some((s) =>
+		s.label === 'tsv_wasm' &&
+		s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser-wasm'))
+	);
+
+	const notes: string[] = [
+		'Parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts',
+	];
+	if (hasNativeOxc) {
+		notes.push(
+			'Parse native: oxc-parser uses raw transfer, tsv-json includes JSON serialization',
+		);
+	}
+	if (hasWasmOxc) {
+		notes.push(
+			'Parse WASM: oxc-parser-wasm and tsv_wasm-json both serialize to JSON — fair comparison',
+		);
+	}
+
+	lines.push('_' + notes.join('. ') + '_');
 
 	return lines.join('\n');
 }

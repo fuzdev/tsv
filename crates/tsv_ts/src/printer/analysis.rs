@@ -158,24 +158,12 @@ pub(crate) fn is_string_literal(expr: &internal::Expression) -> bool {
 /// - Template literals
 /// - Tagged template expressions
 /// - Arrow functions with template literal bodies
-pub(crate) fn needs_isolation_for_hugging(expr: &internal::Expression) -> bool {
-    match expr {
-        internal::Expression::TemplateLiteral(_)
-        | internal::Expression::TaggedTemplateExpression(_) => true,
-        internal::Expression::ArrowFunctionExpression(arrow) => {
-            // Check if the arrow body is a template literal (not a block statement)
-            if let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
-                matches!(
-                    body_expr.as_ref(),
-                    internal::Expression::TemplateLiteral(_)
-                        | internal::Expression::TaggedTemplateExpression(_)
-                )
-            } else {
-                false
-            }
-        }
-        _ => false,
-    }
+pub(crate) fn needs_isolation_for_hugging(_expr: &internal::Expression) -> bool {
+    // Template literals and arrows-with-template-body NO LONGER need isolation.
+    // With replace_end_of_line() adding literalline nodes, template breaks must
+    // propagate to parent groups for correct chain/call expansion decisions.
+    // Isolating them would block will_break() and prevent chains from expanding.
+    false
 }
 
 /// Check if an expression is a pure property chain (member expressions without calls)
@@ -360,6 +348,40 @@ fn array_pattern_nesting_depth(arr: &internal::ArrayPattern) -> usize {
 /// Matches Prettier's `templateLiteralHasNewLines` function
 pub(crate) fn template_literal_has_newlines(template: &internal::TemplateLiteral) -> bool {
     template.quasis.iter().any(|q| q.raw.contains('\n'))
+}
+
+/// Check if an expression is a template literal (or tagged template) with embedded newlines.
+///
+/// Combines the TemplateLiteral/TaggedTemplateExpression dispatch with the newline check.
+/// Used by call_formatting, new_expression, and arrow body formatting.
+pub(crate) fn is_multiline_template_expression(expr: &internal::Expression) -> bool {
+    match expr {
+        internal::Expression::TemplateLiteral(t) => template_literal_has_newlines(t),
+        internal::Expression::TaggedTemplateExpression(t) => {
+            template_literal_has_newlines(&t.quasi)
+        }
+        _ => false,
+    }
+}
+
+/// Check if there's a newline immediately before a position (skipping spaces/tabs).
+///
+/// Walks backwards from `pos` in the source, skipping horizontal whitespace.
+/// Returns true if a newline is found before any non-whitespace character.
+///
+/// Mirrors Prettier's `!hasNewline(text, locStart(node), { backwards: true })`
+/// used by `isTemplateOnItsOwnLine` to detect if a template literal was placed
+/// on its own line by the author.
+pub(crate) fn has_newline_before_position(source: &str, pos: u32) -> bool {
+    let pos = pos as usize;
+    for &b in source.as_bytes()[..pos].iter().rev() {
+        match b {
+            b' ' | b'\t' => continue,
+            b'\n' | b'\r' => return true,
+            _ => return false,
+        }
+    }
+    false
 }
 
 /// Check if an expression contains multiline content (e.g., line continuation strings)

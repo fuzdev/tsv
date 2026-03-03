@@ -85,6 +85,10 @@ pub enum ParenContext {
     /// Computed property key: `{[<expr>]: value}`
     /// Assignment expressions need parens for clarity
     ComputedPropertyKey,
+
+    /// Statement test condition: `if (<expr>)`, `while (<expr>)`, `for (;<expr>;)`, `do {} while (<expr>)`
+    /// Assignment expressions need double-parens for clarity: `while ((x = y))`
+    StatementTest,
 }
 
 /// Determines if an expression needs parentheses in a given context.
@@ -145,32 +149,48 @@ pub fn needs_parens(expr: &Expression, ctx: ParenContext) -> bool {
 
         // Type assertion (as/satisfies): `(a + b) as T`, `(await x) as T`, `(<U>x) as T`
         // Arrow functions need parens because `(...args) => x as T` parses as `(...args) => (x as T)`
+        // Ternary/assignment need parens: `(a ? b : c) as T` vs `a ? b : c as T` (different semantics)
         // Only angle-bracket assertions need parens here (as/satisfies are left-associative)
         ParenContext::TypeAssertion => {
             is_await_or_yield(expr)
                 || matches!(
                     expr,
                     Expression::BinaryExpression(_)
+                        | Expression::ConditionalExpression(_)
+                        | Expression::AssignmentExpression(_)
                         | Expression::ArrowFunctionExpression(_)
                         | Expression::TSTypeAssertion(_)
                 )
         }
 
-        // Angle-bracket assertion: `<T>(a + b)`, `<T>(<U>x)`, `<T>(x as U)`
-        // Unary argument: `!(a + b)`, `!(await x)`, `!(<T>x)`
-        // Both need parens for: await/yield, all type assertions, binary, arrow
+        // Angle-bracket assertion: `<T>(a + b)`, `<T>(<U>x)`, `<T>(x as U)`, `<T>(a ? b : c)`
+        // Unary argument: `!(a + b)`, `!(await x)`, `!(<T>x)`, `typeof (a ? b : c)`
+        // Both need parens for: await/yield, all type assertions, binary, conditional, assignment, arrow
         ParenContext::AngleBracketAssertion | ParenContext::UnaryArgument => {
             is_await_or_yield(expr)
                 || is_type_assertion(expr)
                 || matches!(
                     expr,
-                    Expression::BinaryExpression(_) | Expression::ArrowFunctionExpression(_)
+                    Expression::BinaryExpression(_)
+                        | Expression::ConditionalExpression(_)
+                        | Expression::AssignmentExpression(_)
+                        | Expression::ArrowFunctionExpression(_)
                 )
         }
 
-        // Instantiation: `(<T>() => {})<U>`, `(x as A)<T>`, `(<T>x)<U>`, `(await x)<T>`, `(yield x)<T>`
+        // Instantiation: `(<T>() => {})<U>`, `(x as A)<T>`, `(<T>x)<U>`, `(await x)<T>`, `(a = b)<T>`
+        // Ternary/binary/assignment need parens to preserve semantics:
+        // `(a ? b : c)<T>` vs `a ? b : c<T>` (different - ternary result vs alternate instantiated)
         ParenContext::InstantiationExpression => {
-            is_await_or_yield(expr) || is_type_assertion(expr) || is_function_like(expr)
+            is_await_or_yield(expr)
+                || is_type_assertion(expr)
+                || is_function_like(expr)
+                || matches!(
+                    expr,
+                    Expression::ConditionalExpression(_)
+                        | Expression::AssignmentExpression(_)
+                        | Expression::BinaryExpression(_)
+                )
         }
 
         // Await argument: `await (a + b)`, `await (x as T)`, `await (<T>x)`, `await (a ? b : c)`
@@ -204,6 +224,10 @@ pub fn needs_parens(expr: &Expression, ctx: ParenContext) -> bool {
         | ParenContext::ComputedPropertyKey => {
             matches!(expr, Expression::AssignmentExpression(_))
         }
+
+        // Statement test: `while ((x = y))`, `if ((x = getValue()))`, `for (;(x = y);)`
+        // Double-parens signal intentional assignment (not a typo for ==)
+        ParenContext::StatementTest => matches!(expr, Expression::AssignmentExpression(_)),
     }
 }
 

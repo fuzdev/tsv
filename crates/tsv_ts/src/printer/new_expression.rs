@@ -3,15 +3,21 @@
 // Handles: new Foo(), new Foo(arg1, arg2), new Foo<T>()
 
 use super::calls::{
-    PartitionedComments, build_args_split_last, find_comma_pos, has_inter_argument_comments_slice,
-    has_trailing_comments_slice, has_trailing_line_comments_slice, is_comment_after_comma,
-    is_comment_before_comma, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
+    PartitionedComments, arrow_has_type_annotations, build_args_split_last,
+    build_arrow_call_body_states, build_arrow_inline_signature, find_comma_pos,
+    has_inter_argument_comments_slice, has_trailing_comments_slice,
+    has_trailing_line_comments_slice, is_comment_after_comma, is_comment_before_comma,
+    wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
 };
 use super::utils::{
-    arrow_has_trailing_param_comments, is_block_function, is_function_composition_args,
-    is_short_second_arg_for_expand_first, last_arg_is_array_or_object, preceding_args_allow_hug,
+    arrow_has_trailing_param_comments, could_expand_arrow_body, is_array_or_object_unwrapped,
+    is_block_function, is_concise_numeric_array, is_function_composition_args,
+    is_short_second_arg_for_expand_first, preceding_args_allow_expand_last,
 };
-use super::{ParenContext, Printer, has_multiline_content, needs_parens};
+use super::{
+    ParenContext, Printer, has_multiline_content, has_newline_before_position,
+    is_multiline_template_expression, needs_parens,
+};
 use crate::ast::internal;
 use tsv_lang::doc::arena::DocId;
 
@@ -145,6 +151,141 @@ impl<'a> Printer<'a> {
                         d.text(")"),
                     ]);
                 }
+                // Expression-body arrow: break at => not at (
+                // Mirrors call_formatting.rs expression arrow handling
+                internal::Expression::ArrowFunctionExpression(arrow)
+                    if arrow.body.is_expression() =>
+                {
+                    if let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
+                        let has_no_type_annotations = !arrow_has_type_annotations(arrow);
+
+                        // Call body with complex args (block arrows, objects, arrays)
+                        let is_complex_call_body =
+                            if let internal::Expression::CallExpression(nested_call) = &**body_expr
+                            {
+                                nested_call.arguments.iter().any(|arg| match arg {
+                                    internal::Expression::ArrowFunctionExpression(arr) => {
+                                        if let internal::ArrowFunctionBody::BlockStatement(block) =
+                                            &arr.body
+                                        {
+                                            !block.body.is_empty()
+                                        } else {
+                                            false
+                                        }
+                                    }
+                                    internal::Expression::ObjectExpression(obj) => {
+                                        !obj.properties.is_empty()
+                                    }
+                                    internal::Expression::ArrayExpression(arr) => {
+                                        !arr.elements.is_empty()
+                                    }
+                                    internal::Expression::FunctionExpression(_) => true,
+                                    _ => false,
+                                })
+                            } else {
+                                false
+                            };
+
+                        if is_complex_call_body && has_no_type_annotations {
+                            let inline_sig = build_arrow_inline_signature(self, arrow);
+                            let arrow_doc = self.build_expression_doc(&new_expr.arguments[0]);
+                            let body_doc = self.build_expression_doc(body_expr);
+
+                            // Body has hardlines: use group-based approach
+                            if d.will_break(body_doc) {
+                                return d.group(d.concat(&[
+                                    callee_with_types,
+                                    d.text("("),
+                                    d.concat(&[inline_sig, d.text(" =>")]),
+                                    d.group(
+                                        d.concat(&[d.indent_line(body_doc), d.trailing_comma()]),
+                                    ),
+                                    d.softline(),
+                                    d.text(")"),
+                                ]));
+                            }
+
+                            return build_arrow_call_body_states(
+                                d,
+                                callee_with_types,
+                                arrow_doc,
+                                inline_sig,
+                                body_doc,
+                            );
+                        }
+
+                        // Expandable body (ternary): conditional parens
+                        // Flat: `new Xy((x) => (x ? y : z))`
+                        // Break: `new Xy((x) =>\n  x ? y : z,\n)`
+                        if could_expand_arrow_body(body_expr) {
+                            let sig_doc = d.group(self.build_arrow_signature_doc(arrow));
+                            let body_doc = self.build_expression_doc(body_expr);
+
+                            let state_break = d.concat(&[
+                                callee_with_types,
+                                d.text("("),
+                                sig_doc,
+                                d.text(" =>"),
+                                d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+                                d.hardline(),
+                                d.text(")"),
+                            ]);
+
+                            if d.will_break(body_doc) {
+                                return state_break;
+                            }
+
+                            let state_flat = d.concat(&[
+                                callee_with_types,
+                                d.text("("),
+                                sig_doc,
+                                d.text(" => ("),
+                                body_doc,
+                                d.text("))"),
+                            ]);
+
+                            let state_all_broken = d.concat(&[
+                                callee_with_types,
+                                d.text("("),
+                                d.indent(d.concat(&[
+                                    d.hardline(),
+                                    sig_doc,
+                                    d.text(" =>"),
+                                    d.indent(d.concat(&[
+                                        d.hardline(),
+                                        body_doc,
+                                        d.trailing_comma(),
+                                    ])),
+                                ])),
+                                d.hardline(),
+                                d.text(")"),
+                            ]);
+
+                            return d.conditional_group(&[
+                                state_flat,
+                                state_break,
+                                state_all_broken,
+                            ]);
+                        }
+
+                        // Simple call body: 2-state break at =>
+                        if matches!(&**body_expr, internal::Expression::CallExpression(_))
+                            && has_no_type_annotations
+                        {
+                            let arrow_doc = self.build_expression_doc(&new_expr.arguments[0]);
+                            let body_doc = self.build_expression_doc(body_expr);
+                            let inline_sig = build_arrow_inline_signature(self, arrow);
+                            return build_arrow_call_body_states(
+                                d,
+                                callee_with_types,
+                                arrow_doc,
+                                inline_sig,
+                                body_doc,
+                            );
+                        }
+                    }
+                    // Non-call/non-expandable expression body or typed arrows: fall through
+                }
                 _ => {}
             }
         }
@@ -166,6 +307,31 @@ impl<'a> Printer<'a> {
             );
 
             return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
+        }
+
+        // Single template literal argument with embedded newlines:
+        // Same logic as CallExpression (call_formatting.rs) — hug when template
+        // is on the same line as (, expand when it's on its own line.
+        if new_expr.arguments.len() == 1 && is_multiline_template_expression(&new_expr.arguments[0])
+        {
+            let template_start = new_expr.arguments[0].span().start;
+            if !has_newline_before_position(self.source, template_start) {
+                // Template on same line as ( — hug it
+                let arg_doc = self.build_expression_doc(&new_expr.arguments[0]);
+                let mut parts = vec![callee_with_types, d.text("("), arg_doc, d.text(")")];
+
+                // Add trailing comments as line suffix
+                let last_arg = &new_expr.arguments[0];
+                let paren_close = new_expr.span.end;
+                if let Some(suffix) =
+                    self.build_trailing_comments_line_suffix(last_arg.span().end, paren_close)
+                {
+                    parts.push(suffix);
+                }
+
+                return d.concat(&parts);
+            }
+            // Template on its own line — fall through to has_multiline_content
         }
 
         // Check if any argument has multiline content
@@ -335,25 +501,54 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // "First args inline with last array/object" pattern (same as CallExpression):
-        // When last arg is array/object and preceding args are short,
-        // keep short args inline with the opening bracket/brace.
+        // "Expand last arg" pattern: 3-state conditional group (inline → hug → expand all).
+        // Applies when last arg is function/arrow OR non-concise array/object.
+        // e.g., new Foo(arg, () => { ... }) or new Foo(arg, [items])
         // NOTE: This must come AFTER the trailing comment check above.
-        if new_expr.arguments.len() >= 2
-            && last_arg_is_array_or_object(&new_expr.arguments)
-            && preceding_args_allow_hug(&new_expr.arguments, self.line_breaks)
-            && !has_inter_argument_comments_slice(&new_expr.arguments, self)
         {
-            let (head_parts, last_arg_doc, _) = build_args_split_last(&new_expr.arguments, self);
+            let last_arg = new_expr.arguments.last();
+            let last_is_function = matches!(
+                last_arg,
+                Some(
+                    internal::Expression::ArrowFunctionExpression(_)
+                        | internal::Expression::FunctionExpression(_)
+                )
+            );
+            let last_is_expandable_collection = last_arg
+                .is_some_and(|arg| is_array_or_object_unwrapped(arg) && !is_concise_numeric_array(arg));
 
-            // Keep short args inline with last arg's opener
-            return d.group(d.concat(&[
-                callee_with_types,
-                d.text("("),
-                d.concat(&head_parts),
-                last_arg_doc,
-                d.text(")"),
-            ]));
+            if new_expr.arguments.len() >= 2
+                && (last_is_function || last_is_expandable_collection)
+                && preceding_args_allow_expand_last(&new_expr.arguments, self.line_breaks)
+                && !has_inter_argument_comments_slice(&new_expr.arguments, self)
+            {
+                let (head_parts, last_arg_doc, all_args_broken) =
+                    build_args_split_last(&new_expr.arguments, self);
+
+                let state_inline = d.concat(&[
+                    callee_with_types,
+                    d.text("("),
+                    d.concat(&head_parts),
+                    last_arg_doc,
+                    d.text(")"),
+                ]);
+                let state_hug = d.concat(&[
+                    callee_with_types,
+                    d.text("("),
+                    d.concat(&head_parts),
+                    d.group_break(last_arg_doc),
+                    d.text(")"),
+                ]);
+                let state_expand_all = d.concat(&[
+                    callee_with_types,
+                    d.text("("),
+                    d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
+                    d.line(),
+                    d.text(")"),
+                ]);
+
+                return d.conditional_group(&[state_inline, state_hug, state_expand_all]);
+            }
         }
 
         // Check for leading comments or inter-argument block comments

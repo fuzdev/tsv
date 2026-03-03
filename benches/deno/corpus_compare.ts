@@ -592,12 +592,33 @@ async function main(): Promise<void> {
 				console.log(
 					`    EXPLAINED (${explainedCount}/${totalHunks} hunks): ${patterns}`,
 				);
+				let fileHunksShown = 0;
 				for (const idx of coverage.unexplainedHunks) {
 					const hunk = coverage.hunks[idx];
-					const lineCount = hunk.addedLines.length + hunk.removedLines.length;
-					const preview = (hunk.addedLines[0] || hunk.removedLines[0] || '').trim().slice(0, 50);
+					if (showDiff && fileHunksShown < diffLimit) {
+						const oursLabel = hunk.oursRange ? `ours:${hunk.oursRange.start}` : '';
+						const prettierLabel = hunk.prettierRange ? `prettier:${hunk.prettierRange.start}` : '';
+						console.log(
+							`    UNEXPLAINED hunk ${idx}: @@ ${oursLabel} / ${prettierLabel} @@`,
+						);
+						for (const line of formatDiffForTerminal(hunk.lines)) {
+							console.log(`      ${line}`);
+						}
+						fileHunksShown++;
+					} else {
+						const lineCount = hunk.addedLines.length + hunk.removedLines.length;
+						const preview = (hunk.addedLines[0] || hunk.removedLines[0] || '')
+							.trim().slice(0, 50);
+						console.log(
+							`    UNEXPLAINED hunk ${idx}: "${preview}" (${lineCount} lines)`,
+						);
+					}
+				}
+				if (showDiff && coverage.unexplainedHunks.length > diffLimit) {
 					console.log(
-						`    UNEXPLAINED hunk ${idx}: "${preview}" (${lineCount} lines)`,
+						`    ... ${
+							coverage.unexplainedHunks.length - diffLimit
+						} more (increase --diff-limit to show)`,
 					);
 				}
 			}

@@ -7,6 +7,7 @@
 // Note: Block statements are in blocks.rs as a reusable utility
 
 use super::super::utils::arrow_has_trailing_param_comments;
+use super::super::{has_newline_before_position, is_multiline_template_expression};
 use super::{ParenContext, Printer, needs_parens, unwrap_parenthesized};
 use crate::ast::internal;
 use crate::printer::types::helpers::is_huggable_type;
@@ -26,10 +27,12 @@ fn is_object_expression(expr: &internal::Expression) -> bool {
 /// - Arrow functions: `() => () => ...`
 /// - Block statements (handled separately)
 /// - JSX elements (not yet supported)
-/// - Template literals on own line (not yet implemented)
+///   When true, body uses `" " + body` (simple space).
+///   When false, body uses `indent([line, body])` (can break to new line).
 ///
-/// When true, body uses `" " + body` (simple space).
-/// When false, body uses `indent([line, body])` (can break to new line).
+/// Note: Template literals are NOT included here — they need source-position-dependent
+/// handling (hug when on same line as `=>`, break when on own line). That check is
+/// done in the caller via `is_template_on_same_line` which has access to source text.
 fn should_hug_arrow_body(expr: &internal::Expression) -> bool {
     matches!(
         expr,
@@ -37,6 +40,16 @@ fn should_hug_arrow_body(expr: &internal::Expression) -> bool {
             | internal::Expression::ArrayExpression(_)
             | internal::Expression::ArrowFunctionExpression(_)
     )
+}
+
+/// Check if an expression is a multiline template literal on the same line as `=>`.
+///
+/// Prettier's `isTemplateOnItsOwnLine` — hug when the backtick is on the same line
+/// as `=>` (no newline before it in source), break when the user placed it on its own line.
+/// This creates dual-stable behavior: both forms are preserved.
+fn is_template_on_same_line(source: &str, expr: &internal::Expression) -> bool {
+    is_multiline_template_expression(expr)
+        && !has_newline_before_position(source, expr.span().start)
 }
 
 /// Check if an expression is a type assertion (as/satisfies) wrapping an object literal
@@ -221,7 +234,7 @@ impl<'a> Printer<'a> {
                     };
 
                 let should_hug = !has_post_arrow_comments
-                    && should_hug_arrow_body(expr)
+                    && (should_hug_arrow_body(expr) || is_template_on_same_line(self.source, expr))
                     && !chain_has_return_type
                     && !body_arrow_has_trailing_param_comments;
 
@@ -284,19 +297,10 @@ impl<'a> Printer<'a> {
                     // This allows the arrow body to stay inline even when the parent element
                     // is in break mode, as long as the body content fits from its position.
                     //
-                    // For template literal bodies, wrap in IsolatedGroup to prevent the
-                    // template's internal ${} breaks from forcing the arrow body to break.
-                    // This enables `.map((x) => \`${...}\`)` to stay hugged.
+                    // Normal expression body: can break after => with indentation.
+                    // Template literal bodies with literalline nodes will propagate
+                    // breaks naturally, enabling chain/call expansion decisions.
                     let body_doc = self.build_arrow_body_doc(expr);
-                    let body_doc = if matches!(
-                        expr.as_ref(),
-                        internal::Expression::TemplateLiteral(_)
-                            | internal::Expression::TaggedTemplateExpression(_)
-                    ) {
-                        d.isolated_group(body_doc)
-                    } else {
-                        body_doc
-                    };
                     parts.push(d.group(d.indent(d.concat(&[d.line(), body_doc]))));
                 }
             }

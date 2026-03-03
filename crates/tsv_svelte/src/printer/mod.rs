@@ -426,15 +426,52 @@ impl<'a> Printer<'a> {
                 && !matches!(node, FragmentNode::Text(text) if text.raw.is_whitespace_only())
         });
 
-        for (i, node) in fragment.nodes.iter().enumerate() {
+        let mut i = 0;
+        while i < fragment.nodes.len() {
+            let node = &fragment.nodes[i];
             // Skip indices that were already printed (e.g., comments before script)
             if skip_indices.contains(&i) {
+                i += 1;
                 continue;
             }
+
+            // Detect inline runs: inline node directly adjacent (span-touching) to a
+            // control flow block. Route these through the doc-based printer which handles
+            // `has_preceding_breakable` correctly, breaking fn() args before inserting newlines.
+            if let Some(run_end) = self.detect_root_inline_run(&fragment.nodes, i) {
+                // Resolve pending whitespace before the run (same as ExpressionTag handling)
+                if state.has_output_content {
+                    match state.pending_ws {
+                        PendingWhitespace::None => {}
+                        PendingWhitespace::AlreadyHandled => {}
+                        PendingWhitespace::Space => {
+                            if state.prev_kind == PrevNodeKind::Comment {
+                                self.write("\n");
+                            } else {
+                                self.write(" ");
+                            }
+                        }
+                        PendingWhitespace::Newline => self.write("\n"),
+                        PendingWhitespace::BlankLine => self.write("\n\n"),
+                    }
+                }
+
+                // Build and render the inline run through the doc-based path
+                let doc = self.build_nodes_doc_with_context(&fragment.nodes[i..=run_end], false);
+                self.render_doc_immediate(doc);
+
+                state.has_output_content = true;
+                state.prev_kind = PrevNodeKind::Block; // control flow blocks are block-like
+                state.pending_ws = PendingWhitespace::None;
+                i = run_end + 1;
+                continue;
+            }
+
             match node {
                 FragmentNode::Text(text) => {
                     // Skip leading whitespace-only text nodes at root level
                     if Some(i) < first_non_ws_idx {
+                        i += 1;
                         continue;
                     }
 
@@ -459,7 +496,9 @@ impl<'a> Printer<'a> {
                         let text_has_trailing_newline = text.raw.has_trailing_newline();
 
                         // Upgrade pending whitespace based on text's leading whitespace
-                        if text_has_leading_newline {
+                        if text.raw.leading_whitespace().has_blank_line() {
+                            state.pending_ws.upgrade(PendingWhitespace::BlankLine);
+                        } else if text_has_leading_newline {
                             state.pending_ws.upgrade(PendingWhitespace::Newline);
                         } else if text_has_leading_space {
                             state.pending_ws.upgrade(PendingWhitespace::Space);
@@ -677,6 +716,72 @@ impl<'a> Printer<'a> {
                     state.after_block();
                 }
             }
+            i += 1;
+        }
+    }
+
+    /// Detect an inline run starting at `start_idx` in the root fragment.
+    ///
+    /// An inline run is an inline node (ExpressionTag, HtmlTag, RenderTag, or inline Element)
+    /// directly span-adjacent to a control flow block (no whitespace between `}` and `{#if`),
+    /// optionally with text nodes between them. Multiple control flow blocks may be chained.
+    /// These must be routed through the doc-based printer so that function call args
+    /// break before the control flow block gets a forced newline.
+    ///
+    /// Returns `Some(end_idx)` (inclusive) if an inline run was detected, None otherwise.
+    fn detect_root_inline_run(&self, nodes: &[FragmentNode], start_idx: usize) -> Option<usize> {
+        // Must start with an inline node (not text, not control flow)
+        if !self.is_inline_run_node(&nodes[start_idx]) {
+            return None;
+        }
+
+        // Walk forward through span-adjacent nodes looking for a control flow block.
+        // Track last_cf separately — the run ends at the last control flow block,
+        // not at trailing text/whitespace that happens to be span-adjacent.
+        let mut last_cf_idx = None;
+
+        for j in (start_idx + 1)..nodes.len() {
+            let prev_end = nodes[j - 1].span().end;
+            let curr_start = nodes[j].span().start;
+
+            // Must be directly adjacent (no whitespace gap in source)
+            if prev_end != curr_start {
+                break;
+            }
+
+            match &nodes[j] {
+                FragmentNode::Text(text) => {
+                    // Blank lines break inline runs — they signal separate logical units
+                    if text.raw.has_blank_line() {
+                        break;
+                    }
+                    // Non-blank text nodes can appear between start and control flow
+                }
+                FragmentNode::IfBlock(_)
+                | FragmentNode::EachBlock(_)
+                | FragmentNode::AwaitBlock(_)
+                | FragmentNode::KeyBlock(_) => {
+                    last_cf_idx = Some(j);
+                    // Don't break - continue scanning for chained control flow blocks
+                }
+                node if self.is_inline_run_node(node) => {
+                    // Inline nodes (expressions, html tags, render tags, inline elements)
+                }
+                _ => break,
+            }
+        }
+
+        last_cf_idx
+    }
+
+    /// Check if a fragment node can participate in an inline run (as start or intermediate node).
+    fn is_inline_run_node(&self, node: &FragmentNode) -> bool {
+        match node {
+            FragmentNode::ExpressionTag(_)
+            | FragmentNode::HtmlTag(_)
+            | FragmentNode::RenderTag(_) => true,
+            FragmentNode::Element(el) => !self.is_block_element(el),
+            _ => false,
         }
     }
 

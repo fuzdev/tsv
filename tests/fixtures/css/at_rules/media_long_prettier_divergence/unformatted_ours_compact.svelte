@@ -7,7 +7,7 @@
 /* 101 chars - we wrap, Prettier stays inline */
 @media (min-width: 1000px) and (max-width: 2000px) and (height > 300px) and (a: 100aaaaaaaaaaaaa){.b{color:blue;}}
 
-/* 102 chars - we wrap, Prettier stays inline */
+/* 102 chars - we wrap, Prettier stays inline or preserves wrapping */
 @media (min-width: 1000px) and (max-width: 2000px) and (height > 300px) and (a: 100aaaaaaaaaaaaaa){.c{color:green;}}
 
 /* 103 chars - we wrap, Prettier stays inline */

@@ -153,7 +153,7 @@ pub fn run_test(test: &TestFile) -> (TestResult, Option<bool>) {
 fn run_parse_test(content: &str, frontmatter: &Frontmatter) -> TestResult {
     let is_negative_parse = frontmatter.is_negative_parse();
 
-    // Try to parse the content as JavaScript/TypeScript
+    // Try to parse the content as TypeScript/JS
     // Note: test262 tests are pure ECMAScript, so we parse as TypeScript
     // (which is a superset of JavaScript)
     let parse_result = tsv_ts::parse(content);

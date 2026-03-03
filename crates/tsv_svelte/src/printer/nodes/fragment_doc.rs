@@ -110,7 +110,7 @@ impl<'a> Printer<'a> {
     /// # Parameters
     /// - `trim_text`: If true, trim text completely (block context).
     ///   If false, preserve single space at boundaries (inline context).
-    pub(super) fn build_nodes_doc_with_context(
+    pub(crate) fn build_nodes_doc_with_context(
         &self,
         nodes: &[FragmentNode],
         trim_text: bool,
@@ -134,6 +134,8 @@ impl<'a> Printer<'a> {
                             FragmentNode::ExpressionTag(_)
                                 | FragmentNode::Element(_)
                                 | FragmentNode::SpecialElement(_)
+                                | FragmentNode::HtmlTag(_)
+                                | FragmentNode::RenderTag(_)
                         )
                     });
                     self.build_fragment_node_doc_with_preceding_context(
@@ -254,6 +256,8 @@ impl<'a> Printer<'a> {
                         FragmentNode::ExpressionTag(_)
                             | FragmentNode::Element(_)
                             | FragmentNode::SpecialElement(_)
+                            | FragmentNode::HtmlTag(_)
+                            | FragmentNode::RenderTag(_)
                     )
                 });
                 if let Some(node_doc) = self.build_fragment_node_doc_with_preceding_context(

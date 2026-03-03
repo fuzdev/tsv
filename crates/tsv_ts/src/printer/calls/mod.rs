@@ -35,12 +35,13 @@ pub(crate) use arg_comments::{
     is_comment_before_comma,
 };
 pub(crate) use arg_wrapping::{
-    build_args_split_last, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
+    arrow_has_type_annotations, build_args_split_last, build_arrow_call_body_states,
+    build_arrow_inline_signature, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
 };
 
 use super::Printer;
 use super::chain;
-use super::utils::{is_block_function, preceding_args_allow_hug};
+use super::utils::{is_block_function, preceding_args_allow_expand_last};
 use crate::ast::internal;
 use arg_comments::any_comment_forces_expansion;
 use tsv_lang::doc::arena::DocId;
@@ -103,7 +104,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_call_doc(&self, call: &internal::CallExpression) -> DocId {
         // Curried call with callback pattern: fn()('arg', () => { ... })
         // When the callee is a call expression (curried call) and the last argument
-        // is a block function, keep args hugged (always inline, no conditional_group).
+        // is a block function, use conditional_group to try inline first, then expand-all.
         // This matches Prettier's behavior for test.each() and similar patterns.
         // Must check BEFORE chain handling to bypass chain logic.
         // Skip if there are blank lines between args or comments that force expansion
@@ -116,31 +117,51 @@ impl<'a> Printer<'a> {
         if matches!(&*call.callee, internal::Expression::CallExpression(_))
             && call.arguments.len() >= 2
             && call.arguments.last().is_some_and(is_block_function)
-            && preceding_args_allow_hug(&call.arguments, self.line_breaks)
+            && preceding_args_allow_expand_last(&call.arguments, self.line_breaks)
             && !has_blank_lines_between_args
             && !any_comment_forces_expansion(call, self, paren_open)
         {
-            // Build curried callback doc directly - always hugged, with leading comments
             let d = self.d();
             let callee_doc = self.build_expression_doc(&call.callee);
             let first_arg_start = call.arguments[0].span().start;
 
             // Build args split into head (with commas) and last
-            let (head_parts, last_arg_doc, _) = build_args_split_last(&call.arguments, self);
+            let (head_parts, last_arg_doc, all_args_broken) =
+                build_args_split_last(&call.arguments, self);
 
-            // Build inner parts: optional leading comments + head args + last arg
-            // Uses _opt variant to avoid double binary search
+            // Build inline state with optional leading comments
             let leading_comments = self
                 .build_inline_comments_between_doc_trailing_space_opt(paren_open, first_arg_start);
-            let mut inner_parts: Vec<DocId> = Vec::new();
+            let mut inline_inner: Vec<DocId> = Vec::new();
             if let Some(comment) = leading_comments {
-                inner_parts.push(comment);
+                inline_inner.push(comment);
             }
-            inner_parts.extend(head_parts);
-            inner_parts.push(last_arg_doc);
-            let inner = d.concat(&inner_parts);
+            inline_inner.extend(head_parts);
+            inline_inner.push(last_arg_doc);
 
-            return d.concat(&[callee_doc, d.text("("), inner, d.text(")")]);
+            let state_inline = d.concat(&[
+                callee_doc,
+                d.text("("),
+                d.concat(&inline_inner),
+                d.text(")"),
+            ]);
+            let state_expand_all = d.concat(&[
+                callee_doc,
+                d.text("("),
+                d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
+                d.line(),
+                d.text(")"),
+            ]);
+
+            return d.conditional_group(&[state_inline, state_expand_all]);
+        }
+
+        // Test function calls (it.skip, test.only, etc.) stay on one line even
+        // if they exceed print width. Must check BEFORE chain routing, because
+        // memberish callees like `it.skip(...)` would otherwise be routed through
+        // the chain path which doesn't know about test call special-casing.
+        if test_patterns::is_test_call(call, self) {
+            return self.build_call_doc_with_wrapping(call);
         }
 
         // Check if this is a true chain (callee contains calls, like `a().b()`)

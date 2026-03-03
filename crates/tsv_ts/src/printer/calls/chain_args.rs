@@ -3,18 +3,19 @@
 // Handles building call arguments in chain contexts where the callee
 // is handled separately by the chain printer.
 
-use super::super::Printer;
 use super::super::utils::{
     arrow_has_trailing_param_comments, could_expand_arrow_body, is_block_function,
-    is_short_second_arg_for_expand_first, last_arg_is_array_or_object, preceding_args_allow_hug,
+    is_concise_numeric_array, is_function_composition_args, is_short_second_arg_for_expand_first,
+    last_arg_is_array_or_object, preceding_args_allow_expand_last,
 };
+use super::super::{Printer, has_newline_before_position, is_multiline_template_expression};
 use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, find_comma_pos, has_inter_argument_comments,
     has_trailing_comments_on_args, is_comment_after_comma, is_comment_before_comma,
 };
 use super::arg_wrapping::{
     ChainArgKind, arrow_has_type_annotations, build_args_split_last, build_arrow_inline_signature,
-    classify_chain_arg, wrap_args_with_soft_breaks, wrap_huggable_arg,
+    build_chain_expand_all_args, classify_chain_arg, wrap_args_with_soft_breaks, wrap_huggable_arg,
 };
 use crate::ast::internal;
 use tsv_lang::doc::arena::DocId;
@@ -164,8 +165,13 @@ fn build_call_args_doc_for_chain_impl(
     // Inline block comments don't force expansion
     let comments_force_expansion = any_comment_forces_expansion(call, printer, paren_open);
 
-    let force_expand =
-        force_expand || has_blank_lines || comments_force_expansion || all_args_are_arrows;
+    // Function composition: call arg contains a callback → expand all args
+    // e.g., x.y(arr.map((e) => e[0]), ['foo']) — matches Prettier's isFunctionCompositionArgs
+    let force_expand = force_expand
+        || has_blank_lines
+        || comments_force_expansion
+        || all_args_are_arrows
+        || is_function_composition_args(&call.arguments);
 
     let prefix = if optional { "?.(" } else { "(" };
 
@@ -565,6 +571,21 @@ fn build_call_args_doc_for_chain_impl(
                 return d.concat(&parts);
             }
 
+            // Single multiline template literal on its own line — preserve expanded form.
+            // Mirrors Prettier's isTemplateOnItsOwnLine: walks backwards from the
+            // template backtick to check if the author placed it on a new line.
+            let template_on_own_line = is_multiline_template_expression(arg)
+                && has_newline_before_position(printer.source, arg_start);
+
+            if template_on_own_line {
+                let arg_doc = printer.build_expression_doc(arg);
+                parts.push(d.text(prefix));
+                parts.push(d.indent(d.concat(&[d.hardline(), arg_doc, d.text(",")])));
+                parts.push(d.hardline());
+                parts.push(d.text(")"));
+                return d.concat(&parts);
+            }
+
             match classify_chain_arg(arg) {
                 ChainArgKind::NeedsSoftWrap => {
                     // Needs soft-break wrapping - e.g., long strings
@@ -585,23 +606,36 @@ fn build_call_args_doc_for_chain_impl(
             return d.concat(&parts);
         }
 
-        // Multiple arguments with callback hugging pattern:
-        // When last arg is a block function and preceding args allow hugging,
-        // keep args inline: `.method('arg', () => { ... })` instead of expanding
+        // Multiple arguments with block-body callback:
+        // Use conditional_group to try inline first, then expand-all.
+        // fits() checks actual width, handling both short and non-short preceding args.
+        //
+        // IMPORTANT: Cannot use wrap_args_with_soft_breaks (regular group) because
+        // will_break() recurses into the block body's hardlines and forces break
+        // without trying fits(). conditional_group uses fits() directly.
         if call.arguments.len() >= 2
             && call.arguments.last().is_some_and(is_block_function)
-            && preceding_args_allow_hug(&call.arguments, printer.line_breaks)
+            && preceding_args_allow_expand_last(&call.arguments, printer.line_breaks)
             && !comments_force_expansion
         {
-            let (head_parts, last_arg_doc, _) = build_args_split_last(&call.arguments, printer);
-            let all_parts: Vec<_> = head_parts
-                .into_iter()
-                .chain(std::iter::once(last_arg_doc))
-                .collect();
-            let inner = d.concat(&all_parts);
-            parts.push(d.text(prefix));
-            parts.push(inner);
-            parts.push(d.text(")"));
+            let (head_parts, last_arg_doc, all_args_broken) =
+                build_args_split_last(&call.arguments, printer);
+
+            // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
+            if head_parts.iter().any(|&id| d.will_break(id)) {
+                parts.push(build_chain_expand_all_args(d, prefix, all_args_broken));
+                return d.concat(&parts);
+            }
+
+            let state_inline = d.concat(&[
+                d.text(prefix),
+                d.concat(&head_parts),
+                last_arg_doc,
+                d.text(")"),
+            ]);
+            let state_expand_all = build_chain_expand_all_args(d, prefix, all_args_broken);
+
+            parts.push(d.conditional_group(&[state_inline, state_expand_all]));
             return d.concat(&parts);
         }
 
@@ -609,7 +643,7 @@ fn build_call_args_doc_for_chain_impl(
         // Prettier keeps preceding args inline and breaks after =>
         // e.g., `a.b(c, (x) =>\n  fn(x, ...),\n);`
         if call.arguments.len() >= 2
-            && preceding_args_allow_hug(&call.arguments, printer.line_breaks)
+            && preceding_args_allow_expand_last(&call.arguments, printer.line_breaks)
             && !comments_force_expansion
             && let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
                 call.arguments.last()
@@ -619,6 +653,13 @@ fn build_call_args_doc_for_chain_impl(
         {
             let (head_parts, last_arg_doc, all_args_broken) =
                 build_args_split_last(&call.arguments, printer);
+
+            // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
+            if head_parts.iter().any(|&id| d.will_break(id)) {
+                parts.push(build_chain_expand_all_args(d, prefix, all_args_broken));
+                return d.concat(&parts);
+            }
+
             let inline_sig = build_arrow_inline_signature(printer, arrow);
             let body_doc = printer.build_expression_doc(body_expr);
 
@@ -642,12 +683,7 @@ fn build_call_args_doc_for_chain_impl(
             ]);
 
             // State 2: expand all args
-            let state_expand_all = d.concat(&[
-                d.text(prefix),
-                d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
-                d.line(),
-                d.text(")"),
-            ]);
+            let state_expand_all = build_chain_expand_all_args(d, prefix, all_args_broken);
 
             parts.push(d.conditional_group(&[state_inline, state_break_body, state_expand_all]));
             return d.concat(&parts);
@@ -657,7 +693,7 @@ fn build_call_args_doc_for_chain_impl(
         // Prettier keeps preceding args inline and expands object/array internally
         // e.g., `a.b(c, (x) => ({\n  y: x,\n}));`
         if call.arguments.len() >= 2
-            && preceding_args_allow_hug(&call.arguments, printer.line_breaks)
+            && preceding_args_allow_expand_last(&call.arguments, printer.line_breaks)
             && !comments_force_expansion
             && let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
                 call.arguments.last()
@@ -671,6 +707,13 @@ fn build_call_args_doc_for_chain_impl(
         {
             let (head_parts, last_arg_doc, all_args_broken) =
                 build_args_split_last(&call.arguments, printer);
+
+            // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
+            if head_parts.iter().any(|&id| d.will_break(id)) {
+                parts.push(build_chain_expand_all_args(d, prefix, all_args_broken));
+                return d.concat(&parts);
+            }
+
             let inline_sig = build_arrow_inline_signature(printer, arrow);
             // Object/array in arrow body needs parens: (x) => ({ ... })
             let body_doc = d.parens(printer.build_expression_doc(body_expr));
@@ -694,14 +737,48 @@ fn build_call_args_doc_for_chain_impl(
             ]);
 
             // State 2: expand all args
-            let state_expand_all = d.concat(&[
-                d.text(prefix),
-                d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
-                d.line(),
-                d.text(")"),
-            ]);
+            let state_expand_all = build_chain_expand_all_args(d, prefix, all_args_broken);
 
             parts.push(d.conditional_group(&[state_inline, state_hug, state_expand_all]));
+            return d.concat(&parts);
+        }
+
+        // "Expand first arg" pattern: first arg is block function, rest are short
+        // e.g., `.reduce((acc, item) => { ... }, {})` - callback hugs, tail args stay inline
+        // Matches prettier's shouldExpandFirstArg behavior
+        // NOTE: Must come before expand-last-array/object to match Prettier's ordering —
+        // shouldExpandFirstArg is checked before shouldExpandLastArg for arrays/objects.
+        if call.arguments.len() == 2
+            && is_block_function(&call.arguments[0])
+            && !comments_force_expansion
+            && is_short_second_arg_for_expand_first(&call.arguments[1], |start, end| {
+                printer.has_comments_between(start, end)
+            })
+        {
+            // First arg (callback) expands, tail args stay inline
+            let first_arg_doc = printer.build_arg_expression_doc(&call.arguments[0]);
+            let second_arg_doc = printer.build_arg_expression_doc(&call.arguments[1]);
+
+            // Prettier: if (tailArgs.some(willBreak)) return allArgsBrokenOut()
+            if d.will_break(second_arg_doc) {
+                let all_args = d.join_doc(
+                    call.arguments
+                        .iter()
+                        .map(|arg| printer.build_arg_expression_doc(arg)),
+                    d.comma_hardline(),
+                );
+                parts.push(d.text(prefix));
+                parts.push(d.indent(d.concat(&[d.hardline(), all_args, d.text(",")])));
+                parts.push(d.hardline());
+                parts.push(d.text(")"));
+                return d.concat(&parts);
+            }
+
+            parts.push(d.text(prefix));
+            parts.push(first_arg_doc);
+            parts.push(d.text(", "));
+            parts.push(second_arg_doc);
+            parts.push(d.text(")"));
             return d.concat(&parts);
         }
 
@@ -713,7 +790,8 @@ fn build_call_args_doc_for_chain_impl(
         // Skip when last two args are same type (both arrays or both objects) - use expand-all instead.
         if call.arguments.len() >= 2
             && last_arg_is_array_or_object(&call.arguments)
-            && preceding_args_allow_hug(&call.arguments, printer.line_breaks)
+            && !call.arguments.last().is_some_and(is_concise_numeric_array)
+            && preceding_args_allow_expand_last(&call.arguments, printer.line_breaks)
             && !comments_force_expansion
         {
             // Check if last two args have the same "expandable" type (both arrays or both objects)
@@ -737,6 +815,12 @@ fn build_call_args_doc_for_chain_impl(
                 let (head_parts, last_arg_doc, all_args_broken) =
                     build_args_split_last(&call.arguments, printer);
 
+                // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
+                if head_parts.iter().any(|&id| d.will_break(id)) {
+                    parts.push(build_chain_expand_all_args(d, prefix, all_args_broken));
+                    return d.concat(&parts);
+                }
+
                 // State 0: inline - all args on one line
                 let state_inline = d.concat(&[
                     d.text(prefix),
@@ -755,38 +839,11 @@ fn build_call_args_doc_for_chain_impl(
                 ]);
 
                 // State 2: expand all - all args on separate lines
-                let state_expand_all = d.concat(&[
-                    d.text(prefix),
-                    d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
-                    d.line(),
-                    d.text(")"),
-                ]);
+                let state_expand_all = build_chain_expand_all_args(d, prefix, all_args_broken);
 
                 parts.push(d.conditional_group(&[state_inline, state_hug, state_expand_all]));
                 return d.concat(&parts);
             }
-        }
-
-        // "Expand first arg" pattern: first arg is block function, rest are short
-        // e.g., `.reduce((acc, item) => { ... }, {})` - callback hugs, tail args stay inline
-        // Matches prettier's shouldExpandFirstArg behavior
-        if call.arguments.len() == 2
-            && is_block_function(&call.arguments[0])
-            && !comments_force_expansion
-            && is_short_second_arg_for_expand_first(&call.arguments[1], |start, end| {
-                printer.has_comments_between(start, end)
-            })
-        {
-            // First arg (callback) expands, tail args stay inline
-            let first_arg_doc = printer.build_arg_expression_doc(&call.arguments[0]);
-            let second_arg_doc = printer.build_arg_expression_doc(&call.arguments[1]);
-
-            parts.push(d.text(prefix));
-            parts.push(first_arg_doc);
-            parts.push(d.text(", "));
-            parts.push(second_arg_doc);
-            parts.push(d.text(")"));
-            return d.concat(&parts);
         }
 
         // Multiple arguments: wrap in group with softlines so they can break

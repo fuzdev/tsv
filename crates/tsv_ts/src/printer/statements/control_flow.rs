@@ -321,11 +321,15 @@ impl<'a> Printer<'a> {
 
         // Structure: group([indent([softline/hardline, comments, condition, comments]), softline/hardline])
         // The closing softline/hardline is OUTSIDE the indent so `)` aligns with `(`
-        let closing = if has_own_line_leading || !trailing_own_line.is_empty() {
-            d.hardline()
-        } else {
-            d.softline()
-        };
+        // Force break when trailing inline line comments exist — flattening would cause
+        // the // comment to swallow the closing `) {` producing unparseable output
+        let has_trailing_line_comment = trailing_inline.iter().any(|c| !c.is_block);
+        let closing =
+            if has_own_line_leading || !trailing_own_line.is_empty() || has_trailing_line_comment {
+                d.hardline()
+            } else {
+                d.softline()
+            };
 
         d.group(d.concat(&[d.indent(d.concat(&inner_parts)), closing]))
     }
@@ -438,13 +442,20 @@ impl<'a> Printer<'a> {
     ///
     /// For binary expressions, uses ungrouped version so parent group controls breaking.
     /// This ensures all operands break together when the condition exceeds print width.
+    /// Assignment expressions get double-parens for clarity: `while ((x = y))`
     fn build_condition_doc(&self, expr: &internal::Expression) -> DocId {
-        match expr {
+        let inner = match expr {
             internal::Expression::BinaryExpression(binary) => {
                 // Use ungrouped version so parent group controls breaking
                 self.build_binary_chain_doc_ungrouped(binary)
             }
             _ => self.build_expression_doc(expr),
+        };
+        if super::needs_parens(expr, super::ParenContext::StatementTest) {
+            let d = self.d();
+            d.concat(&[d.text("("), inner, d.text(")")])
+        } else {
+            inner
         }
     }
 
@@ -741,7 +752,7 @@ impl<'a> Printer<'a> {
                 // Only ";" so far, add line (becomes space in flat mode, newline when breaking)
                 inner_parts.push(d.line());
             }
-            inner_parts.push(self.build_expression_doc(test));
+            inner_parts.push(self.build_condition_doc(test));
         }
         inner_parts.push(d.text(";"));
 

@@ -43,14 +43,14 @@ mod utils;
 use analysis::needs_isolation_for_hugging;
 pub(crate) use analysis::{
     PatternContext, build_entity_name_doc, conditional_needs_fluid_layout, has_multiline_content,
-    is_brace_block_multiline, is_module_path_fluid_call, is_multiline_string_literal,
-    is_pure_property_chain, is_string_literal, object_pattern_should_expand,
-    template_literal_has_newlines,
+    has_newline_before_position, is_brace_block_multiline, is_module_path_fluid_call,
+    is_multiline_string_literal, is_multiline_template_expression, is_pure_property_chain,
+    is_string_literal, object_pattern_should_expand, template_literal_has_newlines,
 };
 pub(crate) use assignment::{
     arrow_chain_has_return_type, is_call_on_member_chain, is_curried_arrow_with_return_type,
     is_poorly_breakable_chain, is_self_expanding_value, is_simple_self_expanding,
-    is_type_assertion_call,
+    is_single_call_on_member_chain, is_type_assertion_call,
 };
 pub(crate) use comments::{CommentFilter, CommentSpacing};
 pub(crate) use needs_parens::{ParenContext, needs_parens};

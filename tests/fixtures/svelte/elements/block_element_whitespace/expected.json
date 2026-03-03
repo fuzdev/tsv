@@ -1,0 +1,100 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 71,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 70,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 7,
+						"character": 7
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 8,
+						"end": 27,
+						"name": "data-attr1",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 8,
+								"character": 8
+							},
+							"end": {
+								"line": 1,
+								"column": 18,
+								"character": 18
+							}
+						},
+						"value": [
+							{
+								"start": 20,
+								"end": 26,
+								"type": "Text",
+								"raw": "value1",
+								"data": "value1"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 28,
+						"end": 47,
+						"name": "data-attr2",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 28,
+								"character": 28
+							},
+							"end": {
+								"line": 1,
+								"column": 38,
+								"character": 38
+							}
+						},
+						"value": [
+							{
+								"start": 40,
+								"end": 46,
+								"type": "Text",
+								"raw": "value2",
+								"data": "value2"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 48,
+							"end": 61,
+							"raw": " text1 text2 ",
+							"data": " text1 text2 "
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

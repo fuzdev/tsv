@@ -7,9 +7,9 @@ use crate::deno::{PrettierParser, parse_css, parse_svelte, parse_typescript, run
 use crate::diff;
 use crate::fixtures::{
     self, Fixture, InputType, discover_invalid_variants, discover_prettier_intermediate_variants,
-    discover_prettier_quirk_variants, discover_unformatted_ours_variants,
-    discover_unformatted_prettier_variants, discover_unformatted_variants, discover_unknown_files,
-    has_svelte_divergence_suffix, read_file,
+    discover_prettier_quirk_variants, discover_prettier_stable_variants,
+    discover_unformatted_ours_variants, discover_unformatted_prettier_variants,
+    discover_unformatted_variants, discover_unknown_files, has_svelte_divergence_suffix, read_file,
 };
 use std::collections::HashMap;
 use std::fmt;
@@ -117,12 +117,26 @@ pub enum ValidationError {
     #[error("{0} exists but output_prettier file is missing")]
     NormalizationUnformattedPrettierMissingTarget(String),
 
+    // Prettier stable (dual-stable forms)
+    #[error("{0} not preserved by prettier")]
+    NormalizationPrettierStableNotPreserved(String),
+    #[error("{0} not idempotent with our formatter")]
+    NormalizationPrettierStableOursNotIdempotent(String),
+    #[error("{0} normalizes to input with our formatter (should be prettier_quirk_* instead)")]
+    NormalizationPrettierStableNormalizesToInput(String),
+
+    // Duplicates (within fixture) - prettier_stable
+    #[error("Duplicate prettier_stable files: {}", .0.join(", "))]
+    DuplicatePrettierStableWithinFixture(Vec<String>),
+
     // Prettier intermediate (unstable first-pass output)
     #[error(
         "{0} doesn't match prettier's first-pass output from corresponding unformatted_ours_* file"
     )]
     NormalizationPrettierIntermediateMismatch(String),
-    #[error("{0} is stable (prettier preserves it) - should be prettier_quirk_* instead")]
+    #[error(
+        "{0} is stable (prettier preserves it) - should be prettier_quirk_* or prettier_stable_* instead"
+    )]
     NormalizationPrettierIntermediateIsStable(String),
     #[error("{0} doesn't converge to input file after second pass")]
     NormalizationPrettierIntermediateNotConverging(String),
@@ -245,11 +259,23 @@ impl ValidationError {
             Self::NormalizationUnformattedPrettierMissingTarget(_) => {
                 "Add output_prettier.* file or remove unformatted_prettier_* files"
             }
+            Self::NormalizationPrettierStableNotPreserved(_) => {
+                "Prettier doesn't preserve this file - check if it should be a different variant type"
+            }
+            Self::NormalizationPrettierStableOursNotIdempotent(_) => {
+                "Our formatter doesn't preserve this file - if it normalizes to input, use prettier_quirk_* instead"
+            }
+            Self::NormalizationPrettierStableNormalizesToInput(_) => {
+                "Our formatter normalizes this to input - rename to prettier_quirk_* instead"
+            }
+            Self::DuplicatePrettierStableWithinFixture(_) => {
+                "Remove duplicate files (identical content)"
+            }
             Self::NormalizationPrettierIntermediateMismatch(_) => {
                 "Update prettier_intermediate_* to match prettier's actual first-pass output"
             }
             Self::NormalizationPrettierIntermediateIsStable(_) => {
-                "Rename to prettier_quirk_* (prettier preserves this idempotently)"
+                "Rename to prettier_quirk_* or prettier_stable_* (prettier preserves this idempotently)"
             }
             Self::NormalizationPrettierIntermediateNotConverging(_) => {
                 "Check prettier_intermediate_* content - should converge to input after re-formatting"
@@ -328,12 +354,16 @@ impl ValidationError {
             | Self::NormalizationUnformattedPrettierNotNormalized(_)
             | Self::NormalizationUnformattedPrettierMissingTarget(_)
             | Self::NormalizationPrettierIntermediateMismatch(_)
+            | Self::NormalizationPrettierStableNotPreserved(_)
+            | Self::NormalizationPrettierStableOursNotIdempotent(_)
+            | Self::NormalizationPrettierStableNormalizesToInput(_)
             | Self::NormalizationPrettierIntermediateIsStable(_)
             | Self::NormalizationPrettierIntermediateNotConverging(_)
             | Self::NormalizationPrettierIntermediateMissingSource(_) => "Normalization",
 
             Self::DuplicateUnformattedWithinFixture(_)
             | Self::DuplicatePrettierQuirkWithinFixture(_)
+            | Self::DuplicatePrettierStableWithinFixture(_)
             | Self::RedundantUnformattedMatchesQuirk(_, _) => "Duplicates",
 
             Self::InvalidSyntaxParsedByOurs(_)
@@ -356,9 +386,10 @@ pub enum ValidationSuccess {
     ParserExpectedSvelteMatches,
     FormatterInputIdempotent,
     FormatterMatchesPrettier,
-    NormalizationVariantsOk(usize), // number of variants checked
-    NormalizationSkipped,           // skipped due to formatter failure
-    InvalidSyntaxVariantsOk(usize), // number of invalid syntax files validated
+    NormalizationVariantsOk(usize),  // number of variants checked
+    PrettierStableVariantsOk(usize), // number of prettier_stable_* checked
+    NormalizationSkipped,            // skipped due to formatter failure
+    InvalidSyntaxVariantsOk(usize),  // number of invalid syntax files validated
 }
 
 impl fmt::Display for ValidationSuccess {
@@ -373,6 +404,9 @@ impl fmt::Display for ValidationSuccess {
             Self::FormatterInputIdempotent => write!(f, "input file is idempotent"),
             Self::FormatterMatchesPrettier => write!(f, "input file matches prettier"),
             Self::NormalizationVariantsOk(n) => write!(f, "{n} variants normalize correctly"),
+            Self::PrettierStableVariantsOk(n) => {
+                write!(f, "{n} prettier_stable_* variants validated")
+            }
             Self::NormalizationSkipped => write!(f, "SKIPPED (formatter not idempotent)"),
             Self::InvalidSyntaxVariantsOk(n) => {
                 write!(f, "{n} invalid syntax files correctly rejected")
@@ -392,10 +426,23 @@ pub struct FixtureValidation {
     pub unformatted_ours_count: usize,
     pub unformatted_prettier_count: usize,
     pub prettier_quirk_count: usize,
+    pub prettier_stable_count: usize,
     pub prettier_intermediate_count: usize,
     pub invalid_syntax_count: usize,
     /// Input content for cross-fixture duplicate detection (populated during validation)
     pub input_content: Option<String>,
+    /// Undocumented Prettier outputs from unformatted_ours_* files (informational, not blocking)
+    pub undocumented_prettier_outputs: Vec<UndocumentedPrettierOutput>,
+}
+
+/// An undocumented Prettier output discovered during N10 cross-path analysis
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct UndocumentedPrettierOutput {
+    /// The unformatted_ours_* source file that produced this output
+    pub source_file: String,
+    /// The suffix (e.g., "compact" from "unformatted_ours_compact.svelte")
+    pub suffix: String,
 }
 
 impl FixtureValidation {
@@ -408,9 +455,11 @@ impl FixtureValidation {
             unformatted_ours_count: 0,
             unformatted_prettier_count: 0,
             prettier_quirk_count: 0,
+            prettier_stable_count: 0,
             prettier_intermediate_count: 0,
             invalid_syntax_count: 0,
             input_content: None,
+            undocumented_prettier_outputs: Vec::new(),
         }
     }
 
@@ -782,6 +831,90 @@ fn validate_normalization_ours(
         }
     }
 
+    // N9b, N9c: prettier_stable_* validation (our formatter)
+    // N9b: ours(ours(file)) == ours(file) — our output is idempotent
+    // N9c: ours(file) != input — must NOT normalize to input (else should be prettier_quirk_*)
+    let prettier_stable_variants = discover_prettier_stable_variants(fixture_dir, input_ext);
+    result.prettier_stable_count = prettier_stable_variants.len();
+    let mut prettier_stable_contents: HashMap<String, Vec<String>> = HashMap::new();
+    let mut prettier_stable_ok = 0;
+
+    for stable_name in &prettier_stable_variants {
+        let stable_path = fixture_dir.join(stable_name);
+        let Ok(stable_content) = read_file(&stable_path) else {
+            continue;
+        };
+
+        // Track for duplicate detection
+        prettier_stable_contents
+            .entry(stable_content.clone())
+            .or_default()
+            .push(stable_name.clone());
+
+        match fixtures::format_with_our_formatter(&stable_content, &fixture.input_file) {
+            Ok(formatted) => {
+                // N9c: Must NOT normalize to input
+                if formatted == *input {
+                    result.add_error(
+                        ValidationError::NormalizationPrettierStableNormalizesToInput(
+                            stable_name.clone(),
+                        ),
+                    );
+                    continue;
+                }
+
+                // N9b: Our output must be idempotent (format the result again)
+                match fixtures::format_with_our_formatter(&formatted, &fixture.input_file) {
+                    Ok(second_pass) => {
+                        if second_pass != formatted {
+                            result.add_error(
+                                ValidationError::NormalizationPrettierStableOursNotIdempotent(
+                                    stable_name.clone(),
+                                ),
+                            );
+                            diff::print_diff_with_options(
+                                &format!(
+                                    "prettier_stable idempotency: {}/{}",
+                                    fixture.relative_path, stable_name
+                                ),
+                                &formatted,
+                                &second_pass,
+                                &diff::DiffOptions::idempotency(),
+                            );
+                        } else {
+                            prettier_stable_ok += 1;
+                        }
+                    }
+                    Err(e) => {
+                        result.add_error(ValidationError::FormatterError(format!(
+                            "{stable_name} (second pass): {e}"
+                        )));
+                    }
+                }
+            }
+            Err(e) => {
+                result.add_error(ValidationError::FormatterError(format!(
+                    "{stable_name}: {e}"
+                )));
+            }
+        }
+    }
+
+    // Check for duplicate prettier_stable files
+    for variants in prettier_stable_contents.values() {
+        if variants.len() > 1 {
+            result.add_error(ValidationError::DuplicatePrettierStableWithinFixture(
+                variants.clone(),
+            ));
+        }
+    }
+
+    if prettier_stable_ok > 0 {
+        result.add_success(ValidationSuccess::PrettierStableVariantsOk(
+            prettier_stable_ok,
+        ));
+    }
+
     if total_variants > 0 {
         result.add_success(ValidationSuccess::NormalizationVariantsOk(total_variants));
     }
@@ -1033,6 +1166,35 @@ async fn validate_normalization_prettier(
         }
     }
 
+    // N9a: prettier(prettier_stable_*) == prettier_stable_* (prettier preserves these too)
+    let prettier_stable_variants = discover_prettier_stable_variants(fixture_dir, input_ext);
+    for stable_name in &prettier_stable_variants {
+        let stable_path = fixture_dir.join(stable_name);
+        let Ok(stable_content) = read_file(&stable_path) else {
+            continue;
+        };
+
+        match run_prettier(&stable_content, prettier_parser).await {
+            Ok(formatted) => {
+                if formatted != stable_content {
+                    result.add_error(ValidationError::NormalizationPrettierStableNotPreserved(
+                        stable_name.clone(),
+                    ));
+                    diff::print_diff_with_options(
+                        &format!(
+                            "prettier_stable not preserved: {}/{}",
+                            fixture.relative_path, stable_name
+                        ),
+                        &stable_content,
+                        &formatted,
+                        &diff::DiffOptions::prettier_behavior(),
+                    );
+                }
+            }
+            Err(_) => continue,
+        }
+    }
+
     // N3: prettier(unformatted_*) == input
     // Skip if prettier_quirks exist (prettier won't normalize due to quirks)
     if !prettier_quirk_variants.is_empty() {
@@ -1256,6 +1418,77 @@ async fn validate_normalization_prettier(
             }
         }
     }
+
+    // N10: Cross-path discovery — find undocumented Prettier outputs
+    // After N7, check which unformatted_ours_* prettier outputs weren't consumed by prettier_intermediate_*
+    // Then check if those outputs match any known file content (output_prettier, prettier_quirk_*, prettier_stable_*)
+    {
+        // Build set of suffixes claimed by prettier_intermediate_*
+        let mut claimed_suffixes: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+        for intermediate_name in &prettier_intermediate_variants {
+            let suffix = intermediate_name
+                .strip_prefix("prettier_intermediate_")
+                .and_then(|s| s.strip_suffix(input_ext))
+                .unwrap_or("")
+                .to_string();
+            claimed_suffixes.insert(suffix);
+        }
+
+        // Also claim suffixes where prettier(unformatted_ours_*) == input (those got N6 errors, not novel)
+        // These are already not in unformatted_ours_prettier_outputs (they were flagged as errors)
+
+        // Build known content set from output_prettier, prettier_quirk_*, prettier_stable_*
+        let mut known_contents: Vec<String> = Vec::new();
+
+        // output_prettier content
+        let output_prettier_path = fixture.output_prettier_path();
+        if output_prettier_path.exists()
+            && let Ok(content) = read_file(&output_prettier_path)
+        {
+            known_contents.push(content);
+        }
+
+        // prettier_quirk_* contents
+        for quirk_name in &prettier_quirk_variants {
+            let quirk_path = fixture_dir.join(quirk_name);
+            if let Ok(content) = read_file(&quirk_path) {
+                known_contents.push(content);
+            }
+        }
+
+        // prettier_stable_* contents
+        for stable_name in &prettier_stable_variants {
+            let stable_path = fixture_dir.join(stable_name);
+            if let Ok(content) = read_file(&stable_path) {
+                known_contents.push(content);
+            }
+        }
+
+        // Check unclaimed outputs
+        for (suffix, prettier_output) in &unformatted_ours_prettier_outputs {
+            if claimed_suffixes.contains(suffix) {
+                continue;
+            }
+
+            // Check against input
+            if *prettier_output == *input {
+                continue; // Already flagged by N6
+            }
+
+            // Check against known contents
+            let is_known = known_contents.iter().any(|c| c == prettier_output);
+            if !is_known {
+                let source_file = format!("unformatted_ours_{suffix}{input_ext}");
+                result
+                    .undocumented_prettier_outputs
+                    .push(UndocumentedPrettierOutput {
+                        source_file,
+                        suffix: suffix.clone(),
+                    });
+            }
+        }
+    }
 }
 
 /// Validate input_invalid_* files: must fail to parse with both our parser and canonical parser
@@ -1365,10 +1598,12 @@ pub struct ValidationSummary {
     pub total_unformatted_ours: usize,
     pub total_unformatted_prettier: usize,
     pub total_prettier_quirk: usize,
+    pub total_prettier_stable: usize,
     pub total_prettier_intermediate: usize,
     pub total_invalid_syntax: usize,
     pub results: Vec<FixtureValidation>,
     pub cross_fixture_duplicates: Vec<Vec<String>>,
+    pub total_undocumented_prettier: usize,
 }
 
 impl ValidationSummary {
@@ -1382,8 +1617,10 @@ impl ValidationSummary {
         self.total_unformatted_ours += result.unformatted_ours_count;
         self.total_unformatted_prettier += result.unformatted_prettier_count;
         self.total_prettier_quirk += result.prettier_quirk_count;
+        self.total_prettier_stable += result.prettier_stable_count;
         self.total_prettier_intermediate += result.prettier_intermediate_count;
         self.total_invalid_syntax += result.invalid_syntax_count;
+        self.total_undocumented_prettier += result.undocumented_prettier_outputs.len();
 
         if result.is_valid() {
             self.passed_fixtures += 1;
@@ -1547,6 +1784,12 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
         if summary.total_prettier_quirk > 0 {
             variant_parts.push(format!("{} prettier_quirk_*", summary.total_prettier_quirk));
         }
+        if summary.total_prettier_stable > 0 {
+            variant_parts.push(format!(
+                "{} prettier_stable_*",
+                summary.total_prettier_stable
+            ));
+        }
         if summary.total_prettier_intermediate > 0 {
             variant_parts.push(format!(
                 "{} prettier_intermediate_*",
@@ -1560,6 +1803,29 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
             parts.push(format!("({})", variant_parts.join(", ")));
         }
         println!("{}", parts.join(" "));
+
+        // N10: Print undocumented Prettier outputs as informational notes
+        if summary.total_undocumented_prettier > 0 {
+            println!();
+            println!(
+                "NOTE: {} undocumented Prettier output(s):",
+                summary.total_undocumented_prettier
+            );
+            for result in &summary.results {
+                for undoc in &result.undocumented_prettier_outputs {
+                    println!("  {}/", result.fixture_path);
+                    let source = &undoc.source_file;
+                    println!("    Prettier({source}) produces a novel stable form");
+                    // Extract fixture name for command suggestion
+                    let fixture_name = result
+                        .fixture_path
+                        .rsplit('/')
+                        .next()
+                        .unwrap_or(&result.fixture_path);
+                    println!("    Investigate: deno task fixtures:audit {fixture_name}");
+                }
+            }
+        }
     } else {
         eprintln!("════════════════════");
         eprintln!();

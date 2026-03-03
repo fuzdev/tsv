@@ -352,11 +352,29 @@ impl<'a> Printer<'a> {
         // "first +
         //     second -
         //     third"
+        //
+        // When shouldGroup is true (operand types differ from current node type,
+        // e.g., `(LogicalExpr) + (ConditionalExpr)`), wrap each continuation in
+        // its own sub-group so it can independently evaluate whether it fits on
+        // the current line when the outer group breaks. This matches Prettier's
+        // binaryish.js where shouldGroup controls whether `right` gets a group.
+        //
+        // When shouldGroup is false (operands are same AST type category, e.g.,
+        // `(BinaryExpr) * 100`), all continuations break together with the outer
+        // group. This matches Prettier's behavior for same-type chains.
+        let should_group = Self::should_group_binary_continuation(binary);
         let mut parts = Vec::new();
 
         for (i, operand) in operands.iter().enumerate() {
             if i == 0 {
                 parts.push(*operand);
+            } else if should_group {
+                // Sub-group for independent fitting
+                parts.push(d.group(d.concat(&[
+                    d.text(" "),
+                    d.text(operators[i - 1].as_str()),
+                    d.indent_line(*operand),
+                ])));
             } else {
                 parts.push(d.text(" "));
                 parts.push(d.text(operators[i - 1].as_str()));
@@ -464,47 +482,57 @@ impl<'a> Printer<'a> {
     // Template Literals
     //
 
-    /// Build a Doc for a template literal
+    /// Build a Doc for a template literal.
     ///
-    /// Formatting strategy: preserve user intent for newlines
-    /// 1. If user wrote `${\n...`: preserve it (break after `${`)
-    /// 2. Else if compact `${...}` would overflow: expand to `${\n...\n}`
-    /// 3. Else: keep inline
-    ///
-    /// Divergence from Prettier:
-    /// - We preserve `${\n...}` where Prettier might collapse (chains, calls, arrays)
-    /// - We expand compact overflow where Prettier keeps inline
-    ///
-    /// Both add structure rather than remove it.
+    /// Based on Prettier's two-phase approach (template-literal.js), with
+    /// divergences for width enforcement and user intent preservation:
+    /// 1. Render each `${}` expression at infinite width
+    /// 2. If NO newlines → wrap with softline (divergence: Prettier uses atomic text)
+    /// 3. If HAS newlines → qualifying types get softline wrap, others keep doc as-is
+    /// 4. Wrap in group; use group_break when user wrote `${\n expr \n}`
     fn build_template_literal_doc(
         &self,
         template: &crate::ast::internal::TemplateLiteral,
     ) -> DocId {
         let d = self.d();
         let mut parts = Vec::new();
+        parts.push(d.line_suffix_boundary());
         parts.push(d.text("`"));
 
+        let mut previous_quasi_indent_size: usize = 0;
+        // Track whether any quasi before the current interpolation contains a newline.
+        // When true, literalline has been emitted (resetting output column to 0) but the
+        // indent level on the command stack still carries the code context. We use align(0)
+        // to reset the indent to absolute 0. When false, the template is inline and the
+        // code context indent is correct — no reset needed.
+        let mut any_quasi_had_newline = false;
+
         for (i, quasi) in template.quasis.iter().enumerate() {
-            // Template content (raw, preserving escape sequences verbatim)
-            parts.push(d.text_owned(quasi.raw.clone()));
+            // Template content — split at newlines and join with literalline
+            // (matches Prettier's replaceEndOfLine(node.value.raw) for TemplateElement).
+            // Using literalline makes will_break() propagate correctly through
+            // containing groups, so chains/calls break when they contain multiline templates.
+            parts.push(self.replace_end_of_line(&quasi.raw));
 
             // Interpolation
             if i < template.expressions.len() {
                 let expr = &template.expressions[i];
-
-                // Get the next quasi to determine trailing comment region
                 let next_quasi = &template.quasis[i + 1];
 
-                // Extract line-start whitespace from quasi for template-aware indentation.
-                // If the quasi contains '\n', find whitespace after the last newline.
-                // This whitespace represents the visual column where the line starts in the template.
-                let line_start_whitespace = Self::extract_line_start_whitespace(&quasi.raw);
+                // Calculate indent size from quasi text (Prettier's getIndentSize)
+                let text = &quasi.raw;
+                let quasi_has_newline = text.contains('\n');
+                any_quasi_had_newline = any_quasi_had_newline || quasi_has_newline;
+                let indent_size = if quasi_has_newline {
+                    self.get_template_indent_size(text)
+                } else {
+                    previous_quasi_indent_size
+                };
+                previous_quasi_indent_size = indent_size;
 
-                // Build expression doc (non-flat, can break at method calls)
-                // Set in_template_interpolation to collapse blank lines
+                // Build expression doc
                 let prev_in_template = self.in_template_interpolation.get();
                 self.in_template_interpolation.set(true);
-                // Assignment expressions need parens in template literals: `${(a = b)}`
                 let expr_doc = if needs_parens(expr, ParenContext::TemplateLiteralExpression) {
                     d.parens(self.build_expression_doc(expr))
                 } else {
@@ -524,213 +552,97 @@ impl<'a> Printer<'a> {
                 .collect();
 
                 // Check if any comments are line comments (non-block)
-                // Line comments require a newline after them, so flat layout is invalid
                 let has_line_comment = leading_comments.iter().any(|c| !c.is_block)
                     || trailing_comments.iter().any(|c| !c.is_block);
 
-                // Check if user wrote ${\n (newline after ${) - preserve user intent
-                // Source between quasi.span.end and expr.span().start includes `${` + whitespace/comments
-                let interpolation_prefix = self
-                    .source
-                    .get(quasi.span.end as usize..expr.span().start as usize)
-                    .unwrap_or("");
-                let user_wrote_newline = interpolation_prefix.contains('\n');
+                // Build comment docs
+                let leading_comments_doc =
+                    self.build_template_interpolation_comments(&leading_comments, true);
+                let trailing_comments_doc =
+                    self.build_template_interpolation_comments(&trailing_comments, false);
 
-                // Build leading comments doc with proper line breaks after line comments
-                let leading_comments_doc = self.build_template_interpolation_comments(
-                    &leading_comments,
-                    true, // is_leading
-                );
-
-                // Build trailing comments doc with space before each
-                let trailing_comments_doc = self.build_template_interpolation_comments(
-                    &trailing_comments,
-                    false, // is_leading
-                );
-
-                // Get expression source for width calculation and break detection
-                let expr_source = self
-                    .source
-                    .get(expr.span().start as usize..expr.span().end as usize)
-                    .unwrap_or("");
-                let has_internal_breaks = expr_source.contains('\n');
-
-                // Determine if we should break after ${:
-                // 1. User wrote ${\n - preserve user intent (never collapse)
-                // 2. Line comments present - force multiline
-                // 3. First line would overflow - break to respect print width
-                //
-                // Even for expressions with internal breaks, we check if the FIRST line
-                // (up to the first internal newline) would overflow.
-                let should_break = if user_wrote_newline || has_line_comment {
-                    true
+                // Combine expression with comments
+                let full_expr_doc = if has_line_comment {
+                    self.build_template_comments_and_expr_doc(
+                        &leading_comments,
+                        expr_doc,
+                        &trailing_comments,
+                    )
                 } else {
-                    // Check if first line would overflow
-                    let (prefix_width, has_newline_before) =
-                        self.accumulated_template_prefix_width(template, i);
-
-                    // For expressions with internal breaks, measure only up to first newline
-                    let first_line_len = if has_internal_breaks {
-                        expr_source.find('\n').unwrap_or(expr_source.len())
-                    } else {
-                        expr_source.len()
-                    };
-
-                    let suffix_width = self.estimate_template_suffix_width(&next_quasi.raw);
-
-                    // Core width: prefix + "${" + first_line + "}" (if no internal breaks) + suffix
-                    // For internal breaks, don't add "}" since it's not on the first line
-                    let is_last_interpolation = i == template.expressions.len() - 1;
-                    let is_same_line_ending =
-                        is_last_interpolation && !next_quasi.raw.contains('\n');
-                    // Backtick width (1) if template ends on same line
-                    let closing_backtick = if is_same_line_ending { 1 } else { 0 };
-                    // Trailing content after template (";", ");", etc.) - only needed for
-                    // template-internal lines where ${} starts at column 0 after a newline.
-                    // For inline templates, this is already in statement_buffer.
-                    let trailing_after_template = if is_same_line_ending {
-                        let after_template = &self.source[template.span.end as usize..];
-                        let line_end = after_template.find('\n').unwrap_or(after_template.len());
-                        after_template[..line_end].len()
-                    } else {
-                        0
-                    };
-                    let interp_width = if has_internal_breaks {
-                        prefix_width + 2 + first_line_len
-                    } else {
-                        prefix_width + 2 + first_line_len + 1 + suffix_width + closing_backtick
-                    };
-
-                    // Add context based on template structure:
-                    // - Newline before: template-internal line, add trailing content width
-                    // - No newlines: inline template, trailing already in statement_buffer
-                    let total_width = if has_newline_before {
-                        interp_width + trailing_after_template
-                    } else {
-                        // For inline templates, estimate the output column position.
-                        // Use the expected output indentation level, not source position,
-                        // because the source might be compacted (very long lines).
-                        let base_indent = self
-                            .estimate_inline_template_output_indent(template.span.start as usize);
-                        // Add buffers for context that appears before the template.
-                        // Buffer amounts are tuned to distinguish 100-char (inline)
-                        // from 101-char (break) cases.
-                        let (_, is_expression_context, _) =
-                            self.analyze_template_context(template.span.start as usize);
-                        // Check context type from preceding characters
-                        let before_pos = &self.source[..template.span.start as usize];
-                        let trimmed = before_pos.trim_end();
-                        let last_char = trimmed.chars().last();
-                        let is_ternary_context = matches!(last_char, Some(':' | '?'));
-                        let has_closing_delimiter = matches!(last_char, Some('(' | '[' | '{'));
-                        let is_arrow_body = trimmed.ends_with("=>");
-
-                        // Check if template starts on its own line (after newline + whitespace only)
-                        let template_on_own_line = before_pos.rfind('\n').is_some_and(|nl_pos| {
-                            before_pos[nl_pos + 1..]
-                                .chars()
-                                .all(|c| c == ' ' || c == '\t')
-                        });
-
-                        // base_indent is in indent LEVELS, not visual chars.
-                        // When template is on its own line, only visual indent matters.
-                        // Context-specific handling applies only for inline templates.
-                        let (statement_buffer, closing, expr_prefix, use_visual) =
-                            if template_on_own_line {
-                                // Template on own line: just visual indent + trailing content (;)
-                                (0, trailing_after_template, 0, true)
-                            } else if has_closing_delimiter {
-                                // Inline after bracket: minimal buffer
-                                (0, 0, 3, true)
-                            } else if is_ternary_context {
-                                // Ternary arms: ": " prefix + indent adjustment
-                                (0, 0, 4, true)
-                            } else if is_arrow_body {
-                                // Arrow function body: deeper indent in output
-                                (0, 0, 7, true)
-                            } else if is_expression_context {
-                                // Logical operators (&&, ||): operator on previous line
-                                // Include trailing content (;) since template ends up on own line
-                                (0, trailing_after_template, 0, true)
-                            } else if base_indent <= 2 {
-                                // Statement-level: "const x = " + semicolon
-                                (11, 1, 0, false)
-                            } else {
-                                (0, 0, 0, true)
-                            };
-                        let visual_indent = if use_visual {
-                            base_indent * self.config.tab_width
-                        } else {
-                            base_indent
-                        };
-                        let estimated_col = visual_indent + statement_buffer + expr_prefix;
-                        estimated_col + interp_width + closing
-                    };
-                    total_width > self.config.print_width
+                    d.concat(&[leading_comments_doc, expr_doc, trailing_comments_doc])
                 };
 
-                if should_break {
-                    let content = if has_line_comment {
-                        self.build_template_comments_and_expr_doc(
-                            &leading_comments,
-                            expr_doc,
-                            &trailing_comments,
-                        )
-                    } else {
-                        d.concat(&[leading_comments_doc, expr_doc, trailing_comments_doc])
-                    };
+                // Detect if user deliberately wrapped ${...} across lines by
+                // checking for newlines BETWEEN ${ and the expression start, or
+                // between the expression end and }. This distinguishes:
+                //   `${  \n  expr  \n  }` → user wrapped (preserve with group_break)
+                //   `${obj\n.method()}` → expression-internal newline (don't force break)
+                let interp_start = quasi.span.end as usize + 2; // skip "${"
+                let interp_end = next_quasi.span.start as usize - 1; // before "}"
+                let expr_start = expr.span().start as usize;
+                let expr_end = expr.span().end as usize;
+                let before_expr = self.source.get(interp_start..expr_start).unwrap_or("");
+                let after_expr = self.source.get(expr_end..interp_end).unwrap_or("");
+                let user_wrapped_expression =
+                    before_expr.contains('\n') || after_expr.contains('\n');
 
-                    let base_indent = if let Some(ws) = line_start_whitespace {
-                        // Template has explicit whitespace after a newline in the quasi
-                        Self::whitespace_to_indent_levels(ws, self.config.tab_width)
-                    } else {
-                        // Inline template - analyze context to determine indent
-                        self.determine_inline_template_base_indent(quasi.span.start as usize)
-                    };
+                // Check whether expression doc has structural newlines (hardlines)
+                // by rendering at infinite width. Softlines/lines become spaces;
+                // only hardlines (from block bodies, literalline in templates, etc.)
+                // produce newlines. This matches Prettier's two-phase approach.
+                let rendered = self.render_arena_doc_flat(full_expr_doc);
+                let interpolation_has_newline = rendered.contains('\n');
 
-                    parts.push(self.build_aligned_interpolation(content, base_indent));
+                let has_comments = !leading_comments.is_empty() || !trailing_comments.is_empty();
+
+                let expression_doc = if !interpolation_has_newline {
+                    // No structural newlines: wrap ALL types with softline.
+                    // The group breaks when the line exceeds print_width.
+                    // Diverges from Prettier (which uses atomic text here) —
+                    // we keep doc structure so ${/} can break to respect print_width.
+                    d.concat(&[
+                        d.indent(d.concat(&[d.softline(), full_expr_doc])),
+                        d.softline(),
+                    ])
+                } else if Self::is_template_softline_expression(expr, has_comments)
+                    || user_wrapped_expression
+                {
+                    // Structural newlines + qualifying type or user-wrapped:
+                    // wrap with softline. Qualifying types match Prettier.
+                    // User-wrapped preserves intent.
+                    d.concat(&[
+                        d.indent(d.concat(&[d.softline(), full_expr_doc])),
+                        d.softline(),
+                    ])
                 } else {
-                    // Inline: ${content}
-                    // Use align() to set ABSOLUTE indent level for expression's internal hardlines.
-                    // This is needed because the Svelte wrapper uses start_indent_level=1 for ALL
-                    // hardlines, so we must use absolute positioning to avoid double indentation.
-                    let content =
-                        d.concat(&[leading_comments_doc, expr_doc, trailing_comments_doc]);
+                    // Structural newlines + non-qualifying type (chains, calls,
+                    // arrows with block bodies): keep doc as-is.
+                    // Chain starts inline after ${. Matches Prettier.
+                    full_expr_doc
+                };
 
-                    if has_internal_breaks {
-                        // Expression has internal breaks - need to account for template's visual position
-                        // Calculate absolute indent level from template's line-start whitespace
-                        // Note: the expression's own formatter (chain, arrow, etc.) will add +1 for its
-                        // internal continuation, so we use the template position directly without +1
-                        let indent_levels = if let Some(ws) = line_start_whitespace {
-                            // Template has whitespace: use its visual position
-                            Self::whitespace_to_indent_levels(ws, self.config.tab_width)
-                        } else {
-                            // No template whitespace: use 1 (for script level)
-                            1
-                        };
+                // Apply alignment based on quasi indent (Prettier's addAlignmentToDoc).
+                // Only when a preceding quasi had a newline (literalline was emitted),
+                // because that resets output column to 0 but leaves the command stack's
+                // indent at the code context level. align(0) inside add_alignment_to_doc
+                // resets to absolute 0, then indent^n positions at the template indent.
+                // For inline templates (no newline in any quasi), skip — code context is correct.
+                let aligned = if any_quasi_had_newline {
+                    self.add_alignment_to_doc(expression_doc, indent_size)
+                } else {
+                    expression_doc
+                };
 
-                        let indented_content = d.align(indent_levels, content);
-                        // Wrap with base_indent_override=0 for correct width calculations
-                        parts.push(d.with_base_indent_override(
-                            d.concat(&[d.text("${"), indented_content, d.text("}")]),
-                            0,
-                        ));
-                    } else {
-                        // Simple expression without internal breaks - use align for absolute positioning
-                        // (even though no hardlines exist, this ensures consistency with has_internal_breaks case)
-                        let indent_levels = if let Some(ws) = line_start_whitespace {
-                            Self::whitespace_to_indent_levels(ws, self.config.tab_width)
-                        } else {
-                            1
-                        };
-                        // Wrap with base_indent_override=0 for correct width calculations
-                        parts.push(d.with_base_indent_override(
-                            d.concat(&[d.text("${"), d.align(indent_levels, content), d.text("}")]),
-                            0,
-                        ));
-                    }
-                }
+                // Wrap in group: group(["${", aligned, lineSuffixBoundary, "}"])
+                // Use group_break when user wrapped the expression across lines —
+                // preserves their formatting choice (unlike Prettier which collapses).
+                let group_doc =
+                    d.concat(&[d.text("${"), aligned, d.line_suffix_boundary(), d.text("}")]);
+                parts.push(if user_wrapped_expression {
+                    d.group_break(group_doc)
+                } else {
+                    d.group(group_doc)
+                });
             }
         }
 
@@ -738,268 +650,94 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Calculate accumulated line width for multi-interpolation templates.
-    ///
-    /// For templates like `${a}__${b}__${c}`, when checking if `${c}` overflows,
-    /// we need to include the width of all previous content on the same line.
-    ///
-    /// Returns (visual_width, found_newline) where:
-    /// - visual_width: width from the last newline (or backtick) up to the interpolation
-    /// - found_newline: true if there's a newline before this interpolation
-    fn accumulated_template_prefix_width(
-        &self,
-        template: &crate::ast::internal::TemplateLiteral,
-        interpolation_index: usize,
-    ) -> (usize, bool) {
-        // Walk backwards to find the last newline
-        for i in (0..=interpolation_index).rev() {
-            let quasi = &template.quasis[i];
-
-            if let Some(pos) = quasi.raw.rfind('\n') {
-                // Found the last newline - count content after it
-                let after_newline = &quasi.raw[pos + 1..];
-                let mut width = self.visual_width(after_newline);
-
-                // Add any subsequent expressions and quasis on this line
-                // (these quasis should not have newlines since we found the last one)
-                for j in i..interpolation_index {
-                    // Expression width
-                    let expr = &template.expressions[j];
-                    let expr_source = self
-                        .source
-                        .get(expr.span().start as usize..expr.span().end as usize)
-                        .unwrap_or("");
-                    width += 2 + expr_source.len() + 1; // "${" + expr + "}"
-
-                    // Next quasi width (no newlines expected)
-                    let next_quasi = &template.quasis[j + 1];
-                    width += self.visual_width(&next_quasi.raw);
-                }
-
-                return (width, true);
-            }
-        }
-
-        // No newlines found - accumulate everything from the backtick
-        let mut width = 1; // Opening backtick
-        for i in 0..=interpolation_index {
-            let quasi = &template.quasis[i];
-            width += self.visual_width(&quasi.raw);
-
-            if i < interpolation_index {
-                let expr = &template.expressions[i];
-                let expr_source = self
-                    .source
-                    .get(expr.span().start as usize..expr.span().end as usize)
-                    .unwrap_or("");
-                width += 2 + expr_source.len() + 1; // "${" + expr + "}"
-            }
-        }
-
-        (width, false)
-    }
-
-    /// Estimate the visual width of template content on the same line as `}`.
-    /// This is the content before the first newline (or entire content if no newline).
-    fn estimate_template_suffix_width(&self, raw: &str) -> usize {
-        let line_content = if let Some(pos) = raw.find('\n') {
-            &raw[..pos]
-        } else {
-            raw
-        };
-        self.visual_width(line_content)
-    }
-
-    /// Calculate visual width of a string (tabs expand to tab_width).
-    fn visual_width(&self, s: &str) -> usize {
-        visual_width(s, self.config.tab_width)
-    }
-
-    /// Extract the whitespace after the last newline in template content.
-    /// Returns Some(whitespace) if there's a newline, None otherwise.
-    ///
-    /// This is used for template-aware indentation: when breaking at `${`,
-    /// we align to the visual column of the line in the template.
-    fn extract_line_start_whitespace(raw: &str) -> Option<&str> {
-        // Find the last newline
-        let last_newline_pos = raw.rfind('\n')?;
-
-        // Get content after the newline
-        let after_newline = &raw[last_newline_pos + 1..];
-
-        // Extract leading whitespace (tabs and spaces)
-        let whitespace_end = after_newline
-            .chars()
-            .take_while(|c| *c == '\t' || *c == ' ')
-            .count();
-
-        Some(&after_newline[..whitespace_end])
-    }
-
-    /// Convert whitespace string to equivalent indent levels.
-    ///
-    /// Tabs count as tab_width visual columns. Spaces count as 1.
-    /// Result is visual width / tab_width, rounded UP to ensure content
-    /// is at least as indented as the template.
-    fn whitespace_to_indent_levels(ws: &str, tab_width: usize) -> usize {
-        let visual = visual_width(ws, tab_width);
-        // Round up: (visual + tab_width - 1) / tab_width
-        visual.div_ceil(tab_width)
-    }
-
-    /// Build a multiline template interpolation with aligned content.
-    ///
-    /// Creates: `${\n<tabs>content\n<closing_tabs>}`
-    /// Uses absolute positioning via doc::align for consistent indentation.
-    fn build_aligned_interpolation(&self, content: DocId, base_indent: usize) -> DocId {
-        let d = self.d();
-        let content_indent = base_indent + 1;
-        let content_tabs = "\t".repeat(content_indent);
-        let closing_tabs = "\t".repeat(base_indent);
-
-        let content_doc = d.align(
-            content_indent,
-            d.concat(&[d.literalline(), d.text_owned(content_tabs), content]),
-        );
-
-        // Build the interpolation group without isolation.
-        // IsolatedGroup is applied at the call/array level where hugging is needed,
-        // not here - this allows ternaries and binary expressions to see the breaks.
-        d.group(d.concat(&[
-            d.text("${"),
-            content_doc,
-            d.literalline(),
-            d.text_owned(format!("{closing_tabs}}}")),
-        ]))
-    }
-
-    /// Determine base indent level for inline template at given source position.
-    ///
-    /// This is used for determining the indent level AFTER a template interpolation breaks.
-    /// It uses context-specific bonuses to match the expected output indentation.
-    fn determine_inline_template_base_indent(&self, pos: usize) -> usize {
-        let (ws_indent, is_expression_context, template_nesting) =
-            self.analyze_template_context(pos);
-
-        // Check context type from preceding characters
-        let before_pos = &self.source[..pos];
-        let trimmed = before_pos.trim_end();
-        let last_char = trimmed.chars().last();
-        let is_ternary_context = matches!(last_char, Some(':' | '?'));
-        let has_closing_delimiter = matches!(last_char, Some('(' | '[' | '{'));
-        let is_arrow_body = trimmed.ends_with("=>");
-
-        // Check if template starts on its own line (after newline + whitespace + context)
-        let template_on_own_line = before_pos.rfind('\n').is_some_and(|nl_pos| {
-            before_pos[nl_pos + 1..]
+    /// Get the visual indent size of the last line in template quasi text.
+    /// Equivalent to Prettier's `getIndentSize`.
+    fn get_template_indent_size(&self, text: &str) -> usize {
+        if let Some(last_nl) = text.rfind('\n') {
+            let after_nl = &text[last_nl + 1..];
+            let ws_end = after_nl
                 .chars()
-                .all(|c| c == ' ' || c == '\t' || c == '?' || c == ':')
-        });
+                .take_while(|c| *c == '\t' || *c == ' ')
+                .count();
+            visual_width(&after_nl[..ws_end], self.config.tab_width)
+        } else {
+            0
+        }
+    }
 
-        // Add context-specific bonuses for proper indentation after breaking.
-        // These account for both the expression context and template nesting.
-        // Note: build_aligned_interpolation adds +1 for content, so these are
-        // relative to the closing bracket position.
-        //
-        // For templates inside another template's interpolation, the outer will break
-        // and add indent. The amount varies by context:
-        // - Ternary: moderate nesting (outer breaks, ternary arm adds 1)
-        // - Arrow: deep nesting (outer breaks, map/arrow each add 1)
-        // - Delimiters: moderate nesting (outer breaks, structure adds 1)
-        // - Expression (&&, ||): minimal nesting (outer breaks, operator flat)
-        // Use .max(1) to ensure minimum indent of 1 (Svelte script level) when source
-        // has no whitespace (unformatted code). Formatted code will have ws_indent >= 1.
-        if is_ternary_context {
-            // Ternary arms: when source already broken, use ws_indent + 1
-            // When source is compact (ternary will break in output), need +2
-            if template_on_own_line {
-                ws_indent.max(1) + 1 + template_nesting * 2
-            } else {
-                ws_indent.max(1) + 2 + template_nesting * 2
+    /// Apply alignment to a doc based on indent size.
+    /// Equivalent to Prettier's `addAlignmentToDoc(doc, size, tabWidth)`.
+    ///
+    /// Always wraps with `align(0)` to reset indent to absolute 0,
+    /// then applies indent levels from zero. This is critical because
+    /// after `literalline` in template content, the output column resets
+    /// to 0 but the indent level on the command stack still carries the
+    /// code context. Without the reset, softlines would break at the
+    /// inherited code indent instead of the template's visual position.
+    fn add_alignment_to_doc(&self, doc: DocId, size: usize) -> DocId {
+        let d = self.d();
+        let tab_width = self.config.tab_width;
+        let n = size / tab_width;
+        let r = size - n * tab_width;
+        let mut result = doc;
+        for _ in 0..n {
+            result = d.indent(result);
+        }
+        if r > 0 {
+            result = d.align_spaces(r, result);
+        }
+        // Reset to absolute indent 0. Uses align(0) not dedent because
+        // dedent only decrements by 1 (saturating_sub), while we need
+        // to reset to 0 regardless of the current indent depth.
+        d.align(0, result)
+    }
+
+    /// Convert a string with newlines into a doc with literalline between parts.
+    /// Equivalent to Prettier's `replaceEndOfLine(text)` for TemplateElement nodes.
+    fn replace_end_of_line(&self, text: &str) -> DocId {
+        let d = self.d();
+        if !text.contains('\n') {
+            return d.text_owned(text.to_string());
+        }
+        let mut doc_parts = Vec::new();
+        for (i, part) in text.split('\n').enumerate() {
+            if i > 0 {
+                doc_parts.push(d.literalline());
             }
-        } else if is_arrow_body {
-            // Arrow function body: +3 per nesting level (deeper structure)
-            ws_indent.max(1) + template_nesting * 3
-        } else if has_closing_delimiter {
-            // Array/function/object: +2 per nesting level
-            ws_indent.max(1) + template_nesting * 2
-        } else if is_expression_context {
-            // Other expressions (&&, ||): +1 for context (binary breaks add indent)
-            // +1 per nesting level for template depth
-            ws_indent.max(1) + 1 + template_nesting
-        } else if ws_indent == 0 {
-            // Unformatted source (no leading whitespace) → use default of 1
-            // This hardcoded value works for Svelte context where scripts are at indent level 1.
-            // For standalone TypeScript (level 0), formatted source will have whitespace
-            // so this branch won't be taken.
-            1
-        } else {
-            // Statement context → use line-start whitespace
-            ws_indent
+            if !part.is_empty() {
+                doc_parts.push(d.text_owned(part.to_string()));
+            }
         }
+        d.concat(&doc_parts)
     }
 
-    /// Estimate the output column for an inline template.
+    /// Whether this expression type qualifies for softline wrapping when it
+    /// contains structural newlines (hardlines). Matches Prettier's handling
+    /// of "simple" template expressions.
     ///
-    /// This is used for the BREAK DECISION to determine if a template would exceed print width.
-    /// It uses a more aggressive nesting estimate to account for deeply nested templates in
-    /// compact source that would have much higher indent in formatted output.
-    fn estimate_inline_template_output_indent(&self, pos: usize) -> usize {
-        let (ws_indent, is_expression_context, template_nesting) =
-            self.analyze_template_context(pos);
-
-        // The source's ws_indent may underestimate output indent for nested templates.
-        // When outer interpolations break, they add indent to inner content.
-        // For nesting=1, the indent is usually already correct (ws_indent reflects it).
-        // For nesting>=2, add adjustment to compensate for deeper nesting.
-        let nesting_adjustment = template_nesting.saturating_sub(1);
-
-        // The expression prefix (": ", "? ", "|| " etc.) is handled separately in the
-        // width calculation, not here in the indent estimate.
-        if is_expression_context {
-            // Expression context: +1 for context, +nesting for depth
-            ws_indent.max(1) + 1 + nesting_adjustment
-        } else if ws_indent == 0 {
-            // Unformatted source (no leading whitespace) → use default of 1
-            // (Same reasoning as in determine_inline_template_base_indent)
-            1 + nesting_adjustment
-        } else {
-            // Statement context → use line-start whitespace + nesting
-            ws_indent + nesting_adjustment
+    /// Qualifying types: their docs don't inherently produce hardlines from
+    /// block structure. Any hardlines come from nested content (e.g., a
+    /// ternary whose branch contains a multiline template).
+    ///
+    /// Non-qualifying types (CallExpression, ArrowFunctionExpression, etc.):
+    /// their hardlines come from block bodies / argument lists. Softline
+    /// wrapping would force the ${/} group to break unnecessarily.
+    fn is_template_softline_expression(expr: &Expression, has_comments: bool) -> bool {
+        if has_comments {
+            return true;
         }
-    }
-
-    /// Analyze the context of a template at the given source position.
-    ///
-    /// Returns (ws_indent, is_expression_context, template_nesting_count).
-    fn analyze_template_context(&self, pos: usize) -> (usize, bool, usize) {
-        let before_pos = &self.source[..pos.min(self.source.len())];
-        let line_start = before_pos.rfind('\n').map_or(0, |p| p + 1);
-        let line_prefix = &self.source[line_start..pos];
-
-        // Calculate line-start whitespace
-        let ws_end = line_prefix
-            .chars()
-            .take_while(|c| *c == '\t' || *c == ' ')
-            .count();
-        let line_ws = &line_prefix[..ws_end];
-        let ws_indent = Self::whitespace_to_indent_levels(line_ws, self.config.tab_width);
-
-        // Check if template is in expression context by looking at preceding char
-        let before_backtick = line_prefix.strip_suffix('`').unwrap_or(line_prefix);
-        let non_ws_prefix = before_backtick[ws_end..].trim_end();
-        let last_char = non_ws_prefix.chars().last();
-
-        // Expression context: punctuators indicating we're inside an expression
-        let is_expression_context = matches!(
-            last_char,
-            Some(':' | '?' | ',' | '(' | '[' | '{' | '&' | '|')
-        );
-
-        // Count template interpolation nesting depth
-        let template_nesting = non_ws_prefix.matches("${").count();
-
-        (ws_indent, is_expression_context, template_nesting)
+        matches!(
+            expr,
+            Expression::Identifier(_)
+                | Expression::Literal(_)
+                | Expression::MemberExpression(_)
+                | Expression::ConditionalExpression(_)
+                | Expression::TemplateLiteral(_)
+                | Expression::UnaryExpression(_)
+                | Expression::UpdateExpression(_)
+                | Expression::MetaProperty(_)
+                | Expression::Super(_)
+        )
     }
 
     /// Build comments doc for template literal interpolations

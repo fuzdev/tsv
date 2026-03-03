@@ -37,19 +37,26 @@
 														`${ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd}`
 													}',
 													e: '${
-														[`${
-															eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
-														}`]
+														[
+															`${
+																eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+															}`,
+														]
 													}',
 													f: '${
-														ssss.processFFFFFFFFFFFFFFFFF(`${
-															fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-														}`)
+														ssss.processFFFFFFFFFFFFFFFFF(
+															`${
+																fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+															}`,
+														)
 													}',
 													g: '${
-														ssss.itemsGGGGGGGGGGGGGGGGGG.map((x) => `${
-															ggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg
-														}`)
+														ssss.itemsGGGGGGGGGGGGGGGGGG.map(
+															(x) =>
+																`${
+																	ggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg
+																}`,
+														)
 													}',
 												}`;
 											})

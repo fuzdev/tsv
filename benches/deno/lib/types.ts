@@ -56,7 +56,13 @@ export interface CorpusStats {
 }
 
 /** Implementation names for benchmarking */
-export type ImplementationName = 'canonical' | 'native' | 'wasm' | 'oxc' | 'biome-wasm';
+export type ImplementationName =
+	| 'canonical'
+	| 'native'
+	| 'wasm'
+	| 'oxc'
+	| 'oxc-wasm'
+	| 'biome-wasm';
 
 /** Common interface for parser/formatter implementations */
 export interface TsvImplementation {

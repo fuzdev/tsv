@@ -2,12 +2,15 @@ pub mod ast_diff;
 pub mod canonical_parse;
 pub mod check;
 pub mod compare;
+pub mod fixture_init;
+pub mod fixtures_audit;
 pub mod fixtures_update;
 pub mod fixtures_update_formatted;
 pub mod fixtures_update_parsed;
 pub mod fixtures_validate;
 pub mod format_prettier;
 pub mod line_width;
+pub mod metrics;
 pub mod profile;
 pub mod test262;
 

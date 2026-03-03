@@ -1,0 +1,869 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 478,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Assignment in instantiation: parens required (both formatters agree)",
+			"start": 20,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Ternary in instantiation: parens preserve semantics",
+			"start": 141,
+			"end": 195,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `(x ? y : z)<T>` (instantiate ternary result) vs `x ? y : z<T>` (instantiate alternate only)",
+			"start": 197,
+			"end": 292,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 96
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Binary in instantiation: parens preserve semantics",
+			"start": 320,
+			"end": 373,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `(a + b)<T>` (instantiate sum) vs `a + b<T>` (add to instantiated b)",
+			"start": 375,
+			"end": 446,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 72
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 477,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 468,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 93,
+					"end": 112,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 20
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 97,
+							"end": 111,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 5
+								},
+								"end": {
+									"line": 3,
+									"column": 19
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 97,
+								"end": 98,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 5
+									},
+									"end": {
+										"line": 3,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "TSInstantiationExpression",
+								"start": 101,
+								"end": 111,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 9
+									},
+									"end": {
+										"line": 3,
+										"column": 19
+									}
+								},
+								"expression": {
+									"type": "AssignmentExpression",
+									"start": 102,
+									"end": 107,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 10
+										},
+										"end": {
+											"line": 3,
+											"column": 15
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 102,
+										"end": 103,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 10
+											},
+											"end": {
+												"line": 3,
+												"column": 11
+											}
+										},
+										"name": "x"
+									},
+									"right": {
+										"type": "Identifier",
+										"start": 106,
+										"end": 107,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 14
+											},
+											"end": {
+												"line": 3,
+												"column": 15
+											}
+										},
+										"name": "y"
+									}
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 108,
+									"end": 111,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 16
+										},
+										"end": {
+											"line": 3,
+											"column": 19
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 109,
+											"end": 110,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 17
+												},
+												"end": {
+													"line": 3,
+													"column": 18
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 109,
+												"end": 110,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 17
+													},
+													"end": {
+														"line": 3,
+														"column": 18
+													}
+												},
+												"name": "T"
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Assignment in instantiation: parens required (both formatters agree)",
+							"start": 20,
+							"end": 91
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 114,
+					"end": 138,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 118,
+							"end": 137,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 5
+								},
+								"end": {
+									"line": 4,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 118,
+								"end": 119,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 5
+									},
+									"end": {
+										"line": 4,
+										"column": 6
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "TSInstantiationExpression",
+								"start": 122,
+								"end": 137,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 9
+									},
+									"end": {
+										"line": 4,
+										"column": 24
+									}
+								},
+								"expression": {
+									"type": "AssignmentExpression",
+									"start": 123,
+									"end": 128,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 10
+										},
+										"end": {
+											"line": 4,
+											"column": 15
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 123,
+										"end": 124,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 10
+											},
+											"end": {
+												"line": 4,
+												"column": 11
+											}
+										},
+										"name": "x"
+									},
+									"right": {
+										"type": "Identifier",
+										"start": 127,
+										"end": 128,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 14
+											},
+											"end": {
+												"line": 4,
+												"column": 15
+											}
+										},
+										"name": "y"
+									}
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 129,
+									"end": 137,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 16
+										},
+										"end": {
+											"line": 4,
+											"column": 24
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 130,
+											"end": 132,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 17
+												},
+												"end": {
+													"line": 4,
+													"column": 19
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 130,
+												"end": 132,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 17
+													},
+													"end": {
+														"line": 4,
+														"column": 19
+													}
+												},
+												"name": "T1"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 134,
+											"end": 136,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 21
+												},
+												"end": {
+													"line": 4,
+													"column": 23
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 134,
+												"end": 136,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 21
+													},
+													"end": {
+														"line": 4,
+														"column": 23
+													}
+												},
+												"name": "T2"
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "let"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 294,
+					"end": 317,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 24
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 298,
+							"end": 316,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 5
+								},
+								"end": {
+									"line": 8,
+									"column": 23
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 298,
+								"end": 299,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 5
+									},
+									"end": {
+										"line": 8,
+										"column": 6
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "TSInstantiationExpression",
+								"start": 302,
+								"end": 316,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 9
+									},
+									"end": {
+										"line": 8,
+										"column": 23
+									}
+								},
+								"expression": {
+									"type": "ConditionalExpression",
+									"start": 303,
+									"end": 312,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 10
+										},
+										"end": {
+											"line": 8,
+											"column": 19
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 303,
+										"end": 304,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 10
+											},
+											"end": {
+												"line": 8,
+												"column": 11
+											}
+										},
+										"name": "x"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 307,
+										"end": 308,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 14
+											},
+											"end": {
+												"line": 8,
+												"column": 15
+											}
+										},
+										"name": "y"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 311,
+										"end": 312,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 18
+											},
+											"end": {
+												"line": 8,
+												"column": 19
+											}
+										},
+										"name": "z"
+									}
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 313,
+									"end": 316,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 20
+										},
+										"end": {
+											"line": 8,
+											"column": 23
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 314,
+											"end": 315,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 21
+												},
+												"end": {
+													"line": 8,
+													"column": 22
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 314,
+												"end": 315,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 21
+													},
+													"end": {
+														"line": 8,
+														"column": 22
+													}
+												},
+												"name": "T"
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Ternary in instantiation: parens preserve semantics",
+							"start": 141,
+							"end": 195
+						},
+						{
+							"type": "Line",
+							"value": " `(x ? y : z)<T>` (instantiate ternary result) vs `x ? y : z<T>` (instantiate alternate only)",
+							"start": 197,
+							"end": 292
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 448,
+					"end": 467,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 20
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 452,
+							"end": 466,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 5
+								},
+								"end": {
+									"line": 12,
+									"column": 19
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 452,
+								"end": 453,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 5
+									},
+									"end": {
+										"line": 12,
+										"column": 6
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "TSInstantiationExpression",
+								"start": 456,
+								"end": 466,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 9
+									},
+									"end": {
+										"line": 12,
+										"column": 19
+									}
+								},
+								"expression": {
+									"type": "BinaryExpression",
+									"start": 457,
+									"end": 462,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 10
+										},
+										"end": {
+											"line": 12,
+											"column": 15
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 457,
+										"end": 458,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 10
+											},
+											"end": {
+												"line": 12,
+												"column": 11
+											}
+										},
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 461,
+										"end": 462,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 14
+											},
+											"end": {
+												"line": 12,
+												"column": 15
+											}
+										},
+										"name": "b"
+									}
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 463,
+									"end": 466,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 16
+										},
+										"end": {
+											"line": 12,
+											"column": 19
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 464,
+											"end": 465,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 17
+												},
+												"end": {
+													"line": 12,
+													"column": 18
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 464,
+												"end": 465,
+												"loc": {
+													"start": {
+														"line": 12,
+														"column": 17
+													},
+													"end": {
+														"line": 12,
+														"column": 18
+													}
+												},
+												"name": "T"
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Binary in instantiation: parens preserve semantics",
+							"start": 320,
+							"end": 373
+						},
+						{
+							"type": "Line",
+							"value": " `(a + b)<T>` (instantiate sum) vs `a + b<T>` (add to instantiated b)",
+							"start": 375,
+							"end": 446
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -7,8 +7,9 @@
 
 use super::super::comments_in_range;
 use super::helpers::{
-    find_separator_position, intersection_has_huggable_last_type,
-    type_needs_parens_in_intersection, type_needs_parens_in_union,
+    find_separator_position, intersection_has_expanding_first_type,
+    intersection_has_huggable_last_type, type_needs_parens_in_intersection,
+    type_needs_parens_in_union,
 };
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{TSIntersectionType, TSType, TSUnionType};
@@ -232,11 +233,14 @@ impl<'a> Printer<'a> {
         //            B &
         //            C
         //
-        // Special case: when the last type is a TypeLiteral (object type), use a space
-        // instead of line() to keep `& {` hugged together. The TypeLiteral handles its
-        // own expansion independently.
+        // Special case: when a boundary type is huggable (TypeLiteral/MappedType at first
+        // or last position in a 2-type intersection), use a space instead of line() to
+        // keep `& {` or `} &` hugged. The TypeLiteral handles its own expansion.
         let last_idx = intersection.types.len() - 1;
         let last_is_huggable = intersection_has_huggable_last_type(intersection);
+        let first_is_expanding = intersection_has_expanding_first_type(intersection);
+        let is_huggable_pair =
+            intersection.types.len() == 2 && (last_is_huggable || first_is_expanding);
 
         // Build first type separately (not indented)
         let mut first_parts = Vec::new();
@@ -278,9 +282,9 @@ impl<'a> Printer<'a> {
             let type_end = t.span().end;
             let is_last = i == last_idx;
 
-            // After separator: line when broken, space when flat
-            // But for huggable last types (TypeLiteral), always use space to keep `& {` hugged
-            if is_last && last_is_huggable {
+            // Huggable pair: always space (TypeLiteral handles its own expansion)
+            // Multi-type with huggable last: space only for the last type
+            if is_huggable_pair || (is_last && last_is_huggable) {
                 continuation_parts.push(d.text(" "));
             } else {
                 continuation_parts.push(d.line());
@@ -303,7 +307,7 @@ impl<'a> Printer<'a> {
                 .push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_intersection));
 
             // Add trailing block comments after this type (before the next `&` separator)
-            if i + 1 < intersection.types.len() {
+            if !is_last {
                 let next_type_start = intersection.types[i + 1].span().start;
                 if let Some(amp_pos) =
                     find_separator_position(self.source, type_end, next_type_start, b'&')

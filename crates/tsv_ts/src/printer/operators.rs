@@ -73,7 +73,7 @@ impl<'a> Printer<'a> {
                     ])
                 }
             } else {
-                // Non-binary that needs parens (shouldn't happen currently)
+                // Non-binary that needs parens (e.g., ternary or assignment in unary/assertion)
                 d.concat(&[
                     d.text("("),
                     self.build_expression_doc(&unary.argument),
@@ -223,14 +223,50 @@ impl<'a> Printer<'a> {
             return self.build_expression_doc(&binary.left);
         }
 
+        // Compute shouldGroup from the original binary expression.
+        // This matches Prettier's shouldGroup in printBinaryishExpressions:
+        // the continuation gets its own group only when both operand types
+        // differ from the current node type (BinaryExpression vs LogicalExpression).
+        let should_group = Self::should_group_binary_continuation(binary);
+
         // For ContinuationIndent, we separate first operand from the rest
         // For other styles, we build a flat parts list
         match style {
             BinaryChainStyle::ContinuationIndent => {
                 self.build_binary_chain_continuation_indent(&operands, &operators)
             }
-            _ => self.build_binary_chain_flat(&operands, &operators, style),
+            _ => self.build_binary_chain_flat(&operands, &operators, style, should_group),
         }
+    }
+
+    /// Check if the binary continuation should be wrapped in its own group.
+    ///
+    /// Matches Prettier's `shouldGroup` in `printBinaryishExpressions`:
+    /// - Returns true when both left and right operands are a different AST type
+    ///   category than the current node (BinaryExpression vs LogicalExpression).
+    /// - In ESTree, `+`, `*`, etc. are BinaryExpression while `&&`, `||`, `??`
+    ///   are LogicalExpression. We use `is_logical()` to distinguish these categories.
+    ///
+    /// When shouldGroup is true, the continuation gets its own group, allowing it
+    /// to independently evaluate whether it fits on the current line when the outer
+    /// group breaks (e.g., due to a multi-line parenthesized left operand).
+    pub(super) fn should_group_binary_continuation(binary: &internal::BinaryExpression) -> bool {
+        let current_is_logical = binary.operator.is_logical();
+
+        // Check if left operand is same AST type category
+        let left_is_same_category = matches!(
+            &*binary.left,
+            Expression::BinaryExpression(inner) if inner.operator.is_logical() == current_is_logical
+        );
+
+        // Check if right operand is same AST type category
+        let right_is_same_category = matches!(
+            &*binary.right,
+            Expression::BinaryExpression(inner) if inner.operator.is_logical() == current_is_logical
+        );
+
+        // shouldGroup when NEITHER operand is the same category
+        !left_is_same_category && !right_is_same_category
     }
 
     /// Common logic for building binary chain (shared by flat and continuation indent styles)
@@ -320,20 +356,21 @@ impl<'a> Printer<'a> {
 
     /// Build a flat binary chain (Grouped or Ungrouped style)
     ///
-    /// Matches Prettier's binaryish.js structure (lines 169-178):
-    /// - First operand + first operator at base indent
-    /// - Rest wrapped in indent() for continuation indent when broken
+    /// Matches Prettier's binaryish.js structure:
+    /// - First operand + first operator at base indent (head)
+    /// - Continuation (line + remaining operands) optionally in a sub-group
     ///
-    /// When flat: "first + second + third"
-    /// When broken:
-    /// "first +
-    ///     second +
-    ///     third"
+    /// When `should_group` is true (operand types differ from current node,
+    /// e.g., `(LogicalExpr) + d`), the continuation gets its own group so it
+    /// can independently evaluate fit when the outer group breaks due to a
+    /// multi-line left operand. When false (same category, e.g., `(a+b)*c`),
+    /// continuation breaks with the outer group.
     fn build_binary_chain_flat(
         &self,
         operands: &[ChainOperand],
         operators: &[BinaryOperator],
         style: BinaryChainStyle,
+        should_group: bool,
     ) -> DocId {
         let d = self.d();
         if operands.is_empty() {
@@ -344,14 +381,18 @@ impl<'a> Printer<'a> {
             return operands[0].doc;
         }
 
-        // In script contexts (flat style), allow all breaks - print width decides
         let (mut head_parts, continuation_parts) =
             self.build_binary_chain_parts(operands, operators, false);
 
-        // Combine: head + continuation (NO internal indent)
-        // The parent context (assignment, etc.) provides the indent wrapper.
-        // Nested binaries inside parens get their own group via build_binary_operand_doc.
-        head_parts.extend(continuation_parts);
+        if !continuation_parts.is_empty() {
+            if should_group {
+                // Sub-group: continuation evaluates fit independently
+                head_parts.push(d.group(d.concat(&continuation_parts)));
+            } else {
+                // No sub-group: continuation breaks with outer group
+                head_parts.extend(continuation_parts);
+            }
+        }
 
         match style {
             BinaryChainStyle::Grouped => d.group(d.concat(&head_parts)),

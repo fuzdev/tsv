@@ -31,8 +31,12 @@ impl<'a> Printer<'a> {
     /// `is_leading`: true for first node, false for last node
     ///
     /// Returns true if:
-    /// 1. Boundary node is text containing a newline, OR
-    /// 2. Boundary node is text with whitespace AND any text node has a newline
+    /// 1. Boundary character is whitespace AND (is newline OR text/fragment has newlines)
+    /// 2. Boundary character is NOT whitespace → false (even if text contains newlines elsewhere)
+    ///
+    /// This prevents text like `,\n\tupdated` from being treated as having boundary whitespace
+    /// when the boundary char `,` is not whitespace — important for inline runs like
+    /// `{expr}{#if cond}, updated {expr2}{/if}` where the IfBlock body starts with `,`.
     fn fragment_has_boundary_ws(&self, fragment: &Fragment, is_leading: bool) -> bool {
         if fragment.nodes.is_empty() {
             return false;
@@ -46,17 +50,28 @@ impl<'a> Printer<'a> {
             return false;
         };
 
-        // Direct newline in boundary node
-        if text.raw.contains('\n') {
+        // Check the actual boundary character
+        let boundary_char = if is_leading {
+            text.raw.chars().next()
+        } else {
+            text.raw.chars().last()
+        };
+        let Some(ch) = boundary_char else {
+            return false;
+        };
+
+        // Boundary char must be whitespace to trigger boundary ws
+        if !ch.is_whitespace() {
+            return false;
+        }
+
+        // Boundary whitespace is a newline → yes
+        if ch == '\n' {
             return true;
         }
 
-        // Boundary space + newlines elsewhere → treat as boundary newline
-        if text.raw.chars().any(char::is_whitespace) {
-            return self.fragment_has_any_newlines(fragment);
-        }
-
-        false
+        // Boundary whitespace is space → only if there are newlines in fragment
+        self.fragment_has_any_newlines(fragment)
     }
 
     /// Check if any text node in the fragment contains a newline.

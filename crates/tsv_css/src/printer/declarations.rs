@@ -38,7 +38,9 @@ impl<'a> Printer<'a> {
             _ => return false,
         };
 
-        // Custom properties always inline
+        // Custom properties skip structure-based multiline (one-per-line for List values).
+        // They use width-based wrapping via should_wrap_value_width_based instead.
+        // See fixture: declaration_long_multiline (continuation indent for space-separated items)
         if decl.property.starts_with("--") {
             return false;
         }
@@ -64,16 +66,12 @@ impl<'a> Printer<'a> {
     /// Check if a value should use width-based wrapping
     ///
     /// Prettier uses width-based wrapping for:
-    /// - Long comma-separated lists (font-family, animation-name, etc.)
+    /// - Long comma-separated lists (font-family, custom properties, etc.)
     /// - Long space-separated lists (transform chains, filter chains, etc.)
     ///
     /// Returns (needs_wrapping, is_comma_separated)
     fn should_wrap_value_width_based(&self, value: &CssValue, property: &str) -> (bool, bool) {
-        let is_custom_property = property.starts_with("--");
-
         match value {
-            // Custom properties don't use comma-separated width wrapping
-            CssValue::CommaSeparated { .. } if is_custom_property => (false, false),
             CssValue::CommaSeparated { values, .. } => {
                 let doc = self.build_list_doc(values, ", ");
                 let available = doc::available_width(
@@ -429,11 +427,29 @@ impl<'a> Printer<'a> {
     /// Creates a doc that packs values greedily:
     /// - In flat mode: `item1, item2, item3`
     /// - When broken: `item1, item2,\n  item3, item4,\n  item5`
+    ///
+    /// For space-separated items (CssValue::List), each item is wrapped as
+    /// `group(indent(fill([sub1, line, sub2, ...])))` so fill can break within
+    /// items with continuation indent. This matches prettier's
+    /// `printCommaSeparatedValueGroup` which returns `group(indent(fill(parts)))`.
     fn build_comma_fill_doc(&self, values: &[CssValue]) -> DocId {
         let d = self.d();
         let mut parts = Vec::new();
         for (i, val) in values.iter().enumerate() {
-            parts.push(self.build_css_value_doc(val));
+            if let CssValue::List {
+                values: list_values,
+                ..
+            } = val
+            {
+                // Space-separated values: build as group(indent(fill([sub1, line, sub2])))
+                // so fill can break within items with continuation indent
+                let sub_parts = self.build_space_fill_parts(list_values);
+                let sub_fill = d.fill(&sub_parts);
+                let sub_indented = d.indent(sub_fill);
+                parts.push(d.group(sub_indented));
+            } else {
+                parts.push(self.build_css_value_doc(val));
+            }
             if i < values.len() - 1 {
                 // Separator: ", " in flat mode, ",\n" when broken
                 let comma = d.text(",");

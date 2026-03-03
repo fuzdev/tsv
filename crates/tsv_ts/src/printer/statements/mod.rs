@@ -21,7 +21,7 @@ pub(super) use super::{
 };
 
 use super::{ParenContext, needs_parens};
-use crate::ast::internal::{self, Statement};
+use crate::ast::internal::{self, Expression, LiteralValue, Statement};
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -85,9 +85,13 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an expression statement
     ///
     /// Handles parentheses for object patterns and comments before semicolon.
+    /// Preserves source parens around string literals: `('hello');` stays parenthesized.
     fn build_expression_statement_doc(&self, stmt: &internal::ExpressionStatement) -> DocId {
         let d = self.d();
-        let needs_parens = needs_parens(&stmt.expression, ParenContext::ExpressionStatement);
+        // Parens required for correctness (object expressions, object pattern assignments)
+        // OR preserved from source for string literals (matches Prettier behavior)
+        let needs_parens = needs_parens(&stmt.expression, ParenContext::ExpressionStatement)
+            || self.has_expression_statement_source_parens(stmt);
 
         let mut parts = Vec::new();
 
@@ -122,6 +126,22 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
+    /// Check if an expression statement had parentheses in the source that should be preserved.
+    ///
+    /// Prettier preserves parens around string literal expression statements:
+    /// `('hello');` stays as-is, not stripped to `'hello';`.
+    /// Detected via span: if ExpressionStatement.span.start < Expression.span.start,
+    /// the source had a `(` before the expression.
+    fn has_expression_statement_source_parens(&self, stmt: &internal::ExpressionStatement) -> bool {
+        if stmt.span.start >= stmt.expression.span().start {
+            return false;
+        }
+        matches!(
+            &stmt.expression,
+            Expression::Literal(lit) if matches!(lit.value, LiteralValue::String { .. })
+        )
+    }
+
     /// Build a Doc for a return statement
     ///
     /// Handles parenthesization of multiline expressions:
@@ -143,7 +163,7 @@ impl<'a> Printer<'a> {
 
         // Check if the expression is a binary expression that might break
         // Prettier wraps these in parentheses when they break to multiple lines
-        if let internal::Expression::BinaryExpression(binary) = arg
+        if let Expression::BinaryExpression(binary) = arg
             && binary.operator.is_logical()
         {
             // Build the expression with proper indentation for binary chains
@@ -187,7 +207,7 @@ impl<'a> Printer<'a> {
 
         // Assignment expressions need parentheses: return (a = b);
         // This matches Prettier's behavior for clarity (assignment vs equality)
-        if matches!(arg, internal::Expression::AssignmentExpression(_)) {
+        if matches!(arg, Expression::AssignmentExpression(_)) {
             return d.concat(&[
                 d.text("return ("),
                 self.build_expression_doc(arg),

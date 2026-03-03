@@ -199,7 +199,7 @@ const selfClosingNonvoid: DivergencePattern = {
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
 			const addedHasSelfClose = hunk.addedLines.some((l) => oursSelfClosing.test(l));
 			const removedHasExplicitClose = hunk.removedLines.some((l) => prettierExplicitClose.test(l));
-			return addedHasSelfClose || removedHasExplicitClose;
+			return addedHasSelfClose && removedHasExplicitClose;
 		});
 
 		if (hunkIndices.length > 0) {
@@ -225,9 +225,9 @@ const emptyStatementRemoval: DivergencePattern = {
 		// (not part of for(;;) or other syntax)
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
 			// Removed lines should have standalone ; that we remove
-			const removedStandalone = hunk.removedLines.some((l) => /^\t*;$/.test(l.trim()));
+			const removedStandalone = hunk.removedLines.some((l) => /^\t*;$/.test(l));
 			// Added lines should NOT have standalone ;
-			const addedStandalone = hunk.addedLines.some((l) => /^\t*;$/.test(l.trim()));
+			const addedStandalone = hunk.addedLines.some((l) => /^\t*;$/.test(l));
 			return removedStandalone && !addedStandalone;
 		});
 
@@ -496,7 +496,7 @@ const cssCommentStableQuirk: DivergencePattern = {
 	detect(ctx) {
 		if (ctx.language !== 'css' && ctx.language !== 'svelte') return null;
 
-		const commentPattern = /\/\*.*?\*\//;
+		const commentPattern = /\/\*.*?\*\/|\/\*|\*\//;
 
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
 			if (!isInCssContext(hunk, ctx)) return false;
@@ -509,16 +509,17 @@ const cssCommentStableQuirk: DivergencePattern = {
 
 			// Extract comment text from both sides and verify content is the same
 			// (only position/spacing should differ, not content)
+			const singleLineComment = /\/\*(.*?)\*\//;
 			const addedCommentTexts = hunk.addedLines
 				.filter((l) => commentPattern.test(l))
 				.map((l) => {
-					const m = l.match(/\/\*(.*?)\*\//);
+					const m = l.match(singleLineComment);
 					return m ? m[1].trim() : '';
 				});
 			const removedCommentTexts = hunk.removedLines
 				.filter((l) => commentPattern.test(l))
 				.map((l) => {
-					const m = l.match(/\/\*(.*?)\*\//);
+					const m = l.match(singleLineComment);
 					return m ? m[1].trim() : '';
 				});
 
@@ -568,27 +569,30 @@ const templateLiteralWidth: DivergencePattern = {
 		'typescript/expressions/literals/template/long_prettier_divergence',
 		'typescript/expressions/literals/template/interpolation_expression_long_prettier_divergence',
 		'typescript/expressions/literals/template/interpolation_method_chain_long_prettier_divergence',
-		'typescript/expressions/literals/template/interpolation_chain_blank_lines_prettier_divergence',
 		'typescript/expressions/literals/template/interpolation_multiline_indent_long_prettier_divergence',
 		'typescript/expressions/literals/template/interpolation_nested_template_prettier_divergence',
 		'typescript/expressions/literals/template/interpolation_short_multiline_prettier_divergence',
 		'typescript/types/template_literal_type_long_prettier_divergence',
 		'typescript/types/template_literal_type_conditional_long_prettier_divergence',
-		'typescript/expressions/literals/template/arrow_template_body_nested_long_prettier_divergence',
 		'typescript/expressions/ternary/template_consequent_long_prettier_divergence',
 		'typescript/expressions/logical/template_operand_long_prettier_divergence',
+		'typescript/expressions/calls/template_interpolation_call_break_prettier_divergence',
 	],
 	detect(ctx) {
-		// Template literal break patterns in hunk lines:
-		// 1. ${ at end of line (we break after ${)
-		// 2. ${ at start of indented line
-		// 3. }` alone on a line (closing after break)
-		const templateBreakPattern = /\$\{|^\t+\}\`/;
+		// Template literal break patterns — we break inside ${...} to respect print width.
+		// Detect by looking for lines that END with ${ (the break point) or start with }`
+		// (closing after break). Must use end-of-line anchor to avoid matching inline ${expr}
+		// which appears in both our output and prettier's output.
+		const breakAfterDollarBrace = /\$\{\s*$/;
+		const closingBraceBacktick = /^\t+\}\`/;
 
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
-			// Check if added lines show template break patterns not in removed lines
-			const addedHasBreak = hunk.addedLines.some((l) => templateBreakPattern.test(l));
-			const removedHasBreak = hunk.removedLines.some((l) => templateBreakPattern.test(l));
+			const addedHasBreak = hunk.addedLines.some(
+				(l) => breakAfterDollarBrace.test(l) || closingBraceBacktick.test(l),
+			);
+			const removedHasBreak = hunk.removedLines.some(
+				(l) => breakAfterDollarBrace.test(l) || closingBraceBacktick.test(l),
+			);
 			return addedHasBreak && !removedHasBreak;
 		});
 
@@ -819,6 +823,58 @@ const multiCallbackTrailingMember: DivergencePattern = {
 
 // ─── Svelte-specific patterns ───────────────────────────────────────────────
 
+const menuBlock: DivergencePattern = {
+	id: 'menu_block',
+	description: '<menu> treated as block element (spec-compliant)',
+	languages: ['svelte'],
+	conformanceSections: ['Svelte/HTML'],
+	fixtures: ['svelte/elements/menu_block_prettier_divergence'],
+	detect(ctx) {
+		if (ctx.language !== 'svelte') return null;
+
+		// Look for hunks involving <menu> elements where prettier hugs content
+		// (inline formatting) and we expand it (block formatting)
+		const oursLines = ctx.ours.split('\n');
+		const prettierLines = ctx.prettier.split('\n');
+
+		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
+			// Check for </menu in removed lines (prettier hugs: content</menu on same line,
+			// with > possibly on next line)
+			const removedHasMenuClose = hunk.removedLines.some((l) => /<\/menu/.test(l));
+			// Check for </menu> on added lines on its own line (we expand: block formatting)
+			const addedHasMenuClose = hunk.addedLines.some((l) => /^\s*<\/menu>/.test(l));
+
+			if (removedHasMenuClose || addedHasMenuClose) return true;
+
+			// Also check context: <menu in surrounding lines
+			const oLines = oursLinesInHunk(oursLines, hunk);
+			const pLines = prettierLinesInHunk(prettierLines, hunk);
+			const contextLines = hunk.lines.filter((l) => l.type === 'same').map((l) => l.line);
+			const allLines = [...oLines, ...pLines, ...contextLines];
+			const hasMenuElement = allLines.some((l) => /<menu[\s>]/.test(l));
+
+			if (!hasMenuElement) return false;
+
+			// Prettier hugs: >{content} on same line as attribute
+			const removedHugs = hunk.removedLines.some((l) => />[^<\n]*<\/menu/.test(l));
+			// We expand: > on own line
+			const addedBreaksGt = hunk.addedLines.some((l) => /^\t*>$/.test(l));
+
+			return removedHugs || addedBreaksGt;
+		});
+
+		if (hunkIndices.length > 0) {
+			return {
+				pattern: 'menu_block',
+				confidence: 'certain',
+				hunkIndices,
+				reason: '<menu> treated as block element (prettier treats as inline)',
+			};
+		}
+		return null;
+	},
+};
+
 const inlineContentHug: DivergencePattern = {
 	id: 'inline_content_hug',
 	description: 'Expression breaks internally vs bracket breaks',
@@ -836,8 +892,12 @@ const inlineContentHug: DivergencePattern = {
 
 			// Our added lines hug: >{ or > followed by content
 			const oursHugs = />\{/.test(addedJoined) || />[^<\n]+\{/.test(addedJoined);
-			// Prettier removed lines show tag break: line ending with > alone, or <tag\n>
-			const prettierBreaks = hunk.removedLines.some((l) => /^\t*>$/.test(l)) ||
+			// Prettier removed lines show tag break:
+			//   - > alone on a line (tag break with content on next line)
+			//   - >content on a line (tag break with content on same line, e.g. <small\n\t>text{expr})
+			//   - removed content ending with > (tag with > at end of line)
+			// Exclude closing tags (>/) to avoid matching </tag>
+			const prettierBreaks = hunk.removedLines.some((l) => /^\s*>(?!\/)/.test(l)) ||
 				/>\s*$/.test(removedJoined);
 
 			return oursHugs && prettierBreaks;
@@ -982,6 +1042,7 @@ const cssValueWrap: DivergencePattern = {
 
 		// Check each hunk for long CSS property values in prettier's range
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
+			if (!isInCssContext(hunk, ctx)) return false;
 			const pLines = prettierLinesInHunk(prettierLines, hunk);
 			return pLines.some((l) => /^\t+[\w-]+:\s*.+/.test(l) && visualWidth(l) > 100);
 		});
@@ -1005,8 +1066,9 @@ const fill101Boundary: DivergencePattern = {
 	conformanceSections: ['CSS: Layout', 'CSS: Values', 'Svelte/HTML'],
 	fixtures: [
 		'css/comma_separated_greedy_fill_prettier_divergence',
-		'css/values/lists/comma_space_separated_101_prettier_divergence',
-		'svelte/elements/inline_element_fill_101_prettier_divergence',
+		'css/values/lists/comma_space_separated_long_prettier_divergence',
+		'svelte/elements/inline_element_fill_long_prettier_divergence',
+		'svelte/elements/inline_component_fill_long_prettier_divergence',
 	],
 	detect(ctx) {
 		const prettierLines = ctx.prettier.split('\n');
@@ -1139,6 +1201,7 @@ export const PATTERNS: DivergencePattern[] = [
 	multiCallbackTrailingMember,
 
 	// 4. Svelte-specific patterns
+	menuBlock,
 	inlineContentHug,
 	fillAfterInline,
 	blockMultilineAttrsHug,

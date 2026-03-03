@@ -441,6 +441,21 @@ pub fn is_call_on_member_chain(expr: &Expression) -> bool {
     }
 }
 
+/// Check if an expression is a single call on a member chain (without complex-arg requirement).
+///
+/// Like `is_call_on_member_chain` but without the complex-args check. Used to detect
+/// `a.fn(anyArg)` patterns for width-based layout decisions in variable declarations.
+pub fn is_single_call_on_member_chain(expr: &Expression) -> bool {
+    if let Expression::CallExpression(call) = expr {
+        matches!(
+            &*call.callee,
+            Expression::MemberExpression(_) | Expression::TSNonNullExpression(_)
+        ) && count_calls_in_chain(&call.callee) == 0
+    } else {
+        false
+    }
+}
+
 /// Check if an argument is "short" (won't expand when formatted)
 ///
 /// Matches Prettier's `isLoneShortArgument` logic:
