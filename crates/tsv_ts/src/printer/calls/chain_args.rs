@@ -17,8 +17,27 @@ use super::arg_wrapping::{
     ChainArgKind, arrow_has_type_annotations, build_args_split_last, build_arrow_inline_signature,
     build_chain_expand_all_args, classify_chain_arg, wrap_args_with_soft_breaks, wrap_huggable_arg,
 };
-use crate::ast::internal;
+use crate::ast::internal::{self, Expression};
 use tsv_lang::doc::arena::DocId;
+
+/// Get type arguments for a call expression, checking both the call itself
+/// and a TSInstantiationExpression callee.
+///
+/// Our parser produces `CallExpression { callee: TSInstantiationExpression { expr, <T> } }`
+/// for `expr<T>(args)`, while the canonical parser puts `<T>` directly on
+/// `CallExpression.typeArguments`. In chain context, the TSInstantiationExpression
+/// is linearized away, so the Call node must recover type arguments from the callee.
+fn get_call_type_arguments(
+    call: &internal::CallExpression,
+) -> Option<&internal::TSTypeParameterInstantiation> {
+    call.type_arguments.as_ref().or_else(|| {
+        if let Expression::TSInstantiationExpression(inst) = call.callee.as_ref() {
+            Some(&inst.type_arguments)
+        } else {
+            None
+        }
+    })
+}
 
 /// Build inline leading block comments for the first argument (non-expansion path).
 ///
@@ -97,6 +116,22 @@ pub(super) fn build_call_args_doc_for_chain(
     build_call_args_doc_for_chain_impl(printer, call, optional, false)
 }
 
+/// Check if a single argument is an arrow function with a breakable body
+/// (call expression or ternary).
+///
+/// These patterns use the arrow-hugging layout `(sig =>\n body,\n)` even when
+/// the chain forces expansion, matching prettier's behavior.
+/// Array bodies are excluded — they use the self-expanding layout `(sig => [\n items\n])`.
+fn is_single_arrow_with_breakable_body(arg: &Expression) -> bool {
+    if let Expression::ArrowFunctionExpression(arrow) = arg {
+        if let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
+            return matches!(&**body_expr, Expression::CallExpression(_))
+                || could_expand_arrow_body(body_expr);
+        }
+    }
+    false
+}
+
 /// Build a Doc for call arguments with forced expansion (hardlines instead of softlines)
 ///
 /// Used for the "args expanded, chain inline" state in conditionalGroup.
@@ -117,10 +152,8 @@ fn build_call_args_doc_for_chain_impl(
 ) -> DocId {
     let d = printer.d();
     // Build type arguments if present: `<T, U>`
-    let type_args_doc = call
-        .type_arguments
-        .as_ref()
-        .map(|ta| printer.build_type_parameter_instantiation_doc(ta));
+    let type_args = get_call_type_arguments(call);
+    let type_args_doc = type_args.map(|ta| printer.build_type_parameter_instantiation_doc(ta));
 
     // Check for blank lines between arguments (forces expansion)
     let has_blank_lines = call.arguments.windows(2).any(|window| {
@@ -136,13 +169,10 @@ fn build_call_args_doc_for_chain_impl(
         && call
             .arguments
             .iter()
-            .all(|arg| matches!(arg, internal::Expression::ArrowFunctionExpression(_)));
+            .all(|arg| matches!(arg, Expression::ArrowFunctionExpression(_)));
 
     // Get paren_open position (after type args if present, otherwise after callee)
-    let paren_open = call
-        .type_arguments
-        .as_ref()
-        .map_or_else(|| call.callee.span().end, |ta| ta.span.end);
+    let paren_open = type_args.map_or_else(|| call.callee.span().end, |ta| ta.span.end);
 
     // Check for any comments in arguments (leading, inter-argument, or trailing)
     // Note: presence of comments doesn't necessarily mean expansion - only line comments
@@ -216,13 +246,60 @@ fn build_call_args_doc_for_chain_impl(
             let arg = &call.arguments[0];
             if matches!(
                 arg,
-                internal::Expression::ObjectExpression(_)
-                    | internal::Expression::ArrayExpression(_)
+                Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
             ) {
                 // Build the object/array with forced internal expansion (hardlines)
                 let arg_doc = printer.build_arg_expression_doc_expanded(arg);
                 parts.push(d.text(prefix));
                 parts.push(arg_doc);
+                parts.push(d.text(")"));
+                return d.concat(&parts);
+            }
+        }
+
+        // Special case: single arrow arg with array body — the array expands internally.
+        // Layout: `(sig => [\n  items,\n])` — array content on new lines, bracket hugged.
+        if call.arguments.len() == 1 {
+            if let Expression::ArrowFunctionExpression(arrow) = &call.arguments[0]
+                && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+                && matches!(&**body_expr, Expression::ArrayExpression(_))
+            {
+                let body_doc = printer.build_arg_expression_doc_expanded(body_expr);
+                let sig_doc = if arrow_has_type_annotations(arrow) {
+                    d.group(printer.build_arrow_signature_doc(arrow))
+                } else {
+                    build_arrow_inline_signature(printer, arrow)
+                };
+
+                parts.push(d.text(prefix));
+                parts.push(sig_doc);
+                parts.push(d.text(" => "));
+                parts.push(body_doc);
+                parts.push(d.text(")"));
+                return d.concat(&parts);
+            }
+        }
+
+        // Special case: single arrow arg with breakable body (call, ternary).
+        // Use the arrow-hugging break state directly: `(sig =>\n  body,\n)`
+        // This matches prettier which keeps the signature hugged even when forcing expansion.
+        if call.arguments.len() == 1 && is_single_arrow_with_breakable_body(&call.arguments[0]) {
+            let arg = &call.arguments[0];
+            if let Expression::ArrowFunctionExpression(arrow) = arg
+                && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+            {
+                let body_doc = printer.build_expression_doc(body_expr);
+                let sig_doc = if arrow_has_type_annotations(arrow) {
+                    d.group(printer.build_arrow_signature_doc(arrow))
+                } else {
+                    build_arrow_inline_signature(printer, arrow)
+                };
+
+                parts.push(d.text(prefix));
+                parts.push(sig_doc);
+                parts.push(d.text(" =>"));
+                parts.push(d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])));
+                parts.push(d.hardline());
                 parts.push(d.text(")"));
                 return d.concat(&parts);
             }
@@ -375,24 +452,22 @@ fn build_call_args_doc_for_chain_impl(
             // EXCEPTION: Typed arrows with complex call bodies (objects, non-empty arrays) expand
             // the call arguments, putting signature on its own line:
             // Structure: `(\n  sig =>\n    body,\n)`
-            if let internal::Expression::ArrowFunctionExpression(arrow) = arg
+            if let Expression::ArrowFunctionExpression(arrow) = arg
                 && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-                && matches!(&**body_expr, internal::Expression::CallExpression(_))
+                && matches!(&**body_expr, Expression::CallExpression(_))
             {
                 let has_typed_annotations = arrow_has_type_annotations(arrow);
 
                 // Check if body call has complex arguments (objects, non-empty arrays, block functions)
                 let is_complex_call_body =
-                    if let internal::Expression::CallExpression(nested_call) = &**body_expr {
+                    if let Expression::CallExpression(nested_call) = &**body_expr {
                         nested_call.arguments.iter().any(|arg| match arg {
-                            internal::Expression::ArrowFunctionExpression(arr) => {
+                            Expression::ArrowFunctionExpression(arr) => {
                                 matches!(arr.body, internal::ArrowFunctionBody::BlockStatement(_))
                             }
-                            internal::Expression::ObjectExpression(obj) => {
-                                !obj.properties.is_empty()
-                            }
-                            internal::Expression::ArrayExpression(arr) => !arr.elements.is_empty(),
-                            internal::Expression::FunctionExpression(_) => true,
+                            Expression::ObjectExpression(obj) => !obj.properties.is_empty(),
+                            Expression::ArrayExpression(arr) => !arr.elements.is_empty(),
+                            Expression::FunctionExpression(_) => true,
                             _ => false,
                         })
                     } else {
@@ -445,7 +520,7 @@ fn build_call_args_doc_for_chain_impl(
                     build_arrow_inline_signature(printer, arrow)
                 };
 
-                // Build the break state (always used when body has hardlines)
+                // State 1: sig hugged, body indented — (sig =>\n  body,\n)
                 let break_state = d.concat(&[
                     d.text(prefix),
                     sig_doc,
@@ -455,16 +530,29 @@ fn build_call_args_doc_for_chain_impl(
                     d.text(")"),
                 ]);
 
+                // State 2: all args broken out — (\n  sig => body,\n)
+                // Matches prettier's allArgsBrokenOut(): a group with shouldBreak
+                // that puts a line right after "(" so fits() returns true early
+                // when evaluated in Break mode during look-ahead.
+                let all_broken_state = d.group_break(d.concat(&[
+                    d.text(prefix),
+                    d.indent(d.concat(&[d.line(), arrow_doc, d.trailing_comma()])),
+                    d.line(),
+                    d.text(")"),
+                ]));
+
                 // If body will break (multiline content), use break state directly
                 // This ensures trailing comma is present when content is multiline
                 if d.will_break(body_doc) {
                     parts.push(break_state);
                 } else {
                     parts.push(d.conditional_group(&[
-                        // Flat: (arrow)
+                        // State 0: flat — (arrow)
                         d.concat(&[d.text(prefix), arrow_doc, d.text(")")]),
-                        // Break: (sig =>\n  body,\n)
+                        // State 1: body breaks
                         break_state,
+                        // State 2: all broken out
+                        all_broken_state,
                     ]));
                 }
                 return d.concat(&parts);
@@ -474,7 +562,7 @@ fn build_call_args_doc_for_chain_impl(
             // Prettier uses conditional parens:
             // - Flat: `map((x) => (x ? y : z))` - with parens
             // - Break: `map((x) =>\n  x ? y : z,)` - no parens, body indented
-            if let internal::Expression::ArrowFunctionExpression(arrow) = arg
+            if let Expression::ArrowFunctionExpression(arrow) = arg
                 && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
                 && could_expand_arrow_body(body_expr)
             {
@@ -555,7 +643,7 @@ fn build_call_args_doc_for_chain_impl(
             // Check if it's a block arrow with trailing param comments
             // These need soft-break wrapping to expand the call
             let block_arrow_has_trailing_param_comments =
-                if let internal::Expression::ArrowFunctionExpression(arrow) = arg
+                if let Expression::ArrowFunctionExpression(arrow) = arg
                     && !arrow.body.is_expression()
                 {
                     arrow_has_trailing_param_comments(arrow, |start, end| {
@@ -583,6 +671,38 @@ fn build_call_args_doc_for_chain_impl(
                 parts.push(d.indent(d.concat(&[d.hardline(), arg_doc, d.text(",")])));
                 parts.push(d.hardline());
                 parts.push(d.text(")"));
+                return d.concat(&parts);
+            }
+
+            // Multiline template literal on same line as ( — hug it.
+            // Mirrors call_formatting.rs's isTemplateOnItsOwnLine handling:
+            // when the template starts on the same line as the opening paren,
+            // prettier hugs it (no break between `(` and the backtick).
+            if is_multiline_template_expression(arg) {
+                parts.push(d.text(prefix));
+                parts.push(arg_with_comments);
+                parts.push(d.text(")"));
+                return d.concat(&parts);
+            }
+
+            // Block-body arrows: use conditional_group to try hug first, then expand.
+            // Cannot use wrap_args_with_soft_breaks (regular group) because will_break()
+            // recurses into the block body's hardlines and forces break without trying
+            // fits(). conditional_group uses fits() directly, correctly measuring whether
+            // the hugged first line (e.g., `fn((params) => {`) fits.
+            if let Expression::ArrowFunctionExpression(arrow) = arg
+                && matches!(arrow.body, internal::ArrowFunctionBody::BlockStatement(_))
+            {
+                // State 0: Hug - fn((params) => { body })
+                let state_hug = d.concat(&[d.text(prefix), arg_with_comments, d.text(")")]);
+                // State 1: Expand - fn(\n  (params) => {\n    body\n  },\n)
+                let state_expand = d.concat(&[
+                    d.text(prefix),
+                    d.indent(d.concat(&[d.hardline(), arg_with_comments, d.trailing_comma()])),
+                    d.hardline(),
+                    d.text(")"),
+                ]);
+                parts.push(d.conditional_group(&[state_hug, state_expand]));
                 return d.concat(&parts);
             }
 
@@ -639,16 +759,18 @@ fn build_call_args_doc_for_chain_impl(
             return d.concat(&parts);
         }
 
-        // Expression arrow with call expression body
+        // Expression arrow with call/conditional expression body
         // Prettier keeps preceding args inline and breaks after =>
         // e.g., `a.b(c, (x) =>\n  fn(x, ...),\n);`
         if call.arguments.len() >= 2
             && preceding_args_allow_expand_last(&call.arguments, printer.line_breaks)
             && !comments_force_expansion
-            && let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
-                call.arguments.last()
+            && let Some(Expression::ArrowFunctionExpression(arrow)) = call.arguments.last()
             && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-            && matches!(&**body_expr, internal::Expression::CallExpression(_))
+            && matches!(
+                &**body_expr,
+                Expression::CallExpression(_) | Expression::ConditionalExpression(_)
+            )
             && !arrow_has_type_annotations(arrow)
         {
             let (head_parts, last_arg_doc, all_args_broken) =
@@ -662,14 +784,6 @@ fn build_call_args_doc_for_chain_impl(
 
             let inline_sig = build_arrow_inline_signature(printer, arrow);
             let body_doc = printer.build_expression_doc(body_expr);
-
-            // State 0: all inline
-            let state_inline = d.concat(&[
-                d.text(prefix),
-                d.concat(&head_parts),
-                last_arg_doc,
-                d.text(")"),
-            ]);
 
             // State 1: hug - head inline, arrow body breaks after =>
             let state_break_body = d.concat(&[
@@ -685,6 +799,22 @@ fn build_call_args_doc_for_chain_impl(
             // State 2: expand all args
             let state_expand_all = build_chain_expand_all_args(d, prefix, all_args_broken);
 
+            // Prettier: when willBreak(lastArg) is true, skip flat state.
+            // The flat state would be selected by fits() but produces wrong
+            // closing brackets (e.g., `}));` instead of `}),\n)`).
+            if d.will_break(last_arg_doc) {
+                parts.push(d.conditional_group(&[state_break_body, state_expand_all]));
+                return d.concat(&parts);
+            }
+
+            // State 0: all inline
+            let state_inline = d.concat(&[
+                d.text(prefix),
+                d.concat(&head_parts),
+                last_arg_doc,
+                d.text(")"),
+            ]);
+
             parts.push(d.conditional_group(&[state_inline, state_break_body, state_expand_all]));
             return d.concat(&parts);
         }
@@ -695,13 +825,11 @@ fn build_call_args_doc_for_chain_impl(
         if call.arguments.len() >= 2
             && preceding_args_allow_expand_last(&call.arguments, printer.line_breaks)
             && !comments_force_expansion
-            && let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
-                call.arguments.last()
+            && let Some(Expression::ArrowFunctionExpression(arrow)) = call.arguments.last()
             && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
             && matches!(
                 &**body_expr,
-                internal::Expression::ObjectExpression(_)
-                    | internal::Expression::ArrayExpression(_)
+                Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
             )
             && !arrow_has_type_annotations(arrow)
         {
@@ -793,6 +921,16 @@ fn build_call_args_doc_for_chain_impl(
             && !call.arguments.last().is_some_and(is_concise_numeric_array)
             && preceding_args_allow_expand_last(&call.arguments, printer.line_breaks)
             && !comments_force_expansion
+            // Prettier blocks expand-last for 2-arg arrow+array (React hook pattern)
+            && !(call.arguments.len() == 2
+                && matches!(
+                    call.arguments.first(),
+                    Some(Expression::ArrowFunctionExpression(_))
+                )
+                && matches!(
+                    call.arguments.last(),
+                    Some(Expression::ArrayExpression(_))
+                ))
         {
             // Check if last two args have the same "expandable" type (both arrays or both objects)
             // Prettier disables expand-last-arg in this case
@@ -802,11 +940,11 @@ fn build_call_args_doc_for_chain_impl(
                 matches!(
                     (last, penultimate),
                     (
-                        internal::Expression::ArrayExpression(_),
-                        internal::Expression::ArrayExpression(_)
+                        Expression::ArrayExpression(_),
+                        Expression::ArrayExpression(_)
                     ) | (
-                        internal::Expression::ObjectExpression(_),
-                        internal::Expression::ObjectExpression(_)
+                        Expression::ObjectExpression(_),
+                        Expression::ObjectExpression(_)
                     )
                 )
             };

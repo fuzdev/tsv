@@ -497,6 +497,10 @@ pub fn convert_expression(
                 )),
             })
         }
+        // Parenthesized is internal-only; unwrap for public AST
+        internal::Expression::Parenthesized(inner) => {
+            convert_expression(inner, source, loc, interner, offset)
+        }
     }
 }
 

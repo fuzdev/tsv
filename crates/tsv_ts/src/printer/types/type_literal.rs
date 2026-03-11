@@ -8,7 +8,7 @@
 use super::super::comments_in_range;
 use super::Printer;
 use super::helpers::unwrap_parenthesized;
-use crate::ast::internal::{TSIntersectionType, TSType, TSTypeElement, TSTypeLiteral};
+use crate::ast::internal::{TSIntersectionType, TSType, TSTypeElement, TSTypeLiteral, TSUnionType};
 use tsv_lang::doc::arena::DocId;
 
 /// Mode for building type literal docs.
@@ -135,6 +135,11 @@ impl<'a> Printer<'a> {
                     .build_parenthesized_intersection_trailing_object_doc(intersection, obj);
             }
 
+            // Special case: parenthesized union type
+            if let TSType::Union(union) = unwrap_parenthesized(ts_type) {
+                return self.build_parenthesized_union_doc(union);
+            }
+
             // Default case: simple parenthesization
             d.concat(&[
                 d.text("("),
@@ -144,6 +149,25 @@ impl<'a> Printer<'a> {
         } else {
             self.build_type_doc(ts_type)
         }
+    }
+
+    /// Build doc for a union type wrapped in parentheses.
+    ///
+    /// Prettier uses `group([indent(mainParts), softline])` when `pathNeedsParens`
+    /// is true for a union, so that when the group breaks, `(` and `)` get their
+    /// own lines with the union content indented:
+    /// ```text
+    /// (
+    ///   | { a: string }
+    ///   | { b: string }
+    /// )
+    /// ```
+    pub(super) fn build_parenthesized_union_doc(&self, union: &TSUnionType) -> DocId {
+        let d = self.d();
+        let union_doc = self.build_union_type_doc(union, false);
+        let inner =
+            d.group(d.concat(&[d.indent(d.concat(&[d.softline(), union_doc])), d.softline()]));
+        d.concat(&[d.text("("), inner, d.text(")")])
     }
 
     //

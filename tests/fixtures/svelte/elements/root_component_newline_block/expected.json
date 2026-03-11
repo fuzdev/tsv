@@ -1,0 +1,243 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 83,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Component",
+				"start": 0,
+				"end": 34,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 5,
+						"character": 5
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 6,
+							"end": 8,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 8,
+							"end": 26,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 9
+								},
+								"end": {
+									"line": 2,
+									"column": 5,
+									"character": 12
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 13,
+										"end": 20,
+										"raw": "content",
+										"data": "content"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 26,
+							"end": 27,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 34,
+				"end": 35,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 35,
+				"end": 58,
+				"test": {
+					"type": "Identifier",
+					"start": 40,
+					"end": 41,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 5
+						},
+						"end": {
+							"line": 4,
+							"column": 6
+						}
+					},
+					"name": "a"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 42,
+							"end": 44,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 44,
+							"end": 52,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 2,
+									"character": 45
+								},
+								"end": {
+									"line": 5,
+									"column": 3,
+									"character": 46
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 47,
+										"end": 48,
+										"raw": "a",
+										"data": "a"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 52,
+							"end": 53,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 58,
+				"end": 59,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 59,
+				"end": 82,
+				"test": {
+					"type": "Identifier",
+					"start": 64,
+					"end": 65,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 5
+						},
+						"end": {
+							"line": 7,
+							"column": 6
+						}
+					},
+					"name": "b"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 66,
+							"end": 68,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 68,
+							"end": 76,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 2,
+									"character": 69
+								},
+								"end": {
+									"line": 8,
+									"column": 3,
+									"character": 70
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 71,
+										"end": 72,
+										"raw": "b",
+										"data": "b"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 76,
+							"end": 77,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": null
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

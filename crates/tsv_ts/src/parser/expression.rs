@@ -234,8 +234,12 @@ impl<'a> Parser<'a> {
                     break;
                 };
 
-                // Skip `in` operator when allow_in is false (parsing for-loop headers)
-                if matches!(operator, BinaryOperator::In) && !self.allow_in {
+                // Skip `in` operator when allow_in is false (parsing for-loop headers),
+                // unless inside grouping delimiters where `in` is always a binary operator
+                if matches!(operator, BinaryOperator::In)
+                    && !self.allow_in
+                    && self.grouping_depth == 0
+                {
                     break;
                 }
 
@@ -280,8 +284,11 @@ impl<'a> Parser<'a> {
             }
 
             // Then, try TypeScript `as` and `satisfies` operators (lower precedence than binary)
-            // Only parse when allow_ts_type_assertions is true (disabled in Svelte template contexts)
-            if min_bp <= BP_TS_TYPE_ASSERTION && self.allow_ts_type_assertions {
+            // Enabled when: explicitly allowed (normal TS context), OR inside grouping
+            // delimiters where `as` can never be the Svelte `#each` binding separator
+            if min_bp <= BP_TS_TYPE_ASSERTION
+                && (self.allow_ts_type_assertions || self.grouping_depth > 0)
+            {
                 match self.current_kind() {
                     TokenKind::Keyword(KeywordKind::As) => {
                         self.advance()?; // consume 'as'
@@ -502,6 +509,7 @@ impl<'a> Parser<'a> {
     /// Assumes the opening `(` has already been consumed.
     /// Returns the arguments and the end position of the closing `)`.
     pub(super) fn parse_call_arguments(&mut self) -> Result<(Vec<Expression>, usize), ParseError> {
+        self.grouping_depth += 1;
         let mut arguments = Vec::new();
 
         if !self.check(&TokenKind::ParenClose) {
@@ -517,6 +525,7 @@ impl<'a> Parser<'a> {
 
         let (_, paren_end) = self.current_pos();
         self.expect(&TokenKind::ParenClose)?;
+        self.grouping_depth -= 1;
         Ok((arguments, paren_end))
     }
 
@@ -611,11 +620,13 @@ impl<'a> Parser<'a> {
                         TokenKind::BracketOpen => {
                             // obj?.[expr] - optional computed access
                             self.advance()?; // consume '['
+                            self.grouping_depth += 1;
 
                             let index = self.parse_expression()?;
 
                             let (_, bracket_end) = self.current_pos();
                             self.expect(&TokenKind::BracketClose)?; // consume ']'
+                            self.grouping_depth -= 1;
 
                             let span = Span::new(left.actual_start as u32, bracket_end as u32);
                             left = ParsedExpr::with_end(
@@ -656,11 +667,13 @@ impl<'a> Parser<'a> {
                 TokenKind::BracketOpen => {
                     // Computed member access: arr[0]
                     self.advance()?; // consume '['
+                    self.grouping_depth += 1;
 
                     let index = self.parse_expression()?;
 
                     let (_, bracket_end) = self.current_pos();
                     self.expect(&TokenKind::BracketClose)?; // consume ']'
+                    self.grouping_depth -= 1;
 
                     let span = Span::new(left.actual_start as u32, bracket_end as u32);
                     left = ParsedExpr::with_end(
@@ -970,6 +983,14 @@ impl<'a> Parser<'a> {
             return Ok(ParsedExpr::from_expr(self.parse_arrow_function()?));
         }
 
+        // Check if the last comment before '(' is a JSDoc type cast comment.
+        // Pattern: /** @type {T} */ (expr) or /** @satisfies {T} */ (expr)
+        let is_jsdoc_type_cast = self.comments.last().is_some_and(|c| {
+            c.is_block
+                && c.content.starts_with('*')
+                && (c.content.contains("@type") || c.content.contains("@satisfies"))
+        });
+
         // Parse as grouped expression: (expr)
         // Track actual_start BEFORE '(' and actual_end AFTER ')' for correct spans
         // when this expression is used as a callee: (a ? b : c)() should have
@@ -977,15 +998,24 @@ impl<'a> Parser<'a> {
         let (paren_start, _) = self.current_pos();
         self.expect(&TokenKind::ParenOpen)?; // consume '('
 
+        self.grouping_depth += 1;
         let parsed = self.parse_expression_bp(BP_COMMA)?;
 
         // Capture the end position of ')' before consuming it
         let (_, paren_end) = self.current_pos();
         self.expect(&TokenKind::ParenClose)?; // consume ')'
+        self.grouping_depth -= 1;
+
+        // Wrap in Parenthesized if preceded by JSDoc type cast comment
+        let expr = if is_jsdoc_type_cast {
+            Expression::Parenthesized(Box::new(parsed.expr))
+        } else {
+            parsed.expr
+        };
 
         // Return expression with its original span (excluding parens), but with
         // actual_start before '(' and actual_end after ')' for containing expressions
-        Ok(ParsedExpr::with_bounds(parsed.expr, paren_start, paren_end))
+        Ok(ParsedExpr::with_bounds(expr, paren_start, paren_end))
     }
 
     /// Check if current position starts an arrow function
@@ -1377,6 +1407,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_object_expression(&mut self) -> Result<Expression, ParseError> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?; // consume '{'
+        self.grouping_depth += 1;
 
         let mut properties = Vec::new();
 
@@ -1384,6 +1415,7 @@ impl<'a> Parser<'a> {
         if self.check(&TokenKind::BraceClose) {
             let (_, end) = self.current_pos();
             self.advance()?; // consume '}'
+            self.grouping_depth -= 1;
             return Ok(Expression::ObjectExpression(ObjectExpression {
                 properties,
                 span: Span::new(start as u32, end as u32),
@@ -1617,6 +1649,7 @@ impl<'a> Parser<'a> {
 
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?; // consume '}'
+        self.grouping_depth -= 1;
 
         Ok(Expression::ObjectExpression(ObjectExpression {
             properties,
@@ -1635,6 +1668,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_array_expression(&mut self) -> Result<Expression, ParseError> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BracketOpen)?; // consume '['
+        self.grouping_depth += 1;
 
         let mut elements = Vec::new();
 
@@ -1642,6 +1676,7 @@ impl<'a> Parser<'a> {
         if self.check(&TokenKind::BracketClose) {
             let (_, end) = self.current_pos();
             self.advance()?; // consume ']'
+            self.grouping_depth -= 1;
             return Ok(Expression::ArrayExpression(ArrayExpression {
                 elements,
                 span: Span::new(start as u32, end as u32),
@@ -1690,6 +1725,7 @@ impl<'a> Parser<'a> {
 
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BracketClose)?; // consume ']'
+        self.grouping_depth -= 1;
 
         Ok(Expression::ArrayExpression(ArrayExpression {
             elements,
@@ -2387,6 +2423,8 @@ impl<'a> Parser<'a> {
                     span: Span::new(elem_start as u32, elem_end as u32),
                 });
 
+                self.grouping_depth += 1;
+
                 // Parse expressions and remaining template parts
                 loop {
                     // Parse the interpolated expression
@@ -2458,6 +2496,8 @@ impl<'a> Parser<'a> {
                         }
                     }
                 }
+
+                self.grouping_depth -= 1;
 
                 let end = quasis.last().map_or(start as u32, |q| q.span.end);
 

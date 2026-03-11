@@ -23,8 +23,6 @@
 // - **printing.rs**: Node/group rendering, ChainPrinter trait
 // - **builder/**: Doc building logic split into focused submodules
 //   - mod.rs: Main build_chain_doc entry point
-//   - await_chains.rs: Parenthesized await handling
-//   - non_null_chains.rs: Parenthesized non-null handling
 //   - member_only.rs: Member-only chains using fill()
 //   - expansion.rs: Chain expansion analysis helpers
 //   - helpers.rs: Shared utilities and ChainPartsBuilder

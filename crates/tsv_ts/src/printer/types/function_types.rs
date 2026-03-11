@@ -11,7 +11,7 @@ use super::Printer;
 use super::helpers::type_args_should_wrap_for_return_type;
 use crate::ast::internal::{self, TSConstructorType, TSFunctionType, TSType};
 use tsv_lang::SymbolToU32;
-use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::arena::{DocArena, DocId};
 
 /// Check if an expression is an identifier with a TypeLiteral type annotation.
 ///
@@ -36,6 +36,39 @@ fn get_type_literal_from_identifier(
         }
         _ => None,
     }
+}
+
+/// Check if type parameters allow function parameter grouping.
+///
+/// Returns true when there are 0 type params, or exactly 1 without constraints/defaults.
+/// Shared between function declarations and function/constructor types.
+pub(in crate::printer) fn type_params_allow_grouping(
+    type_parameters: Option<&internal::TSTypeParameterDeclaration>,
+) -> bool {
+    let Some(tp) = type_parameters else {
+        return true;
+    };
+    if tp.params.len() > 1 {
+        return false;
+    }
+    tp.params
+        .first()
+        .is_none_or(|p| p.constraint.is_none() && p.default.is_none())
+}
+
+/// Check if a return type qualifies for function parameter grouping.
+///
+/// Returns true when the return type is an object type (TypeLiteral/Mapped)
+/// or the return type doc will break across lines.
+pub(in crate::printer) fn return_type_triggers_grouping(
+    return_type: &internal::TSTypeAnnotation,
+    return_type_doc: DocId,
+    d: &DocArena,
+) -> bool {
+    matches!(
+        &*return_type.type_annotation,
+        TSType::TypeLiteral(_) | TSType::Mapped(_)
+    ) || d.will_break(return_type_doc)
 }
 
 impl<'a> Printer<'a> {
@@ -96,24 +129,29 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a function type: `(a: T) => U`
     ///
     /// Uses width-aware wrapping similar to arrow functions.
+    /// Applies `shouldGroupFunctionParameters` when there's 1 param and the
+    /// return type is an object type or will break — params are wrapped in
+    /// their own group so they stay flat when the outer group breaks.
     pub(super) fn build_function_type_doc(&self, f: &TSFunctionType) -> DocId {
         let d = self.d();
         let mut parts = Vec::new();
 
-        // Type parameters wrapped in their own group (can break independently)
         if let Some(type_params) = &f.type_parameters {
             parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
         }
 
-        // Function parameters - search for `(` from type_params end or function start
         let paren_search_start = f
             .type_parameters
             .as_ref()
             .map_or(f.span.start, |tp| tp.span.end);
-        parts.extend(self.build_function_params_doc(&f.params, paren_search_start));
-        parts.push(self.build_function_type_return_doc(&f.return_type));
 
-        // Wrap entire function type in a group for width-aware breaking
+        parts.extend(self.build_grouped_params_and_return_type(
+            &f.params,
+            paren_search_start,
+            &f.return_type,
+            f.type_parameters.as_ref(),
+        ));
+
         d.group(d.concat(&parts))
     }
 
@@ -122,29 +160,58 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = Vec::new();
 
-        // Add 'abstract' keyword if present
         if c.abstract_ {
             parts.push(d.text("abstract "));
         }
-
-        // Add 'new' keyword
         parts.push(d.text("new "));
 
-        // Type parameters wrapped in their own group (can break independently)
         if let Some(type_params) = &c.type_parameters {
             parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
         }
 
-        // Constructor parameters - search for `(` from type_params end or constructor start
         let paren_search_start = c
             .type_parameters
             .as_ref()
             .map_or(c.span.start, |tp| tp.span.end);
-        parts.extend(self.build_function_params_doc(&c.params, paren_search_start));
-        parts.push(self.build_function_type_return_doc(&c.return_type));
 
-        // Wrap entire constructor type in a group for width-aware breaking
+        parts.extend(self.build_grouped_params_and_return_type(
+            &c.params,
+            paren_search_start,
+            &c.return_type,
+            c.type_parameters.as_ref(),
+        ));
+
         d.group(d.concat(&parts))
+    }
+
+    /// Build params + return type docs with optional parameter grouping.
+    ///
+    /// Implements Prettier's `shouldGroupFunctionParameters` for function/constructor
+    /// types: when there's 1 param and the return type is an object type or will break,
+    /// wraps params in their own group so they stay flat when the outer group breaks.
+    fn build_grouped_params_and_return_type(
+        &self,
+        params: &[internal::Expression],
+        paren_search_start: u32,
+        return_type: &internal::TSTypeAnnotation,
+        type_parameters: Option<&internal::TSTypeParameterDeclaration>,
+    ) -> [DocId; 2] {
+        let d = self.d();
+
+        // Build return type first so we can check will_break for grouping
+        let return_type_doc = self.build_function_type_return_doc(return_type);
+
+        let params_doc = d.concat(&self.build_function_params_doc(params, paren_search_start));
+        let params_doc = if params.len() == 1
+            && type_params_allow_grouping(type_parameters)
+            && return_type_triggers_grouping(return_type, return_type_doc, d)
+        {
+            d.group(params_doc)
+        } else {
+            params_doc
+        };
+
+        [params_doc, return_type_doc]
     }
 
     //

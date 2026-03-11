@@ -1,7 +1,8 @@
 // Type-related statement printing for TypeScript
 
 use super::{
-    Printer, build_entity_name_doc, intersection_has_huggable_last_type, unwrap_parenthesized,
+    Printer, build_entity_name_doc, intersection_has_huggable_last_type, should_hug_union_type,
+    unwrap_parenthesized,
 };
 use crate::ast::internal::{self, TSType};
 use tsv_lang::doc::arena::{DocArena, DocId};
@@ -89,9 +90,16 @@ impl<'a> Printer<'a> {
         // For union/intersection types, build without their own group so they inherit
         // breaking from this context's group.
         if let TSType::Union(u) = &decl.type_annotation {
-            // Union types: break after `=` with leading `| `
             let type_doc = self.build_union_type_doc(u, false);
-            parts.push(fluid_assignment_doc(d, type_doc));
+            if should_hug_union_type(u) {
+                // Hugged unions (e.g., `{ ... } | null`): the object type handles its own
+                // expansion, so keep `= {` together like other internally-breaking types
+                parts.push(d.text(" "));
+                parts.push(type_doc);
+            } else {
+                // Normal unions: break after `=` with leading `| `
+                parts.push(fluid_assignment_doc(d, type_doc));
+            }
         } else if let TSType::Intersection(i) = &decl.type_annotation {
             // Intersection types: first element stays inline, subsequent wrap with indent
             // Special case: when the last type is a TypeLiteral (huggable), don't add indent
@@ -162,12 +170,23 @@ impl<'a> Printer<'a> {
                 .map(|heritage| {
                     let mut h_parts = vec![self.build_entity_name_doc(&heritage.expression)];
                     if let Some(type_args) = &heritage.type_arguments {
-                        h_parts.push(self.build_type_arguments_doc(type_args));
+                        h_parts.push(self.build_type_arguments_doc_wrapping(type_args));
                     }
                     d.concat(&h_parts)
                 })
                 .collect();
-            Some(d.concat(&[d.text("extends "), d.join(heritage_docs, ", ")]))
+            if group_mode {
+                // Multiple extends: types break individually via inner group
+                // Matches Prettier's printHeritageClauses for hasMultipleHeritage
+                let comma_line = d.concat(&[d.text(","), d.line()]);
+                let types_joined = d.join_doc(heritage_docs, comma_line);
+                Some(d.concat(&[
+                    d.text("extends"),
+                    d.group(d.indent(d.concat(&[d.line(), types_joined]))),
+                ]))
+            } else {
+                Some(d.concat(&[d.text("extends "), d.join(heritage_docs, ", ")]))
+            }
         } else {
             None
         };
@@ -176,13 +195,13 @@ impl<'a> Printer<'a> {
         let header_doc = if group_mode {
             // Group mode: one unified group - when it breaks, extends breaks too
             if let Some(type_params) = &decl.type_parameters {
-                header_parts
-                    .push(self.build_type_parameter_declaration_doc_inline_group(type_params));
+                // Type params get their own group - break independently of extends
+                header_parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
             }
 
             // Extends clause with line break
             if let Some(ext_doc) = extends_doc {
-                header_parts.push(d.indent_line(ext_doc));
+                header_parts.push(d.indent(d.concat(&[d.line(), ext_doc])));
             }
 
             d.group(d.concat(&header_parts))
@@ -290,10 +309,10 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build doc for type arguments with comment preservation: `</* a */ T /* b */, U>`
+    /// Build doc for type arguments: `<T, U>`.
     ///
-    /// Default version: no independent width-based wrapping (parent context controls breaking).
-    /// Use `build_type_arguments_doc_wrapping` when type args should break independently.
+    /// Single arg: always inline. Multi-arg: group-based breaking via shared helper.
+    /// Use `build_type_arguments_doc_wrapping` for single-arg hugging (e.g., `Array<{...}>`).
     pub(crate) fn build_type_arguments_doc(
         &self,
         args: &internal::TSTypeParameterInstantiation,
@@ -308,43 +327,31 @@ impl<'a> Printer<'a> {
             return self.build_type_arguments_doc_with_line_comments(args);
         }
 
-        let mut parts = Vec::new();
-        let mut prev_end = args.span.start + 1; // After the opening `<`
+        // Single type argument: inline (matches Prettier's shouldInline for len==1)
+        if args.params.len() == 1 {
+            let mut parts = Vec::new();
+            let prev_end = args.span.start + 1; // After the opening `<`
+            let param_start = args.params[0].span().start;
+            let param_end = args.params[0].span().end;
+            let before_close = args.span.end - 1;
 
-        for (i, param) in args.params.iter().enumerate() {
-            let param_start = param.span().start;
-
-            if i > 0 {
-                parts.push(d.text(", "));
-            }
-
-            // Add leading block comments before this type argument
             for comment in comments_in_range(self.comments, prev_end, param_start) {
                 if comment.is_block {
                     parts.push(d.text_owned(format!("/*{}*/ ", comment.content)));
                 }
             }
-
-            parts.push(self.build_type_arg_doc(param, args.params.len() > 1));
-
-            // Add trailing block comments after this type argument
-            let param_end = param.span().end;
-            let next_boundary = if i + 1 < args.params.len() {
-                args.params[i + 1].span().start
-            } else {
-                args.span.end - 1 // Before the closing `>`
-            };
-            for comment in comments_in_range(self.comments, param_end, next_boundary) {
+            parts.push(self.build_type_arg_doc(&args.params[0], false));
+            for comment in comments_in_range(self.comments, param_end, before_close) {
                 if comment.is_block {
                     parts.push(d.text_owned(format!(" /*{}*/", comment.content)));
                 }
             }
-
-            // Update prev_end to next_boundary to avoid double-counting comments
-            prev_end = next_boundary;
+            return d.concat(&[d.text("<"), d.concat(&parts), d.text(">")]);
         }
 
-        d.concat(&[d.text("<"), d.concat(&parts), d.text(">")])
+        // Multiple type arguments: use group so they can break at print width.
+        // Matches Prettier's group([<, indent([softline, join([",", line], args)]), softline, >])
+        self.build_type_arguments_doc_multi_arg(args)
     }
 
     /// Build doc for type arguments with width-based wrapping support.
@@ -376,14 +383,28 @@ impl<'a> Printer<'a> {
             return self.build_type_arguments_doc_with_line_comments(args);
         }
 
-        // Special case: single brace-delimited type argument (TypeLiteral or Mapped, possibly
-        // parenthesized) - hug `<{` together. These types handle their own internal breaking,
-        // so we don't need extra softlines/indents around them.
+        // Single type argument inlining, matching Prettier's `shouldInline` logic.
+        // Three categories are inlined (no group/softlines):
+        //
+        // 1. Simple types: keywords (`string`, `number`) and TypeReference without
+        //    type args (`T`, `MyType`). These are atomic and never need breaking.
+        // 2. Object types: TypeLiteral and Mapped types handle their own breaking.
+        // 3. Hugged unions: unions with a brace-delimited member like `{...} | null`.
+        //
+        // Without inlining, the group/softlines create Break-mode Line nodes in
+        // `fits()` rest_commands, causing upstream groups (like arrays in Fluid
+        // assignment layout) to incorrectly appear to "fit" — Line in Break mode
+        // returns true from `fits()`, short-circuiting the width check.
         if args.params.len() == 1 {
-            let is_huggable = matches!(
-                unwrap_parenthesized(&args.params[0]),
-                TSType::TypeLiteral(_) | TSType::Mapped(_)
-            );
+            let unwrapped = unwrap_parenthesized(&args.params[0]);
+            let is_simple = matches!(unwrapped, TSType::Keyword(_))
+                || matches!(unwrapped, TSType::TypeReference(r) if r.type_arguments.is_none());
+            let is_huggable = is_simple
+                || matches!(unwrapped, TSType::TypeLiteral(_) | TSType::Mapped(_))
+                || matches!(unwrapped, TSType::Union(u) if
+                    should_hug_union_type(u)
+                    && u.types.iter().any(|t| matches!(t, TSType::TypeLiteral(_) | TSType::Mapped(_)))
+                );
             if is_huggable {
                 let mut parts = vec![d.text("<")];
 
@@ -412,6 +433,19 @@ impl<'a> Printer<'a> {
             }
         }
 
+        self.build_type_arguments_doc_multi_arg(args)
+    }
+
+    /// Build multi-arg type arguments with group-based breaking.
+    ///
+    /// Matches Prettier's `group([<, indent([softline, join([",", line], args)]), softline, >])`.
+    /// Used by both `build_type_arguments_doc` and `build_type_arguments_doc_wrapping`
+    /// for 2+ type arguments (and non-huggable single args in the wrapping variant).
+    fn build_type_arguments_doc_multi_arg(
+        &self,
+        args: &internal::TSTypeParameterInstantiation,
+    ) -> DocId {
+        let d = self.d();
         let mut inner_parts = Vec::new();
         let mut prev_end = args.span.start + 1; // After the opening `<`
 
@@ -419,7 +453,6 @@ impl<'a> Printer<'a> {
             let param_start = param.span().start;
             let is_last = i == args.params.len() - 1;
 
-            // Build parts for this argument
             let mut arg_parts = Vec::new();
 
             // Add leading block comments before this type argument
@@ -444,22 +477,18 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            // Update prev_end to next_boundary to avoid double-counting comments
             prev_end = next_boundary;
 
-            // Add separator before non-first arguments
             if i > 0 {
                 inner_parts.push(d.line());
             }
             inner_parts.push(d.concat(&arg_parts));
-            // Add comma separator after non-last elements
             if !is_last {
                 inner_parts.push(d.text(","));
             }
             // Note: type arguments don't get trailing commas (unlike params)
         }
 
-        // Wrap in group with proper indentation for width-based breaking
         d.group(d.concat(&[
             d.text("<"),
             d.indent_softline(d.concat(&inner_parts)),

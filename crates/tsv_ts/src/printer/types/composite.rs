@@ -35,7 +35,12 @@ impl<'a> Printer<'a> {
                 // - Flat: add parens for readability: `T extends A ? (T extends B ? C : D) : E`
                 // - Broken: no parens (the line breaks provide clarity)
                 let inner_doc = self.build_conditional_type_doc_inner(inner);
-                d.if_break(inner_doc, d.parens(inner_doc))
+                if d.will_break(inner_doc) {
+                    // Inner doc forces breaking — use broken layout directly
+                    inner_doc
+                } else {
+                    d.if_break(inner_doc, d.parens(inner_doc))
+                }
             } else {
                 self.build_type_doc(&c.true_type)
             };
@@ -169,8 +174,21 @@ impl<'a> Printer<'a> {
                 body_parts.push(self.build_comment_doc(comment));
             }
 
-            body_parts.push(d.text(" "));
-            body_parts.push(self.build_type_doc(type_ann));
+            // When the value type is a union with line comments between members,
+            // break after `:` and indent the union members (matching prettier's
+            // `shouldIndent` → `indent(parts)` in `printUnionType`).
+            if let TSType::Union(u) = type_ann.as_ref() {
+                if self.union_has_line_comments_between_members(u) {
+                    let type_doc = self.build_union_type_doc(u, false);
+                    body_parts.push(d.group(d.indent(d.concat(&[d.line(), type_doc]))));
+                } else {
+                    body_parts.push(d.text(" "));
+                    body_parts.push(self.build_type_doc(type_ann));
+                }
+            } else {
+                body_parts.push(d.text(" "));
+                body_parts.push(self.build_type_doc(type_ann));
+            }
 
             // Trailing comments after value type (before `;` or `}`)
             let body_end = m.span.end.saturating_sub(1); // before `}`

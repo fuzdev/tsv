@@ -7,9 +7,8 @@
 // - Raw content elements (script, style)
 // - Whitespace-sensitive elements (pre, textarea)
 
-use crate::ast::internal::{self, FragmentNode};
+use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
-use crate::printer::helpers::has_multiline_template_literal;
 use crate::printer::text::TextAnalysis;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::{SymbolResolver, SymbolToU32};
@@ -112,8 +111,8 @@ struct ElementContext {
     has_block_flow_children: bool,
     /// Whether to trim boundary whitespace from children
     trim_boundaries: bool,
-    /// Whether any attribute contains a template literal with embedded newlines
-    has_multiline_template_attr: bool,
+    /// Whether any attribute source contains embedded newlines (forces attr group break)
+    has_multiline_attr: bool,
 }
 
 impl<'a> Printer<'a> {
@@ -141,7 +140,7 @@ impl<'a> Printer<'a> {
         }
 
         // Phase 1: Analyze element
-        let ctx = self.analyze_element(element);
+        let ctx = self.analyze_element(element, &attr_docs);
 
         // Phase 2: Compute layout
         let layout = self.compute_element_layout(&ctx);
@@ -149,7 +148,7 @@ impl<'a> Printer<'a> {
         // Phase 3: Build doc based on layout
         match layout {
             ElementLayout::Void | ElementLayout::SelfClosing => {
-                self.build_void_element_doc(tag_sym, attr_docs, &element.attributes)
+                self.build_void_element_doc(tag_sym, attr_docs)
             }
             ElementLayout::Empty => {
                 let opening_tag = self.build_opening_tag(
@@ -157,7 +156,7 @@ impl<'a> Printer<'a> {
                     &attr_docs,
                     false,
                     ctx.is_empty,
-                    ctx.has_multiline_template_attr,
+                    ctx.has_multiline_attr,
                 );
                 self.build_empty_element_doc(
                     &ctx.tag_name,
@@ -184,22 +183,15 @@ impl<'a> Printer<'a> {
 
     /// Build doc for void or self-closing element
     ///
-    /// When any attribute contains a template literal with embedded newlines,
+    /// When any attribute doc will_break (e.g., multiline string value),
     /// forces attributes to break across multiple lines to match Prettier behavior.
-    fn build_void_element_doc(
-        &self,
-        tag_sym: u32,
-        attr_docs: Vec<DocId>,
-        attrs: &[internal::AttributeNode],
-    ) -> DocId {
+    fn build_void_element_doc(&self, tag_sym: u32, attr_docs: Vec<DocId>) -> DocId {
         let d = self.d();
         if attr_docs.is_empty() {
             d.concat(&[d.text("<"), d.symbol(tag_sym), d.text(" />")])
         } else {
-            // Check if any attribute contains a template literal with embedded newlines
-            let has_multiline_template = attrs
-                .iter()
-                .any(|a| has_multiline_template_literal(a.span().extract(self.source)));
+            // Check if any attribute doc will break (contains hardline)
+            let has_multiline = attr_docs.iter().any(|&doc| d.will_break(doc));
 
             let attr_concat = d.concat(&attr_docs);
             let attr_indent = d.indent(attr_concat);
@@ -211,7 +203,7 @@ impl<'a> Printer<'a> {
                 d.text("/>"),
             ]);
 
-            if has_multiline_template {
+            if has_multiline {
                 d.group_break(inner)
             } else {
                 d.group(inner)
@@ -221,7 +213,7 @@ impl<'a> Printer<'a> {
 
     /// Build opening tag with attributes
     ///
-    /// When `force_break` is true (e.g., template literal with embedded newlines),
+    /// When `force_break` is true (e.g., attribute value with embedded newlines),
     /// forces attributes to break across multiple lines.
     fn build_opening_tag(
         &self,
@@ -288,7 +280,7 @@ impl<'a> Printer<'a> {
             attr_docs,
             start_mode == BoundaryMode::Hug,
             ctx.is_empty,
-            ctx.has_multiline_template_attr,
+            ctx.has_multiline_attr,
         );
 
         // Build doc structure based on boundary modes
@@ -801,11 +793,15 @@ impl<'a> Printer<'a> {
     /// These elements preserve text whitespace exactly as-is, but still format
     /// expressions, blocks, and other dynamic content normally.
     ///
-    /// Behavior differs by element type:
-    /// - Block elements (pre): hug `>` with last attr when attrs wrap
-    /// - Inline elements (textarea):
-    ///   - Empty: break `>` to own line when attrs wrap
-    ///   - With content: keep attrs inline, wrap `>content</tag` together
+    /// Behavior differs by content type:
+    /// - **Inline with multiline content** (e.g., `<span>` inside `<pre>` with `\n` in text):
+    ///   break `>` to new line at indent+2, preserve content literally. Only when first
+    ///   text starts with non-whitespace (space/newline keeps `>` inline).
+    /// - **Inline with single-line content and attrs** (textarea with content): keep attrs
+    ///   inline, wrap `>content</tag` together based on width.
+    /// - **Block with simple content** (pre with single expression): break `>` when
+    ///   attrs + content would exceed print width.
+    /// - **Fallback**: hug `>` with attrs (block) or break `>` on wrap (inline empty).
     pub(super) fn build_whitespace_sensitive_element_doc(
         &self,
         tag_name: &str,
@@ -817,41 +813,112 @@ impl<'a> Printer<'a> {
         let is_inline = tsv_html::is_inline_element(tag_name);
         let has_content = !element.fragment.nodes.is_empty();
 
+        // Analyze text nodes in one pass for multiline content detection.
+        // When an inline element inside <pre> has multiline content that starts with
+        // visible text (not whitespace), the `>` must break to a new line.
+        // If content starts with whitespace (space or newline), `>` stays inline:
+        // - `<code>\ncontent` → stays inline (\n naturally separates)
+        // - `<span> {expr}\n` → stays inline (space provides natural break)
+        // - `<span>text\n` → `>` breaks (non-whitespace directly after `>`)
+        //
+        // Also tracks whether the last text node ends with \n (used for closing tag).
+        let (content_has_newlines, last_text_ends_with_newline) = if has_content {
+            let mut is_first_node = true;
+            let mut starts_with_ws = false;
+            let mut has_newline = false;
+            let mut last_ends_newline = true;
+            for node in &element.fragment.nodes {
+                if let FragmentNode::Text(text) = node {
+                    if is_first_node {
+                        starts_with_ws = text.raw.starts_with(|c: char| c.is_ascii_whitespace());
+                    }
+                    if text.raw.contains('\n') {
+                        has_newline = true;
+                    }
+                    last_ends_newline = text.raw.ends_with('\n');
+                }
+                is_first_node = false;
+            }
+            (!starts_with_ws && has_newline, last_ends_newline)
+        } else {
+            (false, true)
+        };
+
+        // Inline elements with multiline content inside whitespace-sensitive context:
+        // Always break `>` to new line (indented 2 levels), preserve content literally.
+        // Attrs stay inline if short, wrap to separate lines if long.
+        // Example: <pre><span attr="val"\n\t\t>text\n</span></pre>
+        if is_inline && content_has_newlines {
+            let content_doc = self.build_whitespace_sensitive_content_doc(&element.fragment.nodes);
+
+            // When content doesn't end with \n, the closing </tag> has its `>` split
+            // to a new line: `line2</span\n\t>` instead of `\n</span>`
+            let closing = if last_text_ends_with_newline {
+                d.concat(&[d.text("</"), d.symbol(tag_sym), d.text(">")])
+            } else {
+                // </tag\n\t> — closing > on new line with indent
+                d.concat(&[
+                    d.text("</"),
+                    d.symbol(tag_sym),
+                    d.indent(d.concat(&[d.hardline(), d.text(">")])),
+                ])
+            };
+
+            // Opening `>` at indent+2 (2 levels: one for element nesting, one for attr indent).
+            // Attrs (if any) go in a group at the same level — flat when short, wrapped when long.
+            let opening_break = d.concat(&[d.hardline(), d.text(">")]);
+            let opening_inner = if attr_docs.is_empty() {
+                opening_break
+            } else {
+                let attr_group = d.group(d.concat(&attr_docs));
+                d.concat(&[attr_group, opening_break])
+            };
+
+            return d.concat(&[
+                d.text("<"),
+                d.symbol(tag_sym),
+                d.indent(d.indent(opening_inner)),
+                content_doc,
+                closing,
+            ]);
+        }
+
         // Inline whitespace-sensitive elements with content and attrs (textarea with content)
         // have special formatting that depends on whether attrs fit on one line:
         // - If fits: <tag attrs>content</tag>
         // - If breaks: <tag attrs\n\t>content</tag\n>
         //
         // This preserves no leading whitespace before content while allowing attrs to stay inline when short.
+        //
+        // The closing `>` of `</tag>` is outside the group so fits() doesn't count it.
+        // At the boundary (e.g. 100 chars), `<tag attr>content</tag` fits but adding `>`
+        // would be 101. The softline puts `>` on its own line in that case.
         if is_inline && has_content && !attr_docs.is_empty() {
             let content_doc = self.build_whitespace_sensitive_content_doc(&element.fragment.nodes);
             // Rebuild as space-separated (caller passes line-separated which we can't use here)
             let space_attrs = self.build_element_attrs_doc_spaces(&element.attributes);
 
-            // In break mode: \n\t>content</tag\n>
-            let break_inner = d.indent(d.concat(&[
+            // In break mode: \n\t>content</tag (closing > handled by outer group)
+            let break_doc = d.indent(d.concat(&[
                 d.hardline(),
                 d.text(">"),
                 content_doc,
                 d.text("</"),
                 d.symbol(tag_sym),
             ]));
-            let break_doc = d.concat(&[break_inner, d.hardline(), d.text(">")]);
-            // In flat mode: >content</tag>
-            let flat_doc = d.concat(&[
-                d.text(">"),
-                content_doc,
-                d.text("</"),
-                d.symbol(tag_sym),
-                d.text(">"),
-            ]);
+            // In flat mode: >content</tag (no closing > — it's outside the group)
+            let flat_doc = d.concat(&[d.text(">"), content_doc, d.text("</"), d.symbol(tag_sym)]);
             let if_break = d.if_break(break_doc, flat_doc);
-            return d.group(d.concat(&[
+            let inner = d.group(d.concat(&[
                 d.text("<"),
                 d.symbol(tag_sym),
                 d.concat(&space_attrs),
                 if_break,
             ]));
+            // Outer group: closing `>` with softline breaks to new line at boundary.
+            // Inner group stays flat when attrs+content fit, outer breaks only for the `>`.
+            let sl = d.softline();
+            return d.group(d.concat(&[inner, sl, d.text(">")]));
         }
 
         // Block whitespace-sensitive elements with content and attrs (pre with content)
@@ -899,8 +966,13 @@ impl<'a> Printer<'a> {
             // Inline whitespace-sensitive elements (empty textarea):
             // Break `>` to own line when attrs wrap (like regular inline elements)
             // Use softline() so it's empty in flat mode, newline in break mode
+            //
+            // Inner group around attrs allows them to stay flat even when the outer
+            // group breaks. Without this, closing tag suffixes (e.g. ></textarea></label>)
+            // are included in fits() evaluation, causing attrs to wrap prematurely.
             let attr_concat = d.concat(&attr_docs);
-            let attr_indent = d.indent(attr_concat);
+            let attr_group = d.group(attr_concat);
+            let attr_indent = d.indent(attr_group);
             d.group(d.concat(&[
                 d.text("<"),
                 d.symbol(tag_sym),
@@ -943,10 +1015,12 @@ impl<'a> Printer<'a> {
 
     /// Build doc for a single node in whitespace-sensitive context.
     ///
-    /// Text nodes preserve raw whitespace.
-    /// Nested elements also use whitespace-sensitive formatting (e.g., <code> inside <pre>).
-    /// Expressions and blocks are formatted normally WITH indent wrapper, so they get
-    /// double-indented (once for being inside <pre>, once for their internal structure).
+    /// - **Text**: preserve raw whitespace (significant in pre/textarea).
+    /// - **Elements**: recursively use whitespace-sensitive formatting (e.g., `<code>` inside `<pre>`).
+    /// - **If/Each blocks**: use inline ws-sensitive block formatting (no added whitespace,
+    ///   body nodes formatted whitespace-sensitively).
+    /// - **Expressions and other blocks**: format normally WITH indent wrapper (double-indented:
+    ///   once for being inside `<pre>`, once for internal structure).
     fn build_whitespace_sensitive_node_doc(&self, node: &FragmentNode) -> DocId {
         let d = self.d();
         match node {
@@ -979,11 +1053,11 @@ impl<'a> Printer<'a> {
                 d.indent(inner)
             }
             FragmentNode::IfBlock(block) => {
-                let inner = self.build_if_block_doc(block);
+                let inner = self.build_ws_sensitive_if_block_doc(block);
                 d.indent(inner)
             }
             FragmentNode::EachBlock(block) => {
-                let inner = self.build_each_block_doc(block);
+                let inner = self.build_ws_sensitive_each_block_doc(block);
                 d.indent(inner)
             }
             FragmentNode::AwaitBlock(block) => {
@@ -1015,6 +1089,136 @@ impl<'a> Printer<'a> {
                 d.indent(inner)
             }
         }
+    }
+
+    /// Build if block doc for whitespace-sensitive context (inside <pre>).
+    ///
+    /// Emits block structure inline without added whitespace. Body nodes are
+    /// formatted with whitespace-sensitive content formatting to preserve
+    /// significant whitespace.
+    fn build_ws_sensitive_if_block_doc(&self, block: &internal::IfBlock) -> DocId {
+        let d = self.d();
+        // Pass false for in_multiline_context: inside whitespace-sensitive elements,
+        // block expressions must not wrap (adding line breaks changes visible content)
+        let expr_doc = self.build_expression_doc_for_block(
+            &block.test,
+            block.opening_tag_span.start + 5, // after "{#if "
+            block.opening_tag_span.end - 1,   // before "}"
+            5,                                // "{#if " = 5 chars
+            false,
+        );
+
+        let body_doc = self.build_whitespace_sensitive_content_doc(&block.consequent.nodes);
+
+        let mut parts = vec![d.text("{#if "), expr_doc, d.text("}"), body_doc];
+
+        if let Some(alt) = &block.alternate {
+            self.build_ws_sensitive_if_alternate(alt, &mut parts);
+        }
+
+        parts.push(d.text("{/if}"));
+        d.concat(&parts)
+    }
+
+    /// Build if alternate (else/else-if) for whitespace-sensitive context.
+    fn build_ws_sensitive_if_alternate(&self, alt: &Fragment, parts: &mut Vec<DocId>) {
+        let d = self.d();
+
+        // Check if this can be flattened to {:else if ...}
+        if let Some(else_if) = Self::get_flattenable_else_if(alt) {
+            let opening_offset: usize = if else_if.elseif { 10 } else { 5 };
+            let expr_doc = self.build_expression_doc_for_block(
+                &else_if.test,
+                else_if.opening_tag_span.start + opening_offset as u32,
+                else_if.opening_tag_span.end - 1,
+                opening_offset,
+                false,
+            );
+
+            let body_doc = self.build_whitespace_sensitive_content_doc(&else_if.consequent.nodes);
+            parts.push(d.text("{:else if "));
+            parts.push(expr_doc);
+            parts.push(d.text("}"));
+            parts.push(body_doc);
+
+            if let Some(nested_alt) = &else_if.alternate {
+                self.build_ws_sensitive_if_alternate(nested_alt, parts);
+            }
+            return;
+        }
+
+        // Plain {:else}
+        let body_doc = self.build_whitespace_sensitive_content_doc(&alt.nodes);
+        parts.push(d.text("{:else}"));
+        parts.push(body_doc);
+    }
+
+    /// Build each block doc for whitespace-sensitive context (inside <pre>).
+    ///
+    /// Emits block structure inline without added whitespace. Body nodes are
+    /// formatted with whitespace-sensitive content formatting.
+    fn build_ws_sensitive_each_block_doc(&self, block: &internal::EachBlock) -> DocId {
+        let d = self.d();
+        let expr_comment_end = block
+            .context
+            .as_ref()
+            .map_or(block.opening_tag_span.end - 1, |c| c.span().start);
+        // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
+        let expr_doc = self.build_expression_doc_for_block(
+            &block.expression,
+            block.opening_tag_span.start + 7, // after "{#each "
+            expr_comment_end,
+            7, // "{#each " = 7 chars
+            false,
+        );
+
+        let mut opening = vec![d.text("{#each "), expr_doc];
+
+        if let Some(context) = &block.context {
+            opening.push(d.text(" as "));
+            let pattern_doc = self.build_pattern_doc(context);
+            opening.push(pattern_doc);
+            if let Some(index) = &block.index {
+                opening.push(d.text(", "));
+                opening.push(d.text_owned(index.clone()));
+            }
+        } else if let Some(index) = &block.index {
+            opening.push(d.text(", "));
+            opening.push(d.text_owned(index.clone()));
+        }
+
+        if let Some(key) = &block.key {
+            let key_doc = if let Some(key_span) = block.key_span {
+                self.build_expression_doc_for_block(
+                    key,
+                    key_span.start + 1,
+                    key_span.end - 1,
+                    1,
+                    false,
+                )
+            } else {
+                self.build_ts_expression_doc(key)
+            };
+            opening.push(d.text(" ("));
+            opening.push(key_doc);
+            opening.push(d.text(")"));
+        }
+
+        opening.push(d.text("}"));
+
+        let body_doc = self.build_whitespace_sensitive_content_doc(&block.body.nodes);
+
+        let opening_concat = d.concat(&opening);
+        let mut parts = vec![opening_concat, body_doc];
+
+        if let Some(fallback) = &block.fallback {
+            let fallback_doc = self.build_whitespace_sensitive_content_doc(&fallback.nodes);
+            parts.push(d.text("{:else}"));
+            parts.push(fallback_doc);
+        }
+
+        parts.push(d.text("{/each}"));
+        d.concat(&parts)
     }
 
     /// Build docs for element attributes (line-separated)
@@ -1110,6 +1314,7 @@ impl<'a> Printer<'a> {
             | Expression::TSParameterProperty(_)
             | Expression::ImportExpression(_)
             | Expression::MetaProperty(_) => false,
+            Expression::Parenthesized(inner) => Self::expression_has_break_points(inner),
         }
     }
 
@@ -1217,7 +1422,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Analyze an element to compute all formatting-relevant properties
-    fn analyze_element(&self, element: &internal::Element) -> ElementContext {
+    fn analyze_element(&self, element: &internal::Element, attr_docs: &[DocId]) -> ElementContext {
         let tag_name = self.resolve_symbol(element.name);
         let is_void = tsv_html::is_void_element(&tag_name);
         let is_foreign = tsv_html::is_foreign_element(&tag_name);
@@ -1273,17 +1478,8 @@ impl<'a> Printer<'a> {
             .iter()
             .any(super::helpers::is_control_flow_block);
 
-        // Opening tag multiline: any newline in attribute source (for trim_boundaries)
-        let has_multiline_attr = element
-            .attributes
-            .iter()
-            .any(|a| a.span().extract(self.source).contains('\n'));
-
-        // Template literals with embedded newlines (for forcing attribute break)
-        let has_multiline_template_attr = element
-            .attributes
-            .iter()
-            .any(|a| has_multiline_template_literal(a.span().extract(self.source)));
+        // Any attribute doc that will_break (forces attr group break + trim_boundaries)
+        let has_multiline_attr = attr_docs.iter().any(|&doc| self.d().will_break(doc));
 
         // Compute needs_multiline
         let needs_multiline = self.compute_needs_multiline(
@@ -1316,7 +1512,7 @@ impl<'a> Printer<'a> {
             needs_multiline,
             has_block_flow_children,
             trim_boundaries,
-            has_multiline_template_attr,
+            has_multiline_attr,
         }
     }
 

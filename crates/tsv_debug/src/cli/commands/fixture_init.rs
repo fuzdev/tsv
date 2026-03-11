@@ -4,6 +4,7 @@ use std::path::Path;
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
 use tsv_cli::json_utils::to_json_with_tabs;
+use tsv_lang::printing::visual_width;
 
 /// fixture_init command - create or reinitialize a fixture
 ///
@@ -12,7 +13,7 @@ use tsv_cli::json_utils::to_json_with_tabs;
 ///
 /// Content sources (in priority order):
 /// 1. `--content` flag
-/// 2. stdin (when piped, e.g., heredoc)
+/// 2. `--stdin` flag (for heredocs and pipes)
 /// 3. Existing input file in the directory (reformat mode)
 pub struct FixtureInitCommand;
 
@@ -78,9 +79,13 @@ impl FixtureInitExecutable {
         let input_type = resolve_input_type(self.parser.as_ref(), dir);
 
         // Get content from --content, --stdin, or existing file
-        let raw_content =
-            match resolve_content(self.content.as_ref(), self.use_stdin, self.force, dir, input_type)
-            {
+        let raw_content = match resolve_content(
+            self.content.as_ref(),
+            self.use_stdin,
+            self.force,
+            dir,
+            input_type,
+        ) {
             Ok(c) => c,
             Err(e) => {
                 eprintln!("Error: {e}");
@@ -117,7 +122,9 @@ impl FixtureInitExecutable {
         match deno::run_prettier(&formatted, input_type.prettier_parser()).await {
             Ok(reformatted) => {
                 if reformatted != formatted {
-                    eprintln!("⚠ Warning: input is not prettier-idempotent (formatting it again produces different output)");
+                    eprintln!(
+                        "⚠ Warning: input is not prettier-idempotent (formatting it again produces different output)"
+                    );
                 }
             }
             Err(e) => {
@@ -125,12 +132,13 @@ impl FixtureInitExecutable {
             }
         }
 
+        // Show line width summary
+        print_line_width_summary(&formatted, &self.dir);
+
         // Generate expected.json from canonical parser
         let parse_result = match input_type {
             InputType::Svelte => deno::parse_svelte(&formatted).await,
-            InputType::SvelteTs | InputType::TypeScript => {
-                deno::parse_typescript(&formatted).await
-            }
+            InputType::SvelteTs | InputType::TypeScript => deno::parse_typescript(&formatted).await,
             InputType::Css => deno::parse_css(&formatted).await,
         };
 
@@ -252,5 +260,59 @@ fn input_file_to_type(input_file: &str) -> InputType {
         InputType::Css
     } else {
         InputType::Svelte
+    }
+}
+
+/// Print a compact line width summary for the formatted input.
+///
+/// Shows lines at or near print_width (90+), max width, and warns for `_long`
+/// directories where nothing is near the boundary.
+fn print_line_width_summary(content: &str, dir_path: &str) {
+    let tab_width = 2;
+    let print_width = 100;
+    let threshold = 90; // Show lines at 90+ chars
+
+    let lines: Vec<&str> = content.lines().collect();
+    if lines.is_empty() {
+        return;
+    }
+
+    let mut max_width = 0;
+    let mut max_line_num = 0;
+    let mut notable_lines: Vec<(usize, usize)> = Vec::new(); // (line_num, width)
+
+    for (idx, line) in lines.iter().enumerate() {
+        let width = visual_width(line, tab_width);
+        if width > max_width {
+            max_width = width;
+            max_line_num = idx + 1;
+        }
+        if width >= threshold {
+            notable_lines.push((idx + 1, width));
+        }
+    }
+
+    // Print notable lines (at/near/over print_width)
+    if notable_lines.is_empty() {
+        println!("  max width: {max_width} (line {max_line_num})");
+    } else {
+        for &(line_num, width) in &notable_lines {
+            let marker = if width > print_width {
+                "✗ EXCEEDS"
+            } else if width == print_width {
+                "⚠ EXACTLY"
+            } else {
+                " "
+            };
+            println!("  line {line_num}: {width} chars {marker}");
+        }
+    }
+
+    // Warn for _long directories where nothing is near print_width
+    let is_long_fixture = dir_path.contains("_long") || dir_path.ends_with("/long");
+    if is_long_fixture && max_width < threshold {
+        eprintln!(
+            "⚠ Warning: directory name suggests a boundary test but max width is {max_width} (need ~{print_width})"
+        );
     }
 }

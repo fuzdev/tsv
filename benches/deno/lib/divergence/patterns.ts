@@ -743,84 +743,6 @@ const returnTypeGenericUnion: DivergencePattern = {
 	},
 };
 
-const chainMethodOverflow: DivergencePattern = {
-	id: 'chain_method_overflow',
-	description: 'Chain method breaks to stay within print width',
-	languages: ['typescript', 'svelte'],
-	conformanceSections: ['TypeScript'],
-	fixtures: ['typescript/expressions/await_yield/chain_method_long_prettier_divergence'],
-	detect(ctx) {
-		const prettierLines = ctx.prettier.split('\n');
-
-		// Look for chain method calls (.method() or ?.method()) where prettier
-		// has a long line and we break before the member access
-		const chainMember = /\)\.\w+|\.?\.\w+\(/;
-
-		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
-			const pLines = prettierLinesInHunk(prettierLines, hunk);
-			// Prettier has a long line with chain member
-			const hasLongChain = pLines.some(
-				(l) => chainMember.test(l) && visualWidth(l) > 100,
-			);
-			if (!hasLongChain) return false;
-
-			// Our added lines show chain break: .method or ?.method at start of line
-			const addedChainBreak = hunk.addedLines.some((l) => /^\t+[.?]/.test(l) && /\.\w+/.test(l));
-			return addedChainBreak;
-		});
-
-		if (hunkIndices.length > 0) {
-			return {
-				pattern: 'chain_method_overflow',
-				confidence: 'likely',
-				hunkIndices,
-				reason: 'Chain method breaks to stay within print width',
-			};
-		}
-		return null;
-	},
-};
-
-const multiCallbackTrailingMember: DivergencePattern = {
-	id: 'multi_callback_trailing_member',
-	description: 'Trailing member after callbacks on separate line',
-	languages: ['typescript', 'svelte'],
-	conformanceSections: ['TypeScript'],
-	fixtures: [
-		'typescript/expressions/calls/chained/multi_callback_trailing_member_prettier_divergence',
-	],
-	detect(ctx) {
-		// Look for property access after ) (like .length, .property) with
-		// multiple callback args in context
-		const callbackPattern = /=>\s*\w|=>\s*\{/;
-		const trailingMember = /\)\.\w+/;
-
-		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
-			// Check for callbacks in the hunk context
-			const allLines = [...hunk.addedLines, ...hunk.removedLines];
-			const hasCallbacks = allLines.filter((l) => callbackPattern.test(l)).length >= 2;
-			if (!hasCallbacks) return false;
-
-			// Our added lines put .property on its own line
-			const addedTrailingMember = hunk.addedLines.some((l) => /^\t+\.\w+/.test(l));
-			// Prettier's removed lines have ).property inline
-			const removedInlineMember = hunk.removedLines.some((l) => trailingMember.test(l));
-
-			return addedTrailingMember && removedInlineMember;
-		});
-
-		if (hunkIndices.length > 0) {
-			return {
-				pattern: 'multi_callback_trailing_member',
-				confidence: 'likely',
-				hunkIndices,
-				reason: 'Trailing member after callbacks on separate line',
-			};
-		}
-		return null;
-	},
-};
-
 // ─── Svelte-specific patterns ───────────────────────────────────────────────
 
 const menuBlock: DivergencePattern = {
@@ -1075,19 +997,25 @@ const fill101Boundary: DivergencePattern = {
 		let longestPrettierOverflow = 0;
 
 		// For each hunk, check if prettier lines in that hunk's range exceed 100 chars
-		// AND our added lines show a break (more lines). Only claim hunks where the
-		// overflow is the actual difference.
+		// AND the difference looks like a print-width boundary divergence.
+		// Two cases: (1) we produce more lines (broke the long line), or
+		// (2) same/fewer lines but all our lines fit within 100 chars (rewrapped at print width).
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
 			const pLines = prettierLinesInHunk(prettierLines, hunk);
-			const hasOverflow = pLines.some((l) => visualWidth(l) > 100);
-			if (!hasOverflow) return false;
+			// >= 100: includes lines at exactly print width, since the divergence is
+			// that prettier fills right up to the limit while we break earlier.
+			const hasLongLine = pLines.some((l) => visualWidth(l) >= 100);
+			if (!hasLongLine) return false;
 
-			// Verify we have more lines (we broke the long line)
-			if (hunk.addedLines.length <= hunk.removedLines.length) return false;
+			// Case 1: We have more lines (we broke prettier's long line)
+			const weBreakMore = hunk.addedLines.length > hunk.removedLines.length;
+			// Case 2: Same or fewer lines, but all our lines fit within print width
+			const oursAllFit = hunk.addedLines.every((l) => visualWidth(l) <= 100);
+			if (!weBreakMore && !oursAllFit) return false;
 
 			for (const l of pLines) {
 				const w = visualWidth(l);
-				if (w > 100) longestPrettierOverflow = Math.max(longestPrettierOverflow, w);
+				if (w >= 100) longestPrettierOverflow = Math.max(longestPrettierOverflow, w);
 			}
 			return true;
 		});
@@ -1140,13 +1068,25 @@ const commentPosition: DivergencePattern = {
 			// At least one side must have comments
 			if (addedCommentLines.length === 0 && removedCommentLines.length === 0) return false;
 
-			// Case 1: Comment moved (appears in one side but not the other)
-			if (addedCommentLines.length > 0 && removedCommentLines.length === 0) return true;
-			if (removedCommentLines.length > 0 && addedCommentLines.length === 0) return true;
+			// Case 1: Comment on one side only — verify it was MOVED (exists in
+			// other side's full output), not incidentally included by reformatting.
+			if (addedCommentLines.length > 0 && removedCommentLines.length === 0) {
+				return addedCommentLines.some((l) => {
+					const text = extractCommentContent(l);
+					return text.length > 0 && ctx.prettier.includes(text);
+				});
+			}
+			if (removedCommentLines.length > 0 && addedCommentLines.length === 0) {
+				return removedCommentLines.some((l) => {
+					const text = extractCommentContent(l);
+					return text.length > 0 && ctx.ours.includes(text);
+				});
+			}
 
-			// Case 2: Both sides have comments - verify the comment TEXT is the same
-			// but its position changed. This prevents overmatching on hunks where
-			// comments are incidentally present but the real diff is in non-comment code.
+			// Case 2: Both sides have comments — verify the comment TEXT overlaps
+			// AND the hunk is primarily about comment repositioning (non-comment
+			// content should be similar). This prevents claiming hunks where the
+			// real diff is code layout and comments are incidentally present.
 			const addedTexts = addedCommentLines.map(extractCommentContent).sort();
 			const removedTexts = removedCommentLines.map(extractCommentContent).sort();
 
@@ -1155,9 +1095,31 @@ const commentPosition: DivergencePattern = {
 			const hasOverlap = removedTexts.some((t) => addedSet.has(t));
 			if (!hasOverlap) return false;
 
-			// Lines differ (the comment moved positions)
-			return addedCommentLines.length !== removedCommentLines.length ||
+			// Lines must differ (the comment moved positions)
+			const linesDiffer = addedCommentLines.length !== removedCommentLines.length ||
 				addedCommentLines.some((l, i) => l !== removedCommentLines[i]);
+			if (!linesDiffer) return false;
+
+			// Non-comment content must be similar — strip comments from both sides
+			// and compare the trimmed non-empty lines. If the code itself changed
+			// significantly, this is a formatting bug, not a comment position divergence.
+			const stripComments = (line: string) =>
+				line.replace(/\/\/.*$/, '').replace(/\/\*.*?\*\//g, '').trim();
+			const addedCode = hunk.addedLines.map(stripComments).filter((l) => l.length > 0).sort();
+			const removedCode = hunk.removedLines.map(stripComments).filter((l) => l.length > 0).sort();
+
+			// If non-comment content is identical (same set of trimmed lines),
+			// the hunk is purely about comment positioning — claim it.
+			if (
+				addedCode.length === removedCode.length &&
+				addedCode.every((l, i) => l === removedCode[i])
+			) {
+				return true;
+			}
+
+			// If non-comment content differs, this is likely a code layout change
+			// with incidental comments. Don't claim.
+			return false;
 		});
 
 		if (hunkIndices.length > 0) {
@@ -1197,8 +1159,6 @@ export const PATTERNS: DivergencePattern[] = [
 	singleSpecifierImport,
 	memberExpressionCall,
 	returnTypeGenericUnion,
-	chainMethodOverflow,
-	multiCallbackTrailingMember,
 
 	// 4. Svelte-specific patterns
 	menuBlock,

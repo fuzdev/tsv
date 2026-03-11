@@ -8,7 +8,7 @@
 use super::super::comments_in_range;
 use super::helpers::{
     find_separator_position, intersection_has_expanding_first_type,
-    intersection_has_huggable_last_type, type_needs_parens_in_intersection,
+    intersection_has_huggable_last_type, should_hug_union_type, type_needs_parens_in_intersection,
     type_needs_parens_in_union,
 };
 use super::{CommentFilter, CommentSpacing, Printer};
@@ -43,13 +43,32 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
-        // Check for line comments between union members (force multiline)
-        // Only check the gaps between member types, not inside member types
-        let has_line_comments_between_members = union
+        // Check for any comments on or between union members (disqualifies hugging).
+        // Prettier's `hasComment(node)` includes attached trailing comments, which in
+        // our detached model appear between consecutive member spans.
+        let has_comments_on_or_between_members = union
             .types
-            .windows(2)
-            .any(|pair| self.has_line_comments_between(pair[0].span().end, pair[1].span().start));
-        if has_line_comments_between_members {
+            .iter()
+            .any(|t| self.has_comments_between(t.span().start, t.span().end))
+            || self.union_has_comments_between_members(union);
+
+        // Prettier's shouldHugUnionType: when one member is object-like and the
+        // rest are void types (null, void), format as inline `A | B | C` where
+        // the object type handles its own expansion.
+        // Example: `{ name: string; value: number } | null` stays hugged.
+        if !has_comments_on_or_between_members && should_hug_union_type(union) {
+            let mut parts = Vec::new();
+            for (i, t) in union.types.iter().enumerate() {
+                if i > 0 {
+                    parts.push(d.text(" | "));
+                }
+                parts.push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_union));
+            }
+            return d.concat(&parts);
+        }
+
+        // Check for line comments between union members (force multiline)
+        if self.union_has_line_comments_between_members(union) {
             return self.build_union_type_doc_with_line_comments(union);
         }
 
@@ -189,6 +208,29 @@ impl<'a> Printer<'a> {
         }
 
         d.concat(&parts)
+    }
+
+    /// Check if a union type has any comments between consecutive members.
+    ///
+    /// Matches prettier's `hasComment(node)` for the detached comment model:
+    /// comments between member spans correspond to attached trailing/leading
+    /// comments in prettier's AST.
+    fn union_has_comments_between_members(&self, union: &TSUnionType) -> bool {
+        union
+            .types
+            .windows(2)
+            .any(|pair| self.has_comments_between(pair[0].span().end, pair[1].span().start))
+    }
+
+    /// Check if a union type has line comments between any consecutive members.
+    ///
+    /// Used by callers (e.g., mapped types) to decide whether the union needs
+    /// extra indentation wrapping, and internally to force multiline formatting.
+    pub(crate) fn union_has_line_comments_between_members(&self, union: &TSUnionType) -> bool {
+        union
+            .types
+            .windows(2)
+            .any(|pair| self.has_line_comments_between(pair[0].span().end, pair[1].span().start))
     }
 
     //

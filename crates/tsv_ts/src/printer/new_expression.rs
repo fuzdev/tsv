@@ -514,8 +514,9 @@ impl<'a> Printer<'a> {
                         | internal::Expression::FunctionExpression(_)
                 )
             );
-            let last_is_expandable_collection = last_arg
-                .is_some_and(|arg| is_array_or_object_unwrapped(arg) && !is_concise_numeric_array(arg));
+            let last_is_expandable_collection = last_arg.is_some_and(|arg| {
+                is_array_or_object_unwrapped(arg) && !is_concise_numeric_array(arg)
+            });
 
             if new_expr.arguments.len() >= 2
                 && (last_is_function || last_is_expandable_collection)
@@ -524,6 +525,19 @@ impl<'a> Printer<'a> {
             {
                 let (head_parts, last_arg_doc, all_args_broken) =
                     build_args_split_last(&new_expr.arguments, self);
+
+                // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
+                // When any preceding arg will break (e.g., callback with block body),
+                // skip the conditional group and expand all args directly.
+                if head_parts.iter().any(|&id| d.will_break(id)) {
+                    return d.concat(&[
+                        callee_with_types,
+                        d.text("("),
+                        d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
+                        d.line(),
+                        d.text(")"),
+                    ]);
+                }
 
                 let state_inline = d.concat(&[
                     callee_with_types,

@@ -150,6 +150,28 @@ Deno.test('fill_101_boundary: negative - prettier lines under 100 chars', () => 
 	assertEquals(match, null);
 });
 
+Deno.test('fill_101_boundary: positive - same line count, different wrapping at print width', () => {
+	// Prettier has 105-char line, we rewrap to 3 lines all ≤ 100 chars (same total line count)
+	const prettierLine = '\t' + 'x'.repeat(50) + ' ' + 'y'.repeat(52); // visual width = 2 + 50 + 1 + 52 = 105
+	const prettier = `before\n${prettierLine}\nyy\nafter`;
+	// Same 3 content lines, but we break differently (all ≤ 100)
+	const ours = `before\n\t${'x'.repeat(50)}\n\t${'y'.repeat(52)} yy\nafter`;
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('fill_101_boundary', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'fill_101_boundary');
+});
+
+Deno.test('fill_101_boundary: negative - our lines also exceed 100 chars', () => {
+	// Both sides have lines > 100 chars — not a print-width boundary divergence
+	const longLine = '\t' + 'x'.repeat(103); // visual width = 105
+	const prettier = `before\n${longLine}\nafter`;
+	const ours = `before\n${longLine}\n\textra\nafter`;
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('fill_101_boundary', ctx);
+	assertEquals(match, null);
+});
+
 Deno.test('fill_101_boundary: negative - we have fewer lines (not a break)', () => {
 	const longLine = '\t' + 'x'.repeat(103);
 	const prettier = `before\n${longLine}\n${'x'.repeat(50)}\nafter`;
@@ -367,6 +389,33 @@ Deno.test('comment_position: negative - identical comments same position', () =>
 	const ours = 'const x = 1; // comment\nconst y = 2;';
 	const ctx = makeContext(ours, prettier, 'typescript');
 	assertEquals(ctx.hunks.length, 0);
+});
+
+Deno.test('comment_position: negative - comment incidental to code layout change', () => {
+	// Non-comment code differs (return vs return + paren wrapping) — comment is incidental
+	const prettier = 'return (\n\tstr\n\t\t// replace\n\t\t.replace(/a/g, "-")\n);';
+	const ours = 'return str\n\t// replace\n\t.replace(/a/g, "-");';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('comment_position', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('comment_position: negative - Case 1 comment not in other side output', () => {
+	// Comment on one side only, and the comment text doesn't exist in the other output
+	const prettier = 'const x = 1;\nconst y = 2;';
+	const ours = 'const x = 1;\n// added comment\nconst y = 2;';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('comment_position', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('comment_position: positive - Case 1 comment moved out of hunk region', () => {
+	// Comment on one side of hunk, but text exists in other side's full output (moved)
+	const prettier = '// todo\nconst x = 1;\nconst y = 2;';
+	const ours = 'const x = 1;\n// todo\nconst y = 2;';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('comment_position', ctx);
+	assertNotEquals(match, null);
 });
 
 // ─── block_multiline_attrs_hug ──────────────────────────────────────────────
@@ -610,46 +659,5 @@ Deno.test('return_type_generic_union: negative - generic without union', () => {
 	const ours = 'function foo(): Promise<\n\tstring\n> {';
 	const ctx = makeContext(ours, prettier, 'typescript');
 	const match = runPattern('return_type_generic_union', ctx);
-	assertEquals(match, null);
-});
-
-// ─── chain_method_overflow ──────────────────────────────────────────────────
-
-Deno.test('chain_method_overflow: positive - chain method on new line, prettier inline', () => {
-	// Need prettier line > 100 chars with chain member
-	const prettier =
-		'\tconst result = (await fetchSomeLongAsyncFunctionWithVeryLongName(longParamName, otherParam)).data?.veryLongMethodName();';
-	const ours =
-		'\tconst result = (await fetchSomeLongAsyncFunctionWithVeryLongName(longParamName, otherParam)).data\n\t\t?.veryLongMethodName();';
-	const ctx = makeContext(ours, prettier, 'typescript');
-	const match = runPattern('chain_method_overflow', ctx);
-	assertNotEquals(match, null);
-});
-
-Deno.test('chain_method_overflow: negative - chain under 100 chars', () => {
-	const prettier = 'const result = (await fn()).data?.method();';
-	const ours = 'const result = (await fn()).data\n\t?.method();';
-	const ctx = makeContext(ours, prettier, 'typescript');
-	const match = runPattern('chain_method_overflow', ctx);
-	assertEquals(match, null);
-});
-
-// ─── multi_callback_trailing_member ─────────────────────────────────────────
-
-Deno.test('multi_callback_trailing_member: positive - .length after callbacks', () => {
-	const prettier =
-		'\tconst a = items.filter((x) => x.aaaaaaaaaaaaaaaaaaaaaa).map((x) => x.bbbbbbbbbbbbbbbbbbbbbb).length;';
-	const ours =
-		'\tconst a = items\n\t\t.filter((x) => x.aaaaaaaaaaaaaaaaaaaaaa)\n\t\t.map((x) => x.bbbbbbbbbbbbbbbbbbbbbb)\n\t\t.length;';
-	const ctx = makeContext(ours, prettier, 'typescript');
-	const match = runPattern('multi_callback_trailing_member', ctx);
-	assertNotEquals(match, null);
-});
-
-Deno.test('multi_callback_trailing_member: negative - simple property access', () => {
-	const prettier = 'const x = obj.property;';
-	const ours = 'const x =\n\tobj.property;';
-	const ctx = makeContext(ours, prettier, 'typescript');
-	const match = runPattern('multi_callback_trailing_member', ctx);
 	assertEquals(match, null);
 });

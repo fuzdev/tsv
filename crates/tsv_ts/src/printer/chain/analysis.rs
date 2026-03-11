@@ -94,6 +94,17 @@ fn linearize_recursive<'a>(expr: &'a Expression, nodes: &mut Vec<ChainNode<'a>>)
             nodes.push(ChainNode::non_null());
         }
 
+        // TSInstantiationExpression: recurse into expression (transparent in chains)
+        // Type args are recovered by get_call_type_arguments() in chain_args.rs.
+        Expression::TSInstantiationExpression(inst) => {
+            linearize_recursive(&inst.expression, nodes);
+        }
+
+        // Parenthesized (JSDoc type cast): transparent in chains, recurse into inner
+        Expression::Parenthesized(inner) => {
+            linearize_recursive(inner, nodes);
+        }
+
         // Base case: expression that's not part of the chain structure
         _ => {
             let needs_parens = needs_parens(expr, ParenContext::ChainBase);
@@ -253,6 +264,9 @@ pub fn should_not_wrap<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
 ///
 /// Short names like `a`, `b`, `fn` get merged with their first call.
 /// Only applies in expression statement context (per Prettier's logic).
+///
+/// Prettier ref: `isShort` in print/member-chain.js:284
+/// Uses `name.length <= options.tabWidth` (JS .length, ASCII-only in practice)
 fn is_short_name(symbol: DefaultSymbol, interner: &impl SymbolLookup, tab_width: usize) -> bool {
     let Some(name) = interner.lookup(symbol) else {
         return false;
@@ -268,18 +282,18 @@ fn is_this_identifier(symbol: DefaultSymbol, interner: &impl SymbolLookup) -> bo
     interner.lookup(symbol).is_some_and(|name| name == "this")
 }
 
-/// Check if an identifier name is a factory pattern (starts with capital letter)
+/// Check if an identifier name is a factory pattern.
 ///
-/// Factory names like `Object`, `React`, `Observable` get merged with their first call.
-/// Note: `$` and `_` prefixes are NOT treated as factory patterns by Prettier.
+/// Factory names get merged with their first call in chain formatting.
+/// Matches Prettier's `isFactory`: `/^[A-Z]|^[$_]+$/u` (member-chain.js:273)
+/// - Starts with uppercase: `Object`, `React`, `Observable`
+/// - Pure `$`/`_` identifiers: `$`, `_`, `$_`, `$__` (lodash-style)
 fn is_factory_name(symbol: DefaultSymbol, interner: &impl SymbolLookup) -> bool {
     let Some(name) = interner.lookup(symbol) else {
         return false;
     };
-    let Some(first_char) = name.chars().next() else {
-        return false;
-    };
-    first_char.is_uppercase()
+    name.chars().next().is_some_and(char::is_uppercase)
+        || (!name.is_empty() && name.chars().all(|c| c == '$' || c == '_'))
 }
 
 #[cfg(test)]

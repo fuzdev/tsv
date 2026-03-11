@@ -8,8 +8,8 @@
 
 use super::{Printer, has_multiline_content};
 use crate::ast::internal::{self, Expression, LiteralValue};
-use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::{comments_in_range, has_multiline_block_comments_in_range};
 
 impl<'a> Printer<'a> {
     /// Check if array should force break based on Prettier's heuristic
@@ -162,12 +162,13 @@ impl<'a> Printer<'a> {
             return self.build_empty_brackets_with_comments_doc(arr.span);
         }
 
-        // Check for line comments in the array (force expansion - can't be inline)
-        let has_line_comments = self.has_line_comments_between(arr.span.start, arr.span.end);
+        // Check for comments that force expansion: line comments (can't be inline)
+        // or multi-line block comments (contain hardlines that must propagate)
+        let has_expanding_comments = self.has_line_comments_between(arr.span.start, arr.span.end)
+            || has_multiline_block_comments_in_range(self.comments, arr.span.start, arr.span.end);
 
-        if has_line_comments {
-            // Use comment-aware doc building path (always expands with hardlines)
-            return self.build_array_doc_with_line_comments(arr);
+        if has_expanding_comments {
+            return self.build_array_doc_with_expanding_comments(arr);
         }
 
         // Check if any element has multiline content (e.g., line continuation strings)
@@ -259,7 +260,7 @@ impl<'a> Printer<'a> {
     /// Includes inline block comments between elements.
     /// Uses binary search to find comments: O(log n + k)
     ///
-    /// Note: Arrays with blank lines between elements use build_array_doc_with_line_comments instead.
+    /// Note: Arrays with expanding comments use build_array_doc_with_expanding_comments instead.
     fn build_array_group_doc(&self, arr: &internal::ArrayExpression) -> DocId {
         let d = self.d();
         let mut parts = Vec::new();
@@ -348,29 +349,25 @@ impl<'a> Printer<'a> {
         let mut parts = Vec::new();
 
         for (i, elem) in arr.elements.iter().enumerate() {
-            // Check for blank line before this element (preserved when wrapped)
-            let has_blank_before = if i > 0 {
+            if i > 0 {
+                parts.push(d.text(","));
+
+                // Check for blank line before this element (preserved when wrapped)
+                // Use literalline() for the blank line (no trailing whitespace) then
+                // hardline() for the indented content line — matches the non-forced path.
                 let prev_end = arr.elements[i - 1]
                     .as_ref()
                     .map_or(arr.span.start + 1, |e| e.span().end);
                 let curr_start = elem.as_ref().map_or(arr.span.end - 1, |e| e.span().start);
-                self.has_blank_line_between(prev_end, curr_start)
-            } else {
-                false
-            };
+                if self.has_blank_line_between(prev_end, curr_start) {
+                    parts.push(d.literalline());
+                }
 
-            if has_blank_before {
-                // Blank line preservation
-                parts.push(d.literalline());
+                parts.push(d.hardline());
             }
 
             if let Some(expr) = elem {
                 parts.push(self.build_array_element_doc(expr));
-            }
-
-            if i < arr.elements.len() - 1 {
-                parts.push(d.text(","));
-                parts.push(d.hardline());
             }
         }
 
@@ -380,33 +377,43 @@ impl<'a> Printer<'a> {
         d.concat(&[d.text("["), indented_content, closing_line, d.text("]")])
     }
 
-    /// Build a Doc for an array with line comments (forced expansion)
+    /// Build a Doc for an array with comments that force expansion.
     ///
-    /// Arrays with line comments always expand to multiline because line comments
-    /// cannot appear on the same line as subsequent content.
-    fn build_array_doc_with_line_comments(&self, arr: &internal::ArrayExpression) -> DocId {
+    /// Used for arrays containing line comments (can't be inline) or multi-line
+    /// block comments (hardlines must propagate). Always expands to multiline.
+    fn build_array_doc_with_expanding_comments(&self, arr: &internal::ArrayExpression) -> DocId {
         let d = self.d();
         let mut parts = Vec::new();
         let mut prev_end = arr.span.start + 1; // After opening bracket
 
         for (i, elem) in arr.elements.iter().enumerate() {
-            let (elem_start, elem_end) = elem.as_ref().map_or_else(
-                || {
-                    // Elision: use next element's start or closing bracket
-                    let pos = arr.elements[i + 1..]
-                        .iter()
-                        .find_map(|e| e.as_ref().map(|e| e.span().start))
-                        .unwrap_or(arr.span.end - 1);
+            let (elem_start, elem_end) = match elem {
+                Some(e) => (e.span().start, e.span().end),
+                // Elision: use next element's start or closing bracket
+                None => {
+                    let pos = self.next_element_boundary(arr, i);
                     (pos, pos)
-                },
-                |e| (e.span().start, e.span().end),
-            );
+                }
+            };
 
             // Collect leading comments before this element
+            // Block comments after the comma are leading on this element, even if on
+            // the same line as the previous element. Line comments on the same line
+            // as the previous element are always trailing (handled in prior iteration).
+            let prev_comma_pos = if i > 0 {
+                self.find_comma_after(prev_end)
+            } else {
+                None
+            };
             let leading_comments: Vec<_> = comments_in_range(self.comments, prev_end, elem_start)
                 .filter(|c| {
-                    // Skip comments that are trailing on the previous line
-                    !(i > 0 && self.is_same_line(prev_end, c.span.start))
+                    // Skip comments that are trailing on the previous element
+                    if i > 0 && self.is_same_line(prev_end, c.span.start) {
+                        // Block comments after the comma are leading on this element
+                        c.is_block && prev_comma_pos.is_some_and(|pos| c.span.start > pos)
+                    } else {
+                        true
+                    }
                 })
                 .collect();
 
@@ -422,12 +429,31 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            // Add leading comments
-            for comment in leading_comments {
+            // Add leading comments (preserve blank lines between consecutive comments)
+            for (ci, comment) in leading_comments.iter().enumerate() {
+                // Preserve blank line between consecutive comments
+                if ci > 0 {
+                    let prev_comment_end = leading_comments[ci - 1].span.end;
+                    if self.has_blank_line_between(prev_comment_end, comment.span.start) {
+                        parts.push(d.literalline());
+                        parts.push(d.hardline());
+                    }
+                }
                 parts.push(self.build_comment_doc(comment));
                 // Line comments always need hardline after
                 // Block comments: hardline if NOT on same line as element, space otherwise
-                if !comment.is_block || !self.is_same_line(comment.span.end, elem_start) {
+                let is_last_comment = ci == leading_comments.len() - 1;
+                let has_blank_after = if is_last_comment {
+                    false
+                } else {
+                    self.has_blank_line_between(
+                        comment.span.end,
+                        leading_comments[ci + 1].span.start,
+                    )
+                };
+                if has_blank_after {
+                    // Skip hardline — the blank line separator at the next comment handles it
+                } else if !comment.is_block || !self.is_same_line(comment.span.end, elem_start) {
                     parts.push(d.hardline());
                 } else {
                     parts.push(d.text(" "));
@@ -443,14 +469,17 @@ impl<'a> Printer<'a> {
             let next_boundary = self.next_element_boundary(arr, i);
 
             // Collect same-line trailing comments (block before comma, line after)
+            let comma_pos = self.find_comma_after(elem_end);
             let trailing: Vec<_> = comments_in_range(self.comments, elem_end, next_boundary)
                 .filter(|c| self.is_same_line(elem_end, c.span.start))
                 .collect();
 
-            // Block comments go before comma
+            // Block comments go before comma (only if actually before the comma)
             for comment in trailing.iter().filter(|c| c.is_block) {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
+                if comma_pos.is_none_or(|pos| comment.span.start < pos) {
+                    parts.push(d.text(" "));
+                    parts.push(self.build_comment_doc(comment));
+                }
             }
 
             parts.push(d.text(","));
@@ -463,22 +492,11 @@ impl<'a> Printer<'a> {
             // Check if next element has blank line before it or before its leading comments
             // If so, don't add hardline here (blank line will be added at start of next iteration)
             let next_has_blank_before = if i + 1 < arr.elements.len() {
-                let next_elem_start = arr.elements[i + 1].as_ref().map_or_else(
-                    || {
-                        // Elision: use next element's start or closing bracket
-                        arr.elements[i + 2..]
-                            .iter()
-                            .find_map(|e| e.as_ref().map(|e| e.span().start))
-                            .unwrap_or(arr.span.end - 1)
-                    },
-                    |e| e.span().start,
-                );
-                // Check for blank line to first leading comment, or to element if no comments
-                let first_leading_comment =
-                    comments_in_range(self.comments, elem_end, next_elem_start)
-                        .find(|c| !self.is_same_line(elem_end, c.span.start));
+                let next_start = self.next_element_boundary(arr, i);
+                let first_leading_comment = comments_in_range(self.comments, elem_end, next_start)
+                    .find(|c| !self.is_same_line(elem_end, c.span.start));
                 let blank_check_boundary =
-                    first_leading_comment.map_or(next_elem_start, |c| c.span.start);
+                    first_leading_comment.map_or(next_start, |c| c.span.start);
                 self.has_blank_line_between(elem_end, blank_check_boundary)
             } else {
                 false

@@ -5,6 +5,7 @@
 
 use super::super::printing::{ChainPrinter, print_node};
 use super::super::types::{ChainGroup, ChainNode};
+use crate::ast::internal::Expression;
 use tsv_lang::doc::arena::DocId;
 
 /// Build doc for member-only chains using fill for greedy packing
@@ -124,12 +125,31 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
         return first_doc;
     }
 
-    // If only one segment, attach it directly (e.g., `a!` or `a!.b!`)
+    // Single segment: identifier bases get flat concat (no break point),
+    // non-identifier bases (regex literals, etc.) get a breakable group so
+    // the dot can break when the line exceeds print width.
+    //
+    // Identifier bases stay flat to avoid regressions in fill contexts —
+    // a breakable `obj.prop` would split at the dot whenever remaining
+    // width on the current fill line is small.
     if segments.len() == 1 {
-        let Some(segment) = segments.pop() else {
-            return first_doc;
-        };
-        return d.concat(&[first_doc, segment]);
+        let segment = segments[0];
+
+        let base_is_identifier = matches!(
+            all_nodes.first(),
+            Some(ChainNode::Base {
+                expr: Expression::Identifier(_),
+                ..
+            })
+        );
+
+        if base_is_identifier {
+            return d.concat(&[first_doc, segment]);
+        }
+
+        let on_line = d.concat(&[first_doc, segment]);
+        let expanded = d.concat(&[first_doc, d.indent(d.concat(&[d.softline(), segment]))]);
+        return d.conditional_group(&[on_line, expanded]);
     }
 
     // For 2+ segments: use conditional_group for proper break decisions

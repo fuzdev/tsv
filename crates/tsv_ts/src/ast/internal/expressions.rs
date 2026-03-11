@@ -57,6 +57,9 @@ pub enum Expression {
     ImportExpression(ImportExpression),
     // Meta property: import.meta, new.target
     MetaProperty(MetaProperty),
+    // Parenthesized expression for JSDoc type casts: /** @type {T} */ (expr)
+    // Only created when preceded by a JSDoc type cast comment, not for all parens.
+    Parenthesized(Box<Expression>),
 }
 
 impl Expression {
@@ -98,6 +101,7 @@ impl Expression {
             Expression::TSParameterProperty(param_prop) => param_prop.span,
             Expression::ImportExpression(import) => import.span,
             Expression::MetaProperty(meta) => meta.span,
+            Expression::Parenthesized(inner) => inner.span(),
         }
     }
 }

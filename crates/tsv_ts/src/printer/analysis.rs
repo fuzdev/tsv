@@ -112,9 +112,10 @@ pub(crate) fn is_module_path_fluid_call(
     expr: &internal::Expression,
     interner: &DefaultStringInterner,
 ) -> bool {
-    // Check for `await import(string)`
+    // Check for `await import(string)` — single-arg only (no options)
     if let internal::Expression::AwaitExpression(await_expr) = expr
         && let internal::Expression::ImportExpression(import_expr) = await_expr.argument.as_ref()
+        && import_expr.options.is_none()
     {
         return is_string_literal(import_expr.source.as_ref());
     }
@@ -186,13 +187,9 @@ pub(crate) fn is_pure_property_chain(expr: &internal::Expression) -> bool {
     }
 }
 
-/// Check if an expression is a memberish call chain (CallExpression with member chain callee)
+/// Check if a ConditionalExpression needs break-after-operator layout.
 ///
-/// Memberish call chains like `obj.a.b.method(args)` should use fluid assignment wrapping
-/// (break after `=` if doesn't fit). This includes chains like:
-/// Check if a ConditionalExpression needs fluid layout for variable assignment.
-///
-/// Prettier uses "break-after-operator" layout when the ternary's test expression
+/// Prettier uses "break-after-operator" when the ternary's test expression
 /// is binaryish (BinaryExpression or LogicalExpression). This causes the pattern:
 /// ```typescript
 /// const value =
@@ -201,19 +198,17 @@ pub(crate) fn is_pure_property_chain(expr: &internal::Expression) -> bool {
 ///         : alternate;
 /// ```
 ///
-/// For simple identifiers in the test, normal layout is used:
-/// ```typescript
-/// const long = aaaaaaaaaaaaaaaa
-///     ? consequent
-///     : alternate;
-/// ```
-pub(crate) fn conditional_needs_fluid_layout(expr: &internal::Expression) -> bool {
+/// Prettier ref: shouldBreakAfterOperator (assignment.js:216-219)
+pub(crate) fn conditional_should_break_after_op(expr: &internal::Expression) -> bool {
     if let internal::Expression::ConditionalExpression(cond) = expr {
-        // Check if test is binaryish (BinaryExpression includes logical operators like &&, ||)
-        matches!(
-            cond.test.as_ref(),
-            internal::Expression::BinaryExpression(_)
-        )
+        // Check if test is binaryish (BinaryExpression includes logical operators like &&, ||),
+        // but exclude logical expressions with inline-able RHS (non-empty object/array).
+        // Prettier ref: assignment.js:219 `isBinaryish(test) && !shouldInlineLogicalExpression(test)`
+        if let internal::Expression::BinaryExpression(binary) = cond.test.as_ref() {
+            !super::assignment::should_inline_logical_expression(binary)
+        } else {
+            false
+        }
     } else {
         false
     }
@@ -526,6 +521,8 @@ pub(crate) fn has_multiline_content(expr: &internal::Expression, source: &str) -
         internal::Expression::MetaProperty(_) => false,
         // Parameter properties don't contain multiline content
         internal::Expression::TSParameterProperty(_) => false,
+        // Parenthesized (JSDoc type cast): check inner expression
+        internal::Expression::Parenthesized(inner) => has_multiline_content(inner, source),
     }
 }
 

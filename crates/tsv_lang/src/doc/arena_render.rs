@@ -1,7 +1,6 @@
 //! Rendering algorithm for arena-based document trees.
 
 use crate::PrintConfig;
-use smallvec::SmallVec;
 use std::collections::HashMap;
 
 use super::arena::{ArenaCommand, DocArena, DocId, DocNode};
@@ -10,37 +9,14 @@ use super::types::{
     DocContext, GroupId, LineKind, Mode, TEXT_WIDTH_HAS_NEWLINE, TextResolver, resolve_text,
 };
 
-/// Strip trailing whitespace from lines with content (matches Prettier's behavior).
-fn strip_trailing_whitespace(s: String) -> String {
-    if !s.lines().any(|line| line.len() != line.trim_end().len()) {
-        return s;
-    }
-
-    let mut result = String::with_capacity(s.len());
-    let mut pending: SmallVec<[&str; 2]> = SmallVec::new();
-
-    for line in s.lines() {
-        let trimmed = line.trim_end();
-        if trimmed.is_empty() {
-            pending.push(line);
-        } else {
-            for ws_line in pending.drain(..) {
-                if !result.is_empty() {
-                    result.push('\n');
-                }
-                result.push_str(ws_line);
-            }
-            if !result.is_empty() {
-                result.push('\n');
-            }
-            result.push_str(trimmed);
-        }
-    }
-
-    if s.ends_with('\n') || !pending.is_empty() {
-        result.push('\n');
-    }
-    result
+/// Trim trailing whitespace from only the last line of output.
+/// Interior lines are already handled by `trim_trailing_whitespace()` in `render_line_break()`.
+fn trim_last_line(mut s: String) -> String {
+    // Find the last newline — only trim after it (the final line)
+    let trim_start = s.rfind('\n').map_or(0, |i| i + 1);
+    let trimmed_len = s[trim_start..].trim_end_matches([' ', '\t']).len();
+    s.truncate(trim_start + trimmed_len);
+    s
 }
 
 //
@@ -73,6 +49,15 @@ fn render_text<R: TextResolver + ?Sized>(
     }
 }
 
+/// Trim trailing whitespace (spaces and tabs) from the end of the output buffer.
+/// Matches Prettier's `trim()` / `trimIndentation()` — called before each
+/// non-literal newline to strip trailing indentation/spaces from code lines.
+#[inline]
+fn trim_trailing_whitespace(output: &mut String) {
+    let trimmed_len = output.trim_end_matches([' ', '\t']).len();
+    output.truncate(trimmed_len);
+}
+
 /// Render a line break.
 #[inline]
 #[allow(clippy::too_many_arguments)]
@@ -88,19 +73,24 @@ fn render_line_break(
 ) -> bool {
     let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
     if mode == Mode::Break || is_hard {
-        output.push('\n');
         if kind == LineKind::Literal {
+            // Literal line (template literals): preserve trailing whitespace
+            output.push('\n');
             *pos = 0;
         } else {
+            // Non-literal line: trim trailing whitespace before newline
+            // (matches Prettier's trim() call before non-literal newlines)
+            trim_trailing_whitespace(output);
+            output.push('\n');
             write_indentation(output, indent_level, align_spaces, config);
             *pos = line_start_column(indent_level, align_spaces, config, base_indent_override);
         }
         true
+    } else if kind == LineKind::Normal {
+        output.push(' ');
+        *pos += 1;
+        false
     } else {
-        if kind == LineKind::Normal {
-            output.push(' ');
-            *pos += 1;
-        }
         false
     }
 }
@@ -165,7 +155,7 @@ fn process_indent_if_break(
 
 /// Convert an arena doc tree to a formatted string (starting at column 0).
 pub fn arena_print_doc(arena: &DocArena, doc: DocId, config: &PrintConfig) -> String {
-    strip_trailing_whitespace(arena_print_doc_at_column(arena, doc, config, 0))
+    arena_print_doc_at_column(arena, doc, config, 0)
 }
 
 /// Convert an arena doc tree to a formatted string with symbol resolution.
@@ -175,9 +165,7 @@ pub fn arena_print_doc_resolved<R: TextResolver + ?Sized>(
     config: &PrintConfig,
     resolver: &R,
 ) -> String {
-    strip_trailing_whitespace(arena_print_doc_with_indent_resolved(
-        arena, doc, config, 0, 0, resolver,
-    ))
+    arena_print_doc_with_indent_resolved(arena, doc, config, 0, 0, resolver)
 }
 
 /// Convert an arena doc tree to a formatted string, starting at a specific column.
@@ -187,13 +175,7 @@ pub fn arena_print_doc_at_column(
     config: &PrintConfig,
     start_column: usize,
 ) -> String {
-    strip_trailing_whitespace(arena_print_doc_with_indent(
-        arena,
-        doc,
-        config,
-        start_column,
-        0,
-    ))
+    arena_print_doc_with_indent(arena, doc, config, start_column, 0)
 }
 
 /// Convert an arena doc tree to a formatted string at a specific column, with symbol resolution.
@@ -204,14 +186,7 @@ pub fn arena_print_doc_at_column_resolved<R: TextResolver + ?Sized>(
     start_column: usize,
     resolver: &R,
 ) -> String {
-    strip_trailing_whitespace(arena_print_doc_with_indent_resolved(
-        arena,
-        doc,
-        config,
-        start_column,
-        0,
-        resolver,
-    ))
+    arena_print_doc_with_indent_resolved(arena, doc, config, start_column, 0, resolver)
 }
 
 /// Convert an arena doc tree to a formatted string with column and indent level.
@@ -235,7 +210,7 @@ pub fn arena_print_doc_with_indent(
         None,
     );
 
-    strip_trailing_whitespace(output)
+    trim_last_line(output)
 }
 
 /// Convert an arena doc tree to a formatted string with column, indent, and symbol resolution.
@@ -260,10 +235,12 @@ pub fn arena_print_doc_with_indent_resolved<R: TextResolver + ?Sized>(
         Some(resolver),
     );
 
-    strip_trailing_whitespace(output)
+    trim_last_line(output)
 }
 
-/// Convert an arena doc tree, preserving trailing whitespace (for HTML <pre>, etc.).
+/// Convert an arena doc tree, preserving trailing whitespace on the last line
+/// (for HTML `<pre>`, `<textarea>`, etc.). Interior non-literal lines are still
+/// trimmed inline by `render_line_break`; only the final-line trim is skipped.
 pub fn arena_print_doc_with_indent_resolved_preserve_whitespace<R: TextResolver + ?Sized>(
     arena: &DocArena,
     doc: DocId,
@@ -688,6 +665,7 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 let line_start_pos =
                     line_start_column(indent_level, 0, config, context.base_indent_override);
                 if *pos != line_start_pos {
+                    trim_trailing_whitespace(output);
                     output.push('\n');
                     write_indentation(output, indent_level, 0, config);
                     *pos = line_start_pos;
@@ -815,6 +793,7 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                     resolver,
                 );
 
+                trim_trailing_whitespace(output);
                 output.push('\n');
                 write_indentation(output, indent_level, 0, config);
                 *pos = line_start_pos;

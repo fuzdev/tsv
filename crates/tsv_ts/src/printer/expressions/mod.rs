@@ -41,18 +41,43 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an expression (for use in object/array contexts and statements)
     pub(super) fn build_expression_doc(&self, expr: &Expression) -> DocId {
         let d = self.d();
+
+        // Take and clear is_expression_statement so it doesn't leak to sub-expressions.
+        // Only chain formatting needs this flag (for the isShort merge heuristic).
+        // Re-set it only for expression types that enter chain formatting:
+        // CallExpression, MemberExpression, TSNonNullExpression.
+        let was_expr_stmt = self.is_expression_statement.replace(false);
+
         match expr {
             Expression::Literal(lit) => self.build_literal_doc(lit),
             Expression::Identifier(id) => self.build_identifier_doc(id),
             Expression::PrivateIdentifier(pid) => self.build_private_identifier_doc(pid),
-            Expression::ObjectExpression(obj) => self.build_object_doc(obj),
+            Expression::ObjectExpression(obj) => {
+                // Consume flag BEFORE building — build_object_doc recurses into
+                // property values which may contain nested ObjectExpressions that
+                // would incorrectly consume the flag if we checked it after.
+                let needs_arrow_parens = self.arrow_body_object_needs_parens.replace(false);
+                let doc = self.build_object_doc(obj);
+                if needs_arrow_parens {
+                    let d = self.d();
+                    d.concat(&[d.text("("), doc, d.text(")")])
+                } else {
+                    doc
+                }
+            }
             Expression::ArrayExpression(arr) => self.build_array_doc(arr),
             Expression::UnaryExpression(unary) => self.build_unary_doc(unary),
             Expression::UpdateExpression(update) => self.build_update_doc(update),
             Expression::BinaryExpression(binary) => self.build_binary_doc(binary),
-            Expression::CallExpression(call) => self.build_call_doc(call),
+            Expression::CallExpression(call) => {
+                self.is_expression_statement.set(was_expr_stmt);
+                self.build_call_doc(call)
+            }
             Expression::NewExpression(new_expr) => self.build_new_doc(new_expr),
-            Expression::MemberExpression(member) => self.build_member_doc(member),
+            Expression::MemberExpression(member) => {
+                self.is_expression_statement.set(was_expr_stmt);
+                self.build_member_doc(member)
+            }
             Expression::ConditionalExpression(cond) => {
                 self.build_conditional_doc_with_wrapping(cond)
             }
@@ -81,6 +106,7 @@ impl<'a> Printer<'a> {
                 self.build_ts_instantiation_doc(inst_expr)
             }
             Expression::TSNonNullExpression(non_null_expr) => {
+                self.is_expression_statement.set(was_expr_stmt);
                 self.build_ts_non_null_doc(non_null_expr)
             }
             Expression::ImportExpression(import_expr) => {
@@ -89,6 +115,9 @@ impl<'a> Printer<'a> {
             Expression::MetaProperty(meta) => self.build_meta_property_doc(meta),
             Expression::TSParameterProperty(param_prop) => {
                 self.build_ts_parameter_property_doc(param_prop)
+            }
+            Expression::Parenthesized(inner) => {
+                d.concat(&[d.text("("), self.build_expression_doc(inner), d.text(")")])
             }
         }
     }
@@ -363,11 +392,47 @@ impl<'a> Printer<'a> {
         // `(BinaryExpr) * 100`), all continuations break together with the outer
         // group. This matches Prettier's behavior for same-type chains.
         let should_group = Self::should_group_binary_continuation(binary);
+        // shouldInlineLogicalExpression: when the outermost logical has a non-empty
+        // object/array on the right, keep operator and RHS on the same line.
+        // Prettier ref: binaryish.js:275, 361
+        let should_inline_last = super::assignment::should_inline_logical_expression(binary);
         let mut parts = Vec::new();
 
         for (i, operand) in operands.iter().enumerate() {
+            let is_last = i == operands.len() - 1;
             if i == 0 {
                 parts.push(*operand);
+            } else if is_last && should_inline_last {
+                // shouldInlineLogicalExpression: keep operator and object/array on same line
+                // Use indent with space (no line break) instead of indent_line.
+                // For 2-operand chains: prettier returns group(parts) with no indent
+                //   (shouldInline && !samePrecedence → flat). We skip indent.
+                // For 3+ operand chains: prettier uses indent(rest) which applies to all
+                //   continuation operands. We need indent to match the level.
+                // Prettier ref: binaryish.js:275-280, 131, 169-178
+                let is_chained = operands.len() > 2;
+                let op_and_operand = if is_chained {
+                    // In a chain, use indent (matches other continuations' indent level)
+                    // but space instead of line (keeps operator and object on same line)
+                    d.concat(&[
+                        d.text(" "),
+                        d.text(operators[i - 1].as_str()),
+                        d.indent(d.concat(&[d.text(" "), *operand])),
+                    ])
+                } else {
+                    // 2-operand: flat, no indent (prettier returns group(parts) directly)
+                    d.concat(&[
+                        d.text(" "),
+                        d.text(operators[i - 1].as_str()),
+                        d.text(" "),
+                        *operand,
+                    ])
+                };
+                if should_group {
+                    parts.push(d.group(op_and_operand));
+                } else {
+                    parts.push(op_and_operand);
+                }
             } else if should_group {
                 // Sub-group for independent fitting
                 parts.push(d.group(d.concat(&[
@@ -442,16 +507,20 @@ impl<'a> Printer<'a> {
             return self.build_binary_doc(binary);
         }
 
-        // For 2-operand non-logical chains, use flat formatting (no line breaks)
-        // to avoid ugly breaks like `(a /\nb)`. Logical operators can still break.
+        // For 2-operand non-logical chains, wrap in a group with line() so the
+        // binary can independently decide whether to break at the operator.
+        // The group stays flat when the operands fit; when they don't, line()
+        // fires and breaks at the operator (e.g., `left +\nright`), preventing
+        // the operands' internal break points (like member chain dots) from
+        // firing instead.
         if operands.len() == 2 && !operators[0].is_logical() {
-            return d.concat(&[
+            return d.group(d.concat(&[
                 operands[0],
                 d.text(" "),
                 d.text(operators[0].as_str()),
-                d.text(" "),
+                d.line(),
                 operands[1],
-            ]);
+            ]));
         }
 
         // For 3+ operand chains, use line breaks between operands:

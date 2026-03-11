@@ -6,19 +6,14 @@
 //
 // ## Architecture
 //
-// - **await_chains.rs**: Parenthesized await chain handling
-// - **non_null_chains.rs**: Parenthesized non-null chain handling
 // - **member_only.rs**: Member-only chains using fill()
 // - **expansion.rs**: Chain expansion analysis helpers
 // - **helpers.rs**: Shared utilities and ChainPartsBuilder
 
-mod await_chains;
 mod expansion;
 mod helpers;
 mod member_only;
-mod non_null_chains;
 
-use await_chains::{build_parenthesized_await_chain_doc, is_parenthesized_await_head};
 use expansion::{
     call_callback_status, call_has_complex_args, ends_with_member, has_blank_lines_between_methods,
     has_comments_forcing_expansion, has_param_type_annotation,
@@ -28,7 +23,6 @@ use helpers::{
     build_rest_parts_with_comments,
 };
 use member_only::build_member_only_chain_doc;
-use non_null_chains::{build_parenthesized_non_null_chain_doc, is_parenthesized_non_null_head};
 
 use super::analysis::should_merge_first_groups;
 use super::printing::{ChainPrinter, print_group, print_group_expanded};
@@ -117,20 +111,10 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
 
     // Single group: just print it
     if groups.len() == 1 {
+        // Clear before printing — call args in this group may contain nested
+        // chains that should not inherit is_expression_statement.
+        printer.clear_expression_statement();
         return print_group(&groups[0], printer);
-    }
-
-    // Check if first group is "(await ...)" pattern (without NonNull)
-    // This takes priority because the parenthesized await needs special break handling.
-    if is_parenthesized_await_head(groups) {
-        return build_parenthesized_await_chain_doc(groups, printer);
-    }
-
-    // Check if first group ends with "(complex)!" pattern
-    // This takes priority over member-only vs call chain distinction because
-    // the parenthesized head needs special break handling regardless of chain type.
-    if is_parenthesized_non_null_head(groups) {
-        return build_parenthesized_non_null_chain_doc(groups, printer);
     }
 
     // Collect all call nodes in the chain for the 3+ calls rule
@@ -140,7 +124,7 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
         .filter(|n| n.is_call())
         .collect();
 
-    // Check if this is a member-only chain (no calls)
+    // Check force expansion early
     let has_calls = !call_nodes.is_empty();
 
     // Prettier's logic (member-chain.js:351-359):
@@ -151,19 +135,35 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
     //
     // We match this: short member-only chains use simple group(), not fill()
     let should_merge = should_merge_first_groups(groups, printer);
+    // Reset after capturing — sub-expressions (call args, assignment RHS, etc.)
+    // must not inherit this flag. Prettier checks parent per-chain.
+    printer.clear_expression_statement();
     let cutoff = if should_merge {
         SHORT_CHAIN_CUTOFF_MERGED
     } else {
         SHORT_CHAIN_CUTOFF
     };
 
-    if !has_calls {
+    // When first group has a parenthesized base with indent-on-break softlines,
+    // use conditionalGroup so the chain can break at group boundaries
+    // rather than inside the parenthesized expression.
+    // Binary expressions are excluded — they have natural break points (at operators)
+    // and should break there rather than at the chain.
+    let first_has_parens = groups
+        .first()
+        .and_then(|g| g.nodes.first())
+        .is_some_and(|n| match n {
+            ChainNode::Base {
+                needs_parens: true,
+                expr,
+            } => !matches!(expr, Expression::BinaryExpression(_)),
+            _ => false,
+        });
+
+    if !has_calls && !first_has_parens {
         // Member-only chain: use fill for greedy packing
         return build_member_only_chain_doc(groups, printer);
     }
-
-    // Chains with calls - determine if we should force expansion
-    let force_expand = should_force_chain_expand(groups, &call_nodes, printer);
 
     // Split groups into first (merged) and rest based on should_merge
     let split_at = if should_merge { 2 } else { 1 }.min(groups.len());
@@ -173,11 +173,24 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
     let first_doc = build_first_groups_doc(first_groups, printer);
 
     // Short chains: use group-based breaking
-    if groups.len() <= cutoff && !force_expand {
-        return build_short_chain_doc(first_groups, rest_groups, first_doc, should_merge, printer);
+    // Prettier (member-chain.js:351-359) only checks nodeHasComment for short chains.
+    // Force expand conditions like "2+ callbacks with breaking body" and "3+ calls
+    // with complex args" only apply to long chains (member-chain.js:400-407).
+    // Comments between chain segments DO block the short chain path (matching
+    // Prettier's nodeHasComment check).
+    if groups.len() <= cutoff && !(has_calls && has_comments_forcing_expansion(groups, printer)) {
+        return build_short_chain_doc(
+            first_groups,
+            rest_groups,
+            first_doc,
+            first_has_parens,
+            has_calls,
+            printer,
+        );
     }
 
-    // Long chains: check for additional break conditions
+    // Long chains: force expand conditions (Prettier member-chain.js:400-407)
+    let force_expand = has_calls && should_force_chain_expand(groups, &call_nodes, printer);
     build_long_chain_doc(
         groups,
         first_groups,
@@ -230,7 +243,8 @@ fn build_short_chain_doc<'a, P: ChainPrinter>(
     first_groups: &[ChainGroup<'a>],
     rest_groups: &[ChainGroup<'a>],
     first_doc: DocId,
-    should_merge: bool,
+    first_has_parens: bool,
+    has_calls: bool,
     printer: &P,
 ) -> DocId {
     let d = printer.arena();
@@ -291,6 +305,20 @@ fn build_short_chain_doc<'a, P: ChainPrinter>(
     // Prettier's short chain behavior (member-chain.js lines 351-360):
     // For chains with groups.length <= cutoff, just return group(oneLine).
     if !first_has_calls {
+        // When first group has a parenthesized base with indent-on-break softlines
+        // and no calls anywhere in the chain, use conditionalGroup to break at
+        // group boundaries rather than inside the parenthesized expression.
+        // When there ARE calls, the inner group breaks naturally via group(oneLine).
+        if first_has_parens && !has_calls {
+            // Build expanded with hardlines between ALL groups (don't skip trailing member)
+            let mut rest_parts = Vec::with_capacity(rest_docs.len() * 2);
+            for &rest_doc in &rest_docs {
+                rest_parts.push(d.hardline());
+                rest_parts.push(rest_doc);
+            }
+            let expanded = d.concat(&[first_doc, d.indent(d.concat(&rest_parts))]);
+            return d.conditional_group(&[on_line, expanded]);
+        }
         return d.group(on_line);
     }
 
@@ -302,16 +330,10 @@ fn build_short_chain_doc<'a, P: ChainPrinter>(
         .any(|call| call.arguments.iter().any(contains_call_expression));
 
     if !first_call_arg_contains_call {
-        // For factory patterns (shouldMerge), use simple group
-        if should_merge {
-            return d.group(on_line);
-        }
-
-        let rest_expanded = build_rest_expanded_docs(rest_groups, printer);
-        let mut state_last_expanded_parts = vec![first_doc];
-        state_last_expanded_parts.extend(rest_expanded);
-        let state_last_expanded = d.concat(&state_last_expanded_parts);
-        return d.conditional_group(&[on_line, state_last_expanded]);
+        // Prettier: group(printedGroups.flat()) for short chains (member-chain.js:351-359).
+        // group() lets hardlines in the first call (e.g., multiline array) render
+        // naturally while the second call's inner group handles its own arg layout.
+        return d.group(on_line);
     }
 
     // When first call's arg contains calls, try both expansion directions

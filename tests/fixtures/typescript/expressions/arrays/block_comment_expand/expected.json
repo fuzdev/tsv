@@ -1,0 +1,553 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 397,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Multi-line block comment at start of array forces expansion",
+			"start": 20,
+			"end": 82,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment line 1\ncomment line 2 ",
+			"start": 98,
+			"end": 133,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Multi-line block comment in middle also forces expansion",
+			"start": 153,
+			"end": 212,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment line 1\ncomment line 2 ",
+			"start": 233,
+			"end": 268,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Single-line block comment does NOT force expansion (short array)",
+			"start": 283,
+			"end": 350,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 363,
+			"end": 376,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 12
+				},
+				"end": {
+					"line": 19,
+					"column": 25
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 396,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 387,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 20,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 84,
+					"end": 150,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 90,
+							"end": 149,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 90,
+								"end": 91,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 94,
+								"end": 149,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 134,
+										"end": 135,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 18
+											},
+											"end": {
+												"line": 5,
+												"column": 19
+											}
+										},
+										"name": "b",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " comment line 1\ncomment line 2 ",
+												"start": 98,
+												"end": 133
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 139,
+										"end": 140,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 3
+											}
+										},
+										"name": "c"
+									},
+									{
+										"type": "Identifier",
+										"start": 144,
+										"end": 145,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 3
+											}
+										},
+										"name": "d"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multi-line block comment at start of array forces expansion",
+							"start": 20,
+							"end": 82
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 214,
+					"end": 280,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 220,
+							"end": 279,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 16,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 220,
+								"end": 221,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 224,
+								"end": 279,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 11
+									},
+									"end": {
+										"line": 16,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 228,
+										"end": 229,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 2
+											},
+											"end": {
+												"line": 12,
+												"column": 3
+											}
+										},
+										"name": "f"
+									},
+									{
+										"type": "Identifier",
+										"start": 269,
+										"end": 270,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 18
+											},
+											"end": {
+												"line": 14,
+												"column": 19
+											}
+										},
+										"name": "g",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " comment line 1\ncomment line 2 ",
+												"start": 233,
+												"end": 268
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 274,
+										"end": 275,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 2
+											},
+											"end": {
+												"line": 15,
+												"column": 3
+											}
+										},
+										"name": "h"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multi-line block comment in middle also forces expansion",
+							"start": 153,
+							"end": 212
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 352,
+					"end": 386,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 35
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 358,
+							"end": 385,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 7
+								},
+								"end": {
+									"line": 19,
+									"column": 34
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 358,
+								"end": 359,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 7
+									},
+									"end": {
+										"line": 19,
+										"column": 8
+									}
+								},
+								"name": "i"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 362,
+								"end": 385,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 11
+									},
+									"end": {
+										"line": 19,
+										"column": 34
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 377,
+										"end": 378,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 26
+											},
+											"end": {
+												"line": 19,
+												"column": 27
+											}
+										},
+										"name": "j",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " comment ",
+												"start": 363,
+												"end": 376
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 380,
+										"end": 381,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 29
+											},
+											"end": {
+												"line": 19,
+												"column": 30
+											}
+										},
+										"name": "k"
+									},
+									{
+										"type": "Identifier",
+										"start": 383,
+										"end": 384,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 32
+											},
+											"end": {
+												"line": 19,
+												"column": 33
+											}
+										},
+										"name": "l"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Single-line block comment does NOT force expansion (short array)",
+							"start": 283,
+							"end": 350
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

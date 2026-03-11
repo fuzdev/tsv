@@ -751,11 +751,14 @@ impl<'a> Printer<'a> {
 
             match &nodes[j] {
                 FragmentNode::Text(text) => {
-                    // Blank lines break inline runs — they signal separate logical units
-                    if text.raw.has_blank_line() {
+                    // Whitespace-only text nodes break inline runs — they signal
+                    // intentional separation between nodes. Inline runs are for
+                    // span-adjacent sequences like `{expr}{#if cond}` or
+                    // `{expr} content text {#if cond}` (text with actual content).
+                    if text.raw.is_whitespace_only() {
                         break;
                     }
-                    // Non-blank text nodes can appear between start and control flow
+                    // Text nodes with content can appear between start and control flow
                 }
                 FragmentNode::IfBlock(_)
                 | FragmentNode::EachBlock(_)
@@ -781,6 +784,7 @@ impl<'a> Printer<'a> {
             | FragmentNode::HtmlTag(_)
             | FragmentNode::RenderTag(_) => true,
             FragmentNode::Element(el) => !self.is_block_element(el),
+            FragmentNode::SpecialElement(el) => !el.kind.is_block(),
             _ => false,
         }
     }

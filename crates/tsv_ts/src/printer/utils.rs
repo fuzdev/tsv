@@ -1,7 +1,7 @@
 //! Shared utility functions for the TypeScript printer
 
 use crate::ast::internal::{self, Expression};
-use tsv_lang::printing::has_newline_between_fast;
+use tsv_lang::printing::{has_newline_between_fast, visual_width};
 
 /// Check if an argument is "hopefully short" enough to stay inline
 ///
@@ -24,7 +24,9 @@ fn is_hopefully_short_arg(expr: &Expression) -> bool {
         }
 
         // Prettier: return isRegExpLiteral(node) || isSimpleCallArgument(node)
-        // RegExp literals are handled by is_simple_call_argument (via RegexLiteral)
+        // All regex is "hopefully short" regardless of pattern length — the pattern
+        // length check in is_simple_call_argument only matters for chain 3+ calls.
+        Expression::RegexLiteral(_) => true,
         _ => is_simple_call_argument(expr, 2),
     }
 }
@@ -206,16 +208,6 @@ pub(super) fn is_block_function(expr: &Expression) -> bool {
     ) || matches!(expr, Expression::FunctionExpression(_))
 }
 
-/// Check if any argument (except the last) is a function with a block body.
-///
-/// When true, the call should use full expansion instead of hugging.
-pub(super) fn has_block_function_before_last(args: &[Expression]) -> bool {
-    if args.len() < 2 {
-        return false;
-    }
-    args[..args.len() - 1].iter().any(is_block_function)
-}
-
 /// Check if an expression is a "simple" call argument (Prettier's `isSimpleCallArgument`)
 ///
 /// Uses depth-limited recursion (typically depth=2) to prevent checking arbitrarily
@@ -243,8 +235,10 @@ pub fn is_simple_call_argument(expr: &Expression, depth: usize) -> bool {
 
     match expr {
         // Simple literals are always simple (Prettier: isLiteral)
-        // Note: RegexLiteral is separate from Literal in our internal AST
-        Expression::Literal(_) | Expression::RegexLiteral(_) => true,
+        Expression::Literal(_) => true,
+
+        // Regex: simple only if pattern is short (Prettier: getStringWidth(pattern) <= 5)
+        Expression::RegexLiteral(regex) => visual_width(&regex.pattern, 2) <= 5,
 
         // Single-word types are simple (Prettier: isSingleWordType)
         // Includes: Identifier, ThisExpression, Super, MetaProperty
@@ -434,6 +428,7 @@ pub fn contains_call_expression(expr: &Expression) -> bool {
         | Expression::RestElement(_)
         | Expression::PrivateIdentifier(_)
         | Expression::TSParameterProperty(_) => false,
+        Expression::Parenthesized(inner) => contains_call_expression(inner),
     }
 }
 

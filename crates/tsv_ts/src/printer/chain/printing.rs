@@ -10,7 +10,7 @@ use super::types::{ChainGroup, ChainNode};
 use crate::ast::internal::{self, Expression};
 use string_interner::DefaultSymbol;
 use tsv_lang::doc::arena::{DocArena, DocId};
-use tsv_lang::printing::has_blank_line_between_fast;
+use tsv_lang::printing::has_blank_line_between_strict;
 use tsv_lang::{ClassifiedComments, Span, SymbolToU32};
 
 //
@@ -25,12 +25,11 @@ pub trait ChainPrinter: SymbolLookup {
     /// Print an expression as a DocId
     fn print_expression(&self, expr: &Expression) -> DocId;
 
-    /// Print a parenthesized base expression with indent-on-break behavior
-    fn print_parenthesized_base(&self, expr: &Expression) -> DocId;
+    /// Build inner doc for logical binary in parenthesized chain base
+    fn build_parenthesized_base_inner_logical(&self, binary: &internal::BinaryExpression) -> DocId;
 
-    /// Print a parenthesized base expression with forced expansion (hardlines)
-    /// Used for `args_break` state in conditional_group so fits() can measure correctly
-    fn print_parenthesized_base_expanded(&self, expr: &Expression) -> DocId;
+    /// Build inner doc for arithmetic binary in parenthesized chain base
+    fn build_parenthesized_base_inner_binary(&self, binary: &internal::BinaryExpression) -> DocId;
 
     /// Print call arguments: () or (arg1, arg2)
     fn print_call_args(&self, call: &internal::CallExpression, optional: bool) -> DocId;
@@ -57,6 +56,14 @@ pub trait ChainPrinter: SymbolLookup {
     /// Used to determine if short identifier names should be merged with their
     /// first call (e.g., `a.fn().b()` → merge `a` with `.fn()` only in statements).
     fn is_expression_statement(&self) -> bool;
+
+    /// Reset `is_expression_statement` to false.
+    ///
+    /// Called after `should_merge` captures the flag, so that sub-expressions
+    /// (call arguments, etc.) don't inherit the expression statement context.
+    /// Prettier checks `path.parent.type === "ExpressionStatement"` per-chain,
+    /// so only the outermost chain should see `true`.
+    fn clear_expression_statement(&self);
 
     /// Get the precomputed line breaks table for O(log n) line boundary lookups
     fn get_line_breaks(&self) -> &[u32];
@@ -100,20 +107,11 @@ pub trait ChainPrinter: SymbolLookup {
     /// Get the tab width from config
     fn get_tab_width(&self) -> usize;
 
-    /// Get the print width from config
-    fn get_print_width(&self) -> usize;
-
     /// Check if chain expansion should be forced
     ///
     /// Used when inside template expressions with original breaks, where the
     /// expression is too long for the remaining print width.
     fn should_force_expand(&self) -> bool;
-
-    /// Check if a doc fits in the available width (for chain break decisions)
-    ///
-    /// Used when deciding between args_break and chain_break states.
-    /// Performs accurate width measurement via fits() with symbol resolution.
-    fn fits_chain_tail(&self, doc: DocId, available: usize) -> bool;
 }
 
 //
@@ -138,7 +136,37 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
     match node {
         ChainNode::Base { expr, needs_parens } => {
             if *needs_parens {
-                printer.print_parenthesized_base(expr)
+                let inner = printer.print_expression(expr);
+                // Match Prettier: inner group handles indent-on-break,
+                // bare parens outside so chain conditionalGroup drives breaking
+                let inner_group = match expr {
+                    Expression::AwaitExpression(_) => {
+                        // Prettier: group([indent([softline, inner]), softline])
+                        d.group(
+                            d.concat(&[d.indent(d.concat(&[d.softline(), inner])), d.softline()]),
+                        )
+                    }
+                    Expression::BinaryExpression(binary) if binary.operator.is_logical() => {
+                        // Logical: keep existing indented structure
+                        printer.build_parenthesized_base_inner_logical(binary)
+                    }
+                    Expression::BinaryExpression(binary) => {
+                        // Arithmetic: same indent-on-break as await
+                        let bin_inner = printer.build_parenthesized_base_inner_binary(binary);
+                        d.group(d.concat(&[
+                            d.indent(d.concat(&[d.softline(), bin_inner])),
+                            d.softline(),
+                        ]))
+                    }
+                    _ => {
+                        // All other expressions: same indent-on-break as await
+                        // so chain conditionalGroup can try flat first
+                        d.group(
+                            d.concat(&[d.indent(d.concat(&[d.softline(), inner])), d.softline()]),
+                        )
+                    }
+                };
+                d.concat(&[d.text("("), inner_group, d.text(")")])
             } else {
                 printer.print_expression(expr)
             }
@@ -427,10 +455,13 @@ pub(crate) fn build_chain_line_break<P: ChainPrinter>(
     // Check for blank line preservation (only when no comments - comments handle their own spacing)
     // When there are comments between obj and property, the 2+ newlines (one before comment,
     // one after) should NOT be treated as a blank line.
-    let line_breaks = printer.get_line_breaks();
+    // Use strict check: verifies intermediate lines are truly blank (whitespace-only).
+    // This avoids false positives when the parser strips grouping parens, leaving `)` between
+    // newlines (e.g., `(fn({...}))\n.method()` → inner span ends before `)`, creating `\n)\n`).
+    let source = printer.get_source();
     let has_comments = printer.has_comments_between(object_end, property_start);
 
-    if !has_comments && has_blank_line_between_fast(line_breaks, object_end, property_start) {
+    if !has_comments && has_blank_line_between_strict(source, object_end, property_start) {
         // Preserve blank line: literalline (no indent) + hardline (with indent for next content)
         d.concat(&[d.literalline(), d.hardline()])
     } else {

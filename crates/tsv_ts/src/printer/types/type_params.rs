@@ -117,16 +117,6 @@ impl<'a> Printer<'a> {
         ])
     }
 
-    /// Build doc for type parameter declaration without independent group
-    /// Used when type params should break with the parent group (e.g., class header group mode)
-    #[inline]
-    pub(in crate::printer) fn build_type_parameter_declaration_doc_inline_group(
-        &self,
-        decl: &TSTypeParameterDeclaration,
-    ) -> DocId {
-        self.build_type_parameter_declaration_doc_inner(decl)
-    }
-
     /// Build doc for a single type parameter
     /// With optional modifiers: `const T`, `in T`, `out T`, `in out T`
     pub(in crate::printer) fn build_type_parameter_doc(&self, param: &TSTypeParameter) -> DocId {

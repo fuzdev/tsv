@@ -42,19 +42,23 @@ mod utils;
 
 use analysis::needs_isolation_for_hugging;
 pub(crate) use analysis::{
-    PatternContext, build_entity_name_doc, conditional_needs_fluid_layout, has_multiline_content,
-    has_newline_before_position, is_brace_block_multiline, is_module_path_fluid_call,
-    is_multiline_string_literal, is_multiline_template_expression, is_pure_property_chain,
-    is_string_literal, object_pattern_should_expand, template_literal_has_newlines,
+    PatternContext, build_entity_name_doc, conditional_should_break_after_op,
+    has_multiline_content, has_newline_before_position, is_brace_block_multiline,
+    is_module_path_fluid_call, is_multiline_string_literal, is_multiline_template_expression,
+    is_pure_property_chain, is_string_literal, object_pattern_should_expand,
+    template_literal_has_newlines,
 };
 pub(crate) use assignment::{
     arrow_chain_has_return_type, is_call_on_member_chain, is_curried_arrow_with_return_type,
-    is_poorly_breakable_chain, is_self_expanding_value, is_simple_self_expanding,
-    is_single_call_on_member_chain, is_type_assertion_call,
+    is_literal_member_chain, is_poorly_breakable_chain, is_regex_root_chain,
+    is_self_expanding_value, is_simple_self_expanding, is_simple_value,
+    is_single_call_on_member_chain, is_type_assertion_call, should_inline_logical_expression,
 };
 pub(crate) use comments::{CommentFilter, CommentSpacing};
 pub(crate) use needs_parens::{ParenContext, needs_parens};
-pub(crate) use types::{intersection_has_huggable_last_type, unwrap_parenthesized};
+pub(crate) use types::{
+    intersection_has_huggable_last_type, should_hug_union_type, unwrap_parenthesized,
+};
 
 use crate::ast::internal;
 use std::cell::{Cell, RefCell};
@@ -112,6 +116,10 @@ pub struct Printer<'a> {
     /// When true, nested arrows always break after `=>` regardless of their own return type.
     /// Used for: const f = (x: T): H => (y) => expr - ALL arrows break, not just the typed ones.
     pub(crate) in_curried_typed_arrow: Cell<bool>,
+    /// Whether the next ObjectExpression should be wrapped in parens.
+    /// Set when printing arrow body with chained as/satisfies wrapping an object:
+    /// `() => ({}) as unknown as Logger` — parens go around inner object only.
+    pub(crate) arrow_body_object_needs_parens: Cell<bool>,
 }
 
 impl<'a> Printer<'a> {
@@ -139,6 +147,7 @@ impl<'a> Printer<'a> {
             force_chain_expand: Cell::new(false),
             in_template_interpolation: Cell::new(false),
             in_curried_typed_arrow: Cell::new(false),
+            arrow_body_object_needs_parens: Cell::new(false),
         }
     }
 
@@ -216,6 +225,16 @@ impl<'a> Printer<'a> {
     /// Get the current column position (for doc-builder width calculations)
     pub(crate) fn current_column(&self) -> usize {
         self.buffer.current_column(self.config.tab_width)
+    }
+
+    /// Compute the visual indent width at a source position.
+    ///
+    /// Finds the start of the line containing `pos` and measures the leading
+    /// whitespace visual width (tabs count as `tab_width` chars).
+    pub(crate) fn source_indent_visual(&self, pos: u32) -> usize {
+        let pos = pos as usize;
+        let line_start = self.source[..pos].rfind('\n').map_or(0, |i| i + 1);
+        printing::visual_width(&self.source[line_start..pos], self.config.tab_width)
     }
 
     /// Check if two positions are on the same line (O(log n) binary search)

@@ -1,0 +1,729 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 312,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Await in test position — needs parens for clarity",
+			"start": 10,
+			"end": 62,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Await with member expression",
+			"start": 98,
+			"end": 129,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Simple await",
+			"start": 167,
+			"end": 182,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Short control — fits inline, no parens needed on non-await",
+			"start": 215,
+			"end": 276,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 62
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 311,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 302,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 64,
+					"end": 95,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 70,
+							"end": 94,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 70,
+								"end": 71,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 74,
+								"end": 94,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 31
+									}
+								},
+								"test": {
+									"type": "AwaitExpression",
+									"start": 75,
+									"end": 85,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 12
+										},
+										"end": {
+											"line": 3,
+											"column": 22
+										}
+									},
+									"argument": {
+										"type": "CallExpression",
+										"start": 81,
+										"end": 85,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 18
+											},
+											"end": {
+												"line": 3,
+												"column": 22
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 81,
+											"end": 82,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 18
+												},
+												"end": {
+													"line": 3,
+													"column": 19
+												}
+											},
+											"name": "b"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 83,
+												"end": 84,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 20
+													},
+													"end": {
+														"line": 3,
+														"column": 21
+													}
+												},
+												"name": "c"
+											}
+										],
+										"optional": false
+									}
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 89,
+									"end": 90,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 26
+										},
+										"end": {
+											"line": 3,
+											"column": 27
+										}
+									},
+									"name": "d"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 93,
+									"end": 94,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 30
+										},
+										"end": {
+											"line": 3,
+											"column": 31
+										}
+									},
+									"name": "e"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Await in test position — needs parens for clarity",
+							"start": 10,
+							"end": 62
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 131,
+					"end": 164,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 34
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 137,
+							"end": 163,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 33
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 137,
+								"end": 138,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 141,
+								"end": 163,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 33
+									}
+								},
+								"test": {
+									"type": "AwaitExpression",
+									"start": 142,
+									"end": 154,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 12
+										},
+										"end": {
+											"line": 6,
+											"column": 24
+										}
+									},
+									"argument": {
+										"type": "CallExpression",
+										"start": 148,
+										"end": 154,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 18
+											},
+											"end": {
+												"line": 6,
+												"column": 24
+											}
+										},
+										"callee": {
+											"type": "MemberExpression",
+											"start": 148,
+											"end": 151,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 18
+												},
+												"end": {
+													"line": 6,
+													"column": 21
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 148,
+												"end": 149,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 18
+													},
+													"end": {
+														"line": 6,
+														"column": 19
+													}
+												},
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 150,
+												"end": 151,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 20
+													},
+													"end": {
+														"line": 6,
+														"column": 21
+													}
+												},
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 152,
+												"end": 153,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 22
+													},
+													"end": {
+														"line": 6,
+														"column": 23
+													}
+												},
+												"name": "c"
+											}
+										],
+										"optional": false
+									}
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 158,
+									"end": 159,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 28
+										},
+										"end": {
+											"line": 6,
+											"column": 29
+										}
+									},
+									"name": "d"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 162,
+									"end": 163,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 32
+										},
+										"end": {
+											"line": 6,
+											"column": 33
+										}
+									},
+									"name": "e"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Await with member expression",
+							"start": 98,
+							"end": 129
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 184,
+					"end": 212,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 29
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 190,
+							"end": 211,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 28
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 190,
+								"end": 191,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"name": "g"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 194,
+								"end": 211,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 11
+									},
+									"end": {
+										"line": 9,
+										"column": 28
+									}
+								},
+								"test": {
+									"type": "AwaitExpression",
+									"start": 195,
+									"end": 202,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 12
+										},
+										"end": {
+											"line": 9,
+											"column": 19
+										}
+									},
+									"argument": {
+										"type": "Identifier",
+										"start": 201,
+										"end": 202,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 18
+											},
+											"end": {
+												"line": 9,
+												"column": 19
+											}
+										},
+										"name": "a"
+									}
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 206,
+									"end": 207,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 23
+										},
+										"end": {
+											"line": 9,
+											"column": 24
+										}
+									},
+									"name": "b"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 210,
+									"end": 211,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 27
+										},
+										"end": {
+											"line": 9,
+											"column": 28
+										}
+									},
+									"name": "c"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Simple await",
+							"start": 167,
+							"end": 182
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 278,
+					"end": 301,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 24
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 284,
+							"end": 300,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 23
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 284,
+								"end": 285,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"name": "h"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 288,
+								"end": 300,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 11
+									},
+									"end": {
+										"line": 12,
+										"column": 23
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 288,
+									"end": 292,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 11
+										},
+										"end": {
+											"line": 12,
+											"column": 15
+										}
+									},
+									"name": "cond"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 295,
+									"end": 296,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 18
+										},
+										"end": {
+											"line": 12,
+											"column": 19
+										}
+									},
+									"name": "a"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 299,
+									"end": 300,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 22
+										},
+										"end": {
+											"line": 12,
+											"column": 23
+										}
+									},
+									"name": "b"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Short control — fits inline, no parens needed on non-await",
+							"start": 215,
+							"end": 276
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

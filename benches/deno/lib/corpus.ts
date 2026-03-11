@@ -10,8 +10,6 @@ import { basename, extname } from '@std/path';
 
 import type { CorpusStats, Language, Logger, SourceFile } from './types.ts';
 
-export type { Logger };
-
 /**
  * Interface for loading benchmark corpus from different sources.
  *
@@ -144,23 +142,32 @@ const DEFAULT_REPOS = [
 	// Large apps
 	'zzz',
 	'mageguild',
+	'tx',
 	// Fuz ecosystem
 	'fuz.dev',
-	'fuz_css',
-	'fuz_ui',
-	'fuz_util',
-	'fuz_template',
+	'fuz_app',
 	'fuz_blog',
-	'fuz_mastodon',
+	'fuz_css',
+	'fuz_docs',
 	'fuz_code',
 	'fuz_gitops',
+	'fuz_mastodon',
+	'fuz_template',
+	'fuz_ui',
+	'fuz_util',
 	// Build tooling
 	'gro',
 	'svelte-docinfo',
+	'tsv.dev',
+	// Applications
+	'visionesdelcaribe.org',
 	// Personal sites
 	'webdevladder.net',
 	'ryanatkn.com',
-	'trillionx.dev',
+	// External projects (monorepo subpaths — baseDir/name/srcDir still resolves)
+	'svelte.dev/apps/svelte.dev',
+	'svelte.dev/packages/repl',
+	'svelte.dev/packages/site-kit',
 ];
 
 /**
@@ -201,7 +208,7 @@ export class DevReposLoader implements CorpusLoader {
 			try {
 				await Deno.stat(srcPath);
 			} catch {
-				// No src directory or repo not found, skip
+				logger(`  ${repoName}: not found, skipping`);
 				continue;
 			}
 

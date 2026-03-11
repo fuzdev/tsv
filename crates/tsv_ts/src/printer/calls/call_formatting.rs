@@ -4,10 +4,10 @@
 // all the special cases for call expression formatting.
 
 use super::super::utils::{
-    arrow_has_trailing_param_comments, could_expand_arrow_body, has_block_function_before_last,
-    is_array_or_object_unwrapped, is_block_function, is_concise_numeric_array,
-    is_function_composition_args, is_short_second_arg_for_expand_first,
-    last_arg_is_array_or_object, preceding_args_allow_expand_last,
+    arrow_has_trailing_param_comments, could_expand_arrow_body, is_array_or_object_unwrapped,
+    is_block_function, is_concise_numeric_array, is_function_composition_args,
+    is_short_second_arg_for_expand_first, last_arg_is_array_or_object,
+    preceding_args_allow_expand_last,
 };
 use super::super::{
     ParenContext, Printer, has_multiline_content, has_newline_before_position,
@@ -328,13 +328,39 @@ pub(super) fn build_call_doc_with_wrapping(
 
             // Object/array literals (or type assertions wrapping them): hug them
             // e.g., @decorator({...}), fn([item]), fn({...} as T), fn([...] satisfies T)
+            //
+            // Non-empty arrays/objects are hugged: the object expands internally
+            // while the call stays flat. e.g., `fn({a: 1, b: 2})` → `fn({\n\ta: 1,\n\tb: 2,\n})`
+            //
+            // Empty arrays/objects use soft wrapping so the call has softlines
+            // for fits() evaluation. This allows fluid assignment layouts to
+            // detect a break point — without softlines, the marker's fits()
+            // measures the full flat width and breaks at `=` instead of letting
+            // the call args break. e.g., `const x: LongType = fn([])` should
+            // break call args, not at `=`.
             _ if is_array_or_object_unwrapped(arg) => {
-                return d.concat(&[
-                    callee,
-                    d.text("("),
-                    printer.build_expression_doc(arg),
-                    d.text(")"),
-                ]);
+                // Truly empty (no elements/properties AND no comments inside):
+                // use soft wrapping so the call has softlines for fits() to detect
+                // break points in fluid assignment layouts.
+                //
+                // Non-empty or comment-only objects/arrays: hug them. Comments
+                // produce hardlines in the doc, which already provide break points.
+                let is_truly_empty = match arg {
+                    internal::Expression::ArrayExpression(arr) => {
+                        arr.elements.is_empty()
+                            && !printer.has_comments_between(arr.span.start, arr.span.end)
+                    }
+                    internal::Expression::ObjectExpression(obj) => {
+                        obj.properties.is_empty()
+                            && !printer.has_comments_between(obj.span.start, obj.span.end)
+                    }
+                    _ => false,
+                };
+                let arg_doc = printer.build_expression_doc(arg);
+                if is_truly_empty {
+                    return wrap_call_with_soft_breaks(d, callee, arg_doc);
+                }
+                return d.concat(&[callee, d.text("("), arg_doc, d.text(")")]);
             }
 
             // Short literals (non-string or short string): hug them
@@ -693,20 +719,27 @@ pub(super) fn build_call_doc_with_wrapping(
                     return build_expand_all_args(d, callee, all_args_broken);
                 }
 
-                // Special case: expression arrow with call expression body
+                // Special case: expression arrow with call/conditional expression body
                 // Prettier keeps preceding args inline and only breaks arrow body after =>
                 // e.g., fn({a: 1}, (x) =>\n  call(x, ...),\n)
+                //
+                // Prettier's couldExpandArg includes CallExpression and ConditionalExpression
+                // for non-chain arrow bodies. When the last arg doc will_break (e.g., the
+                // inner call has a source-multiline object), Prettier skips the flat state
+                // and uses only 2 states: break-body and expand-all (matching willBreak path
+                // in callArguments.js:167-175).
                 if let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
                     call.arguments.last()
                     && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-                    && matches!(&**body_expr, internal::Expression::CallExpression(_))
+                    && matches!(
+                        &**body_expr,
+                        internal::Expression::CallExpression(_)
+                            | internal::Expression::ConditionalExpression(_)
+                    )
                     && !arrow_has_type_annotations(arrow)
                 {
                     let inline_sig = build_arrow_inline_signature(printer, arrow);
                     let body_doc = printer.build_expression_doc(body_expr);
-
-                    let state_inline =
-                        build_inline_args(d, callee, head_parts.clone(), last_arg_doc);
 
                     let state_break_body = d.concat(&[
                         callee,
@@ -720,6 +753,15 @@ pub(super) fn build_call_doc_with_wrapping(
                     ]);
 
                     let state_expand_all = build_expand_all_args(d, callee, all_args_broken);
+
+                    // Prettier: when willBreak(lastArg) is true, skip flat state.
+                    // The flat state would be selected by fits() (first line is short)
+                    // but produces wrong closing brackets (e.g., `}));` instead of `}),\n)`).
+                    if d.will_break(last_arg_doc) {
+                        return d.conditional_group(&[state_break_body, state_expand_all]);
+                    }
+
+                    let state_inline = build_inline_args(d, callee, head_parts, last_arg_doc);
 
                     return d.conditional_group(&[
                         state_inline,
@@ -762,15 +804,37 @@ pub(super) fn build_call_doc_with_wrapping(
                     return d.conditional_group(&[state_inline, state_hug, state_expand_all]);
                 }
 
-                // All other function/arrow last args (block-body arrows, function expressions,
-                // general expression arrows): inline or expand all via conditional_group.
-                return build_inline_or_expand_all(
-                    d,
-                    callee,
-                    head_parts,
-                    last_arg_doc,
-                    all_args_broken,
-                );
+                // Remaining function/arrow last args: block-body arrows and function
+                // expressions use inline-or-expand-all. Expression-body arrows with
+                // non-expandable bodies (e.g., AwaitExpression) must NOT use expand-last —
+                // Prettier's couldExpandArg returns false for these, so they fall through
+                // to the default group path which correctly expands all args when needed.
+                if let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
+                    call.arguments.last()
+                {
+                    if let internal::ArrowFunctionBody::Expression(_) = &arrow.body {
+                        // Expression-body arrow with non-expandable body (Call, Object,
+                        // Array, Conditional already handled above). Skip expand-last.
+                    } else {
+                        // Block-body arrow: use inline-or-expand-all
+                        return build_inline_or_expand_all(
+                            d,
+                            callee,
+                            head_parts,
+                            last_arg_doc,
+                            all_args_broken,
+                        );
+                    }
+                } else {
+                    // FunctionExpression: always expandable
+                    return build_inline_or_expand_all(
+                        d,
+                        callee,
+                        head_parts,
+                        last_arg_doc,
+                        all_args_broken,
+                    );
+                }
             }
         }
     }
@@ -960,18 +1024,6 @@ pub(super) fn build_call_doc_with_wrapping(
         return wrap_call_with_soft_breaks(d, callee, arg_doc);
     }
 
-    // Block function before last arg: force expansion
-    // e.g., fn((x) => { ... }, {a: 1}) → all args on separate lines
-    if call.arguments.len() >= 2 && has_block_function_before_last(&call.arguments) {
-        let arg_parts = d.join_doc(
-            call.arguments
-                .iter()
-                .map(|arg| printer.build_expression_doc(arg)),
-            d.comma_hardline(),
-        );
-        return wrap_call_with_hard_breaks(d, callee, arg_parts);
-    }
-
     // "Expand last arg" pattern (Prettier's shouldExpandLastArg):
     // When last arg is array/object and preceding args allow it,
     // use different strategies based on whether last two args have same type.
@@ -981,11 +1033,25 @@ pub(super) fn build_call_doc_with_wrapping(
     //
     // Prettier also excludes "concise" arrays (all numeric literals) — these use
     // fill layout which has different break characteristics and don't hug.
+    //
+    // Prettier also blocks expand-last when there are exactly 2 args, the penultimate
+    // is an ArrowFunctionExpression, and the last is an array — this covers React hook
+    // patterns like `useMemo(() => func(), [dep1, dep2])` where the deps array should
+    // NOT be hugged (shouldExpandLastArg, callArguments.js:260-262).
     if call.arguments.len() >= 2
         && last_arg_is_array_or_object(&call.arguments)
         && !call.arguments.last().is_some_and(is_concise_numeric_array)
         && preceding_args_allow_expand_last(&call.arguments, printer.line_breaks)
         && !has_inter_argument_comments(call, printer)
+        && !(call.arguments.len() == 2
+            && matches!(
+                call.arguments.first(),
+                Some(internal::Expression::ArrowFunctionExpression(_))
+            )
+            && matches!(
+                call.arguments.last(),
+                Some(internal::Expression::ArrayExpression(_))
+            ))
     {
         // Check if last two args have the same "expandable" type (both arrays or both objects)
         // Prettier disables expand-last-arg in this case
@@ -1136,6 +1202,23 @@ pub(super) fn build_call_doc_with_wrapping(
         d.comma_line(),
     );
 
-    // Wrap in group with parens
-    wrap_call_with_soft_breaks(d, callee, arg_parts)
+    // Prettier: group(contents, { shouldBreak: printedArguments.some(willBreak) })
+    // If any arg has hardlines (e.g., non-empty block body), force the group to break.
+    // This handles block functions before the last arg (e.g., `fn((x) => { body }, aaa)`)
+    // without the old has_block_function_before_last check, which was too aggressive —
+    // it forced hardlines for empty block bodies like `async () => {}`, preventing
+    // calls like `fn([], 3, async () => {}, aaa)` from staying on one line.
+    if d.will_break(arg_parts) {
+        d.concat(&[
+            callee,
+            d.group_break(d.concat(&[
+                d.text("("),
+                d.indent_softline(d.concat(&[arg_parts, d.trailing_comma()])),
+                d.softline(),
+                d.text(")"),
+            ])),
+        ])
+    } else {
+        wrap_call_with_soft_breaks(d, callee, arg_parts)
+    }
 }

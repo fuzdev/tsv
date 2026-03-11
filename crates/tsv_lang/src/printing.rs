@@ -239,6 +239,60 @@ pub fn has_blank_line_between(source: &str, prev_end: u32, curr_start: u32) -> b
     between.matches('\n').count() >= 2
 }
 
+/// Check if there's a truly blank line between two positions in source.
+///
+/// Unlike [`has_blank_line_between`] which just counts newlines, this function
+/// verifies that an intermediate line contains only whitespace. This correctly
+/// handles cases where the parser strips grouping parentheses, leaving closing
+/// `)` characters between newlines that look like blank lines to newline-counting
+/// checks.
+///
+/// Returns `true` if there's a line containing only whitespace between two
+/// newlines in the range `[prev_end, curr_start)`.
+///
+/// # Examples
+///
+/// ```
+/// use tsv_lang::printing::has_blank_line_between_strict;
+///
+/// // Truly blank line: "foo\n\nbar"
+/// assert_eq!(has_blank_line_between_strict("foo\n\nbar", 3, 5), true);
+///
+/// // Content between newlines: "foo\n)\nbar" (stripped parens)
+/// assert_eq!(has_blank_line_between_strict("foo\n)\nbar", 3, 6), false);
+///
+/// // One newline: "foo\nbar"
+/// assert_eq!(has_blank_line_between_strict("foo\nbar", 3, 4), false);
+/// ```
+pub fn has_blank_line_between_strict(source: &str, prev_end: u32, curr_start: u32) -> bool {
+    let prev_end = prev_end as usize;
+    let curr_start = curr_start as usize;
+
+    if prev_end >= curr_start || curr_start > source.len() {
+        return false;
+    }
+
+    let between = &source[prev_end..curr_start];
+    let mut found_first_newline = false;
+    let mut line_start = 0;
+
+    for (i, byte) in between.bytes().enumerate() {
+        if byte == b'\n' {
+            if found_first_newline {
+                // Check if the line between previous newline and this one is blank
+                let line = &between[line_start..i];
+                if line.bytes().all(|b| b == b' ' || b == b'\t' || b == b'\r') {
+                    return true;
+                }
+            }
+            found_first_newline = true;
+            line_start = i + 1;
+        }
+    }
+
+    false
+}
+
 /// Check if there's any newline between two positions in source
 ///
 /// Used to detect source-triggered line breaks, e.g., newline after `{` in objects.

@@ -1,8 +1,6 @@
 // Chain builder helper functions
 //
 // Shared utilities used across the builder submodules:
-// - build_chain_break_doc: Standard chain break layout
-// - build_two_state_chain: Common conditional_group pattern
 // - ChainPartsBuilder: Builder for constructing chain parts with comments
 
 use super::super::printing::{
@@ -11,23 +9,7 @@ use super::super::printing::{
 };
 use super::super::types::ChainGroup;
 use tsv_lang::doc::arena::DocId;
-
-/// Build a chain-break doc: first_doc followed by indented rest_docs on new lines
-///
-/// Result: `first_doc + indent(hardline + rest[0] + hardline + rest[1] + ...)`
-pub(super) fn build_chain_break_doc<P: ChainPrinter>(
-    first_doc: DocId,
-    rest_docs: &[DocId],
-    printer: &P,
-) -> DocId {
-    let d = printer.arena();
-    let mut rest_parts = Vec::with_capacity(rest_docs.len() * 2);
-    for &rest_doc in rest_docs {
-        rest_parts.push(d.hardline());
-        rest_parts.push(rest_doc);
-    }
-    d.concat(&[first_doc, d.indent(d.concat(&rest_parts))])
-}
+use tsv_lang::printing::has_blank_line_between_strict;
 
 /// Builder for constructing chain parts with proper comment handling.
 ///
@@ -156,6 +138,26 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
                 self.printer
                     .build_leading_line_doc(&classified.leading_line),
             );
+
+            // Preserve blank line between last comment and property
+            // (when there are comments, build_chain_line_break skips blank line detection,
+            // but a blank line after the last comment should still be preserved)
+            if self.use_hardline {
+                let last_comment_end = classified
+                    .leading_line
+                    .last()
+                    .or(classified.leading_block.last())
+                    .or(classified.trailing_line.last())
+                    .or(classified.trailing_block.last())
+                    .map(|c| c.span.end);
+                if let Some(end) = last_comment_end {
+                    let source = self.printer.get_source();
+                    if has_blank_line_between_strict(source, end, property_start) {
+                        let d = self.printer.arena();
+                        self.parts.push(d.hardline());
+                    }
+                }
+            }
         } else {
             // No member range - just add line break
             let d = self.printer.arena();

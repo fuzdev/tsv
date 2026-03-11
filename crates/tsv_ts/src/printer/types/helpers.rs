@@ -5,7 +5,7 @@
 // - Type unwrapping utilities
 // - Source scanning helpers
 
-use crate::ast::internal::{self, TSIntersectionType, TSType};
+use crate::ast::internal::{self, TSIntersectionType, TSKeywordKind, TSType, TSUnionType};
 
 //
 // Type argument analysis
@@ -32,6 +32,8 @@ pub(super) fn type_args_should_wrap_for_return_type(
         match param {
             // Unions/intersections can break internally
             TSType::Union(_) | TSType::Intersection(_) => true,
+            // Function/constructor types can break params internally
+            TSType::Function(_) | TSType::Constructor(_) => true,
             // Nested TypeReference with multiple type args can break
             TSType::TypeReference(r) => r
                 .type_arguments
@@ -82,6 +84,55 @@ pub fn unwrap_parenthesized(ts_type: &TSType) -> &TSType {
 #[inline]
 pub fn is_huggable_type(ts_type: &TSType) -> bool {
     matches!(ts_type, TSType::TypeLiteral(_) | TSType::Mapped(_))
+}
+
+/// Check if a union type should be "hugged" — formatted as `A | B | C` inline
+/// even when it breaks, rather than using the multi-line `| A\n| B\n| C` format.
+///
+/// Matches Prettier's `shouldHugUnionType`: hugs when there's exactly one
+/// object-like type (TSTypeLiteral or TSTypeReference) and all other members
+/// are void types (void, null).
+///
+/// Example: `{ name: string; value: number } | null` stays hugged.
+pub fn should_hug_union_type(union: &TSUnionType) -> bool {
+    // Find exactly one object-like type
+    let mut object_idx = None;
+    for (i, t) in union.types.iter().enumerate() {
+        if is_object_like_type(t) {
+            if object_idx.is_some() {
+                // More than one object-like type — don't hug
+                return false;
+            }
+            object_idx = Some(i);
+        }
+    }
+    let Some(obj_idx) = object_idx else {
+        return false;
+    };
+
+    // All non-object members must be void types
+    union
+        .types
+        .iter()
+        .enumerate()
+        .all(|(i, t)| i == obj_idx || is_void_type(t))
+}
+
+/// Check if a type is "object-like" for union hugging purposes.
+/// Matches Prettier's `isObjectLikeType`: TSTypeLiteral and TSTypeReference.
+#[inline]
+fn is_object_like_type(ts_type: &TSType) -> bool {
+    matches!(ts_type, TSType::TypeLiteral(_) | TSType::TypeReference(_))
+}
+
+/// Check if a type is a "void type" for union hugging purposes.
+/// Matches Prettier's `isVoidType`: void and null keywords.
+#[inline]
+fn is_void_type(ts_type: &TSType) -> bool {
+    matches!(
+        ts_type,
+        TSType::Keyword(kw) if matches!(kw.kind, TSKeywordKind::Void | TSKeywordKind::Null)
+    )
 }
 
 /// Check if the last type in an intersection is "huggable" (like TypeLiteral or MappedType).

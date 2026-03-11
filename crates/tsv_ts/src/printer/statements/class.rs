@@ -229,7 +229,7 @@ impl<'a> Printer<'a> {
             let mut ext_parts = vec![d.text("extends ")];
             ext_parts.push(d.text_owned(self.expression_to_string(super_class)));
             if let Some(type_args) = &decl.super_type_parameters {
-                ext_parts.push(self.build_type_arguments_doc(type_args));
+                ext_parts.push(self.build_type_arguments_doc_wrapping(type_args));
             }
             Some(d.concat(&ext_parts))
         } else {
@@ -237,17 +237,29 @@ impl<'a> Printer<'a> {
         };
 
         let implements_doc = if !decl.implements.is_empty() {
-            let mut impl_parts = vec![d.text("implements ")];
-            for (i, heritage) in decl.implements.iter().enumerate() {
-                if i > 0 {
-                    impl_parts.push(d.text(", "));
-                }
-                impl_parts.push(self.build_entity_name_doc(&heritage.expression));
-                if let Some(type_args) = &heritage.type_arguments {
-                    impl_parts.push(self.build_type_arguments_doc(type_args));
-                }
+            let impl_type_docs: Vec<_> = decl
+                .implements
+                .iter()
+                .map(|heritage| {
+                    let mut h_parts = vec![self.build_entity_name_doc(&heritage.expression)];
+                    if let Some(type_args) = &heritage.type_arguments {
+                        h_parts.push(self.build_type_arguments_doc_wrapping(type_args));
+                    }
+                    d.concat(&h_parts)
+                })
+                .collect();
+            if group_mode {
+                // Multiple implements: types break individually via inner group
+                // Matches Prettier's printHeritageClauses for hasMultipleHeritage
+                let comma_line = d.concat(&[d.text(","), d.line()]);
+                let types_joined = d.join_doc(impl_type_docs, comma_line);
+                Some(d.concat(&[
+                    d.text("implements"),
+                    d.group(d.indent(d.concat(&[d.line(), types_joined]))),
+                ]))
+            } else {
+                Some(d.concat(&[d.text("implements "), d.join(impl_type_docs, ", ")]))
             }
-            Some(d.concat(&impl_parts))
         } else {
             None
         };
@@ -258,7 +270,8 @@ impl<'a> Printer<'a> {
         let header_doc = if group_mode {
             // Group mode: one unified group - when it breaks, heritage breaks too
             if let Some(type_params) = &decl.type_parameters {
-                parts.push(self.build_type_parameter_declaration_doc_inline_group(type_params));
+                // Type params get their own group - break independently of heritage
+                parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
             }
 
             // Heritage clauses with line breaks
@@ -511,24 +524,31 @@ impl<'a> Printer<'a> {
             parts.push(self.build_type_annotation_doc_wrapping(type_ann));
         }
 
-        // Value if present
+        // Value if present - use assignment layout (matches prettier's printAssignment)
         if let Some(value) = &prop.value {
-            parts.push(d.text(" = "));
-
             // Check for comments between = and value (e.g., /* @__PURE__ */ annotations)
-            // The = comes after the key (and type annotation if present)
             let before_value = prop
                 .type_annotation
                 .as_ref()
                 .map_or_else(|| prop.key.span().end, |ta| ta.span.end);
-            if let Some(comments) = self.build_inline_comments_between_doc_trailing_space_opt(
-                before_value,
-                value.span().start,
-            ) {
-                parts.push(comments);
-            }
+            let has_comments = self
+                .build_inline_comments_between_doc_trailing_space_opt(
+                    before_value,
+                    value.span().start,
+                );
 
-            parts.push(self.build_expression_doc(value));
+            if let Some(comments) = has_comments {
+                // Comments between = and value: use direct layout to preserve them
+                parts.push(d.text(" = "));
+                parts.push(comments);
+                parts.push(self.build_expression_doc(value));
+            } else {
+                // No comments: use assignment layout for proper line-breaking
+                // The left doc (parts) includes modifiers + key + type annotation
+                let left_doc = d.concat(&parts);
+                let assignment_doc = self.build_assignment_layout(left_doc, " =", value, false);
+                parts = vec![assignment_doc];
+            }
         }
 
         parts.push(d.text(";"));

@@ -14,9 +14,11 @@ node_modules
 # WASM build output
 /crates/tsv_wasm/pkg
 
-# Benchmark results
+# Benchmark results (report.json and report.md are committed)
 /benches/deno/results/*.json
 /benches/deno/results/*.md
+!/benches/deno/results/report.json
+!/benches/deno/results/report.md
 /benches/deno/baseline.json
 
 # Env

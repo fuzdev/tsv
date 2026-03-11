@@ -47,6 +47,10 @@ impl<'a> Printer<'a> {
             let child = &rule.declarations[i];
             match child {
                 internal::CssBlockChild::Declaration(decl) => {
+                    // Preserve blank line before declaration if source has one
+                    if i > start_index && self.has_blank_line_before_child(&rule.declarations, i) {
+                        self.write("\n");
+                    }
                     self.print_css_declaration(decl);
 
                     // Check for inline comments after the declaration
@@ -63,11 +67,7 @@ impl<'a> Printer<'a> {
                     // Standalone comment (not inline after a declaration)
                     // Preserve blank line before comment if present in source
                     let mut added_blank_line = false;
-                    if i > start_index
-                        && let Some(prev_child) = rule.declarations.get(i - 1)
-                        && self
-                            .has_blank_line_between_spans(prev_child.span().end, comment.span.start)
-                    {
+                    if i > start_index && self.has_blank_line_before_child(&rule.declarations, i) {
                         self.write("\n");
                         added_blank_line = true;
                     }
@@ -96,21 +96,11 @@ impl<'a> Printer<'a> {
                     // - Previous is a declaration (transition from declarations to rules)
                     // - OR source has blank line between consecutive nested rules (preserve author intent)
                     // Don't add blank line if previous is comment (handles its own spacing)
-                    if i > start_index && !Self::prev_is_comment(&rule.declarations, i) {
-                        if Self::prev_is_rule(&rule.declarations, i) {
-                            // Consecutive rules: only add blank line if source had one
-                            if let Some(prev_span_end) = Self::prev_span_end(&rule.declarations, i)
-                                && self.has_blank_line_between_spans(
-                                    prev_span_end,
-                                    nested_rule.span.start,
-                                )
-                            {
-                                self.write("\n");
-                            }
-                        } else {
-                            // Previous is declaration: always add blank line
-                            self.write("\n");
-                        }
+                    if i > start_index
+                        && !Self::prev_is_comment(&rule.declarations, i)
+                        && self.has_blank_line_before_child(&rule.declarations, i)
+                    {
+                        self.write("\n");
                     }
                     self.write_indent();
                     self.print_css_rule(nested_rule);
@@ -121,38 +111,20 @@ impl<'a> Printer<'a> {
 
                     self.write("\n");
 
-                    // Add blank line after nested rule if next sibling is a declaration
-                    // (Don't add for comments - comment handles its own spacing)
-                    let next_idx = i + 1 + inline_count;
-                    if let Some(internal::CssBlockChild::Declaration(_)) =
-                        rule.declarations.get(next_idx)
-                    {
-                        self.write("\n");
-                    }
-
                     i += inline_count;
                 }
                 internal::CssBlockChild::Atrule(nested_atrule) => {
                     // Nested at-rule (e.g., @media inside a rule)
-                    // Add blank line before nested at-rule if there's a previous sibling
-                    // UNLESS the previous sibling was a comment (blank line already added)
-                    if i > start_index && !Self::prev_is_comment(&rule.declarations, i) {
+                    // Add blank line before nested at-rule only if source had one
+                    if i > start_index
+                        && !Self::prev_is_comment(&rule.declarations, i)
+                        && self.has_blank_line_before_child(&rule.declarations, i)
+                    {
                         self.write("\n");
                     }
                     self.write_indent();
                     self.print_css_atrule(nested_atrule);
                     self.write("\n");
-
-                    // Add blank line after nested at-rule if next sibling exists and is a declaration/comment
-                    if let Some(next_child) = rule.declarations.get(i + 1)
-                        && matches!(
-                            next_child,
-                            internal::CssBlockChild::Declaration(_)
-                                | internal::CssBlockChild::Comment(_)
-                        )
-                    {
-                        self.write("\n");
-                    }
                 }
             }
             i += 1;

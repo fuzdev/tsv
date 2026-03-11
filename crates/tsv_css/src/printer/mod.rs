@@ -520,22 +520,41 @@ impl<'a> Printer<'a> {
         index > 0 && matches!(children.get(index - 1), Some(CssBlockChild::Comment(_)))
     }
 
-    /// Check if previous sibling is a nested rule
-    pub(crate) fn prev_is_rule(children: &[CssBlockChild], index: usize) -> bool {
-        index > 0 && matches!(children.get(index - 1), Some(CssBlockChild::Rule(_)))
+    /// Find the position after the `;` following a declaration's span end.
+    ///
+    /// Declaration spans don't include the trailing `;`. In unformatted source,
+    /// the `;` may be on a separate line, adding extra newlines to the gap.
+    /// This scans forward past whitespace to find and skip the `;`.
+    fn end_after_semicolon(&self, span_end: u32) -> u32 {
+        let start = span_end as usize;
+        for (i, &b) in self.source.as_bytes().iter().enumerate().skip(start) {
+            match b {
+                b';' => return (i + 1) as u32,
+                b' ' | b'\t' | b'\n' | b'\r' => continue,
+                _ => break,
+            }
+        }
+        span_end
     }
 
-    /// Get the end span of the previous sibling
-    pub(crate) fn prev_span_end(children: &[CssBlockChild], index: usize) -> Option<u32> {
-        if index == 0 {
-            return None;
-        }
-        children.get(index - 1).map(|child| match child {
-            CssBlockChild::Declaration(d) => d.span.end,
-            CssBlockChild::Comment(c) => c.span.end,
-            CssBlockChild::Rule(r) => r.span.end,
-            CssBlockChild::Atrule(a) => a.span.end,
-        })
+    /// Check if there's a blank line before a block child, accounting for the
+    /// previous sibling's trailing `;` (not included in declaration spans).
+    pub(crate) fn has_blank_line_before_child(
+        &self,
+        children: &[CssBlockChild],
+        index: usize,
+    ) -> bool {
+        let Some(prev) = children.get(index.wrapping_sub(1)) else {
+            return false;
+        };
+        let curr_start = children[index].span().start;
+        let prev_end = prev.span().end;
+        let effective_end = if matches!(prev, CssBlockChild::Declaration(_)) {
+            self.end_after_semicolon(prev_end)
+        } else {
+            prev_end
+        };
+        self.has_blank_line_between_spans(effective_end, curr_start)
     }
 }
 

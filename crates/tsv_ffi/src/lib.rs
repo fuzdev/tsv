@@ -349,7 +349,7 @@ pub unsafe extern "C" fn tsv_free(ptr: *mut u8, len: usize) {
     if !ptr.is_null() && len > 0 {
         // Safety: Caller guarantees ptr was allocated by us with the given len
         unsafe {
-            drop(Box::from_raw(slice::from_raw_parts_mut(ptr, len)));
+            drop(Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, len)));
         }
     }
 }

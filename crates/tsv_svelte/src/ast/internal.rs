@@ -476,6 +476,21 @@ pub enum SpecialElementKind {
 }
 
 impl SpecialElementKind {
+    /// Whether this special element is a block-level element (forces line breaks).
+    ///
+    /// Block elements: `svelte:head`, `svelte:window`, `svelte:body`, `svelte:document`
+    /// — these bind to global objects and don't participate in inline flow.
+    ///
+    /// Inline elements: `slot`, `svelte:element`, `svelte:component`, `svelte:self`,
+    /// `svelte:fragment`, `svelte:boundary`, `title` — these render content inline.
+    #[inline]
+    pub const fn is_block(&self) -> bool {
+        matches!(
+            self,
+            Self::SvelteHead | Self::SvelteWindow | Self::SvelteBody | Self::SvelteDocument
+        )
+    }
+
     /// Returns the tag name as it appears in source code
     #[inline]
     pub const fn tag_name(&self) -> &'static str {

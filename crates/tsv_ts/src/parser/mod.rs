@@ -41,6 +41,13 @@ pub struct Parser<'a> {
     /// Disabled in partial expression parsing for Svelte template contexts
     /// where `as` has different meaning (e.g., `{#each items as pattern}`).
     allow_ts_type_assertions: bool,
+    /// Nesting depth inside grouping delimiters (`(...)`, `[...]`, `{...}`, `${...}`).
+    /// Used to disambiguate context-sensitive keywords inside nested expressions:
+    /// - `as`/`satisfies`: always type assertions when depth > 0, even when
+    ///   `allow_ts_type_assertions` is false (Svelte `#each` partial parsing)
+    /// - `in`: always a binary operator when depth > 0, even when `allow_in` is
+    ///   false (for-loop header parsing)
+    grouping_depth: u32,
     /// True when parsing inside `declare namespace` or `declare module`.
     /// Functions inside ambient contexts don't have bodies (end with `;`).
     in_ambient_context: bool,
@@ -106,6 +113,7 @@ impl<'a> Parser<'a> {
             had_line_terminator: false, // No line terminator before first token
             prev_end: 0,
             allow_ts_type_assertions: true, // Enable by default (TypeScript context)
+            grouping_depth: 0,              // Not inside any grouping delimiters
             in_ambient_context: false,      // Not in declare namespace/module
             lexer_error: None,              // No stored lexer error
             allow_in: true,                 // Allow `in` binary operator by default

@@ -21,8 +21,13 @@ struct ChainOperand {
 enum BinaryChainStyle {
     /// Wrapped in a group, flat structure (for standalone binary expressions)
     Grouped,
-    /// No group wrapper, flat structure (for conditions where parent controls breaking)
+    /// No group wrapper, flat structure (for contexts where parent controls breaking)
     Ungrouped,
+    /// Like Ungrouped, but also suppresses shouldGroup for logical operators.
+    /// Used only for condition parentheses (if/while/for/do-while/switch) where
+    /// Prettier's `isInsideParenthesis` is true. In these contexts, logical chain
+    /// breaks must be controlled by the parent condition group, not a sub-group.
+    UngroupedCondition,
     /// First operand at base indent, continuation lines indented (for attribute contexts)
     ContinuationIndent,
 }
@@ -58,7 +63,13 @@ impl<'a> Printer<'a> {
             // Binary expressions need parens - use grouping for logical ops to allow line breaking
             if let Expression::BinaryExpression(binary) = unary.argument.as_ref() {
                 if binary.operator.is_logical() {
-                    let inner = self.build_expression_doc(&unary.argument);
+                    // Use ungrouped binary chain in a single paren group.
+                    // Matches Prettier's `parent.type === "UnaryExpression"` path
+                    // (binaryish.js:88-91): `group([indent([softline, ...parts]), softline])`.
+                    // The chain's shouldGroup is computed normally: 2-operand chains
+                    // get a sub-group (can stay flat at inner indent when paren group
+                    // breaks), 3+ chained operands break together with the paren group.
+                    let inner = self.build_binary_chain_doc_ungrouped(binary);
                     d.group(d.concat(&[
                         d.text("("),
                         d.indent_softline(inner),
@@ -147,13 +158,27 @@ impl<'a> Printer<'a> {
 
     /// Build a binary chain doc WITHOUT the outer group wrapper
     ///
-    /// Use in contexts where the parent group should control breaking (e.g., if conditions).
-    /// The line() elements will break with the parent group.
+    /// Use in contexts where the parent group should control breaking
+    /// (e.g., !!(), new expression callee, return/throw).
+    /// The line() elements will break with the parent group, but shouldGroup
+    /// is computed normally — 2-operand chains get a sub-group.
     pub(super) fn build_binary_chain_doc_ungrouped(
         &self,
         binary: &internal::BinaryExpression,
     ) -> DocId {
         self.build_binary_chain_doc_core(binary, BinaryChainStyle::Ungrouped)
+    }
+
+    /// Build a binary chain doc for condition parentheses (if/while/for/do-while/switch)
+    ///
+    /// Like ungrouped, but also suppresses shouldGroup for logical operators so that
+    /// logical chain breaks are controlled by the parent condition group.
+    /// Matches Prettier's `isInsideParenthesis` behavior (binaryish.js:331).
+    pub(super) fn build_binary_chain_doc_ungrouped_condition(
+        &self,
+        binary: &internal::BinaryExpression,
+    ) -> DocId {
+        self.build_binary_chain_doc_core(binary, BinaryChainStyle::UngroupedCondition)
     }
 
     /// Build a binary chain doc with continuation indent
@@ -192,13 +217,13 @@ impl<'a> Printer<'a> {
             return self.build_expression_doc(&binary.left);
         }
 
-        // In Svelte template expressions, use restrictive behavior for short binaries
-        // In script contexts, allow breaks for all binaries
-        let restrict_short_binaries = self.config.first_line_offset > 0;
+        let should_inline_last = super::assignment::should_inline_logical_expression(binary);
+        let should_group = Self::should_group_binary_continuation(binary);
         self.build_binary_chain_continuation_indent_parts(
             &operands,
             &operators,
-            restrict_short_binaries,
+            should_inline_last,
+            should_group,
         )
     }
 
@@ -227,15 +252,47 @@ impl<'a> Printer<'a> {
         // This matches Prettier's shouldGroup in printBinaryishExpressions:
         // the continuation gets its own group only when both operand types
         // differ from the current node type (BinaryExpression vs LogicalExpression).
-        let should_group = Self::should_group_binary_continuation(binary);
+        //
+        // In UngroupedCondition mode (if/while/for/do-while/switch conditions),
+        // logical operators (&&, ||, ??) must NOT get a sub-group — the parent
+        // condition group controls their breaking. This matches Prettier's
+        // `isInsideParenthesis` suppression (binaryish.js:331).
+        // Without this, `while (a < b && c === d)` keeps the chain flat when
+        // the condition group breaks, because the sub-group evaluates fit
+        // independently.
+        //
+        // In plain Ungrouped mode (!!(), new, return/throw), shouldGroup is
+        // computed normally — 2-operand chains get a sub-group so they can
+        // stay flat when the parent's paren group breaks.
+        let should_group = if matches!(style, BinaryChainStyle::UngroupedCondition)
+            && binary.operator.is_logical()
+        {
+            false
+        } else {
+            Self::should_group_binary_continuation(binary)
+        };
+
+        // shouldInlineLogicalExpression: when the outermost logical has a non-empty
+        // object/array on the right, keep operator and RHS on the same line.
+        // Prettier ref: binaryish.js:275, 361
+        let should_inline_last = super::assignment::should_inline_logical_expression(binary);
 
         // For ContinuationIndent, we separate first operand from the rest
         // For other styles, we build a flat parts list
         match style {
-            BinaryChainStyle::ContinuationIndent => {
-                self.build_binary_chain_continuation_indent(&operands, &operators)
-            }
-            _ => self.build_binary_chain_flat(&operands, &operators, style, should_group),
+            BinaryChainStyle::ContinuationIndent => self.build_binary_chain_continuation_indent(
+                &operands,
+                &operators,
+                should_inline_last,
+                should_group,
+            ),
+            _ => self.build_binary_chain_flat(
+                &operands,
+                &operators,
+                style,
+                should_group,
+                should_inline_last,
+            ),
         }
     }
 
@@ -273,16 +330,14 @@ impl<'a> Printer<'a> {
     ///
     /// Returns (head_parts, continuation_parts) where head includes first operand + operator.
     ///
-    /// The `restrict_short_binaries` parameter controls behavior for 2-operand non-logical binaries:
-    /// - `true`: Use spaces (no breaks) for these expressions. Used in Svelte template expressions
-    ///   where Prettier keeps short binaries like `typeof x === 'string'` on one line.
-    /// - `false`: Allow breaks for all binaries. Used in script contexts where Prettier breaks
-    ///   long string concat like `'aaa...' + 'bbb...'` at the operator.
+    /// When `should_inline_last` is true (shouldInlineLogicalExpression), the last operand
+    /// uses a space instead of `line()`, keeping operator and RHS on the same line so the
+    /// object/array can self-expand. Prettier ref: binaryish.js:275, 361
     fn build_binary_chain_parts(
         &self,
         operands: &[ChainOperand],
         operators: &[BinaryOperator],
-        restrict_short_binaries: bool,
+        should_inline_last: bool,
     ) -> (Vec<DocId>, Vec<DocId>) {
         let d = self.d();
         if operands.is_empty() || operands.len() == 1 {
@@ -296,12 +351,6 @@ impl<'a> Printer<'a> {
         let first_op = operators[0];
         let first_op_str = first_op.as_str();
 
-        // Always allow line breaks - the group fitting algorithm decides when to actually
-        // break based on print width. Prettier uses `line()` for all binary continuations
-        // except for `shouldInlineLogicalExpression` cases (LogicalExpression with
-        // object/array/JSX on right), which we don't need special handling for here.
-        let allow_breaks = true;
-        let _ = restrict_short_binaries; // Parameter kept for API compatibility
         let first_op_pos =
             self.find_operator_position(operands[0].span.end, operands[1].span.start, first_op_str);
 
@@ -323,7 +372,10 @@ impl<'a> Printer<'a> {
             let op_pos =
                 self.find_operator_position(prev_operand.span.end, operand.span.start, op_str);
 
-            // Add line break and operand
+            // shouldInlineLogicalExpression: the last operand (non-empty object/array)
+            // uses a space instead of line(), keeping operator and RHS on the same line.
+            let allow_breaks = !(i == operands.len() - 1 && should_inline_last);
+
             self.append_post_operator_parts(
                 &mut continuation_parts,
                 op_pos.end,
@@ -371,6 +423,7 @@ impl<'a> Printer<'a> {
         operators: &[BinaryOperator],
         style: BinaryChainStyle,
         should_group: bool,
+        should_inline_last: bool,
     ) -> DocId {
         let d = self.d();
         if operands.is_empty() {
@@ -382,7 +435,7 @@ impl<'a> Printer<'a> {
         }
 
         let (mut head_parts, continuation_parts) =
-            self.build_binary_chain_parts(operands, operators, false);
+            self.build_binary_chain_parts(operands, operators, should_inline_last);
 
         if !continuation_parts.is_empty() {
             if should_group {
@@ -411,35 +464,59 @@ impl<'a> Printer<'a> {
         &self,
         operands: &[ChainOperand],
         operators: &[BinaryOperator],
+        should_inline_last: bool,
+        should_group: bool,
     ) -> DocId {
         let d = self.d();
-        // In Svelte template expressions (first_line_offset > 0), use restrictive behavior
-        d.group(self.build_binary_chain_continuation_indent_parts(operands, operators, true))
+        d.group(self.build_binary_chain_continuation_indent_parts(
+            operands,
+            operators,
+            should_inline_last,
+            should_group,
+        ))
     }
 
-    /// Build binary chain continuation indent parts WITHOUT group wrapper
+    /// Build binary chain continuation indent parts WITHOUT group wrapper.
     ///
     /// Returns the concat of first_parts + indent(continuation_parts) without
-    /// wrapping in a group. Use this when the caller controls grouping.
+    /// wrapping in a group. Used in Svelte template expressions and when the
+    /// caller controls grouping.
     ///
-    /// `restrict_short_binaries`: When true, uses spaces (no breaks) for 2-operand
-    /// non-logical binaries. Used in Svelte template expressions. When false, allows
-    /// breaks for all binaries based on print width. Used in script contexts.
+    /// When `should_group` is true, wraps the continuation in a sub-group so it
+    /// can independently evaluate fit (bypassing the renderer's `will_break` check
+    /// on the outer group).
     fn build_binary_chain_continuation_indent_parts(
         &self,
         operands: &[ChainOperand],
         operators: &[BinaryOperator],
-        restrict_short_binaries: bool,
+        should_inline_last: bool,
+        should_group: bool,
     ) -> DocId {
         let d = self.d();
         let (first_parts, continuation_parts) =
-            self.build_binary_chain_parts(operands, operators, restrict_short_binaries);
+            self.build_binary_chain_parts(operands, operators, should_inline_last);
 
-        // Combine: first_parts + indent(continuation_parts)
-        d.concat(&[
-            d.concat(&first_parts),
-            d.indent(d.concat(&continuation_parts)),
-        ])
+        // When should_group is true, wrap the continuation in its own group so it
+        // can independently evaluate fit. Without this, the renderer's will_break()
+        // check on the outer group sees hardlines in the left operand (e.g., a
+        // multi-line call expression) and forces the entire group to Break mode,
+        // even when the continuation (e.g., `?? 'text'`) fits on the closing line.
+        //
+        // When should_inline_last is true, skip indent entirely — matching prettier's
+        // early return of group(parts) with no indent wrapper (binaryish.js:131-134).
+        // The inlined last operand (object/array) handles its own indentation.
+        let continuation_doc = if should_inline_last {
+            d.concat(&continuation_parts)
+        } else {
+            d.indent(d.concat(&continuation_parts))
+        };
+        let continuation_doc = if should_group {
+            d.group(continuation_doc)
+        } else {
+            continuation_doc
+        };
+
+        d.concat(&[d.concat(&first_parts), continuation_doc])
     }
 
     /// Append post-operator parts (comments and line breaks) to a parts vector

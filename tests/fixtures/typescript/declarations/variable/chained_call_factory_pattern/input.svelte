@@ -32,4 +32,15 @@
 
 	export const Yyyyyyyyyyyyyyyyyyyyyyy =
 		$__.method1(Zzzzzzzzzzzz).method2('Yyyyyyyyyyyyyyyyyyyyyyy');
+
+	// Pure $__ with 3 calls: merge first call (factory, same as uppercase)
+	export const Aaaaaaaaaaaaaaaaaaaaaaaa = $__.method1(Bbbbbbbbbbb)
+		.method2(Cccccccccc)
+		.method3('Aaaaaaaaaaaaaaaaaaaaaaaa');
+
+	// $util with 3 calls: no merge (not factory, $ prefix with letters)
+	export const Ddddddddddddddddddddddd = $util
+		.method1(Eeeeeeeeeee)
+		.method2(Fffffffffff)
+		.method3('Ddddddddddddddddddddddd');
 </script>

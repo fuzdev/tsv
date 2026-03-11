@@ -5,6 +5,10 @@ use crate::ast::internal;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
+use super::super::types::function_types::{
+    return_type_triggers_grouping, type_params_allow_grouping,
+};
+
 /// Prettier's `shouldGroupFunctionParameters`: wrap params in their own group
 /// when there's 1 param and the return type is an object type or will break.
 ///
@@ -21,28 +25,12 @@ fn should_group_function_parameters(
     let Some(rt_doc) = return_type_doc else {
         return false;
     };
-
-    // Type params: 0 or 1 without constraint/default
-    if let Some(tp) = &decl.type_parameters {
-        if tp.params.len() > 1 {
-            return false;
-        }
-        if tp
-            .params
-            .first()
-            .is_some_and(|p| p.constraint.is_some() || p.default.is_some())
-        {
-            return false;
-        }
+    if !type_params_allow_grouping(decl.type_parameters.as_ref()) {
+        return false;
     }
-
-    // Return type must be an object type or will break
-    decl.return_type.as_ref().is_some_and(|rt| {
-        matches!(
-            &*rt.type_annotation,
-            internal::TSType::TypeLiteral(_) | internal::TSType::Mapped(_)
-        ) || d.will_break(rt_doc)
-    })
+    decl.return_type
+        .as_ref()
+        .is_some_and(|rt| return_type_triggers_grouping(rt, rt_doc, d))
 }
 
 impl<'a> Printer<'a> {

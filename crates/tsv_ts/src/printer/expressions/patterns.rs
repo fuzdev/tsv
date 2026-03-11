@@ -690,20 +690,24 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Build group contents
-        let mut group_parts = vec![
+        // Build group for the array pattern brackets only
+        // Type annotation is OUTSIDE the group so it breaks independently.
+        // This ensures `[a, b]: [long_tuple]` breaks the tuple type, not the pattern.
+        let group_parts = vec![
             d.text("["),
             d.indent_softline(d.concat(&parts)),
             d.softline(),
             d.text("]"),
         ];
 
-        // Include type annotation in the group
-        if let Some(type_annotation) = &arr.type_annotation {
-            group_parts.push(self.build_type_annotation_doc(type_annotation));
-        }
+        let group_doc = d.group(d.concat(&group_parts));
 
-        d.group(d.concat(&group_parts))
+        if let Some(type_annotation) = &arr.type_annotation {
+            let type_doc = self.build_type_annotation_doc(type_annotation);
+            d.concat(&[group_doc, type_doc])
+        } else {
+            group_doc
+        }
     }
 
     /// Build expanded array pattern doc (always multiline)

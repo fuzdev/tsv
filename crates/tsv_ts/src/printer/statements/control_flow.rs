@@ -3,7 +3,7 @@
 use smallvec::SmallVec;
 
 use super::Printer;
-use crate::ast::internal::{self, Statement};
+use crate::ast::internal::{self, Expression, Statement};
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::DocId;
 
@@ -129,7 +129,7 @@ impl<'a> Printer<'a> {
     ///
     /// This group decides whether the condition breaks (operators go to new lines).
     /// Binary expressions use ungrouped version so this parent group controls their breaking.
-    fn build_condition_group(&self, test_expr: &internal::Expression) -> DocId {
+    fn build_condition_group(&self, test_expr: &Expression) -> DocId {
         let d = self.d();
         let test_doc = self.build_condition_doc(test_expr);
         d.group(d.concat(&[d.indent_softline(test_doc), d.softline()]))
@@ -147,7 +147,7 @@ impl<'a> Printer<'a> {
     /// ```
     fn build_condition_group_with_comments(
         &self,
-        test_expr: &internal::Expression,
+        test_expr: &Expression,
         open_paren_pos: u32,
         close_paren_pos: u32,
     ) -> DocId {
@@ -165,7 +165,7 @@ impl<'a> Printer<'a> {
     /// of moving comments outside the parens.
     fn build_condition_group_preserve_inline(
         &self,
-        test_expr: &internal::Expression,
+        test_expr: &Expression,
         open_paren_pos: u32,
         close_paren_pos: u32,
     ) -> DocId {
@@ -179,7 +179,7 @@ impl<'a> Printer<'a> {
 
     fn build_condition_group_with_comments_impl(
         &self,
-        test_expr: &internal::Expression,
+        test_expr: &Expression,
         open_paren_pos: u32,
         close_paren_pos: u32,
         preserve_inline: bool,
@@ -441,13 +441,14 @@ impl<'a> Printer<'a> {
     /// Build a doc for a condition expression (if/while/for test)
     ///
     /// For binary expressions, uses ungrouped version so parent group controls breaking.
-    /// This ensures all operands break together when the condition exceeds print width.
+    /// Logical operators (`&&`, `||`, `??`) break with the parent condition group.
+    /// Non-logical operators (`<`, `===`, etc.) keep a sub-group for independent evaluation
+    /// (e.g., `for (i = 0; i < len; i++)` — the `i < len` stays flat).
     /// Assignment expressions get double-parens for clarity: `while ((x = y))`
-    fn build_condition_doc(&self, expr: &internal::Expression) -> DocId {
+    fn build_condition_doc(&self, expr: &Expression) -> DocId {
         let inner = match expr {
-            internal::Expression::BinaryExpression(binary) => {
-                // Use ungrouped version so parent group controls breaking
-                self.build_binary_chain_doc_ungrouped(binary)
+            Expression::BinaryExpression(binary) => {
+                self.build_binary_chain_doc_ungrouped_condition(binary)
             }
             _ => self.build_expression_doc(expr),
         };
@@ -752,7 +753,12 @@ impl<'a> Printer<'a> {
                 // Only ";" so far, add line (becomes space in flat mode, newline when breaking)
                 inner_parts.push(d.line());
             }
-            inner_parts.push(self.build_condition_doc(test));
+            // Wrap in group so binary chains (Ungrouped mode) have a tight parent
+            // to evaluate fit against — matching how if/while use build_condition_group.
+            // Without this, logical operators break with the for-header group (too wide)
+            // instead of their own condition width.
+            let condition_doc = self.build_condition_doc(test);
+            inner_parts.push(d.group(condition_doc));
         }
         inner_parts.push(d.text(";"));
 
@@ -904,9 +910,9 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a for loop update expression
-    fn build_for_update_doc(&self, expr: &internal::Expression) -> DocId {
+    fn build_for_update_doc(&self, expr: &Expression) -> DocId {
         let d = self.d();
-        if let internal::Expression::SequenceExpression(seq) = expr {
+        if let Expression::SequenceExpression(seq) = expr {
             d.join(
                 seq.expressions.iter().map(|e| self.build_expression_doc(e)),
                 ", ",
@@ -1119,7 +1125,7 @@ impl<'a> Printer<'a> {
     fn build_for_in_of_with_line_comments(
         &self,
         left: &internal::ForInOfLeft,
-        right: &internal::Expression,
+        right: &Expression,
         body: &Statement,
         stmt_start: u32,
         keyword: &str, // "in" or "of"
@@ -1410,7 +1416,11 @@ impl<'a> Printer<'a> {
                     continue;
                 }
                 // Add hardline before comment (except for very first item - body_doc handles that)
+                // Preserve blank lines before comments (e.g., between `return;` and `// comment`)
                 if !is_first_item {
+                    if self.has_blank_line_between(last_content_end, comment.span.start) {
+                        case_parts.push(d.literalline());
+                    }
                     case_parts.push(d.hardline());
                 }
                 is_first_item = false;
@@ -1443,12 +1453,17 @@ impl<'a> Printer<'a> {
         // Handle trailing comments after the last case (before closing `}`)
         // Also handles comments in empty switch bodies
         let switch_end = stmt.span.end - 1; // Before '}'
+        let mut last_trailing_end = prev_end;
         for comment in tsv_lang::comments_in_range(self.comments, prev_end, switch_end) {
             if !is_first_item {
+                if self.has_blank_line_between(last_trailing_end, comment.span.start) {
+                    case_parts.push(d.literalline());
+                }
                 case_parts.push(d.hardline());
             }
             is_first_item = false;
             case_parts.push(self.build_comment_doc(comment));
+            last_trailing_end = comment.span.end;
         }
 
         // Structure: switch (...) { indent([hardline, cases...]) hardline }
@@ -1596,6 +1611,17 @@ impl<'a> Printer<'a> {
                 // Build the indented content for this statement
                 let mut stmt_parts = vec![d.hardline()];
 
+                // Preserve blank lines between statements within case consequent
+                if prev_stmt_end.is_some() {
+                    let check_end = leading_comments
+                        .first()
+                        .map(|c| c.span.start)
+                        .unwrap_or(stmt_start);
+                    if self.has_blank_line_between(prev_end, check_end) {
+                        stmt_parts.push(d.hardline());
+                    }
+                }
+
                 // Print leading comments before this statement
                 for comment in &leading_comments {
                     stmt_parts.push(self.build_comment_doc(comment));
@@ -1652,7 +1678,16 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let is_block = matches!(stmt.consequent.as_ref(), Statement::BlockStatement(_));
 
-        let mut parts = vec![d.text("if ("), self.build_expression_doc(&stmt.test)];
+        // Build condition group (same as build_if_statement_with_wrapping_doc)
+        let open_paren = self.find_open_paren_after(stmt.span.start);
+        let close_paren = self.find_close_paren_after(stmt.test.span().end);
+        let condition_group = if let (Some(open), Some(close)) = (open_paren, close_paren) {
+            self.build_condition_group_with_comments(&stmt.test, open, close)
+        } else {
+            self.build_condition_group(&stmt.test)
+        };
+
+        let mut parts = vec![d.text("if ("), condition_group];
 
         // Build consequent
         if is_block {
@@ -1765,7 +1800,7 @@ impl<'a> Printer<'a> {
                 // Sequence expressions in for loop init don't need outer parens
                 // e.g., `for (i = 0, j = 0; ...)` not `for ((i = 0, j = 0); ...)`
                 // Same handling as build_for_update_doc
-                if let internal::Expression::SequenceExpression(seq) = expr {
+                if let Expression::SequenceExpression(seq) = expr {
                     d.join(
                         seq.expressions.iter().map(|e| self.build_expression_doc(e)),
                         ", ",
@@ -1950,6 +1985,19 @@ impl<'a> Printer<'a> {
 
     pub(super) fn build_throw_statement_doc(&self, stmt: &internal::ThrowStatement) -> DocId {
         let d = self.d();
+
+        // Prettier wraps throw args with own-line comments in unconditional parens
+        // (same as return — see returnArgumentHasLeadingComment in function.js)
+        if self.return_argument_has_own_line_comment(stmt.span.start, &stmt.argument) {
+            return self.build_return_or_throw_comment_paren_doc("throw", &stmt.argument);
+        }
+
+        // Prettier wraps all binaryish throw args in parens when breaking
+        // (same as return — see printReturnOrThrowArgument in function.js)
+        if let Expression::BinaryExpression(binary) = &stmt.argument {
+            return self.build_return_or_throw_binary_doc("throw", binary);
+        }
+
         d.concat(&[
             d.text("throw "),
             self.build_expression_doc(&stmt.argument),

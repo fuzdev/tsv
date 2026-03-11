@@ -55,16 +55,6 @@ impl<'a> Printer<'a> {
         let has_line_comments = self.has_line_comments_between(test_end, consequent_start)
             || self.has_line_comments_between(consequent_end, alternate_start);
 
-        // Check for comments between ? and consequent, or : and alternate
-        // These comments need special positioning (after the operator) that the flat
-        // layout can't handle, so we use the breaking layout.
-        let has_comments_after_operators = self.has_comments_after_ternary_operator(
-            test_end,
-            consequent_start,
-            consequent_end,
-            alternate_start,
-        );
-
         // Check for multiline template literals in test, consequent, or alternate
         // Template literals with embedded newlines should force the ternary to break,
         // even though those newlines don't appear in the doc structure.
@@ -72,26 +62,56 @@ impl<'a> Printer<'a> {
             || is_multiline_template_literal(&cond.consequent)
             || is_multiline_template_literal(&cond.alternate);
 
-        // If there are line comments, operator comments, or multiline template literals,
-        // use a breaking layout
-        if has_line_comments || has_comments_after_operators || has_multiline_template {
+        // If there are line comments or multiline template literals, use a breaking layout.
+        // Block comments after ? or : are handled inline in the non-breaking path.
+        if has_line_comments || has_multiline_template {
             return self.build_conditional_doc_with_line_comments(cond, is_chained);
         }
 
-        // Nullish coalescing and assignments in test position need parens for clarity
+        // Nullish coalescing, assignments, and await in test position need parens for clarity
+        // Prettier: needs-parens.js — AwaitExpression needs parens when parent is
+        // ConditionalExpression and key is "test" (await has higher precedence than ?:
+        // but parens aid readability)
         let test = self.build_expression_doc(&cond.test);
         let test = if is_nullish_coalescing(&cond.test)
-            || matches!(&*cond.test, internal::Expression::AssignmentExpression(_))
-        {
+            || matches!(
+                &*cond.test,
+                internal::Expression::AssignmentExpression(_)
+                    | internal::Expression::AwaitExpression(_)
+            ) {
             d.parens(test)
         } else {
             test
         };
         let consequent = self.build_expression_doc(&cond.consequent);
 
-        // Check for comments between test and ? (before consequent)
-        let comments_after_test =
-            self.build_inline_comments_between_doc(test_end, consequent_start);
+        // Split comments around ? and : operators.
+        // Comments before ? go after test, comments after ? go before consequent,
+        // comments after : go before alternate.
+        let question_pos = self.find_char_position(test_end, consequent_start, '?');
+        let colon_pos = self.find_char_position(consequent_end, alternate_start, ':');
+
+        // Comments between test and ?
+        let comments_before_question = if let Some(q) = question_pos {
+            self.build_inline_comments_between_doc(test_end, q)
+        } else {
+            self.build_inline_comments_between_doc(test_end, consequent_start)
+        };
+
+        // Comments between ? and consequent (e.g., `b ? /* comment */ c`)
+        // Trailing space so the comment doesn't touch the consequent
+        let comments_after_question = if let Some(q) = question_pos {
+            self.build_inline_comments_between_doc_trailing_space(q + 1, consequent_start)
+        } else {
+            d.empty()
+        };
+
+        // Comments between : and alternate (e.g., `c : /* comment */ d`)
+        let comments_after_colon = if let Some(c) = colon_pos {
+            self.build_inline_comments_between_doc_trailing_space(c + 1, alternate_start)
+        } else {
+            d.empty()
+        };
 
         // Handle nested conditional in consequent specially:
         // - When flat: parens for parsing `a ? (b ? c : d) : e`
@@ -102,12 +122,20 @@ impl<'a> Printer<'a> {
         // conditionals handle their own indentation, so no extra wrapper.
         let consequent_doc =
             if let internal::Expression::ConditionalExpression(nested) = &*cond.consequent {
-                // Flat version: parens around the nested conditional
-                let flat_consequent = d.parens(consequent);
                 // Broken version: continue chain without parens
                 let broken_consequent = self.build_conditional_doc_impl(nested, true);
-                // No indent wrapper - nested conditional has its own structure
-                d.if_break(broken_consequent, flat_consequent)
+                if d.will_break(consequent) {
+                    // Consequent forces breaking (e.g., line comments produce hardlines).
+                    // Skip if_break and use broken layout directly — the outer group
+                    // will break because broken_consequent contains hardlines.
+                    // Matches Prettier's willBreak(consequentDoc) → shouldBreak check
+                    // in printTernaryOld (ternary-old.js).
+                    broken_consequent
+                } else {
+                    // Normal if_break: parens when flat, chain when broken
+                    let flat_consequent = d.parens(consequent);
+                    d.if_break(broken_consequent, flat_consequent)
+                }
             } else if matches!(
                 &*cond.consequent,
                 internal::Expression::TSAsExpression(_)
@@ -148,13 +176,15 @@ impl<'a> Printer<'a> {
 
         let inner = d.concat(&[
             test,
-            comments_after_test,
+            comments_before_question,
             d.indent(d.concat(&[
                 d.line(),
                 d.text("? "),
+                comments_after_question,
                 consequent_doc,
                 d.line(),
                 d.text(": "),
+                comments_after_colon,
                 alternate_doc,
             ])),
         ]);
@@ -186,11 +216,14 @@ impl<'a> Printer<'a> {
         let consequent_end = cond.consequent.span().end;
         let alternate_start = cond.alternate.span().start;
 
-        // Build test expression with parens if needed
+        // Build test expression with parens if needed (same logic as non-breaking path)
         let test = self.build_expression_doc(&cond.test);
         let test = if is_nullish_coalescing(&cond.test)
-            || matches!(&*cond.test, internal::Expression::AssignmentExpression(_))
-        {
+            || matches!(
+                &*cond.test,
+                internal::Expression::AssignmentExpression(_)
+                    | internal::Expression::AwaitExpression(_)
+            ) {
             d.parens(test)
         } else {
             test
@@ -289,48 +322,6 @@ impl<'a> Printer<'a> {
         parts.push(d.indent(d.concat(&q_parts)));
 
         d.concat(&parts)
-    }
-
-    /// Check if there are comments between ternary operators and their operands
-    ///
-    /// Returns true if:
-    /// - There's a comment between `?` and the consequent expression
-    /// - There's a comment between `:` and the alternate expression
-    ///
-    /// These comments need special positioning that the flat layout can't handle,
-    /// so we force the breaking layout when they're present.
-    fn has_comments_after_ternary_operator(
-        &self,
-        test_end: u32,
-        consequent_start: u32,
-        consequent_end: u32,
-        alternate_start: u32,
-    ) -> bool {
-        // Find ? position between test and consequent
-        let question_pos = self.find_char_position(test_end, consequent_start, '?');
-
-        // Check for comments between ? and consequent
-        if let Some(q_pos) = question_pos
-            && tsv_lang::comments_in_range(self.comments, q_pos + 1, consequent_start)
-                .next()
-                .is_some()
-        {
-            return true;
-        }
-
-        // Find : position between consequent and alternate
-        let colon_pos = self.find_char_position(consequent_end, alternate_start, ':');
-
-        // Check for comments between : and alternate
-        if let Some(c_pos) = colon_pos
-            && tsv_lang::comments_in_range(self.comments, c_pos + 1, alternate_start)
-                .next()
-                .is_some()
-        {
-            return true;
-        }
-
-        false
     }
 
     /// Find the position of a character in source, skipping over comments

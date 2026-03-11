@@ -17,6 +17,7 @@ use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
 use tsv_lang::SymbolResolver;
+use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
 
 /// Position of a text node relative to its siblings.
@@ -85,6 +86,45 @@ fn indent_body(printer: &Printer, body_doc: DocId, has_leading_ws: bool) -> DocI
     } else {
         printer.d().indent(body_doc)
     }
+}
+
+/// Split a raw parameter string at top-level commas, returning trimmed param strings.
+///
+/// Handles nesting for `()`, `[]`, `{}`, `<>`, and string literals (`'...'`, `"..."`).
+/// E.g., `"a: A | 'x', b: B<C, D>"` → `["a: A | 'x'", "b: B<C, D>"]`.
+fn split_raw_params_at_commas(raw: &str) -> Vec<&str> {
+    let mut result = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0;
+    let bytes = raw.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\'' | b'"' => {
+                let quote = bytes[i];
+                i += 1;
+                while i < bytes.len() && bytes[i] != quote {
+                    if bytes[i] == b'\\' {
+                        i += 1; // skip escaped char
+                    }
+                    i += 1;
+                }
+            }
+            b'(' | b'[' | b'{' | b'<' => depth += 1,
+            b')' | b']' | b'}' | b'>' => depth -= 1,
+            b',' if depth == 0 => {
+                result.push(raw[start..i].trim());
+                start = i + 1;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    let last = raw[start..].trim();
+    if !last.is_empty() {
+        result.push(last);
+    }
+    result
 }
 
 impl<'a> Printer<'a> {
@@ -367,8 +407,14 @@ impl<'a> Printer<'a> {
         };
 
         // If text starts with whitespace and prev is inline element:
-        // trim the leading ws and wrap the previous element with a trailing line
-        if has_leading_ws && !is_first && position.prev_is_inline() {
+        // trim the leading ws and wrap the previous element with a trailing line.
+        // For last child: skip when the previous element will break (e.g. multiline attrs),
+        // because group([breaking_element, line()]) forces the line() to break too,
+        // incorrectly separating the closing tag from trailing text.
+        // Non-breaking elements still get wrapped so fill can break long lines.
+        let prev_will_break = child_docs.last().is_some_and(|&doc| d.will_break(doc));
+        let skip_wrapping = is_last && prev_will_break;
+        if has_leading_ws && !is_first && !skip_wrapping && position.prev_is_inline() {
             trim_left = true;
             add_leading_space = false; // line() handles the space
             // Pop the last doc (the inline element) and wrap it with trailing line
@@ -380,18 +426,32 @@ impl<'a> Printer<'a> {
         }
 
         // If text ends with whitespace and next is inline element:
-        // trim the trailing ws and set flag for the next element
-        if has_trailing_ws && !is_last && position.next_is_inline() {
+        // trim the trailing ws and set flag for the next element.
+        // For first child: matches prettier's handleTextChild early return for idx===0,
+        // where trailing whitespace stays as line() after the fill and the next inline
+        // element is pushed bare (not wrapped in group([line, element])).
+        let first_child_trailing_line =
+            if has_trailing_ws && is_first && !is_last && position.next_is_inline() {
+                add_trailing_space = false;
+                true
+            } else {
+                false
+            };
+        if has_trailing_ws && !is_first && !is_last && position.next_is_inline() {
             trim_right = true;
             add_trailing_space = false; // next element's line() handles the space
             *handle_whitespace_of_prev_text = true;
         }
 
-        // Build fill for this text node's words
+        // Build fill for this text node's words.
+        // For first-child text before inline: use line() as trailing separator inside the fill,
+        // matching prettier's splitTextToDocs where trailing whitespace becomes trailing line.
         if add_leading_space {
             child_docs.push(d.text(" "));
         }
-        if let Some(fill_doc) = self.build_text_fill_doc_trimmed(raw, trim_left, trim_right) {
+        if let Some(fill_doc) =
+            self.build_text_fill_doc_trimmed(raw, trim_left, trim_right, first_child_trailing_line)
+        {
             child_docs.push(fill_doc);
         }
         if add_trailing_space {
@@ -602,7 +662,9 @@ impl<'a> Printer<'a> {
                             current_line.push(d.text(" "));
                         }
                         // Use fill for word-level breaking
-                        if let Some(fill_doc) = self.build_text_fill_doc_trimmed(part, true, true) {
+                        if let Some(fill_doc) =
+                            self.build_text_fill_doc_trimmed(part, true, true, false)
+                        {
                             current_line.push(fill_doc);
                             consecutive_blank_count = 0; // Content resets blank tracking
 
@@ -635,7 +697,8 @@ impl<'a> Printer<'a> {
                     }
 
                     // Use fill for multi-word text to enable word-level line breaking
-                    if let Some(fill_doc) = self.build_text_fill_doc_trimmed(&text.raw, true, true)
+                    if let Some(fill_doc) =
+                        self.build_text_fill_doc_trimmed(&text.raw, true, true, false)
                     {
                         current_line.push(fill_doc);
                     }
@@ -714,7 +777,7 @@ impl<'a> Printer<'a> {
                 // Only HTML block elements - components are inline
                 tsv_html::is_block_element(&tag)
             }
-            FragmentNode::SpecialElement(_) => true,
+            FragmentNode::SpecialElement(el) => el.kind.is_block(),
             _ => super::helpers::is_control_flow_block(node),
         }
     }
@@ -871,17 +934,20 @@ impl<'a> Printer<'a> {
     /// Splits text on whitespace into words, joining with line() docs.
     /// This allows fill() to break at word boundaries when lines exceed width.
     fn build_text_fill_doc(&self, raw: &str, trim_completely: bool) -> Option<DocId> {
-        self.build_text_fill_doc_trimmed(raw, trim_completely, trim_completely)
+        self.build_text_fill_doc_trimmed(raw, trim_completely, trim_completely, false)
     }
 
     /// Build a fill doc for text with separate control over leading/trailing trimming.
     ///
     /// Used by build_nodes_doc_trimmed where first node trims leading, last trims trailing.
+    /// When `trailing_line` is true, trailing whitespace uses `line()` instead of `text(" ")`,
+    /// matching prettier's splitTextToDocs for first-child text before inline elements.
     fn build_text_fill_doc_trimmed(
         &self,
         raw: &str,
         trim_leading: bool,
         trim_trailing: bool,
+        trailing_line: bool,
     ) -> Option<DocId> {
         let d = self.d();
         let has_leading_ws = raw.starts_with(char::is_whitespace);
@@ -893,8 +959,18 @@ impl<'a> Printer<'a> {
             return None;
         }
 
-        // Single word: just return text (with boundary handling)
+        // Single word: return text (with boundary handling)
         if words.len() == 1 {
+            if trailing_line && has_trailing_ws {
+                // Use fill with trailing line() for first-child text before inline element
+                let word = if !trim_leading && has_leading_ws {
+                    format!(" {}", words[0])
+                } else {
+                    words[0].to_string()
+                };
+                let parts = [d.text_owned(word), d.line()];
+                return Some(d.fill(&parts));
+            }
             let mut result = String::new();
             if !trim_leading && has_leading_ws {
                 result.push(' ');
@@ -907,23 +983,35 @@ impl<'a> Printer<'a> {
         }
 
         // Multiple words: build fill parts [word, line, word, line, ...]
+        // Leading/trailing whitespace is prepended/appended to the first/last word
+        // to maintain correct fill alternation (content, separator, content, ...).
         let mut parts = Vec::with_capacity(words.len() * 2);
-
-        // Handle leading whitespace
-        if !trim_leading && has_leading_ws {
-            parts.push(d.text(" "));
-        }
+        let prepend_space = !trim_leading && has_leading_ws;
+        let append_space = !trim_trailing && has_trailing_ws && !trailing_line;
 
         for (i, word) in words.iter().enumerate() {
             if i > 0 {
                 parts.push(d.line());
             }
-            parts.push(d.text_owned((*word).to_string()));
+            if i == 0 && prepend_space {
+                let mut s = String::with_capacity(1 + word.len());
+                s.push(' ');
+                s.push_str(word);
+                parts.push(d.text_owned(s));
+            } else if i == words.len() - 1 && append_space {
+                let mut s = String::with_capacity(word.len() + 1);
+                s.push_str(word);
+                s.push(' ');
+                parts.push(d.text_owned(s));
+            } else {
+                parts.push(d.text_owned((*word).to_string()));
+            }
         }
 
-        // Handle trailing whitespace
-        if !trim_trailing && has_trailing_ws {
-            parts.push(d.text(" "));
+        // When trailing_line is set, use line() for trailing whitespace
+        // (first-child text before inline element)
+        if trailing_line && has_trailing_ws {
+            parts.push(d.line());
         }
 
         Some(d.fill(&parts))
@@ -1047,7 +1135,7 @@ impl<'a> Printer<'a> {
     /// Returns the single IfBlock if the fragment contains exactly one IfBlock
     /// (plus optional whitespace) and can be flattened. Returns None if the
     /// fragment has multiple IfBlocks or other content that prevents flattening.
-    fn get_flattenable_else_if(alt: &Fragment) -> Option<&internal::IfBlock> {
+    pub(super) fn get_flattenable_else_if(alt: &Fragment) -> Option<&internal::IfBlock> {
         let mut if_block: Option<&internal::IfBlock> = None;
 
         for node in &alt.nodes {
@@ -1592,9 +1680,14 @@ impl<'a> Printer<'a> {
         );
 
         // Parameters: use raw_parameters if available (preserves TypeScript types),
-        // otherwise format individual params
+        // otherwise format individual params.
+        // Split raw_parameters at top-level commas so each param gets its own
+        // line when the group breaks (matching prettier's per-param wrapping).
         let params_docs: Vec<DocId> = if let Some(raw) = &block.raw_parameters {
-            vec![d.text_owned(raw.clone())]
+            split_raw_params_at_commas(raw)
+                .iter()
+                .map(|s| d.text_owned(s.to_string()))
+                .collect()
         } else {
             block
                 .parameters
@@ -1693,27 +1786,153 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc for {@const declaration}
+    ///
+    /// Prettier formats @const as an AssignmentExpression, using its assignment
+    /// layout to decide whether to break at `=`. Three layouts:
+    /// - will_break: `{@const id = init}` (init has hardlines, keep together)
+    /// - fluid: `{@const id = init}` or `{@const id =\n\tinit}` (marker group)
+    /// - break-after-operator: `{@const id =\n\tinit}` (group with line at `=`)
     pub(crate) fn build_const_tag_doc(&self, tag: &internal::ConstTag) -> DocId {
         let d = self.d();
-        // Format both id (pattern) and init expression properly
-        // Patterns like {a,b} need spacing: {a, b}
-        // For @const, comments are typically after the init expression
-        // Span range for init: after "= " to before "}" (end - 1)
         let id_doc = self.build_ts_expression_doc_no_comments(&tag.id);
-        // Build init with comments (comments are typically trailing after init)
-        let init_doc = self.build_expression_with_comments_doc(
+        // Build init with first_line_offset=0 so binary chains use Grouped style
+        // (not ContinuationIndent). The assignment layout handles indentation —
+        // ContinuationIndent would double-indent continuation lines.
+        let init_doc = self.build_const_init_doc(
             &tag.init,
             tag.init.span().start,
             tag.span.end - 1, // before "}"
         );
 
-        d.concat(&[
-            d.text("{@const "),
-            id_doc,
-            d.text(" = "),
-            init_doc,
-            d.text("}"),
-        ])
+        // Choose layout matching prettier's assignment layout selection.
+        if d.will_break(init_doc) {
+            // Init has forced breaks (ternary, multi-line template, etc.)
+            // Keep "= init" together — init's own breaks handle formatting.
+            d.concat(&[
+                d.text("{@const "),
+                id_doc,
+                d.text(" = "),
+                init_doc,
+                d.text("}"),
+            ])
+        } else if Self::const_should_break_after_op(&tag.init) {
+            // Binary expressions, conditional with binary test, etc.
+            // Break-after-operator: group with line at "=" so the doc printer
+            // can break when the flat form exceeds print width.
+            // Prettier ref: shouldBreakAfterOperator (assignment.js:196-259)
+            let rhs = d.concat(&[d.line(), init_doc]);
+            let rhs_indented = d.indent(rhs);
+            let assignment = d.group(d.concat(&[d.text(" ="), rhs_indented, d.text("}")]));
+
+            d.concat(&[d.text("{@const "), id_doc, assignment])
+        } else {
+            // Fluid layout: break at `=` only when the full line exceeds
+            // print width. Uses indentIfBreak so the RHS is evaluated
+            // independently — e.g., a ternary with identifier test stays
+            // on the same line as `=` while its branches break below.
+            // Prettier ref: "fluid" layout (assignment.js:59-67)
+            d.concat(&[
+                d.text("{@const "),
+                id_doc,
+                d.text(" ="),
+                d.group_with_id(d.indent(d.line()), GroupId::Assignment),
+                d.line_suffix_boundary(),
+                d.indent_if_break(init_doc, GroupId::Assignment, false),
+                d.text("}"),
+            ])
+        }
+    }
+
+    /// Check if a @const init expression needs break-after-operator layout.
+    ///
+    /// Matches prettier's `shouldBreakAfterOperator` for the expression types
+    /// that appear in @const tags. Binary expressions and conditionals with
+    /// binary tests break after `=`; other expressions use fluid layout.
+    /// Prettier ref: assignment.js:196-226
+    fn const_should_break_after_op(expr: &tsv_ts::Expression) -> bool {
+        match expr {
+            // Binary expressions break after `=`, UNLESS it's a logical expression
+            // with a self-expanding RHS (non-empty object/array). In that case, the
+            // RHS handles its own expansion: `= item || { ... }` not `=\n  item || {}`
+            // Prettier ref: assignment.js:199 `isBinaryish && !shouldInlineLogicalExpression`
+            tsv_ts::Expression::BinaryExpression(bin) => !Self::is_inline_logical(bin),
+            tsv_ts::Expression::SequenceExpression(_) => true,
+            tsv_ts::Expression::ConditionalExpression(cond) => {
+                // Only break-after-operator when test is binary (and not inline logical).
+                // Simple identifier tests (e.g., `cond ? a : b`) use fluid layout.
+                // Prettier ref: assignment.js:216-219
+                matches!(&*cond.test, tsv_ts::Expression::BinaryExpression(bin) if !Self::is_inline_logical(bin))
+            }
+            _ => false,
+        }
+    }
+
+    /// Check if a binary expression is a logical expression with a self-expanding RHS.
+    ///
+    /// Logical operators (`&&`, `||`, `??`) with non-empty object or array on the
+    /// right should NOT use break-after-operator — the RHS self-expands.
+    /// Prettier ref: `shouldInlineLogicalExpression` (binaryish.js:361)
+    fn is_inline_logical(bin: &tsv_ts::ast::internal::BinaryExpression) -> bool {
+        if !bin.operator.is_logical() {
+            return false;
+        }
+        match &*bin.right {
+            tsv_ts::Expression::ObjectExpression(obj) => !obj.properties.is_empty(),
+            tsv_ts::Expression::ArrayExpression(arr) => !arr.elements.is_empty(),
+            _ => false,
+        }
+    }
+
+    /// Build init expression doc for @const with assignment-appropriate config.
+    ///
+    /// Like `build_expression_with_comments_doc` but uses `first_line_offset = 0`
+    /// so binary chains use Grouped style (not ContinuationIndent). The @const
+    /// assignment layout handles indentation; ContinuationIndent would stack.
+    fn build_const_init_doc(
+        &self,
+        expr: &tsv_ts::Expression,
+        span_start: u32,
+        span_end: u32,
+    ) -> DocId {
+        let d = self.d();
+        let expr_start = expr.span().start;
+        let expr_end = expr.span().end;
+
+        let leading_docs: Vec<DocId> =
+            tsv_lang::comments_in_range(self.comments, span_start, expr_start)
+                .map(|c| self.build_leading_js_comment_doc(c))
+                .collect();
+
+        // first_line_offset = 0: binary chains use Grouped style, not ContinuationIndent
+        let config = tsv_lang::PrintConfig {
+            first_line_offset: 0,
+            ..self.config
+        };
+
+        let expr_doc = tsv_ts::build_expression_doc_with_comments(
+            d,
+            expr,
+            self.source,
+            Rc::clone(&self.interner),
+            &config,
+            self.comments,
+            &self.line_breaks,
+        );
+
+        let trailing_docs: Vec<DocId> =
+            tsv_lang::comments_in_range(self.comments, expr_end, span_end)
+                .map(|c| self.build_trailing_js_comment_doc(c))
+                .collect();
+
+        if leading_docs.is_empty() && trailing_docs.is_empty() {
+            expr_doc
+        } else {
+            let mut parts = Vec::with_capacity(leading_docs.len() + 1 + trailing_docs.len());
+            parts.extend(leading_docs);
+            parts.push(expr_doc);
+            parts.extend(trailing_docs);
+            d.concat(&parts)
+        }
     }
 
     /// Build a doc for {@debug vars}
@@ -1766,7 +1985,7 @@ impl<'a> Printer<'a> {
     /// - Array patterns: `[a, b]` (no spaces inside brackets)
     ///
     /// Used for `{#each ... as pattern}` contexts.
-    fn build_pattern_doc(&self, expr: &tsv_ts::Expression) -> DocId {
+    pub(super) fn build_pattern_doc(&self, expr: &tsv_ts::Expression) -> DocId {
         let d = self.d();
         match expr {
             tsv_ts::Expression::ObjectPattern(obj) => {
@@ -1944,7 +2163,7 @@ impl<'a> Printer<'a> {
     /// - `opening_offset` - Characters before the expression (e.g., 5 for `{#if `). Used to
     ///   calculate `first_line_offset` which triggers continuation indent for binary expressions.
     /// - `in_multiline_context` - Whether the block is on its own line (multiline) or inline
-    fn build_expression_doc_for_block(
+    pub(super) fn build_expression_doc_for_block(
         &self,
         expr: &tsv_ts::Expression,
         span_start: u32,

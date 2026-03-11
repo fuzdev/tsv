@@ -12,12 +12,12 @@ use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tempfile::NamedTempFile;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
-use tokio::process::{Child, ChildStdin, ChildStdout, Command};
+use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::{Duration, timeout};
 
-/// Timeout for reading a response from the sidecar (5 seconds)
-const READ_TIMEOUT: Duration = Duration::from_secs(5);
+/// Timeout for reading a response from the sidecar (30 seconds)
+const READ_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Embedded sidecar script
 const SIDECAR_SCRIPT: &str = include_str!("sidecar.ts");
@@ -110,6 +110,29 @@ impl DenoActor {
             }
         });
 
+        // Spawn dedicated stdout reader task.
+        // read_line is NOT cancel-safe, so we must not use it inside tokio::select!.
+        // This task reads complete lines and sends them via a cancel-safe channel.
+        let (line_tx, line_rx) = mpsc::channel::<String>(64);
+        tokio::spawn(async move {
+            let mut reader = BufReader::new(stdout);
+            loop {
+                let mut line = String::new();
+                match reader.read_line(&mut line).await {
+                    Ok(0) => break,
+                    Ok(_) => {
+                        if line_tx.send(line).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[deno] stdout read error: {e}");
+                        break;
+                    }
+                }
+            }
+        });
+
         // Create channel for requests
         let (tx, rx) = mpsc::channel(256);
 
@@ -117,7 +140,7 @@ impl DenoActor {
         let actor_state = ActorState {
             child,
             stdin: BufWriter::new(stdin),
-            stdout: BufReader::new(stdout),
+            line_rx,
             pending: HashMap::new(),
             _script_file: script_file, // Keep alive for process lifetime
             _config_file: config_file, // Keep alive for process lifetime
@@ -168,7 +191,7 @@ impl Drop for DenoActor {
 struct ActorState {
     child: Child,
     stdin: BufWriter<ChildStdin>,
-    stdout: BufReader<ChildStdout>,
+    line_rx: mpsc::Receiver<String>,
     pending: HashMap<u64, oneshot::Sender<Result<Value, DenoError>>>,
     _script_file: NamedTempFile,
     _config_file: NamedTempFile,
@@ -208,17 +231,16 @@ impl ActorState {
     ///
     /// Returns false on EOF (sidecar crashed)
     async fn read_response(&mut self) -> Result<bool, DenoError> {
-        let mut line = String::new();
-        let bytes_read = timeout(READ_TIMEOUT, self.stdout.read_line(&mut line))
-            .await
-            .map_err(|_| DenoError::Timeout {
-                seconds: READ_TIMEOUT.as_secs(),
-            })?
-            .map_err(DenoError::Communication)?;
-
-        if bytes_read == 0 {
-            return Ok(false); // EOF
-        }
+        // Receive from the dedicated reader task (cancel-safe, unlike read_line)
+        let line = match timeout(READ_TIMEOUT, self.line_rx.recv()).await {
+            Ok(Some(line)) => line,
+            Ok(None) => return Ok(false), // EOF - reader task ended
+            Err(_) => {
+                return Err(DenoError::Timeout {
+                    seconds: READ_TIMEOUT.as_secs(),
+                });
+            }
+        };
 
         // Skip empty lines and non-JSON output (defensive against stdout noise from npm packages)
         let trimmed = line.trim();

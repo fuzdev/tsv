@@ -13,6 +13,7 @@ use crate::ast::internal::{self, Expression, Literal, LiteralValue};
 use tsv_lang::SymbolResolver;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::printing::visual_width;
 
 impl<'a> Printer<'a> {
     /// Build a Doc for an object expression
@@ -540,20 +541,25 @@ impl<'a> Printer<'a> {
     /// Complex expressions (calls, binary, etc.) are never short - they can't
     /// be reduced to a simple width, matching Prettier's `cleanDoc` behavior.
     ///
-    /// Reference: prettier's `isObjectPropertyWithShortKey` in assignment.js
+    /// Prettier ref: `isObjectPropertyWithShortKey` in print/assignment.js:401
+    /// Uses `getStringWidth(cleanDoc(keyDoc)) < tabWidth + MIN_OVERLAP_FOR_BREAK`
     fn is_short_property_key(&self, key: &Expression, computed: bool) -> bool {
+        // Prettier: MIN_OVERLAP_FOR_BREAK = 3 (assignment.js:409)
         let threshold = self.config.tab_width + super::assignment::MIN_OVERLAP_FOR_BREAK;
 
         let base_width = match key {
-            Expression::Identifier(id) => self.resolve_symbol(id.name).len(),
+            // Prettier: cleanDoc reduces identifier keys to their name string
+            Expression::Identifier(id) => {
+                visual_width(&self.resolve_symbol(id.name), self.config.tab_width)
+            }
             Expression::Literal(lit) => match &lit.value {
                 LiteralValue::String { content, .. } => {
                     // For computed keys, quotes are always preserved: ["x"] prints as ['x']
                     // For non-computed keys, valid identifiers are unquoted: {"x":1} → {x:1}
                     if computed || !is_valid_js_identifier(content) {
-                        content.len() + 2 // Include quotes
+                        visual_width(content, self.config.tab_width) + 2 // Include quotes
                     } else {
-                        content.len()
+                        visual_width(content, self.config.tab_width)
                     }
                 }
                 LiteralValue::Number(_) => {

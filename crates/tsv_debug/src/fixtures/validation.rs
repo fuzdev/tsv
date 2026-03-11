@@ -150,6 +150,8 @@ pub enum ValidationError {
     DuplicatePrettierQuirkWithinFixture(Vec<String>),
     #[error("{0} is redundant (identical to {1})")]
     RedundantUnformattedMatchesQuirk(String, String),
+    #[error("{0} is redundant (identical to output_prettier)")]
+    RedundantPrettierQuirkMatchesOutputPrettier(String),
 
     // Invalid syntax (input_invalid_* files)
     #[error("{0} parsed successfully by our parser (should fail)")]
@@ -290,6 +292,9 @@ impl ValidationError {
             Self::RedundantUnformattedMatchesQuirk(_, _) => {
                 "Remove redundant file (already covered by prettier_quirk_*)"
             }
+            Self::RedundantPrettierQuirkMatchesOutputPrettier(_) => {
+                "Remove redundant file (output_prettier already documents this prettier output)"
+            }
             Self::InvalidSyntaxParsedByOurs(_) => {
                 "Our parser is too permissive - it accepts syntax that the canonical parser rejects. Fix the parser."
             }
@@ -364,7 +369,8 @@ impl ValidationError {
             Self::DuplicateUnformattedWithinFixture(_)
             | Self::DuplicatePrettierQuirkWithinFixture(_)
             | Self::DuplicatePrettierStableWithinFixture(_)
-            | Self::RedundantUnformattedMatchesQuirk(_, _) => "Duplicates",
+            | Self::RedundantUnformattedMatchesQuirk(_, _)
+            | Self::RedundantPrettierQuirkMatchesOutputPrettier(_) => "Duplicates",
 
             Self::InvalidSyntaxParsedByOurs(_)
             | Self::InvalidSyntaxParsedBySvelte(_)
@@ -730,6 +736,24 @@ fn validate_normalization_ours(
             result.add_error(ValidationError::DuplicatePrettierQuirkWithinFixture(
                 variants.clone(),
             ));
+        }
+    }
+
+    // Check for prettier_quirk files identical to output_prettier (redundant)
+    let output_prettier_path = fixture.output_prettier_path();
+    if output_prettier_path.exists()
+        && let Ok(output_prettier_content) = read_file(&output_prettier_path)
+    {
+        for (quirk_content, quirk_files) in &quirk_contents {
+            if *quirk_content == output_prettier_content {
+                for quirk_file in quirk_files {
+                    result.add_error(
+                        ValidationError::RedundantPrettierQuirkMatchesOutputPrettier(
+                            quirk_file.clone(),
+                        ),
+                    );
+                }
+            }
         }
     }
 

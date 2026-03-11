@@ -7,8 +7,8 @@
 
 use super::helpers::{
     find_separator_position, intersection_has_expanding_first_type,
-    intersection_has_huggable_last_type, type_args_should_wrap_for_return_type,
-    type_needs_parens_in_intersection,
+    intersection_has_huggable_last_type, should_hug_union_type,
+    type_args_should_wrap_for_return_type, type_needs_parens_in_intersection, unwrap_parenthesized,
 };
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType};
@@ -179,6 +179,20 @@ impl<'a> Printer<'a> {
         // Handle Union types - break after colon with indent when long
         if let TSType::Union(u) = annotation.type_annotation.as_ref() {
             let type_doc = self.build_union_type_doc(u, false);
+
+            if should_hug_union_type(u) {
+                // Hugged unions (e.g., `null | { ... }`) use conditional_group to bypass
+                // the renderer's will_break check. The object type inside the union has
+                // hardlines for multiline members, but those shouldn't force the type
+                // annotation to break after `:`. The conditional_group calls fits()
+                // directly, which correctly handles nested hardlines (returns true).
+                // State 0: `: null | { ... }` (inline, no break after colon)
+                // State 1: `:\n  null | { ... }` (break after colon, for very long names)
+                let flat_state = d.concat(&[d.text(": "), type_doc]);
+                let break_state = d.concat(&[d.text(":"), d.indent_line(type_doc)]);
+                return d.conditional_group(&[flat_state, break_state]);
+            }
+
             let union_group = d.group(d.indent_line(type_doc));
             return d.concat(&[d.text(":"), union_group]);
         }
@@ -347,6 +361,11 @@ impl<'a> Printer<'a> {
     fn build_intersection_member_type_doc(&self, t: &TSType) -> DocId {
         let d = self.d();
         if type_needs_parens_in_intersection(t) {
+            // Special case: parenthesized union type
+            if let TSType::Union(union) = unwrap_parenthesized(t) {
+                return self.build_parenthesized_union_doc(union);
+            }
+
             d.concat(&[
                 d.text("("),
                 self.build_type_doc_with_wrapping_type_args(t),

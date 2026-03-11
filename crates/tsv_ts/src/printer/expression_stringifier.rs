@@ -418,6 +418,9 @@ impl<'a> Printer<'a> {
                 parts.push(self.expression_to_string(&param_prop.parameter));
                 parts.join(" ")
             }
+            Expression::Parenthesized(inner) => {
+                format!("({})", self.expression_to_string(inner))
+            }
         }
     }
 

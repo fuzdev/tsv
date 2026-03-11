@@ -1,0 +1,414 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 228,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 227,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 218,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 20,
+					"end": 53,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 26,
+							"end": 52,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 26,
+								"end": 27,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 30,
+								"end": 52,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 2
+									}
+								},
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 31,
+										"end": 51,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 12
+											},
+											"end": {
+												"line": 5,
+												"column": 1
+											}
+										},
+										"value": {
+											"raw": "export { \n\ta, \n\tb,\n}",
+											"cooked": "export { \n\ta, \n\tb,\n}"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 56,
+					"end": 104,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 62,
+							"end": 103,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 62,
+								"end": 63,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 66,
+								"end": 103,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 10
+									}
+								},
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 67,
+										"end": 102,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 12
+											},
+											"end": {
+												"line": 8,
+												"column": 9
+											}
+										},
+										"value": {
+											"raw": "line with trailing space \nnext line",
+											"cooked": "line with trailing space \nnext line"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 107,
+					"end": 147,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 113,
+							"end": 146,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 113,
+								"end": 114,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 117,
+								"end": 146,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 11
+									},
+									"end": {
+										"line": 11,
+										"column": 10
+									}
+								},
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 118,
+										"end": 145,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 12
+											},
+											"end": {
+												"line": 11,
+												"column": 9
+											}
+										},
+										"value": {
+											"raw": "no trailing space\nnext line",
+											"cooked": "no trailing space\nnext line"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 150,
+					"end": 217,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 156,
+							"end": 216,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 156,
+								"end": 157,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 160,
+								"end": 216,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 11
+									},
+									"end": {
+										"line": 15,
+										"column": 8
+									}
+								},
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 161,
+										"end": 215,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 12
+											},
+											"end": {
+												"line": 15,
+												"column": 7
+											}
+										},
+										"value": {
+											"raw": "mixed trailing spaces   \n\tindented trailing   \nregular",
+											"cooked": "mixed trailing spaces   \n\tindented trailing   \nregular"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -52,29 +52,31 @@ fn is_template_on_same_line(source: &str, expr: &internal::Expression) -> bool {
         && !has_newline_before_position(source, expr.span().start)
 }
 
-/// Check if an expression is a type assertion (as/satisfies) wrapping an object literal
-/// Returns the inner expression type for special handling in arrow body context
-fn get_type_assertion_with_object(
-    expr: &internal::Expression,
-) -> Option<TypeAssertionWithObject<'_>> {
+/// Check if an expression has an ObjectExpression at its leftmost position.
+/// In arrow bodies, `{...}` at the start is ambiguous with a block statement and needs parens.
+/// Returns true for chains like: `{} as T`, `{}[name]`, `{}.prop`, `{} as A as B`, etc.
+fn has_leftmost_object_expression(expr: &internal::Expression) -> bool {
     match expr {
-        internal::Expression::TSAsExpression(as_expr)
-            if is_object_expression(&as_expr.expression) =>
-        {
-            Some(TypeAssertionWithObject::As(as_expr))
+        internal::Expression::TSAsExpression(e) => {
+            is_object_expression(&e.expression) || has_leftmost_object_expression(&e.expression)
         }
-        internal::Expression::TSSatisfiesExpression(sat_expr)
-            if is_object_expression(&sat_expr.expression) =>
-        {
-            Some(TypeAssertionWithObject::Satisfies(sat_expr))
+        internal::Expression::TSSatisfiesExpression(e) => {
+            is_object_expression(&e.expression) || has_leftmost_object_expression(&e.expression)
         }
-        _ => None,
+        internal::Expression::MemberExpression(e) => {
+            is_object_expression(&e.object) || has_leftmost_object_expression(&e.object)
+        }
+        internal::Expression::CallExpression(e) => {
+            is_object_expression(&e.callee) || has_leftmost_object_expression(&e.callee)
+        }
+        internal::Expression::TaggedTemplateExpression(e) => {
+            is_object_expression(&e.tag) || has_leftmost_object_expression(&e.tag)
+        }
+        internal::Expression::TSNonNullExpression(e) => {
+            is_object_expression(&e.expression) || has_leftmost_object_expression(&e.expression)
+        }
+        _ => false,
     }
-}
-
-enum TypeAssertionWithObject<'a> {
-    As(&'a internal::TSAsExpression),
-    Satisfies(&'a internal::TSSatisfiesExpression),
 }
 
 /// Check if an expression is a huggable pattern for function parameters.
@@ -103,13 +105,17 @@ fn is_huggable_pattern(expr: &internal::Expression) -> bool {
 /// - The closing `}` comes on its own line
 ///
 /// This matches Prettier's behavior where `fn(a?: {` stays together.
+///
+/// NOTE: Does NOT recurse into AssignmentPattern. When a param has a default value
+/// like `a: { b: T } = {}`, the `= {}` prevents hugging — prettier breaks the
+/// param list instead. Destructuring patterns with defaults (`{a, b} = {}`) are
+/// handled separately by `is_huggable_pattern`.
 fn has_huggable_type_annotation(expr: &internal::Expression) -> bool {
     match expr {
         internal::Expression::Identifier(id) => id
             .type_annotation
             .as_ref()
             .is_some_and(|ann| is_huggable_type(&ann.type_annotation)),
-        internal::Expression::AssignmentPattern(ap) => has_huggable_type_annotation(&ap.left),
         _ => false,
     }
 }
@@ -195,11 +201,14 @@ impl<'a> Printer<'a> {
             sig_parts.push(self.build_comment_doc(comment));
         }
 
-        // Include " =>" in the signature group for width calculation
-        sig_parts.push(d.text(" =>"));
-
         // Wrap entire signature in a group
         parts.push(d.group(d.concat(&sig_parts)));
+
+        // " =>" outside the sig group so fits() look-ahead sees it as text
+        // consuming remaining width. When sig + " =>" = print_width, the " =>"
+        // leaves remaining=0 for the body — ternary body's " " text then
+        // pushes to -1 and forces the sig group to break params.
+        parts.push(d.text(" =>"));
 
         // Body - expression bodies can break to new line with indent
         match &arrow.body {
@@ -285,8 +294,45 @@ impl<'a> Printer<'a> {
                 } else if self.in_curried_typed_arrow.get() {
                     // Innermost arrow in curried chain - body is NOT another arrow.
                     // This needs indent since it's the final expression.
+                    // Reset flag so arrows inside the body (e.g. callback args) aren't
+                    // treated as part of the curried chain.
+                    self.in_curried_typed_arrow.set(false);
                     let body_doc = self.build_arrow_body_doc(expr);
+                    self.in_curried_typed_arrow.set(true);
                     parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
+                } else if matches!(&**expr, internal::Expression::ConditionalExpression(_))
+                    && !has_leftmost_object_expression(expr)
+                {
+                    // Prettier's shouldAddParensIfNotBreak: ternary body gets conditional
+                    // parens when inline, no parens when on its own line.
+                    // Excludes ternaries whose test starts with ObjectExpression (matches
+                    // Prettier's startsWithNoLookaheadToken check) — those fall through
+                    // to the normal path which calls build_arrow_body_doc for object parens.
+                    //
+                    // Structure: [" ", group([ifBreak("","("), indent([softline, body]),
+                    //                         ifBreak("",")")])]
+                    //
+                    // The " " TEXT element before the group is critical for fits() boundary:
+                    // when sig + " =>" = exactly print_width, remaining=0. The " " consumes
+                    // 1 char (→ -1), making the sig group fail fits() and break params.
+                    // With the old group(indent(line, body)), line() in Break mode would
+                    // short-circuit fits() to return true, keeping the sig flat.
+                    //
+                    // Flat:  ` => (cond ? a : b)` — parens, same line
+                    // Break: ` =>\n\tcond ? a : b` — no parens, next line
+                    let body_doc = self.build_expression_doc(expr);
+                    if d.will_break(body_doc) {
+                        // Body has hardlines (multiline template in ternary, etc.)
+                        // Use normal break layout — no parens needed
+                        parts.push(d.group(d.indent(d.concat(&[d.line(), body_doc]))));
+                    } else {
+                        parts.push(d.text(" "));
+                        parts.push(d.group(d.concat(&[
+                            d.if_break(d.empty(), d.text("(")),
+                            d.indent(d.concat(&[d.softline(), body_doc])),
+                            d.if_break(d.empty(), d.text(")")),
+                        ])));
+                    }
                 } else {
                     // Normal expression: can break after => with indentation
                     // Short: (x) => x + 1
@@ -391,12 +437,18 @@ impl<'a> Printer<'a> {
             d.join_trailing(param_docs, d.comma_line())
         };
 
-        let brackets_doc = d.concat(&[
-            d.text("<"),
-            d.indent_softline(inner_parts),
-            d.softline(),
-            d.text(">"),
-        ]);
+        // Single param with trailing comma (Svelte disambiguation) stays inline —
+        // `<T,>` should never expand even when the parent group breaks.
+        let brackets_doc = if needs_trailing_comma {
+            d.concat(&[d.text("<"), inner_parts, d.text(">")])
+        } else {
+            d.concat(&[
+                d.text("<"),
+                d.indent_softline(inner_parts),
+                d.softline(),
+                d.text(">"),
+            ])
+        };
 
         if grouped {
             d.group(brackets_doc)
@@ -492,32 +544,22 @@ impl<'a> Printer<'a> {
     /// Build doc for arrow function body expression.
     fn build_arrow_body_doc(&self, expr: &internal::Expression) -> DocId {
         let d = self.d();
-        // Special case: type assertion wrapping object - parens go around inner object only
-        // `() => ({}) as T` not `() => (({}) as T)`
-        if let Some(assertion) = get_type_assertion_with_object(expr) {
-            return match assertion {
-                TypeAssertionWithObject::As(as_expr) => d.concat(&[
-                    d.text("("),
-                    self.build_expression_doc(&as_expr.expression),
-                    d.text(") as "),
-                    self.build_type_doc_with_wrapping_type_args(&as_expr.type_annotation),
-                ]),
-                TypeAssertionWithObject::Satisfies(sat_expr) => d.concat(&[
-                    d.text("("),
-                    self.build_expression_doc(&sat_expr.expression),
-                    d.text(") satisfies "),
-                    self.build_type_doc_with_wrapping_type_args(&sat_expr.type_annotation),
-                ]),
-            };
+        // Object at leftmost position in arrow body needs parens to avoid block ambiguity.
+        // Examples: `() => ({}) as T`, `() => ({})[name]`, `() => ({}).prop`
+        // The flag tells build_expression_doc to wrap the ObjectExpression in parens when reached.
+        if has_leftmost_object_expression(expr) {
+            self.arrow_body_object_needs_parens.set(true);
+            let doc = self.build_expression_doc(expr);
+            self.arrow_body_object_needs_parens.set(false);
+            return doc;
         }
 
-        // Conditional expressions need parens only when inline:
-        // Same line: `() => (a ? b : c)` - parens needed to disambiguate
-        // New line:  `() =>\n    a ? b : c` - no parens needed
-        //
-        // We use two checks:
-        // 1. will_break: If body contains hardlines, it WILL break, so no parens needed
-        // 2. if_break: For bodies without hardlines, check if enclosing group breaks
+        // Conditional expressions: parens when inline, none when on own line.
+        // The primary ternary path is shouldAddParensIfNotBreak in
+        // build_arrow_doc_wrapping. This branch handles ternaries reached
+        // via other callers (curried innermost arrow, post-arrow comments)
+        // where the body always breaks via hardline — if_break selects
+        // the break variant (no parens).
         if matches!(expr, internal::Expression::ConditionalExpression(_)) {
             let body_doc = self.build_expression_doc(expr);
             // If body contains hardlines (will definitely break), no parens

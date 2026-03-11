@@ -702,7 +702,8 @@ impl<'a> Parser<'a> {
         self.expect(&TokenKind::ParenOpen)?;
 
         // Check if this is definitely a parenthesized type (not function params)
-        // Types that can't be parameter names: typeof, keyof, [, {, -, etc.
+        // Tokens that can't be parameter names: keywords (typeof, new, import),
+        // type operators (|, &), brackets, literals, etc.
         if self.is_definitely_type_start() {
             let inner_type = self.parse_type()?;
             let end = self.current_pos().0;
@@ -733,16 +734,15 @@ impl<'a> Parser<'a> {
                 span: Span::new(start as u32, end),
             }))
         } else if params.len() == 1 && !self.is_function_param(&params[0]) {
-            // Single identifier without type annotation - could be parenthesized type
-            // But for simplicity, we'll treat `()` as function type
+            // Single identifier without type annotation or optional marker:
+            // `(T)` is a parenthesized type reference, not a function type
             if let Expression::Identifier(id) = &params[0] {
-                // Parse this as a type reference wrapped in parentheses
                 let type_ref = TSType::TypeReference(TSTypeReference {
                     type_name: TSEntityName::Identifier(id.clone()),
                     type_arguments: None,
                     span: id.span,
                 });
-                let (_, end) = (self.current_pos().0, params[0].span().end);
+                let end = params[0].span().end;
                 Ok(TSType::Parenthesized(TSParenthesizedType {
                     type_annotation: Box::new(type_ref),
                     span: Span::new(start as u32, end),
@@ -777,12 +777,16 @@ impl<'a> Parser<'a> {
             TokenKind::Keyword(kw) if kw.is_type_keyword() => true,
             // Constructor types: new () => T
             TokenKind::Keyword(KeywordKind::New) => true,
+            // Import types: import("./a").B
+            TokenKind::Keyword(KeywordKind::Import) => true,
             // Non-identifier tokens that start types
             TokenKind::BracketOpen => true, // tuple types
             TokenKind::BraceOpen => true,   // object types
             TokenKind::LessThan => true,    // generic function types
             TokenKind::Minus => true,       // negative number literals
             TokenKind::ParenOpen => true,   // nested parenthesized types
+            TokenKind::Pipe => true,        // leading pipe in union: (| A | B)
+            TokenKind::Ampersand => true,   // leading ampersand in intersection: (& A & B)
             // String/number literals are types, not params
             TokenKind::String | TokenKind::Number => true,
             // Template literals
@@ -798,15 +802,14 @@ impl<'a> Parser<'a> {
                     return matches!(self.peek_kind(), TokenKind::Keyword(KeywordKind::New));
                 }
                 // If an identifier is followed by these tokens, it's a type not a param:
-                // (A | B) is a union type, not function params
-                // (A & B) is an intersection type
-                // (A[K]) is an indexed access type
-                // (T extends U ? V : W) is a conditional type in parentheses
-                // (ns.X) is a qualified type reference
+                // (A | B) union, (A & B) intersection, (A<B>) generic,
+                // (A[K]) indexed access, (T extends U ? V : W) conditional,
+                // (ns.X) qualified type reference
                 matches!(
                     self.peek_kind(),
                     TokenKind::Pipe
                         | TokenKind::Ampersand
+                        | TokenKind::LessThan
                         | TokenKind::BracketOpen
                         | TokenKind::Keyword(KeywordKind::Extends)
                         | TokenKind::Dot

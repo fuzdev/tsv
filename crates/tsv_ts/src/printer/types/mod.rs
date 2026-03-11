@@ -17,7 +17,7 @@
 // - literal_types.rs: Literal types (string, number, template literal)
 
 mod composite;
-mod function_types;
+pub(in crate::printer) mod function_types;
 pub(crate) mod helpers;
 mod literal_types;
 mod type_annotation;
@@ -27,7 +27,9 @@ mod type_params;
 mod union_intersection;
 
 // Re-export public items from helpers
-pub use helpers::{intersection_has_huggable_last_type, unwrap_parenthesized};
+pub use helpers::{
+    intersection_has_huggable_last_type, should_hug_union_type, unwrap_parenthesized,
+};
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};

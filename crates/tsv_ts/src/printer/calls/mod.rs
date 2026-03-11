@@ -103,57 +103,67 @@ impl<'a> Printer<'a> {
     /// comments between member segments.
     pub(super) fn build_call_doc(&self, call: &internal::CallExpression) -> DocId {
         // Curried call with callback pattern: fn()('arg', () => { ... })
-        // When the callee is a call expression (curried call) and the last argument
-        // is a block function, use conditional_group to try inline first, then expand-all.
-        // This matches Prettier's behavior for test.each() and similar patterns.
-        // Must check BEFORE chain handling to bypass chain logic.
-        // Skip if there are blank lines between args or comments that force expansion
-        // (line comments or block comments on their own line - inline block comments are OK).
-        let has_blank_lines_between_args = call
-            .arguments
-            .windows(2)
-            .any(|w| self.has_blank_line_between(w[0].span().end, w[1].span().start));
-        let paren_open = call.callee.span().end;
-        if matches!(&*call.callee, internal::Expression::CallExpression(_))
-            && call.arguments.len() >= 2
-            && call.arguments.last().is_some_and(is_block_function)
-            && preceding_args_allow_expand_last(&call.arguments, self.line_breaks)
-            && !has_blank_lines_between_args
-            && !any_comment_forces_expansion(call, self, paren_open)
-        {
-            let d = self.d();
-            let callee_doc = self.build_expression_doc(&call.callee);
-            let first_arg_start = call.arguments[0].span().start;
+        // When the callee is a simple call expression and the last argument is a
+        // block function, use conditional_group to try inline first, then expand-all.
+        //
+        // Skip when the inner call has array/object args — those may force multiline,
+        // and the chain formatter handles that correctly via group(oneLine).
+        if let internal::Expression::CallExpression(inner) = &*call.callee {
+            let inner_has_multiline_arg = inner.arguments.iter().any(|arg| {
+                matches!(
+                    arg,
+                    internal::Expression::ArrayExpression(_)
+                        | internal::Expression::ObjectExpression(_)
+                )
+            });
+            let has_blank_lines_between_args = call
+                .arguments
+                .windows(2)
+                .any(|w| self.has_blank_line_between(w[0].span().end, w[1].span().start));
+            let paren_open = call.callee.span().end;
+            if call.arguments.len() >= 2
+                && call.arguments.last().is_some_and(is_block_function)
+                && preceding_args_allow_expand_last(&call.arguments, self.line_breaks)
+                && !has_blank_lines_between_args
+                && !any_comment_forces_expansion(call, self, paren_open)
+                && !inner_has_multiline_arg
+            {
+                let d = self.d();
+                let callee_doc = self.build_expression_doc(&call.callee);
+                let first_arg_start = call.arguments[0].span().start;
 
-            // Build args split into head (with commas) and last
-            let (head_parts, last_arg_doc, all_args_broken) =
-                build_args_split_last(&call.arguments, self);
+                // Build args split into head (with commas) and last
+                let (head_parts, last_arg_doc, all_args_broken) =
+                    build_args_split_last(&call.arguments, self);
 
-            // Build inline state with optional leading comments
-            let leading_comments = self
-                .build_inline_comments_between_doc_trailing_space_opt(paren_open, first_arg_start);
-            let mut inline_inner: Vec<DocId> = Vec::new();
-            if let Some(comment) = leading_comments {
-                inline_inner.push(comment);
+                // Build inline state with optional leading comments
+                let leading_comments = self.build_inline_comments_between_doc_trailing_space_opt(
+                    paren_open,
+                    first_arg_start,
+                );
+                let mut inline_inner: Vec<DocId> = Vec::new();
+                if let Some(comment) = leading_comments {
+                    inline_inner.push(comment);
+                }
+                inline_inner.extend(head_parts);
+                inline_inner.push(last_arg_doc);
+
+                let state_inline = d.concat(&[
+                    callee_doc,
+                    d.text("("),
+                    d.concat(&inline_inner),
+                    d.text(")"),
+                ]);
+                let state_expand_all = d.concat(&[
+                    callee_doc,
+                    d.text("("),
+                    d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
+                    d.line(),
+                    d.text(")"),
+                ]);
+
+                return d.conditional_group(&[state_inline, state_expand_all]);
             }
-            inline_inner.extend(head_parts);
-            inline_inner.push(last_arg_doc);
-
-            let state_inline = d.concat(&[
-                callee_doc,
-                d.text("("),
-                d.concat(&inline_inner),
-                d.text(")"),
-            ]);
-            let state_expand_all = d.concat(&[
-                callee_doc,
-                d.text("("),
-                d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
-                d.line(),
-                d.text(")"),
-            ]);
-
-            return d.conditional_group(&[state_inline, state_expand_all]);
         }
 
         // Test function calls (it.skip, test.only, etc.) stay on one line even

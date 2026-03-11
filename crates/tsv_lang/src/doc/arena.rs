@@ -978,6 +978,17 @@ impl DocArena {
         std::cell::Ref::map(self.nodes.borrow(), |nodes| &nodes[id.index()])
     }
 
+    /// If this DocId points to a Group node, return its contents (unwrapping the group).
+    /// Otherwise return the DocId unchanged.
+    #[inline]
+    pub fn unwrap_group(&self, id: DocId) -> DocId {
+        let nodes = self.nodes.borrow();
+        match &nodes[id.index()] {
+            DocNode::Group { contents, .. } => *contents,
+            _ => id,
+        }
+    }
+
     /// Borrow the full nodes vec for rendering.
     #[inline]
     pub fn borrow_nodes(&self) -> std::cell::Ref<'_, Vec<DocNode>> {

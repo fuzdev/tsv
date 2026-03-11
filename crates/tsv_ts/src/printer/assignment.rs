@@ -14,6 +14,7 @@
 // - prettier/src/language-js/print/assignment.js
 
 use super::Printer;
+use super::analysis::conditional_should_break_after_op;
 use super::expressions::format_string_literal_from_ast;
 use super::is_string_literal;
 use crate::ast::internal::{self, Expression};
@@ -72,8 +73,15 @@ pub fn choose_layout(
         return AssignmentLayout::NeverBreakAfterOperator;
     }
 
-    // Binary expressions → break after operator
-    if matches!(right_expr, Expression::BinaryExpression(_)) {
+    // Binary expressions → break after operator, UNLESS it's a logical expression
+    // with a self-expanding RHS (non-empty object/array). In that case, the RHS
+    // handles its own expansion: `x = foo || { a: 1 }` not `x =\n  foo || {a: 1}`
+    //
+    // Prettier ref: shouldBreakAfterOperator (assignment.js:199)
+    //   `isBinaryish(rightNode) && !shouldInlineLogicalExpression(rightNode)`
+    if let Expression::BinaryExpression(binary) = right_expr
+        && !should_inline_logical_expression(binary)
+    {
         return AssignmentLayout::BreakAfterOperator;
     }
 
@@ -83,12 +91,8 @@ pub fn choose_layout(
     }
 
     // Conditional expressions with binary test → break after operator
-    // When a ternary has a BinaryExpression as its test, prettier breaks after the
-    // operator to put the entire ternary on the next line with increased indentation.
-    // This allows the ternary to stay intact if it fits, or break internally if needed.
-    if let Expression::ConditionalExpression(cond) = right_expr
-        && matches!(cond.test.as_ref(), Expression::BinaryExpression(_))
-    {
+    // Prettier ref: shouldBreakAfterOperator (assignment.js:216-219)
+    if conditional_should_break_after_op(right_expr) {
         return AssignmentLayout::BreakAfterOperator;
     }
 
@@ -143,6 +147,26 @@ pub fn is_self_expanding_value(expr: &Expression) -> bool {
         // Arrow functions are self-expanding UNLESS they're curried with return type
         Expression::ArrowFunctionExpression(_) => !is_curried_arrow_with_return_type(expr),
 
+        _ => false,
+    }
+}
+
+/// Check if a binary expression is a logical expression with a self-expanding RHS.
+///
+/// Returns true when a LogicalExpression (`&&`, `||`, `??`) has a non-empty object,
+/// non-empty array, or JSX element on the right side. These cases should NOT use
+/// BreakAfterOperator — the RHS handles its own expansion.
+///
+/// Prettier ref: `shouldInlineLogicalExpression` (binaryish.js:361)
+pub fn should_inline_logical_expression(binary: &internal::BinaryExpression) -> bool {
+    if !binary.operator.is_logical() {
+        return false;
+    }
+
+    match &*binary.right {
+        Expression::ObjectExpression(obj) => !obj.properties.is_empty(),
+        Expression::ArrayExpression(arr) => !arr.elements.is_empty(),
+        // Note: Prettier also checks isJsxElement, but JSX is not supported in tsv
         _ => false,
     }
 }
@@ -225,33 +249,13 @@ pub fn arrow_chain_has_return_type(arrow: &internal::ArrowFunctionExpression) ->
 /// - Single-element arrays/objects where the element itself won't expand
 pub fn is_simple_self_expanding(expr: &Expression) -> bool {
     match expr {
-        Expression::ArrayExpression(arr) => {
-            if arr.elements.is_empty() {
-                return true;
-            }
-            if arr.elements.len() > 1 {
-                return false;
-            }
-            // Single element - check if it will expand
-            arr.elements[0]
-                .as_ref()
-                .is_none_or(|e| !is_self_expanding_value(e))
-        }
-        Expression::ObjectExpression(obj) => {
-            if obj.properties.is_empty() {
-                return true;
-            }
-            if obj.properties.len() > 1 {
-                return false;
-            }
-            // Single property - check if value will expand (for non-shorthand)
-            match &obj.properties[0] {
-                internal::ObjectProperty::Property(prop) => {
-                    !prop.shorthand && !is_self_expanding_value(&prop.value)
-                }
-                internal::ObjectProperty::SpreadElement(_) => false,
-            }
-        }
+        // Only empty arrays/objects are "simple" — they truly won't expand.
+        // Non-empty arrays/objects have group softlines that can break internally
+        // when the line exceeds print_width, so they handle their own expansion.
+        // Treating non-empty ones as "simple" would force break-after-operator,
+        // preventing the array/object from expanding naturally (e.g., `= [\n  elem,\n]`).
+        Expression::ArrayExpression(arr) => arr.elements.is_empty(),
+        Expression::ObjectExpression(obj) => obj.properties.is_empty(),
         _ => false,
     }
 }
@@ -261,9 +265,11 @@ pub fn is_simple_self_expanding(expr: &Expression) -> bool {
 /// Returns true for expressions that don't break well internally:
 /// - Poorly breakable chains (member-only chains, trivial call chains)
 /// - String literals (can't break internally)
-/// - Regex literals (can't break internally)
 ///
 /// Precondition: Only called when is_short_key is false (checked in choose_layout)
+///
+/// Note: Prettier does NOT include RegexLiteral here. Regex falls through to
+/// Fluid layout, which produces the same output since regex can't break internally.
 fn should_break_after_operator(expr: &Expression, source: &str, print_width: usize) -> bool {
     // Unwrap wrapper expressions to get to the core
     let core_expr = unwrap_expression(expr);
@@ -273,16 +279,11 @@ fn should_break_after_operator(expr: &Expression, source: &str, print_width: usi
         return true;
     }
 
-    // Regex literals can't break internally, so break after operator
-    if matches!(core_expr, Expression::RegexLiteral(_)) {
-        return true;
-    }
-
     // Check if it's a poorly breakable chain
     is_poorly_breakable_chain(core_expr, source, print_width)
 }
 
-/// Unwrap wrapper expressions (TSNonNullExpression, await, unary, yield)
+/// Unwrap wrapper expressions (TSNonNullExpression, await, unary, yield, parenthesized)
 fn unwrap_expression(expr: &Expression) -> &Expression {
     match expr {
         Expression::TSNonNullExpression(non_null) => unwrap_expression(&non_null.expression),
@@ -295,6 +296,7 @@ fn unwrap_expression(expr: &Expression) -> &Expression {
                 expr
             }
         }
+        Expression::Parenthesized(inner) => unwrap_expression(inner),
         _ => expr,
     }
 }
@@ -371,11 +373,19 @@ fn is_poorly_breakable_chain_recursive(
                 );
             }
 
-            // 2 calls: check if factory pattern
+            // 2 calls: check if factory pattern AND all calls have trivial args
+            // Prettier's isPoorlyBreakableMemberOrCallChain recurses through the
+            // entire chain checking each call's args. A factory chain like
+            // `A.fn("long string").optional()` is NOT poorly breakable because
+            // the inner call has a non-trivial arg that provides a good break point.
             if call_count == 2 {
                 if is_factory_chain(&call.callee, source) {
-                    // Factory pattern with 2 calls → break after operator
-                    return true;
+                    return is_poorly_breakable_chain_recursive(
+                        &call.callee,
+                        true,
+                        source,
+                        print_width,
+                    );
                 }
                 // Non-factory with 2 calls → let chain formatter handle it
                 return false;
@@ -456,37 +466,77 @@ pub fn is_single_call_on_member_chain(expr: &Expression) -> bool {
     }
 }
 
+/// Check if a call expression on a member chain has a regex literal as its root.
+///
+/// Matches patterns like `/regex/.exec(b)` where the chain root is a `RegexLiteral`.
+/// These chains are NOT poorly-breakable (only Identifier/Super are valid roots in
+/// `is_poorly_breakable_chain`) but should use fluid layout matching Prettier's default.
+pub fn is_regex_root_chain(expr: &Expression) -> bool {
+    if let Expression::CallExpression(call) = expr {
+        let mut node = &*call.callee;
+        loop {
+            match node {
+                Expression::MemberExpression(member) => node = &member.object,
+                Expression::TSNonNullExpression(non_null) => node = &non_null.expression,
+                _ => break,
+            }
+        }
+        matches!(node, Expression::RegexLiteral(_))
+    } else {
+        false
+    }
+}
+
 /// Check if an argument is "short" (won't expand when formatted)
 ///
-/// Matches Prettier's `isLoneShortArgument` logic:
-/// - Identifiers are short if name length <= threshold (printWidth * 0.25)
-/// - String literals are short if formatted length <= threshold
-/// - Template literals without expressions are short if raw length <= threshold and no newlines
-/// - Other literals (numbers, booleans, null) are short
+/// Prettier ref: `isLoneShortArgument` in utils/index.js:434
+/// Threshold: `printWidth * LONE_SHORT_ARGUMENT_THRESHOLD_RATE` (0.25)
+///
+/// Note: Prettier uses JS `.length` (UTF-16 code units) for all measurements,
+/// we use `.len()` (UTF-8 bytes). These match for ASCII (the common case).
 fn is_short_arg(expr: &Expression, source: &str, print_width: usize) -> bool {
-    // Prettier's LONE_SHORT_ARGUMENT_THRESHOLD_RATE = 0.25
-    // Threshold = printWidth * 0.25 (using integer division: printWidth / 4)
+    // Prettier: LONE_SHORT_ARGUMENT_THRESHOLD_RATE = 0.25 (utils/index.js:433)
     let threshold = print_width / 4;
 
     match expr {
-        // String literals: check formatted length against threshold
+        // Prettier: node.type === "Identifier" && node.name.length <= threshold
+        Expression::Identifier(id) => id.span.extract(source).len() <= threshold,
+
+        // Prettier: isSignedNumericLiteral(node) && !hasComment(node.argument)
+        // + general UnaryExpression recursion (line 471-472)
+        // We combine both: recurse into all unary arguments.
+        Expression::UnaryExpression(unary) => is_short_arg(&unary.argument, source, print_width),
+
+        // Prettier: regexpPattern.length <= threshold (line 456)
+        Expression::RegexLiteral(regex) => regex.pattern.len() <= threshold,
+
+        // Prettier: printString(getRaw(node), options).length <= threshold (line 460)
         Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. }) => {
             format_string_literal_from_ast(lit, source).len() <= threshold
         }
-        // Template literals: short if no expressions, raw length <= threshold, and no newlines
+
+        // Prettier: node.quasis[0].value.raw.length <= threshold && !includes("\n") (line 464-468)
         Expression::TemplateLiteral(template) => {
             template.expressions.is_empty()
                 && !template.quasis.is_empty()
                 && template.quasis[0].raw.len() <= threshold
                 && !super::template_literal_has_newlines(template)
         }
-        // Other literals (numbers, booleans, null, bigint) are short
+
+        // Prettier: CallExpression with 0 args + Identifier callee (line 475-481)
+        // callee.name.length <= threshold - 2 (accounts for "()")
+        Expression::CallExpression(call) => {
+            call.arguments.is_empty()
+                && matches!(&*call.callee, Expression::Identifier(id)
+                    if id.span.extract(source).len() <= threshold.saturating_sub(2))
+        }
+
+        // Prettier: isLiteral(node) — numbers, booleans, null, bigint (line 483)
         Expression::Literal(_) => true,
-        // Identifiers: short if name length <= threshold
-        Expression::Identifier(id) => id.span.extract(source).len() <= threshold,
-        // `this` is short (can't break)
+
+        // super — rare as standalone arg, but trivially short
         Expression::Super(_) => true,
-        // Everything else might be complex
+
         _ => false,
     }
 }
@@ -528,6 +578,37 @@ fn is_member_only_chain(expr: &Expression) -> bool {
     }
 }
 
+/// Check if an expression is a member-only chain with a literal base
+/// (e.g., `'string'.length`, `` `template`.length ``).
+///
+/// These chains need Fluid assignment layout because the literal base can't break
+/// internally but may exceed print_width on the assignment line. Without Fluid,
+/// the member access breaks to the next line but the assignment stays flat,
+/// potentially exceeding print_width.
+///
+/// Prettier handles this via `printMemberExpression` which produces
+/// `[objectDoc, group(indent([softline, ".prop"]))]` — the assignment's
+/// `chooseLayout` returns Fluid (default) for these expressions.
+pub fn is_literal_member_chain(expr: &Expression) -> bool {
+    if !matches!(expr, Expression::MemberExpression(_)) {
+        return false;
+    }
+    let root = member_chain_root(expr);
+    matches!(
+        root,
+        Expression::Literal(_) | Expression::TemplateLiteral(_)
+    )
+}
+
+/// Walk a member chain to find the root expression.
+fn member_chain_root(expr: &Expression) -> &Expression {
+    match expr {
+        Expression::MemberExpression(member) => member_chain_root(&member.object),
+        Expression::TSNonNullExpression(non_null) => member_chain_root(&non_null.expression),
+        _ => expr,
+    }
+}
+
 /// Count calls in a chain expression.
 fn count_calls_in_chain(expr: &Expression) -> usize {
     match expr {
@@ -542,7 +623,10 @@ fn count_calls_in_chain(expr: &Expression) -> usize {
 ///
 /// Factory patterns include:
 /// - Capital letter start: Object.keys, React.createElement, etc.
-/// - Special prefixes: $_, $__ (lodash-style)
+/// - Pure `$`/`_` identifiers: `$`, `_`, `$_`, `$__` (lodash-style)
+///
+/// Matches Prettier's `isFactory`: `/^[A-Z]|^[$_]+$/u` (member-chain.js:273)
+/// Note: `$util`, `_helper` etc. are NOT factories — only pure `$`/`_` names.
 fn is_factory_chain(expr: &Expression, source: &str) -> bool {
     match expr {
         Expression::CallExpression(call) => is_factory_chain(&call.callee, source),
@@ -550,10 +634,8 @@ fn is_factory_chain(expr: &Expression, source: &str) -> bool {
         Expression::TSNonNullExpression(non_null) => is_factory_chain(&non_null.expression, source),
         Expression::Identifier(id) => {
             let name = id.span.extract(source);
-            // Factory patterns: capital letter start OR $_ style (lodash)
-            name.chars()
-                .next()
-                .is_some_and(|c| c.is_uppercase() || (c == '$' || c == '_'))
+            name.chars().next().is_some_and(char::is_uppercase)
+                || (!name.is_empty() && name.chars().all(|c| c == '$' || c == '_'))
         }
         Expression::Super(_) => true,
         _ => false,
@@ -561,7 +643,11 @@ fn is_factory_chain(expr: &Expression, source: &str) -> bool {
 }
 
 /// Check if an expression is a simple value that shouldn't break
-fn is_simple_value(expr: &Expression) -> bool {
+/// Values that should never break after operator: booleans, numbers, template literals.
+///
+/// Prettier ref: chooseLayout (assignment.js:181-191) — when !canBreakLeftDoc.
+/// Note: ClassExpression is handled separately by is_self_expanding_value.
+pub fn is_simple_value(expr: &Expression) -> bool {
     matches!(
         expr,
         Expression::Literal(lit) if matches!(
@@ -569,7 +655,10 @@ fn is_simple_value(expr: &Expression) -> bool {
             internal::LiteralValue::Boolean(_)
             | internal::LiteralValue::Number(_)
         )
-    ) || matches!(expr, Expression::TemplateLiteral(_))
+    ) || matches!(
+        expr,
+        Expression::TemplateLiteral(_) | Expression::TaggedTemplateExpression(_)
+    )
 }
 
 impl<'a> Printer<'a> {

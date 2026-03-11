@@ -7,7 +7,7 @@
  * Implementations:
  * - Canonical: prettier + svelte/compiler (JavaScript baseline)
  * - Native: tsv via FFI (Rust, maximum performance)
- * - WASM: tsv compiled to WebAssembly (portable, near-native)
+ * - WASM: tsv compiled to WASM (portable, near-native)
  * - Alternatives: oxc-parser, oxfmt, biome-wasm (for comparison)
  *
  * Run with: deno task bench:run
@@ -19,6 +19,7 @@
  *   --compare-baseline  Compare against saved baseline
  *
  * Results are always saved to benches/deno/results/<timestamp>_<commit>.{json,md}.
+ * Latest results are also written to benches/deno/results/report.{json,md} (committed to git).
  *
  * Environment variables:
  *   BENCH_LIMIT         Limit files per language (default: all)
@@ -616,9 +617,12 @@ async function saveResults(
 		data.git_commit,
 	);
 
+	const json = JSON.stringify(data, null, '\t');
 	await Promise.all([
-		Deno.writeTextFile(`${basePath}.json`, JSON.stringify(data, null, '\t')),
+		Deno.writeTextFile(`${basePath}.json`, json),
 		Deno.writeTextFile(`${basePath}.md`, markdown),
+		Deno.writeTextFile(`${RESULTS_DIR}/report.json`, json),
+		Deno.writeTextFile(`${RESULTS_DIR}/report.md`, markdown),
 	]);
 
 	return basePath;

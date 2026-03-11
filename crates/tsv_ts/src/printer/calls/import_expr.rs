@@ -56,13 +56,29 @@ pub(super) fn build_import_expression_doc(
                 ]);
             }
 
-            // Block comments only - keep inline
+            // Block comments only - wrap in group so import() can break
             let mut parts = vec![source_doc];
             pc.emit_trailing_comments(&mut parts, printer);
-            return d.concat(&[d.text("import("), d.concat(&parts), d.text(")")]);
+            let inner = d.concat(&parts);
+            return d.group(d.concat(&[
+                d.text("import("),
+                d.indent(d.concat(&[d.softline(), inner])),
+                d.softline(),
+                d.text(")"),
+            ]));
         }
 
-        return d.concat(&[d.text("import"), d.parens(source_doc)]);
+        // Wrap in group with softline break points so the outer import()
+        // can break when the line exceeds print width, matching Prettier's
+        // call-arg expansion behavior. Without this, only the inner arg's
+        // groups can break (e.g., `import(fn(\n  'long',\n))` instead of
+        // the correct `import(\n  fn('long')\n)`).
+        return d.group(d.concat(&[
+            d.text("import("),
+            d.indent(d.concat(&[d.softline(), source_doc])),
+            d.softline(),
+            d.text(")"),
+        ]));
     };
 
     let options_doc = printer.build_expression_doc(options);
@@ -70,115 +86,96 @@ pub(super) fn build_import_expression_doc(
     let paren_close = import_expr.span.end;
 
     // Check for trailing comments after the options arg
-    let has_trailing_comments = printer.has_comments_between(options_end, paren_close);
     let has_trailing_line_comments = printer.has_line_comments_between(options_end, paren_close);
+    let has_trailing_comments =
+        has_trailing_line_comments || printer.has_comments_between(options_end, paren_close);
 
-    // "Expand last arg" pattern for objects: keep first arg inline, only expand the object
-    // Result: import(source, {\n\twith: {...},\n})
-    if is_expandable_object(options) {
-        if has_trailing_line_comments {
-            // Line comments force multiline expansion
-            // import(\n\t'./a',\n\t{opts} // comment\n)
-            let pc = PartitionedComments::new(
-                printer.comments,
-                printer.line_breaks,
-                options_end,
-                paren_close,
-            );
+    // Comment paths are the same regardless of whether options is an expandable object.
+    // The is_expandable_object check only matters for the no-comment expand-last-arg pattern.
+    if has_trailing_line_comments {
+        // Line comments force hardline layout: import(\n\t'source',\n\t{opts} // comment\n)
+        let pc = PartitionedComments::new(
+            printer.comments,
+            printer.line_breaks,
+            options_end,
+            paren_close,
+        );
 
-            let mut parts = vec![options_doc];
-            pc.emit_trailing_comments(&mut parts, printer);
+        let mut parts = vec![options_doc];
+        pc.emit_trailing_comments(&mut parts, printer);
 
-            d.concat(&[
-                d.text("import("),
-                d.indent(d.concat(&[
-                    d.hardline(),
-                    source_doc,
-                    d.text(","),
-                    d.hardline(),
-                    d.concat(&parts),
-                ])),
+        d.concat(&[
+            d.text("import("),
+            d.indent(d.concat(&[
                 d.hardline(),
-                d.text(")"),
-            ])
-        } else if has_trailing_comments {
-            // Block comments only - keep inline
-            let pc = PartitionedComments::new(
-                printer.comments,
-                printer.line_breaks,
-                options_end,
-                paren_close,
-            );
-
-            let mut parts = vec![source_doc, d.text(", "), options_doc];
-            pc.emit_trailing_comments(&mut parts, printer);
-
-            d.concat(&[d.text("import("), d.concat(&parts), d.text(")")])
-        } else {
-            d.concat(&[
-                d.text("import"),
-                d.text("("),
                 source_doc,
-                d.text(", "),
-                options_doc,
-                d.text(")"),
-            ])
-        }
-    } else {
-        // Standard wrapping for non-object options
-        if has_trailing_line_comments {
-            // Line comments force multiline expansion
-            let pc = PartitionedComments::new(
-                printer.comments,
-                printer.line_breaks,
-                options_end,
-                paren_close,
-            );
-
-            let mut parts = vec![options_doc];
-            pc.emit_trailing_comments(&mut parts, printer);
-
-            d.concat(&[
-                d.text("import("),
-                d.indent(d.concat(&[
-                    d.hardline(),
-                    source_doc,
-                    d.text(","),
-                    d.hardline(),
-                    d.concat(&parts),
-                ])),
+                d.text(","),
                 d.hardline(),
-                d.text(")"),
-            ])
-        } else if has_trailing_comments {
-            let pc = PartitionedComments::new(
-                printer.comments,
-                printer.line_breaks,
-                options_end,
-                paren_close,
-            );
+                d.concat(&parts),
+            ])),
+            d.hardline(),
+            d.text(")"),
+        ])
+    } else if has_trailing_comments {
+        // Block comments — standard group wrapping
+        let pc = PartitionedComments::new(
+            printer.comments,
+            printer.line_breaks,
+            options_end,
+            paren_close,
+        );
 
-            let mut parts = vec![options_doc];
-            pc.emit_trailing_comments(&mut parts, printer);
+        let mut opts_parts = vec![options_doc];
+        pc.emit_trailing_comments(&mut opts_parts, printer);
+        let opts_with_comment = d.concat(&opts_parts);
 
-            let arg_parts = d.join_doc([source_doc, d.concat(&parts)], d.comma_line());
-            d.group(d.concat(&[
-                d.text("import"),
-                d.text("("),
-                d.indent_softline(arg_parts),
-                d.softline(),
-                d.text(")"),
-            ]))
-        } else {
-            let arg_parts = d.join_doc([source_doc, options_doc], d.comma_line());
-            d.group(d.concat(&[
-                d.text("import"),
-                d.text("("),
-                d.indent_softline(arg_parts),
-                d.softline(),
-                d.text(")"),
-            ]))
-        }
+        let arg_parts = d.join_doc([source_doc, opts_with_comment], d.comma_line());
+        d.group(d.concat(&[
+            d.text("import("),
+            d.indent_softline(arg_parts),
+            d.softline(),
+            d.text(")"),
+        ]))
+    } else if is_expandable_object(options) {
+        // Three-state conditional group matching Prettier's expand-last-arg:
+        // State 0: all flat — import('source', {with: {type: 'json'}})
+        // State 1: expand-last — import('source', {\n\twith: ...\n})
+        // State 2: expand-all — import(\n\t'source',\n\t{...}\n)
+        let state_flat = d.concat(&[
+            d.text("import("),
+            source_doc,
+            d.text(", "),
+            options_doc,
+            d.text(")"),
+        ]);
+
+        let expanded_options = d.group_break(options_doc);
+        let state_expand_last = d.concat(&[
+            d.text("import("),
+            source_doc,
+            d.text(", "),
+            expanded_options,
+            d.text(")"),
+        ]);
+
+        let arg_parts = d.join_doc([source_doc, options_doc], d.comma_line());
+        let state_expand_all = d.concat(&[
+            d.text("import("),
+            d.indent_softline(arg_parts),
+            d.softline(),
+            d.text(")"),
+        ]);
+
+        d.conditional_group(&[state_flat, state_expand_last, state_expand_all])
+    } else {
+        // Standard group wrapping for non-expandable options
+        let arg_parts = d.join_doc([source_doc, options_doc], d.comma_line());
+        d.group(d.concat(&[
+            d.text("import("),
+            d.indent_softline(arg_parts),
+            d.softline(),
+            d.text(")"),
+        ]))
     }
 }
 

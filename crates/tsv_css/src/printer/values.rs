@@ -67,6 +67,8 @@ impl<'a> Printer<'a> {
     ///
     /// Uses source extraction to preserve escapes, with whitespace normalization
     /// for parenthesized expressions (like calc sub-expressions).
+    /// Parenthesized groups like `(100vw - var(--a) - var(--b))` get fill-based
+    /// wrapping so they can break at operator boundaries when exceeding print width.
     fn build_identifier_doc(&self, name: &str, span: Span) -> DocId {
         let d = self.d();
         // Try source extraction first to preserve any escapes
@@ -76,12 +78,51 @@ impl<'a> Printer<'a> {
                 // Normalize whitespace for parenthesized expressions
                 // (e.g., "(  100%  -  40px  )" → "(100% - 40px)")
                 let normalized = source_fidelity::normalize_css_whitespace(raw);
+
+                // Parenthesized groups with multiple space-separated tokens get
+                // fill-based wrapping so they can break at operator boundaries.
+                // Matches prettier's group(indent(fill(parts))) for paren groups.
+                if normalized.starts_with('(') && normalized.ends_with(')') {
+                    let inner = &normalized[1..normalized.len() - 1];
+                    let tokens = source_fidelity::split_by_space_preserving_parens(inner);
+                    if tokens.len() >= 3 {
+                        return self.build_paren_group_doc(&tokens);
+                    }
+                }
+
                 return d.text_owned(normalized);
             }
         }
         // Fallback: semantic formatting
         let formatted = source_fidelity::format_identifier_value(name);
         d.text_owned(formatted)
+    }
+
+    /// Build a doc for a parenthesized group with fill-based wrapping
+    ///
+    /// Structure: group("(" indent(softline group(indent(fill(tokens...)))) softline ")")
+    /// - Flat: `(a - b - c)`
+    /// - Break: `(\n  a - b -\n    c\n)`
+    fn build_paren_group_doc(&self, tokens: &[&str]) -> DocId {
+        let d = self.d();
+        let mut fill_parts = Vec::with_capacity(tokens.len() * 2);
+        for (i, token) in tokens.iter().enumerate() {
+            fill_parts.push(d.text_owned(token.to_string()));
+            if i < tokens.len() - 1 {
+                fill_parts.push(d.line());
+            }
+        }
+        // Inner: group(indent(fill(tokens))) — continuation indent for wrapped lines
+        let inner = d.group(d.indent(d.fill(&fill_parts)));
+        // Outer: group("(" indent(softline inner) softline ")")
+        let open = d.text("(");
+        let close = d.text(")");
+        d.group(d.concat(&[
+            open,
+            d.indent(d.concat(&[d.softline(), inner])),
+            d.softline(),
+            close,
+        ]))
     }
 
     /// Build a doc for a string value
@@ -131,8 +172,7 @@ impl<'a> Printer<'a> {
         // WORKAROUND: url() data URIs contain commas that our parser incorrectly treats as
         // argument separators. Use no space after commas to preserve data URI format.
         // url() also never wraps since it has no natural break points.
-        let is_url = name == "url";
-        if is_url {
+        if name == "url" {
             let name_doc = d.text_owned(name.to_string());
             let open = d.text("(");
             let args_doc = d.join(args.iter().map(|arg| self.build_css_value_doc(arg)), ",");
@@ -158,7 +198,14 @@ impl<'a> Printer<'a> {
         // When flat: name(arg1, arg2, arg3)
         let mut inner_parts = Vec::new();
         for (i, arg) in args.iter().enumerate() {
-            inner_parts.push(self.build_css_value_doc(arg));
+            // For List args (space-separated values like calc math expressions),
+            // use fill with line() separators so content can break at operators.
+            // Matches prettier's group(indent(fill(parts))) pattern.
+            if let CssValue::List { values, .. } = arg {
+                inner_parts.push(self.build_space_fill_value_doc(values));
+            } else {
+                inner_parts.push(self.build_css_value_doc(arg));
+            }
             if i < args.len() - 1 {
                 inner_parts.push(d.text(","));
                 inner_parts.push(d.line()); // space when flat, newline when broken
@@ -166,14 +213,33 @@ impl<'a> Printer<'a> {
         }
 
         let name_doc = d.text_owned(name.to_string());
-        let open = d.text("(");
-        let softline1 = d.softline(); // nothing when flat, newline when broken
         let inner = d.concat(&inner_parts);
-        let indent_content = d.concat(&[softline1, inner]);
-        let indented = d.indent(indent_content);
-        let softline2 = d.softline(); // nothing when flat, newline when broken
-        let close = d.text(")");
-        d.group(d.concat(&[name_doc, open, indented, softline2, close]))
+        d.group(d.concat(&[
+            name_doc,
+            d.text("("),
+            d.indent(d.concat(&[d.softline(), inner])),
+            d.softline(),
+            d.text(")"),
+        ]))
+    }
+
+    /// Build a doc for space-separated values inside a function argument
+    ///
+    /// Uses fill with line() separators so the renderer can break at space boundaries
+    /// when content exceeds print width. Wrapped in group(indent(fill(...))) to match
+    /// prettier's CSS value group pattern — continuation lines get extra indent.
+    ///
+    /// Example: `calc(0.5 * (100vw - var(--a)))` breaks as:
+    /// ```text
+    /// calc(
+    ///   0.5 *
+    ///     (100vw - var(--a))
+    /// )
+    /// ```
+    fn build_space_fill_value_doc(&self, values: &[CssValue]) -> DocId {
+        let d = self.d();
+        let parts = self.build_space_fill_parts(values);
+        d.group(d.indent(d.fill(&parts)))
     }
 
     /// Build a doc for space-separated values

@@ -6,9 +6,9 @@
  *   deno task corpus:compare ~/dev/some-project --filter svelte
  *   deno task corpus:compare ~/dev/some-project --limit 100
  *   deno task corpus:compare ~/dev/some-project --verbose
- *   deno task corpus:compare ~/dev/some-project --diff
  *   deno task corpus:compare ~/dev/some-project --safety-only
  *   deno task corpus:compare ~/dev/some-project --explain
+ *   deno task corpus:compare ~/dev/some-project --summary   # Compact output (no diffs)
  *   deno task corpus:compare --all                          # All SvelteKit repos from ~/dev
  */
 
@@ -38,13 +38,12 @@ interface Args {
 	filter?: string;
 	limit?: number;
 	verbose?: boolean;
-	diff?: boolean;
-	'diff-limit'?: number;
 	'exit-on-first'?: boolean;
 	'safety-only'?: boolean;
 	explain?: boolean;
 	strict?: boolean;
 	'audit-patterns'?: boolean;
+	summary?: boolean;
 	help?: boolean;
 }
 
@@ -145,11 +144,10 @@ Options:
   --filter <lang>   Only compare files of this language (svelte, typescript, css)
   --limit <n>       Limit to first n files per language
   --verbose         Show each file as it's processed
-  --diff            Show unified diffs for mismatches
-  --diff-limit <n>  Max diffs to show (default: 5)
-  --exit-on-first   Stop after finding the first mismatch or error
+  --exit-on-first   Stop after finding the first mismatch or error (shows diff)
   --safety-only     Only check for safety violations (data loss), skip formatting comparison
   --explain         Show detected divergence patterns for each difference
+  --summary         Compact output (no diffs, just file lists with brief descriptions)
   --strict          Fail on any difference (disable divergence detection)
   --audit-patterns  Show per-pattern corpus coverage with sample diffs for spot-checking
   --help            Show this help message
@@ -158,11 +156,11 @@ Examples:
   deno task corpus:compare ~/dev/my-project
   deno task corpus:compare ~/dev/my-project --filter svelte
   deno task corpus:compare ~/dev/my-project --limit 50 --verbose
-  deno task corpus:compare ~/dev/my-project --diff --diff-limit 3
-  deno task corpus:compare ~/dev/my-project --exit-on-first --diff
+  deno task corpus:compare ~/dev/my-project --exit-on-first
   deno task corpus:compare ~/dev/my-project --safety-only
   deno task corpus:compare ~/dev/my-project --explain
   deno task corpus:compare --all --audit-patterns
+  deno task corpus:compare --all --summary
 `);
 }
 
@@ -173,14 +171,14 @@ async function main(): Promise<void> {
 			'all',
 			'verbose',
 			'help',
-			'diff',
 			'exit-on-first',
 			'safety-only',
 			'explain',
 			'strict',
 			'audit-patterns',
+			'summary',
 		],
-		alias: { h: 'help', v: 'verbose', f: 'filter', l: 'limit', d: 'diff', a: 'all' },
+		alias: { h: 'help', v: 'verbose', f: 'filter', l: 'limit', a: 'all' },
 	}) as Args;
 
 	if (args.help) {
@@ -211,13 +209,12 @@ async function main(): Promise<void> {
 
 	const limit = args.limit ? Number(args.limit) : undefined;
 	const verbose = args.verbose ?? false;
-	const showDiff = args.diff ?? false;
-	const diffLimit = args['diff-limit'] ? Number(args['diff-limit']) : 5;
 	const exitOnFirst = args['exit-on-first'] ?? false;
 	const safetyOnly = args['safety-only'] ?? false;
 	const explain = args.explain ?? false;
 	const strict = args.strict ?? false;
 	const auditPatterns = args['audit-patterns'] ?? false;
+	const summary = args.summary ?? false;
 
 	if (useAllRepos) {
 		console.log('Comparing: All SvelteKit repos from ~/dev');
@@ -230,6 +227,7 @@ async function main(): Promise<void> {
 	if (strict) console.log(`Mode: strict (no divergence detection)`);
 	if (explain) console.log(`Mode: explain (show divergence patterns)`);
 	if (auditPatterns) console.log(`Mode: audit-patterns (per-pattern coverage report)`);
+	if (summary) console.log(`Mode: summary (compact output, no diffs)`);
 	console.log();
 
 	// Load corpus
@@ -430,17 +428,15 @@ async function main(): Promise<void> {
 							langResults.push({ file, status: 'unknown_diff', ours, prettier, coverage });
 							if (exitOnFirst) {
 								console.log(`\nUnknown difference: ${rel}`);
-								if (showDiff) {
-									console.log('─'.repeat(70));
-									const removals = diff.filter((d) => d.type === 'remove').length;
-									const additions = diff.filter((d) => d.type === 'add').length;
-									console.log(
-										`Diff: \x1b[31m- Prettier\x1b[0m → \x1b[32m+ Ours\x1b[0m  (${removals} prettier-only, ${additions} ours-only)`,
-									);
-									console.log('');
-									for (const line of formatDiffForTerminal(filterDiffContext(diff))) {
-										console.log(line);
-									}
+								console.log('─'.repeat(70));
+								const removals = diff.filter((d) => d.type === 'remove').length;
+								const additions = diff.filter((d) => d.type === 'add').length;
+								console.log(
+									`Diff: \x1b[31m- Prettier\x1b[0m → \x1b[32m+ Ours\x1b[0m  (${removals} prettier-only, ${additions} ours-only)`,
+								);
+								console.log('');
+								for (const line of formatDiffForTerminal(filterDiffContext(diff))) {
+									console.log(line);
 								}
 								shouldExit = true;
 							}
@@ -578,53 +574,18 @@ async function main(): Promise<void> {
 		results.get(lang)!.filter((r) => r.status === 'partial_divergence')
 	).sort((a, b) => a.file.bytes - b.file.bytes);
 
-	if (allPartial.length > 0) {
-		if (explain) {
+	// Show unknown differences (needs investigation)
+	const allUnknown = LANGUAGES.flatMap((lang) =>
+		results.get(lang)!.filter((r) => r.status === 'unknown_diff')
+	).sort((a, b) => a.file.bytes - b.file.bytes);
+
+	// Default: show unexplained diffs (partial hunks + unknown files)
+	// --summary: compact output without diffs
+	if (summary) {
+		// Compact partial divergence listing
+		if (allPartial.length > 0) {
 			console.log(
-				`\nPartial Divergences (${allPartial.length} files - some hunks unexplained):`,
-			);
-			for (const r of allPartial) {
-				const coverage = r.coverage!;
-				const patterns = coverage.matches.map((d) => d.pattern).join(', ');
-				const explainedCount = coverage.explainedHunks.size;
-				const totalHunks = coverage.hunks.length;
-				console.log(`  ${relPath(r.file.path, resolvedPath)}:`);
-				console.log(
-					`    EXPLAINED (${explainedCount}/${totalHunks} hunks): ${patterns}`,
-				);
-				let fileHunksShown = 0;
-				for (const idx of coverage.unexplainedHunks) {
-					const hunk = coverage.hunks[idx];
-					if (showDiff && fileHunksShown < diffLimit) {
-						const oursLabel = hunk.oursRange ? `ours:${hunk.oursRange.start}` : '';
-						const prettierLabel = hunk.prettierRange ? `prettier:${hunk.prettierRange.start}` : '';
-						console.log(
-							`    UNEXPLAINED hunk ${idx}: @@ ${oursLabel} / ${prettierLabel} @@`,
-						);
-						for (const line of formatDiffForTerminal(hunk.lines)) {
-							console.log(`      ${line}`);
-						}
-						fileHunksShown++;
-					} else {
-						const lineCount = hunk.addedLines.length + hunk.removedLines.length;
-						const preview = (hunk.addedLines[0] || hunk.removedLines[0] || '')
-							.trim().slice(0, 50);
-						console.log(
-							`    UNEXPLAINED hunk ${idx}: "${preview}" (${lineCount} lines)`,
-						);
-					}
-				}
-				if (showDiff && coverage.unexplainedHunks.length > diffLimit) {
-					console.log(
-						`    ... ${
-							coverage.unexplainedHunks.length - diffLimit
-						} more (increase --diff-limit to show)`,
-					);
-				}
-			}
-		} else {
-			console.log(
-				`\nPartial Divergences (${allPartial.length} files - use --explain for details):`,
+				`\nPartial Divergences (${allPartial.length} files):`,
 			);
 			for (const r of allPartial.slice(0, 10)) {
 				const coverage = r.coverage!;
@@ -639,48 +600,73 @@ async function main(): Promise<void> {
 				console.log(`  ... and ${allPartial.length - 10} more`);
 			}
 		}
-	}
 
-	// Show unknown differences (needs investigation)
-	const allUnknown = LANGUAGES.flatMap((lang) =>
-		results.get(lang)!.filter((r) => r.status === 'unknown_diff')
-	).sort((a, b) => a.file.bytes - b.file.bytes);
-
-	if (allUnknown.length > 0) {
-		if (showDiff) {
-			// Show diffs for unknown differences (smallest files first)
-			const toShow = allUnknown.slice(0, diffLimit);
-			for (const r of toShow) {
-				console.log(`\n${'═'.repeat(70)}`);
-				console.log(
-					`File: ${relPath(r.file.path, resolvedPath)} (${formatBytes(r.file.bytes)}) - UNKNOWN`,
-				);
-				console.log('─'.repeat(70));
-
-				const diff = diffLines(r.prettier!, r.ours!);
-				const removals = diff.filter((d) => d.type === 'remove').length;
-				const additions = diff.filter((d) => d.type === 'add').length;
-				console.log(
-					`Diff: \x1b[31m- Prettier\x1b[0m → \x1b[32m+ Ours\x1b[0m  (${removals} prettier-only, ${additions} ours-only)`,
-				);
-				console.log('');
-				for (const line of formatDiffForTerminal(filterDiffContext(diff))) {
-					console.log(line);
-				}
-			}
-			if (allUnknown.length > diffLimit) {
-				console.log(`\n... and ${allUnknown.length - diffLimit} more unknown differences`);
-			}
-		} else {
-			console.log(`\nUnknown Differences (${allUnknown.length} files, needs investigation):`);
+		// Compact unknown differences listing
+		if (allUnknown.length > 0) {
+			console.log(
+				`\nUnknown Differences (${allUnknown.length} files, needs investigation):`,
+			);
 			for (const r of allUnknown.slice(0, 10)) {
 				const sizeStr = formatBytes(r.file.bytes);
-				const summary = getDiffSummary(r.prettier!, r.ours!);
+				const diffSummary = getDiffSummary(r.prettier!, r.ours!);
 				console.log(`  ${relPath(r.file.path, resolvedPath)} (${sizeStr})`);
-				console.log(`    ${summary}`);
+				console.log(`    ${diffSummary}`);
 			}
 			if (allUnknown.length > 10) {
 				console.log(`  ... and ${allUnknown.length - 10} more`);
+			}
+		}
+	} else {
+		// Default: show all unexplained diffs
+		const totalUnexplainedFiles = allPartial.length + allUnknown.length;
+		if (totalUnexplainedFiles > 0) {
+			console.log(
+				`\nUnexplained Differences (${allPartial.length} partial + ${allUnknown.length} unknown = ${totalUnexplainedFiles} files):`,
+			);
+		}
+
+		// Partial files: show only unexplained hunks with diffs
+		if (allPartial.length > 0) {
+			console.log(`\n${'─'.repeat(70)}`);
+			console.log(`Partial files (${allPartial.length} — unexplained hunks only):`);
+			for (const r of allPartial) {
+				const coverage = r.coverage!;
+				const patterns = coverage.matches.map((d) => d.pattern).join(', ');
+				const explainedCount = coverage.explainedHunks.size;
+				const totalHunks = coverage.hunks.length;
+				console.log(`\n  ${relPath(r.file.path, resolvedPath)}:`);
+				console.log(
+					`    explained ${explainedCount}/${totalHunks} hunks: ${patterns}`,
+				);
+				for (const idx of coverage.unexplainedHunks) {
+					const hunk = coverage.hunks[idx];
+					const oursLabel = hunk.oursRange ? `ours:${hunk.oursRange.start}` : '';
+					const prettierLabel = hunk.prettierRange ? `prettier:${hunk.prettierRange.start}` : '';
+					console.log(
+						`    \x1b[33mhunk ${idx}\x1b[0m: @@ ${oursLabel} / ${prettierLabel} @@`,
+					);
+					for (const line of formatDiffForTerminal(hunk.lines)) {
+						console.log(`      ${line}`);
+					}
+				}
+			}
+		}
+
+		// Unknown files: show full diffs
+		if (allUnknown.length > 0) {
+			console.log(`\n${'─'.repeat(70)}`);
+			console.log(`Unknown files (${allUnknown.length} — full diffs):`);
+			for (const r of allUnknown) {
+				const diff = diffLines(r.prettier!, r.ours!);
+				const removals = diff.filter((d) => d.type === 'remove').length;
+				const additions = diff.filter((d) => d.type === 'add').length;
+				console.log(`\n  ${relPath(r.file.path, resolvedPath)} (${formatBytes(r.file.bytes)}):`);
+				console.log(
+					`    \x1b[31m-${removals} prettier-only\x1b[0m, \x1b[32m+${additions} ours-only\x1b[0m`,
+				);
+				for (const line of formatDiffForTerminal(filterDiffContext(diff))) {
+					console.log(`      ${line}`);
+				}
 			}
 		}
 	}

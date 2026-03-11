@@ -308,7 +308,7 @@ impl<'a> Printer<'a> {
             }
             internal::SimpleSelector::Nesting { .. } => d.text("&"),
             internal::SimpleSelector::Percentage { value, .. } => d.text_owned(format!("{value}%")),
-            internal::SimpleSelector::Invalid { raw, .. } => d.text_owned(raw.to_string()),
+            internal::SimpleSelector::Invalid { raw, .. } => d.text_owned(raw.clone()),
         }
     }
 

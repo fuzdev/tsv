@@ -489,7 +489,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Build fill parts for space-separated values (shared helper)
-    fn build_space_fill_parts(&self, values: &[CssValue]) -> Vec<DocId> {
+    ///
+    /// Returns `[val1, line, val2, line, val3]` — suitable for `d.fill()`.
+    /// Used by both declaration wrapping and function arg wrapping.
+    pub(super) fn build_space_fill_parts(&self, values: &[CssValue]) -> Vec<DocId> {
         let d = self.d();
         let mut parts = Vec::with_capacity(values.len() * 2);
         for (i, val) in values.iter().enumerate() {

@@ -29,44 +29,14 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.build_expression_doc(expr)
     }
 
-    fn print_parenthesized_base(&self, expr: &internal::Expression) -> DocId {
+    fn build_parenthesized_base_inner_logical(&self, binary: &internal::BinaryExpression) -> DocId {
         let d = self.d();
-        // Build the inner expression with proper grouping for parenthesized chains
-        match expr {
-            internal::Expression::BinaryExpression(binary) => {
-                // Different structures for different operator types:
-                // - Arithmetic: parens_break for indent-on-break structure
-                // - Logical (&&, ||): Keep original structure with continuation indent
-                if binary.operator.is_logical() {
-                    let inner = self.build_binary_chain_parts_indented(binary);
-                    d.group(d.parens(inner))
-                } else {
-                    let inner = self.build_binary_chain_for_parens(binary);
-                    d.parens_break(inner)
-                }
-            }
-            // Await in chain base: (await fn(...)).method()
-            // Use parens_break so chain prefers breaking at parens over inside call args
-            // Note: YieldExpression uses simple parens - Prettier treats yield differently
-            internal::Expression::AwaitExpression(_) => {
-                let inner = self.build_expression_doc(expr);
-                d.parens_break(inner)
-            }
-            _ => d.parens(self.build_expression_doc(expr)),
-        }
+        let inner = self.build_binary_chain_parts_indented(binary);
+        d.group(inner)
     }
 
-    fn print_parenthesized_base_expanded(&self, expr: &internal::Expression) -> DocId {
-        let d = self.d();
-        // Expanded version with hardlines so fits() can measure actual line widths.
-        // Used for args_break state in conditional_group.
-        let inner = self.build_expression_doc(expr);
-        d.concat(&[
-            d.text("("),
-            d.indent(d.concat(&[d.hardline(), inner])),
-            d.hardline(),
-            d.text(")"),
-        ])
+    fn build_parenthesized_base_inner_binary(&self, binary: &internal::BinaryExpression) -> DocId {
+        self.build_binary_chain_for_parens(binary)
     }
 
     fn print_call_args(&self, call: &internal::CallExpression, optional: bool) -> DocId {
@@ -120,6 +90,10 @@ impl<'a> ChainPrinter for Printer<'a> {
 
     fn is_expression_statement(&self) -> bool {
         self.is_expression_statement.get()
+    }
+
+    fn clear_expression_statement(&self) {
+        self.is_expression_statement.set(false);
     }
 
     fn get_line_breaks(&self) -> &[u32] {
@@ -221,23 +195,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.config.tab_width
     }
 
-    fn get_print_width(&self) -> usize {
-        self.config.print_width
-    }
-
     fn should_force_expand(&self) -> bool {
         self.force_chain_expand.get()
-    }
-
-    fn fits_chain_tail(&self, doc: DocId, available: usize) -> bool {
-        use tsv_lang::doc::{Mode, arena_fits};
-        arena_fits(
-            self.arena,
-            doc,
-            available,
-            Mode::Flat,
-            &self.config,
-            Some(&*self.interner.borrow()),
-        )
     }
 }

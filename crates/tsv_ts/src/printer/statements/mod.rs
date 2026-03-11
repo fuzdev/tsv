@@ -17,7 +17,8 @@ mod variable;
 
 // Re-export for submodules to use `super::Printer` instead of `super::super::Printer`
 pub(super) use super::{
-    Printer, build_entity_name_doc, intersection_has_huggable_last_type, unwrap_parenthesized,
+    Printer, build_entity_name_doc, intersection_has_huggable_last_type, should_hug_union_type,
+    unwrap_parenthesized,
 };
 
 use super::{ParenContext, needs_parens};
@@ -142,67 +143,27 @@ impl<'a> Printer<'a> {
         )
     }
 
-    /// Build a Doc for a return statement
+    /// Build a Doc for a return statement.
     ///
-    /// Handles parenthesization of multiline expressions:
-    /// ```javascript
-    /// // Single line - no parens
-    /// return a && b;
-    ///
-    /// // Multiline - Prettier wraps in parens
-    /// return (
-    ///     a &&
-    ///     b
-    /// );
-    /// ```
+    /// Prettier's `printReturnOrThrowArgument` (function.js:231-277) wraps in parens
+    /// for two cases:
+    /// 1. Own-line comments in chain — unconditional: `return (\n  a\n    // comment\n    .b()\n);`
+    /// 2. Binaryish arguments — conditional: `return (\n  a +\n  b\n);` (only when breaking)
     fn build_return_statement_doc(&self, ret: &internal::ReturnStatement) -> DocId {
         let d = self.d();
         let Some(arg) = &ret.argument else {
             return d.text("return;");
         };
 
-        // Check if the expression is a binary expression that might break
-        // Prettier wraps these in parentheses when they break to multiple lines
-        if let Expression::BinaryExpression(binary) = arg
-            && binary.operator.is_logical()
-        {
-            // Build the expression with proper indentation for binary chains
-            let expr_doc = self.build_binary_chain_doc_ungrouped(binary);
+        // Prettier wraps return args with own-line comments in unconditional parens
+        // (function.js:238-239, returnArgumentHasLeadingComment)
+        if self.return_argument_has_own_line_comment(ret.span.start, arg) {
+            return self.build_return_or_throw_comment_paren_doc("return", arg);
+        }
 
-            // Find trailing comments between expression end and semicolon
-            // These need to be inside the parens when we wrap
-            let expr_end = binary.span.end as usize;
-            let semicolon_pos = self.source[expr_end..]
-                .find(';')
-                .map_or(expr_end, |i| expr_end + i);
-            let trailing_comments_doc =
-                self.build_inline_comments_between_doc(expr_end as u32, semicolon_pos as u32);
-
-            // Structure for multiline:
-            // return (
-            //     expr // trailing comment
-            // );
-            //
-            // Structure for single line:
-            // return expr; // trailing comment
-            //
-            // The binary chain is wrapped in its own group so it can independently
-            // decide whether to break. When the outer group breaks (to add parens),
-            // the inner chain should still try to fit on one line if possible.
-            let broken_doc = d.concat(&[
-                d.text(" ("),
-                d.indent(d.concat(&[d.softline(), d.group(expr_doc), trailing_comments_doc])),
-                d.softline(),
-                d.text(")"),
-            ]);
-
-            let flat_doc = d.concat(&[d.text(" "), expr_doc, trailing_comments_doc]);
-
-            return d.group(d.concat(&[
-                d.text("return"),
-                d.if_break(broken_doc, flat_doc),
-                d.text(";"),
-            ]));
+        // Prettier wraps all binaryish (binary + logical) return args in parens when breaking
+        if let Expression::BinaryExpression(binary) = arg {
+            return self.build_return_or_throw_binary_doc("return", binary);
         }
 
         // Assignment expressions need parentheses: return (a = b);
@@ -221,5 +182,123 @@ impl<'a> Printer<'a> {
             self.build_expression_doc(arg),
             d.text(";"),
         ])
+    }
+
+    /// Check if a return/throw argument has own-line comments that require
+    /// unconditional paren wrapping.
+    ///
+    /// Matches Prettier's `returnArgumentHasLeadingComment` (function.js:290-318):
+    /// walks the left side of chainable expressions (calls, members, etc.)
+    /// looking for own-line comments. If found, the return/throw value gets
+    /// wrapped in `("(", indent([hardline, doc]), hardline, ")")`.
+    fn return_argument_has_own_line_comment(&self, keyword_start: u32, arg: &Expression) -> bool {
+        // Check for own-line comments before the argument itself
+        // (e.g., `return // comment\n expr`)
+        if self.has_leading_own_line_comment_in_range(keyword_start, arg.span().start) {
+            return true;
+        }
+
+        // Walk the left side of chainable expressions checking for own-line comments
+        self.chain_has_own_line_comment(arg)
+    }
+
+    /// Walk the left side of a chain looking for leading own-line comments.
+    ///
+    /// Mirrors Prettier's `hasNakedLeftSide` + `getLeftSide` walk with
+    /// `hasLeadingOwnLineComment` check at each node. Only counts comments
+    /// that are on their own line (not trailing comments on the same line
+    /// as the preceding expression).
+    fn chain_has_own_line_comment(&self, expr: &Expression) -> bool {
+        match expr {
+            Expression::CallExpression(call) => self.chain_has_own_line_comment(&call.callee),
+            Expression::MemberExpression(member) => {
+                // Check for leading own-line comments between object and property.
+                // Must NOT be on the same line as the object — trailing comments
+                // like `foo() // comment` don't trigger paren wrapping.
+                let obj_end = member.object.span().end;
+                let prop_start = member.property.span().start;
+                if self.has_leading_own_line_comment_in_range(obj_end, prop_start) {
+                    return true;
+                }
+                self.chain_has_own_line_comment(&member.object)
+            }
+            Expression::TSNonNullExpression(non_null) => {
+                self.chain_has_own_line_comment(&non_null.expression)
+            }
+            Expression::TaggedTemplateExpression(tagged) => {
+                self.chain_has_own_line_comment(&tagged.tag)
+            }
+            _ => false,
+        }
+    }
+
+    /// Check if there are any leading own-line comments in a range.
+    ///
+    /// "Leading own-line" means the comment is NOT on the same line as `start`
+    /// (i.e., it's on its own line, not trailing the previous expression).
+    /// This matches Prettier's `hasLeadingOwnLineComment` which checks for
+    /// comments with a newline after them that are leading on a node.
+    fn has_leading_own_line_comment_in_range(&self, start: u32, end: u32) -> bool {
+        tsv_lang::comments_in_range(self.comments, start, end)
+            .any(|c| !self.is_same_line(start, c.span.start))
+    }
+
+    /// Build unconditional paren-wrapped doc for return/throw with own-line comments.
+    ///
+    /// Matches Prettier's `["(", indent([hardline, argumentDoc]), hardline, ")"]`
+    /// (function.js:239). Unlike the binaryish case which uses `ifBreak`, this is
+    /// unconditional because the comment placement makes the line break semantically necessary.
+    fn build_return_or_throw_comment_paren_doc(
+        &self,
+        keyword: &'static str,
+        arg: &Expression,
+    ) -> DocId {
+        let d = self.d();
+        let expr_doc = self.build_expression_doc(arg);
+        d.concat(&[
+            d.text(keyword),
+            d.text(" ("),
+            d.indent(d.concat(&[d.hardline(), expr_doc])),
+            d.hardline(),
+            d.text(");"),
+        ])
+    }
+
+    /// Shared logic for return/throw with binaryish arguments.
+    ///
+    /// Matches Prettier's `printReturnOrThrowArgument` (function.js:240-252):
+    /// when the argument is `isBinaryish`, wraps in `ifBreak("(")...ifBreak(")")`.
+    pub(super) fn build_return_or_throw_binary_doc(
+        &self,
+        keyword: &'static str,
+        binary: &internal::BinaryExpression,
+    ) -> DocId {
+        let d = self.d();
+        let expr_doc = self.build_binary_chain_doc_ungrouped(binary);
+
+        // Find trailing comments between expression end and semicolon
+        let expr_end = binary.span.end as usize;
+        let semicolon_pos = self.source[expr_end..]
+            .find(';')
+            .map_or(expr_end, |i| expr_end + i);
+        let trailing_comments_doc =
+            self.build_inline_comments_between_doc(expr_end as u32, semicolon_pos as u32);
+
+        // Broken: keyword (\n  expr\n);
+        // Flat: keyword expr;
+        let broken_doc = d.concat(&[
+            d.text(" ("),
+            d.indent(d.concat(&[d.softline(), d.group(expr_doc), trailing_comments_doc])),
+            d.softline(),
+            d.text(")"),
+        ]);
+
+        let flat_doc = d.concat(&[d.text(" "), expr_doc, trailing_comments_doc]);
+
+        d.group(d.concat(&[
+            d.text(keyword),
+            d.if_break(broken_doc, flat_doc),
+            d.text(";"),
+        ]))
     }
 }

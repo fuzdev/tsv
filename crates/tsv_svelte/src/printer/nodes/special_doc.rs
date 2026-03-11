@@ -8,7 +8,6 @@
 
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
-use crate::printer::helpers::has_multiline_template_literal;
 use crate::printer::text::TextAnalysis;
 use tsv_lang::doc::arena::DocId;
 
@@ -33,9 +32,14 @@ impl<'a> Printer<'a> {
             SpecialElementKind::SvelteWindow
                 | SpecialElementKind::SvelteBody
                 | SpecialElementKind::SvelteDocument
+                | SpecialElementKind::SvelteHead
                 | SpecialElementKind::SvelteComponent { .. }
                 | SpecialElementKind::SvelteElement { .. }
                 | SpecialElementKind::SvelteSelf
+                | SpecialElementKind::SlotElement
+                | SpecialElementKind::SvelteFragment
+                | SpecialElementKind::SvelteBoundary
+                | SpecialElementKind::TitleElement
         );
 
         let is_inline_element = matches!(
@@ -65,11 +69,8 @@ impl<'a> Printer<'a> {
         let attr_docs = self.build_special_element_attrs_doc(element);
         let has_attrs = !attr_docs.is_empty();
 
-        // Check if any attribute contains a template literal with embedded newlines
-        let has_multiline_template = element
-            .attributes
-            .iter()
-            .any(|a| has_multiline_template_literal(a.span().extract(self.source)));
+        // Check if any attribute doc will break (e.g., multiline string value)
+        let has_multiline = attr_docs.iter().any(|&doc| d.will_break(doc));
 
         // Handle self-closing elements
         if is_self_closing {
@@ -86,7 +87,7 @@ impl<'a> Printer<'a> {
                     d.text("/>"),
                 ]);
 
-                if has_multiline_template {
+                if has_multiline {
                     d.group_break(inner)
                 } else {
                     d.group(inner)
@@ -328,7 +329,7 @@ impl<'a> Printer<'a> {
             let body = d.concat(&[d.text(">"), children_doc, d.text("</"), d.text(tag_name)]);
 
             let attr_concat = d.concat(&attr_docs);
-            let attr_group = if has_multiline_template {
+            let attr_group = if has_multiline {
                 d.group_break(attr_concat)
             } else {
                 d.group(attr_concat)
@@ -344,13 +345,13 @@ impl<'a> Printer<'a> {
                 d.text(">"),
             ]);
 
-            if has_multiline_template {
+            if has_multiline {
                 d.group_break(inner)
             } else {
                 d.group(inner)
             }
-        } else if has_multiline_template {
-            // With attrs containing multiline template, inline children
+        } else if has_multiline {
+            // With attrs containing multiline value, inline children
             // Force attrs to break and use hug structure like Prettier
             let body = d.concat(&[d.text(">"), children_doc, d.text("</"), d.text(tag_name)]);
 

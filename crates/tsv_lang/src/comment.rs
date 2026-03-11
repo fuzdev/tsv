@@ -268,6 +268,16 @@ pub fn has_line_comments_in_range(comments: &[Comment], start: u32, end: u32) ->
     comments_in_range(comments, start, end).any(|c| !c.is_block)
 }
 
+/// Check if any multi-line block comments exist in the range [start, end)
+///
+/// Multi-line block comments contain newlines in their content and force
+/// expansion of containing constructs (arrays, objects, etc.).
+/// Uses binary search: O(log n + k) where k is comments in range
+#[inline]
+pub fn has_multiline_block_comments_in_range(comments: &[Comment], start: u32, end: u32) -> bool {
+    comments_in_range(comments, start, end).any(|c| c.is_block && c.content.contains('\n'))
+}
+
 /// Iterate over comments after a position (span.start >= pos)
 ///
 /// Returns an iterator over all comments starting at or after the given position.

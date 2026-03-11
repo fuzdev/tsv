@@ -140,7 +140,22 @@ impl<'a> Printer<'a> {
     /// allowing binary expressions to break when the attribute value exceeds print width.
     fn build_attribute_value_doc(&self, value: &internal::AttributeValue) -> DocId {
         match value {
-            internal::AttributeValue::Text(text) => self.d().text_owned(text.raw.clone()),
+            internal::AttributeValue::Text(text) => {
+                let d = self.d();
+                if text.raw.contains('\n') {
+                    // Split at newlines, join with literalline to preserve literal newlines
+                    // and trigger will_break on the attribute group
+                    let line_docs: Vec<DocId> = text
+                        .raw
+                        .split('\n')
+                        .map(|part| d.text_owned(part.to_string()))
+                        .collect();
+                    let sep = d.literalline();
+                    d.join_doc(line_docs, sep)
+                } else {
+                    d.text_owned(text.raw.clone())
+                }
+            }
             internal::AttributeValue::ExpressionTag(expr_tag) => {
                 // Allow binary breaks in attribute string contexts
                 let config = tsv_lang::PrintConfig {
