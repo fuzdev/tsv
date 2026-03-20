@@ -331,9 +331,9 @@ pub fn has_newline_between(source: &str, start: u32, end: u32) -> bool {
     source[start..end].contains('\n')
 }
 
-// =============================================================================
+//
 // Line Breaks Table Functions (O(log n) binary search)
-// =============================================================================
+//
 //
 // These functions use a precomputed line breaks table for O(log n) lookups
 // instead of O(n) string scans. The table is a Vec<u32> of newline byte offsets

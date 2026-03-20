@@ -1134,6 +1134,38 @@ const commentPosition: DivergencePattern = {
 	},
 };
 
+const jsdocTypeCastParens: DivergencePattern = {
+	id: 'jsdoc_type_cast_parens',
+	description: 'JSDoc type cast parens stripped',
+	languages: ['svelte'],
+	conformanceSections: ['TypeScript: Comments'],
+	fixtures: ['typescript/syntax/comments/jsdoc_type_cast_prettier_divergence'],
+	detect(ctx) {
+		if (ctx.language !== 'svelte') return null;
+
+		// Prettier keeps parens: /** @type {T} */ (expr)
+		// We strip them: /** @type {T} */ expr
+		const jsdocCastWithParens = /@(?:type|satisfies)\s*\{[^}]*\}\s*\*\/\s*\(/;
+		const jsdocCastWithoutParens = /@(?:type|satisfies)\s*\{[^}]*\}\s*\*\/\s*[^(]/;
+
+		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
+			const prettierHasParens = hunk.removedLines.some((l) => jsdocCastWithParens.test(l));
+			const oursWithoutParens = hunk.addedLines.some((l) => jsdocCastWithoutParens.test(l));
+			return prettierHasParens && oursWithoutParens;
+		});
+
+		if (hunkIndices.length > 0) {
+			return {
+				pattern: 'jsdoc_type_cast_parens',
+				confidence: 'certain',
+				hunkIndices,
+				reason: 'JSDoc type cast parens stripped (semantically meaningless)',
+			};
+		}
+		return null;
+	},
+};
+
 // ─── Pattern Registry ───────────────────────────────────────────────────────
 //
 // Ordered: specific → broad. Specific patterns run first for best explanations.
@@ -1167,7 +1199,10 @@ export const PATTERNS: DivergencePattern[] = [
 	blockMultilineAttrsHug,
 	shortExpr100,
 
-	// 5. Broad patterns (run last)
+	// 5. Comment-specific patterns
+	jsdocTypeCastParens,
+
+	// 6. Broad patterns (run last)
 	cssValueWrap,
 	fill101Boundary,
 	commentPosition,

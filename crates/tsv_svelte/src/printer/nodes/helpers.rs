@@ -114,6 +114,7 @@ impl<'a> Printer<'a> {
             first_line_offset,
             suffix_width,
             base_indent_offset,
+            is_embedded_expression: true,
             ..Default::default()
         };
 

@@ -10,7 +10,7 @@ use super::Printer;
 use super::analysis::skip_string_or_comment;
 use crate::ast::internal;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::{CommentPosition, classify_comment_fast, comments_in_range, printing};
+use tsv_lang::{comments_in_range, printing};
 
 /// Spacing style for comments in doc building
 #[derive(Debug, Clone, Copy)]
@@ -74,153 +74,6 @@ impl<'a> Printer<'a> {
             self.find_comma_after(prev_end)
                 .map_or(prev_end, |pos| pos + 1)
         }
-    }
-
-    /// Print a TypeScript comment
-    pub(crate) fn print_comment(&mut self, comment: &internal::Comment) {
-        if comment.is_block {
-            // Block comment: /* content */
-            self.write("/*");
-
-            if comment.content.contains('\n') {
-                // JSDoc comments (start with *) get re-indented to match context
-                // Other multi-line comments preserve original indentation
-                let is_jsdoc = comment.content.starts_with('*');
-
-                if is_jsdoc {
-                    // JSDoc: strip original indentation and re-apply context indent
-                    let stripped = printing::strip_comment_indentation(
-                        self.source,
-                        &comment.content,
-                        comment.span.start,
-                    );
-                    let lines: Vec<&str> = stripped.split('\n').collect();
-
-                    for (i, line) in lines.iter().enumerate() {
-                        let is_last = i == lines.len() - 1;
-                        if i > 0 {
-                            self.write("\n");
-                            // Blank lines inside comments should be truly empty (no indentation)
-                            // But the closing line (last line before */) needs context indent
-                            if !line.is_empty() || is_last {
-                                self.write_indent();
-                            }
-                        }
-                        self.write(line);
-                    }
-                } else {
-                    // Regular block comment: preserve original indentation
-                    // The outer formatter (e.g., Svelte) is responsible for not
-                    // adding extra indent to continuation lines.
-                    let lines: Vec<&str> = comment.content.split('\n').collect();
-
-                    // Prettier adds a space before */ when:
-                    // 1. There are exactly 2 lines (just newline between /* and */)
-                    // 2. The closing line is empty
-                    let last_line = lines.last().unwrap_or(&"");
-                    let add_closing_space = lines.len() == 2 && last_line.is_empty();
-
-                    for (i, line) in lines.iter().enumerate() {
-                        let is_last = i == lines.len() - 1;
-                        if i > 0 {
-                            self.write("\n");
-                        }
-                        if is_last && add_closing_space {
-                            // Skip empty last line content, space will be added below
-                        } else {
-                            self.write(line);
-                        }
-                    }
-
-                    // Add space before */ for empty closing line (prettier behavior)
-                    if add_closing_space {
-                        self.write(" ");
-                    }
-                }
-            } else {
-                // Single-line block comment
-                self.write(&comment.content);
-            }
-
-            self.write("*/");
-        } else if comment.span.start == 0 && comment.content.starts_with("#!") {
-            // Hashbang comment: #!/usr/bin/env node (no // prefix)
-            // Content already includes the #! prefix
-            self.write(&comment.content);
-        } else {
-            // Line comment: // content (no closing delimiter)
-            self.write("//");
-            self.write(&comment.content);
-        }
-    }
-
-    /// Print leading comments (comments between prev_end and curr_start)
-    /// Returns true if any comments were printed
-    ///
-    /// - `prev_end`: Position after the previous statement (or 0 for first statement)
-    /// - `curr_start`: Position of the current statement
-    /// - `is_first`: True if this is the first statement (prev_end is start of file)
-    ///
-    /// Uses binary search to find starting point: O(log n + k)
-    pub(crate) fn print_leading_comments(
-        &mut self,
-        prev_end: u32,
-        curr_start: u32,
-        is_first: bool,
-    ) -> bool {
-        let mut last_comment_end = prev_end;
-        let mut printed_any = false;
-
-        for comment in comments_in_range(self.comments, prev_end, curr_start) {
-            let position = classify_comment_fast(comment, prev_end, curr_start, self.line_breaks);
-
-            // Skip trailing comments EXCEPT for first statement (file start)
-            // Still track the comment end so blank line preservation works after trailing comments
-            if !is_first && matches!(position, CommentPosition::Trailing) {
-                last_comment_end = comment.span.end;
-                continue;
-            }
-
-            // Handle inline leading comments (same line as statement)
-            if matches!(position, CommentPosition::LeadingInline) {
-                self.write_indent();
-                self.print_comment(comment);
-                self.write(" ");
-                printed_any = true;
-                last_comment_end = comment.span.end;
-                continue;
-            }
-
-            // Comment on its own line: check for blank lines
-            // Skip blank line preservation at the very start of the program
-            // (before the first comment/statement). Prettier removes leading blank lines.
-            let is_program_start = is_first && !printed_any;
-            if !is_program_start
-                && comment.span.start > last_comment_end
-                && self.has_blank_line_between(last_comment_end, comment.span.start)
-            {
-                self.write("\n");
-            }
-
-            self.write_indent();
-            self.print_comment(comment);
-            self.write("\n");
-
-            last_comment_end = comment.span.end;
-            printed_any = true;
-        }
-
-        // Check if there's a blank line after the last comment and before curr_start
-        // Use last_comment_end > prev_end to detect if we encountered any comments
-        // (including trailing comments that were skipped but still updated last_comment_end)
-        if last_comment_end > prev_end
-            && last_comment_end < curr_start
-            && self.has_blank_line_between(last_comment_end, curr_start)
-        {
-            self.write("\n");
-        }
-
-        printed_any
     }
 
     /// Build a Doc for inline comments between two positions with specified spacing and filter
@@ -368,19 +221,59 @@ impl<'a> Printer<'a> {
         self.build_comments_between(start, end, CommentSpacing::Trailing)
     }
 
-    /// Build a Doc for inline comments (trailing space), returning None if no comments.
-    #[inline]
-    pub(crate) fn build_inline_comments_between_doc_trailing_space_opt(
+    /// Build inline comments between two positions with line-comment-safe trailing spacing.
+    ///
+    /// Block comments get a trailing space: `/* comment */ expr`
+    /// Line comments get a hardline: `// comment\nexpr`
+    ///
+    /// This prevents line comments from absorbing the following expression as comment text.
+    /// Use for any position where a comment appears before an expression (RHS of `=`,
+    /// after keywords like `return`/`await`, after operators like `!`/`...`, etc.).
+    pub(crate) fn build_rhs_comments_opt(&self, start: u32, end: u32) -> Option<DocId> {
+        let d = self.d();
+        let mut parts = Vec::new();
+        for comment in comments_in_range(self.comments, start, end) {
+            parts.push(self.build_comment_doc(comment));
+            if comment.is_block {
+                if comment.content.contains('\n') {
+                    // Multiline block comment: value starts on next line
+                    // Prettier ref: hasLeadingOwnLineComment → break-after-operator
+                    parts.push(d.hardline());
+                } else {
+                    parts.push(d.text(" "));
+                }
+            } else {
+                parts.push(d.hardline());
+            }
+        }
+        if parts.is_empty() {
+            None
+        } else {
+            Some(d.concat(&parts))
+        }
+    }
+
+    /// Detect a block comment that should be promoted from after `=` to before `=`.
+    ///
+    /// When JSDoc cast parens are stripped (e.g., `var a = /** @type {T} */ (\n\texpr\n)`),
+    /// multiple block comments end up after `=`. Prettier places the first one before `=`
+    /// when it's on a different source line than the second. Returns the promoted comment's
+    /// doc (with leading space) and the end position to use as the new RHS comment start.
+    pub(crate) fn promote_block_comment_before_eq(
         &self,
         start: u32,
         end: u32,
-    ) -> Option<DocId> {
-        self.build_comments_between_filtered_opt(
-            start,
-            end,
-            CommentSpacing::Trailing,
-            CommentFilter::All,
-        )
+    ) -> Option<(DocId, u32)> {
+        let d = self.d();
+        let blocks: Vec<_> = comments_in_range(self.comments, start, end)
+            .filter(|c| c.is_block)
+            .collect();
+        if blocks.len() >= 2 && !self.is_same_line(blocks[0].span.start, blocks[1].span.start) {
+            let doc = d.concat(&[d.text(" "), self.build_comment_doc(blocks[0])]);
+            Some((doc, blocks[0].span.end))
+        } else {
+            None
+        }
     }
 
     /// Prepend comments from removed parentheses to a doc.
@@ -398,9 +291,7 @@ impl<'a> Printer<'a> {
         doc: DocId,
     ) -> DocId {
         if outer_start < inner_start {
-            if let Some(comments) =
-                self.build_inline_comments_between_doc_trailing_space_opt(outer_start, inner_start)
-            {
+            if let Some(comments) = self.build_rhs_comments_opt(outer_start, inner_start) {
                 let d = self.d();
                 d.concat(&[comments, doc])
             } else {
@@ -475,15 +366,24 @@ impl<'a> Printer<'a> {
     ///
     /// Returns true if there's at least one comment in the range and a newline
     /// exists between `start` and the first comment's start position.
-    pub(crate) fn has_newline_before_comment(&self, start: u32, end: u32) -> bool {
+    /// Check if ALL comments in the range are inline block comments on the same line as `end`.
+    ///
+    /// Returns true when every comment is a block comment AND on the same line as `end`
+    /// (the next expression). Used to keep `/** @type {T} */ arg` as a unit.
+    /// Returns false for line comments or block comments on their own line.
+    pub(crate) fn all_comments_are_inline_block(&self, start: u32, end: u32) -> bool {
         let first_idx = tsv_lang::find_first_comment_from(self.comments, start);
-        if let Some(comment) = self.comments.get(first_idx)
-            && comment.span.end <= end
+        let mut found_any = false;
+        for comment in self.comments[first_idx..]
+            .iter()
+            .take_while(|c| c.span.end <= end)
         {
-            // Check if there's a newline between start and comment start (O(log n))
-            return !self.is_same_line(start, comment.span.start);
+            found_any = true;
+            if !comment.is_block || !self.is_same_line(comment.span.end, end) {
+                return false;
+            }
         }
-        false
+        found_any
     }
 
     /// Check if there's a block comment on its own line within a container.
@@ -721,9 +621,13 @@ impl<'a> Printer<'a> {
                         }
                     }
                     if i == 0 {
-                        line_docs.push(d.text_owned(format!("/*{line}")));
-                    } else {
+                        line_docs.push(d.text_owned(format!("/*{}", line.trim_end())));
+                    } else if is_last {
+                        // Preserve last line content (space before */)
                         line_docs.push(d.text_owned((*line).to_string()));
+                    } else {
+                        // Strip trailing whitespace from middle lines (matches prettier)
+                        line_docs.push(d.text_owned(line.trim_end().to_string()));
                     }
                 }
                 line_docs.push(d.text("*/"));
@@ -732,6 +636,10 @@ impl<'a> Printer<'a> {
                 // Single-line block comment
                 d.text_owned(format!("/*{}*/", comment.content))
             }
+        } else if comment.span.start == 0 && comment.content.starts_with("#!") {
+            // Hashbang comment: #!/usr/bin/env node (no // prefix)
+            // Content already includes the #! prefix
+            d.text_owned(comment.content.clone())
         } else {
             // Line comment: // content
             d.text_owned(format!("//{}", comment.content))

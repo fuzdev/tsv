@@ -12,7 +12,7 @@ use super::super::comments_in_range;
 use super::Printer;
 use super::helpers::{type_needs_parens_for_array_element, unwrap_parenthesized};
 use crate::ast::internal::{
-    self, TSArrayType, TSConditionalType, TSMappedType, TSTupleType, TSType,
+    self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
 use tsv_lang::doc::arena::DocId;
 
@@ -119,9 +119,13 @@ impl<'a> Printer<'a> {
         // Build the mapping body (starting from `[`)
         let mut body_parts = vec![];
 
-        // readonly modifier: `readonly` or `-readonly`
+        // readonly modifier: `readonly`, `+readonly`, or `-readonly`
         if let Some(readonly) = m.readonly {
-            body_parts.push(d.text(if readonly { "readonly " } else { "-readonly " }));
+            body_parts.push(d.text(match readonly {
+                TSMappedTypeModifier::True => "readonly ",
+                TSMappedTypeModifier::Plus => "+readonly ",
+                TSMappedTypeModifier::Minus => "-readonly ",
+            }));
         }
 
         // [K in constraint]
@@ -147,9 +151,13 @@ impl<'a> Printer<'a> {
 
         body_parts.push(d.text("]"));
 
-        // optional modifier: `?` or `-?`
+        // optional modifier: `?`, `+?`, or `-?`
         if let Some(optional) = m.optional {
-            body_parts.push(d.text(if optional { "?" } else { "-?" }));
+            body_parts.push(d.text(match optional {
+                TSMappedTypeModifier::True => "?",
+                TSMappedTypeModifier::Plus => "+?",
+                TSMappedTypeModifier::Minus => "-?",
+            }));
         }
 
         // Comments and value type

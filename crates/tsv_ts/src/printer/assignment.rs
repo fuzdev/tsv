@@ -296,7 +296,6 @@ fn unwrap_expression(expr: &Expression) -> &Expression {
                 expr
             }
         }
-        Expression::Parenthesized(inner) => unwrap_expression(inner),
         _ => expr,
     }
 }
@@ -668,12 +667,40 @@ impl<'a> Printer<'a> {
     ///
     /// `is_short_key`: True for property keys shorter than `tabWidth + MIN_OVERLAP_FOR_BREAK`.
     /// For non-property assignments (e.g., `x = value`), pass `false`.
+    ///
+    /// `rhs_comments`: Optional inline comments between the operator and the RHS expression
+    /// (e.g., `x = /** @type {T} */ (expr)`). Pass `None` for callers that handle
+    /// comments separately (object properties, variable declarations).
     pub fn build_assignment_layout(
         &self,
         left_doc: DocId,
         operator: &'static str,
         right_expr: &Expression,
         is_short_key: bool,
+        rhs_comments: Option<DocId>,
+    ) -> DocId {
+        self.build_assignment_layout_with_line_comment(
+            left_doc,
+            operator,
+            right_expr,
+            is_short_key,
+            rhs_comments,
+            false,
+        )
+    }
+
+    /// Like `build_assignment_layout`, but with explicit control over line comment handling.
+    ///
+    /// When `rhs_has_line_comment` is true, forces `BreakAfterOperator` layout so the
+    /// line comment and expression get proper indentation instead of being placed inline.
+    pub fn build_assignment_layout_with_line_comment(
+        &self,
+        left_doc: DocId,
+        operator: &'static str,
+        right_expr: &Expression,
+        is_short_key: bool,
+        rhs_comments: Option<DocId>,
+        rhs_has_line_comment: bool,
     ) -> DocId {
         let d = self.d();
         let mut layout = choose_layout(
@@ -683,8 +710,24 @@ impl<'a> Printer<'a> {
             self.config.print_width,
         );
 
-        // Override layout based on line comments in the RHS:
+        // Override layout based on comments:
         //
+        // Line comments between operator and RHS (e.g., `a = // comment\n  b`)
+        // contain a hardline that forces a break. BreakAfterOperator provides
+        // the indent context so the comment and expression are indented together.
+        //
+        // Multiline block comments (e.g., `a = /**\n * comment\n */\n  b`) also
+        // force break-after-operator. Detected via will_break on the rhs_comments doc.
+        // Prettier ref: hasLeadingOwnLineComment → break-after-operator in chooseLayout
+        if rhs_has_line_comment && layout != AssignmentLayout::BreakAfterOperator {
+            layout = AssignmentLayout::BreakAfterOperator;
+        }
+        if layout != AssignmentLayout::BreakAfterOperator
+            && let Some(comments_doc) = rhs_comments
+            && d.will_break(comments_doc)
+        {
+            layout = AssignmentLayout::BreakAfterOperator;
+        }
         // For member-only chains with line comments, force BreakAfterOperator.
         // Line comments cause Prettier's first pass to break at `=`.
         //
@@ -704,6 +747,14 @@ impl<'a> Printer<'a> {
 
         let right_doc = self.build_expression_doc(right_expr);
 
+        // Build the RHS doc with optional inline comments prepended
+        // Comments use Trailing spacing (`/* comment */ `) so no extra space needed
+        let right_doc_with_comments = if let Some(comments_doc) = rhs_comments {
+            d.concat(&[comments_doc, right_doc])
+        } else {
+            right_doc
+        };
+
         match layout {
             AssignmentLayout::BreakAfterOperator => {
                 // Break after operator with nested groups - matches prettier exactly
@@ -712,7 +763,7 @@ impl<'a> Printer<'a> {
                 d.group(d.concat(&[
                     d.group(left_doc),
                     d.text(operator),
-                    d.group(d.indent_line(right_doc)),
+                    d.group(d.indent_line(right_doc_with_comments)),
                 ]))
             }
 
@@ -720,7 +771,12 @@ impl<'a> Printer<'a> {
                 // Never break after operator - matches prettier: group([group(left), op, " ", right])
                 // Wrapping left_doc in a group allows right_doc's conditional_groups to expand independently
                 // Structure: group([group(left), op, " ", right])
-                d.group(d.concat(&[d.group(left_doc), d.text(operator), d.text(" "), right_doc]))
+                d.group(d.concat(&[
+                    d.group(left_doc),
+                    d.text(operator),
+                    d.text(" "),
+                    right_doc_with_comments,
+                ]))
             }
 
             AssignmentLayout::Fluid => {
@@ -738,7 +794,7 @@ impl<'a> Printer<'a> {
                     d.text(operator),
                     d.group_with_id(d.indent(d.line()), GroupId::Assignment),
                     d.line_suffix_boundary(),
-                    d.indent_if_break(right_doc, GroupId::Assignment, false),
+                    d.indent_if_break(right_doc_with_comments, GroupId::Assignment, false),
                 ]))
             }
         }

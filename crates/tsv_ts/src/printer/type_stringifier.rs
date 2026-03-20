@@ -9,7 +9,9 @@
 
 use super::Printer;
 use super::expressions::normalize_number_literal;
-use crate::ast::internal::{self, TSLiteralType, TSType, TemplateLiteralType};
+use crate::ast::internal::{
+    self, TSLiteralType, TSMappedTypeModifier, TSType, TemplateLiteralType,
+};
 use tsv_lang::SymbolResolver;
 use tsv_lang::printing::{StringFormatOptions, format_string_literal};
 
@@ -186,11 +188,11 @@ impl<'a> Printer<'a> {
 
         // readonly modifier
         if let Some(readonly) = m.readonly {
-            if readonly {
-                result.push_str("readonly ");
-            } else {
-                result.push_str("-readonly ");
-            }
+            result.push_str(match readonly {
+                TSMappedTypeModifier::True => "readonly ",
+                TSMappedTypeModifier::Plus => "+readonly ",
+                TSMappedTypeModifier::Minus => "-readonly ",
+            });
         }
 
         // [K in constraint]
@@ -209,11 +211,11 @@ impl<'a> Printer<'a> {
 
         // optional modifier
         if let Some(optional) = m.optional {
-            if optional {
-                result.push('?');
-            } else {
-                result.push_str("-?");
-            }
+            result.push_str(match optional {
+                TSMappedTypeModifier::True => "?",
+                TSMappedTypeModifier::Plus => "+?",
+                TSMappedTypeModifier::Minus => "-?",
+            });
         }
 
         result.push_str(": ");

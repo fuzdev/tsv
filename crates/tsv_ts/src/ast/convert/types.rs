@@ -170,14 +170,14 @@ pub(in crate::ast) fn convert_type(
             })
         }
         internal::TSType::TypePredicate(p) => {
-            // We don't have access to the interner here, so we use a placeholder
-            // This is a limitation - we'd need to pass interner through
             let parameter_name = public::Identifier {
                 node_type: "Identifier".to_string(),
                 start: p.parameter_name.span.start,
                 end: p.parameter_name.span.end,
                 loc: create_location(p.parameter_name.span, loc, offset),
-                name: format!("__symbol_{:?}", p.parameter_name.name), // Placeholder
+                name: interner
+                    .resolve_infallible(p.parameter_name.name)
+                    .to_string(),
                 optional: false,
                 type_annotation: None,
                 decorators: Vec::new(),
@@ -245,19 +245,15 @@ pub(in crate::ast) fn convert_type(
                 .type_annotation
                 .as_ref()
                 .map(|t| Box::new(convert_type(t, source, loc, interner, offset))),
-            readonly: m.readonly.map(|r| {
-                if r {
-                    public::TSMappedTypeModifier::True
-                } else {
-                    public::TSMappedTypeModifier::Minus
-                }
+            readonly: m.readonly.map(|r| match r {
+                internal::TSMappedTypeModifier::True => public::TSMappedTypeModifier::True,
+                internal::TSMappedTypeModifier::Plus => public::TSMappedTypeModifier::Plus,
+                internal::TSMappedTypeModifier::Minus => public::TSMappedTypeModifier::Minus,
             }),
-            optional: m.optional.map(|o| {
-                if o {
-                    public::TSMappedTypeModifier::True
-                } else {
-                    public::TSMappedTypeModifier::Minus
-                }
+            optional: m.optional.map(|o| match o {
+                internal::TSMappedTypeModifier::True => public::TSMappedTypeModifier::True,
+                internal::TSMappedTypeModifier::Plus => public::TSMappedTypeModifier::Plus,
+                internal::TSMappedTypeModifier::Minus => public::TSMappedTypeModifier::Minus,
             }),
         }),
         internal::TSType::TypeOperator(o) => {

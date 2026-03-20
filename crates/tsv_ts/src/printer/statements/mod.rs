@@ -17,8 +17,8 @@ mod variable;
 
 // Re-export for submodules to use `super::Printer` instead of `super::super::Printer`
 pub(super) use super::{
-    Printer, build_entity_name_doc, intersection_has_huggable_last_type, should_hug_union_type,
-    unwrap_parenthesized,
+    Printer, build_entity_name_doc, intersection_has_expanding_first_type,
+    intersection_has_huggable_last_type, should_hug_union_type, unwrap_parenthesized,
 };
 
 use super::{ParenContext, needs_parens};
@@ -67,19 +67,6 @@ impl<'a> Printer<'a> {
             Statement::TSDeclareFunction(decl) => self.build_declare_function_doc(decl),
             Statement::TSEnumDeclaration(decl) => self.build_enum_declaration_doc(decl),
             Statement::TSModuleDeclaration(decl) => self.build_module_declaration_doc(decl),
-        }
-    }
-
-    /// Print trailing comments on the same line after a position
-    pub(super) fn print_trailing_same_line_comments(&mut self, after_pos: u32) {
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, after_pos);
-        for comment in &self.comments[first_idx..] {
-            if self.is_same_line(after_pos, comment.span.start) {
-                self.write(" ");
-                self.print_comment(comment);
-            } else {
-                break;
-            }
         }
     }
 
@@ -144,54 +131,87 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a return statement.
-    ///
-    /// Prettier's `printReturnOrThrowArgument` (function.js:231-277) wraps in parens
-    /// for two cases:
-    /// 1. Own-line comments in chain — unconditional: `return (\n  a\n    // comment\n    .b()\n);`
-    /// 2. Binaryish arguments — conditional: `return (\n  a +\n  b\n);` (only when breaking)
     fn build_return_statement_doc(&self, ret: &internal::ReturnStatement) -> DocId {
         let d = self.d();
         let Some(arg) = &ret.argument else {
             return d.text("return;");
         };
 
-        // Prettier wraps return args with own-line comments in unconditional parens
-        // (function.js:238-239, returnArgumentHasLeadingComment)
-        if self.return_argument_has_own_line_comment(ret.span.start, arg) {
-            return self.build_return_or_throw_comment_paren_doc("return", arg);
+        self.build_keyword_argument_doc("return", ret.span.start, arg)
+    }
+
+    /// Shared dispatch for return/throw argument formatting.
+    ///
+    /// Matches Prettier's `printReturnOrThrowArgument` (function.js:231-277):
+    /// 1. Assignment expressions → unconditional parens: `return (a = b);`
+    /// 2. Own-line comments in chain → unconditional parens
+    /// 3. Binaryish arguments → conditional parens (ifBreak)
+    /// 4. Otherwise → plain `keyword expr;`
+    fn build_keyword_argument_doc(
+        &self,
+        keyword: &'static str,
+        keyword_start: u32,
+        arg: &Expression,
+    ) -> DocId {
+        let d = self.d();
+
+        // Extract inline comments between keyword and argument
+        // Uses line-comment-safe spacing to prevent `return // comment expr`
+        let keyword_end = keyword_start + keyword.len() as u32;
+        let inline_comments = self.build_rhs_comments_opt(keyword_end, arg.span().start);
+
+        if self.argument_has_own_line_comment(keyword_start, arg) {
+            return self.build_comment_paren_doc(keyword, arg, inline_comments);
         }
 
-        // Prettier wraps all binaryish (binary + logical) return args in parens when breaking
-        if let Expression::BinaryExpression(binary) = arg {
-            return self.build_return_or_throw_binary_doc("return", binary);
-        }
-
-        // Assignment expressions need parentheses: return (a = b);
-        // This matches Prettier's behavior for clarity (assignment vs equality)
+        // Assignment expressions need parentheses for clarity: return (a = b);
+        // Comments go BEFORE the parens: return /* comment */ (a = b);
+        // Matches Prettier's behavior for both return and throw.
+        // Note: own-line comment check above takes priority — when there's a line
+        // comment, the whole thing wraps in outer parens with build_comment_paren_doc
+        // (which adds inner assignment parens separately).
         if matches!(arg, Expression::AssignmentExpression(_)) {
-            return d.concat(&[
-                d.text("return ("),
-                self.build_expression_doc(arg),
-                d.text(");"),
-            ]);
+            let expr_doc = self.build_expression_doc(arg);
+            return if let Some(comments_doc) = inline_comments {
+                d.concat(&[
+                    d.text(keyword),
+                    d.text(" "),
+                    comments_doc,
+                    d.text("("),
+                    expr_doc,
+                    d.text(");"),
+                ])
+            } else {
+                d.concat(&[d.text(keyword), d.text(" ("), expr_doc, d.text(");")])
+            };
         }
 
-        // Standard case: no parenthesization needed
-        d.concat(&[
-            d.text("return "),
-            self.build_expression_doc(arg),
-            d.text(";"),
-        ])
+        if let Expression::BinaryExpression(binary) = arg {
+            return self.build_binary_paren_doc(keyword, binary, inline_comments);
+        }
+
+        // Ternary in return/throw: binary test expressions need continuation indent.
+        // Matches Prettier's shouldNotIndent (binaryish.js:109-113) — when the binary's
+        // grandparent is ReturnStatement/ThrowStatement, shouldNotIndent = false.
+        let expr_doc = if let Expression::ConditionalExpression(cond) = arg {
+            self.build_conditional_doc_with_binary_test_indent(cond)
+        } else {
+            self.build_expression_doc(arg)
+        };
+        let rhs_doc = if let Some(comments_doc) = inline_comments {
+            d.concat(&[comments_doc, expr_doc])
+        } else {
+            expr_doc
+        };
+
+        d.concat(&[d.text(keyword), d.text(" "), rhs_doc, d.text(";")])
     }
 
     /// Check if a return/throw argument has own-line comments that require
     /// unconditional paren wrapping.
     ///
-    /// Matches Prettier's `returnArgumentHasLeadingComment` (function.js:290-318):
-    /// walks the left side of chainable expressions (calls, members, etc.)
-    /// looking for own-line comments. If found, the return/throw value gets
-    /// wrapped in `("(", indent([hardline, doc]), hardline, ")")`.
-    fn return_argument_has_own_line_comment(&self, keyword_start: u32, arg: &Expression) -> bool {
+    /// Matches Prettier's `returnArgumentHasLeadingComment` (function.js:290-318).
+    fn argument_has_own_line_comment(&self, keyword_start: u32, arg: &Expression) -> bool {
         // Check for own-line comments before the argument itself
         // (e.g., `return // comment\n expr`)
         if self.has_leading_own_line_comment_in_range(keyword_start, arg.span().start) {
@@ -248,17 +268,29 @@ impl<'a> Printer<'a> {
     /// Matches Prettier's `["(", indent([hardline, argumentDoc]), hardline, ")"]`
     /// (function.js:239). Unlike the binaryish case which uses `ifBreak`, this is
     /// unconditional because the comment placement makes the line break semantically necessary.
-    fn build_return_or_throw_comment_paren_doc(
+    fn build_comment_paren_doc(
         &self,
         keyword: &'static str,
         arg: &Expression,
+        inline_comments: Option<DocId>,
     ) -> DocId {
         let d = self.d();
-        let expr_doc = self.build_expression_doc(arg);
+        let raw_expr_doc = self.build_expression_doc(arg);
+        // Assignment expressions need inner parens for clarity: return (\n  (a = b)\n);
+        let expr_doc = if matches!(arg, Expression::AssignmentExpression(_)) {
+            d.concat(&[d.text("("), raw_expr_doc, d.text(")")])
+        } else {
+            raw_expr_doc
+        };
+        let rhs_doc = if let Some(comments_doc) = inline_comments {
+            d.concat(&[comments_doc, expr_doc])
+        } else {
+            expr_doc
+        };
         d.concat(&[
             d.text(keyword),
             d.text(" ("),
-            d.indent(d.concat(&[d.hardline(), expr_doc])),
+            d.indent(d.concat(&[d.hardline(), rhs_doc])),
             d.hardline(),
             d.text(");"),
         ])
@@ -268,13 +300,26 @@ impl<'a> Printer<'a> {
     ///
     /// Matches Prettier's `printReturnOrThrowArgument` (function.js:240-252):
     /// when the argument is `isBinaryish`, wraps in `ifBreak("(")...ifBreak(")")`.
-    pub(super) fn build_return_or_throw_binary_doc(
+    ///
+    /// When the expression contains hardlines (multi-line callbacks, block bodies,
+    /// object literals), the group is forced to break so `ifBreak` produces parens.
+    /// This matches Prettier's `propagateBreaks` preprocessing which cascades
+    /// `breakParent` (bundled with every `hardline`) up through all ancestor groups.
+    /// Our renderer's `will_break` can't see through `IfBreak` nodes, so we detect
+    /// hardlines in the expression doc and force the group to break explicitly.
+    fn build_binary_paren_doc(
         &self,
         keyword: &'static str,
         binary: &internal::BinaryExpression,
+        inline_comments: Option<DocId>,
     ) -> DocId {
         let d = self.d();
-        let expr_doc = self.build_binary_chain_doc_ungrouped(binary);
+        let raw_expr_doc = self.build_binary_chain_doc_ungrouped(binary);
+        let expr_doc = if let Some(comments_doc) = inline_comments {
+            d.concat(&[comments_doc, raw_expr_doc])
+        } else {
+            raw_expr_doc
+        };
 
         // Find trailing comments between expression end and semicolon
         let expr_end = binary.span.end as usize;
@@ -283,6 +328,12 @@ impl<'a> Printer<'a> {
             .map_or(expr_end, |i| expr_end + i);
         let trailing_comments_doc =
             self.build_inline_comments_between_doc(expr_end as u32, semicolon_pos as u32);
+
+        // When the expression contains hardlines (e.g., multi-line callback in a
+        // chain), the group must break to produce parens. In Prettier, hardline
+        // includes breakParent which propagateBreaks cascades up. Our will_break
+        // can't see through IfBreak, so we check the expression doc directly.
+        let force_break = d.will_break(expr_doc);
 
         // Broken: keyword (\n  expr\n);
         // Flat: keyword expr;
@@ -295,10 +346,16 @@ impl<'a> Printer<'a> {
 
         let flat_doc = d.concat(&[d.text(" "), expr_doc, trailing_comments_doc]);
 
-        d.group(d.concat(&[
+        let inner = d.concat(&[
             d.text(keyword),
             d.if_break(broken_doc, flat_doc),
             d.text(";"),
-        ]))
+        ]);
+
+        if force_break {
+            d.group_break(inner)
+        } else {
+            d.group(inner)
+        }
     }
 }

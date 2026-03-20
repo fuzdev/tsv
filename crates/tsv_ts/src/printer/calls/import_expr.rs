@@ -21,7 +21,19 @@ pub(super) fn build_import_expression_doc(
     import_expr: &internal::ImportExpression,
 ) -> DocId {
     let d = printer.d();
-    let source_doc = printer.build_expression_doc(&import_expr.source);
+
+    // Extract inline block comments between `import(` and the source expression
+    // e.g., import(/* @vite-ignore */ expr) — the comment would otherwise be lost
+    let open_paren_end = import_expr.span.start + 7; // "import(" is 7 chars
+    let source_start = import_expr.source.span().start;
+    let leading_comment_doc = printer.build_rhs_comments_opt(open_paren_end, source_start);
+
+    let raw_source_doc = printer.build_expression_doc(&import_expr.source);
+    let source_doc = if let Some(comment_doc) = leading_comment_doc {
+        d.concat(&[comment_doc, raw_source_doc])
+    } else {
+        raw_source_doc
+    };
 
     // If no options, check for trailing comments on the source arg
     let Some(options) = &import_expr.options else {

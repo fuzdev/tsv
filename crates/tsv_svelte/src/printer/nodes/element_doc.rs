@@ -355,32 +355,38 @@ impl<'a> Printer<'a> {
             _ => {
                 // Standard: soft breaks that can harden based on source
                 //
-                // For inline elements with trim_boundaries, boundary whitespace was
-                // removed from the text. Use line (space in flat) instead of softline
-                // (nothing in flat) to preserve the space that was trimmed.
+                // For inline elements, use line() (space in flat, newline in break)
+                // when the boundary text has whitespace. This matches Prettier's
+                // printLineBeforeChildren (element.js:99-102) which returns `line`
+                // when hasLeadingSpaces && isLeadingSpaceSensitive.
+                //
+                // line() handles both modes: space in flat, newline in break.
+                // When trim_boundaries was false, rebuild children with trim=true
+                // since line() now provides the boundary space.
+                let is_inline = ctx.kind.is_inline();
                 let leading_break = if start_mode == BoundaryMode::Hard {
                     d.hardline()
-                } else if ctx.kind.is_inline() && ctx.trim_boundaries {
-                    // Check if first child text had leading whitespace
-                    let has_ws = element.fragment.nodes.first().is_some_and(|n| {
-                        matches!(n, FragmentNode::Text(t) if !t.raw.leading_whitespace().is_empty())
-                    });
-                    if has_ws { d.line() } else { d.softline() }
+                } else if is_inline && Self::first_child_has_leading_ws(&element.fragment.nodes) {
+                    d.line()
                 } else {
                     d.softline()
                 };
                 let trailing_break = if end_mode == BoundaryMode::Hard {
                     d.hardline()
-                } else if ctx.kind.is_inline() && ctx.trim_boundaries {
-                    // Check if last child text had trailing whitespace
-                    let has_ws = element.fragment.nodes.last().is_some_and(|n| {
-                        matches!(n, FragmentNode::Text(t) if !t.raw.trailing_whitespace().is_empty())
-                    });
-                    if has_ws { d.line() } else { d.softline() }
+                } else if is_inline && Self::last_child_has_trailing_ws(&element.fragment.nodes) {
+                    d.line()
                 } else {
                     d.softline()
                 };
-                let inner_group = d.group(d.concat(&[children_doc]));
+                // Rebuild children with trim=true when trim_boundaries was false,
+                // since line() now provides the boundary space that
+                // handle_text_child would otherwise duplicate.
+                let effective_children = if is_inline && !ctx.trim_boundaries {
+                    self.build_nodes_doc_trimmed(&element.fragment.nodes, true)
+                } else {
+                    children_doc
+                };
+                let inner_group = d.group(d.concat(&[effective_children]));
                 let indent_inner = d.indent(d.concat(&[leading_break, inner_group]));
                 d.group(d.concat(&[
                     opening_tag,
@@ -649,6 +655,18 @@ impl<'a> Printer<'a> {
                 }
             }
         }
+    }
+
+    fn first_child_has_leading_ws(nodes: &[FragmentNode]) -> bool {
+        nodes.first().is_some_and(
+            |n| matches!(n, FragmentNode::Text(t) if !t.raw.leading_whitespace().is_empty()),
+        )
+    }
+
+    fn last_child_has_trailing_ws(nodes: &[FragmentNode]) -> bool {
+        nodes.last().is_some_and(
+            |n| matches!(n, FragmentNode::Text(t) if !t.raw.trailing_whitespace().is_empty()),
+        )
     }
 
     /// Build doc for empty element with no hugging
@@ -1121,6 +1139,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build if alternate (else/else-if) for whitespace-sensitive context.
+    #[allow(clippy::literal_string_with_formatting_args)]
     fn build_ws_sensitive_if_alternate(&self, alt: &Fragment, parts: &mut Vec<DocId>) {
         let d = self.d();
 
@@ -1157,6 +1176,7 @@ impl<'a> Printer<'a> {
     ///
     /// Emits block structure inline without added whitespace. Body nodes are
     /// formatted with whitespace-sensitive content formatting.
+    #[allow(clippy::literal_string_with_formatting_args)]
     fn build_ws_sensitive_each_block_doc(&self, block: &internal::EachBlock) -> DocId {
         let d = self.d();
         let expr_comment_end = block
@@ -1314,7 +1334,6 @@ impl<'a> Printer<'a> {
             | Expression::TSParameterProperty(_)
             | Expression::ImportExpression(_)
             | Expression::MetaProperty(_) => false,
-            Expression::Parenthesized(inner) => Self::expression_has_break_points(inner),
         }
     }
 

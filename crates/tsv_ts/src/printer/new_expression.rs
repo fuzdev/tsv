@@ -3,11 +3,13 @@
 // Handles: new Foo(), new Foo(arg1, arg2), new Foo<T>()
 
 use super::calls::{
-    PartitionedComments, arrow_has_type_annotations, build_args_split_last,
-    build_arrow_call_body_states, build_arrow_inline_signature, find_comma_pos,
-    has_inter_argument_comments_slice, has_trailing_comments_slice,
+    PartitionedComments, arrow_has_type_reference_return, build_args_split_last,
+    build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
+    build_expand_all_args, build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
+    find_comma_pos, has_inter_argument_comments_slice, has_trailing_comments_slice,
     has_trailing_line_comments_slice, is_comment_after_comma, is_comment_before_comma,
-    wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
+    last_two_args_same_type, prepend_arrow_body_comments, wrap_call_with_hard_breaks,
+    wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
 use super::utils::{
     arrow_has_trailing_param_comments, could_expand_arrow_body, is_array_or_object_unwrapped,
@@ -107,19 +109,38 @@ impl<'a> Printer<'a> {
                         d.text(")"),
                     ]);
                 }
-                // Block arrow function: use conditional_group to let Doc decide hug vs wrap
+                // Block arrow (or expandable arrow chain): use conditional_group to let Doc decide hug vs wrap
                 internal::Expression::ArrowFunctionExpression(arrow)
-                    if !arrow.body.is_expression() =>
+                    if !arrow.body.is_expression()
+                        || (!arrow_has_type_reference_return(arrow)
+                            && could_expand_arrow_chain(arrow)) =>
                 {
-                    let arrow_doc = self.build_expression_doc(&new_expr.arguments[0]);
+                    let mut arrow_doc = self.build_expression_doc(&new_expr.arguments[0]);
 
-                    // If the arrow has trailing param comments, force wrapped state
+                    // Prepend leading comments (e.g., /** @param {any} x */ before arrow)
+                    // and force wrapped state when present (prettier expands args with leading comments)
+                    let paren_open = new_expr
+                        .type_arguments
+                        .as_ref()
+                        .map_or_else(|| new_expr.callee.span().end, |ta| ta.span.end);
+                    let arg_start = new_expr.arguments[0].span().start;
+                    let has_leading_comment =
+                        if let Some(leading) = self.build_rhs_comments_opt(paren_open, arg_start) {
+                            arrow_doc = d.concat(&[leading, arrow_doc]);
+                            true
+                        } else {
+                            false
+                        };
+
+                    // If the arrow has trailing param comments or leading comments,
+                    // force wrapped state
+                    let arrow_token = self.find_arrow_token_for(arrow);
                     let has_trailing_param_comments =
-                        arrow_has_trailing_param_comments(arrow, |start, end| {
+                        arrow_has_trailing_param_comments(arrow, arrow_token, |start, end| {
                             self.has_comments_between(start, end)
                         });
 
-                    if has_trailing_param_comments {
+                    if has_trailing_param_comments || has_leading_comment {
                         return d.concat(&[
                             callee_with_types,
                             d.text("("),
@@ -157,69 +178,21 @@ impl<'a> Printer<'a> {
                     if arrow.body.is_expression() =>
                 {
                     if let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
-                        let has_no_type_annotations = !arrow_has_type_annotations(arrow);
-
-                        // Call body with complex args (block arrows, objects, arrays)
-                        let is_complex_call_body =
-                            if let internal::Expression::CallExpression(nested_call) = &**body_expr
-                            {
-                                nested_call.arguments.iter().any(|arg| match arg {
-                                    internal::Expression::ArrowFunctionExpression(arr) => {
-                                        if let internal::ArrowFunctionBody::BlockStatement(block) =
-                                            &arr.body
-                                        {
-                                            !block.body.is_empty()
-                                        } else {
-                                            false
-                                        }
-                                    }
-                                    internal::Expression::ObjectExpression(obj) => {
-                                        !obj.properties.is_empty()
-                                    }
-                                    internal::Expression::ArrayExpression(arr) => {
-                                        !arr.elements.is_empty()
-                                    }
-                                    internal::Expression::FunctionExpression(_) => true,
-                                    _ => false,
-                                })
-                            } else {
-                                false
-                            };
-
-                        if is_complex_call_body && has_no_type_annotations {
-                            let inline_sig = build_arrow_inline_signature(self, arrow);
-                            let arrow_doc = self.build_expression_doc(&new_expr.arguments[0]);
-                            let body_doc = self.build_expression_doc(body_expr);
-
-                            // Body has hardlines: use group-based approach
-                            if d.will_break(body_doc) {
-                                return d.group(d.concat(&[
-                                    callee_with_types,
-                                    d.text("("),
-                                    d.concat(&[inline_sig, d.text(" =>")]),
-                                    d.group(
-                                        d.concat(&[d.indent_line(body_doc), d.trailing_comma()]),
-                                    ),
-                                    d.softline(),
-                                    d.text(")"),
-                                ]));
-                            }
-
-                            return build_arrow_call_body_states(
-                                d,
-                                callee_with_types,
-                                arrow_doc,
-                                inline_sig,
-                                body_doc,
-                            );
-                        }
-
                         // Expandable body (ternary): conditional parens
                         // Flat: `new Xy((x) => (x ? y : z))`
                         // Break: `new Xy((x) =>\n  x ? y : z,\n)`
-                        if could_expand_arrow_body(body_expr) {
-                            let sig_doc = d.group(self.build_arrow_signature_doc(arrow));
+                        // Arrows with TSTypeReference return types are NOT expandable.
+                        if could_expand_arrow_body(body_expr)
+                            && !arrow_has_type_reference_return(arrow)
+                        {
+                            let sig_doc = build_arrow_sig_doc(self, arrow);
                             let body_doc = self.build_expression_doc(body_expr);
+                            let body_doc = prepend_arrow_body_comments(
+                                self,
+                                arrow,
+                                body_expr.span().start,
+                                body_doc,
+                            );
 
                             let state_break = d.concat(&[
                                 callee_with_types,
@@ -269,17 +242,24 @@ impl<'a> Printer<'a> {
                         }
 
                         // Simple call body: 2-state break at =>
+                        // Arrows with TSTypeReference return types are NOT expandable.
                         if matches!(&**body_expr, internal::Expression::CallExpression(_))
-                            && has_no_type_annotations
+                            && !arrow_has_type_reference_return(arrow)
                         {
                             let arrow_doc = self.build_expression_doc(&new_expr.arguments[0]);
                             let body_doc = self.build_expression_doc(body_expr);
-                            let inline_sig = build_arrow_inline_signature(self, arrow);
+                            let body_doc = prepend_arrow_body_comments(
+                                self,
+                                arrow,
+                                body_expr.span().start,
+                                body_doc,
+                            );
+                            let sig_doc = build_arrow_sig_doc(self, arrow);
                             return build_arrow_call_body_states(
                                 d,
                                 callee_with_types,
                                 arrow_doc,
-                                inline_sig,
+                                sig_doc,
                                 body_doc,
                             );
                         }
@@ -353,6 +333,12 @@ impl<'a> Printer<'a> {
             return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
         }
 
+        // Compute paren_open: position after callee and type args (just before `(`)
+        let paren_open = new_expr
+            .type_arguments
+            .as_ref()
+            .map_or_else(|| new_expr.callee.span().end, |ta| ta.span.end);
+
         // "Expand first arg" pattern: callback first, short/empty container last
         // e.g., new Proxy((x) => { ... }, {}) - callback hugs, empty obj stays inline
         if new_expr.arguments.len() == 2 {
@@ -360,6 +346,14 @@ impl<'a> Printer<'a> {
             let second_arg = &new_expr.arguments[1];
 
             if is_block_function(first_arg)
+                // Prettier's couldExpandArg returns true for objects/arrays with leading
+                // comments (hasComment includes leading). Block expand-first to avoid
+                // dropping the comment (SAFETY).
+                && !(matches!(
+                    second_arg,
+                    internal::Expression::ObjectExpression(_)
+                        | internal::Expression::ArrayExpression(_)
+                ) && self.has_comments_between(first_arg.span().end, second_arg.span().start))
                 && is_short_second_arg_for_expand_first(second_arg, |start, end| {
                     self.has_comments_between(start, end)
                 })
@@ -501,9 +495,8 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // "Expand last arg" pattern: 3-state conditional group (inline → hug → expand all).
-        // Applies when last arg is function/arrow OR non-concise array/object.
-        // e.g., new Foo(arg, () => { ... }) or new Foo(arg, [items])
+        // "Expand last arg" pattern — matches call_formatting.rs logic.
+        // Split into function/arrow last arg and array/object last arg paths.
         // NOTE: This must come AFTER the trailing comment check above.
         {
             let last_arg = new_expr.arguments.last();
@@ -524,28 +517,95 @@ impl<'a> Printer<'a> {
                 && !has_inter_argument_comments_slice(&new_expr.arguments, self)
             {
                 let (head_parts, last_arg_doc, all_args_broken) =
-                    build_args_split_last(&new_expr.arguments, self);
+                    build_args_split_last(&new_expr.arguments, self, paren_open);
 
                 // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
-                // When any preceding arg will break (e.g., callback with block body),
-                // skip the conditional group and expand all args directly.
                 if head_parts.iter().any(|&id| d.will_break(id)) {
-                    return d.concat(&[
-                        callee_with_types,
-                        d.text("("),
-                        d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
-                        d.line(),
-                        d.text(")"),
-                    ]);
+                    return build_expand_all_args(d, callee_with_types, all_args_broken);
                 }
 
-                let state_inline = d.concat(&[
-                    callee_with_types,
-                    d.text("("),
-                    d.concat(&head_parts),
-                    last_arg_doc,
-                    d.text(")"),
-                ]);
+                if last_is_function {
+                    // Function/arrow last arg path (matches call_formatting.rs:714-866)
+                    // Expression arrows with call/conditional body get break-body state
+                    if let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
+                        new_expr.arguments.last()
+                        && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+                        && matches!(
+                            &**body_expr,
+                            internal::Expression::CallExpression(_)
+                                | internal::Expression::ConditionalExpression(_)
+                        )
+                        && !arrow_has_type_reference_return(arrow)
+                    {
+                        let sig_doc = build_arrow_sig_doc(self, arrow);
+                        let body_doc = self.build_expression_doc(body_expr);
+                        let body_doc = prepend_arrow_body_comments(
+                            self,
+                            arrow,
+                            body_expr.span().start,
+                            body_doc,
+                        );
+
+                        let prefix = d.concat(&[callee_with_types, d.text("(")]);
+                        let state_break_body =
+                            build_break_body_state(d, prefix, &head_parts, sig_doc, body_doc);
+
+                        let state_expand_all =
+                            build_expand_all_args(d, callee_with_types, all_args_broken);
+
+                        // Prettier: when willBreak(lastArg), skip flat state
+                        if d.will_break(last_arg_doc) {
+                            return d.conditional_group(&[state_break_body, state_expand_all]);
+                        }
+
+                        let state_inline =
+                            build_inline_args(d, callee_with_types, head_parts, last_arg_doc);
+
+                        return d.conditional_group(&[
+                            state_inline,
+                            state_break_body,
+                            state_expand_all,
+                        ]);
+                    }
+
+                    // Block-body arrow/function: inline vs expand-all (no hug state)
+                    let state_inline =
+                        build_inline_args(d, callee_with_types, head_parts, last_arg_doc);
+                    let state_expand_all =
+                        build_expand_all_args(d, callee_with_types, all_args_broken);
+                    return d.conditional_group(&[state_inline, state_expand_all]);
+                }
+
+                // Array/object last arg path (matches call_formatting.rs:870-999)
+                // Same type (both arrays or both objects): skip hug, use expand-all
+                if last_two_args_same_type(&new_expr.arguments) {
+                    // Same type: Prettier uses expand-all when last arg will break
+                    if d.will_break(last_arg_doc) {
+                        return build_expand_all_args(d, callee_with_types, all_args_broken);
+                    }
+                    return build_inline_or_expand_all(
+                        d,
+                        callee_with_types,
+                        head_parts,
+                        last_arg_doc,
+                        all_args_broken,
+                    );
+                }
+
+                // Different types: if last arg has forced breaks, use inline-or-expand-all
+                if d.has_forced_break(last_arg_doc) {
+                    return build_inline_or_expand_all(
+                        d,
+                        callee_with_types,
+                        head_parts,
+                        last_arg_doc,
+                        all_args_broken,
+                    );
+                }
+
+                // No forced breaks: 3-state (inline → hug → expand all)
+                let state_inline =
+                    build_inline_args(d, callee_with_types, head_parts.clone(), last_arg_doc);
                 let state_hug = d.concat(&[
                     callee_with_types,
                     d.text("("),
@@ -553,21 +613,13 @@ impl<'a> Printer<'a> {
                     d.group_break(last_arg_doc),
                     d.text(")"),
                 ]);
-                let state_expand_all = d.concat(&[
-                    callee_with_types,
-                    d.text("("),
-                    d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
-                    d.line(),
-                    d.text(")"),
-                ]);
-
+                let state_expand_all = build_expand_all_args(d, callee_with_types, all_args_broken);
                 return d.conditional_group(&[state_inline, state_hug, state_expand_all]);
             }
         }
 
         // Check for leading comments or inter-argument block comments
         // These need explicit handling that the simple join_doc path doesn't provide
-        let paren_open = new_expr.callee.span().end;
         let has_leading_comments = !new_expr.arguments.is_empty()
             && self.has_comments_between(paren_open, new_expr.arguments[0].span().start);
         let has_inter_arg_comments = has_inter_argument_comments_slice(&new_expr.arguments, self);
@@ -649,7 +701,7 @@ impl<'a> Printer<'a> {
             }
 
             let arg_doc = d.concat(&arg_parts);
-            return wrap_call_with_soft_breaks(d, callee_with_types, arg_doc);
+            return wrap_call_with_will_break_guard(d, callee_with_types, arg_doc);
         }
 
         // Build args with line separators (one per line when broken)
@@ -661,8 +713,8 @@ impl<'a> Printer<'a> {
             d.comma_line(),
         );
 
-        // Wrap in group with parens
-        wrap_call_with_soft_breaks(d, callee_with_types, arg_parts)
+        // Wrap in group with parens, forcing break when args contain hardlines
+        wrap_call_with_will_break_guard(d, callee_with_types, arg_parts)
     }
 
     /// Build a Doc for a new expression (for nested contexts)

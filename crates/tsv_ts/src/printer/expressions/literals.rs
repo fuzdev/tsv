@@ -207,8 +207,7 @@ impl<'a> Printer<'a> {
         let dots_end = spread.span.start + 3;
         let arg_start = spread.argument.span().start;
         // Use trailing_space variant: `.../* comment */ arg` (space after comment, not before)
-        let comment_doc =
-            self.build_inline_comments_between_doc_trailing_space_opt(dots_end, arg_start);
+        let comment_doc = self.build_rhs_comments_opt(dots_end, arg_start);
 
         if needs_parens {
             match comment_doc {

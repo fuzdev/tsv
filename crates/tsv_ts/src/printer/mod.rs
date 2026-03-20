@@ -57,7 +57,8 @@ pub(crate) use assignment::{
 pub(crate) use comments::{CommentFilter, CommentSpacing};
 pub(crate) use needs_parens::{ParenContext, needs_parens};
 pub(crate) use types::{
-    intersection_has_huggable_last_type, should_hug_union_type, unwrap_parenthesized,
+    intersection_has_expanding_first_type, intersection_has_huggable_last_type,
+    should_hug_union_type, unwrap_parenthesized,
 };
 
 use crate::ast::internal;
@@ -207,11 +208,6 @@ impl<'a> Printer<'a> {
         doc::arena_print_doc_resolved(self.arena, d, &flat_config, &*interner)
     }
 
-    /// Write indentation based on current indent level
-    pub(crate) fn write_indent(&mut self) {
-        tsv_lang::write_indent(&mut self.buffer, self.indent_level, self.config.indent);
-    }
-
     /// Get the formatted output
     pub fn into_string(self) -> String {
         self.buffer.into_string()
@@ -298,28 +294,6 @@ impl<'a> Printer<'a> {
             d.isolated_group(base_doc)
         } else {
             base_doc
-        }
-    }
-
-    /// Build a DocId for an expression with continuation indent for binary expressions.
-    ///
-    /// For binary expressions, produces:
-    /// ```text
-    /// first &&
-    ///   second &&
-    ///   third
-    /// ```
-    ///
-    /// Other expressions are built normally.
-    pub fn build_expression_doc_with_continuation_indent_public(
-        &self,
-        expr: &internal::Expression,
-    ) -> DocId {
-        match expr {
-            internal::Expression::BinaryExpression(binary) => {
-                self.build_binary_chain_doc_with_continuation_indent(binary)
-            }
-            _ => self.build_expression_doc(expr),
         }
     }
 
@@ -471,6 +445,15 @@ impl<'a> Printer<'a> {
         has_line_comments_in_range(self.comments, start, end)
     }
 
+    /// Check if there are multiline block comments between two positions
+    ///
+    /// Multiline block comments (containing newlines) force break-after-operator
+    /// layout in assignments and property values.
+    /// Prettier ref: `hasLeadingOwnLineComment` in assignment.js `chooseLayout`
+    pub(crate) fn has_multiline_block_comments_between(&self, start: u32, end: u32) -> bool {
+        tsv_lang::has_multiline_block_comments_in_range(self.comments, start, end)
+    }
+
     /// Check if a delimited list (tuple, type params, etc.) has line comments
     /// between any elements OR after the last element.
     ///
@@ -521,6 +504,27 @@ impl<'a> Printer<'a> {
             i += 1;
         }
         None
+    }
+
+    /// Find the `=>` token position for an arrow function.
+    ///
+    /// Computes the signature end from the arrow's structure and scans for `=>`.
+    /// Returns the position of `=` in `=>`, or the body start as fallback.
+    pub(crate) fn find_arrow_token_for(&self, arrow: &internal::ArrowFunctionExpression) -> u32 {
+        let body_start = arrow.body.span().start;
+        let sig_end = if let Some(rt) = &arrow.return_type {
+            rt.span.end
+        } else if let Some(ps) = arrow.params_start {
+            self.find_closing_paren(ps, body_start)
+                .unwrap_or(body_start)
+        } else {
+            arrow
+                .params
+                .last()
+                .map_or(arrow.span.start, |p| p.span().end)
+        };
+        self.find_arrow_token(sig_end, body_start)
+            .unwrap_or(body_start)
     }
 
     /// Find the `=>` token between a start position and end boundary.
@@ -599,109 +603,13 @@ impl<'a> Printer<'a> {
     }
 
     /// Print a TypeScript program
-    pub fn print_program(&mut self, program: &internal::Program) {
-        let mut prev_end = 0u32; // Start of file
-        // Track if we've printed any output (comments or statements)
-        // Used to correctly handle blank line preservation - we never want blank lines
-        // at the very start of the program, but we do want them between subsequent items.
-        let mut has_output = false;
-
-        // Filter out standalone EmptyStatements - prettier removes them
-        // (EmptyStatement is still printed when part of control flow: if/while/for/label)
-        for statement in program.body.iter() {
-            // Skip standalone empty statements but preserve blank lines around them
-            if matches!(statement, internal::Statement::EmptyStatement(_)) {
-                // Add separator only if buffer doesn't end with newline
-                // (statements don't add trailing newlines, but comments do)
-                // This ensures we start on a new line for blank line detection to work correctly.
-                if has_output && !self.buffer.ends_with('\n') {
-                    self.write("\n");
-                }
-                // Process comments associated with this statement (preserves blank lines within)
-                let printed_comments =
-                    self.print_leading_comments(prev_end, statement.span().start, !has_output);
-                if printed_comments {
-                    has_output = true;
-                }
-                // Remove trailing space if any (same-line comments add space for the next element,
-                // but we're skipping this statement so there's no next element)
-                self.buffer.pop_if_ends_with(' ');
-                prev_end = statement.span().end;
-                continue;
-            }
-
-            // Always add newline between output (separator)
-            if has_output {
-                self.write("\n");
-
-                // Check for blank lines between statements (preserve from source)
-                // Only check if there are no comments between statements
-                // (comments handle their own blank line preservation)
-                let stmt_start = statement.span().start;
-                if !has_comments_in_range(self.comments, prev_end, stmt_start)
-                    && self.has_blank_line_between(prev_end, stmt_start)
-                {
-                    self.write("\n");
-                }
-            }
-
-            // Print leading comments before this statement
-            // (blank line preservation handled inside print_leading_comments)
-            // For the first statement, include same-line comments (no previous statement to be trailing from)
-            let is_first = !has_output;
-            self.print_leading_comments(prev_end, statement.span().start, is_first);
-
-            let doc = self.build_statement_doc(statement);
-            self.write_arena_doc(doc);
-
-            // Print trailing same-line comments after the statement
-            self.print_trailing_same_line_comments(statement.span().end);
-
-            prev_end = statement.span().end;
-            has_output = true;
-        }
-
-        // Print trailing comments after the last statement
-        self.print_program_trailing_comments(prev_end);
-
-        // Add trailing newline (matches prettier)
-        self.write("\n");
-    }
-
-    /// Print comments after the last statement in the program
     ///
-    /// These are comments that appear after all statements but before end of file.
-    /// Note: Same-line inline comments are already handled by statement-level printers
-    /// (e.g., print_inline_comments_in_statement), so we skip those here.
-    fn print_program_trailing_comments(&mut self, prev_end: u32) {
-        let mut last_comment_end = prev_end;
-        let mut is_first_comment = true;
-
-        for comment in comments_after(self.comments, prev_end) {
-            // Skip comments on same line as prev_end - those are inline trailing comments
-            // already handled by statement-level printers (print_inline_comments_in_statement)
-            // BUT: When prev_end == 0 (no statements), there's no previous statement to be
-            // trailing from, so comments at position 0 should NOT be skipped.
-            if prev_end > 0 && self.is_same_line(prev_end, comment.span.start) {
-                last_comment_end = comment.span.end;
-                continue;
-            }
-
-            // For comments-only files (no statements), don't add leading newline for first comment
-            if prev_end > 0 || !is_first_comment {
-                // Comment on its own line - add newline and possible blank line
-                self.write("\n");
-
-                if self.has_blank_line_between(last_comment_end, comment.span.start) {
-                    self.write("\n");
-                }
-            }
-
-            self.write_indent();
-            self.print_comment(comment);
-            last_comment_end = comment.span.end;
-            is_first_comment = false;
-        }
+    /// Delegates to `build_program_doc` to build the doc tree, then renders it.
+    /// This is the same path used by Svelte's `<script>` formatting, ensuring
+    /// consistent behavior (e.g., trailing whitespace trimming in comments).
+    pub fn print_program(&mut self, program: &internal::Program) {
+        let doc = self.build_program_doc(program);
+        self.write_arena_doc(doc);
     }
 }
 
@@ -709,7 +617,8 @@ impl<'a> Printer<'a> {
     /// Build a DocId tree for a TypeScript program
     ///
     /// Returns a DocId that can be wrapped with `indent()` and rendered.
-    /// Used when embedding TypeScript in other formats like Svelte's `<script>`.
+    /// Used both for standalone TS/JS formatting (via `print_program`) and
+    /// when embedding TypeScript in other formats like Svelte's `<script>`.
     ///
     /// The Doc structure preserves:
     /// - Statement separation with hardline

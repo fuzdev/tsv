@@ -155,39 +155,62 @@ impl<'a> Printer<'a> {
         nodes: &[FragmentNode],
         trim_text: bool,
     ) -> DocId {
-        let docs: Vec<DocId> = nodes
-            .iter()
-            .enumerate()
-            .filter_map(|(i, node)| {
-                // For control flow blocks, check if there's preceding breakable content
-                let is_control_flow = matches!(
-                    node,
-                    FragmentNode::IfBlock(_)
-                        | FragmentNode::EachBlock(_)
-                        | FragmentNode::AwaitBlock(_)
-                        | FragmentNode::KeyBlock(_)
-                );
-                if is_control_flow {
-                    let has_preceding_breakable = nodes[..i].iter().any(|n| {
-                        matches!(
-                            n,
-                            FragmentNode::ExpressionTag(_)
-                                | FragmentNode::Element(_)
-                                | FragmentNode::SpecialElement(_)
-                                | FragmentNode::HtmlTag(_)
-                                | FragmentNode::RenderTag(_)
-                        )
-                    });
-                    self.build_fragment_node_doc_with_preceding_context(
-                        node,
-                        trim_text,
-                        has_preceding_breakable,
-                    )
-                } else {
-                    self.build_fragment_node_doc_with_context(node, trim_text)
+        let mut docs: Vec<DocId> = Vec::new();
+        let mut prettier_ignore_next = false;
+        for (i, node) in nodes.iter().enumerate() {
+            // prettier-ignore: skip whitespace, emit raw source for ignored node
+            if prettier_ignore_next {
+                if let FragmentNode::Text(text) = node {
+                    if text.raw.is_whitespace_only() {
+                        continue;
+                    }
                 }
-            })
-            .collect();
+                let raw = node.span().extract(self.source);
+                docs.push(self.d().text_owned(raw.to_string()));
+                prettier_ignore_next = false;
+                continue;
+            }
+            if let FragmentNode::Comment(comment) = node {
+                if comment.content.trim() == "prettier-ignore" {
+                    if let Some(doc) = self.build_fragment_node_doc_with_context(node, trim_text) {
+                        docs.push(doc);
+                    }
+                    prettier_ignore_next = true;
+                    continue;
+                }
+            }
+
+            // For control flow blocks, check if there's preceding breakable content
+            let is_control_flow = matches!(
+                node,
+                FragmentNode::IfBlock(_)
+                    | FragmentNode::EachBlock(_)
+                    | FragmentNode::AwaitBlock(_)
+                    | FragmentNode::KeyBlock(_)
+            );
+            let doc = if is_control_flow {
+                let has_preceding_breakable = nodes[..i].iter().any(|n| {
+                    matches!(
+                        n,
+                        FragmentNode::ExpressionTag(_)
+                            | FragmentNode::Element(_)
+                            | FragmentNode::SpecialElement(_)
+                            | FragmentNode::HtmlTag(_)
+                            | FragmentNode::RenderTag(_)
+                    )
+                });
+                self.build_fragment_node_doc_with_preceding_context(
+                    node,
+                    trim_text,
+                    has_preceding_breakable,
+                )
+            } else {
+                self.build_fragment_node_doc_with_context(node, trim_text)
+            };
+            if let Some(doc) = doc {
+                docs.push(doc);
+            }
+        }
 
         if docs.is_empty() {
             self.d().empty()
@@ -261,9 +284,29 @@ impl<'a> Printer<'a> {
         let mut child_docs: Vec<DocId> = Vec::new();
         let mut handle_whitespace_of_prev_text = false;
 
+        let mut prettier_ignore_next = false;
         for (i, node) in trimmed_nodes.iter().enumerate() {
             let is_first = i == 0;
             let is_last = i == trimmed_len - 1;
+
+            // prettier-ignore: skip whitespace, emit raw source for ignored node
+            if prettier_ignore_next {
+                if let FragmentNode::Text(text) = node {
+                    if text.raw.is_whitespace_only() {
+                        continue;
+                    }
+                }
+                let raw = node.span().extract(self.source);
+                child_docs.push(d.text_owned(raw.to_string()));
+                handle_whitespace_of_prev_text = false;
+                prettier_ignore_next = false;
+                continue;
+            }
+            if let FragmentNode::Comment(comment) = node {
+                if comment.content.trim() == "prettier-ignore" {
+                    prettier_ignore_next = true;
+                }
+            }
 
             if let FragmentNode::Text(text) = node {
                 let prev_is_inline = i > 0 && Self::is_inline_content(&trimmed_nodes[i - 1]);
@@ -519,7 +562,32 @@ impl<'a> Printer<'a> {
         // Track if previous text ended with space (for inline-before-block pattern)
         let mut prev_text_has_trailing_space = false;
 
+        let mut prettier_ignore_next = false;
         for (i, node) in trimmed_nodes.iter().enumerate() {
+            // prettier-ignore: skip whitespace, emit raw source for ignored node
+            if prettier_ignore_next {
+                if let FragmentNode::Text(text) = node {
+                    if text.raw.is_whitespace_only() {
+                        continue;
+                    }
+                }
+                let raw = node.span().extract(self.source);
+                let raw_doc = d.text_owned(raw.to_string());
+                if !current_line.is_empty() {
+                    lines.push(std::mem::take(&mut current_line));
+                }
+                current_line.push(raw_doc);
+                // Don't close the line — let subsequent inline content stay on same line
+                prev_text_has_trailing_space = false;
+                prettier_ignore_next = false;
+                continue;
+            }
+            if let FragmentNode::Comment(comment) = node {
+                if comment.content.trim() == "prettier-ignore" {
+                    prettier_ignore_next = true;
+                }
+            }
+
             let is_block = self.is_block_fragment_node(node);
 
             if is_block {
@@ -530,8 +598,11 @@ impl<'a> Printer<'a> {
                 // 2. Previous text had trailing space AND on same source line
                 //
                 // HTML block elements (<div>, <p>, etc.) can stay inline when:
-                // - Previous text had trailing space AND on same source line
-                // (But NOT when directly adjacent without whitespace)
+                // - Block is the second trimmed child (i==1) AND first child is content text
+                //   with trailing space AND on same source line.
+                //   This matches prettier: only first-child text keeps blocks inline.
+                //   When non-text nodes (elements, expressions) precede the whitespace,
+                //   prettier adds softline + breakParent to force a line break.
                 let is_control_flow = super::helpers::is_control_flow_block(node);
                 let keep_inline_with_prev = if i > 0 {
                     let prev_span = trimmed_nodes[i - 1].span();
@@ -539,13 +610,27 @@ impl<'a> Printer<'a> {
                     // Directly adjacent: prev.end == curr.start (no text node between)
                     // Only control flow blocks can hug when directly adjacent
                     let directly_adjacent = is_control_flow && prev_span.end == curr_span.start;
-                    // Previous text had trailing space and on same line - works for all blocks
+                    // Previous text had trailing space and on same line
                     let text_with_space = prev_text_has_trailing_space
                         && tsv_lang::printing::spans_on_same_line(
                             self.source,
                             prev_span,
                             curr_span,
                         );
+                    // For HTML block elements (not control flow), only keep inline
+                    // when the block is the second child and the first child is
+                    // content text. This matches prettier where forceBreakContent
+                    // (breakParent) forces all softlines to break, and only
+                    // first-child text avoids getting a softline before the block.
+                    let text_with_space = if !is_control_flow && text_with_space {
+                        i == 1
+                            && matches!(
+                                &trimmed_nodes[0],
+                                FragmentNode::Text(t) if !t.raw.is_whitespace_only()
+                            )
+                    } else {
+                        text_with_space
+                    };
                     directly_adjacent || text_with_space
                 } else {
                     false
@@ -780,6 +865,19 @@ impl<'a> Printer<'a> {
             FragmentNode::SpecialElement(el) => el.kind.is_block(),
             _ => super::helpers::is_control_flow_block(node),
         }
+    }
+
+    /// Check if fragment content should force breaking due to block elements.
+    ///
+    /// Matches prettier's `forceBreakContent`: when there are multiple non-whitespace
+    /// children and at least one is a block element, content should break.
+    /// This forces the multiline path even for "inline" Svelte block bodies.
+    fn fragment_should_force_break_content(&self, nodes: &[FragmentNode]) -> bool {
+        let non_ws_count = nodes
+            .iter()
+            .filter(|n| !n.is_whitespace_only_text())
+            .count();
+        non_ws_count > 1 && nodes.iter().any(|n| self.is_block_fragment_node(n))
     }
 
     /// Check if expressions should be split to separate lines in multiline mode.
@@ -1088,7 +1186,10 @@ impl<'a> Printer<'a> {
         // E.g., `{#if a} content {/if}` or `{#if a} content{/if}` → expand to multiline.
         let (has_leading, has_trailing) =
             self.fragment_ws_status(&block.consequent, in_multiline_context);
-        let is_inline = !has_leading && !has_trailing;
+        // Force non-inline when block elements among multiple children
+        // (matches prettier's forceBreakContent + breakParent)
+        let force_break = self.fragment_should_force_break_content(&block.consequent.nodes);
+        let is_inline = !has_leading && !has_trailing && !force_break;
 
         // For inline: use regular fragment doc (preserves spaces)
         // For multiline: use multiline doc (preserves line structure with hardlines)
@@ -1193,7 +1294,8 @@ impl<'a> Printer<'a> {
             // Check this branch's own leading/trailing whitespace
             let (has_leading, has_trailing) =
                 self.fragment_ws_status(&else_if.consequent, in_multiline_context);
-            let is_inline = !has_leading && !has_trailing;
+            let force_break = self.fragment_should_force_break_content(&else_if.consequent.nodes);
+            let is_inline = !has_leading && !has_trailing && !force_break;
             let parent_inline = !parent_has_leading && !parent_has_trailing;
             let is_both_inline = is_inline && parent_inline;
 
@@ -1228,7 +1330,8 @@ impl<'a> Printer<'a> {
 
         // Plain {:else}
         let (has_leading, has_trailing) = self.fragment_ws_status(alt, in_multiline_context);
-        let is_inline = !has_leading && !has_trailing;
+        let force_break = self.fragment_should_force_break_content(&alt.nodes);
+        let is_inline = !has_leading && !has_trailing && !force_break;
         let parent_inline = !parent_has_leading && !parent_has_trailing;
         let is_both_inline = is_inline && parent_inline;
 
@@ -1355,7 +1458,9 @@ impl<'a> Printer<'a> {
         // Space-only whitespace (no newlines) also triggers expansion to match prettier.
         let (has_leading, has_trailing) =
             self.fragment_ws_status(&block.body, in_multiline_context);
-        let is_inline = !has_leading && !has_trailing;
+        // Force non-inline when block elements among multiple children
+        let force_break = self.fragment_should_force_break_content(&block.body.nodes);
+        let is_inline = !has_leading && !has_trailing && !force_break;
 
         // For inline: use regular fragment doc (preserves inline spacing)
         // For multiline: use multiline doc (preserves line structure with hardlines)
@@ -1379,7 +1484,9 @@ impl<'a> Printer<'a> {
 
             let (fallback_has_leading, fallback_has_trailing) =
                 self.fragment_ws_status(fallback, in_multiline_context);
-            let fallback_inline = !fallback_has_leading && !fallback_has_trailing;
+            let fallback_force_break = self.fragment_should_force_break_content(&fallback.nodes);
+            let fallback_inline =
+                !fallback_has_leading && !fallback_has_trailing && !fallback_force_break;
             let is_both_inline = fallback_inline && is_inline;
 
             parts.push(d.text("{:else}"));
@@ -1448,17 +1555,16 @@ impl<'a> Printer<'a> {
 
         // Shorthand: {#await expr then value}
         if let (Some(value), None) = (&block.value, &block.pending) {
-            let value_pattern =
-                self.extract_source_range(value.span().start_usize(), value.span().end_usize());
             parts.push(d.text(" then "));
-            parts.push(d.text_owned(value_pattern.to_string()));
+            parts.push(self.build_pattern_doc(value));
             parts.push(d.text("}"));
             if let Some(then_block) = &block.then {
                 // Await shorthands: only use newline-based detection (not space-only)
                 // Prettier keeps shorthand forms inline even with symmetric spaces
                 let has_leading = self.fragment_has_leading_ws(then_block);
                 let has_trailing = self.fragment_has_trailing_ws(then_block);
-                let is_inline = !has_leading && !has_trailing;
+                let force_break = self.fragment_should_force_break_content(&then_block.nodes);
+                let is_inline = !has_leading && !has_trailing && !force_break;
                 let body_doc = if is_inline {
                     self.build_fragment_doc(then_block)
                 } else {
@@ -1478,16 +1584,15 @@ impl<'a> Printer<'a> {
             && block.value.is_none()
             && let Some(error) = &block.error
         {
-            let error_pattern =
-                self.extract_source_range(error.span().start_usize(), error.span().end_usize());
             parts.push(d.text(" catch "));
-            parts.push(d.text_owned(error_pattern.to_string()));
+            parts.push(self.build_pattern_doc(error));
             parts.push(d.text("}"));
             if let Some(catch_block) = &block.catch {
                 // Await shorthands: only use newline-based detection (not space-only)
                 let has_leading = self.fragment_has_leading_ws(catch_block);
                 let has_trailing = self.fragment_has_trailing_ws(catch_block);
-                let is_inline = !has_leading && !has_trailing;
+                let force_break = self.fragment_should_force_break_content(&catch_block.nodes);
+                let is_inline = !has_leading && !has_trailing && !force_break;
                 let body_doc = if is_inline {
                     self.build_fragment_doc(catch_block)
                 } else {
@@ -1515,7 +1620,8 @@ impl<'a> Printer<'a> {
         if let Some(pending) = &block.pending {
             let has_leading = self.fragment_has_leading_ws(pending);
             let has_trailing = self.fragment_has_trailing_ws(pending);
-            let is_inline = !has_leading && !has_trailing;
+            let force_break = self.fragment_should_force_break_content(&pending.nodes);
+            let is_inline = !has_leading && !has_trailing && !force_break;
             let body_doc = if is_inline {
                 self.build_fragment_doc(pending)
             } else {
@@ -1531,10 +1637,8 @@ impl<'a> Printer<'a> {
             if prev_has_trailing {
                 parts.push(d.hardline());
             }
-            let value_pattern =
-                self.extract_source_range(value.span().start_usize(), value.span().end_usize());
             parts.push(d.text("{:then "));
-            parts.push(d.text_owned(value_pattern.to_string()));
+            parts.push(self.build_pattern_doc(value));
             parts.push(d.text("}"));
         } else if block.then.as_ref().is_some_and(|t| !t.nodes.is_empty()) {
             if prev_has_trailing {
@@ -1546,7 +1650,8 @@ impl<'a> Printer<'a> {
             // Await blocks only use newline-based detection
             let has_leading = self.fragment_has_leading_ws(then_block);
             let has_trailing = self.fragment_has_trailing_ws(then_block);
-            let is_inline = !has_leading && !has_trailing;
+            let force_break = self.fragment_should_force_break_content(&then_block.nodes);
+            let is_inline = !has_leading && !has_trailing && !force_break;
             let body_doc = if is_inline {
                 self.build_fragment_doc(then_block)
             } else {
@@ -1562,10 +1667,8 @@ impl<'a> Printer<'a> {
             if prev_has_trailing {
                 parts.push(d.hardline());
             }
-            let error_pattern =
-                self.extract_source_range(error.span().start_usize(), error.span().end_usize());
             parts.push(d.text("{:catch "));
-            parts.push(d.text_owned(error_pattern.to_string()));
+            parts.push(self.build_pattern_doc(error));
             parts.push(d.text("}"));
         } else if block.catch.as_ref().is_some_and(|c| !c.nodes.is_empty()) {
             if prev_has_trailing {
@@ -1577,7 +1680,8 @@ impl<'a> Printer<'a> {
             // Await blocks only use newline-based detection
             let has_leading = self.fragment_has_leading_ws(catch_block);
             let has_trailing = self.fragment_has_trailing_ws(catch_block);
-            let is_inline = !has_leading && !has_trailing;
+            let force_break = self.fragment_should_force_break_content(&catch_block.nodes);
+            let is_inline = !has_leading && !has_trailing && !force_break;
             let body_doc = if is_inline {
                 self.build_fragment_doc(catch_block)
             } else {
@@ -1633,7 +1737,9 @@ impl<'a> Printer<'a> {
         // Check leading/trailing whitespace, considering space-only patterns.
         // Space-only whitespace (no newlines) also triggers expansion to match prettier.
         let (has_leading, has_trailing) = self.fragment_ws_status(&block.fragment, false);
-        let is_inline = !has_leading && !has_trailing;
+        // Force non-inline when block elements among multiple children
+        let force_break = self.fragment_should_force_break_content(&block.fragment.nodes);
+        let is_inline = !has_leading && !has_trailing && !force_break;
 
         // For inline: use regular fragment doc (preserves inline spacing)
         // For multiline: use multiline doc (preserves line structure with hardlines)
@@ -1671,7 +1777,8 @@ impl<'a> Printer<'a> {
         // Check leading/trailing whitespace, considering space-only patterns.
         // Space-only whitespace (no newlines) also triggers expansion to match prettier.
         let (has_leading, has_trailing) = self.fragment_ws_status(&block.body, false);
-        let is_inline = !has_leading && !has_trailing;
+        let force_break = self.fragment_should_force_break_content(&block.body.nodes);
+        let is_inline = !has_leading && !has_trailing && !force_break;
 
         // Type parameters (generics)
         let type_params_part = block.type_parameters.as_ref().map_or_else(
@@ -1795,7 +1902,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_const_tag_doc(&self, tag: &internal::ConstTag) -> DocId {
         let d = self.d();
         let id_doc = self.build_ts_expression_doc_no_comments(&tag.id);
-        // Build init with first_line_offset=0 so binary chains use Grouped style
+        // Build init with is_embedded_expression=false so binary chains use Grouped style
         // (not ContinuationIndent). The assignment layout handles indentation —
         // ContinuationIndent would double-indent continuation lines.
         let init_doc = self.build_const_init_doc(
@@ -1903,7 +2010,7 @@ impl<'a> Printer<'a> {
                 .map(|c| self.build_leading_js_comment_doc(c))
                 .collect();
 
-        // first_line_offset = 0: binary chains use Grouped style, not ContinuationIndent
+        // is_embedded_expression defaults to false: binary chains use Grouped style, not ContinuationIndent
         let config = tsv_lang::PrintConfig {
             first_line_offset: 0,
             ..self.config
@@ -1996,8 +2103,13 @@ impl<'a> Printer<'a> {
                     }
                     match prop {
                         tsv_ts::ObjectPatternProperty::Property(p) => {
-                            parts.push(self.build_ts_expression_doc_no_comments(&p.key));
-                            if !p.shorthand {
+                            if p.shorthand {
+                                // Shorthand: `{ k }` or `{ k = 1 }`
+                                // Use build_pattern_doc for the value to handle
+                                // AssignmentPattern (defaults) and preserve quotes
+                                parts.push(self.build_pattern_doc(&p.value));
+                            } else {
+                                parts.push(self.build_ts_expression_doc_no_comments(&p.key));
                                 parts.push(d.text(": "));
                                 parts.push(self.build_pattern_doc(&p.value));
                             }
@@ -2020,8 +2132,11 @@ impl<'a> Printer<'a> {
                     }
                     match prop {
                         tsv_ts::ObjectProperty::Property(p) => {
-                            parts.push(self.build_ts_expression_doc_no_comments(&p.key));
-                            if !p.shorthand {
+                            if p.shorthand {
+                                // Shorthand: `{ k }` or `{ k = 1 }`
+                                parts.push(self.build_pattern_doc(&p.value));
+                            } else {
+                                parts.push(self.build_ts_expression_doc_no_comments(&p.key));
                                 parts.push(d.text(": "));
                                 parts.push(self.build_pattern_doc(&p.value));
                             }
@@ -2070,8 +2185,20 @@ impl<'a> Printer<'a> {
             tsv_ts::Expression::AssignmentPattern(assign) => {
                 let left = self.build_pattern_doc(&assign.left);
                 let eq = d.text(" = ");
-                let right = self.build_ts_expression_doc_no_comments(&assign.right);
+                let right = self.build_pattern_doc(&assign.right);
                 d.concat(&[left, eq, right])
+            }
+            tsv_ts::Expression::AssignmentExpression(assign) => {
+                // Legacy AST - treat same as AssignmentPattern
+                let left = self.build_pattern_doc(&assign.left);
+                let eq = d.text(" = ");
+                let right = self.build_pattern_doc(&assign.right);
+                d.concat(&[left, eq, right])
+            }
+            tsv_ts::Expression::Literal(lit) => {
+                // Preserve source text for literals (maintains original quote style)
+                let text = self.extract_source_range(lit.span.start_usize(), lit.span.end_usize());
+                d.text_owned(text.to_string())
             }
             // Default: build doc directly in shared arena
             _ => self.build_ts_expression_doc_no_comments(expr),
@@ -2086,10 +2213,10 @@ impl<'a> Printer<'a> {
     /// - Trailing comments: between expr.span().end and span_end
     ///
     /// Builds the expression doc directly in the shared arena using
-    /// `build_expression_doc_with_comments`. The `first_line_offset` is set so the
-    /// TS printer builds the correct binary chain doc structure, and the surrounding
-    /// Svelte doc tree (e.g., the closing `}`) provides natural lookahead for fits
-    /// checks — no `suffix_width` estimation needed.
+    /// `build_expression_doc_with_comments` with `is_embedded_expression = true`
+    /// so binary chains use ContinuationIndent style. The surrounding Svelte doc tree
+    /// (e.g., the closing `}`) provides natural lookahead for fits checks — no
+    /// `suffix_width` estimation needed.
     fn build_expression_with_comments_doc(
         &self,
         expr: &tsv_ts::Expression,
@@ -2106,13 +2233,14 @@ impl<'a> Printer<'a> {
                 .map(|c| self.build_leading_js_comment_doc(c))
                 .collect();
 
-        // Config with first_line_offset > 0 for correct binary chain doc structure
-        // (operators.rs checks this flag). The exact value estimates the column position.
+        // Config for embedded expression context: binary chains use ContinuationIndent style.
+        // first_line_offset estimates the column position for width calculations.
         let context_indent = self.config.tab_width;
         let opening_offset = 5; // typical tag prefix, e.g. `{#if `
         let first_line_offset = context_indent + opening_offset;
         let config = tsv_lang::PrintConfig {
             first_line_offset,
+            is_embedded_expression: true,
             ..self.config
         };
 
@@ -2157,11 +2285,11 @@ impl<'a> Printer<'a> {
     ///
     /// - **Multiline context** (`in_multiline_context=true`): The condition is on its own line.
     ///   No `remove_lines()` is applied, allowing long chains to wrap naturally.
-    ///   Uses `first_line_offset` to get proper continuation indent for wrapped binary expressions.
+    ///   Uses `is_embedded_expression` for proper continuation indent on wrapped binary expressions.
     ///
     /// # Parameters
     /// - `opening_offset` - Characters before the expression (e.g., 5 for `{#if `). Used to
-    ///   calculate `first_line_offset` which triggers continuation indent for binary expressions.
+    ///   calculate `first_line_offset` for width estimation.
     /// - `in_multiline_context` - Whether the block is on its own line (multiline) or inline
     pub(super) fn build_expression_doc_for_block(
         &self,
@@ -2181,15 +2309,14 @@ impl<'a> Printer<'a> {
                 .map(|c| self.build_leading_js_comment_doc(c))
                 .collect();
 
-        // Set up config with first_line_offset to trigger continuation indent in the
-        // TypeScript formatter. The formatter checks `first_line_offset > 0` to decide
-        // whether to use continuation indent for binary expressions.
-        // Only apply in multiline context where wrapping is allowed.
+        // In multiline contexts, set up embedded expression config so binary chains
+        // use ContinuationIndent style. first_line_offset estimates the column position.
         let config = if in_multiline_context {
             let context_indent = self.config.tab_width;
             let first_line_offset = context_indent + opening_offset;
             tsv_lang::PrintConfig {
                 first_line_offset,
+                is_embedded_expression: true,
                 ..self.config
             }
         } else {

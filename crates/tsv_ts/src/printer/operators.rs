@@ -4,6 +4,7 @@
 // - Operator precedence and parenthesization
 // - Clarity-based parens (mixing logical operators, etc.)
 
+use super::comments::CommentSpacing;
 use super::{ParenContext, Printer, needs_parens};
 use crate::ast::internal::{self, BinaryOperator, Expression};
 use tsv_lang::Span;
@@ -59,7 +60,31 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a unary expression
     pub(super) fn build_unary_doc(&self, unary: &internal::UnaryExpression) -> DocId {
         let d = self.d();
-        let argument_doc = if needs_parens(&unary.argument, ParenContext::UnaryArgument) {
+
+        // Check for comments between operator and argument.
+        // When grouping parens containing a JSDoc comment are stripped by the parser,
+        // the comment ends up in the gap between operator and argument span.
+        // Re-add parens to preserve the comment: `!(/** @type {T} */ expr.prop)`
+        let operator_end = unary.span.start + unary.operator.as_str().len() as u32;
+        let argument_start = unary.argument.span().start;
+        let comments_opt = self.build_rhs_comments_opt(operator_end, argument_start);
+
+        let has_line_comment = self.has_line_comments_between(operator_end, argument_start);
+        let argument_doc = if let Some(comments) = comments_opt {
+            let inner = self.build_expression_doc(&unary.argument);
+            if has_line_comment {
+                // Line comments need indent + hardline structure:
+                // !(\n  // comment\n  expr\n)
+                d.concat(&[
+                    d.text("("),
+                    d.indent(d.concat(&[d.hardline(), comments, inner])),
+                    d.hardline(),
+                    d.text(")"),
+                ])
+            } else {
+                d.concat(&[d.text("("), comments, inner, d.text(")")])
+            }
+        } else if needs_parens(&unary.argument, ParenContext::UnaryArgument) {
             // Binary expressions need parens - use grouping for logical ops to allow line breaking
             if let Expression::BinaryExpression(binary) = unary.argument.as_ref() {
                 if binary.operator.is_logical() {
@@ -124,9 +149,10 @@ impl<'a> Printer<'a> {
     ///
     /// See: prettier/src/language-js/print/binaryish.js
     pub(super) fn build_binary_doc(&self, binary: &internal::BinaryExpression) -> DocId {
-        // Use continuation indent in inline embedded contexts (first_line_offset > 0)
-        // This ensures wrapped lines get proper indentation in Svelte template expressions
-        if self.config.first_line_offset > 0 {
+        // Use continuation indent in embedded expression contexts (Svelte template expressions).
+        // This matches Prettier where JsExpressionRoot parent triggers the normal indent path
+        // (group([head, indent(rest)])) vs the shouldNotIndent path (group(parts)).
+        if self.config.is_embedded_expression {
             self.build_binary_chain_doc_with_continuation_indent(binary)
         } else {
             self.build_binary_chain_doc(binary)
@@ -152,7 +178,7 @@ impl<'a> Printer<'a> {
     /// Handles comments between operands (Prettier 3.7 #17723):
     /// - Line comments force a line break
     /// - Block comments are printed inline
-    fn build_binary_chain_doc(&self, binary: &internal::BinaryExpression) -> DocId {
+    pub(super) fn build_binary_chain_doc(&self, binary: &internal::BinaryExpression) -> DocId {
         self.build_binary_chain_doc_core(binary, BinaryChainStyle::Grouped)
     }
 
@@ -554,14 +580,17 @@ impl<'a> Printer<'a> {
         let has_line_comment = comments.iter().any(|c| !c.is_block);
 
         if !has_line_comment {
-            // Only block comments - join them inline
-            let comments_doc = self.build_inline_comments_between_doc(op_end, operand.span.start);
-            parts.push(comments_doc);
+            // Only block comments - place as leading on RHS operand.
+            // In flat mode: `a || /* comment */ b` (space from line(), comment+trailing space, operand)
+            // In break mode: `a ||\n<indent>/* comment */ b` (comment leads continuation line)
+            let comments_doc =
+                self.build_comments_between(op_end, operand.span.start, CommentSpacing::Trailing);
             if allow_breaks {
                 parts.push(d.line());
             } else {
                 parts.push(d.text(" "));
             }
+            parts.push(comments_doc);
             parts.push(operand.doc);
             return;
         }
@@ -698,16 +727,16 @@ impl<'a> Printer<'a> {
         // This gives: `(first &&\n\t\tsecond)` not `(first &&\n\tsecond)`
         //
         // Context-dependent behavior:
-        // - Script contexts (first_line_offset = 0): Use group with parens INSIDE so the
-        //   fit calculation includes `)`. This ensures `(A + B) *` at 101 chars breaks
-        //   inside the parens, not just at `*`.
-        // - Svelte template contexts (first_line_offset > 0): Use the grouped approach
-        //   from build_binary_chain_doc_with_continuation_indent, which keeps short
-        //   2-operand binaries flat (Prettier's behavior for template expressions).
+        // - Script contexts (is_embedded_expression = false): Use group with parens INSIDE
+        //   so the fit calculation includes `)`. This ensures `(A + B) *` at 101 chars
+        //   breaks inside the parens, not just at `*`.
+        // - Embedded expression contexts (is_embedded_expression = true): Use the grouped
+        //   approach from build_binary_chain_doc_with_continuation_indent, which keeps
+        //   short 2-operand binaries flat (Prettier's behavior for template expressions).
         if needs_parens(operand, ctx) {
             if let Expression::BinaryExpression(inner_binary) = operand {
-                if self.config.first_line_offset > 0 {
-                    // Svelte template context: use grouped approach that keeps short binaries flat
+                if self.config.is_embedded_expression {
+                    // Embedded expression context: use grouped approach that keeps short binaries flat
                     let inner_doc =
                         self.build_binary_chain_doc_with_continuation_indent(inner_binary);
                     return d.parens(inner_doc);
@@ -719,6 +748,13 @@ impl<'a> Printer<'a> {
             }
             let operand_doc = self.build_expression_doc(operand);
             d.parens(operand_doc)
+        } else if let Expression::BinaryExpression(inner_binary) = operand {
+            // Nested binary sub-expressions use continuation indent.
+            // Prettier's shouldNotIndent (binaryish.js:96-115) evaluates to false when
+            // parent is BinaryExpression (none of the conditions match), so the inner
+            // chain gets indent(rest). E.g., `0.5 * a(...) * b(...)` inside `... + 1.0`
+            // indents the `*` continuation lines relative to `0.5`.
+            self.build_binary_chain_doc_with_continuation_indent(inner_binary)
         } else {
             self.build_expression_doc(operand)
         }
@@ -727,7 +763,16 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an await expression
     pub(super) fn build_await_doc(&self, await_expr: &internal::AwaitExpression) -> DocId {
         let d = self.d();
-        let argument_doc = if needs_parens(&await_expr.argument, ParenContext::AwaitArgument) {
+
+        // Preserve comments from stripped grouping parens: `await (/** @type {T} */ expr)`
+        let keyword_end = await_expr.span.start + "await".len() as u32;
+        let argument_start = await_expr.argument.span().start;
+        let comments_opt = self.build_rhs_comments_opt(keyword_end, argument_start);
+
+        let argument_doc = if let Some(comments) = comments_opt {
+            let inner = self.build_expression_doc(&await_expr.argument);
+            d.concat(&[comments, inner])
+        } else if needs_parens(&await_expr.argument, ParenContext::AwaitArgument) {
             d.concat(&[
                 d.text("("),
                 self.build_expression_doc(&await_expr.argument),
@@ -753,6 +798,18 @@ impl<'a> Printer<'a> {
 
         if let Some(ref arg) = yield_expr.argument {
             parts.push(d.text(" "));
+            // Preserve comments from stripped grouping parens: `yield (/** @type {T} */ expr)`
+            let keyword_end = yield_expr.span.start
+                + if yield_expr.delegate {
+                    "yield*"
+                } else {
+                    "yield"
+                }
+                .len() as u32;
+            let argument_start = arg.span().start;
+            if let Some(comments) = self.build_rhs_comments_opt(keyword_end, argument_start) {
+                parts.push(comments);
+            }
             parts.push(self.build_expression_doc(arg));
         }
 

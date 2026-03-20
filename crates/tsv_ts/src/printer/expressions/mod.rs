@@ -116,9 +116,6 @@ impl<'a> Printer<'a> {
             Expression::TSParameterProperty(param_prop) => {
                 self.build_ts_parameter_property_doc(param_prop)
             }
-            Expression::Parenthesized(inner) => {
-                d.concat(&[d.text("("), self.build_expression_doc(inner), d.text(")")])
-            }
         }
     }
 
@@ -156,6 +153,12 @@ impl<'a> Printer<'a> {
             Expression::BinaryExpression(binary) => {
                 // Use indented binary chain - continuation lines get extra indent
                 self.build_binary_chain_doc_indented(binary)
+            }
+            Expression::ConditionalExpression(cond) => {
+                // Ternary in call/new args: binary expressions in branches use
+                // continuation indent. Matches Prettier's shouldNotIndent = false
+                // when grandparent is CallExpression/NewExpression (binaryish.js:112).
+                self.build_conditional_doc_with_binary_test_indent(cond)
             }
             // For other expressions, use normal doc building
             _ => self.build_expression_doc(expr),

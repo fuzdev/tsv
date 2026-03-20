@@ -1231,31 +1231,15 @@ fn parse_atrule_block(
         | "left-top" | "left-middle" | "left-bottom"
         | "right-top" | "right-middle" | "right-bottom"
         | "bottom-left-corner" | "bottom-left" | "bottom-center" | "bottom-right" | "bottom-right-corner"
-    ) || (matches!(
-        atrule_name,
-        "media" | "supports" | "layer" | "container" | "starting-style" | "scope"
-    ) && nested_in_rule);
+    );
+    // Conditional group at-rules (@media, @supports, etc.) nested inside a rule
+    // can contain BOTH declarations and nested rules — they fall through to the
+    // generic fallback which uses is_nested_rule_start() to disambiguate.
 
     while !parser.check(&TokenKind::RightBrace) && !parser.check(&TokenKind::Eof) {
-        // Handle comments
         if matches!(&parser.current_kind, TokenKind::Comment) {
-            let comment_start = parser.base_offset() + parser.current_start;
-            let comment_end = parser.base_offset() + parser.current_end;
-            // Extract content without /* */ delimiters
-            let content =
-                parser.source()[parser.current_start + 2..parser.current_end - 2].to_string();
-
-            parser.advance()?;
-            parser.skip_whitespace()?;
-
-            children.push(CssBlockChild::Comment(Comment {
-                content,
-                is_block: true,
-                span: Span {
-                    start: comment_start as u32,
-                    end: comment_end as u32,
-                },
-            }));
+            let comment = parser.parse_block_comment()?;
+            children.push(CssBlockChild::Comment(comment));
             continue;
         }
 
@@ -1278,7 +1262,7 @@ fn parse_atrule_block(
 
         // For @media, @supports, @layer, @keyframes, parse rules
         if expect_rules {
-            let rule = super::declarations::parse_rule(parser)?;
+            let rule = super::declarations::parse_rule(parser, false)?;
             children.push(CssBlockChild::Rule(rule));
             parser.skip_whitespace()?;
             continue;
@@ -1288,8 +1272,8 @@ fn parse_atrule_block(
         // by checking if the current position looks like a nested rule start
         let looks_like_rule = super::declarations::is_nested_rule_start(parser)?;
         if looks_like_rule {
-            // Parse as rule (selector + block)
-            let rule = super::declarations::parse_rule(parser)?;
+            // Parse as rule (selector + block) — use nested=true to allow leading combinators
+            let rule = super::declarations::parse_rule(parser, true)?;
             children.push(CssBlockChild::Rule(rule));
             parser.skip_whitespace()?;
             continue;

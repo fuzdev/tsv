@@ -641,6 +641,31 @@ impl<'a> Printer<'a> {
                     }
 
                     self.print_comment(comment);
+
+                    // prettier-ignore: preserve next non-whitespace node as raw source
+                    if comment.content.trim() == "prettier-ignore" {
+                        let mut next_idx = i + 1;
+                        while next_idx < fragment.nodes.len() {
+                            if let FragmentNode::Text(text) = &fragment.nodes[next_idx] {
+                                if text.raw.is_whitespace_only() {
+                                    next_idx += 1;
+                                    continue;
+                                }
+                            }
+                            break;
+                        }
+                        if next_idx < fragment.nodes.len() {
+                            self.write("\n");
+                            let raw = fragment.nodes[next_idx].span().extract(self.source);
+                            self.write(raw);
+                            state.has_output_content = true;
+                            state.prev_kind = PrevNodeKind::Block;
+                            state.pending_ws = PendingWhitespace::None;
+                            i = next_idx + 1;
+                            continue;
+                        }
+                    }
+
                     state.after_comment();
                 }
                 // Block-like nodes: control blocks, tags, special elements

@@ -57,9 +57,6 @@ pub enum Expression {
     ImportExpression(ImportExpression),
     // Meta property: import.meta, new.target
     MetaProperty(MetaProperty),
-    // Parenthesized expression for JSDoc type casts: /** @type {T} */ (expr)
-    // Only created when preceded by a JSDoc type cast comment, not for all parens.
-    Parenthesized(Box<Expression>),
 }
 
 impl Expression {
@@ -101,7 +98,6 @@ impl Expression {
             Expression::TSParameterProperty(param_prop) => param_prop.span,
             Expression::ImportExpression(import) => import.span,
             Expression::MetaProperty(meta) => meta.span,
-            Expression::Parenthesized(inner) => inner.span(),
         }
     }
 }
@@ -787,6 +783,30 @@ impl AssignmentOperator {
             AssignmentOperator::LogicalOrAssign => "||=",
             AssignmentOperator::LogicalAndAssign => "&&=",
             AssignmentOperator::NullishAssign => "??=",
+        }
+    }
+
+    /// Returns the operator string with a leading space (e.g., `" ="`, `" +="`)
+    /// for use in assignment layout formatting.
+    #[inline]
+    pub const fn as_str_with_leading_space(self) -> &'static str {
+        match self {
+            AssignmentOperator::Assign => " =",
+            AssignmentOperator::AddAssign => " +=",
+            AssignmentOperator::SubtractAssign => " -=",
+            AssignmentOperator::MultiplyAssign => " *=",
+            AssignmentOperator::DivideAssign => " /=",
+            AssignmentOperator::RemainderAssign => " %=",
+            AssignmentOperator::ExponentiateAssign => " **=",
+            AssignmentOperator::LeftShiftAssign => " <<=",
+            AssignmentOperator::RightShiftAssign => " >>=",
+            AssignmentOperator::UnsignedRightShiftAssign => " >>>=",
+            AssignmentOperator::BitwiseOrAssign => " |=",
+            AssignmentOperator::BitwiseXorAssign => " ^=",
+            AssignmentOperator::BitwiseAndAssign => " &=",
+            AssignmentOperator::LogicalOrAssign => " ||=",
+            AssignmentOperator::LogicalAndAssign => " &&=",
+            AssignmentOperator::NullishAssign => " ??=",
         }
     }
 }

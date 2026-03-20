@@ -521,8 +521,6 @@ pub(crate) fn has_multiline_content(expr: &internal::Expression, source: &str) -
         internal::Expression::MetaProperty(_) => false,
         // Parameter properties don't contain multiline content
         internal::Expression::TSParameterProperty(_) => false,
-        // Parenthesized (JSDoc type cast): check inner expression
-        internal::Expression::Parenthesized(inner) => has_multiline_content(inner, source),
     }
 }
 

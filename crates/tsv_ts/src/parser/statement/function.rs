@@ -70,11 +70,14 @@ impl<'a> Parser<'a> {
         };
 
         // Parse function name (required for declarations)
-        if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(self.error_expected_after("function name", "function"));
-        }
+        // Keywords like `object` and `async` can be function names
         let (id_start, id_end) = self.current_pos();
-        let symbol = self.intern_identifier();
+        let symbol = match self.try_intern_identifier_or_keyword() {
+            Some(sym) => sym,
+            None => {
+                return Err(self.error_expected_after("function name", "function"));
+            }
+        };
         self.advance()?;
 
         let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
@@ -191,9 +194,9 @@ impl<'a> Parser<'a> {
         };
 
         // Parse function name (required for declarations, optional for export default)
-        let id = if matches!(self.current_kind(), TokenKind::Identifier) {
+        // Keywords like `object` and `async` can be function names
+        let id = if let Some(symbol) = self.try_intern_identifier_or_keyword() {
             let (id_start, id_end) = self.current_pos();
-            let symbol = self.intern_identifier();
             self.advance()?;
 
             Some(Identifier::simple(

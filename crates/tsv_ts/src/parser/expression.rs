@@ -452,11 +452,21 @@ impl<'a> Parser<'a> {
                     self.advance()?; // consume 'async'
                     let expr = self.parse_async_function_expression(start)?;
                     ParsedExpr::from_expr(expr)
-                } else if matches!(
-                    peek,
-                    TokenKind::ParenOpen | TokenKind::Identifier | TokenKind::LessThan
-                ) {
-                    // Async arrow function: `async () => ...` or `async x => ...` or `async <T>() => ...`
+                } else if peek == TokenKind::ParenOpen {
+                    // `async(...)` — could be async arrow or call to function named `async`
+                    // Scan ahead: if `(...)` is followed by `=>`, it's an async arrow function
+                    let paren_start = self.peek_start();
+                    if scan_parens_then_arrow(self.source.as_bytes(), paren_start) {
+                        let (start, _) = self.current_pos();
+                        self.advance()?; // consume 'async'
+                        let expr = self.parse_async_arrow_function_after_async(start)?;
+                        ParsedExpr::from_expr(expr)
+                    } else {
+                        // `async(2)` — call to function named `async`
+                        self.parse_primary_expression_with_end()?
+                    }
+                } else if matches!(peek, TokenKind::Identifier | TokenKind::LessThan) {
+                    // Async arrow function: `async x => ...` or `async <T>() => ...`
                     let (start, _) = self.current_pos();
                     self.advance()?; // consume 'async'
                     let expr = self.parse_async_arrow_function_after_async(start)?;
@@ -952,7 +962,7 @@ impl<'a> Parser<'a> {
             | TokenKind::Keyword(KeywordKind::As)
             | TokenKind::Keyword(KeywordKind::Satisfies) => {
                 let (start, end) = self.current_pos();
-                let symbol = self.intern_identifier();
+                let symbol = self.intern(self.current_value());
                 self.advance()?;
                 Ok(ParsedExpr::with_end(
                     Expression::Identifier(Identifier::simple(
@@ -983,18 +993,14 @@ impl<'a> Parser<'a> {
             return Ok(ParsedExpr::from_expr(self.parse_arrow_function()?));
         }
 
-        // Check if the last comment before '(' is a JSDoc type cast comment.
-        // Pattern: /** @type {T} */ (expr) or /** @satisfies {T} */ (expr)
-        let is_jsdoc_type_cast = self.comments.last().is_some_and(|c| {
-            c.is_block
-                && c.content.starts_with('*')
-                && (c.content.contains("@type") || c.content.contains("@satisfies"))
-        });
-
         // Parse as grouped expression: (expr)
         // Track actual_start BEFORE '(' and actual_end AFTER ')' for correct spans
         // when this expression is used as a callee: (a ? b : c)() should have
         // CallExpression span starting at '(', not at 'a'
+        //
+        // Note: JSDoc type cast parens (/** @type {T} */ (expr)) are handled identically
+        // to regular parens — the parser consumes them and returns the inner expression.
+        // Comments are preserved via position-based lookup in the flat Vec<Comment>.
         let (paren_start, _) = self.current_pos();
         self.expect(&TokenKind::ParenOpen)?; // consume '('
 
@@ -1006,16 +1012,9 @@ impl<'a> Parser<'a> {
         self.expect(&TokenKind::ParenClose)?; // consume ')'
         self.grouping_depth -= 1;
 
-        // Wrap in Parenthesized if preceded by JSDoc type cast comment
-        let expr = if is_jsdoc_type_cast {
-            Expression::Parenthesized(Box::new(parsed.expr))
-        } else {
-            parsed.expr
-        };
-
         // Return expression with its original span (excluding parens), but with
         // actual_start before '(' and actual_end after ')' for containing expressions
-        Ok(ParsedExpr::with_bounds(expr, paren_start, paren_end))
+        Ok(ParsedExpr::with_bounds(parsed.expr, paren_start, paren_end))
     }
 
     /// Check if current position starts an arrow function
@@ -1268,10 +1267,17 @@ impl<'a> Parser<'a> {
     /// - `arr[0]`: numeric index → array access
     /// - `arr[i]` followed by `<` or `;`: array access
     /// - `T[K]` followed by `>` or `,`: indexed type
+    /// - `T["key"]`, `T[keyof U]`, `T[typeof x]`: indexed type
+    /// - `a[b - 1]`: complex expression → array access (default)
     fn check_indexed_type_pattern(&self, bytes: &[u8], pos: usize) -> bool {
         let inside = skip_whitespace_and_comments(bytes, pos + 1);
         if inside >= bytes.len() {
             return false;
+        }
+
+        // Empty brackets `T[]` — array type
+        if bytes[inside] == b']' {
+            return true;
         }
 
         // Numeric index is definitely array access
@@ -1279,9 +1285,16 @@ impl<'a> Parser<'a> {
             return false;
         }
 
-        // Identifier index: check what follows `]`
+        // Identifier index: check for type keywords then what follows `]`
         if is_identifier_start(bytes[inside]) {
             let after_id = skip_identifier(bytes, inside);
+
+            // Type operator keywords: `T[keyof U]`, `T[typeof x]`
+            let kw = &bytes[inside..after_id];
+            if kw == b"keyof" || kw == b"typeof" {
+                return true;
+            }
+
             let after_bracket = skip_whitespace_and_comments(bytes, after_id);
             if after_bracket < bytes.len() && bytes[after_bracket] == b']' {
                 let after_close = skip_whitespace_and_comments(bytes, after_bracket + 1);
@@ -1291,10 +1304,18 @@ impl<'a> Parser<'a> {
                 }
                 return false;
             }
+            // Identifier followed by something other than `]` (e.g., `b - 1]`)
+            // is a complex expression — array access, not indexed type
+            return false;
         }
 
-        // Other patterns (string keys, complex expressions) - assume type args
-        true
+        // String literal key: `T["key"]`, `T['key']` — indexed access type
+        if matches!(bytes[inside], b'\'' | b'"' | b'`') {
+            return true;
+        }
+
+        // Unknown pattern — default to NOT type args (safer for JS expressions)
+        false
     }
 
     /// Check if numeric literal at `pos` is a type argument, not a comparison.
@@ -1510,7 +1531,7 @@ impl<'a> Parser<'a> {
                 }
                 TokenKind::Keyword(kw) => {
                     let (key_start, key_end) = self.current_pos();
-                    let symbol = self.intern_identifier();
+                    let symbol = self.intern(kw.as_str());
                     // Track if this keyword cannot be used as identifier reference in shorthand
                     let restricted = matches!(
                         kw,

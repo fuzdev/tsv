@@ -313,19 +313,16 @@ pub fn format_color_from_source(color: &Color, source: &str, span: Span) -> Stri
                 if let Some(a) = alpha {
                     let a_str = format_color_channel(a);
                     if has_slash {
-                        // rgb(r g b / a) syntax
-                        format!("rgb({r_str} {g_str} {b_str} / {a_str})")
-                    } else if func_name == "rgba" {
-                        // rgba(r, g, b, a) syntax
-                        format!("rgba({r_str}, {g_str}, {b_str}, {a_str})")
+                        // Preserve original function name with slash syntax
+                        format!("{func_name}({r_str} {g_str} {b_str} / {a_str})")
                     } else {
-                        // Fallback: rgba with comma
-                        format!("rgba({r_str}, {g_str}, {b_str}, {a_str})")
+                        // Preserve original function name with comma syntax
+                        format!("{func_name}({r_str}, {g_str}, {b_str}, {a_str})")
                     }
                 } else if has_comma {
-                    format!("rgb({r_str}, {g_str}, {b_str})")
+                    format!("{func_name}({r_str}, {g_str}, {b_str})")
                 } else {
-                    format!("rgb({r_str} {g_str} {b_str})")
+                    format!("{func_name}({r_str} {g_str} {b_str})")
                 }
             }
             Color::Hsl {
@@ -347,19 +344,16 @@ pub fn format_color_from_source(color: &Color, source: &str, span: Span) -> Stri
                 if let Some(a) = alpha {
                     let a_str = format_color_channel(a);
                     if has_slash {
-                        // hsl(h s% l% / a) syntax
-                        format!("hsl({hue_str} {sat_str} {light_str} / {a_str})")
-                    } else if func_name == "hsla" {
-                        // hsla(h, s%, l%, a) syntax
-                        format!("hsla({hue_str}, {sat_str}, {light_str}, {a_str})")
+                        // Preserve original function name with slash syntax
+                        format!("{func_name}({hue_str} {sat_str} {light_str} / {a_str})")
                     } else {
-                        // Fallback: hsla with comma
-                        format!("hsla({hue_str}, {sat_str}, {light_str}, {a_str})")
+                        // Preserve original function name with comma syntax
+                        format!("{func_name}({hue_str}, {sat_str}, {light_str}, {a_str})")
                     }
                 } else if has_comma {
-                    format!("hsl({hue_str}, {sat_str}, {light_str})")
+                    format!("{func_name}({hue_str}, {sat_str}, {light_str})")
                 } else {
-                    format!("hsl({hue_str} {sat_str} {light_str})")
+                    format!("{func_name}({hue_str} {sat_str} {light_str})")
                 }
             }
             // Fallback for any other color types (future-proofing)

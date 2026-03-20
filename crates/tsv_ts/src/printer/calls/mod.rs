@@ -32,18 +32,23 @@ mod test_patterns;
 pub(crate) use arg_comments::{
     PartitionedComments, find_comma_pos, has_inter_argument_comments_slice,
     has_trailing_comments_slice, has_trailing_line_comments_slice, is_comment_after_comma,
-    is_comment_before_comma,
+    is_comment_before_comma, skip_stripped_open_paren,
 };
 pub(crate) use arg_wrapping::{
-    arrow_has_type_annotations, build_args_split_last, build_arrow_call_body_states,
-    build_arrow_inline_signature, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
+    arrow_has_type_reference_return, build_args_split_last, build_arrow_call_body_states,
+    build_arrow_sig_doc, build_break_body_state, build_expand_all_args, build_inline_args,
+    build_inline_or_expand_all, could_expand_arrow_chain, last_two_args_same_type,
+    prepend_arrow_body_comments, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
+    wrap_call_with_will_break_guard,
 };
 
 use super::Printer;
 use super::chain;
 use super::utils::{is_block_function, preceding_args_allow_expand_last};
 use crate::ast::internal;
-use arg_comments::any_comment_forces_expansion;
+use arg_comments::{
+    any_comment_forces_expansion, has_blank_line_between_args, last_arg_has_comments,
+};
 use tsv_lang::doc::arena::DocId;
 
 /// Check if a chain expression contains any call expressions
@@ -84,12 +89,14 @@ impl<'a> Printer<'a> {
     /// member chain formatting, including the 3+ calls rule.
     fn build_chain_doc_with_wrapping(&self, expr: &internal::Expression) -> DocId {
         let nodes = chain::linearize_chain(expr);
+        let base_start = get_chain_base_comment_start(&nodes, expr);
         let groups = chain::group_chain_nodes(nodes);
         let chain_doc = chain::build_chain_doc(&groups, self);
 
-        // Prepend comments from removed parentheses at the chain base
+        // Prepend comments from removed parentheses at the chain base.
         // e.g., (/* comment */ obj).prop.method()
-        let base_start = get_chain_base_start(expr);
+        // For call chains, linearization extends member ranges to cover paren gaps
+        // with mid-chain comments — base_start excludes those to avoid duplication.
         self.prepend_removed_paren_comments(expr.span().start, base_start, chain_doc)
     }
 
@@ -116,42 +123,36 @@ impl<'a> Printer<'a> {
                         | internal::Expression::ObjectExpression(_)
                 )
             });
-            let has_blank_lines_between_args = call
-                .arguments
-                .windows(2)
-                .any(|w| self.has_blank_line_between(w[0].span().end, w[1].span().start));
+            let has_blank_lines_between_args = call.arguments.windows(2).any(|w| {
+                has_blank_line_between_args(
+                    self.source,
+                    self.line_breaks,
+                    w[0].span().end,
+                    w[1].span().start,
+                )
+            });
             let paren_open = call.callee.span().end;
             if call.arguments.len() >= 2
                 && call.arguments.last().is_some_and(is_block_function)
                 && preceding_args_allow_expand_last(&call.arguments, self.line_breaks)
                 && !has_blank_lines_between_args
                 && !any_comment_forces_expansion(call, self, paren_open)
+                && !last_arg_has_comments(&call.arguments, self, call.span.end)
                 && !inner_has_multiline_arg
             {
                 let d = self.d();
                 let callee_doc = self.build_expression_doc(&call.callee);
-                let first_arg_start = call.arguments[0].span().start;
 
                 // Build args split into head (with commas) and last
+                // Leading comments before first arg are handled inside build_args_split_last
                 let (head_parts, last_arg_doc, all_args_broken) =
-                    build_args_split_last(&call.arguments, self);
-
-                // Build inline state with optional leading comments
-                let leading_comments = self.build_inline_comments_between_doc_trailing_space_opt(
-                    paren_open,
-                    first_arg_start,
-                );
-                let mut inline_inner: Vec<DocId> = Vec::new();
-                if let Some(comment) = leading_comments {
-                    inline_inner.push(comment);
-                }
-                inline_inner.extend(head_parts);
-                inline_inner.push(last_arg_doc);
+                    build_args_split_last(&call.arguments, self, paren_open);
 
                 let state_inline = d.concat(&[
                     callee_doc,
                     d.text("("),
-                    d.concat(&inline_inner),
+                    d.concat(&head_parts),
+                    last_arg_doc,
                     d.text(")"),
                 ]);
                 let state_expand_all = d.concat(&[
@@ -206,12 +207,12 @@ impl<'a> Printer<'a> {
         // Use chain-based implementation
         let expr = internal::Expression::MemberExpression(member.clone());
         let nodes = chain::linearize_chain(&expr);
+        let base_start = get_chain_base_comment_start(&nodes, &expr);
         let groups = chain::group_chain_nodes(nodes);
         let chain_doc = chain::build_chain_doc(&groups, self);
 
-        // Prepend comments from removed parentheses at the chain base
-        // e.g., (/* comment */ obj).prop has member.span.start at '(' and object.span.start at 'obj'
-        let base_start = get_chain_base_start(&member.object);
+        // Prepend comments from removed parentheses at the chain base.
+        // For call chains, base_start excludes paren gaps handled mid-chain.
         self.prepend_removed_paren_comments(member.span.start, base_start, chain_doc)
     }
 
@@ -249,6 +250,37 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         chain_args::build_call_args_doc_for_chain_expanded(self, call, optional)
     }
+}
+
+/// Get the comment boundary for prepend_removed_paren_comments in chains.
+///
+/// When linearization extends a member's object_end backward to cover a paren gap
+/// (indicated by object_end < base_start), returns that extended position so
+/// prepend_removed_paren_comments won't double-print comments already handled
+/// mid-chain. Falls back to the normal base start otherwise.
+///
+/// Only applies to call chains: prettier places comments mid-chain only when the
+/// chain has calls. Member-only chains keep all comments before the chain base.
+fn get_chain_base_comment_start(
+    nodes: &[chain::ChainNode<'_>],
+    expr: &internal::Expression,
+) -> u32 {
+    let base_start = get_chain_base_start(expr);
+    // Only check for extended ranges in call chains — prettier doesn't
+    // place comments mid-chain for member-only chains
+    let has_calls = nodes.iter().any(chain::ChainNode::is_call);
+    if has_calls {
+        for node in nodes {
+            if let Some((object_end, _)) = node.comment_range()
+                && object_end < base_start
+            {
+                // This member's range was extended by linearization to cover
+                // a paren gap — prepend should stop here to avoid duplication
+                return object_end;
+            }
+        }
+    }
+    base_start
 }
 
 /// Get the start position of the innermost base expression in a chain

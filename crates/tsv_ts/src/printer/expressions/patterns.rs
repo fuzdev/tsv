@@ -56,12 +56,12 @@ fn is_nested_arrow_function(expr: &Expression) -> bool {
 fn build_chain_doc(
     d: &tsv_lang::doc::arena::DocArena,
     left_doc: DocId,
-    operator: String,
+    operator: &'static str,
     right_doc: DocId,
     is_tail: bool,
     is_arrow_chain: bool,
 ) -> DocId {
-    let mut parts = vec![d.group(left_doc), d.text_owned(operator)];
+    let mut parts = vec![d.group(left_doc), d.text(operator)];
 
     if is_tail {
         if is_arrow_chain {
@@ -100,90 +100,89 @@ impl<'a> Printer<'a> {
         context: AssignmentContext,
     ) -> DocId {
         let d = self.d();
-        // Check if RHS is an assignment (determines if we're in a chain)
         let rhs_is_assignment =
             matches!(assign.right.as_ref(), Expression::AssignmentExpression(_));
+        let left_doc = self.build_expression_doc(&assign.left);
 
-        // Use chain formatting ONLY when parent is an assignment
+        // Extract inline comments between operator and RHS
+        // Uses line-comment-safe spacing: block comments get trailing space,
+        // line comments get hardline to prevent content absorption.
+        let rhs_comment_start = assign.left.span().end;
+        let rhs_comment_end = assign.right.span().start;
+
+        // When JSDoc cast parens are stripped, 2+ block comments may end up
+        // after the operator even though prettier places the first one before it.
+        // Detect and promote the first comment to the LHS.
+        let (left_doc, effective_rhs_start) = if let Some((promoted, new_start)) =
+            self.promote_block_comment_before_eq(rhs_comment_start, rhs_comment_end)
+        {
+            (d.concat(&[left_doc, promoted]), new_start)
+        } else {
+            (left_doc, rhs_comment_start)
+        };
+
+        let rhs_has_line_comment =
+            self.has_line_comments_between(effective_rhs_start, rhs_comment_end);
+        let rhs_comments = self.build_rhs_comments_opt(effective_rhs_start, rhs_comment_end);
+
+        // Use unified assignment layout for simple (non-chain, non-pattern) cases.
+        // build_assignment_layout builds right_doc internally and handles rhs_comments.
+        if !matches!(context, AssignmentContext::Chain)
+            && !matches!(assign.left.as_ref(), Expression::ObjectPattern(_))
+            && !rhs_is_assignment
+        {
+            return self.build_assignment_layout_with_line_comment(
+                left_doc,
+                assign.operator.as_str_with_leading_space(),
+                &assign.right,
+                false,
+                rhs_comments,
+                rhs_has_line_comment,
+            );
+        }
+
+        // Build right doc for paths that handle layout directly
+        let right_doc = if let Expression::AssignmentExpression(rhs_assign) = assign.right.as_ref()
+        {
+            self.build_assignment_doc_with_context(rhs_assign, AssignmentContext::Chain)
+        } else {
+            self.build_expression_doc(&assign.right)
+        };
+
+        // Prepend inline comments to right doc if present
+        let right_doc = if let Some(comments_doc) = rhs_comments {
+            d.concat(&[comments_doc, right_doc])
+        } else {
+            right_doc
+        };
+
         if matches!(context, AssignmentContext::Chain) {
-            let left_doc = self.build_expression_doc(&assign.left);
-
-            // Build right doc with chain context if needed
-            let right_doc = if rhs_is_assignment {
-                // RHS is an assignment - tell it "your parent is an assignment (me)"
-                if let Expression::AssignmentExpression(rhs_assign) = assign.right.as_ref() {
-                    // Always pass Chain context to RHS because from RHS's perspective, its parent is ME (an assignment)
-                    self.build_assignment_doc_with_context(rhs_assign, AssignmentContext::Chain)
-                } else {
-                    self.build_expression_doc(&assign.right)
-                }
-            } else {
-                self.build_expression_doc(&assign.right)
-            };
-
-            let operator = format!(" {}", assign.operator.as_str());
+            // Chain formatting - parent is an assignment
             let is_tail = !rhs_is_assignment;
             let is_arrow_chain = is_tail && is_nested_arrow_function(assign.right.as_ref());
-            build_chain_doc(d, left_doc, operator, right_doc, is_tail, is_arrow_chain)
+            build_chain_doc(
+                d,
+                left_doc,
+                assign.operator.as_str_with_leading_space(),
+                right_doc,
+                is_tail,
+                is_arrow_chain,
+            )
+        } else if matches!(assign.left.as_ref(), Expression::ObjectPattern(_)) {
+            // Object patterns on LHS - never break after operator
+            d.concat(&[
+                left_doc,
+                d.text(assign.operator.as_str_with_leading_space()),
+                d.text(" "),
+                right_doc,
+            ])
         } else {
-            // Non-chain formatting
-            let left_doc = self.build_expression_doc(&assign.left);
-
-            // Build right doc with chain context if RHS is an assignment
-            let right_doc = if rhs_is_assignment {
-                if let Expression::AssignmentExpression(rhs_assign) = assign.right.as_ref() {
-                    self.build_assignment_doc_with_context(rhs_assign, AssignmentContext::Chain)
-                } else {
-                    self.build_expression_doc(&assign.right)
-                }
-            } else {
-                self.build_expression_doc(&assign.right)
-            };
-
-            // Object patterns on LHS need special handling - never break after operator
-            // The object pattern handles its own expansion
-            if matches!(assign.left.as_ref(), Expression::ObjectPattern(_)) {
-                d.concat(&[
-                    left_doc,
-                    d.text(" "),
-                    d.text(assign.operator.as_str()),
-                    d.text(" "),
-                    right_doc,
-                ])
-            } else if rhs_is_assignment {
-                // RHS is a chain - don't use assignment layout, just group + indent
-                // The right_doc already has chain formatting from recursive call
-                d.group(d.concat(&[
-                    left_doc,
-                    d.text(" "),
-                    d.text(assign.operator.as_str()),
-                    d.indent_line(right_doc),
-                ]))
-            } else {
-                // Use unified assignment layout system (matches Prettier)
-                let operator = match assign.operator.as_str() {
-                    "=" => " =",
-                    "+=" => " +=",
-                    "-=" => " -=",
-                    "*=" => " *=",
-                    "/=" => " /=",
-                    "%=" => " %=",
-                    "**=" => " **=",
-                    "<<=" => " <<=",
-                    ">>=" => " >>=",
-                    ">>>=" => " >>>=",
-                    "&=" => " &=",
-                    "|=" => " |=",
-                    "^=" => " ^=",
-                    "&&=" => " &&=",
-                    "||=" => " ||=",
-                    "??=" => " ??=",
-                    _ => " =",
-                };
-
-                // Assignment expressions have no property key, so is_short_key = false
-                self.build_assignment_layout(left_doc, operator, &assign.right, false)
-            }
+            // RHS is a chain - group + indent (chain formatting from recursive call)
+            d.group(d.concat(&[
+                left_doc,
+                d.text(assign.operator.as_str_with_leading_space()),
+                d.indent_line(right_doc),
+            ]))
         }
     }
 
@@ -805,11 +804,22 @@ impl<'a> Printer<'a> {
         pattern: &internal::AssignmentPattern,
     ) -> DocId {
         let d = self.d();
-        d.concat(&[
-            self.build_expression_doc(&pattern.left),
-            d.text(" = "),
-            self.build_expression_doc(&pattern.right),
-        ])
+        let left_doc = self.build_expression_doc(&pattern.left);
+
+        // Extract inline block comments between `=` and the default value expression
+        // (e.g., `a = /** @type {T} */ (expr)` — the JSDoc type cast comment)
+        let left_end = pattern.left.span().end;
+        let rhs_start = pattern.right.span().start;
+        let inline_comments = self.build_rhs_comments_opt(left_end, rhs_start);
+
+        let rhs_doc = self.build_expression_doc(&pattern.right);
+        let value_doc = if let Some(comments_doc) = inline_comments {
+            d.concat(&[comments_doc, rhs_doc])
+        } else {
+            rhs_doc
+        };
+
+        d.concat(&[left_doc, d.text(" = "), value_doc])
     }
 
     /// Build a Doc for a rest element

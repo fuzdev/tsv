@@ -28,7 +28,8 @@ mod union_intersection;
 
 // Re-export public items from helpers
 pub use helpers::{
-    intersection_has_huggable_last_type, should_hug_union_type, unwrap_parenthesized,
+    intersection_has_expanding_first_type, intersection_has_huggable_last_type,
+    should_hug_union_type, unwrap_parenthesized,
 };
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`

@@ -48,51 +48,45 @@ impl<'a> Parser<'a> {
         // Parse binding pattern: identifier, array pattern [a, b], or object pattern {a, b}
         // Note: Some keywords can be used as identifiers in variable declarations (e.g., `async`)
         // For simple identifiers, also handles definite assignment assertion (`!`)
-        let (id, definite) = match self.current_kind() {
-            TokenKind::Identifier => {
-                let symbol = self.intern_identifier();
-                self.parse_simple_binding(symbol)?
-            }
-            // Keywords that can be used as variable names (contextual keywords like `async`, `as`, etc.)
-            // Note: `await`, `yield`, `let` are NOT allowed as binding names
-            TokenKind::Keyword(kw) if kw.can_be_binding_name() => {
-                let symbol = self.intern(kw.as_str());
-                self.parse_simple_binding(symbol)?
-            }
-            TokenKind::BracketOpen => {
-                // Array destructuring pattern: [a, b] = arr
-                let expr = self.parse_array_expression()?;
-                let mut pattern = self.to_assignable(expr)?;
+        let (id, definite) = if let Some(symbol) = self.try_intern_binding_name() {
+            self.parse_simple_binding(symbol)?
+        } else {
+            match self.current_kind() {
+                TokenKind::BracketOpen => {
+                    // Array destructuring pattern: [a, b] = arr
+                    let expr = self.parse_array_expression()?;
+                    let mut pattern = self.to_assignable(expr)?;
 
-                // Check for type annotation on array pattern: [a, b]: Type
-                if let Expression::ArrayPattern(ref mut arr) = pattern
-                    && self.check(&TokenKind::Colon)
-                {
-                    let type_annotation = self.parse_type_annotation()?;
-                    arr.span = Span::new(arr.span.start, type_annotation.span.end);
-                    arr.type_annotation = Some(type_annotation);
+                    // Check for type annotation on array pattern: [a, b]: Type
+                    if let Expression::ArrayPattern(ref mut arr) = pattern
+                        && self.check(&TokenKind::Colon)
+                    {
+                        let type_annotation = self.parse_type_annotation()?;
+                        arr.span = Span::new(arr.span.start, type_annotation.span.end);
+                        arr.type_annotation = Some(type_annotation);
+                    }
+                    // Destructuring patterns don't support definite assignment
+                    (pattern, false)
                 }
-                // Destructuring patterns don't support definite assignment
-                (pattern, false)
-            }
-            TokenKind::BraceOpen => {
-                // Object destructuring pattern: {a, b} = obj
-                let expr = self.parse_object_expression()?;
-                let mut pattern = self.to_assignable(expr)?;
+                TokenKind::BraceOpen => {
+                    // Object destructuring pattern: {a, b} = obj
+                    let expr = self.parse_object_expression()?;
+                    let mut pattern = self.to_assignable(expr)?;
 
-                // Check for type annotation on object pattern: {a, b}: Type
-                if let Expression::ObjectPattern(ref mut obj) = pattern
-                    && self.check(&TokenKind::Colon)
-                {
-                    let type_annotation = self.parse_type_annotation()?;
-                    obj.span = Span::new(obj.span.start, type_annotation.span.end);
-                    obj.type_annotation = Some(type_annotation);
+                    // Check for type annotation on object pattern: {a, b}: Type
+                    if let Expression::ObjectPattern(ref mut obj) = pattern
+                        && self.check(&TokenKind::Colon)
+                    {
+                        let type_annotation = self.parse_type_annotation()?;
+                        obj.span = Span::new(obj.span.start, type_annotation.span.end);
+                        obj.type_annotation = Some(type_annotation);
+                    }
+                    // Destructuring patterns don't support definite assignment
+                    (pattern, false)
                 }
-                // Destructuring patterns don't support definite assignment
-                (pattern, false)
-            }
-            _ => {
-                return Err(self.error_expected_found("identifier or destructuring pattern"));
+                _ => {
+                    return Err(self.error_expected_found("identifier or destructuring pattern"));
+                }
             }
         };
 
@@ -106,7 +100,14 @@ impl<'a> Parser<'a> {
             None
         };
 
-        let end = init.as_ref().map_or(id_end, |e| e.span().end_usize());
+        // Use the later of expression span end and prev_token_end() to include any
+        // stripped parens (e.g., JSDoc type cast: `const a = /** @type {T} */ (expr)` —
+        // the closing `)` is consumed by the parser but not part of the inner expression's
+        // span). Using max() handles both the normal case (same value) and error recovery
+        // (expression span may extend further). Matches acorn's VariableDeclarator span.
+        let end = init
+            .as_ref()
+            .map_or(id_end, |e| e.span().end_usize().max(self.prev_token_end()));
 
         Ok(VariableDeclarator {
             id,

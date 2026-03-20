@@ -97,15 +97,15 @@ impl<'a> Parser<'a> {
                 | KeywordKind::Case
                 | KeywordKind::Default
                 | KeywordKind::Catch
-                | KeywordKind::Finally
-                | KeywordKind::From => Err(self.error_unexpected_keyword(*kw)),
+                | KeywordKind::Finally => Err(self.error_unexpected_keyword(*kw)),
                 // Binary operator keywords are not valid at statement level
                 KeywordKind::Instanceof | KeywordKind::In | KeywordKind::Extends => {
                     Err(self.error_unexpected_keyword(*kw))
                 }
                 // Contextual keywords that can be used as identifiers in expression statements
-                // E.g., `as = 'updated';` where `as` is a variable name
-                KeywordKind::As
+                // E.g., `from.shift();` or `as = 'updated';` where the keyword is a variable name
+                KeywordKind::From
+                | KeywordKind::As
                 | KeywordKind::Satisfies
                 | KeywordKind::Number
                 | KeywordKind::String

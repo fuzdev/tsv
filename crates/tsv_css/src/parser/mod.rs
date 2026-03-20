@@ -213,6 +213,24 @@ impl<'a> CssParser<'a> {
         self.base_offset + self.current_start
     }
 
+    /// Parse the current comment token into a `Comment` and advance past it.
+    /// Caller must verify `current_kind` is `TokenKind::Comment` before calling.
+    pub(crate) fn parse_block_comment(&mut self) -> Result<Comment, ParseError> {
+        let comment_start = self.base_offset + self.current_start;
+        let comment_end = self.base_offset + self.current_end;
+        let content = self.source[self.current_start + 2..self.current_end - 2].to_string();
+        self.advance()?;
+        self.skip_whitespace()?;
+        Ok(Comment {
+            content,
+            is_block: true,
+            span: Span {
+                start: comment_start as u32,
+                end: comment_end as u32,
+            },
+        })
+    }
+
     // Error Helpers
 
     /// Create an error with custom message at current position
@@ -303,7 +321,7 @@ impl<'a> CssParser<'a> {
             }
 
             // Parse rules (selector { declarations })
-            let node = declarations::parse_rule(self)?;
+            let node = declarations::parse_rule(self, false)?;
             nodes.push(CssNode::Rule(node));
 
             self.skip_whitespace()?;

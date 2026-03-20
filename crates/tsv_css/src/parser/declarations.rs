@@ -1,6 +1,6 @@
 use super::CssParser;
 use crate::ast::internal::*;
-use crate::lexer::TokenKind;
+use crate::lexer::{Lexer, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 /// Check if we're looking at the start of a nested rule (selector) rather than a declaration.
@@ -12,6 +12,7 @@ use tsv_lang::{ParseError, Span};
 /// - `*` (universal selector)
 /// - `:` (pseudo-class/element)
 /// - `[` (attribute selector)
+/// - `>`, `+`, `~` (leading combinator - CSS Nesting relative selectors)
 /// - Identifier (type selector - but could also be a property name)
 ///
 /// For identifiers, we need to look ahead: if next non-whitespace/comment token is `:`, it's a declaration.
@@ -23,7 +24,11 @@ pub(crate) fn is_nested_rule_start(parser: &mut CssParser) -> Result<bool, Parse
         | TokenKind::Hash
         | TokenKind::Asterisk
         | TokenKind::Colon
-        | TokenKind::LeftBracket => Ok(true),
+        | TokenKind::LeftBracket
+        // Leading combinators (CSS Nesting relative selectors: `> .child {}`, `+ .sibling {}`)
+        | TokenKind::GreaterThan
+        | TokenKind::Plus
+        | TokenKind::Tilde => Ok(true),
 
         // Ambiguous: identifier could be type selector (nested rule) or property name (declaration)
         // Look ahead to check if next non-whitespace/comment token is `:` (declaration) or not (nested rule)
@@ -31,8 +36,10 @@ pub(crate) fn is_nested_rule_start(parser: &mut CssParser) -> Result<bool, Parse
             // Peek past whitespace and comments to find the significant next token
             let next_kind = parser.peek_past_whitespace()?;
             match next_kind {
-                // Colon after identifier (possibly with whitespace/comments) = declaration
-                TokenKind::Colon => Ok(false),
+                // Colon after identifier - ambiguous: could be declaration (`color: red`)
+                // or nested rule with pseudo-class (`span:hover { }`)
+                // Need deeper lookahead to disambiguate
+                TokenKind::Colon => is_type_selector_with_pseudo(parser),
                 // Left brace after identifier = nested rule (e.g., "div {")
                 TokenKind::LeftBrace => Ok(true),
                 // Selector tokens after identifier = nested rule
@@ -46,35 +53,54 @@ pub(crate) fn is_nested_rule_start(parser: &mut CssParser) -> Result<bool, Parse
     }
 }
 
+/// Disambiguate `Identifier` + `Colon` between declaration and nested rule.
+///
+/// Examples:
+/// - `color: red;` or `color:red;` → declaration (ends with `;`)
+/// - `span:hover { }` → nested rule (ends with `{`)
+/// - `filter:blur(5px);` → declaration (function value, ends with `;`)
+/// - `span:not(:last-child)::after { }` → nested rule (ends with `{`)
+///
+/// Approach: create a temporary lexer from after the identifier and scan forward,
+/// skipping parenthesized groups, until we find `{` (nested rule) or `;`/`}` (declaration).
+fn is_type_selector_with_pseudo(parser: &CssParser) -> Result<bool, ParseError> {
+    let remaining = &parser.source()[parser.current_end..];
+    let mut temp = Lexer::new(remaining);
+    let mut paren_depth: i32 = 0;
+    loop {
+        let tok = temp.next_token()?;
+        match &tok.kind {
+            TokenKind::LeftParen => paren_depth += 1,
+            TokenKind::RightParen => paren_depth = (paren_depth - 1).max(0),
+            TokenKind::LeftBrace if paren_depth == 0 => return Ok(true),
+            TokenKind::Semicolon | TokenKind::RightBrace if paren_depth == 0 => return Ok(false),
+            TokenKind::Eof => return Ok(false),
+            _ => {}
+        }
+    }
+}
+
 /// Parse a CSS rule: `selector { property: value; }`
-pub(crate) fn parse_rule(parser: &mut CssParser) -> Result<CssRule, ParseError> {
+///
+/// When `nested` is true, the selector list allows leading combinators (CSS Nesting relative selectors).
+/// For example: `> .child {}`, `+ .sibling {}`, `~ .general {}`
+pub(crate) fn parse_rule(parser: &mut CssParser, nested: bool) -> Result<CssRule, ParseError> {
     let start = parser.base_offset() + parser.current_start;
 
-    // Parse selector list (complex selectors for top-level rules)
-    // Top-level rules use strict parsing (not forgiving like :is/:where)
-    let selector = super::selectors::parse_complex_selector_list(parser)?;
+    // Nested rules use relative selectors (can start with combinators like `> .child`)
+    // Top-level rules use complex selectors (cannot start with combinators)
+    let selector = if nested {
+        super::selectors::parse_relative_selector_list(parser)?
+    } else {
+        super::selectors::parse_complex_selector_list(parser)?
+    };
 
     // Capture any comment after selector (before {)
     let mut declarations = Vec::new();
     parser.skip_whitespace()?;
     if matches!(&parser.current_kind, TokenKind::Comment) {
-        let comment_start = parser.base_offset() + parser.current_start;
-        let comment_end = parser.base_offset() + parser.current_end;
-        // Extract content without /* */ delimiters
-        let content = parser.source()[parser.current_start + 2..parser.current_end - 2].to_string();
-
-        parser.advance()?;
-        parser.skip_whitespace()?;
-
-        // Store comment as first child (will be formatted before opening brace)
-        declarations.push(CssBlockChild::Comment(Comment {
-            content,
-            is_block: true,
-            span: Span {
-                start: comment_start as u32,
-                end: comment_end as u32,
-            },
-        }));
+        let comment = parser.parse_block_comment()?;
+        declarations.push(CssBlockChild::Comment(comment));
     }
 
     // Expect { and capture its start
@@ -84,25 +110,9 @@ pub(crate) fn parse_rule(parser: &mut CssParser) -> Result<CssRule, ParseError> 
 
     // Parse declarations, comments, and nested rules
     while !parser.check(&TokenKind::RightBrace) && !parser.check(&TokenKind::Eof) {
-        // Capture comments in declaration blocks
         if matches!(&parser.current_kind, TokenKind::Comment) {
-            let comment_start = parser.base_offset() + parser.current_start;
-            let comment_end = parser.base_offset() + parser.current_end;
-            // Extract content without /* */ delimiters
-            let content =
-                parser.source()[parser.current_start + 2..parser.current_end - 2].to_string();
-
-            parser.advance()?;
-            parser.skip_whitespace()?;
-
-            declarations.push(CssBlockChild::Comment(Comment {
-                content,
-                is_block: true,
-                span: Span {
-                    start: comment_start as u32,
-                    end: comment_end as u32,
-                },
-            }));
+            let comment = parser.parse_block_comment()?;
+            declarations.push(CssBlockChild::Comment(comment));
             continue;
         }
 
@@ -118,8 +128,8 @@ pub(crate) fn parse_rule(parser: &mut CssParser) -> Result<CssRule, ParseError> 
 
         // Check if we're looking at a nested rule (CSS Nesting Module)
         if is_nested_rule_start(parser)? {
-            // Parse nested rule recursively
-            let nested_rule = parse_rule(parser)?;
+            // Parse nested rule recursively (nested rules allow leading combinators)
+            let nested_rule = parse_rule(parser, true)?;
             declarations.push(CssBlockChild::Rule(nested_rule));
             parser.skip_whitespace()?;
             continue;
@@ -141,7 +151,6 @@ pub(crate) fn parse_rule(parser: &mut CssParser) -> Result<CssRule, ParseError> 
         return Err(parser.error_expected("'}'"));
     }
     let block_end = parser.base_offset() + parser.current_end;
-    let end = block_end;
     parser.advance()?; // consume }
 
     Ok(CssRule {
@@ -153,7 +162,7 @@ pub(crate) fn parse_rule(parser: &mut CssParser) -> Result<CssRule, ParseError> 
         declarations,
         span: Span {
             start: start as u32,
-            end: end as u32,
+            end: block_end as u32,
         },
     })
 }

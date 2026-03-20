@@ -476,7 +476,13 @@ impl<'a> Parser<'a> {
     fn parse_import_type(&mut self) -> Result<TSType, ParseError> {
         let start = self.current_pos().0;
         self.advance()?; // consume 'import'
+        let import = self.parse_import_type_body(start)?;
+        Ok(TSType::Import(import))
+    }
 
+    /// Parse import type body after `import` keyword has been consumed.
+    /// Parses: `('module')`, `('module', {options}).Qualifier<TypeArgs>`
+    fn parse_import_type_body(&mut self, start: usize) -> Result<TSImportType, ParseError> {
         // Expect '('
         self.expect(&TokenKind::ParenOpen)?;
 
@@ -526,13 +532,13 @@ impl<'a> Parser<'a> {
             .or_else(|| qualifier.as_ref().map(|q| q.span().end))
             .unwrap_or(self.prev_end as u32);
 
-        Ok(TSType::Import(TSImportType {
+        Ok(TSImportType {
             argument,
             options,
             qualifier,
             type_arguments,
             span: Span::new(start as u32, end),
-        }))
+        })
     }
 
     /// Parse type query: `typeof x`, `typeof Foo.bar`, `typeof import("module")`
@@ -542,66 +548,10 @@ impl<'a> Parser<'a> {
 
         // Check for import type: typeof import("module")
         let expr_name = if self.check(&TokenKind::Keyword(KeywordKind::Import)) {
-            // Parse the import type
             let import_start = self.current_pos().0;
             self.advance()?; // consume 'import'
-
-            // Expect '('
-            self.expect(&TokenKind::ParenOpen)?;
-
-            // Parse the module specifier (string literal)
-            if !matches!(self.current_kind(), TokenKind::String) {
-                return Err(self.error_expected("string literal in import type"));
-            }
-
-            let (arg_start, arg_end) = self.current_pos();
-            let (content, quote) = self.extract_string_literal();
-            self.advance()?;
-
-            let argument = Literal {
-                value: LiteralValue::String { content, quote },
-                span: Span::new(arg_start as u32, arg_end as u32),
-            };
-
-            // Optional options object: `typeof import('module', {with: {...}})`
-            let options = if self.check(&TokenKind::Comma) {
-                self.advance()?; // consume ','
-                Some(Box::new(self.parse_expression()?))
-            } else {
-                None
-            };
-
-            // Expect ')'
-            self.expect(&TokenKind::ParenClose)?;
-
-            // Optional qualifier: .Foo or .Foo.Bar
-            let qualifier = if self.check(&TokenKind::Dot) {
-                self.advance()?; // consume '.'
-                Some(self.parse_entity_name()?)
-            } else {
-                None
-            };
-
-            // Optional type arguments: <T, U>
-            let type_arguments = if self.check(&TokenKind::LessThan) {
-                Some(self.parse_type_arguments()?)
-            } else {
-                None
-            };
-
-            let import_end = type_arguments
-                .as_ref()
-                .map(|ta| ta.span.end)
-                .or_else(|| qualifier.as_ref().map(|q| q.span().end))
-                .unwrap_or(self.prev_end as u32);
-
-            TSTypeQueryExprName::Import(Box::new(TSImportType {
-                argument,
-                options,
-                qualifier,
-                type_arguments,
-                span: Span::new(import_start as u32, import_end),
-            }))
+            let import = self.parse_import_type_body(import_start)?;
+            TSTypeQueryExprName::Import(Box::new(import))
         } else {
             // Parse entity name: identifier or qualified name
             let entity_name = self.parse_entity_name()?;
@@ -640,12 +590,11 @@ impl<'a> Parser<'a> {
         while self.check(&TokenKind::Dot) {
             self.advance()?; // consume '.'
 
-            if !matches!(self.current_kind(), TokenKind::Identifier) {
-                return Err(self.error_expected_after("identifier", "."));
-            }
+            let right_symbol = self
+                .try_intern_identifier_or_keyword()
+                .ok_or_else(|| self.error_expected_after("identifier", "."))?;
 
             let (right_start, right_end) = self.current_pos();
-            let right_symbol = self.intern_identifier();
             self.advance()?;
 
             let right = Identifier::simple(
@@ -930,11 +879,10 @@ impl<'a> Parser<'a> {
 
         let (id_start, id_end) = self.current_pos();
 
-        if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(self.error_expected("parameter name"));
-        }
-
-        let symbol = self.intern_identifier();
+        // Accept identifiers and contextual keywords (e.g., `from`, `as`) as parameter names
+        let symbol = self
+            .try_intern_binding_name()
+            .ok_or_else(|| self.error_expected("parameter name"))?;
         self.advance()?;
 
         // Check for optional: ?
@@ -1019,10 +967,10 @@ impl<'a> Parser<'a> {
 
         // Parse the identifier (parameter name for mapped type, or key name for index sig)
         let param_start = self.current_pos().0;
-        if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(self.error_expected_after("identifier", "["));
-        }
-        let param_name = self.current_value().to_string();
+        let param_name = self
+            .current_identifier_or_keyword_name()
+            .ok_or_else(|| self.error_expected_after("identifier", "["))?
+            .to_string();
         let param_symbol = self.intern(&param_name);
         let (id_start, id_end) = self.current_pos();
         self.advance()?;
@@ -1031,7 +979,12 @@ impl<'a> Parser<'a> {
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
             // Mapped type: [K in keyof T]: V
             self.advance()?; // consume 'in'
-            self.parse_mapped_type_body_after_in(start, param_start, param_name, readonly)
+            let readonly = if readonly {
+                Some(TSMappedTypeModifier::True)
+            } else {
+                None
+            };
+            self.finish_mapped_type(start, param_start, param_name, readonly)
         } else if self.check(&TokenKind::Colon) {
             // Index signature: [key: string]: T
             // Parse it as a type element, then continue with remaining members
@@ -1049,56 +1002,6 @@ impl<'a> Parser<'a> {
                 self.current_kind()
             )))
         }
-    }
-
-    /// Continue parsing mapped type after `[K in` has been consumed
-    fn parse_mapped_type_body_after_in(
-        &mut self,
-        start: usize,
-        param_start: usize,
-        param_name: String,
-        readonly: bool,
-    ) -> Result<TSType, ParseError> {
-        // Parse constraint type (e.g., `keyof T`)
-        let constraint = self.parse_type()?;
-        let param_end = constraint.span().end;
-
-        // Check for optional `as` clause: `as NewKey`
-        let name_type = if self.eat(TokenKind::Keyword(KeywordKind::As)) {
-            Some(Box::new(self.parse_type()?))
-        } else {
-            None
-        };
-
-        // Expect `]`
-        self.expect(&TokenKind::BracketClose)?;
-
-        // Parse optional modifier: `?`, `+?`, `-?`
-        let optional = self.parse_mapped_type_optional_modifier();
-
-        // Expect `:` and parse value type
-        self.expect(&TokenKind::Colon)?;
-        let type_annotation = Some(Box::new(self.parse_type()?));
-
-        // Consume optional separator
-        self.eat(TokenKind::Semicolon);
-
-        // Expect `}`
-        let (_, end) = self.current_pos();
-        self.expect(&TokenKind::BraceClose)?;
-
-        Ok(TSType::Mapped(TSMappedType {
-            type_parameter: TSMappedTypeParameter {
-                name: param_name,
-                constraint: Box::new(constraint),
-                span: Span::new(param_start as u32, param_end),
-            },
-            name_type,
-            type_annotation,
-            readonly: if readonly { Some(true) } else { None },
-            optional,
-            span: Span::new(start as u32, end as u32),
-        }))
     }
 
     /// Parse type literal that starts with an index signature
@@ -1177,10 +1080,10 @@ impl<'a> Parser<'a> {
 
         // Parse type parameter name: `K`
         let param_start = self.current_pos().0;
-        if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(self.error_expected("type parameter name in mapped type"));
-        }
-        let param_name = self.current_value().to_string();
+        let param_name = self
+            .current_identifier_or_keyword_name()
+            .ok_or_else(|| self.error_expected("type parameter name in mapped type"))?
+            .to_string();
         self.advance()?;
 
         // Expect `in`
@@ -1189,6 +1092,18 @@ impl<'a> Parser<'a> {
         }
         self.advance()?; // consume 'in'
 
+        self.finish_mapped_type(start, param_start, param_name, readonly)
+    }
+
+    /// Shared tail for mapped type parsing after `[K in` has been consumed.
+    /// Parses: constraint, optional `as` clause, `]`, optional modifier, `:`, value type, `}`
+    fn finish_mapped_type(
+        &mut self,
+        start: usize,
+        param_start: usize,
+        param_name: String,
+        readonly: Option<TSMappedTypeModifier>,
+    ) -> Result<TSType, ParseError> {
         // Parse constraint type (e.g., `keyof T`)
         let constraint = self.parse_type()?;
         let param_end = constraint.span().end;
@@ -1232,11 +1147,11 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse readonly modifier for mapped type: `readonly`, `+readonly`, `-readonly`
-    fn parse_mapped_type_readonly_modifier(&mut self) -> Option<bool> {
+    fn parse_mapped_type_readonly_modifier(&mut self) -> Option<TSMappedTypeModifier> {
         if self.eat(TokenKind::Minus) {
             // `-readonly`
             if self.eat_contextual_keyword("readonly") {
-                return Some(false); // false = minus modifier
+                return Some(TSMappedTypeModifier::Minus);
             }
             // Unexpected - but we consumed `-`
         }
@@ -1244,23 +1159,23 @@ impl<'a> Parser<'a> {
         if self.eat(TokenKind::Plus) {
             // `+readonly`
             if self.eat_contextual_keyword("readonly") {
-                return Some(true); // true = plus modifier (same as just `readonly`)
+                return Some(TSMappedTypeModifier::Plus);
             }
         }
 
         if self.eat_contextual_keyword("readonly") {
-            return Some(true); // true = readonly present
+            return Some(TSMappedTypeModifier::True);
         }
 
         None
     }
 
     /// Parse optional modifier for mapped type: `?`, `+?`, `-?`
-    fn parse_mapped_type_optional_modifier(&mut self) -> Option<bool> {
+    fn parse_mapped_type_optional_modifier(&mut self) -> Option<TSMappedTypeModifier> {
         if self.eat(TokenKind::Minus) {
             // `-?`
             if self.eat(TokenKind::Question) {
-                return Some(false); // false = minus modifier
+                return Some(TSMappedTypeModifier::Minus);
             }
             // Unexpected - but we consumed `-`
         }
@@ -1268,12 +1183,12 @@ impl<'a> Parser<'a> {
         if self.eat(TokenKind::Plus) {
             // `+?`
             if self.eat(TokenKind::Question) {
-                return Some(true); // true = plus modifier
+                return Some(TSMappedTypeModifier::Plus);
             }
         }
 
         if self.eat(TokenKind::Question) {
-            return Some(true); // true = optional present
+            return Some(TSMappedTypeModifier::True);
         }
 
         None
@@ -2151,72 +2066,69 @@ impl<'a> Parser<'a> {
         // Check for 'asserts' keyword
         let asserts = self.eat_contextual_keyword("asserts");
 
-        // Check if this might be a type predicate: `identifier is type`
-        if matches!(self.current_kind(), TokenKind::Identifier)
-            && self.peek_is_contextual_keyword("is")
-        {
-            // Parse parameter name
-            let (id_start, id_end) = self.current_pos();
-            let param_name_str = self.current_value().to_string();
-            let param_symbol = self.intern(&param_name_str);
-            self.advance()?;
+        // Check if current token is an identifier (for type predicates and asserts)
+        if let Some(param_symbol) = self.try_intern_identifier_or_keyword() {
+            // Type predicate: `identifier is Type` or `asserts identifier is Type`
+            if self.peek_is_contextual_keyword("is") {
+                let (id_start, id_end) = self.current_pos();
+                self.advance()?;
 
-            let parameter_name =
-                Identifier::simple(param_symbol, Span::new(id_start as u32, id_end as u32));
+                let parameter_name =
+                    Identifier::simple(param_symbol, Span::new(id_start as u32, id_end as u32));
 
-            // Consume 'is' keyword
-            self.advance()?;
+                // Consume 'is' keyword
+                self.advance()?;
 
-            // Parse the type
-            let type_node = self.parse_type()?;
-            let end = type_node.span().end;
+                // Parse the type
+                let type_node = self.parse_type()?;
+                let end = type_node.span().end;
 
-            let predicate = TSTypePredicate {
-                parameter_name,
-                type_annotation: Some(Box::new(type_node)),
-                asserts,
-                span: Span::new(start, end),
-            };
+                let predicate = TSTypePredicate {
+                    parameter_name,
+                    type_annotation: Some(Box::new(type_node)),
+                    asserts,
+                    span: Span::new(start, end),
+                };
 
-            Ok(TSTypeAnnotation {
-                type_annotation: Box::new(TSType::TypePredicate(predicate)),
-                span: Span::new(start, end),
-            })
-        } else if asserts {
-            // `asserts x` without `is T` - just the parameter name
-            if !matches!(self.current_kind(), TokenKind::Identifier) {
-                return Err(self.error_expected_after("identifier", "asserts"));
+                return Ok(TSTypeAnnotation {
+                    type_annotation: Box::new(TSType::TypePredicate(predicate)),
+                    span: Span::new(start, end),
+                });
             }
 
-            let (id_start, id_end) = self.current_pos();
-            let param_name_str = self.current_value().to_string();
-            let param_symbol = self.intern(&param_name_str);
-            self.advance()?;
+            // Asserts predicate: `asserts identifier`
+            if asserts {
+                let (id_start, id_end) = self.current_pos();
+                self.advance()?;
 
-            let parameter_name =
-                Identifier::simple(param_symbol, Span::new(id_start as u32, id_end as u32));
+                let parameter_name =
+                    Identifier::simple(param_symbol, Span::new(id_start as u32, id_end as u32));
 
-            let predicate = TSTypePredicate {
-                parameter_name,
-                type_annotation: None,
-                asserts: true,
-                span: Span::new(start, id_end as u32),
-            };
+                let predicate = TSTypePredicate {
+                    parameter_name,
+                    type_annotation: None,
+                    asserts: true,
+                    span: Span::new(start, id_end as u32),
+                };
 
-            Ok(TSTypeAnnotation {
-                type_annotation: Box::new(TSType::TypePredicate(predicate)),
-                span: Span::new(start, id_end as u32),
-            })
-        } else {
-            // Regular type annotation
-            let type_node = self.parse_type()?;
-            let end = type_node.span().end;
-
-            Ok(TSTypeAnnotation {
-                type_annotation: Box::new(type_node),
-                span: Span::new(start, end),
-            })
+                return Ok(TSTypeAnnotation {
+                    type_annotation: Box::new(TSType::TypePredicate(predicate)),
+                    span: Span::new(start, id_end as u32),
+                });
+            }
+        } else if asserts {
+            // `asserts` followed by non-identifier
+            return Err(self.error_expected_after("identifier", "asserts"));
         }
+
+        // Regular type annotation
+        let type_node = self.parse_type()?;
+        let end = type_node.span().end;
+
+        Ok(TSTypeAnnotation {
+            type_annotation: Box::new(type_node),
+            span: Span::new(start, end),
+        })
     }
 
     /// Parse declare class: `declare class Foo { ... }`

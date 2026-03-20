@@ -13,6 +13,26 @@ use super::scan::{
     skip_string_literal, skip_whitespace_and_comments,
 };
 
+/// `<` at `pos` is `<=` comparison operator, not an angle bracket open
+#[inline]
+fn is_less_equal_op(bytes: &[u8], pos: usize) -> bool {
+    pos + 1 < bytes.len() && bytes[pos + 1] == b'='
+}
+
+/// `>` at `pos` is preceded by `=`, making it part of `=>` arrow operator
+#[inline]
+fn is_arrow_close(bytes: &[u8], pos: usize) -> bool {
+    pos > 0 && bytes[pos - 1] == b'='
+}
+
+/// `>` at `pos` is `>=` comparison operator, but NOT `>=>` (close-angle + arrow)
+#[inline]
+fn is_greater_equal_op(bytes: &[u8], pos: usize) -> bool {
+    pos + 1 < bytes.len()
+        && bytes[pos + 1] == b'='
+        && !(pos + 2 < bytes.len() && bytes[pos + 2] == b'>')
+}
+
 /// Scan through parentheses and check if followed by `=>`
 ///
 /// Assumes `pos` is at the opening `(`. Handles:
@@ -126,13 +146,11 @@ fn scan_for_arrow(bytes: &[u8], mut pos: usize) -> bool {
                     return false;
                 }
             }
+            b'<' if is_less_equal_op(bytes, pos) => pos += 1,
             b'<' => angle_depth += 1,
-            b'>' => {
-                // Only decrement if not part of `=>`
-                if pos > 0 && bytes[pos - 1] != b'=' && angle_depth > 0 {
-                    angle_depth -= 1;
-                }
-            }
+            b'>' if is_arrow_close(bytes, pos) => {} // `=>` handled by `=` match
+            b'>' if is_greater_equal_op(bytes, pos) => pos += 1,
+            b'>' if angle_depth > 0 => angle_depth -= 1,
 
             // Check for `=>` at depth 0
             b'=' if pos + 1 < bytes.len() && bytes[pos + 1] == b'>' && at_depth_zero => {
@@ -185,13 +203,11 @@ pub(super) fn scan_angle_brackets(bytes: &[u8], pos: usize) -> usize {
 
     while pos < bytes.len() && depth > 0 {
         match bytes[pos] {
+            b'<' if is_less_equal_op(bytes, pos) => pos += 1,
             b'<' => depth += 1,
-            b'>' => {
-                // Check if this is `=>` (arrow) rather than `>` (close angle)
-                if pos > 0 && bytes[pos - 1] != b'=' {
-                    depth -= 1;
-                }
-            }
+            b'>' if is_arrow_close(bytes, pos) => {}
+            b'>' if is_greater_equal_op(bytes, pos) => pos += 1,
+            b'>' => depth -= 1,
             b'"' | b'\'' | b'`' => {
                 pos = skip_string_literal(bytes, pos);
                 continue; // Don't increment pos again
@@ -267,7 +283,9 @@ pub(super) fn is_function_type_start(bytes: &[u8], pos: usize) -> bool {
 /// Returns `true` if a matching `>` is found before hitting an unbalanced
 /// `)`, `]`, `}`, or `;` at depth 0.
 ///
-/// Assumes scanning starts AFTER the initial `<` (i.e., angle_depth starts at 1).
+/// Operator disambiguation: `<=` and `>=` are comparison operators (not angle
+/// brackets), `=>` is an arrow operator (not a closing bracket), and a bare
+/// identifier after `>` indicates comparison rather than type argument close.
 pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], mut pos: usize) -> bool {
     let mut angle_depth: i32 = 1;
     let mut paren_depth: i32 = 0;
@@ -276,11 +294,25 @@ pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], mut pos: usize) -> bo
 
     while pos < bytes.len() {
         match bytes[pos] {
+            b'<' if is_less_equal_op(bytes, pos) => pos += 1,
             b'<' => angle_depth += 1,
             b'>' if paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 => {
-                angle_depth -= 1;
-                if angle_depth == 0 {
-                    return true;
+                if is_arrow_close(bytes, pos) {
+                    // `=>` arrow operator, not a closing angle bracket
+                } else if is_greater_equal_op(bytes, pos) {
+                    pos += 1; // skip the `=` too
+                } else {
+                    angle_depth -= 1;
+                    if angle_depth == 0 {
+                        // After closing `>` in type args, the next token is never
+                        // a bare identifier (it would be `(`, `.`, `[`, `,`, etc.).
+                        // An identifier means this `>` is a comparison operator.
+                        let after = skip_whitespace_and_comments(bytes, pos + 1);
+                        if after < bytes.len() && is_identifier_start(bytes[after]) {
+                            return false;
+                        }
+                        return true;
+                    }
                 }
             }
             b'(' => paren_depth += 1,

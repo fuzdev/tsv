@@ -146,9 +146,9 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
                 let last_comment_end = classified
                     .leading_line
                     .last()
-                    .or(classified.leading_block.last())
-                    .or(classified.trailing_line.last())
-                    .or(classified.trailing_block.last())
+                    .or_else(|| classified.leading_block.last())
+                    .or_else(|| classified.trailing_line.last())
+                    .or_else(|| classified.trailing_block.last())
                     .map(|c| c.span.end);
                 if let Some(end) = last_comment_end {
                     let source = self.printer.get_source();

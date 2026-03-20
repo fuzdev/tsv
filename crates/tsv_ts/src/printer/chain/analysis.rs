@@ -32,17 +32,48 @@ pub trait SymbolLookup {
 ///
 /// Example: `a().b().c!.d` produces:
 /// [Base(a), Call(), Member(.b), Call(), NonNull(!), Member(.d)]
+///
+/// For call chains with stripped grouping parens, extends member comment ranges
+/// to cover paren gaps where block comments may live (mid-chain comment placement).
+/// This only applies to call chains — prettier keeps comments at the chain start
+/// for member-only chains.
 pub fn linearize_chain<'a>(expr: &'a Expression) -> Vec<ChainNode<'a>> {
     let mut nodes = Vec::new();
-    linearize_recursive(expr, &mut nodes);
+    let mut paren_gaps = Vec::new();
+    linearize_recursive(expr, &mut nodes, &mut paren_gaps);
+
+    // Only extend ranges for call chains — prettier places comments mid-chain
+    // only when the chain contains calls
+    if !paren_gaps.is_empty() && nodes.iter().any(ChainNode::is_call) {
+        for (node_index, gap_start) in paren_gaps {
+            if let Some(node) = nodes.get_mut(node_index) {
+                match node {
+                    ChainNode::Member { object_end, .. }
+                    | ChainNode::PrivateMember { object_end, .. }
+                    | ChainNode::ComputedMember { object_end, .. } => {
+                        *object_end = gap_start;
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
     nodes
 }
 
-fn linearize_recursive<'a>(expr: &'a Expression, nodes: &mut Vec<ChainNode<'a>>) {
+/// A deferred paren gap extension: (node_index, gap_start)
+type ParenGap = (usize, u32);
+
+fn linearize_recursive<'a>(
+    expr: &'a Expression,
+    nodes: &mut Vec<ChainNode<'a>>,
+    paren_gaps: &mut Vec<ParenGap>,
+) {
     match expr {
         // CallExpression: recurse into callee, then add Call node
         Expression::CallExpression(call) => {
-            linearize_recursive(&call.callee, nodes);
+            linearize_recursive(&call.callee, nodes, paren_gaps);
             if call.optional {
                 nodes.push(ChainNode::call_optional(expr));
             } else {
@@ -52,7 +83,29 @@ fn linearize_recursive<'a>(expr: &'a Expression, nodes: &mut Vec<ChainNode<'a>>)
 
         // MemberExpression: recurse into object, then add Member node
         Expression::MemberExpression(member) => {
-            linearize_recursive(&member.object, nodes);
+            linearize_recursive(&member.object, nodes, paren_gaps);
+
+            // When grouping parens are stripped (e.g., `/* comment */ (a).b` → `/* comment */ a.b`),
+            // the MemberExpression span extends earlier than its object span, creating a gap
+            // where comments from the stripped parens live. Record the gap so we can extend
+            // the last member node's comment range (only applied for call chains).
+            let member_start = member.span.start;
+            let object_start = member.object.span().start;
+            if member_start < object_start {
+                // Find the last member node in the sub-chain
+                for i in (0..nodes.len()).rev() {
+                    match &nodes[i] {
+                        ChainNode::Member { .. }
+                        | ChainNode::PrivateMember { .. }
+                        | ChainNode::ComputedMember { .. } => {
+                            paren_gaps.push((i, member_start));
+                            break;
+                        }
+                        ChainNode::Base { .. } => break,
+                        _ => continue,
+                    }
+                }
+            }
 
             let object_end = member.object.span().end;
             let property_start = member.property.span().start;
@@ -90,19 +143,14 @@ fn linearize_recursive<'a>(expr: &'a Expression, nodes: &mut Vec<ChainNode<'a>>)
 
         // TSNonNullExpression: recurse into expression, then add NonNull node
         Expression::TSNonNullExpression(non_null) => {
-            linearize_recursive(&non_null.expression, nodes);
+            linearize_recursive(&non_null.expression, nodes, paren_gaps);
             nodes.push(ChainNode::non_null());
         }
 
         // TSInstantiationExpression: recurse into expression (transparent in chains)
         // Type args are recovered by get_call_type_arguments() in chain_args.rs.
         Expression::TSInstantiationExpression(inst) => {
-            linearize_recursive(&inst.expression, nodes);
-        }
-
-        // Parenthesized (JSDoc type cast): transparent in chains, recurse into inner
-        Expression::Parenthesized(inner) => {
-            linearize_recursive(inner, nodes);
+            linearize_recursive(&inst.expression, nodes, paren_gaps);
         }
 
         // Base case: expression that's not part of the chain structure

@@ -32,7 +32,20 @@ impl<'a> Printer<'a> {
         &self,
         cond: &internal::ConditionalExpression,
     ) -> DocId {
-        self.build_conditional_doc_impl(cond, false)
+        self.build_conditional_doc_impl(cond, false, false)
+    }
+
+    /// Build a Doc for a conditional expression in return/throw/call/new context.
+    ///
+    /// When the ternary's parent is ReturnStatement, ThrowStatement, CallExpression,
+    /// or NewExpression, binary expressions in the test position use continuation
+    /// indent. This matches Prettier's shouldNotIndent (binaryish.js:109-113) which
+    /// exempts binaries from indent only when the grandparent is NOT one of these types.
+    pub(super) fn build_conditional_doc_with_binary_test_indent(
+        &self,
+        cond: &internal::ConditionalExpression,
+    ) -> DocId {
+        self.build_conditional_doc_impl(cond, false, true)
     }
 
     /// Implementation of conditional doc building
@@ -40,10 +53,15 @@ impl<'a> Printer<'a> {
     /// `is_chained` indicates this conditional is nested within a parent conditional
     /// (either in consequent when broken, or in alternate). When chained, we don't
     /// wrap in a new group, so the parent's break decision cascades to this one.
+    ///
+    /// `indent_binary_test` indicates the ternary is inside a return/throw/call/new
+    /// statement, so binary expressions in the test position should use continuation
+    /// indent (matching Prettier's shouldNotIndent = false for these grandparents).
     fn build_conditional_doc_impl(
         &self,
         cond: &internal::ConditionalExpression,
         is_chained: bool,
+        indent_binary_test: bool,
     ) -> DocId {
         let d = self.d();
         let test_end = cond.test.span().end;
@@ -68,11 +86,30 @@ impl<'a> Printer<'a> {
             return self.build_conditional_doc_with_line_comments(cond, is_chained);
         }
 
-        // Nullish coalescing, assignments, and await in test position need parens for clarity
-        // Prettier: needs-parens.js — AwaitExpression needs parens when parent is
-        // ConditionalExpression and key is "test" (await has higher precedence than ?:
-        // but parens aid readability)
-        let test = self.build_expression_doc(&cond.test);
+        // Prettier's shouldNotIndent (binaryish.js:109-113) exempts binaries whose
+        // parent is ConditionalExpression from continuation indent, UNLESS the
+        // grandparent is ReturnStatement, ThrowStatement, CallExpression, or
+        // NewExpression. In those cases, shouldNotIndent = false and the binary
+        // gets indent(rest) for its continuation lines.
+        //
+        // In embedded contexts (Svelte attributes), the grandparent is a template
+        // node (none of the above), so shouldNotIndent = true → no indent.
+        let test = if let internal::Expression::BinaryExpression(binary) = &*cond.test {
+            if self.config.is_embedded_expression {
+                // Embedded: shouldNotIndent = true (grandparent is Svelte template node)
+                self.build_binary_chain_doc(binary)
+            } else if indent_binary_test {
+                // Grandparent is return/throw/call/new: shouldNotIndent = false
+                self.build_binary_chain_doc_with_continuation_indent(binary)
+            } else {
+                // Default: shouldNotIndent = true (grandparent is assignment, variable, etc.)
+                self.build_binary_chain_doc(binary)
+            }
+        } else {
+            self.build_expression_doc(&cond.test)
+        };
+        // Nullish coalescing, assignments, and await in test position need parens
+        // Prettier: needs-parens.js
         let test = if is_nullish_coalescing(&cond.test)
             || matches!(
                 &*cond.test,
@@ -83,7 +120,12 @@ impl<'a> Printer<'a> {
         } else {
             test
         };
-        let consequent = self.build_expression_doc(&cond.consequent);
+        // Prettier's shouldNotIndent (binaryish.js:109-113) also applies to binaries
+        // in consequent/alternate positions: when parent is ConditionalExpression and
+        // grandparent is ReturnStatement/ThrowStatement/CallExpression/NewExpression,
+        // shouldNotIndent = false → binary gets indent(rest) for continuation lines.
+        // In assignment/variable contexts, shouldNotIndent = true → flat (no indent).
+        let consequent = self.build_ternary_branch_expr_doc(&cond.consequent, indent_binary_test);
 
         // Split comments around ? and : operators.
         // Comments before ? go after test, comments after ? go before consequent,
@@ -123,7 +165,8 @@ impl<'a> Printer<'a> {
         let consequent_doc =
             if let internal::Expression::ConditionalExpression(nested) = &*cond.consequent {
                 // Broken version: continue chain without parens
-                let broken_consequent = self.build_conditional_doc_impl(nested, true);
+                let broken_consequent =
+                    self.build_conditional_doc_impl(nested, true, indent_binary_test);
                 if d.will_break(consequent) {
                     // Consequent forces breaking (e.g., line comments produce hardlines).
                     // Skip if_break and use broken layout directly — the outer group
@@ -153,26 +196,27 @@ impl<'a> Printer<'a> {
         //   (right-associative, so naturally parsed as `a ? b : (c ? d : e)`)
         // - `as`/`satisfies` need parens to avoid `:` ambiguity: `a ? b : (c as T)`
         // - `??` needs parens for clarity: `a ? b : (c ?? d)`
-        let alternate_doc =
-            if let internal::Expression::ConditionalExpression(nested) = &*cond.alternate {
-                // Recursively build as chained (no group wrapper, no parens)
-                // No indent wrapper - nested conditional has its own structure
-                self.build_conditional_doc_impl(nested, true)
+        let alternate_doc = if let internal::Expression::ConditionalExpression(nested) =
+            &*cond.alternate
+        {
+            // Recursively build as chained (no group wrapper, no parens)
+            // No indent wrapper - nested conditional has its own structure
+            self.build_conditional_doc_impl(nested, true, indent_binary_test)
+        } else {
+            let alternate = self.build_ternary_branch_expr_doc(&cond.alternate, indent_binary_test);
+            let alternate = if matches!(
+                &*cond.alternate,
+                internal::Expression::TSAsExpression(_)
+                    | internal::Expression::TSSatisfiesExpression(_)
+                    | internal::Expression::AssignmentExpression(_)
+            ) || is_nullish_coalescing(&cond.alternate)
+            {
+                d.parens(alternate)
             } else {
-                let alternate = self.build_expression_doc(&cond.alternate);
-                let alternate = if matches!(
-                    &*cond.alternate,
-                    internal::Expression::TSAsExpression(_)
-                        | internal::Expression::TSSatisfiesExpression(_)
-                        | internal::Expression::AssignmentExpression(_)
-                ) || is_nullish_coalescing(&cond.alternate)
-                {
-                    d.parens(alternate)
-                } else {
-                    alternate
-                };
-                d.indent(alternate)
+                alternate
             };
+            d.indent(alternate)
+        };
 
         let inner = d.concat(&[
             test,
@@ -257,8 +301,18 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Consequent expression
-        let consequent = self.build_expression_doc(&cond.consequent);
+        // Consequent expression — when the outer ternary enters breaking layout
+        // (line comments or multiline templates), nested conditionals in the
+        // consequent must also break. Without group_break, the inner ternary's
+        // group stays flat (content fits on one line), but Prettier cascades
+        // the break from the parent to the entire ternary chain.
+        let (consequent, is_nested_cond) =
+            if let internal::Expression::ConditionalExpression(nested) = &*cond.consequent {
+                let chained = self.build_conditional_doc_impl(nested, true, false);
+                (d.group_break(chained), true)
+            } else {
+                (self.build_expression_doc(&cond.consequent), false)
+            };
         if has_line_comment_before_consequent {
             // Line comment needs hardline before consequent
             q_parts.push(d.hardline());
@@ -267,7 +321,12 @@ impl<'a> Printer<'a> {
         } else {
             // Block comment or no comment - space then consequent
             q_parts.push(d.text(" "));
-            q_parts.push(d.indent(consequent));
+            if is_nested_cond {
+                // Nested conditional handles its own indent via chained structure
+                q_parts.push(consequent);
+            } else {
+                q_parts.push(d.indent(consequent));
+            }
         }
 
         // Comments between consequent and : (inline after consequent)
@@ -322,6 +381,22 @@ impl<'a> Printer<'a> {
         parts.push(d.indent(d.concat(&q_parts)));
 
         d.concat(&parts)
+    }
+
+    /// Build expression doc for a ternary branch (consequent/alternate).
+    ///
+    /// When `indent_binary` is true (grandparent is return/throw/call/new),
+    /// binary expressions use continuation indent matching Prettier's
+    /// shouldNotIndent=false for these contexts (binaryish.js:109-113).
+    fn build_ternary_branch_expr_doc(
+        &self,
+        expr: &internal::Expression,
+        indent_binary: bool,
+    ) -> DocId {
+        if indent_binary && let internal::Expression::BinaryExpression(binary) = expr {
+            return self.build_binary_chain_doc_with_continuation_indent(binary);
+        }
+        self.build_expression_doc(expr)
     }
 
     /// Find the position of a character in source, skipping over comments

@@ -1615,8 +1615,7 @@ impl<'a> Printer<'a> {
                 if prev_stmt_end.is_some() {
                     let check_end = leading_comments
                         .first()
-                        .map(|c| c.span.start)
-                        .unwrap_or(stmt_start);
+                        .map_or(stmt_start, |c| c.span.start);
                     if self.has_blank_line_between(prev_end, check_end) {
                         stmt_parts.push(d.hardline());
                     }
@@ -1984,25 +1983,7 @@ impl<'a> Printer<'a> {
     }
 
     pub(super) fn build_throw_statement_doc(&self, stmt: &internal::ThrowStatement) -> DocId {
-        let d = self.d();
-
-        // Prettier wraps throw args with own-line comments in unconditional parens
-        // (same as return — see returnArgumentHasLeadingComment in function.js)
-        if self.return_argument_has_own_line_comment(stmt.span.start, &stmt.argument) {
-            return self.build_return_or_throw_comment_paren_doc("throw", &stmt.argument);
-        }
-
-        // Prettier wraps all binaryish throw args in parens when breaking
-        // (same as return — see printReturnOrThrowArgument in function.js)
-        if let Expression::BinaryExpression(binary) = &stmt.argument {
-            return self.build_return_or_throw_binary_doc("throw", binary);
-        }
-
-        d.concat(&[
-            d.text("throw "),
-            self.build_expression_doc(&stmt.argument),
-            d.text(";"),
-        ])
+        self.build_keyword_argument_doc("throw", stmt.span.start, &stmt.argument)
     }
 
     pub(super) fn build_break_statement_doc(&self, stmt: &internal::BreakStatement) -> DocId {

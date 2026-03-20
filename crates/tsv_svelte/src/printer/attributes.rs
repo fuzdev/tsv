@@ -270,8 +270,11 @@ impl<'a> Printer<'a> {
         match &dir.value {
             internal::StyleDirectiveValue::True => {}
             internal::StyleDirectiveValue::ExpressionTag(tag) => {
-                parts.push(d.text("="));
-                parts.push(self.build_expression_tag_doc(tag));
+                // Only include expression if not shorthand (style:color={color} → style:color)
+                if !self.is_identifier_with_name(&tag.expression, &dir.name) {
+                    parts.push(d.text("="));
+                    parts.push(self.build_expression_tag_doc(tag));
+                }
             }
             internal::StyleDirectiveValue::Parts(value_parts) => {
                 parts.push(d.text("=\""));
@@ -322,8 +325,13 @@ impl<'a> Printer<'a> {
     fn build_let_directive_doc(&self, dir: &internal::LetDirective) -> DocId {
         let d = self.d();
         let mut parts = vec![d.text("let:"), d.text_owned(dir.name.clone())];
+        // Only include expression if not shorthand (let:foo={foo} → let:foo)
         if let Some(expr) = &dir.expression {
-            parts.extend(self.build_expression_doc_parts_with_span(expr, dir.expression_tag_span));
+            if !self.is_identifier_with_name(expr, &dir.name) {
+                parts.extend(
+                    self.build_expression_doc_parts_with_span(expr, dir.expression_tag_span),
+                );
+            }
         }
         d.concat(&parts)
     }
@@ -340,13 +348,21 @@ impl<'a> Printer<'a> {
             .collect()
     }
 
-    /// Build expression doc, using continuation indent for binary expressions
+    /// Build expression doc for attribute context (embedded expression).
+    ///
+    /// Sets `is_embedded_expression = true` so binary expressions use ContinuationIndent style.
+    /// Assignment expressions get wrapped in parens: `prop={(a = b)}`.
     fn build_expression_doc_for_attribute(
         &self,
         expr: &tsv_ts::ast::internal::Expression,
         config: &tsv_lang::PrintConfig,
     ) -> DocId {
         let d = self.d();
+        let embedded_config = tsv_lang::PrintConfig {
+            is_embedded_expression: true,
+            ..*config
+        };
+
         // Assignment expressions need parens in attribute values: prop={(a = b)}
         if let tsv_ts::ast::internal::Expression::AssignmentExpression(_) = expr {
             let inner = tsv_ts::build_expression_doc_with_comments(
@@ -354,34 +370,22 @@ impl<'a> Printer<'a> {
                 expr,
                 self.source,
                 Rc::clone(&self.interner),
-                config,
+                &embedded_config,
                 self.comments,
                 &self.line_breaks,
             );
             return d.parens(inner);
         }
 
-        if let tsv_ts::ast::internal::Expression::BinaryExpression(_) = expr {
-            tsv_ts::build_expression_doc_with_continuation_indent(
-                d,
-                expr,
-                self.source,
-                Rc::clone(&self.interner),
-                config,
-                self.comments,
-                &self.line_breaks,
-            )
-        } else {
-            tsv_ts::build_expression_doc_with_comments(
-                d,
-                expr,
-                self.source,
-                Rc::clone(&self.interner),
-                config,
-                self.comments,
-                &self.line_breaks,
-            )
-        }
+        tsv_ts::build_expression_doc_with_comments(
+            d,
+            expr,
+            self.source,
+            Rc::clone(&self.interner),
+            &embedded_config,
+            self.comments,
+            &self.line_breaks,
+        )
     }
 
     /// Build Doc parts for an expression with optional span for comment lookup: `={expr}`

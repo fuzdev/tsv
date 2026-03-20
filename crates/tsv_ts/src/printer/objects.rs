@@ -8,6 +8,7 @@
 // - Blank line preservation between properties
 
 use super::Printer;
+use super::calls::skip_stripped_open_paren;
 use super::expression_stringifier::{escape_single_quote_string, is_valid_js_identifier};
 use crate::ast::internal::{self, Expression, Literal, LiteralValue};
 use tsv_lang::SymbolResolver;
@@ -264,10 +265,15 @@ impl<'a> Printer<'a> {
 
             for (i, prop) in obj.properties.iter().enumerate() {
                 // Check for blank line before this property (preserved in multiline)
+                // Use find_comma_after + skip_stripped_open_paren to avoid span gaps
+                // from stripped grouping parens being falsely detected as blank lines.
                 let has_blank_before = if i > 0 {
                     let prev_prop = &obj.properties[i - 1];
                     let prev_end = prev_prop.value_end();
-                    self.has_blank_line_between(prev_end, prop.span().start)
+                    let prop_start = prop.span().start;
+                    let check_start = self.find_comma_after(prev_end).map_or(prev_end, |c| c + 1);
+                    let check_end = skip_stripped_open_paren(self.source, check_start, prop_start);
+                    self.has_blank_line_between(check_start, check_end)
                 } else {
                     false
                 };
@@ -288,8 +294,10 @@ impl<'a> Printer<'a> {
                     // Only add line break if next property doesn't have blank line before it
                     let next_prop = &obj.properties[i + 1];
                     let curr_end = prop.value_end();
-                    let next_has_blank =
-                        self.has_blank_line_between(curr_end, next_prop.span().start);
+                    let next_start = next_prop.span().start;
+                    let check_start = self.find_comma_after(curr_end).map_or(curr_end, |c| c + 1);
+                    let check_end = skip_stripped_open_paren(self.source, check_start, next_start);
+                    let next_has_blank = self.has_blank_line_between(check_start, check_end);
 
                     if !next_has_blank {
                         parts.push(d.line());
@@ -501,36 +509,78 @@ impl<'a> Printer<'a> {
                 } else {
                     // No parens needed: use unified assignment layout
                     let is_short_key = self.is_short_property_key(&prop.key, prop.computed);
-                    self.build_assignment_layout(key_doc, ":", &prop.value, is_short_key)
+                    self.build_assignment_layout(key_doc, ":", &prop.value, is_short_key, None)
                 }
             } else {
-                // Comments around colon: build manually to preserve them
-                let mut parts = vec![key_doc];
+                // Comments around colon: check if any post-colon comment is multiline
+                // Multiline block comments force break-after-operator layout
+                // Prettier ref: hasLeadingOwnLineComment → break-after-operator in chooseLayout
+                let has_multiline_post_colon =
+                    self.has_multiline_block_comments_between(colon_pos + 1, value_start);
 
-                // Add comments between key and colon
-                for comment in &pre_colon_comments {
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
+                if has_multiline_post_colon {
+                    // Multiline block comment after colon: use BreakAfterOperator layout
+                    // Structure: group([group(key + pre_colon), ":", group(indent([line, rhs]))])
+                    let mut lhs_parts = vec![key_doc];
+                    for comment in &pre_colon_comments {
+                        lhs_parts.push(d.text(" "));
+                        lhs_parts.push(self.build_comment_doc(comment));
+                    }
+                    let lhs_doc = if lhs_parts.len() == 1 {
+                        key_doc
+                    } else {
+                        d.concat(&lhs_parts)
+                    };
+
+                    // Build RHS: comments (with proper separators) + value
+                    let comments_doc = self
+                        .build_rhs_comments_opt(colon_pos + 1, value_start)
+                        .unwrap_or_else(|| d.empty());
+                    let mut value_parts = vec![comments_doc];
+                    if needs_parens {
+                        value_parts.push(d.text("("));
+                    }
+                    value_parts.push(self.build_expression_doc(&prop.value));
+                    if needs_parens {
+                        value_parts.push(d.text(")"));
+                    }
+                    let rhs_doc = d.concat(&value_parts);
+
+                    // BreakAfterOperator: group([group(left), ":", group(indent([line, rhs]))])
+                    d.group(d.concat(&[
+                        d.group(lhs_doc),
+                        d.text(":"),
+                        d.group(d.indent(d.concat(&[d.line(), rhs_doc]))),
+                    ]))
+                } else {
+                    // Inline comments: build manually (existing behavior)
+                    let mut parts = vec![key_doc];
+
+                    // Add comments between key and colon
+                    for comment in &pre_colon_comments {
+                        parts.push(d.text(" "));
+                        parts.push(self.build_comment_doc(comment));
+                    }
+
+                    parts.push(d.text(": "));
+
+                    // Add comments between colon and value
+                    for comment in &post_colon_comments {
+                        parts.push(self.build_comment_doc(comment));
+                        parts.push(d.text(" "));
+                    }
+
+                    // Add parens around assignment expressions
+                    if needs_parens {
+                        parts.push(d.text("("));
+                    }
+                    parts.push(self.build_expression_doc(&prop.value));
+                    if needs_parens {
+                        parts.push(d.text(")"));
+                    }
+
+                    d.concat(&parts)
                 }
-
-                parts.push(d.text(": "));
-
-                // Add comments between colon and value
-                for comment in &post_colon_comments {
-                    parts.push(self.build_comment_doc(comment));
-                    parts.push(d.text(" "));
-                }
-
-                // Add parens around assignment expressions
-                if needs_parens {
-                    parts.push(d.text("("));
-                }
-                parts.push(self.build_expression_doc(&prop.value));
-                if needs_parens {
-                    parts.push(d.text(")"));
-                }
-
-                d.concat(&parts)
             }
         }
     }

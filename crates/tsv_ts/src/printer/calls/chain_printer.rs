@@ -47,41 +47,21 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.build_call_args_doc_for_chain_expanded(call, optional)
     }
 
-    fn build_block_comments_doc(&self, start: u32, end: u32, spacing: CommentSpacing) -> DocId {
-        let d = self.d();
-        // Filter block comments based on position:
-        // - Leading spacing: typically used for trailing position (same line as start)
-        // - Trailing spacing: typically used for inside brackets (space after comment)
-        // The position filter is tied to the semantics of where we're inserting:
-        // - Leading (space before): we're adding inline with previous element, so same line
-        // - Trailing (space after): we're adding inside brackets, also same line
-        let same_line = !matches!(spacing, CommentSpacing::None);
-        let block_comments = self.filter_block_comments(start, end, same_line);
-
-        if block_comments.is_empty() {
-            return d.empty();
-        }
-
-        let mut parts = Vec::new();
-        for comment in block_comments {
-            match spacing {
-                CommentSpacing::Leading => {
-                    // Space before comment (for inline trailing comments: `method() /* c */`)
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                }
-                CommentSpacing::Trailing => {
-                    // Space after comment (for inside brackets: `[/* c */ key]`)
-                    parts.push(self.build_comment_doc(comment));
-                    parts.push(d.text(" "));
-                }
-                CommentSpacing::None => {
-                    // Different line comments - filter gave us nothing since same_line=false
-                    parts.push(self.build_comment_doc(comment));
-                }
-            }
-        }
-        d.concat(&parts)
+    fn build_block_comments_doc(
+        &self,
+        start: u32,
+        end: u32,
+        spacing: CommentSpacing,
+        same_line_only: bool,
+    ) -> DocId {
+        let block_comments = if same_line_only {
+            self.filter_block_comments(start, end, true)
+        } else {
+            comments_in_range(self.comments, start, end)
+                .filter(|c| c.is_block)
+                .collect()
+        };
+        self.format_block_comments(&block_comments, spacing)
     }
 
     fn get_property_span(&self, expr: &internal::Expression) -> tsv_lang::Span {
@@ -197,5 +177,37 @@ impl<'a> ChainPrinter for Printer<'a> {
 
     fn should_force_expand(&self) -> bool {
         self.force_chain_expand.get()
+    }
+}
+
+impl<'a> Printer<'a> {
+    /// Format a slice of block comments with the given spacing style.
+    ///
+    /// Shared formatting for block comments with the given spacing style.
+    fn format_block_comments(&self, block_comments: &[&Comment], spacing: CommentSpacing) -> DocId {
+        let d = self.d();
+        if block_comments.is_empty() {
+            return d.empty();
+        }
+
+        let mut parts = Vec::new();
+        for comment in block_comments {
+            match spacing {
+                CommentSpacing::Leading => {
+                    // Space before comment: `method() /* c */`
+                    parts.push(d.text(" "));
+                    parts.push(self.build_comment_doc(comment));
+                }
+                CommentSpacing::Trailing => {
+                    // Space after comment: `/* c */ key`
+                    parts.push(self.build_comment_doc(comment));
+                    parts.push(d.text(" "));
+                }
+                CommentSpacing::None => {
+                    parts.push(self.build_comment_doc(comment));
+                }
+            }
+        }
+        d.concat(&parts)
     }
 }

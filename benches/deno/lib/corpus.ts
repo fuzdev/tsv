@@ -6,7 +6,7 @@
  */
 
 import { walk } from '@std/fs/walk';
-import { basename, extname } from '@std/path';
+import { basename, dirname, extname, join } from '@std/path';
 
 import type { CorpusStats, Language, Logger, SourceFile } from './types.ts';
 
@@ -41,6 +41,7 @@ export function detectLanguage(path: string): Language | null {
 	const ext = extname(path).toLowerCase();
 	switch (ext) {
 		case '.svelte':
+		case '.html':
 			return 'svelte';
 		case '.ts':
 		case '.js':
@@ -61,6 +62,34 @@ const DEFAULT_EXCLUSIONS = [
 	'/build/',
 	'/dist/',
 ];
+
+/**
+ * Check if a file has a companion options.json (non-default prettier settings).
+ * Checks two patterns:
+ * - Same directory: `dir/options.json` (prettier-plugin-svelte formatting samples)
+ * - Sibling file: `name.options.json` (prettier-plugin-svelte printer samples)
+ */
+async function hasCompanionOptions(filePath: string): Promise<boolean> {
+	const dir = dirname(filePath);
+	const base = basename(filePath);
+	const nameWithoutExt = base.replace(/\.[^.]+$/, '');
+
+	try {
+		// Check dir/options.json (formatting samples pattern)
+		await Deno.stat(join(dir, 'options.json'));
+		return true;
+	} catch {
+		// Not found, check sibling pattern
+	}
+
+	try {
+		// Check name.options.json (printer samples pattern)
+		await Deno.stat(join(dir, `${nameWithoutExt}.options.json`));
+		return true;
+	} catch {
+		return false;
+	}
+}
 
 /** Check if file should be excluded based on default patterns */
 export function shouldExclude(path: string, exclusions = DEFAULT_EXCLUSIONS): boolean {
@@ -120,12 +149,26 @@ export function groupByLanguage(files: SourceFile[]): Record<Language, SourceFil
 // Default Implementation: ~/dev/ repos
 //
 
+/** Per-repo configuration overrides */
+export interface RepoConfig {
+	name: string;
+	/** Override srcDir for this repo (default: global srcDir) */
+	srcDir?: string;
+	/** Override extensions for this repo (default: global extensions) */
+	extensions?: string[];
+	/** Override exclusions for this repo (default: global exclusions) */
+	exclusions?: string[];
+}
+
+/** A repo entry is either a name string or a config object */
+export type RepoEntry = string | RepoConfig;
+
 /** Configuration for DevReposLoader */
 export interface DevReposLoaderOptions {
 	/** Base directory containing repos (default: ~/dev) */
 	baseDir?: string;
 	/** List of repo names to load (default: hardcoded list) */
-	repos?: string[];
+	repos?: RepoEntry[];
 	/** Subdirectory within each repo to scan (default: src) */
 	srcDir?: string;
 	/** File extensions to include (default: svelte, ts, js, css) */
@@ -137,8 +180,9 @@ export interface DevReposLoaderOptions {
 /**
  * Default repos for the dev loader.
  * SvelteKit projects from ~/dev/web.code-workspace (those with src/routes/).
+ * Object entries override per-repo srcDir/extensions/exclusions.
  */
-const DEFAULT_REPOS = [
+const DEFAULT_REPOS: RepoEntry[] = [
 	// Large apps
 	'zzz',
 	'mageguild',
@@ -165,9 +209,19 @@ const DEFAULT_REPOS = [
 	'webdevladder.net',
 	'ryanatkn.com',
 	// External projects (monorepo subpaths — baseDir/name/srcDir still resolves)
+	'svelte/packages/svelte',
 	'svelte.dev/apps/svelte.dev',
 	'svelte.dev/packages/repl',
 	'svelte.dev/packages/site-kit',
+	// prettier-plugin-svelte test cases (.html files treated as Svelte)
+	// output.html = prettier-formatted (canonical), input.html = unformatted source
+	// Both included — input.html surfaces normalization differences
+	{
+		name: 'prettier-plugin-svelte',
+		srcDir: 'test',
+		extensions: ['html'],
+	},
+	// TODO: svelte/packages/svelte/tests (7124 files — needs per-repo srcDir override)
 ];
 
 /**
@@ -201,22 +255,26 @@ export class DevReposLoader implements CorpusLoader {
 		const allFiles: SourceFile[] = [];
 		const loadedRepos: string[] = [];
 
-		for (const repoName of repos) {
-			const repoPath = `${baseDir}/${repoName}`;
-			const srcPath = `${repoPath}/${srcDir}`;
+		for (const entry of repos) {
+			const config = typeof entry === 'string' ? { name: entry } : entry;
+			const repoSrcDir = config.srcDir ?? srcDir;
+			const repoExtensions = config.extensions ?? extensions;
+			const repoExclusions = config.exclusions ?? exclusions;
+			const repoPath = `${baseDir}/${config.name}`;
+			const srcPath = `${repoPath}/${repoSrcDir}`;
 
 			try {
 				await Deno.stat(srcPath);
 			} catch {
-				logger(`  ${repoName}: not found, skipping`);
+				logger(`  ${config.name}: not found, skipping`);
 				continue;
 			}
 
-			const repoFiles = await this.#loadDirectory(srcPath, extensions, exclusions);
+			const repoFiles = await this.#loadDirectory(srcPath, repoExtensions, repoExclusions);
 			if (repoFiles.length > 0) {
 				allFiles.push(...repoFiles);
-				loadedRepos.push(repoName);
-				logger(`  ${repoName}: ${repoFiles.length} files`);
+				loadedRepos.push(config.name);
+				logger(`  ${config.name}: ${repoFiles.length} files`);
 			}
 		}
 
@@ -239,6 +297,11 @@ export class DevReposLoader implements CorpusLoader {
 
 			const language = detectLanguage(entry.path);
 			if (!language) continue;
+
+			// Skip .html files with companion options.json (non-default prettier settings)
+			if (entry.path.endsWith('.html') && (await hasCompanionOptions(entry.path))) {
+				continue;
+			}
 
 			try {
 				const content = await Deno.readTextFile(entry.path);

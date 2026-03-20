@@ -235,7 +235,8 @@ impl<'a> Printer<'a> {
                 let body_arrow_has_trailing_param_comments =
                     if let internal::Expression::ArrowFunctionExpression(body_arrow) = expr.as_ref()
                     {
-                        arrow_has_trailing_param_comments(body_arrow, |start, end| {
+                        let arrow_token = self.find_arrow_token_for(body_arrow);
+                        arrow_has_trailing_param_comments(body_arrow, arrow_token, |start, end| {
                             self.has_comments_between(start, end)
                         })
                     } else {

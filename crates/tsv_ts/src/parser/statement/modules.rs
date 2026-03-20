@@ -372,9 +372,12 @@ impl<'a> Parser<'a> {
             let specifier_export_kind = if matches!(self.current_kind(), TokenKind::Identifier)
                 && self.current_value() == "type"
             {
-                // Look ahead to see if next is identifier (inline type) or 'as'/',' (regular export named "type")
+                // Look ahead to see if next is identifier or keyword-as-identifier
+                // (inline type) or 'as'/',' (regular export named "type")
                 let next_kind = self.peek_kind();
-                if matches!(next_kind, TokenKind::Identifier) {
+                let next_is_identifier = matches!(next_kind, TokenKind::Identifier)
+                    || matches!(next_kind, TokenKind::Keyword(kw) if kw.can_be_identifier());
+                if next_is_identifier {
                     self.advance()?; // consume 'type'
                     ExportKind::Type
                 } else {
@@ -384,45 +387,7 @@ impl<'a> Parser<'a> {
                 ExportKind::Value
             };
 
-            // Parse local name (the name being exported)
-            // Can be an identifier or 'default' keyword (for re-exporting default)
-            let is_valid_local = matches!(self.current_kind(), TokenKind::Identifier)
-                || matches!(
-                    self.current_kind(),
-                    TokenKind::Keyword(KeywordKind::Default)
-                );
-            if !is_valid_local {
-                return Err(self.error_expected("identifier in export specifier"));
-            }
-            let (local_start, local_end) = self.current_pos();
-            let local_name = self.intern_identifier();
-            self.advance()?;
-
-            let local =
-                Identifier::simple(local_name, Span::new(local_start as u32, local_end as u32));
-
-            // Check for 'as exported_name'
-            let (exported, spec_end) =
-                if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As)) {
-                    self.advance()?; // consume 'as'
-
-                    if !matches!(self.current_kind(), TokenKind::Identifier) {
-                        return Err(self.error_expected_after("identifier", "as"));
-                    }
-                    let (exp_start, exp_end) = self.current_pos();
-                    let exported_name = self.intern_identifier();
-                    self.advance()?;
-
-                    (
-                        Identifier::simple(
-                            exported_name,
-                            Span::new(exp_start as u32, exp_end as u32),
-                        ),
-                        exp_end as u32,
-                    )
-                } else {
-                    (local.clone(), local_end as u32)
-                };
+            let (local, exported, spec_end) = self.parse_export_specifier_names()?;
 
             specifiers.push(ExportSpecifier {
                 local,
@@ -480,45 +445,7 @@ impl<'a> Parser<'a> {
         while !matches!(self.current_kind(), TokenKind::BraceClose) {
             let (spec_start, _) = self.current_pos();
 
-            // Parse local name (the name being exported)
-            // Can be an identifier or 'default' keyword (for re-exporting default)
-            let is_valid_local = matches!(self.current_kind(), TokenKind::Identifier)
-                || matches!(
-                    self.current_kind(),
-                    TokenKind::Keyword(KeywordKind::Default)
-                );
-            if !is_valid_local {
-                return Err(self.error_expected("identifier in export specifier"));
-            }
-            let (local_start, local_end) = self.current_pos();
-            let local_name = self.intern_identifier();
-            self.advance()?;
-
-            let local =
-                Identifier::simple(local_name, Span::new(local_start as u32, local_end as u32));
-
-            // Check for 'as exported_name'
-            let (exported, spec_end) =
-                if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As)) {
-                    self.advance()?; // consume 'as'
-
-                    if !matches!(self.current_kind(), TokenKind::Identifier) {
-                        return Err(self.error_expected_after("identifier", "as"));
-                    }
-                    let (exp_start, exp_end) = self.current_pos();
-                    let exported_name = self.intern_identifier();
-                    self.advance()?;
-
-                    (
-                        Identifier::simple(
-                            exported_name,
-                            Span::new(exp_start as u32, exp_end as u32),
-                        ),
-                        exp_end as u32,
-                    )
-                } else {
-                    (local.clone(), local_end as u32)
-                };
+            let (local, exported, spec_end) = self.parse_export_specifier_names()?;
 
             specifiers.push(ExportSpecifier {
                 local,
@@ -563,6 +490,58 @@ impl<'a> Parser<'a> {
             export_kind: ExportKind::Type,
             span: Span::new(start, end),
         }))
+    }
+
+    /// Parse an export specifier: `local`, `local as exported`, or `default`.
+    ///
+    /// Returns (local, exported, spec_end_pos).
+    /// Accepts contextual keywords as local names and any keyword as exported names.
+    fn parse_export_specifier_names(
+        &mut self,
+    ) -> Result<(Identifier, Identifier, u32), ParseError> {
+        // Parse local name: identifier, contextual keyword, or 'default'
+        let (local_start, local_end) = self.current_pos();
+        let local_name = if matches!(
+            self.current_kind(),
+            TokenKind::Keyword(KeywordKind::Default)
+        ) {
+            self.intern(KeywordKind::Default.as_str())
+        } else {
+            match self.try_intern_identifier_or_keyword() {
+                Some(sym) => sym,
+                None => {
+                    return Err(self.error_expected("identifier in export specifier"));
+                }
+            }
+        };
+        self.advance()?;
+
+        let local = Identifier::simple(local_name, Span::new(local_start as u32, local_end as u32));
+
+        // Check for 'as exported_name'
+        // ES spec: exported name is a ModuleExportName (any IdentifierName or string)
+        let (exported, spec_end) =
+            if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As)) {
+                self.advance()?; // consume 'as'
+
+                let (exp_start, exp_end) = self.current_pos();
+                let exported_name = match self.try_intern_identifier_name() {
+                    Some(sym) => sym,
+                    None => {
+                        return Err(self.error_expected_after("identifier", "as"));
+                    }
+                };
+                self.advance()?;
+
+                (
+                    Identifier::simple(exported_name, Span::new(exp_start as u32, exp_end as u32)),
+                    exp_end as u32,
+                )
+            } else {
+                (local.clone(), local_end as u32)
+            };
+
+        Ok((local, exported, spec_end))
     }
 
     /// Parse import declaration:
@@ -690,9 +669,12 @@ impl<'a> Parser<'a> {
                 let specifier_import_kind = if matches!(self.current_kind(), TokenKind::Identifier)
                     && self.current_value() == "type"
                 {
-                    // Look ahead to see if next is identifier (inline type) or 'as'/',' (regular import named "type")
+                    // Look ahead to see if next is identifier or keyword-as-identifier
+                    // (inline type) or 'as'/',' (regular import named "type")
                     let next_kind = self.peek_kind();
-                    if matches!(next_kind, TokenKind::Identifier) {
+                    let next_is_identifier = matches!(next_kind, TokenKind::Identifier)
+                        || matches!(next_kind, TokenKind::Keyword(kw) if kw.can_be_identifier());
+                    if next_is_identifier {
                         self.advance()?; // consume 'type'
                         ImportKind::Type
                     } else {
@@ -702,12 +684,14 @@ impl<'a> Parser<'a> {
                     ImportKind::Value
                 };
 
-                // Parse imported name
-                if !matches!(self.current_kind(), TokenKind::Identifier) {
-                    return Err(self.error_expected("identifier in import specifier"));
-                }
+                // Parse imported name (keywords can be specifier names: `import { object }`)
                 let (imp_start, imp_end) = self.current_pos();
-                let imported_symbol = self.intern_identifier();
+                let imported_symbol = match self.try_intern_identifier_or_keyword() {
+                    Some(sym) => sym,
+                    None => {
+                        return Err(self.error_expected("identifier in import specifier"));
+                    }
+                };
                 self.advance()?;
 
                 let imported = Identifier::simple(
@@ -720,11 +704,13 @@ impl<'a> Parser<'a> {
                     if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As)) {
                         self.advance()?;
 
-                        if !matches!(self.current_kind(), TokenKind::Identifier) {
-                            return Err(self.error_expected_after("identifier", "as"));
-                        }
                         let (local_start, local_end) = self.current_pos();
-                        let local_symbol = self.intern_identifier();
+                        let local_symbol = match self.try_intern_binding_name() {
+                            Some(sym) => sym,
+                            None => {
+                                return Err(self.error_expected_after("identifier", "as"));
+                            }
+                        };
                         self.advance()?;
 
                         (

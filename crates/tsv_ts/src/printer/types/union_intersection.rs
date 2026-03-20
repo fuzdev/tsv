@@ -316,12 +316,45 @@ impl<'a> Printer<'a> {
             ));
         }
 
+        // Special case: expanding first type with 3+ members
+        //
+        // Matches prettier's per-member indent logic for object-to-non-object transitions:
+        // - First successor (i=1) is hugged: `} & B` (space, no indent)
+        // - Further successors (i>=2) get per-member indent: `indent(" &" line C)`
+        //
+        // Example: `type T = { a: A } & B & C` formats as:
+        //   type T = {
+        //       a: A;
+        //   } & B &
+        //       C;
+        let first_expanding_multi =
+            first_is_expanding && !is_huggable_pair && intersection.types.len() > 2;
+        if first_expanding_multi {
+            let mut parts = first_parts;
+
+            for (i, _) in intersection.types.iter().enumerate().skip(1) {
+                let body = self.build_intersection_member_body_doc(intersection, i);
+                let sep = if i == 1 { d.text(" ") } else { d.line() };
+                let mut member = vec![sep];
+                member.extend(body);
+
+                if i == 1 {
+                    // Hugged to first type: no indent
+                    parts.extend(member);
+                } else {
+                    // Per-member indent
+                    parts.push(d.indent(d.concat(&member)));
+                }
+            }
+
+            // Always need a group for line() in index 2+ members
+            return d.group(d.concat(&parts));
+        }
+
         // Build continuation types (indented when breaking)
         let mut continuation_parts = Vec::new();
 
-        for (i, t) in intersection.types.iter().enumerate().skip(1) {
-            let type_start = t.span().start;
-            let type_end = t.span().end;
+        for (i, _) in intersection.types.iter().enumerate().skip(1) {
             let is_last = i == last_idx;
 
             // Huggable pair: always space (TypeLiteral handles its own expansion)
@@ -332,45 +365,7 @@ impl<'a> Printer<'a> {
                 continuation_parts.push(d.line());
             }
 
-            // Add leading block comments for this type (after the `&` separator)
-            let prev_type_end = intersection.types[i - 1].span().end;
-            if let Some(amp_pos) =
-                find_separator_position(self.source, prev_type_end, type_start, b'&')
-            {
-                continuation_parts.push(self.build_comments_between_filtered(
-                    amp_pos + 1,
-                    type_start,
-                    CommentSpacing::Trailing,
-                    CommentFilter::BlockOnly,
-                ));
-            }
-
-            continuation_parts
-                .push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_intersection));
-
-            // Add trailing block comments after this type (before the next `&` separator)
-            if !is_last {
-                let next_type_start = intersection.types[i + 1].span().start;
-                if let Some(amp_pos) =
-                    find_separator_position(self.source, type_end, next_type_start, b'&')
-                {
-                    continuation_parts.push(self.build_comments_between_filtered(
-                        type_end,
-                        amp_pos,
-                        CommentSpacing::Leading,
-                        CommentFilter::BlockOnly,
-                    ));
-                }
-                continuation_parts.push(d.text(" &"));
-            } else {
-                // Last type - include all trailing comments up to intersection span end
-                continuation_parts.push(self.build_comments_between_filtered(
-                    type_end,
-                    intersection.span.end,
-                    CommentSpacing::Leading,
-                    CommentFilter::BlockOnly,
-                ));
-            }
+            continuation_parts.extend(self.build_intersection_member_body_doc(intersection, i));
         }
 
         // Combine: first_parts + continuation
@@ -490,5 +485,60 @@ impl<'a> Printer<'a> {
         }
 
         d.concat(&parts)
+    }
+
+    /// Build the body of an intersection continuation member (everything except separator).
+    ///
+    /// Returns: leading comments + type doc + trailing comments/`&` separator.
+    /// Used by both the normal and expanding-first-type paths.
+    fn build_intersection_member_body_doc(
+        &self,
+        intersection: &TSIntersectionType,
+        i: usize,
+    ) -> Vec<DocId> {
+        let t = &intersection.types[i];
+        let type_start = t.span().start;
+        let type_end = t.span().end;
+        let is_last = i == intersection.types.len() - 1;
+        let mut parts = Vec::new();
+
+        // Leading block comments (after the `&` separator)
+        let prev_type_end = intersection.types[i - 1].span().end;
+        if let Some(amp_pos) = find_separator_position(self.source, prev_type_end, type_start, b'&')
+        {
+            parts.push(self.build_comments_between_filtered(
+                amp_pos + 1,
+                type_start,
+                CommentSpacing::Trailing,
+                CommentFilter::BlockOnly,
+            ));
+        }
+
+        parts.push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_intersection));
+
+        // Trailing block comments + `&` separator (or end-of-intersection comments)
+        if !is_last {
+            let next_type_start = intersection.types[i + 1].span().start;
+            if let Some(amp_pos) =
+                find_separator_position(self.source, type_end, next_type_start, b'&')
+            {
+                parts.push(self.build_comments_between_filtered(
+                    type_end,
+                    amp_pos,
+                    CommentSpacing::Leading,
+                    CommentFilter::BlockOnly,
+                ));
+            }
+            parts.push(self.d().text(" &"));
+        } else {
+            parts.push(self.build_comments_between_filtered(
+                type_end,
+                intersection.span.end,
+                CommentSpacing::Leading,
+                CommentFilter::BlockOnly,
+            ));
+        }
+
+        parts
     }
 }

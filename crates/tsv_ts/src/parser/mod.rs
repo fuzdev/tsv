@@ -276,6 +276,56 @@ impl<'a> Parser<'a> {
         self.intern(self.current_identifier_name())
     }
 
+    /// Get the string value of the current identifier or contextual keyword.
+    ///
+    /// Returns the decoded name for identifiers with unicode escapes,
+    /// or the keyword string for contextual keywords. Returns `None`
+    /// if the current token is not identifier-like.
+    pub(super) fn current_identifier_or_keyword_name(&self) -> Option<&str> {
+        match self.current_kind() {
+            TokenKind::Identifier => Some(self.current_identifier_name()),
+            TokenKind::Keyword(kw) if kw.can_be_identifier() => Some(kw.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Intern the current token as an identifier, accepting contextual keywords.
+    ///
+    /// Handles `TokenKind::Identifier` (with unicode escape decoding) and
+    /// contextual keywords like `from`, `as`, `satisfies`. Returns `None`
+    /// if the current token is not identifier-like.
+    pub(super) fn try_intern_identifier_or_keyword(&self) -> Option<DefaultSymbol> {
+        match self.current_kind() {
+            TokenKind::Identifier => Some(self.intern_identifier()),
+            TokenKind::Keyword(kw) if kw.can_be_identifier() => Some(self.intern(kw.as_str())),
+            _ => None,
+        }
+    }
+
+    /// Intern the current token as a binding name, accepting contextual keywords.
+    ///
+    /// Like `try_intern_identifier_or_keyword` but uses `can_be_binding_name()`,
+    /// which excludes `await`, `yield`, and `let` (not valid as parameter/variable names).
+    pub(super) fn try_intern_binding_name(&self) -> Option<DefaultSymbol> {
+        match self.current_kind() {
+            TokenKind::Identifier => Some(self.intern_identifier()),
+            TokenKind::Keyword(kw) if kw.can_be_binding_name() => Some(self.intern(kw.as_str())),
+            _ => None,
+        }
+    }
+
+    /// Intern the current token as a module export name, accepting ANY keyword.
+    ///
+    /// ES spec: ModuleExportName is IdentifierName | StringLiteral.
+    /// IdentifierName includes all reserved words (e.g., `export { x as if }`).
+    pub(super) fn try_intern_identifier_name(&self) -> Option<DefaultSymbol> {
+        match self.current_kind() {
+            TokenKind::Identifier => Some(self.intern_identifier()),
+            TokenKind::Keyword(kw) => Some(self.intern(kw.as_str())),
+            _ => None,
+        }
+    }
+
     /// Extract string literal content and quote character from current token.
     ///
     /// Assumes current token is `TokenKind::String`. Returns `(content, quote)` where:
@@ -322,15 +372,6 @@ impl<'a> Parser<'a> {
         ParseError::InvalidSyntax {
             message: format!("Expected {what}"),
             position: self.current_pos().0,
-            context: None,
-        }
-    }
-
-    /// Create an error: "Expected X" at custom position
-    pub(super) fn error_expected_at(&self, what: &str, position: usize) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: format!("Expected {what}"),
-            position,
             context: None,
         }
     }
@@ -469,6 +510,11 @@ impl<'a> Parser<'a> {
         self.peek_kind() == *kind
     }
 
+    /// Get the start position of the peek token (cache must be populated via peek_kind() first)
+    pub(super) fn peek_start(&self) -> usize {
+        self.peek_cache.as_ref().map_or(0, |p| p.start)
+    }
+
     /// Check if peek token could be a property name (identifier, keyword, string, or computed key)
     ///
     /// Used to detect getter/setter syntax where `get` and `set` are contextual keywords:
@@ -601,13 +647,14 @@ impl<'a> Parser<'a> {
         let start = self.current_pos().0;
         self.advance()?; // consume '#'
 
-        // Must be followed by an identifier
-        if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(self.error_expected_after("identifier", "#"));
-        }
-
+        // Must be followed by an identifier (keywords like `async` are valid: `#async`)
         let (_, end) = self.current_pos();
-        let name = self.intern_identifier();
+        let name = match self.try_intern_identifier_or_keyword() {
+            Some(sym) => sym,
+            None => {
+                return Err(self.error_expected_after("identifier", "#"));
+            }
+        };
         self.advance()?;
 
         Ok(PrivateIdentifier {
@@ -823,6 +870,51 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parse a simple parameter: identifier with optional `?`, type annotation, and default value.
+    ///
+    /// Accepts both regular identifiers and contextual keywords (`from`, `as`, etc.).
+    /// Does NOT handle parameter property modifiers (`public`, `private`, `readonly`).
+    fn parse_simple_param(&mut self) -> Result<Expression, ParseError> {
+        let (param_start, param_end) = self.current_pos();
+        let symbol = self
+            .try_intern_binding_name()
+            .ok_or_else(|| self.error_expected("parameter name"))?;
+        self.advance()?;
+
+        // Check for optional marker: param?
+        let optional = self.eat(TokenKind::Question);
+
+        // Check for type annotation: param: type
+        let (type_annotation, id_end) = if self.check(&TokenKind::Colon) {
+            let ta = self.parse_type_annotation()?;
+            let end = ta.span.end;
+            (Some(ta), end as usize)
+        } else {
+            (None, param_end)
+        };
+
+        let mut param = Expression::Identifier(Identifier {
+            name: symbol,
+            optional,
+            type_annotation,
+            decorators: None,
+            span: Span::new(param_start as u32, id_end as u32),
+        });
+
+        // Check for default value: param = default
+        if self.check(&TokenKind::Equals) {
+            self.advance()?; // consume '='
+            let default_value = self.parse_assignment_expression()?;
+            let assign_end = default_value.span().end;
+            param = Expression::AssignmentPattern(AssignmentPattern {
+                left: Box::new(param),
+                right: Box::new(default_value),
+                span: Span::new(param_start as u32, assign_end),
+            });
+        }
+        Ok(param)
+    }
+
     /// Parse a parenthesized parameter list: `(a, b, c)`
     ///
     /// Used by function declarations, method shorthand, and arrow functions.
@@ -849,47 +941,20 @@ impl<'a> Parser<'a> {
                                 span: Span::new(start as u32, end),
                             });
                         }
-                        let decorators_opt = Some(decorators);
-
-                        // After decorators, we must have an identifier parameter
-                        if !matches!(self.current_kind(), TokenKind::Identifier) {
-                            return Err(self.error_expected("parameter name after decorator"));
+                        // After decorators, parse parameter and attach decorators
+                        let mut param = self.parse_simple_param()?;
+                        // Attach decorators to the identifier (possibly inside AssignmentPattern)
+                        match &mut param {
+                            Expression::Identifier(id) => {
+                                id.decorators = Some(decorators);
+                            }
+                            Expression::AssignmentPattern(ap) => {
+                                if let Expression::Identifier(id) = ap.left.as_mut() {
+                                    id.decorators = Some(decorators);
+                                }
+                            }
+                            _ => {}
                         }
-
-                        let param_start = self.current_pos().0;
-                        let symbol = self.intern_identifier();
-                        self.advance()?;
-
-                        let optional = self.eat(TokenKind::Question);
-
-                        let (type_annotation, id_end) = if self.check(&TokenKind::Colon) {
-                            let ta = self.parse_type_annotation()?;
-                            let end = ta.span.end;
-                            (Some(ta), end as usize)
-                        } else {
-                            (None, self.current_pos().0)
-                        };
-
-                        let mut param = Expression::Identifier(Identifier {
-                            name: symbol,
-                            optional,
-                            type_annotation,
-                            decorators: decorators_opt,
-                            span: Span::new(param_start as u32, id_end as u32),
-                        });
-
-                        // Check for default value
-                        if self.check(&TokenKind::Equals) {
-                            self.advance()?;
-                            let default_value = self.parse_assignment_expression()?;
-                            let assign_end = default_value.span().end;
-                            param = Expression::AssignmentPattern(AssignmentPattern {
-                                left: Box::new(param),
-                                right: Box::new(default_value),
-                                span: Span::new(param_start as u32, assign_end),
-                            });
-                        }
-
                         param
                     }
                     TokenKind::Identifier => {
@@ -911,53 +976,8 @@ impl<'a> Parser<'a> {
 
                         // If we have modifiers, this is a parameter property
                         if accessibility.is_some() || readonly {
-                            // Parse the parameter name
-                            let (id_start, id_end) = self.current_pos();
-                            if !matches!(self.current_kind(), TokenKind::Identifier) {
-                                return Err(self
-                                    .error_expected_at("parameter name after modifier", id_start));
-                            }
-                            let symbol = self.intern_identifier();
-                            self.advance()?;
-
-                            // Check for optional marker: param?
-                            let optional = self.eat(TokenKind::Question);
-
-                            // Check for type annotation: param: type
-                            let (type_annotation, end_pos) = if self.check(&TokenKind::Colon) {
-                                let ta = self.parse_type_annotation()?;
-                                let end = ta.span.end;
-                                (Some(ta), end as usize)
-                            } else {
-                                (None, id_end)
-                            };
-
-                            let identifier = Identifier {
-                                name: symbol,
-                                optional,
-                                type_annotation,
-                                decorators: None,
-                                span: Span::new(id_start as u32, end_pos as u32),
-                            };
-
-                            // Check for default value: param = default
-                            let (parameter, param_end): (Expression, u32) =
-                                if self.check(&TokenKind::Equals) {
-                                    self.advance()?;
-                                    let default_value = self.parse_assignment_expression()?;
-                                    let assign_end = default_value.span().end;
-                                    (
-                                        Expression::AssignmentPattern(AssignmentPattern {
-                                            left: Box::new(Expression::Identifier(identifier)),
-                                            right: Box::new(default_value),
-                                            span: Span::new(id_start as u32, assign_end),
-                                        }),
-                                        assign_end,
-                                    )
-                                } else {
-                                    (Expression::Identifier(identifier), end_pos as u32)
-                                };
-
+                            let parameter = self.parse_simple_param()?;
+                            let param_end = parameter.span().end;
                             Expression::TSParameterProperty(TSParameterProperty {
                                 accessibility,
                                 readonly,
@@ -966,83 +986,13 @@ impl<'a> Parser<'a> {
                             })
                         } else {
                             // Simple identifier parameter (no modifiers)
-                            let (param_start, param_end) = self.current_pos();
-                            let symbol = self.intern_identifier();
-                            self.advance()?;
-
-                            // Check for optional marker: param?
-                            let optional = self.eat(TokenKind::Question);
-
-                            // Check for type annotation: param: type
-                            let (type_annotation, id_end) = if self.check(&TokenKind::Colon) {
-                                let ta = self.parse_type_annotation()?;
-                                let end = ta.span.end;
-                                (Some(ta), end as usize)
-                            } else {
-                                (None, param_end)
-                            };
-
-                            let mut param = Expression::Identifier(Identifier {
-                                name: symbol,
-                                optional,
-                                type_annotation,
-                                decorators: None,
-                                span: Span::new(param_start as u32, id_end as u32),
-                            });
-
-                            // Check for default value: param = default
-                            if self.check(&TokenKind::Equals) {
-                                self.advance()?; // consume '='
-                                let default_value = self.parse_assignment_expression()?;
-                                let assign_end = default_value.span().end;
-                                param = Expression::AssignmentPattern(AssignmentPattern {
-                                    left: Box::new(param),
-                                    right: Box::new(default_value),
-                                    span: Span::new(param_start as u32, assign_end),
-                                });
-                            }
-                            param
+                            self.parse_simple_param()?
                         }
                     }
                     // Keywords that can be used as parameter names (contextual keywords like `from`, `async`)
                     // Note: `await`, `yield`, `let` are NOT allowed as parameter names
                     TokenKind::Keyword(kw) if kw.can_be_binding_name() => {
-                        let (param_start, param_end) = self.current_pos();
-                        let symbol = self.intern(kw.as_str());
-                        self.advance()?;
-
-                        // Check for optional marker: param?
-                        let optional = self.eat(TokenKind::Question);
-
-                        // Check for type annotation: param: type
-                        let (type_annotation, id_end) = if self.check(&TokenKind::Colon) {
-                            let ta = self.parse_type_annotation()?;
-                            let end = ta.span.end;
-                            (Some(ta), end as usize)
-                        } else {
-                            (None, param_end)
-                        };
-
-                        let mut param = Expression::Identifier(Identifier {
-                            name: symbol,
-                            optional,
-                            type_annotation,
-                            decorators: None,
-                            span: Span::new(param_start as u32, id_end as u32),
-                        });
-
-                        // Check for default value: param = default
-                        if self.check(&TokenKind::Equals) {
-                            self.advance()?; // consume '='
-                            let default_value = self.parse_assignment_expression()?;
-                            let assign_end = default_value.span().end;
-                            param = Expression::AssignmentPattern(AssignmentPattern {
-                                left: Box::new(param),
-                                right: Box::new(default_value),
-                                span: Span::new(param_start as u32, assign_end),
-                            });
-                        }
-                        param
+                        self.parse_simple_param()?
                     }
                     TokenKind::BracketOpen => {
                         // Array destructuring pattern: [a, b] or [a, b]: Type

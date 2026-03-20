@@ -415,31 +415,6 @@ pub fn build_expression_doc_with_comments(
     printer.build_expression_doc_public(expression)
 }
 
-/// Build a DocId for a TypeScript expression with continuation indent for binary expressions.
-///
-/// When a binary expression breaks, continuation lines are indented relative to the first:
-/// ```text
-/// first &&
-///   second &&
-///   third
-/// ```
-///
-/// This is used in attribute contexts (like Svelte's `={...}`) where prettier uses
-/// this specific indentation style for binary expressions.
-pub fn build_expression_doc_with_continuation_indent(
-    arena: &tsv_lang::doc::arena::DocArena,
-    expression: &Expression,
-    source: &str,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
-    config: &tsv_lang::PrintConfig,
-    comments: &[ast::Comment],
-    line_breaks: &[u32],
-) -> tsv_lang::doc::arena::DocId {
-    let printer =
-        printer::Printer::with_config(arena, interner, source, comments, line_breaks, *config);
-    printer.build_expression_doc_with_continuation_indent_public(expression)
-}
-
 /// Build a DocId for a TypeScript program in the caller's arena.
 ///
 /// Returns a DocId that can be rendered with the arena.

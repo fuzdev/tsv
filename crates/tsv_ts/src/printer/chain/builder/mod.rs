@@ -25,7 +25,9 @@ use helpers::{
 use member_only::build_member_only_chain_doc;
 
 use super::analysis::should_merge_first_groups;
-use super::printing::{ChainPrinter, print_group, print_group_expanded};
+use super::printing::{
+    ChainPrinter, has_inside_bracket_comments, print_group, print_group_expanded,
+};
 use super::types::{ChainGroup, ChainNode};
 use crate::ast::internal::{ArrowFunctionBody, Expression};
 use crate::printer::utils::contains_call_expression;
@@ -160,7 +162,15 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
             _ => false,
         });
 
-    if !has_calls && !first_has_parens {
+    // Member-only chains with inside-bracket comments in computed members need the
+    // conditional_group path (not fill), so the bracket content can break when the
+    // chain expands. Fill can't break inside a computed member's brackets.
+    let has_bracket_comments = groups
+        .iter()
+        .flat_map(|g| g.nodes.iter())
+        .any(|n| has_inside_bracket_comments(n, printer));
+
+    if !has_calls && !first_has_parens && !has_bracket_comments {
         // Member-only chain: use fill for greedy packing
         return build_member_only_chain_doc(groups, printer);
     }
@@ -472,7 +482,13 @@ fn build_member_ending_chain_doc<'a, P: ChainPrinter>(
     let rest_expanded = build_rest_expanded_docs(rest_groups, printer);
     let mut args_expanded_parts = first_docs;
     args_expanded_parts.extend(rest_expanded);
-    let args_expanded_doc = d.concat(&args_expanded_parts);
+    let args_expanded_inner = d.concat(&args_expanded_parts);
+    // Wrap in group_break: when the conditional_group selects this state in Flat
+    // mode, the group forces Break mode during rendering. Without this, hardlines
+    // in the expanded call args create newlines but the mode stays Flat, causing
+    // nested groups (arrow sig groups) to evaluate fits() with Flat-mode rest
+    // commands — body line() = space, not newline — breaking the signature.
+    let args_expanded_doc = d.group_break(args_expanded_inner);
 
     // When the arg will break internally, directly use args_expanded_doc
     if rest_has_breaking_arg {
@@ -533,5 +549,8 @@ fn build_breaking_object_chain_doc<'a, P: ChainPrinter>(
 
     let mut all_parts = first_docs;
     all_parts.extend(rest_docs);
-    Some(d.concat(&all_parts))
+    // Wrap in group_break for same reason as build_member_ending_chain_doc:
+    // conditional_group may select this in Flat mode, but nested groups need
+    // Break mode for correct fits() evaluation.
+    Some(d.group_break(d.concat(&all_parts)))
 }

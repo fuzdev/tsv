@@ -9,6 +9,54 @@ use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;
 
+/// Find the position of the LAST top-level ` as ` keyword in a string.
+///
+/// "Top-level" means not inside `()`, `[]`, `{}`, or `<>` brackets, and not inside string
+/// literals. Returns the byte offset of the space before `as`, or None if not found.
+///
+/// Used to detect TypeScript type assertions in `{#each}` expressions:
+/// `{#each items as A[] as item}` → binding_str is `A[] as item`, this finds ` as ` after `A[]`.
+fn find_last_top_level_as(s: &str) -> Option<usize> {
+    let bytes = s.as_bytes();
+    let len = bytes.len();
+    let mut depth: i32 = 0;
+    let mut last_pos = None;
+    let mut i = 0;
+
+    while i < len {
+        match bytes[i] {
+            b'(' | b'[' | b'{' | b'<' => depth += 1,
+            b')' | b']' | b'}' | b'>' => {
+                if depth > 0 {
+                    depth -= 1;
+                }
+            }
+            b'\'' | b'"' | b'`' => {
+                let quote = bytes[i];
+                i += 1;
+                while i < len && bytes[i] != quote {
+                    if bytes[i] == b'\\' {
+                        i += 1;
+                    }
+                    i += 1;
+                }
+            }
+            b' ' if depth == 0 && i + 3 <= len => {
+                // Check for " as " or " as" at end of string
+                if bytes[i + 1] == b'a'
+                    && bytes[i + 2] == b's'
+                    && (i + 3 == len || bytes[i + 3] == b' ')
+                {
+                    last_pos = Some(i);
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    last_pos
+}
+
 /// Return type for parse_each_binding: (context, index, key_expr, key_span)
 type EachBindingResult = (
     tsv_ts::Expression,
@@ -210,15 +258,36 @@ impl<'a> SvelteParser<'a> {
         let after_expr = &content[expr_consumed..];
 
         // Try to strip " as " to get binding (with context pattern)
-        let (context, index, key, key_span) = if let Some(binding_str) = after_expr
+        let (expression, context, index, key, key_span) = if let Some(binding_str) = after_expr
             .strip_prefix(" as ")
             .or_else(|| after_expr.trim_start().strip_prefix("as "))
         {
-            // Has `as` clause: parse context pattern, index, and key
             let as_len = after_expr.len() - binding_str.len();
             let binding_offset = content_offset + expr_consumed + as_len;
-            let (ctx, idx, k, k_span) = self.parse_each_binding(binding_str, binding_offset)?;
-            (Some(ctx), idx, k, k_span)
+
+            // Check if binding_str contains another top-level `as` keyword.
+            // If so, the first `as` was a TypeScript type assertion (e.g., `items as A[] as item`),
+            // not the Svelte binding separator. Find the LAST top-level `as` to split correctly,
+            // handling chained assertions like `items as A as B[] as item`.
+            if let Some(last_as_pos) = find_last_top_level_as(binding_str) {
+                // Re-parse: expression extends through all type assertions
+                let full_expr_end = expr_consumed + as_len + last_as_pos;
+                let full_expr_str = &content[..full_expr_end];
+                let expr_offset = content_offset + (content.len() - content.trim_start().len());
+                let expression = self.parse_ts_expression(full_expr_str.trim(), expr_offset)?;
+
+                // Real binding starts after the last " as " (4 bytes: space-a-s-space)
+                let real_binding_start = last_as_pos + " as ".len();
+                let real_binding = &binding_str[real_binding_start..];
+                let real_binding_offset = binding_offset + real_binding_start;
+                let (ctx, idx, k, k_span) =
+                    self.parse_each_binding(real_binding, real_binding_offset)?;
+                (expression, Some(ctx), idx, k, k_span)
+            } else {
+                // Normal case: first `as` is the Svelte binding separator
+                let (ctx, idx, k, k_span) = self.parse_each_binding(binding_str, binding_offset)?;
+                (expression, Some(ctx), idx, k, k_span)
+            }
         } else {
             // No `as` clause: {#each expr} or {#each expr, index}
             // Check for ", index" syntax
@@ -226,10 +295,10 @@ impl<'a> SvelteParser<'a> {
             if let Some(rest) = trimmed.strip_prefix(',') {
                 // {#each expr, index} - just index, no context
                 let index_str = rest.trim().to_string();
-                (None, Some(index_str), None, None)
+                (expression, None, Some(index_str), None, None)
             } else {
                 // {#each expr} - no context, no index
-                (None, None, None, None)
+                (expression, None, None, None, None)
             }
         };
 

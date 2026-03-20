@@ -39,3 +39,4 @@ mod types;
 pub use analysis::{SymbolLookup, group_chain_nodes, linearize_chain};
 pub use builder::build_chain_doc;
 pub use printing::ChainPrinter;
+pub use types::ChainNode;

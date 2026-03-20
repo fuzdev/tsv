@@ -10,15 +10,29 @@ use super::super::utils::{
 };
 use super::super::{Printer, has_newline_before_position, is_multiline_template_expression};
 use super::arg_comments::{
-    PartitionedComments, any_comment_forces_expansion, find_comma_pos, has_inter_argument_comments,
-    has_trailing_comments_on_args, is_comment_after_comma, is_comment_before_comma,
+    PartitionedComments, any_comment_forces_expansion, find_comma_pos, first_arg_has_any_comments,
+    has_blank_line_between_args, has_inter_argument_comments, has_trailing_comments_on_args,
+    is_comment_after_comma, is_comment_before_comma, is_comment_inline_with_next,
+    last_arg_has_comments,
 };
 use super::arg_wrapping::{
-    ChainArgKind, arrow_has_type_annotations, build_args_split_last, build_arrow_inline_signature,
-    build_chain_expand_all_args, classify_chain_arg, wrap_args_with_soft_breaks, wrap_huggable_arg,
+    ChainArgKind, arrow_has_type_annotations, arrow_has_type_reference_return,
+    build_args_split_last, build_arrow_inline_signature, build_arrow_sig_doc,
+    build_break_body_state, build_chain_expand_all_args, classify_chain_arg,
+    last_two_args_same_type, prepend_arrow_body_comments, wrap_args_with_soft_breaks,
+    wrap_huggable_arg,
 };
 use crate::ast::internal::{self, Expression};
-use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::arena::{DocArena, DocId};
+
+/// Prepend optional leading comments to a doc.
+#[inline]
+fn prepend_leading(d: &DocArena, leading: Option<DocId>, doc: DocId) -> DocId {
+    match leading {
+        Some(lc) => d.concat(&[lc, doc]),
+        None => doc,
+    }
+}
 
 /// Get type arguments for a call expression, checking both the call itself
 /// and a TSInstantiationExpression callee.
@@ -60,9 +74,9 @@ fn build_inline_leading_comments(
         parts.push(d.text(" "));
     }
 
-    // Block comments on same line as first arg
+    // Block comments effectively inline with first arg
     for comment in &pc.leading {
-        if comment.is_block && printer.is_same_line(comment.span.start, arg_start) {
+        if comment.is_block && is_comment_inline_with_next(printer, comment.span.end, arg_start) {
             parts.push(printer.build_comment_doc(comment));
             parts.push(d.text(" "));
         }
@@ -76,6 +90,9 @@ fn build_inline_leading_comments(
 }
 
 /// Build inline trailing block comments for an argument (non-expansion path).
+///
+/// Used for the last arg (comments before closing paren) and single-arg paths
+/// where there's no comma to split around.
 fn build_inline_trailing_comments(
     printer: &Printer,
     arg_end: u32,
@@ -101,6 +118,62 @@ fn build_inline_trailing_comments(
     Some(d.concat(&parts))
 }
 
+/// Build inline block comments AFTER the comma as leading on the next arg.
+///
+/// For `fn(a, /** @type {T} */ b)`, the comment is after the comma and should
+/// be emitted as `/** @type {T} */ ` before `b`, not as trailing on `a`.
+fn build_after_comma_leading_comments(
+    printer: &Printer,
+    prev_arg_end: u32,
+    arg_start: u32,
+) -> Option<DocId> {
+    let d = printer.d();
+    let comma_pos = find_comma_pos(printer.source, prev_arg_end, arg_start)?;
+    let mut parts = Vec::new();
+    for comment in tsv_lang::comments_in_range(printer.comments, prev_arg_end, arg_start) {
+        if is_comment_after_comma(comment, comma_pos)
+            && comment.is_block
+            && is_comment_inline_with_next(printer, comment.span.end, arg_start)
+        {
+            parts.push(printer.build_comment_doc(comment));
+            parts.push(d.text(" "));
+        }
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(d.concat(&parts))
+    }
+}
+
+/// Build inline block comments BEFORE the comma as trailing on the current arg.
+///
+/// For `fn(a /* comment */, b)`, the comment is before the comma and should
+/// be emitted as ` /* comment */` after `a`.
+fn build_before_comma_trailing_comments(
+    printer: &Printer,
+    arg_end: u32,
+    next_arg_start: u32,
+) -> Option<DocId> {
+    let d = printer.d();
+    let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start)?;
+    let mut parts = Vec::new();
+    for comment in tsv_lang::comments_in_range(printer.comments, arg_end, next_arg_start) {
+        if is_comment_before_comma(comment, comma_pos)
+            && comment.is_block
+            && printer.is_same_line(arg_end, comment.span.start)
+        {
+            parts.push(d.text(" "));
+            parts.push(printer.build_comment_doc(comment));
+        }
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(d.concat(&parts))
+    }
+}
+
 /// Build a Doc for call arguments only (for chain printing)
 ///
 /// Uses proper group wrapping so args can break independently from the chain.
@@ -123,11 +196,11 @@ pub(super) fn build_call_args_doc_for_chain(
 /// the chain forces expansion, matching prettier's behavior.
 /// Array bodies are excluded — they use the self-expanding layout `(sig => [\n items\n])`.
 fn is_single_arrow_with_breakable_body(arg: &Expression) -> bool {
-    if let Expression::ArrowFunctionExpression(arrow) = arg {
-        if let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
-            return matches!(&**body_expr, Expression::CallExpression(_))
-                || could_expand_arrow_body(body_expr);
-        }
+    if let Expression::ArrowFunctionExpression(arrow) = arg
+        && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+    {
+        return matches!(&**body_expr, Expression::CallExpression(_))
+            || could_expand_arrow_body(body_expr);
     }
     false
 }
@@ -156,10 +229,14 @@ fn build_call_args_doc_for_chain_impl(
     let type_args_doc = type_args.map(|ta| printer.build_type_parameter_instantiation_doc(ta));
 
     // Check for blank lines between arguments (forces expansion)
+    // Uses has_blank_line_between_args to skip stripped grouping paren span gaps.
     let has_blank_lines = call.arguments.windows(2).any(|window| {
-        let prev_end = window[0].span().end;
-        let curr_start = window[1].span().start;
-        printer.has_blank_line_between(prev_end, curr_start)
+        has_blank_line_between_args(
+            printer.source,
+            printer.line_breaks,
+            window[0].span().end,
+            window[1].span().start,
+        )
     });
 
     // Multiple arrow function arguments: always expand to multiple lines
@@ -190,6 +267,14 @@ fn build_call_args_doc_for_chain_impl(
         || has_inter_arg_comments
         || has_trailing_comments
         || has_trailing_block_comments;
+
+    // Build leading comment doc once for reuse in single-arg arrow paths
+    // (e.g., /** @param {any} x */ before arrow function parameters)
+    let leading_comment_doc = if has_leading_comments && !call.arguments.is_empty() {
+        build_inline_leading_comments(printer, paren_open, call.arguments[0].span().start)
+    } else {
+        None
+    };
 
     // Check if any comments require expansion (line comments or block comments on own line)
     // Inline block comments don't force expansion
@@ -259,41 +344,41 @@ fn build_call_args_doc_for_chain_impl(
 
         // Special case: single arrow arg with array body — the array expands internally.
         // Layout: `(sig => [\n  items,\n])` — array content on new lines, bracket hugged.
-        if call.arguments.len() == 1 {
-            if let Expression::ArrowFunctionExpression(arrow) = &call.arguments[0]
-                && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-                && matches!(&**body_expr, Expression::ArrayExpression(_))
-            {
-                let body_doc = printer.build_arg_expression_doc_expanded(body_expr);
-                let sig_doc = if arrow_has_type_annotations(arrow) {
-                    d.group(printer.build_arrow_signature_doc(arrow))
-                } else {
-                    build_arrow_inline_signature(printer, arrow)
-                };
+        if call.arguments.len() == 1
+            && let Expression::ArrowFunctionExpression(arrow) = &call.arguments[0]
+            && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+            && matches!(&**body_expr, Expression::ArrayExpression(_))
+        {
+            let body_doc = printer.build_arg_expression_doc_expanded(body_expr);
+            let body_doc =
+                prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
+            let sig_doc = build_arrow_sig_doc(printer, arrow);
+            let sig_doc = prepend_leading(d, leading_comment_doc, sig_doc);
 
-                parts.push(d.text(prefix));
-                parts.push(sig_doc);
-                parts.push(d.text(" => "));
-                parts.push(body_doc);
-                parts.push(d.text(")"));
-                return d.concat(&parts);
-            }
+            parts.push(d.text(prefix));
+            parts.push(sig_doc);
+            parts.push(d.text(" => "));
+            parts.push(body_doc);
+            parts.push(d.text(")"));
+            return d.concat(&parts);
         }
 
         // Special case: single arrow arg with breakable body (call, ternary).
         // Use the arrow-hugging break state directly: `(sig =>\n  body,\n)`
         // This matches prettier which keeps the signature hugged even when forcing expansion.
+        // Arrows with TSTypeReference return types fall through — prettier's couldExpandArg
+        // returns false for them, so they use default wrapping.
         if call.arguments.len() == 1 && is_single_arrow_with_breakable_body(&call.arguments[0]) {
             let arg = &call.arguments[0];
             if let Expression::ArrowFunctionExpression(arrow) = arg
                 && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+                && !arrow_has_type_reference_return(arrow)
             {
                 let body_doc = printer.build_expression_doc(body_expr);
-                let sig_doc = if arrow_has_type_annotations(arrow) {
-                    d.group(printer.build_arrow_signature_doc(arrow))
-                } else {
-                    build_arrow_inline_signature(printer, arrow)
-                };
+                let body_doc =
+                    prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
+                let sig_doc = build_arrow_sig_doc(printer, arrow);
+                let sig_doc = prepend_leading(d, leading_comment_doc, sig_doc);
 
                 parts.push(d.text(prefix));
                 parts.push(sig_doc);
@@ -326,7 +411,9 @@ fn build_call_args_doc_for_chain_impl(
                 // - Block comments on same line as first arg: emit inline
                 // - Other comments: emit on own line
                 for comment in &first_pc.leading {
-                    if comment.is_block && printer.is_same_line(comment.span.start, arg_start) {
+                    if comment.is_block
+                        && is_comment_inline_with_next(printer, comment.span.end, arg_start)
+                    {
                         // Inline with first arg
                         arg_parts.push(printer.build_comment_doc(comment));
                         arg_parts.push(d.text(" "));
@@ -350,11 +437,18 @@ fn build_call_args_doc_for_chain_impl(
 
             // Check for blank line before this arg (from previous arg)
             // Only add blank line preservation when there are no comments between args,
-            // since comments will be emitted with their own line breaks
+            // since comments will be emitted with their own line breaks.
             if i > 0 {
                 let prev_end = call.arguments[i - 1].span().end;
                 let has_comments_before = printer.has_comments_between(prev_end, arg_start);
-                if !has_comments_before && printer.has_blank_line_between(prev_end, arg_start) {
+                if !has_comments_before
+                    && has_blank_line_between_args(
+                        printer.source,
+                        printer.line_breaks,
+                        prev_end,
+                        arg_start,
+                    )
+                {
                     arg_parts.push(d.literalline());
                     arg_parts.push(d.hardline());
                 }
@@ -415,7 +509,12 @@ fn build_call_args_doc_for_chain_impl(
                 let has_comments_before_next =
                     printer.has_comments_between(arg_end, next_arg_start);
                 let next_has_blank = !has_comments_before_next
-                    && printer.has_blank_line_between(arg_end, next_arg_start);
+                    && has_blank_line_between_args(
+                        printer.source,
+                        printer.line_breaks,
+                        arg_end,
+                        next_arg_start,
+                    );
                 if !next_has_blank {
                     arg_parts.push(d.hardline());
                 }
@@ -449,76 +548,21 @@ fn build_call_args_doc_for_chain_impl(
             // Prettier keeps `(sig =>` hugged, breaking after `=>` to the body.
             // Structure: `(sig =>\n  body,\n)` instead of `(\n  sig =>\n    body,\n)`
             //
-            // EXCEPTION: Typed arrows with complex call bodies (objects, non-empty arrays) expand
-            // the call arguments, putting signature on its own line:
-            // Structure: `(\n  sig =>\n    body,\n)`
+            // Arrows with TSTypeReference return types (e.g., `: Promise<any>`) are NOT
+            // expandable per prettier's couldExpandArg, so they fall through to default
+            // wrapping via classify_chain_arg.
             if let Expression::ArrowFunctionExpression(arrow) = arg
                 && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
                 && matches!(&**body_expr, Expression::CallExpression(_))
+                && !arrow_has_type_reference_return(arrow)
             {
-                let has_typed_annotations = arrow_has_type_annotations(arrow);
-
-                // Check if body call has complex arguments (objects, non-empty arrays, block functions)
-                let is_complex_call_body =
-                    if let Expression::CallExpression(nested_call) = &**body_expr {
-                        nested_call.arguments.iter().any(|arg| match arg {
-                            Expression::ArrowFunctionExpression(arr) => {
-                                matches!(arr.body, internal::ArrowFunctionBody::BlockStatement(_))
-                            }
-                            Expression::ObjectExpression(obj) => !obj.properties.is_empty(),
-                            Expression::ArrayExpression(arr) => !arr.elements.is_empty(),
-                            Expression::FunctionExpression(_) => true,
-                            _ => false,
-                        })
-                    } else {
-                        false
-                    };
-
-                // Typed arrow with complex call body: force full expansion
-                // Structure: `(\n  sig =>\n    body,\n)`
-                if has_typed_annotations && is_complex_call_body {
-                    let arrow_doc = printer.build_arg_expression_doc(arg);
-                    let body_doc = printer.build_expression_doc(body_expr);
-                    let sig_doc = d.group(printer.build_arrow_signature_doc(arrow));
-
-                    // Expanded state with signature on its own line
-                    let expanded_state = d.concat(&[
-                        d.text(prefix),
-                        d.indent(d.concat(&[
-                            d.hardline(),
-                            sig_doc,
-                            d.text(" =>"),
-                            d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
-                        ])),
-                        d.hardline(),
-                        d.text(")"),
-                    ]);
-
-                    // If body will break, use expanded directly
-                    if d.will_break(body_doc) {
-                        parts.push(expanded_state);
-                    } else {
-                        parts.push(d.conditional_group(&[
-                            // Flat: (arrow)
-                            d.concat(&[d.text(prefix), arrow_doc, d.text(")")]),
-                            // Expanded: (\n  sig =>\n    body,\n)
-                            expanded_state,
-                        ]));
-                    }
-                    return d.concat(&parts);
-                }
-
-                // Untyped arrow or typed without complex body: use hugged pattern
                 let arrow_doc = printer.build_arg_expression_doc(arg);
+                let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
                 let body_doc = printer.build_expression_doc(body_expr);
-
-                // For typed arrows, use full signature; for untyped, use inline signature
-                // Wrap in group so the signature stays flat even when the outer group breaks
-                let sig_doc = if has_typed_annotations {
-                    d.group(printer.build_arrow_signature_doc(arrow))
-                } else {
-                    build_arrow_inline_signature(printer, arrow)
-                };
+                let body_doc =
+                    prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
+                let sig_doc = build_arrow_sig_doc(printer, arrow);
+                let sig_doc = prepend_leading(d, leading_comment_doc, sig_doc);
 
                 // State 1: sig hugged, body indented — (sig =>\n  body,\n)
                 let break_state = d.concat(&[
@@ -562,13 +606,20 @@ fn build_call_args_doc_for_chain_impl(
             // Prettier uses conditional parens:
             // - Flat: `map((x) => (x ? y : z))` - with parens
             // - Break: `map((x) =>\n  x ? y : z,)` - no parens, body indented
+            // Arrows with TSTypeReference return types are NOT expandable
+            // (prettier's couldExpandArg returns false), so they fall through.
             if let Expression::ArrowFunctionExpression(arrow) = arg
                 && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
                 && could_expand_arrow_body(body_expr)
+                && !arrow_has_type_reference_return(arrow)
             {
                 let arrow_doc = printer.build_arg_expression_doc(arg);
+                let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
                 let body_doc = printer.build_expression_doc(body_expr);
-                let sig_doc = d.group(printer.build_arrow_signature_doc(arrow));
+                let body_doc =
+                    prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
+                let sig_doc = build_arrow_sig_doc(printer, arrow);
+                let sig_doc = prepend_leading(d, leading_comment_doc, sig_doc);
 
                 // State 0: Flat - with parens around ternary
                 let state_flat = d.concat(&[
@@ -646,7 +697,8 @@ fn build_call_args_doc_for_chain_impl(
                 if let Expression::ArrowFunctionExpression(arrow) = arg
                     && !arrow.body.is_expression()
                 {
-                    arrow_has_trailing_param_comments(arrow, |start, end| {
+                    let arrow_token = printer.find_arrow_token_for(arrow);
+                    arrow_has_trailing_param_comments(arrow, arrow_token, |start, end| {
                         printer.has_comments_between(start, end)
                     })
                 } else {
@@ -690,19 +742,27 @@ fn build_call_args_doc_for_chain_impl(
             // recurses into the block body's hardlines and forces break without trying
             // fits(). conditional_group uses fits() directly, correctly measuring whether
             // the hugged first line (e.g., `fn((params) => {`) fits.
+            //
+            // Exception: when the arg has leading comments, force expansion.
+            // Prettier's shouldExpandLastArg returns false for args with leading comments,
+            // and the default path forces expansion via shouldBreak: printedArguments.some(willBreak).
             if let Expression::ArrowFunctionExpression(arrow) = arg
                 && matches!(arrow.body, internal::ArrowFunctionBody::BlockStatement(_))
             {
-                // State 0: Hug - fn((params) => { body })
-                let state_hug = d.concat(&[d.text(prefix), arg_with_comments, d.text(")")]);
-                // State 1: Expand - fn(\n  (params) => {\n    body\n  },\n)
                 let state_expand = d.concat(&[
                     d.text(prefix),
                     d.indent(d.concat(&[d.hardline(), arg_with_comments, d.trailing_comma()])),
                     d.hardline(),
                     d.text(")"),
                 ]);
-                parts.push(d.conditional_group(&[state_hug, state_expand]));
+                if has_leading_comments {
+                    // Leading comments prevent hugging — force expansion
+                    parts.push(state_expand);
+                } else {
+                    // No leading comments — try hug first, then expand
+                    let state_hug = d.concat(&[d.text(prefix), arg_with_comments, d.text(")")]);
+                    parts.push(d.conditional_group(&[state_hug, state_expand]));
+                }
                 return d.concat(&parts);
             }
 
@@ -737,9 +797,10 @@ fn build_call_args_doc_for_chain_impl(
             && call.arguments.last().is_some_and(is_block_function)
             && preceding_args_allow_expand_last(&call.arguments, printer.line_breaks)
             && !comments_force_expansion
+            && !last_arg_has_comments(&call.arguments, printer, call.span.end)
         {
             let (head_parts, last_arg_doc, all_args_broken) =
-                build_args_split_last(&call.arguments, printer);
+                build_args_split_last(&call.arguments, printer, paren_open);
 
             // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
             if head_parts.iter().any(|&id| d.will_break(id)) {
@@ -765,6 +826,7 @@ fn build_call_args_doc_for_chain_impl(
         if call.arguments.len() >= 2
             && preceding_args_allow_expand_last(&call.arguments, printer.line_breaks)
             && !comments_force_expansion
+            && !last_arg_has_comments(&call.arguments, printer, call.span.end)
             && let Some(Expression::ArrowFunctionExpression(arrow)) = call.arguments.last()
             && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
             && matches!(
@@ -774,7 +836,7 @@ fn build_call_args_doc_for_chain_impl(
             && !arrow_has_type_annotations(arrow)
         {
             let (head_parts, last_arg_doc, all_args_broken) =
-                build_args_split_last(&call.arguments, printer);
+                build_args_split_last(&call.arguments, printer, paren_open);
 
             // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
             if head_parts.iter().any(|&id| d.will_break(id)) {
@@ -784,17 +846,13 @@ fn build_call_args_doc_for_chain_impl(
 
             let inline_sig = build_arrow_inline_signature(printer, arrow);
             let body_doc = printer.build_expression_doc(body_expr);
+            let body_doc =
+                prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
 
             // State 1: hug - head inline, arrow body breaks after =>
-            let state_break_body = d.concat(&[
-                d.text(prefix),
-                d.concat(&head_parts),
-                inline_sig,
-                d.text(" =>"),
-                d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
-                d.hardline(),
-                d.text(")"),
-            ]);
+            let prefix_doc = d.text(prefix);
+            let state_break_body =
+                build_break_body_state(d, prefix_doc, &head_parts, inline_sig, body_doc);
 
             // State 2: expand all args
             let state_expand_all = build_chain_expand_all_args(d, prefix, all_args_broken);
@@ -825,6 +883,7 @@ fn build_call_args_doc_for_chain_impl(
         if call.arguments.len() >= 2
             && preceding_args_allow_expand_last(&call.arguments, printer.line_breaks)
             && !comments_force_expansion
+            && !last_arg_has_comments(&call.arguments, printer, call.span.end)
             && let Some(Expression::ArrowFunctionExpression(arrow)) = call.arguments.last()
             && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
             && matches!(
@@ -834,7 +893,7 @@ fn build_call_args_doc_for_chain_impl(
             && !arrow_has_type_annotations(arrow)
         {
             let (head_parts, last_arg_doc, all_args_broken) =
-                build_args_split_last(&call.arguments, printer);
+                build_args_split_last(&call.arguments, printer, paren_open);
 
             // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
             if head_parts.iter().any(|&id| d.will_break(id)) {
@@ -845,6 +904,8 @@ fn build_call_args_doc_for_chain_impl(
             let inline_sig = build_arrow_inline_signature(printer, arrow);
             // Object/array in arrow body needs parens: (x) => ({ ... })
             let body_doc = d.parens(printer.build_expression_doc(body_expr));
+            let body_doc =
+                prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
 
             // State 0: all inline
             let state_inline = d.concat(&[
@@ -879,6 +940,18 @@ fn build_call_args_doc_for_chain_impl(
         if call.arguments.len() == 2
             && is_block_function(&call.arguments[0])
             && !comments_force_expansion
+            && !first_arg_has_any_comments(&call.arguments, printer, paren_open)
+            // Prettier's shouldExpandFirstArg checks !couldExpandArg(secondArg).
+            // couldExpandArg returns true for objects/arrays when hasComment(node) is true,
+            // which includes leading comments. Block expand-first when the second arg is
+            // an object/array with leading comments — those become expandable.
+            && !(matches!(
+                &call.arguments[1],
+                Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
+            ) && printer.has_comments_between(
+                call.arguments[0].span().end,
+                call.arguments[1].span().start,
+            ))
             && is_short_second_arg_for_expand_first(&call.arguments[1], |start, end| {
                 printer.has_comments_between(start, end)
             })
@@ -887,16 +960,27 @@ fn build_call_args_doc_for_chain_impl(
             let first_arg_doc = printer.build_arg_expression_doc(&call.arguments[0]);
             let second_arg_doc = printer.build_arg_expression_doc(&call.arguments[1]);
 
+            // Inter-arg comment handling (e.g., `a.b((x) => { ... }, /** @type {T} */ c)`)
+            let first_end = call.arguments[0].span().end;
+            let second_start = call.arguments[1].span().start;
+            let inter_leading =
+                build_after_comma_leading_comments(printer, first_end, second_start);
+            let inter_trailing =
+                build_before_comma_trailing_comments(printer, first_end, second_start);
+
             // Prettier: if (tailArgs.some(willBreak)) return allArgsBrokenOut()
             if d.will_break(second_arg_doc) {
-                let all_args = d.join_doc(
-                    call.arguments
-                        .iter()
-                        .map(|arg| printer.build_arg_expression_doc(arg)),
-                    d.comma_hardline(),
-                );
+                let mut all_parts = vec![first_arg_doc];
+                if let Some(t) = inter_trailing {
+                    all_parts.push(t);
+                }
+                all_parts.push(d.comma_hardline());
+                if let Some(l) = inter_leading {
+                    all_parts.push(l);
+                }
+                all_parts.push(second_arg_doc);
                 parts.push(d.text(prefix));
-                parts.push(d.indent(d.concat(&[d.hardline(), all_args, d.text(",")])));
+                parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&all_parts), d.text(",")])));
                 parts.push(d.hardline());
                 parts.push(d.text(")"));
                 return d.concat(&parts);
@@ -904,7 +988,13 @@ fn build_call_args_doc_for_chain_impl(
 
             parts.push(d.text(prefix));
             parts.push(first_arg_doc);
+            if let Some(t) = inter_trailing {
+                parts.push(t);
+            }
             parts.push(d.text(", "));
+            if let Some(l) = inter_leading {
+                parts.push(l);
+            }
             parts.push(second_arg_doc);
             parts.push(d.text(")"));
             return d.concat(&parts);
@@ -921,6 +1011,7 @@ fn build_call_args_doc_for_chain_impl(
             && !call.arguments.last().is_some_and(is_concise_numeric_array)
             && preceding_args_allow_expand_last(&call.arguments, printer.line_breaks)
             && !comments_force_expansion
+            && !last_arg_has_comments(&call.arguments, printer, call.span.end)
             // Prettier blocks expand-last for 2-arg arrow+array (React hook pattern)
             && !(call.arguments.len() == 2
                 && matches!(
@@ -931,97 +1022,85 @@ fn build_call_args_doc_for_chain_impl(
                     call.arguments.last(),
                     Some(Expression::ArrayExpression(_))
                 ))
+            && !last_two_args_same_type(&call.arguments)
         {
-            // Check if last two args have the same "expandable" type (both arrays or both objects)
-            // Prettier disables expand-last-arg in this case
-            let last_two_same_type = {
-                let last = &call.arguments[call.arguments.len() - 1];
-                let penultimate = &call.arguments[call.arguments.len() - 2];
-                matches!(
-                    (last, penultimate),
-                    (
-                        Expression::ArrayExpression(_),
-                        Expression::ArrayExpression(_)
-                    ) | (
-                        Expression::ObjectExpression(_),
-                        Expression::ObjectExpression(_)
-                    )
-                )
-            };
+            let (head_parts, last_arg_doc, all_args_broken) =
+                build_args_split_last(&call.arguments, printer, paren_open);
 
-            if !last_two_same_type {
-                let (head_parts, last_arg_doc, all_args_broken) =
-                    build_args_split_last(&call.arguments, printer);
-
-                // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
-                if head_parts.iter().any(|&id| d.will_break(id)) {
-                    parts.push(build_chain_expand_all_args(d, prefix, all_args_broken));
-                    return d.concat(&parts);
-                }
-
-                // State 0: inline - all args on one line
-                let state_inline = d.concat(&[
-                    d.text(prefix),
-                    d.concat(&head_parts),
-                    last_arg_doc,
-                    d.text(")"),
-                ]);
-
-                // State 1: hug - head inline, last expands with group_break
-                // group_break forces the array/object to break internally
-                let state_hug = d.concat(&[
-                    d.text(prefix),
-                    d.concat(&head_parts),
-                    d.group_break(last_arg_doc),
-                    d.text(")"),
-                ]);
-
-                // State 2: expand all - all args on separate lines
-                let state_expand_all = build_chain_expand_all_args(d, prefix, all_args_broken);
-
-                parts.push(d.conditional_group(&[state_inline, state_hug, state_expand_all]));
+            // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
+            if head_parts.iter().any(|&id| d.will_break(id)) {
+                parts.push(build_chain_expand_all_args(d, prefix, all_args_broken));
                 return d.concat(&parts);
             }
+
+            // State 0: inline - all args on one line
+            let state_inline = d.concat(&[
+                d.text(prefix),
+                d.concat(&head_parts),
+                last_arg_doc,
+                d.text(")"),
+            ]);
+
+            // State 1: hug - head inline, last expands with group_break
+            // group_break forces the array/object to break internally
+            let state_hug = d.concat(&[
+                d.text(prefix),
+                d.concat(&head_parts),
+                d.group_break(last_arg_doc),
+                d.text(")"),
+            ]);
+
+            // State 2: expand all - all args on separate lines
+            let state_expand_all = build_chain_expand_all_args(d, prefix, all_args_broken);
+
+            parts.push(d.conditional_group(&[state_inline, state_hug, state_expand_all]));
+            return d.concat(&parts);
         }
 
         // Multiple arguments: wrap in group with softlines so they can break
-        // Include inline block comments if present
+        // Comments are placed relative to commas: before-comma → trailing on current arg,
+        // after-comma → leading on next arg.
         let mut arg_docs_with_comments = Vec::new();
         for (i, arg) in call.arguments.iter().enumerate() {
             let arg_doc = printer.build_arg_expression_doc(arg);
             let arg_start = arg.span().start;
             let arg_end = arg.span().end;
+            let is_first = i == 0;
+            let is_last = i == call.arguments.len() - 1;
 
-            // For first arg, check for leading inline block comments
-            let with_leading = if i == 0 && has_leading_comments {
-                if let Some(leading) = build_inline_leading_comments(printer, paren_open, arg_start)
-                {
-                    d.concat(&[leading, arg_doc])
-                } else {
-                    arg_doc
-                }
+            // Leading inline block comments
+            let leading = if !has_any_comments {
+                None
+            } else if is_first {
+                build_inline_leading_comments(printer, paren_open, arg_start)
             } else {
-                arg_doc
+                build_after_comma_leading_comments(
+                    printer,
+                    call.arguments[i - 1].span().end,
+                    arg_start,
+                )
             };
 
-            // Check for trailing block comments
-            let next_boundary = if i < call.arguments.len() - 1 {
-                call.arguments[i + 1].span().start
+            // Trailing inline block comments
+            let trailing = if !has_any_comments {
+                None
+            } else if is_last {
+                build_inline_trailing_comments(printer, arg_end, call.span.end)
             } else {
-                call.span.end
+                build_before_comma_trailing_comments(
+                    printer,
+                    arg_end,
+                    call.arguments[i + 1].span().start,
+                )
             };
 
-            if has_any_comments {
-                if let Some(trailing) =
-                    build_inline_trailing_comments(printer, arg_end, next_boundary)
-                {
-                    arg_docs_with_comments.push(d.concat(&[with_leading, trailing]));
-                } else {
-                    arg_docs_with_comments.push(with_leading);
-                }
-            } else {
-                arg_docs_with_comments.push(with_leading);
-            }
+            let doc = match (leading, trailing) {
+                (Some(l), Some(t)) => d.concat(&[l, arg_doc, t]),
+                (Some(l), None) => d.concat(&[l, arg_doc]),
+                (None, Some(t)) => d.concat(&[arg_doc, t]),
+                (None, None) => arg_doc,
+            };
+            arg_docs_with_comments.push(doc);
         }
         let arg_parts = d.join_doc(arg_docs_with_comments, d.comma_line());
         parts.push(wrap_args_with_soft_breaks(d, prefix, arg_parts));

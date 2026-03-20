@@ -531,22 +531,36 @@ impl<'a> Printer<'a> {
                 .type_annotation
                 .as_ref()
                 .map_or_else(|| prop.key.span().end, |ta| ta.span.end);
-            let has_comments = self
-                .build_inline_comments_between_doc_trailing_space_opt(
+            let has_line_comment = self.has_line_comments_between(before_value, value.span().start);
+            let rhs_comments = if has_line_comment {
+                // Line comments: build without trailing hardline — we add indent([hardline, ...])
+                self.build_inline_comments_between_doc_no_leading_space_opt(
                     before_value,
                     value.span().start,
-                );
+                )
+            } else {
+                self.build_rhs_comments_opt(before_value, value.span().start)
+            };
 
-            if let Some(comments) = has_comments {
-                // Comments between = and value: use direct layout to preserve them
+            if let Some(comments) = rhs_comments {
+                // Comments between = and value: inline the comment, indent the expression.
                 parts.push(d.text(" = "));
-                parts.push(comments);
-                parts.push(self.build_expression_doc(value));
+                let expr_doc = self.build_expression_doc(value);
+                if has_line_comment {
+                    // Line comment stays inline with `=`, expression indented on next line:
+                    // `= // comment\n      c`
+                    parts.push(comments);
+                    parts.push(d.indent(d.concat(&[d.hardline(), expr_doc])));
+                } else {
+                    // Block comment inline: `= /* comment */ c`
+                    parts.push(comments);
+                    parts.push(expr_doc);
+                }
             } else {
                 // No comments: use assignment layout for proper line-breaking
-                // The left doc (parts) includes modifiers + key + type annotation
                 let left_doc = d.concat(&parts);
-                let assignment_doc = self.build_assignment_layout(left_doc, " =", value, false);
+                let assignment_doc =
+                    self.build_assignment_layout(left_doc, " =", value, false, None);
                 parts = vec![assignment_doc];
             }
         }

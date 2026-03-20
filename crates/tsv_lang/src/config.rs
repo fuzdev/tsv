@@ -30,6 +30,12 @@ pub struct PrintConfig {
     /// When true, simple binary expressions like `a || b` can break when they exceed print width.
     /// Used in attribute string contexts where Prettier allows internal expression breaks.
     pub force_binary_breaks: bool,
+    /// Whether this expression is embedded in a template language (default: false)
+    /// When true, binary expressions use ContinuationIndent style (group([head, indent(rest)]))
+    /// instead of Grouped style (group(parts)). This matches Prettier's behavior where
+    /// JsExpressionRoot parent triggers `shouldNotIndent = true` (no indent) at the top level,
+    /// but nested binaries within the expression still get normal indentation.
+    pub is_embedded_expression: bool,
 }
 
 impl Default for PrintConfig {
@@ -46,6 +52,7 @@ impl Default for PrintConfig {
             suffix_width: 0,
             arrow_type_param_trailing_comma: true, // Default to true for Svelte compatibility
             force_binary_breaks: false,
+            is_embedded_expression: false,
         }
     }
 }

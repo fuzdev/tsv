@@ -2,30 +2,47 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 287,
+	"end": 349,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
 		"nodes": []
 	},
 	"options": null,
-	"comments": [],
+	"comments": [
+		{
+			"type": "Line",
+			"value": " from as expression statement",
+			"start": 279,
+			"end": 310,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 32
+				}
+			}
+		}
+	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 286,
+		"end": 348,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 277,
+			"end": 339,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 23,
+					"line": 27,
 					"column": 9
 				}
 			},
@@ -999,6 +1016,159 @@
 						}
 					],
 					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 312,
+					"end": 325,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 14
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 312,
+						"end": 324,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 1
+							},
+							"end": {
+								"line": 25,
+								"column": 13
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 312,
+							"end": 322,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 1
+								},
+								"end": {
+									"line": 25,
+									"column": 11
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 312,
+								"end": 316,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 1
+									},
+									"end": {
+										"line": 25,
+										"column": 5
+									}
+								},
+								"name": "from"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 317,
+								"end": 322,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 6
+									},
+									"end": {
+										"line": 25,
+										"column": 11
+									}
+								},
+								"name": "shift"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " from as expression statement",
+							"start": 279,
+							"end": 310
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 327,
+					"end": 338,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 12
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 327,
+						"end": 337,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 1
+							},
+							"end": {
+								"line": 26,
+								"column": 11
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 327,
+							"end": 331,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 1
+								},
+								"end": {
+									"line": 26,
+									"column": 5
+								}
+							},
+							"name": "from"
+						},
+						"right": {
+							"type": "Literal",
+							"start": 334,
+							"end": 337,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 8
+								},
+								"end": {
+									"line": 26,
+									"column": 11
+								}
+							},
+							"value": "a",
+							"raw": "'a'"
+						}
+					}
 				}
 			],
 			"sourceType": "module"

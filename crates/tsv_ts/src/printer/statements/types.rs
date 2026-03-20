@@ -1,8 +1,8 @@
 // Type-related statement printing for TypeScript
 
 use super::{
-    Printer, build_entity_name_doc, intersection_has_huggable_last_type, should_hug_union_type,
-    unwrap_parenthesized,
+    Printer, build_entity_name_doc, intersection_has_expanding_first_type,
+    intersection_has_huggable_last_type, should_hug_union_type, unwrap_parenthesized,
 };
 use crate::ast::internal::{self, TSType};
 use tsv_lang::doc::arena::{DocArena, DocId};
@@ -102,10 +102,13 @@ impl<'a> Printer<'a> {
             }
         } else if let TSType::Intersection(i) = &decl.type_annotation {
             // Intersection types: first element stays inline, subsequent wrap with indent
-            // Special case: when the last type is a TypeLiteral (huggable), don't add indent
+            // Special cases where indent is skipped:
+            // - Last type is huggable (TypeLiteral/Mapped): it handles its own expansion
+            // - First type is expanding (TypeLiteral/Mapped): outer indent would incorrectly
+            //   indent the object literal's members; the intersection handles indent internally
             let type_doc = self.build_intersection_type_doc(i, false);
             parts.push(d.text(" "));
-            if intersection_has_huggable_last_type(i) {
+            if intersection_has_huggable_last_type(i) || intersection_has_expanding_first_type(i) {
                 parts.push(type_doc);
             } else {
                 parts.push(d.group(d.indent(type_doc)));

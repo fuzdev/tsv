@@ -114,18 +114,20 @@ pub(super) fn could_expand_arrow_body(body: &Expression) -> bool {
 
 /// Check if an arrow function has trailing comments after its last parameter.
 ///
-/// Returns true if there are comments between the last param and the body, e.g.:
+/// Returns true if there are comments between the last param and the `=>` token, e.g.:
 /// ```text
 /// (a: string, // comment
 /// ) => {}
 /// ```
 ///
-/// This is used to determine when arrow callbacks should force call expansion,
-/// and when nested arrows should use the curried alignment pattern.
+/// Does NOT include comments between `=>` and the body — those are body comments,
+/// not trailing param comments.
 ///
-/// The `has_comments_between` parameter is typically `printer.has_comments_between`.
+/// `arrow_token_pos` is the byte offset of `=>` in the source. Callers should obtain
+/// this via `printer.find_arrow_token_for(arrow)`.
 pub(crate) fn arrow_has_trailing_param_comments<F>(
     arrow: &internal::ArrowFunctionExpression,
+    arrow_token_pos: u32,
     has_comments_between: F,
 ) -> bool
 where
@@ -135,12 +137,8 @@ where
         return false;
     };
     let param_end = last_param.span().end;
-    let body_start = match &arrow.body {
-        internal::ArrowFunctionBody::BlockStatement(block) => block.span.start,
-        internal::ArrowFunctionBody::Expression(expr) => expr.span().start,
-    };
 
-    has_comments_between(param_end, body_start)
+    has_comments_between(param_end, arrow_token_pos)
 }
 
 /// Check if the last argument is an array or object expression (unwrapping type assertions)
@@ -323,8 +321,8 @@ pub fn is_simple_call_argument(expr: &Expression, depth: usize) -> bool {
         // Update expressions (++x, x++)
         Expression::UpdateExpression(update) => is_simple_call_argument(&update.argument, depth),
 
-        // Spread elements: simple if the argument is simple
-        Expression::SpreadElement(spread) => is_simple_call_argument(&spread.argument, depth),
+        // Spread elements are NOT simple (matches prettier — no SpreadElement case)
+        Expression::SpreadElement(_) => false,
 
         // Everything else is not simple (arrow functions, function expressions, etc.)
         _ => false,
@@ -428,7 +426,6 @@ pub fn contains_call_expression(expr: &Expression) -> bool {
         | Expression::RestElement(_)
         | Expression::PrivateIdentifier(_)
         | Expression::TSParameterProperty(_) => false,
-        Expression::Parenthesized(inner) => contains_call_expression(inner),
     }
 }
 

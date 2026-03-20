@@ -3,12 +3,12 @@
 use super::Printer;
 use crate::ast::internal::{self, Expression};
 use crate::printer::{
-    ParenContext, conditional_should_break_after_op, is_call_on_member_chain,
-    is_curried_arrow_with_return_type, is_literal_member_chain, is_module_path_fluid_call,
-    is_multiline_string_literal, is_poorly_breakable_chain, is_pure_property_chain,
-    is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding, is_simple_value,
-    is_single_call_on_member_chain, is_string_literal, is_type_assertion_call, needs_parens,
-    should_inline_logical_expression,
+    CommentFilter, CommentSpacing, ParenContext, conditional_should_break_after_op,
+    is_call_on_member_chain, is_curried_arrow_with_return_type, is_literal_member_chain,
+    is_module_path_fluid_call, is_multiline_string_literal, is_poorly_breakable_chain,
+    is_pure_property_chain, is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding,
+    is_simple_value, is_single_call_on_member_chain, is_string_literal, is_type_assertion_call,
+    needs_parens, should_inline_logical_expression,
 };
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::GroupId;
@@ -209,24 +209,69 @@ impl<'a> Printer<'a> {
                 let has_comments_before_eq = self.has_comments_between(id_end, equals_pos);
                 let has_comments_after_eq = self.has_comments_between(equals_pos + 1, init_start);
 
+                // When JSDoc cast parens are stripped, 2+ block comments may end up
+                // after `=` even though prettier places the first one before `=`.
+                // Detect and promote the first comment to before `=`.
+                let promoted = has_comments_after_eq
+                    .then(|| self.promote_block_comment_before_eq(equals_pos + 1, init_start))
+                    .flatten();
+                let promoted_before_eq_doc = promoted.map(|(doc, _)| doc);
+                let rhs_comments_start = promoted.map_or(equals_pos + 1, |(_, end)| end);
+
                 // Helpers for LHS doc handling. Most branches use id_doc as-is;
                 // some rebuild it (break-lhs wrapping type, fluid non-wrapping type).
                 // Comments before `=` are always appended after the LHS.
+                // Promoted comments also go here (between identifier and `=`).
                 let push_lhs = |parts: &mut Vec<DocId>, lhs_doc: DocId| {
                     parts.push(lhs_doc);
                     if has_comments_before_eq {
                         parts.push(self.build_inline_comments_between_doc(id_end, equals_pos));
                     }
+                    if let Some(doc) = promoted_before_eq_doc {
+                        parts.push(doc);
+                    }
                 };
                 // For fluid layout, LHS + comments must be a single doc (inside the fluid group)
                 let make_fluid_lhs = |lhs_doc: DocId| -> DocId {
-                    if has_comments_before_eq {
-                        d.concat(&[
-                            lhs_doc,
-                            self.build_inline_comments_between_doc(id_end, equals_pos),
-                        ])
+                    let has_any_before_eq =
+                        has_comments_before_eq || promoted_before_eq_doc.is_some();
+                    if has_any_before_eq {
+                        let mut lhs_parts = vec![lhs_doc];
+                        if has_comments_before_eq {
+                            lhs_parts
+                                .push(self.build_inline_comments_between_doc(id_end, equals_pos));
+                        }
+                        if let Some(doc) = promoted_before_eq_doc {
+                            lhs_parts.push(doc);
+                        }
+                        d.concat(&lhs_parts)
                     } else {
                         lhs_doc
+                    }
+                };
+
+                // Build optional inline block comment doc between `=` and init.
+                // These are comments like `const x = /* comment */ expr` that should be
+                // part of the RHS doc in assignment layout decisions. Line comments are
+                // handled separately (mandatory break path).
+                let rhs_block_comment_doc = if has_comments_after_eq {
+                    self.build_comments_between_filtered_opt(
+                        rhs_comments_start,
+                        init_start,
+                        CommentSpacing::Trailing,
+                        CommentFilter::BlockOnly,
+                    )
+                } else {
+                    None
+                };
+
+                // Helper: build init doc with optional inline block comments prepended.
+                // Comments use Trailing spacing (`/* comment */ `) so no extra space needed.
+                let make_init_doc = |init_doc: DocId| -> DocId {
+                    if let Some(comment_doc) = rhs_block_comment_doc {
+                        d.concat(&[comment_doc, init_doc])
+                    } else {
+                        init_doc
                     }
                 };
 
@@ -410,6 +455,11 @@ impl<'a> Printer<'a> {
                 let has_line_comments_after_eq =
                     self.has_line_comments_between(equals_pos + 1, init_start);
 
+                // Check for multiline block comments after = which force break-after-operator
+                // Prettier ref: hasLeadingOwnLineComment → break-after-operator in chooseLayout
+                let has_multiline_block_comment_after_eq = has_comments_after_eq
+                    && self.has_multiline_block_comments_between(rhs_comments_start, init_start);
+
                 // Curried arrows with return type always break after `=`
                 let is_curried_arrow = is_curried_arrow_with_return_type(init);
 
@@ -418,7 +468,9 @@ impl<'a> Printer<'a> {
                     push_lhs(&mut parts, id_doc);
                     parts.push(d.text(" ="));
                     if has_comments_after_eq {
-                        // For line comments, print them and break
+                        // Single pass: partition comments into same-line (inline) and
+                        // different-line (leading) relative to the `=` sign.
+                        let mut leading_comments = Vec::new();
                         for comment in
                             tsv_lang::comments_in_range(self.comments, equals_pos + 1, init_start)
                         {
@@ -426,28 +478,33 @@ impl<'a> Printer<'a> {
                                 // Inline comment on same line as =
                                 parts.push(d.text(" "));
                                 parts.push(self.build_comment_doc(comment));
+                            } else {
+                                leading_comments.push(self.build_comment_doc(comment));
+                                leading_comments.push(d.hardline());
                             }
                         }
+                        parts.push(d.indent(d.concat(&[
+                            d.hardline(),
+                            d.concat(&leading_comments),
+                            wrap_init_doc(d, self.build_expression_doc(init), init),
+                        ])));
+                    } else {
+                        parts.push(d.indent(d.concat(&[
+                            d.hardline(),
+                            wrap_init_doc(d, self.build_expression_doc(init), init),
+                        ])));
                     }
-                    parts.push(d.indent(d.concat(&[
-                        d.hardline(),
-                        // Leading comments (on their own line before value)
-                        {
-                            let mut leading = Vec::new();
-                            for comment in tsv_lang::comments_in_range(
-                                self.comments,
-                                equals_pos + 1,
-                                init_start,
-                            ) {
-                                if !self.is_same_line(equals_pos, comment.span.start) {
-                                    leading.push(self.build_comment_doc(comment));
-                                    leading.push(d.hardline());
-                                }
-                            }
-                            d.concat(&leading)
-                        },
-                        wrap_init_doc(d, self.build_expression_doc(init), init),
-                    ])));
+                } else if has_multiline_block_comment_after_eq {
+                    // Multiline block comment after `=` forces break-after-operator layout.
+                    // Prettier ref: hasLeadingOwnLineComment → break-after-operator
+                    push_lhs(&mut parts, id_doc);
+                    parts.push(d.text(" ="));
+                    let comments_doc = self
+                        .build_rhs_comments_opt(rhs_comments_start, init_start)
+                        .unwrap_or_else(|| d.empty());
+                    let init_doc = wrap_init_doc(d, self.build_expression_doc(init), init);
+                    let rhs_doc = d.concat(&[comments_doc, init_doc]);
+                    parts.push(d.group(d.indent(d.concat(&[d.line(), rhs_doc]))));
                 } else if is_curried_arrow {
                     // Curried arrow with return type: mandatory break after `=`
                     // The arrow expression formatter handles the rest of the breaking
@@ -491,13 +548,9 @@ impl<'a> Printer<'a> {
 
                     // Add ` = rightDoc` (right side grouped)
                     parts.push(d.text(" = "));
-                    parts.push(d.group(wrap_init_doc(d, self.build_expression_doc(init), init)));
-                } else if has_comments_after_eq {
-                    push_lhs(&mut parts, id_doc);
-                    parts.push(d.text(" ="));
-                    parts.push(self.build_inline_comments_between_doc(equals_pos + 1, init_start));
-                    parts.push(d.text(" "));
-                    parts.push(wrap_init_doc(d, self.build_expression_doc(init), init));
+                    let init_doc =
+                        make_init_doc(wrap_init_doc(d, self.build_expression_doc(init), init));
+                    parts.push(d.group(init_doc));
                 } else if is_type_assertion_with_lhs_type
                     || is_single_call_member_chain
                     || needs_fluid_for_breakable_lhs
@@ -518,10 +571,12 @@ impl<'a> Printer<'a> {
                     } else {
                         id_doc
                     };
+                    let init_doc =
+                        make_init_doc(wrap_init_doc(d, self.build_expression_doc(init), init));
                     parts.push(build_fluid_assignment_doc(
                         d,
                         make_fluid_lhs(fluid_id_doc),
-                        wrap_init_doc(d, self.build_expression_doc(init), init),
+                        init_doc,
                     ));
                 } else if needs_break_after_operator {
                     // Break-after-operator layout for binary/conditional expressions:
@@ -532,25 +587,28 @@ impl<'a> Printer<'a> {
                     // indented together after the `=` break.
                     push_lhs(&mut parts, id_doc);
                     parts.push(d.text(" ="));
-                    parts.push(d.group(d.indent(d.concat(&[
-                        d.line(),
-                        wrap_init_doc(d, self.build_expression_doc(init), init),
-                    ]))));
+                    let init_doc =
+                        make_init_doc(wrap_init_doc(d, self.build_expression_doc(init), init));
+                    parts.push(d.group(d.indent(d.concat(&[d.line(), init_doc]))));
                 } else if is_layout_eligible && !is_simple_value(init) {
                     // Fluid layout (default for layout-eligible values)
                     //
                     // Matches prettier's chooseLayout default: when no special layout
                     // applies, use fluid so the marker can break at `=` only if needed,
                     // while allowing the RHS to break internally first.
+                    let init_doc =
+                        make_init_doc(wrap_init_doc(d, self.build_expression_doc(init), init));
                     parts.push(build_fluid_assignment_doc(
                         d,
                         make_fluid_lhs(id_doc),
-                        wrap_init_doc(d, self.build_expression_doc(init), init),
+                        init_doc,
                     ));
                 } else {
                     push_lhs(&mut parts, id_doc);
                     parts.push(d.text(" = "));
-                    parts.push(wrap_init_doc(d, self.build_expression_doc(init), init));
+                    let init_doc =
+                        make_init_doc(wrap_init_doc(d, self.build_expression_doc(init), init));
+                    parts.push(init_doc);
                 }
             } else if should_break || i == 0 {
                 // No initializer: push id_doc directly

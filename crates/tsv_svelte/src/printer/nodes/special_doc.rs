@@ -439,14 +439,20 @@ impl<'a> Printer<'a> {
         let d = self.d();
         use tsv_ts::ast::internal::{Expression, LiteralValue};
 
-        // Handle string literal: this="value" (without braces)
+        // Handle plain string attribute: this="value" (no braces in source)
+        // Distinguished from expression form this={"value"} by checking source:
+        // - Plain string: span covers `hello` (no quote at span start)
+        // - Expression: span covers `"hello"` (quote char at span start)
         if let Expression::Literal(lit) = expr
             && let LiteralValue::String { content, .. } = &lit.value
         {
-            return d.text_owned(format!("this=\"{content}\""));
+            let first_byte = self.source.as_bytes().get(lit.span.start as usize).copied();
+            if first_byte != Some(b'"') && first_byte != Some(b'\'') {
+                return d.text_owned(format!("this=\"{content}\""));
+            }
         }
 
-        // Expression: this={expr}
+        // Expression (including braced string literals): this={expr}
         let expr_doc_id = self.build_ts_expression_doc_no_comments(expr);
         d.concat(&[d.text("this={"), expr_doc_id, d.text("}")])
     }

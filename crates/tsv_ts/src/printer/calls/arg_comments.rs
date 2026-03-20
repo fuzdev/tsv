@@ -24,6 +24,45 @@ pub(crate) fn find_comma_pos(source: &str, start: u32, end: u32) -> Option<usize
     between.find(',').map(|offset| start as usize + offset)
 }
 
+/// Find the effective start position for blank-line checking before an arg.
+///
+/// When grouping parens are stripped (e.g., `(expr)` → `expr`), the expression's
+/// span starts after the `(`, but the source between a comma and the expression
+/// may contain `(\n\t\texpr` — two newlines that look like a blank line.
+/// This scans from `from` toward `to` and skips past any opening `(` that's the
+/// first non-whitespace character, returning the position after it.
+#[inline]
+pub(crate) fn skip_stripped_open_paren(source: &str, from: u32, to: u32) -> u32 {
+    let slice = &source[from as usize..to as usize];
+    for (i, byte) in slice.bytes().enumerate() {
+        if byte == b'(' {
+            return from + i as u32 + 1;
+        }
+        if !byte.is_ascii_whitespace() {
+            break;
+        }
+    }
+    to
+}
+
+/// Check for a blank line between two consecutive call arguments, accounting
+/// for stripped grouping parens on both sides.
+///
+/// Uses `find_comma_pos` to skip past the closing `)` gap after the previous arg,
+/// and `skip_stripped_open_paren` to skip past the opening `(` gap before the next arg.
+#[inline]
+pub(crate) fn has_blank_line_between_args(
+    source: &str,
+    line_breaks: &[u32],
+    prev_end: u32,
+    curr_start: u32,
+) -> bool {
+    let check_start =
+        find_comma_pos(source, prev_end, curr_start).map_or(prev_end, |c| c as u32 + 1);
+    let check_end = skip_stripped_open_paren(source, check_start, curr_start);
+    tsv_lang::printing::has_blank_line_between_fast(line_breaks, check_start, check_end)
+}
+
 /// Check if a comment is before the comma position
 #[inline]
 pub(crate) fn is_comment_before_comma(comment: &internal::Comment, comma_pos: usize) -> bool {
@@ -104,22 +143,86 @@ pub(crate) fn has_inter_argument_comments_slice(
     false
 }
 
-/// Check if comments between two positions should force multi-line layout
-/// Returns true if there are line comments OR block comments on their own line
-#[inline]
-pub(super) fn should_force_expansion_for_comments(printer: &Printer, start: u32, end: u32) -> bool {
-    printer.has_line_comments_between(start, end) || printer.has_newline_before_comment(start, end)
+/// Check if the gap between two source positions contains only whitespace and parens,
+/// with the first paren on the same line as `start`.
+///
+/// Detects stripped grouping parens: `/** @type {T} */ (\n\texpr)` → after stripping,
+/// the gap between `*/` and `expr` is ` (\n\t` (whitespace + parens). The opening
+/// paren is on the same line as the comment, so these should be treated as inline.
+///
+/// Returns false when the paren is on a different line from the comment:
+/// `/* block */\n(expr)` → gap `\n(` has a newline before the paren → NOT inline.
+fn has_stripped_paren_gap(source: &str, start: u32, end: u32) -> bool {
+    let s = start as usize;
+    let e = end as usize;
+    if s >= e || e > source.len() {
+        return false;
+    }
+    let gap = &source[s..e];
+    // All bytes must be whitespace or parens
+    if !gap
+        .bytes()
+        .all(|b| matches!(b, b' ' | b'\t' | b'\n' | b'\r' | b'(' | b')'))
+    {
+        return false;
+    }
+    // Must have a paren, and no newline before it (comment and paren on same line)
+    match gap.bytes().position(|b| b == b'(' || b == b')') {
+        Some(pos) => !gap.as_bytes()[..pos]
+            .iter()
+            .any(|&b| b == b'\n' || b == b'\r'),
+        None => false,
+    }
 }
 
-/// Check if any comments in a call's arguments force expansion
+/// Check if a block comment ending at `comment_end` is effectively inline with `next_pos`.
 ///
-/// Checks leading comments (before first arg), inter-argument comments, and trailing comments.
-/// Returns true if:
-/// - Any line comments exist
-/// - Block comments are on their own line
-/// - Block comments are AFTER the comma (semantically leading on next arg)
+/// True if they share a source line, or if the gap between them contains only stripped
+/// grouping parens on the same line as the comment (e.g., `/** @type {T} */ (\n\texpr)`).
+pub(super) fn is_comment_inline_with_next(
+    printer: &Printer,
+    comment_end: u32,
+    next_pos: u32,
+) -> bool {
+    printer.is_same_line(comment_end, next_pos)
+        || has_stripped_paren_gap(printer.source, comment_end, next_pos)
+}
+
+/// Check if comments between `start` and `next_code_pos` should force expansion.
+/// Excludes inline block comments that share a source line with `next_code_pos`.
 ///
-/// Inline block comments BEFORE the comma (trailing on current arg) do not force expansion.
+/// A block comment on a different line from `start` but the same line as `next_code_pos`
+/// is an inline leading comment (e.g., `arg1,\n/** @type {T} */ arg2`). These should NOT
+/// force expansion — they're part of the next arg's line and the group/fits mechanism
+/// should decide the layout.
+///
+/// Only truly standalone block comments (different line from both `start` AND `next_code_pos`)
+/// force expansion.
+pub(super) fn should_force_expansion_for_comments(
+    printer: &Printer,
+    start: u32,
+    next_code_pos: u32,
+) -> bool {
+    // Line comments always force expansion
+    if printer.has_line_comments_between(start, next_code_pos) {
+        return true;
+    }
+    // Check if any block comment is truly standalone (not inline with the next code)
+    for comment in tsv_lang::comments_in_range(printer.comments, start, next_code_pos) {
+        if comment.is_block
+            && !printer.is_same_line(start, comment.span.start)
+            && !is_comment_inline_with_next(printer, comment.span.end, next_code_pos)
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// Check if any comments in a call's arguments force expansion.
+///
+/// Returns true for line comments or standalone block comments (on their own line,
+/// not inline with either neighbor). Inline block comments do not force expansion.
 pub(super) fn any_comment_forces_expansion(
     call: &internal::CallExpression,
     printer: &Printer,
@@ -150,22 +253,80 @@ pub(super) fn any_comment_forces_expansion(
             continue;
         }
 
-        // Line comments or block comments on own line always force expansion
+        // Line comments or standalone block comments force expansion.
+        // Inline block comments (same line as previous arg or inline with next arg)
+        // do not force expansion — the group/fits mechanism decides layout.
         if should_force_expansion_for_comments(printer, arg_end, next_boundary) {
             return true;
         }
+    }
 
-        // For inter-argument block comments (not trailing after last arg),
-        // check if ANY comment is AFTER the comma (leading on next arg).
-        // If so, it forces expansion even if it's an inline block comment.
-        if i < call.arguments.len() - 1
-            && let Some(comma_pos) = find_comma_pos(printer.source, arg_end, next_boundary)
-        {
-            for comment in tsv_lang::comments_in_range(printer.comments, arg_end, next_boundary) {
-                if is_comment_after_comma(comment, comma_pos) {
-                    return true;
-                }
-            }
+    false
+}
+
+/// Check if the last arg has leading or trailing comments.
+///
+/// Matches prettier's shouldExpandLastArg checks:
+///   `!hasComment(lastArg, CommentCheckFlags.Leading) &&
+///    !hasComment(lastArg, CommentCheckFlags.Trailing)`
+///
+/// Leading = comments after the comma, before the last arg's span.
+/// Trailing = comments after the last arg's span, before the closing paren.
+///
+/// Used to prevent expand-last-arg layout when the last arg has comments,
+/// since prettier's shouldExpandLastArg returns false in that case.
+pub(super) fn last_arg_has_comments(
+    arguments: &[internal::Expression],
+    printer: &Printer,
+    call_end: u32,
+) -> bool {
+    let [.., prev, last] = arguments else {
+        return false;
+    };
+    let prev_end = prev.span().end;
+    let last_start = last.span().start;
+
+    // Leading: comments after comma, before last arg
+    if let Some(cp) = find_comma_pos(printer.source, prev_end, last_start)
+        && printer.has_comments_between((cp + 1) as u32, last_start)
+    {
+        return true;
+    }
+
+    // Trailing: comments after last arg, before closing paren
+    printer.has_comments_between(last.span().end, call_end)
+}
+
+/// Check if the first arg has any comments (leading or trailing).
+///
+/// Matches prettier's shouldExpandFirstArg check: `!hasComment(firstArg)`
+///
+/// Leading = comments between opening paren and the first arg's span.
+/// Trailing = comments between the first arg's span end and the comma.
+///
+/// Used to prevent expand-first-arg layout when the first arg has comments,
+/// since prettier's shouldExpandFirstArg returns false in that case.
+pub(super) fn first_arg_has_any_comments(
+    arguments: &[internal::Expression],
+    printer: &Printer,
+    paren_open: u32,
+) -> bool {
+    if arguments.is_empty() {
+        return false;
+    }
+    let first = &arguments[0];
+
+    // Leading: comments between paren and first arg
+    if printer.has_comments_between(paren_open, first.span().start) {
+        return true;
+    }
+
+    // Trailing: comments between first arg end and comma
+    if arguments.len() >= 2 {
+        let first_end = first.span().end;
+        let next_start = arguments[1].span().start;
+        if let Some(cp) = find_comma_pos(printer.source, first_end, next_start) {
+            return printer.has_comments_between(first_end, cp as u32);
         }
     }
 
@@ -337,13 +498,8 @@ impl<'a> PartitionedComments<'a> {
         let d = printer.d();
         for comment in &self.leading {
             parts.push(printer.build_comment_doc(comment));
-            // If comment is on same line as next element, keep it inline
-            if comment.is_block
-                && tsv_lang::printing::is_same_line_fast(
-                    printer.line_breaks,
-                    comment.span.end,
-                    next_pos,
-                )
+            // If comment is effectively inline with next element, keep it inline.
+            if comment.is_block && is_comment_inline_with_next(printer, comment.span.end, next_pos)
             {
                 parts.push(d.text(" "));
             } else {

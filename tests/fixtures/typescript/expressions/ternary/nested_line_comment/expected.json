@@ -1,0 +1,1542 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 832,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Nested ternary with line comment before consequent - inner breaks",
+			"start": 10,
+			"end": 78,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 100,
+			"end": 110,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 4
+				},
+				"end": {
+					"line": 4,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Without comment - stays inline",
+			"start": 143,
+			"end": 176,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " In object property with line comment",
+			"start": 231,
+			"end": 270,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 305,
+			"end": 315,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 5
+				},
+				"end": {
+					"line": 16,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Object property without comment - stays inline",
+			"start": 356,
+			"end": 405,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Trailing comment on nested consequent",
+			"start": 465,
+			"end": 505,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing",
+			"start": 547,
+			"end": 558,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 7
+				},
+				"end": {
+					"line": 32,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Line comment before alternate only - inner consequent still breaks",
+			"start": 568,
+			"end": 637,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 683,
+			"end": 693,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 4
+				},
+				"end": {
+					"line": 40,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Multiline template literal in test - inner consequent breaks",
+			"start": 702,
+			"end": 765,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 1
+				},
+				"end": {
+					"line": 43,
+					"column": 64
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 831,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 822,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 50,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 80,
+					"end": 140,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 86,
+							"end": 139,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 86,
+								"end": 87,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 90,
+								"end": 139,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 90,
+									"end": 95,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 11
+										},
+										"end": {
+											"line": 3,
+											"column": 16
+										}
+									},
+									"name": "cond1"
+								},
+								"consequent": {
+									"type": "ConditionalExpression",
+									"start": 114,
+									"end": 133,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 3
+										},
+										"end": {
+											"line": 7,
+											"column": 6
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 114,
+										"end": 119,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 3
+											},
+											"end": {
+												"line": 5,
+												"column": 8
+											}
+										},
+										"name": "cond2"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 125,
+										"end": 126,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 5
+											},
+											"end": {
+												"line": 6,
+												"column": 6
+											}
+										},
+										"name": "b"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 132,
+										"end": 133,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 5
+											},
+											"end": {
+												"line": 7,
+												"column": 6
+											}
+										},
+										"name": "c"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " comment",
+											"start": 100,
+											"end": 110
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 138,
+									"end": 139,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 4
+										},
+										"end": {
+											"line": 8,
+											"column": 5
+										}
+									},
+									"name": "d"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Nested ternary with line comment before consequent - inner breaks",
+							"start": 10,
+							"end": 78
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 178,
+					"end": 228,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 51
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 184,
+							"end": 227,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 50
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 184,
+								"end": 185,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 188,
+								"end": 227,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 11
+									},
+									"end": {
+										"line": 11,
+										"column": 50
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 188,
+									"end": 193,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 11
+										},
+										"end": {
+											"line": 11,
+											"column": 16
+										}
+									},
+									"name": "cond1"
+								},
+								"consequent": {
+									"type": "ConditionalExpression",
+									"start": 197,
+									"end": 218,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 20
+										},
+										"end": {
+											"line": 11,
+											"column": 41
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 197,
+										"end": 202,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 20
+											},
+											"end": {
+												"line": 11,
+												"column": 25
+											}
+										},
+										"name": "cond2"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 205,
+										"end": 210,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 28
+											},
+											"end": {
+												"line": 11,
+												"column": 33
+											}
+										},
+										"name": "expr1"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 213,
+										"end": 218,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 36
+											},
+											"end": {
+												"line": 11,
+												"column": 41
+											}
+										},
+										"name": "expr2"
+									}
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 222,
+									"end": 227,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 45
+										},
+										"end": {
+											"line": 11,
+											"column": 50
+										}
+									},
+									"name": "expr3"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Without comment - stays inline",
+							"start": 143,
+							"end": 176
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 272,
+					"end": 353,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 278,
+							"end": 352,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 7
+								},
+								"end": {
+									"line": 21,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 278,
+								"end": 281,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 10
+									}
+								},
+								"name": "obj"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 284,
+								"end": 352,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 13
+									},
+									"end": {
+										"line": 21,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 288,
+										"end": 348,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 2
+											},
+											"end": {
+												"line": 20,
+												"column": 6
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 288,
+											"end": 292,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 2
+												},
+												"end": {
+													"line": 15,
+													"column": 6
+												}
+											},
+											"name": "prop"
+										},
+										"value": {
+											"type": "ConditionalExpression",
+											"start": 294,
+											"end": 348,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 8
+												},
+												"end": {
+													"line": 20,
+													"column": 6
+												}
+											},
+											"test": {
+												"type": "Identifier",
+												"start": 294,
+												"end": 299,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 8
+													},
+													"end": {
+														"line": 15,
+														"column": 13
+													}
+												},
+												"name": "cond1"
+											},
+											"consequent": {
+												"type": "ConditionalExpression",
+												"start": 320,
+												"end": 341,
+												"loc": {
+													"start": {
+														"line": 17,
+														"column": 4
+													},
+													"end": {
+														"line": 19,
+														"column": 7
+													}
+												},
+												"test": {
+													"type": "Identifier",
+													"start": 320,
+													"end": 325,
+													"loc": {
+														"start": {
+															"line": 17,
+															"column": 4
+														},
+														"end": {
+															"line": 17,
+															"column": 9
+														}
+													},
+													"name": "cond2"
+												},
+												"consequent": {
+													"type": "Identifier",
+													"start": 332,
+													"end": 333,
+													"loc": {
+														"start": {
+															"line": 18,
+															"column": 6
+														},
+														"end": {
+															"line": 18,
+															"column": 7
+														}
+													},
+													"name": "b"
+												},
+												"alternate": {
+													"type": "Identifier",
+													"start": 340,
+													"end": 341,
+													"loc": {
+														"start": {
+															"line": 19,
+															"column": 6
+														},
+														"end": {
+															"line": 19,
+															"column": 7
+														}
+													},
+													"name": "c"
+												},
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " comment",
+														"start": 305,
+														"end": 315
+													}
+												]
+											},
+											"alternate": {
+												"type": "Identifier",
+												"start": 347,
+												"end": 348,
+												"loc": {
+													"start": {
+														"line": 20,
+														"column": 5
+													},
+													"end": {
+														"line": 20,
+														"column": 6
+													}
+												},
+												"name": "d"
+											}
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " In object property with line comment",
+							"start": 231,
+							"end": 270
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 407,
+					"end": 462,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 413,
+							"end": 461,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 7
+								},
+								"end": {
+									"line": 26,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 413,
+								"end": 417,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 7
+									},
+									"end": {
+										"line": 24,
+										"column": 11
+									}
+								},
+								"name": "obj2"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 420,
+								"end": 461,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 14
+									},
+									"end": {
+										"line": 26,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 424,
+										"end": 457,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 2
+											},
+											"end": {
+												"line": 25,
+												"column": 35
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 424,
+											"end": 428,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 2
+												},
+												"end": {
+													"line": 25,
+													"column": 6
+												}
+											},
+											"name": "prop"
+										},
+										"value": {
+											"type": "ConditionalExpression",
+											"start": 430,
+											"end": 457,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 8
+												},
+												"end": {
+													"line": 25,
+													"column": 35
+												}
+											},
+											"test": {
+												"type": "Identifier",
+												"start": 430,
+												"end": 435,
+												"loc": {
+													"start": {
+														"line": 25,
+														"column": 8
+													},
+													"end": {
+														"line": 25,
+														"column": 13
+													}
+												},
+												"name": "cond1"
+											},
+											"consequent": {
+												"type": "ConditionalExpression",
+												"start": 439,
+												"end": 452,
+												"loc": {
+													"start": {
+														"line": 25,
+														"column": 17
+													},
+													"end": {
+														"line": 25,
+														"column": 30
+													}
+												},
+												"test": {
+													"type": "Identifier",
+													"start": 439,
+													"end": 444,
+													"loc": {
+														"start": {
+															"line": 25,
+															"column": 17
+														},
+														"end": {
+															"line": 25,
+															"column": 22
+														}
+													},
+													"name": "cond2"
+												},
+												"consequent": {
+													"type": "Identifier",
+													"start": 447,
+													"end": 448,
+													"loc": {
+														"start": {
+															"line": 25,
+															"column": 25
+														},
+														"end": {
+															"line": 25,
+															"column": 26
+														}
+													},
+													"name": "b"
+												},
+												"alternate": {
+													"type": "Identifier",
+													"start": 451,
+													"end": 452,
+													"loc": {
+														"start": {
+															"line": 25,
+															"column": 29
+														},
+														"end": {
+															"line": 25,
+															"column": 30
+														}
+													},
+													"name": "c"
+												}
+											},
+											"alternate": {
+												"type": "Identifier",
+												"start": 456,
+												"end": 457,
+												"loc": {
+													"start": {
+														"line": 25,
+														"column": 34
+													},
+													"end": {
+														"line": 25,
+														"column": 35
+													}
+												},
+												"name": "d"
+											}
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Object property without comment - stays inline",
+							"start": 356,
+							"end": 405
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 507,
+					"end": 565,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 513,
+							"end": 564,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 7
+								},
+								"end": {
+									"line": 33,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 513,
+								"end": 514,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 7
+									},
+									"end": {
+										"line": 29,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 517,
+								"end": 564,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 11
+									},
+									"end": {
+										"line": 33,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 517,
+									"end": 522,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 11
+										},
+										"end": {
+											"line": 29,
+											"column": 16
+										}
+									},
+									"name": "cond1"
+								},
+								"consequent": {
+									"type": "ConditionalExpression",
+									"start": 527,
+									"end": 546,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 4
+										},
+										"end": {
+											"line": 32,
+											"column": 6
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 527,
+										"end": 532,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 4
+											},
+											"end": {
+												"line": 30,
+												"column": 9
+											}
+										},
+										"name": "cond2"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 538,
+										"end": 539,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 5
+											},
+											"end": {
+												"line": 31,
+												"column": 6
+											}
+										},
+										"name": "b"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 545,
+										"end": 546,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 5
+											},
+											"end": {
+												"line": 32,
+												"column": 6
+											}
+										},
+										"name": "c"
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " trailing",
+											"start": 547,
+											"end": 558
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 563,
+									"end": 564,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 4
+										},
+										"end": {
+											"line": 33,
+											"column": 5
+										}
+									},
+									"name": "d"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Trailing comment on nested consequent",
+							"start": 465,
+							"end": 505
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 639,
+					"end": 699,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 41,
+							"column": 5
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 645,
+							"end": 698,
+							"loc": {
+								"start": {
+									"line": 36,
+									"column": 7
+								},
+								"end": {
+									"line": 41,
+									"column": 4
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 645,
+								"end": 646,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 7
+									},
+									"end": {
+										"line": 36,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 649,
+								"end": 698,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 11
+									},
+									"end": {
+										"line": 41,
+										"column": 4
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 649,
+									"end": 654,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 11
+										},
+										"end": {
+											"line": 36,
+											"column": 16
+										}
+									},
+									"name": "cond1"
+								},
+								"consequent": {
+									"type": "ConditionalExpression",
+									"start": 659,
+									"end": 678,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 4
+										},
+										"end": {
+											"line": 39,
+											"column": 6
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 659,
+										"end": 664,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 4
+											},
+											"end": {
+												"line": 37,
+												"column": 9
+											}
+										},
+										"name": "cond2"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 670,
+										"end": 671,
+										"loc": {
+											"start": {
+												"line": 38,
+												"column": 5
+											},
+											"end": {
+												"line": 38,
+												"column": 6
+											}
+										},
+										"name": "b"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 677,
+										"end": 678,
+										"loc": {
+											"start": {
+												"line": 39,
+												"column": 5
+											},
+											"end": {
+												"line": 39,
+												"column": 6
+											}
+										},
+										"name": "c"
+									}
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 697,
+									"end": 698,
+									"loc": {
+										"start": {
+											"line": 41,
+											"column": 3
+										},
+										"end": {
+											"line": 41,
+											"column": 4
+										}
+									},
+									"name": "d",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " comment",
+											"start": 683,
+											"end": 693
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment before alternate only - inner consequent still breaks",
+							"start": 568,
+							"end": 637
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 767,
+					"end": 821,
+					"loc": {
+						"start": {
+							"line": 44,
+							"column": 1
+						},
+						"end": {
+							"line": 49,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 773,
+							"end": 820,
+							"loc": {
+								"start": {
+									"line": 44,
+									"column": 7
+								},
+								"end": {
+									"line": 49,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 773,
+								"end": 774,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 7
+									},
+									"end": {
+										"line": 44,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 777,
+								"end": 820,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 11
+									},
+									"end": {
+										"line": 49,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "TemplateLiteral",
+									"start": 777,
+									"end": 790,
+									"loc": {
+										"start": {
+											"line": 44,
+											"column": 11
+										},
+										"end": {
+											"line": 45,
+											"column": 6
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 778,
+											"end": 789,
+											"loc": {
+												"start": {
+													"line": 44,
+													"column": 12
+												},
+												"end": {
+													"line": 45,
+													"column": 5
+												}
+											},
+											"value": {
+												"raw": "line1\nline2",
+												"cooked": "line1\nline2"
+											},
+											"tail": true
+										}
+									]
+								},
+								"consequent": {
+									"type": "ConditionalExpression",
+									"start": 795,
+									"end": 814,
+									"loc": {
+										"start": {
+											"line": 46,
+											"column": 4
+										},
+										"end": {
+											"line": 48,
+											"column": 6
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 795,
+										"end": 800,
+										"loc": {
+											"start": {
+												"line": 46,
+												"column": 4
+											},
+											"end": {
+												"line": 46,
+												"column": 9
+											}
+										},
+										"name": "cond2"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 806,
+										"end": 807,
+										"loc": {
+											"start": {
+												"line": 47,
+												"column": 5
+											},
+											"end": {
+												"line": 47,
+												"column": 6
+											}
+										},
+										"name": "b"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 813,
+										"end": 814,
+										"loc": {
+											"start": {
+												"line": 48,
+												"column": 5
+											},
+											"end": {
+												"line": 48,
+												"column": 6
+											}
+										},
+										"name": "c"
+									}
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 819,
+									"end": 820,
+									"loc": {
+										"start": {
+											"line": 49,
+											"column": 4
+										},
+										"end": {
+											"line": 49,
+											"column": 5
+										}
+									},
+									"name": "d"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multiline template literal in test - inner consequent breaks",
+							"start": 702,
+							"end": 765
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

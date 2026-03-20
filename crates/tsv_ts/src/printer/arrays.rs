@@ -6,6 +6,7 @@
 // - Forced expansion for multiline content
 // - Comment preservation
 
+use super::calls::skip_stripped_open_paren;
 use super::{Printer, has_multiline_content};
 use crate::ast::internal::{self, Expression, LiteralValue};
 use tsv_lang::doc::arena::DocId;
@@ -298,8 +299,12 @@ impl<'a> Printer<'a> {
             let is_last = i == arr.elements.len() - 1;
             if !is_last {
                 // Check for blank line after this element (using same boundary logic as comments)
+                // Use find_comma_after + skip_stripped_open_paren to avoid span gaps
+                // from stripped grouping parens being falsely detected as blank lines.
                 let next_start = self.next_element_boundary(arr, i);
-                let has_blank_after = self.has_blank_line_between(elem_end, next_start);
+                let check_start = self.find_comma_after(elem_end).map_or(elem_end, |c| c + 1);
+                let check_end = skip_stripped_open_paren(self.source, check_start, next_start);
+                let has_blank_after = self.has_blank_line_between(check_start, check_end);
 
                 // Separator comma between elements
                 parts.push(d.text(","));
@@ -355,11 +360,14 @@ impl<'a> Printer<'a> {
                 // Check for blank line before this element (preserved when wrapped)
                 // Use literalline() for the blank line (no trailing whitespace) then
                 // hardline() for the indented content line — matches the non-forced path.
+                // Use find_comma_after + skip_stripped_open_paren to avoid span gaps.
                 let prev_end = arr.elements[i - 1]
                     .as_ref()
                     .map_or(arr.span.start + 1, |e| e.span().end);
                 let curr_start = elem.as_ref().map_or(arr.span.end - 1, |e| e.span().start);
-                if self.has_blank_line_between(prev_end, curr_start) {
+                let check_start = self.find_comma_after(prev_end).map_or(prev_end, |c| c + 1);
+                let check_end = skip_stripped_open_paren(self.source, check_start, curr_start);
+                if self.has_blank_line_between(check_start, check_end) {
                     parts.push(d.literalline());
                 }
 
@@ -418,12 +426,15 @@ impl<'a> Printer<'a> {
                 .collect();
 
             // Check for blank line before this element or before leading comments
+            // Use find_comma_after + skip_stripped_open_paren to avoid span gaps.
             if i > 0 {
                 // Check blank line to the first leading comment, or to the element if no comments
                 let blank_check_end = leading_comments
                     .first()
                     .map_or(elem_start, |c| c.span.start);
-                if self.has_blank_line_between(prev_end, blank_check_end) {
+                let check_start = self.find_comma_after(prev_end).map_or(prev_end, |c| c + 1);
+                let check_end = skip_stripped_open_paren(self.source, check_start, blank_check_end);
+                if self.has_blank_line_between(check_start, check_end) {
                     parts.push(d.literalline());
                     parts.push(d.hardline());
                 }
@@ -497,7 +508,10 @@ impl<'a> Printer<'a> {
                     .find(|c| !self.is_same_line(elem_end, c.span.start));
                 let blank_check_boundary =
                     first_leading_comment.map_or(next_start, |c| c.span.start);
-                self.has_blank_line_between(elem_end, blank_check_boundary)
+                let check_start = self.find_comma_after(elem_end).map_or(elem_end, |c| c + 1);
+                let check_end =
+                    skip_stripped_open_paren(self.source, check_start, blank_check_boundary);
+                self.has_blank_line_between(check_start, check_end)
             } else {
                 false
             };

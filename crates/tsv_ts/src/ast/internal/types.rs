@@ -583,6 +583,17 @@ pub struct TSTypePredicate {
 /// Mapped type: `{ [K in keyof T]: V }`
 ///
 /// Transforms properties from one type to another.
+/// Modifier for mapped type `readonly` and `?`: bare, `+`, or `-`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TSMappedTypeModifier {
+    /// Bare modifier: `readonly` or `?`
+    True,
+    /// Explicit plus: `+readonly` or `+?`
+    Plus,
+    /// Explicit minus: `-readonly` or `-?`
+    Minus,
+}
+
 #[derive(Debug, Clone)]
 pub struct TSMappedType {
     /// The type parameter with constraint: `K in keyof T`
@@ -591,10 +602,10 @@ pub struct TSMappedType {
     pub name_type: Option<Box<TSType>>,
     /// The value type
     pub type_annotation: Option<Box<TSType>>,
-    /// Readonly modifier: None, Some(true) for `readonly`, Some(false) for `-readonly`
-    pub readonly: Option<bool>,
-    /// Optional modifier: None, Some(true) for `?`, Some(false) for `-?`
-    pub optional: Option<bool>,
+    /// Readonly modifier: `readonly`, `+readonly`, `-readonly`, or absent
+    pub readonly: Option<TSMappedTypeModifier>,
+    /// Optional modifier: `?`, `+?`, `-?`, or absent
+    pub optional: Option<TSMappedTypeModifier>,
     pub span: Span,
 }
 

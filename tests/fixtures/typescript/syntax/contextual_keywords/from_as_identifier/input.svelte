@@ -20,4 +20,8 @@
 	function fn1(from: number, to: number) {}
 
 	const fn2 = ([from, to]: [number, number]) => from + to;
+
+	// from as expression statement
+	from.shift();
+	from = 'a';
 </script>

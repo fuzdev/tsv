@@ -38,14 +38,17 @@ pub trait ChainPrinter: SymbolLookup {
     /// Used for the "args broken, chain inline" state in conditionalGroup
     fn print_call_args_expanded(&self, call: &internal::CallExpression, optional: bool) -> DocId;
 
-    /// Build a doc for inline block comments between two positions
-    /// Returns a doc with block comments using the specified spacing
-    /// Note: Only block comments are included (line comments are filtered out)
+    /// Build a doc for block comments between two positions.
+    ///
+    /// When `same_line_only` is true, only includes comments on the same line as `start`.
+    /// When false, includes all block comments in range.
+    /// Note: Only block comments are included (line comments are filtered out).
     fn build_block_comments_doc(
         &self,
         start: u32,
         end: u32,
         spacing: crate::printer::CommentSpacing,
+        same_line_only: bool,
     ) -> DocId;
 
     /// Get the span for a given expression
@@ -239,28 +242,46 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
                 *object_end,
                 bracket_open_pos,
                 crate::printer::CommentSpacing::Leading,
+                true,
             );
 
             // Block comments inside brackets: [/* c */ key] and [key /* c */]
-            let inside_bracket_start = if *optional {
-                bracket_open_pos + 3 // after `?.[`
-            } else {
-                bracket_open_pos + 1 // after `[`
-            };
+            // No same-line filter because when the input is already broken across
+            // lines, the comment may be on a different line from the bracket opening
+            // (e.g., `?.[` on one line, `/** @type {string} */ d` on the next).
+            let inside_start = bracket_open_pos + if *optional { 3 } else { 1 };
             let leading_comments_doc = printer.build_block_comments_doc(
-                inside_bracket_start,
+                inside_start,
                 prop_span.start,
                 crate::printer::CommentSpacing::Trailing,
+                false,
             );
             let trailing_comments_doc = printer.build_block_comments_doc(
                 prop_span.end,
                 *bracket_end,
                 crate::printer::CommentSpacing::Leading,
+                false,
             );
 
             let inner_with_comments =
                 d.concat(&[leading_comments_doc, inner, trailing_comments_doc]);
-            let bracket_doc = if *optional {
+
+            // When there are block comments inside brackets (e.g., `?.[/** @type {string} */ d]`),
+            // use a group with indent/softline so the bracket content can break:
+            //   obj.chain?.[
+            //       /** @type {string} */ d
+            //   ]
+            // Without comments, keep the flat form (existing behavior).
+            let has_inside_comments = printer.has_comments_between(inside_start, prop_span.start)
+                || printer.has_comments_between(prop_span.end, *bracket_end);
+            let bracket_doc = if has_inside_comments {
+                let open = if *optional { "?.[" } else { "[" };
+                let sl = d.softline();
+                let content = d.concat(&[sl, inner_with_comments]);
+                let indented = d.indent(content);
+                let sl2 = d.softline();
+                d.group(d.concat(&[d.text(open), indented, sl2, d.text("]")]))
+            } else if *optional {
                 d.concat(&[d.text("?.["), inner_with_comments, d.text("]")])
             } else {
                 d.brackets(inner_with_comments)
@@ -400,6 +421,32 @@ fn print_member_access<P: ChainPrinter>(
         leading_line,
         member_doc,
     ])
+}
+
+/// Check if a computed member node has block comments inside its brackets.
+///
+/// Used by the chain builder to route chains with inside-bracket comments
+/// through the conditional_group path (instead of fill), so the bracket
+/// content can break internally.
+pub(crate) fn has_inside_bracket_comments<'a, P: ChainPrinter>(
+    node: &ChainNode<'a>,
+    printer: &P,
+) -> bool {
+    if let ChainNode::ComputedMember {
+        expr,
+        optional,
+        object_end,
+        bracket_end,
+    } = node
+    {
+        let prop_span = printer.get_property_span(expr);
+        let bracket_open_pos = find_bracket_position(printer, *object_end, prop_span.start);
+        let inside_start = bracket_open_pos + if *optional { 3 } else { 1 };
+        printer.has_comments_between(inside_start, prop_span.start)
+            || printer.has_comments_between(prop_span.end, *bracket_end)
+    } else {
+        false
+    }
 }
 
 /// Find the position of `[` (or `?.[` for optional) in the source,
