@@ -36,7 +36,7 @@ pub use comment::{
 pub use config::PrintConfig;
 pub use error::{ErrorContext, ParseError, Result};
 pub use interner::{InfallibleResolve, SymbolResolver, SymbolToU32};
-pub use location::{LocationTracker, Position, SourceLocation};
+pub use location::{ByteToCharMap, LocationTracker, Position, SourceLocation};
 pub use output::{OutputBuffer, write_indent};
 pub use parser::PeekData;
 pub use span::Span;

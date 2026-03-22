@@ -3,8 +3,9 @@
 use super::super::{internal, public};
 use super::types::convert_declare_function;
 use super::{
-    convert_block_statement, convert_class_declaration, convert_expression, convert_identifier,
-    convert_type_annotation, convert_type_parameter_declaration, create_location,
+    ConversionContext, bigint_to_decimal, convert_block_statement, convert_class_declaration,
+    convert_expression, convert_identifier, convert_type_annotation,
+    convert_type_parameter_declaration, create_location,
 };
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
@@ -14,6 +15,7 @@ pub(in crate::ast) fn convert_import_specifier(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
+    ctx: ConversionContext,
 ) -> public::ImportSpecifier {
     match spec {
         internal::ImportSpecifier::Default(default_spec) => {
@@ -37,6 +39,16 @@ pub(in crate::ast) fn convert_import_specifier(
             })
         }
         internal::ImportSpecifier::Named(named_spec) => {
+            let import_kind = match named_spec.import_kind {
+                internal::ImportKind::Value => {
+                    if ctx.is_svelte_script {
+                        None
+                    } else {
+                        Some("value".to_string())
+                    }
+                }
+                internal::ImportKind::Type => Some("type".to_string()),
+            };
             public::ImportSpecifier::Named(public::ImportNamedSpecifier {
                 node_type: "ImportSpecifier".to_string(),
                 start: named_spec.span.start,
@@ -66,10 +78,7 @@ pub(in crate::ast) fn convert_import_specifier(
                     type_annotation: None,
                     decorators: Vec::new(),
                 },
-                import_kind: match named_spec.import_kind {
-                    internal::ImportKind::Value => "value".to_string(),
-                    internal::ImportKind::Type => "type".to_string(),
-                },
+                import_kind,
             })
         }
         internal::ImportSpecifier::Namespace(ns_spec) => {
@@ -124,7 +133,18 @@ pub(in crate::ast) fn convert_export_specifier(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
+    ctx: ConversionContext,
 ) -> public::ExportSpecifier {
+    let export_kind = match spec.export_kind {
+        internal::ExportKind::Value => {
+            if ctx.is_svelte_script {
+                None
+            } else {
+                Some("value".to_string())
+            }
+        }
+        internal::ExportKind::Type => Some("type".to_string()),
+    };
     public::ExportSpecifier {
         node_type: "ExportSpecifier".to_string(),
         start: spec.span.start,
@@ -150,10 +170,7 @@ pub(in crate::ast) fn convert_export_specifier(
             type_annotation: None,
             decorators: Vec::new(),
         },
-        export_kind: match spec.export_kind {
-            internal::ExportKind::Value => "value".to_string(),
-            internal::ExportKind::Type => "type".to_string(),
-        },
+        export_kind,
     }
 }
 
@@ -204,7 +221,8 @@ pub(in crate::ast) fn convert_literal(
             (serde_json::Value::String(content.clone()), None)
         }
         internal::LiteralValue::BigInt(val) => {
-            (serde_json::Value::String(val.clone()), Some(val.clone()))
+            let decimal = bigint_to_decimal(val);
+            (serde_json::Value::String(decimal.clone()), Some(decimal))
         }
         internal::LiteralValue::Boolean(b) => (serde_json::Value::Bool(*b), None),
         internal::LiteralValue::Null => (serde_json::Value::Null, None),

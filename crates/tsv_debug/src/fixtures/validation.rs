@@ -3,6 +3,12 @@
 //! All validation errors for a single fixture are collected together,
 //! enabling better DX with grouped error reporting.
 
+/// Ratchet: minimum number of fixtures where our parser must match expected.json.
+/// This prevents regressions — if the count drops below this, validation fails.
+/// Bump this number upward as parser fixes land.
+/// Current state: 1761/1764 match (2026-03-22)
+const PARSER_MATCH_RATCHET: usize = 1761;
+
 use crate::deno::{PrettierParser, parse_css, parse_svelte, parse_typescript, run_prettier};
 use crate::diff;
 use crate::fixtures::{
@@ -389,6 +395,7 @@ pub enum ValidationSuccess {
     StructureValid(usize), // number of checks passed
     ParserExpectedJsonMatches,
     ParserExpectedOursMatches,
+    ParserOursMatchesExpected,
     ParserExpectedSvelteMatches,
     FormatterInputIdempotent,
     FormatterMatchesPrettier,
@@ -404,6 +411,9 @@ impl fmt::Display for ValidationSuccess {
             Self::StructureValid(n) => write!(f, "{n} structure checks passed"),
             Self::ParserExpectedJsonMatches => write!(f, "expected.json matches Svelte parser"),
             Self::ParserExpectedOursMatches => write!(f, "expected_ours.json matches our parser"),
+            Self::ParserOursMatchesExpected => {
+                write!(f, "our parser output matches expected.json")
+            }
             Self::ParserExpectedSvelteMatches => {
                 write!(f, "expected_svelte.json matches Svelte parser")
             }
@@ -421,12 +431,30 @@ impl fmt::Display for ValidationSuccess {
     }
 }
 
+/// Non-blocking warning (tracked and reported, but doesn't fail validation)
+#[derive(Debug, Clone)]
+pub enum ValidationWarning {
+    /// Our parser output differs from expected.json (semantic comparison)
+    ParserOursDiffersFromExpected,
+}
+
+impl fmt::Display for ValidationWarning {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ParserOursDiffersFromExpected => {
+                write!(f, "our parser output differs from expected.json")
+            }
+        }
+    }
+}
+
 /// Result of validating a single fixture
 #[derive(Debug)]
 pub struct FixtureValidation {
     pub fixture_path: String,
     pub errors: Vec<ValidationError>,
     pub successes: Vec<ValidationSuccess>,
+    pub warnings: Vec<ValidationWarning>,
     /// Variants that were checked (for reporting)
     pub unformatted_count: usize,
     pub unformatted_ours_count: usize,
@@ -457,6 +485,7 @@ impl FixtureValidation {
             fixture_path,
             errors: Vec::new(),
             successes: Vec::new(),
+            warnings: Vec::new(),
             unformatted_count: 0,
             unformatted_ours_count: 0,
             unformatted_prettier_count: 0,
@@ -475,6 +504,10 @@ impl FixtureValidation {
 
     pub fn add_success(&mut self, success: ValidationSuccess) {
         self.successes.push(success);
+    }
+
+    pub fn add_warning(&mut self, warning: ValidationWarning) {
+        self.warnings.push(warning);
     }
 
     pub fn is_valid(&self) -> bool {
@@ -564,6 +597,9 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
         // Phase 2: Our Parser validation - P2 (pure Rust)
         validate_parser_ours(&mut result, fixture, &input);
 
+        // Phase 2b: Our parser matches expected.json (non-divergence only, pure Rust)
+        validate_parser_ours_matches_expected(&mut result, fixture, &input);
+
         // Phase 3: Our Formatter validation - F1 (pure Rust)
         let format_ok = validate_formatter_idempotent(&mut result, fixture, &input);
 
@@ -636,6 +672,69 @@ fn validate_parser_ours(result: &mut FixtureValidation, fixture: &Fixture, input
             } else {
                 result.add_error(ValidationError::ParserError(e));
             }
+        }
+    }
+}
+
+/// Validate our parser output matches expected.json (non-divergence fixtures only)
+///
+/// For non-divergence fixtures, expected.json should match both the canonical parser
+/// AND our parser. Uses semantic (serde_json::Value) comparison to ignore field ordering
+/// differences between our parser and the canonical parser.
+fn validate_parser_ours_matches_expected(
+    result: &mut FixtureValidation,
+    fixture: &Fixture,
+    input: &str,
+) {
+    // Only for non-divergence fixtures that have expected.json but not expected_ours.json
+    if fixture.expected_ours_path().exists() {
+        return; // Divergence fixture — P2 handles this
+    }
+    let expected_path = fixture.expected_path();
+    if !expected_path.exists() {
+        return;
+    }
+
+    let expected_str = match read_file(&expected_path) {
+        Ok(s) => s,
+        Err(e) => {
+            result.add_error(ValidationError::ParserError(format!(
+                "Failed to read expected.json: {e}"
+            )));
+            return;
+        }
+    };
+
+    let expected_json: serde_json::Value = match serde_json::from_str(&expected_str) {
+        Ok(v) => v,
+        Err(e) => {
+            result.add_error(ValidationError::ParserError(format!(
+                "Failed to parse expected.json: {e}"
+            )));
+            return;
+        }
+    };
+
+    match fixtures::parse_with_our_parser_to_string(input, &fixture.input_file) {
+        Ok(actual_str) => {
+            let actual_json: serde_json::Value = match serde_json::from_str(&actual_str) {
+                Ok(v) => v,
+                Err(e) => {
+                    result.add_error(ValidationError::ParserError(format!(
+                        "Failed to parse our parser output as JSON: {e}"
+                    )));
+                    return;
+                }
+            };
+
+            if actual_json == expected_json {
+                result.add_success(ValidationSuccess::ParserOursMatchesExpected);
+            } else {
+                result.add_warning(ValidationWarning::ParserOursDiffersFromExpected);
+            }
+        }
+        Err(e) => {
+            result.add_error(ValidationError::ParserError(e));
         }
     }
 }
@@ -1628,6 +1727,8 @@ pub struct ValidationSummary {
     pub results: Vec<FixtureValidation>,
     pub cross_fixture_duplicates: Vec<Vec<String>>,
     pub total_undocumented_prettier: usize,
+    pub total_parser_mismatch_warnings: usize,
+    pub parser_ratchet_regression: bool,
 }
 
 impl ValidationSummary {
@@ -1645,6 +1746,11 @@ impl ValidationSummary {
         self.total_prettier_intermediate += result.prettier_intermediate_count;
         self.total_invalid_syntax += result.invalid_syntax_count;
         self.total_undocumented_prettier += result.undocumented_prettier_outputs.len();
+        self.total_parser_mismatch_warnings += result
+            .warnings
+            .iter()
+            .filter(|w| matches!(w, ValidationWarning::ParserOursDiffersFromExpected))
+            .count();
 
         if result.is_valid() {
             self.passed_fixtures += 1;
@@ -1667,7 +1773,18 @@ impl ValidationSummary {
     }
 
     pub fn is_valid(&self) -> bool {
-        self.failed_fixtures == 0 && self.cross_fixture_duplicates.is_empty()
+        self.failed_fixtures == 0
+            && self.cross_fixture_duplicates.is_empty()
+            && !self.parser_ratchet_regression
+    }
+
+    /// Check parser match ratchet — fails if matches dropped below the ratchet value.
+    /// Only checked when validating all fixtures (no filters, not prettier-only).
+    pub fn check_parser_ratchet(&mut self) {
+        let matched = self.total_fixtures - self.total_parser_mismatch_warnings;
+        if matched < PARSER_MATCH_RATCHET {
+            self.parser_ratchet_regression = true;
+        }
     }
 
     pub fn failed_results(&self) -> impl Iterator<Item = &FixtureValidation> {
@@ -1721,10 +1838,16 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
                 for success in &result.successes {
                     println!("    [OK] {success}");
                 }
+                for warning in &result.warnings {
+                    println!("    [WARN] {warning}");
+                }
             } else {
                 eprintln!("✗ {}", result.fixture_path);
                 for success in &result.successes {
                     eprintln!("    [OK] {success}");
+                }
+                for warning in &result.warnings {
+                    eprintln!("    [WARN] {warning}");
                 }
                 for error in &result.errors {
                     eprintln!("    [{}] {}", error.category(), error);
@@ -1828,6 +1951,22 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
         }
         println!("{}", parts.join(" "));
 
+        // Parser match ratchet
+        {
+            let matched = summary.total_fixtures - summary.total_parser_mismatch_warnings;
+            if summary.parser_ratchet_regression {
+                eprintln!(
+                    "  ✗ parser ratchet REGRESSION: {matched}/{} match expected.json (ratchet: {PARSER_MATCH_RATCHET})",
+                    summary.total_fixtures
+                );
+            } else if summary.total_parser_mismatch_warnings > 0 {
+                println!(
+                    "  parser: {matched}/{} match expected.json ({} differ, ratchet: {PARSER_MATCH_RATCHET})",
+                    summary.total_fixtures, summary.total_parser_mismatch_warnings
+                );
+            }
+        }
+
         // N10: Print undocumented Prettier outputs as informational notes
         if summary.total_undocumented_prettier > 0 {
             println!();
@@ -1866,5 +2005,21 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
             "Results Summary: {} passed, {} failed out of {} total",
             summary.passed_fixtures, summary.failed_fixtures, summary.total_fixtures
         );
+
+        // Parser match ratchet
+        {
+            let matched = summary.total_fixtures - summary.total_parser_mismatch_warnings;
+            if summary.parser_ratchet_regression {
+                eprintln!(
+                    "  ✗ parser ratchet REGRESSION: {matched}/{} match expected.json (ratchet: {PARSER_MATCH_RATCHET})",
+                    summary.total_fixtures
+                );
+            } else if summary.total_parser_mismatch_warnings > 0 {
+                eprintln!(
+                    "  parser: {matched}/{} match expected.json ({} differ, ratchet: {PARSER_MATCH_RATCHET})",
+                    summary.total_fixtures, summary.total_parser_mismatch_warnings
+                );
+            }
+        }
     }
 }

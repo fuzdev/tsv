@@ -236,7 +236,8 @@ impl<'a> Printer<'a> {
         for (i, m) in t.members.iter().enumerate() {
             let is_first = i == 0;
             let is_last = i == t.members.len() - 1;
-            let member_end = m.span().end;
+            // Use content_end for comment detection (before trailing separator)
+            let member_content_end = m.content_end(self.source);
 
             if force_multiline {
                 // Forced multiline: build with hardlines
@@ -252,12 +253,13 @@ impl<'a> Printer<'a> {
                     .members
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
-                let trailing: Vec<_> = comments_in_range(self.comments, member_end, upper_bound)
-                    .filter(|c| self.is_same_line(member_end, c.span.start))
-                    .collect();
+                let trailing: Vec<_> =
+                    comments_in_range(self.comments, member_content_end, upper_bound)
+                        .filter(|c| self.is_same_line(member_content_end, c.span.start))
+                        .collect();
                 member_parts.extend(self.build_comments_around_semicolon_doc(
                     &trailing,
-                    member_end,
+                    member_content_end,
                     upper_bound,
                 ));
             } else {
@@ -271,7 +273,7 @@ impl<'a> Printer<'a> {
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
                 let trailing: Vec<_> =
-                    comments_in_range(self.comments, member_end, upper_bound).collect();
+                    comments_in_range(self.comments, member_content_end, upper_bound).collect();
 
                 if is_last {
                     // Last member: semicolon only when broken
@@ -286,7 +288,7 @@ impl<'a> Printer<'a> {
                     // Non-last: semicolon always present, preserve comment position
                     member_parts.extend(self.build_comments_around_semicolon_doc(
                         &trailing,
-                        member_end,
+                        member_content_end,
                         upper_bound,
                     ));
                     // Space before next member only when flat
@@ -294,7 +296,7 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            prev_end = member_end;
+            prev_end = m.span().end;
         }
 
         if force_multiline {
@@ -419,7 +421,8 @@ impl<'a> Printer<'a> {
             let mut prev_end = t.span.start + 1; // after opening brace
             for (i, m) in t.members.iter().enumerate() {
                 let is_first = i == 0;
-                let member_end = m.span().end;
+                // Use content_end for comment detection (before trailing separator)
+                let member_content_end = m.content_end(self.source);
 
                 member_parts.extend(self.build_multiline_member_prefix_doc(
                     prev_end,
@@ -433,16 +436,17 @@ impl<'a> Printer<'a> {
                     .members
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
-                let trailing: Vec<_> = comments_in_range(self.comments, member_end, upper_bound)
-                    .filter(|c| self.is_same_line(member_end, c.span.start))
-                    .collect();
+                let trailing: Vec<_> =
+                    comments_in_range(self.comments, member_content_end, upper_bound)
+                        .filter(|c| self.is_same_line(member_content_end, c.span.start))
+                        .collect();
                 member_parts.extend(self.build_comments_around_semicolon_doc(
                     &trailing,
-                    member_end,
+                    member_content_end,
                     upper_bound,
                 ));
 
-                prev_end = member_end;
+                prev_end = m.span().end;
             }
 
             let body_end = t.span.end.saturating_sub(1);
@@ -455,7 +459,8 @@ impl<'a> Printer<'a> {
             // Preserve comment position relative to semicolon
             for (i, m) in t.members.iter().enumerate() {
                 let is_last = i == t.members.len() - 1;
-                let member_end = m.span().end;
+                // Use content_end for comment detection (before trailing separator)
+                let member_content_end = m.content_end(self.source);
 
                 parts.push(self.build_type_member_doc_inner(m, false));
 
@@ -464,12 +469,12 @@ impl<'a> Printer<'a> {
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
                 let trailing: Vec<_> =
-                    comments_in_range(self.comments, member_end, upper_bound).collect();
+                    comments_in_range(self.comments, member_content_end, upper_bound).collect();
 
                 if !is_last {
                     parts.extend(self.build_comments_around_semicolon_doc(
                         &trailing,
-                        member_end,
+                        member_content_end,
                         upper_bound,
                     ));
                     parts.push(d.text(" "));
@@ -487,7 +492,8 @@ impl<'a> Printer<'a> {
             let mut member_parts = vec![];
             for (i, m) in t.members.iter().enumerate() {
                 let is_last = i == t.members.len() - 1;
-                let member_end = m.span().end;
+                // Use content_end for comment detection (before trailing separator)
+                let member_content_end = m.content_end(self.source);
 
                 member_parts.push(d.softline());
                 member_parts.push(self.build_type_member_doc_inner(m, false));
@@ -497,7 +503,7 @@ impl<'a> Printer<'a> {
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
                 let trailing: Vec<_> =
-                    comments_in_range(self.comments, member_end, upper_bound).collect();
+                    comments_in_range(self.comments, member_content_end, upper_bound).collect();
 
                 if is_last {
                     // Last member: semicolon only when broken, comments after
@@ -510,7 +516,7 @@ impl<'a> Printer<'a> {
                     // Non-last: preserve comment position relative to semicolon
                     member_parts.extend(self.build_comments_around_semicolon_doc(
                         &trailing,
-                        member_end,
+                        member_content_end,
                         upper_bound,
                     ));
                     // Space before next member only when flat

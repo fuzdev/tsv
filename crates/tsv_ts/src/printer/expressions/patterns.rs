@@ -125,6 +125,28 @@ impl<'a> Printer<'a> {
             self.has_line_comments_between(effective_rhs_start, rhs_comment_end);
         let rhs_comments = self.build_rhs_comments_opt(effective_rhs_start, rhs_comment_end);
 
+        // For 2-segment chains at top level (a = b = value), use unified assignment layout.
+        // Prettier only uses chain formatting for 3+ segments (assignment.js:113-125).
+        // A 2-segment chain has rhs_is_assignment=true but the inner RHS is NOT an assignment.
+        if !matches!(context, AssignmentContext::Chain)
+            && rhs_is_assignment
+            && !matches!(assign.left.as_ref(), Expression::ObjectPattern(_))
+            && let Expression::AssignmentExpression(inner) = assign.right.as_ref()
+        {
+            let inner_rhs_is_assignment =
+                matches!(inner.right.as_ref(), Expression::AssignmentExpression(_));
+            if !inner_rhs_is_assignment {
+                return self.build_assignment_layout_with_line_comment(
+                    left_doc,
+                    assign.operator.as_str_with_leading_space(),
+                    &assign.right,
+                    false,
+                    rhs_comments,
+                    rhs_has_line_comment,
+                );
+            }
+        }
+
         // Use unified assignment layout for simple (non-chain, non-pattern) cases.
         // build_assignment_layout builds right_doc internally and handles rhs_comments.
         if !matches!(context, AssignmentContext::Chain)
@@ -825,6 +847,10 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a rest element
     pub(super) fn build_rest_element_doc(&self, rest: &internal::RestElement) -> DocId {
         let d = self.d();
-        d.concat(&[d.text("..."), self.build_expression_doc(&rest.argument)])
+        let mut parts = vec![d.text("..."), self.build_expression_doc(&rest.argument)];
+        if let Some(ta) = &rest.type_annotation {
+            parts.push(self.build_type_annotation_doc(ta));
+        }
+        d.concat(&parts)
     }
 }

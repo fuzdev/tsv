@@ -201,6 +201,9 @@ mod tests {
         let result = parse_css(".a { color: red; }").await;
         assert!(result.is_ok(), "parse_css failed: {result:?}");
         let ast = result.unwrap();
-        assert_eq!(ast.get("type").and_then(|v| v.as_str()), Some("StyleSheet"));
+        assert_eq!(
+            ast.get("type").and_then(|v| v.as_str()),
+            Some("StyleSheetFile")
+        );
     }
 }

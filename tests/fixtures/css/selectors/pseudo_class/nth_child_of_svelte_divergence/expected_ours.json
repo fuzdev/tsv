@@ -20,8 +20,6 @@
 								{
 									"type": "RelativeSelector",
 									"combinator": null,
-									"start": 61,
-									"end": 88,
 									"selectors": [
 										{
 											"type": "TypeSelector",
@@ -45,8 +43,6 @@
 															{
 																"type": "RelativeSelector",
 																"combinator": null,
-																"start": 74,
-																"end": 87,
 																"selectors": [
 																	{
 																		"type": "Nth",
@@ -66,8 +62,6 @@
 																						{
 																							"type": "RelativeSelector",
 																							"combinator": null,
-																							"start": 80,
-																							"end": 87,
 																							"selectors": [
 																								{
 																									"type": "ClassSelector",
@@ -75,14 +69,18 @@
 																									"start": 80,
 																									"end": 87
 																								}
-																							]
+																							],
+																							"start": 80,
+																							"end": 87
 																						}
 																					]
 																				}
 																			]
 																		}
 																	}
-																]
+																],
+																"start": 74,
+																"end": 87
 															}
 														]
 													}
@@ -91,7 +89,9 @@
 											"start": 63,
 											"end": 88
 										}
-									]
+									],
+									"start": 61,
+									"end": 88
 								}
 							]
 						}
@@ -129,8 +129,6 @@
 								{
 									"type": "RelativeSelector",
 									"combinator": null,
-									"start": 121,
-									"end": 150,
 									"selectors": [
 										{
 											"type": "TypeSelector",
@@ -154,8 +152,6 @@
 															{
 																"type": "RelativeSelector",
 																"combinator": null,
-																"start": 135,
-																"end": 149,
 																"selectors": [
 																	{
 																		"type": "Nth",
@@ -175,8 +171,6 @@
 																						{
 																							"type": "RelativeSelector",
 																							"combinator": null,
-																							"start": 142,
-																							"end": 149,
 																							"selectors": [
 																								{
 																									"type": "ClassSelector",
@@ -184,14 +178,18 @@
 																									"start": 142,
 																									"end": 149
 																								}
-																							]
+																							],
+																							"start": 142,
+																							"end": 149
 																						}
 																					]
 																				}
 																			]
 																		}
 																	}
-																]
+																],
+																"start": 135,
+																"end": 149
 															}
 														]
 													}
@@ -200,7 +198,9 @@
 											"start": 124,
 											"end": 150
 										}
-									]
+									],
+									"start": 121,
+									"end": 150
 								}
 							]
 						}
@@ -238,8 +238,6 @@
 								{
 									"type": "RelativeSelector",
 									"combinator": null,
-									"start": 173,
-									"end": 204,
 									"selectors": [
 										{
 											"type": "TypeSelector",
@@ -263,8 +261,6 @@
 															{
 																"type": "RelativeSelector",
 																"combinator": null,
-																"start": 191,
-																"end": 203,
 																"selectors": [
 																	{
 																		"type": "Nth",
@@ -284,8 +280,6 @@
 																						{
 																							"type": "RelativeSelector",
 																							"combinator": null,
-																							"start": 196,
-																							"end": 203,
 																							"selectors": [
 																								{
 																									"type": "ClassSelector",
@@ -293,14 +287,18 @@
 																									"start": 196,
 																									"end": 203
 																								}
-																							]
+																							],
+																							"start": 196,
+																							"end": 203
 																						}
 																					]
 																				}
 																			]
 																		}
 																	}
-																]
+																],
+																"start": 191,
+																"end": 203
 															}
 														]
 													}
@@ -309,7 +307,9 @@
 											"start": 175,
 											"end": 204
 										}
-									]
+									],
+									"start": 173,
+									"end": 204
 								}
 							]
 						}
@@ -347,8 +347,6 @@
 								{
 									"type": "RelativeSelector",
 									"combinator": null,
-									"start": 276,
-									"end": 322,
 									"selectors": [
 										{
 											"type": "TypeSelector",
@@ -372,8 +370,6 @@
 															{
 																"type": "RelativeSelector",
 																"combinator": null,
-																"start": 291,
-																"end": 321,
 																"selectors": [
 																	{
 																		"type": "Nth",
@@ -393,8 +389,6 @@
 																						{
 																							"type": "RelativeSelector",
 																							"combinator": null,
-																							"start": 301,
-																							"end": 311,
 																							"selectors": [
 																								{
 																									"type": "TypeSelector",
@@ -408,7 +402,9 @@
 																									"start": 304,
 																									"end": 311
 																								}
-																							]
+																							],
+																							"start": 301,
+																							"end": 311
 																						},
 																						{
 																							"type": "RelativeSelector",
@@ -418,8 +414,6 @@
 																								"start": 312,
 																								"end": 313
 																							},
-																							"start": 312,
-																							"end": 321,
 																							"selectors": [
 																								{
 																									"type": "ClassSelector",
@@ -427,14 +421,18 @@
 																									"start": 314,
 																									"end": 321
 																								}
-																							]
+																							],
+																							"start": 312,
+																							"end": 321
 																						}
 																					]
 																				}
 																			]
 																		}
 																	}
-																]
+																],
+																"start": 291,
+																"end": 321
 															}
 														]
 													}
@@ -443,7 +441,9 @@
 											"start": 280,
 											"end": 322
 										}
-									]
+									],
+									"start": 276,
+									"end": 322
 								}
 							]
 						}

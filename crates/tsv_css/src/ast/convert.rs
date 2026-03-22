@@ -17,7 +17,6 @@
 // - Both derive from the same semantic AST, not from source slices
 
 use super::internal;
-use crate::escapes;
 use crate::printer::source_fidelity;
 
 /// Split a declaration source into property and value, matching Svelte's quirky behavior.
@@ -58,6 +57,26 @@ fn split_declaration_svelte_compat(decl_source: &str) -> (&str, &str) {
     (property, value)
 }
 
+/// Convert a CSS declaration to JSON, including !important in value and end position
+fn convert_declaration(decl: &internal::CssDeclaration, source: &str) -> serde_json::Value {
+    let decl_source = decl.span.extract(source);
+    let (property_source, value_source) = split_declaration_svelte_compat(decl_source);
+
+    let (end, value) = if let Some(important_end) = decl.important_end {
+        (important_end, format!("{value_source} !important"))
+    } else {
+        (decl.span.end, value_source.to_string())
+    };
+
+    serde_json::json!({
+        "type": "Declaration",
+        "start": decl.span.start,
+        "end": end,
+        "property": property_source,
+        "value": value,
+    })
+}
+
 /// Convert PseudoClassArgs to Svelte's expected JSON structure
 ///
 /// Generates the wrapper structure: SelectorList → ComplexSelector → RelativeSelector → Nth
@@ -93,17 +112,16 @@ fn convert_pseudo_class_args(args: &internal::PseudoClassArgs) -> serde_json::Va
                     "children": [{
                         "type": "RelativeSelector",
                         "combinator": null,
+                        "selectors": [nth_node],
                         "start": span.start,
                         "end": span.end,
-                        "selectors": [nth_node]
                     }]
                 }]
             })
         }
         internal::PseudoClassArgs::SelectorList { selectors, .. } => {
             // For :is(), :not(), :where(), :has(), :global() - convert the nested selector list
-            // Filter out Invalid selectors (from forgiving parsing) and pseudo-elements
-            // (contextually invalid in :is/:where per CSS Selectors Level 4)
+            // Filter out Invalid selectors (from forgiving parsing)
             convert_selector_list_filtered(selectors)
         }
         internal::PseudoClassArgs::Identifier { value, span } => {
@@ -126,14 +144,14 @@ fn convert_pseudo_class_args(args: &internal::PseudoClassArgs) -> serde_json::Va
                     "children": [{
                         "type": "RelativeSelector",
                         "combinator": null,
-                        "start": span.start,
-                        "end": span.end,
                         "selectors": [{
                             "type": "TypeSelector",
                             "name": value,
                             "start": span.start,
                             "end": span.end
-                        }]
+                        }],
+                        "start": span.start,
+                        "end": span.end,
                     }]
                 }]
             })
@@ -215,25 +233,7 @@ fn convert_css_rule(rule: &internal::CssRule, source: &str) -> serde_json::Value
         .filter_map(|child| {
             match child {
                 internal::CssBlockChild::Declaration(decl) => {
-                    // SVELTE QUIRK: Extract property and value from source to preserve raw escapes
-                    // Svelte does NOT decode escape sequences in property names (only in selectors)
-                    // Example: `\00e9motion` stays as `\00e9motion`, not `émotion`
-                    let decl_source = decl.span.extract(source);
-
-                    // Split using Svelte-compatible logic (handles comment-before-colon quirk)
-                    let (property_source, value_source) =
-                        split_declaration_svelte_compat(decl_source);
-
-                    // Apply Svelte quirks to value (backslash doubling, unicode duplication)
-                    let value_with_quirks = escapes::apply_svelte_quirks(value_source);
-
-                    Some(serde_json::json!({
-                        "type": "Declaration",
-                        "start": decl.span.start,
-                        "end": decl.span.end,
-                        "property": property_source,  // Raw from source (Svelte quirk)
-                        "value": value_with_quirks,
-                    }))
+                    Some(convert_declaration(decl, source))
                 }
                 internal::CssBlockChild::Rule(nested_rule) => {
                     // CSS Nesting Module - recursively convert nested rules
@@ -321,39 +321,10 @@ fn convert_prelude_to_string(prelude: &internal::PreludeValue, source: &str) -> 
             // Extract from source for maximum fidelity
             span.extract(source).to_string()
         }
-        internal::PreludeValue::Supports { condition, .. } => condition_to_string(condition),
-        internal::PreludeValue::Container {
-            name, condition, ..
-        } => {
-            let condition_str = condition_to_string(condition);
-            if let Some(container_name) = name {
-                format!("{container_name} {condition_str}")
-            } else {
-                condition_str
-            }
-        }
-        internal::PreludeValue::Media { content, .. } => content.clone(),
+        internal::PreludeValue::Supports { span, .. } => span.extract(source).trim().to_string(),
+        internal::PreludeValue::Container { span, .. } => span.extract(source).trim().to_string(),
+        internal::PreludeValue::Media { span, .. } => span.extract(source).trim().to_string(),
     }
-}
-
-/// Convert a SupportsCondition to its string representation
-fn condition_to_string(condition: &internal::SupportsCondition) -> String {
-    condition
-        .parts
-        .iter()
-        .map(|part| {
-            if let Some(connector) = &part.connector {
-                let conn_str = match connector {
-                    internal::SupportsConnector::And => "and",
-                    internal::SupportsConnector::Or => "or",
-                };
-                format!("{conn_str} {}", part.content)
-            } else {
-                part.content.clone()
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 /// Convert a CssValue to its string representation (for prelude conversion)
@@ -393,24 +364,7 @@ fn value_to_string(value: &internal::CssValue, source: &str) -> String {
 fn convert_atrule_block_child(child: &internal::CssBlockChild, source: &str) -> serde_json::Value {
     match child {
         internal::CssBlockChild::Rule(rule) => convert_css_rule(rule, source),
-        internal::CssBlockChild::Declaration(decl) => {
-            // SVELTE QUIRK: Extract property and value from source to preserve raw escapes
-            let decl_source = decl.span.extract(source);
-
-            // Split using Svelte-compatible logic (handles comment-before-colon quirk)
-            let (property_source, value_source) = split_declaration_svelte_compat(decl_source);
-
-            // Apply Svelte quirks to value (backslash doubling, unicode duplication)
-            let value_with_quirks = escapes::apply_svelte_quirks(value_source);
-
-            serde_json::json!({
-                "type": "Declaration",
-                "start": decl.span.start,
-                "end": decl.span.end,
-                "property": property_source,  // Raw from source (Svelte quirk)
-                "value": value_with_quirks,
-            })
-        }
+        internal::CssBlockChild::Declaration(decl) => convert_declaration(decl, source),
         internal::CssBlockChild::Atrule(atrule) => convert_css_atrule(atrule, source),
         internal::CssBlockChild::Comment(_) => {
             // Comments are filtered out before calling this function
@@ -435,13 +389,15 @@ fn convert_selector_list(selector_list: &internal::SelectorList) -> serde_json::
     })
 }
 
-/// Convert a SelectorList to JSON, filtering out Invalid and PseudoElement selectors
+/// Convert a SelectorList to JSON, filtering out Invalid selectors (from forgiving parsing).
 ///
 /// Used for pseudo-class arguments (:is, :where, :not, :has) to ensure Svelte compatibility.
 ///
 /// Per CSS Selectors Level 4:
 /// - Invalid selectors (from forgiving parsing) are ignored for matching
-/// - Pseudo-elements are contextually invalid in :is() and :where()
+///
+/// Note: Pseudo-elements are technically contextually invalid in :is() and :where()
+/// per the spec, but Svelte's parser keeps them in the AST, so we do too.
 ///
 /// This filtering happens at conversion time, not in the internal AST, to preserve
 /// full semantic information for the formatter (which outputs all selectors).
@@ -449,7 +405,7 @@ fn convert_selector_list_filtered(selector_list: &internal::SelectorList) -> ser
     let children: Vec<serde_json::Value> = selector_list
         .selectors
         .iter()
-        .filter(|selector| !selector_contains_invalid_or_pseudo_element(selector))
+        .filter(|selector| !selector_contains_invalid(selector))
         .map(convert_complex_selector)
         .collect();
 
@@ -461,14 +417,12 @@ fn convert_selector_list_filtered(selector_list: &internal::SelectorList) -> ser
     })
 }
 
-/// Check if a complex selector contains Invalid or PseudoElement simple selectors
-fn selector_contains_invalid_or_pseudo_element(complex: &internal::ComplexSelector) -> bool {
+/// Check if a complex selector contains Invalid simple selectors (from forgiving parsing)
+fn selector_contains_invalid(complex: &internal::ComplexSelector) -> bool {
     for relative in &complex.children {
         for simple in &relative.selectors {
-            match simple {
-                internal::SimpleSelector::Invalid { .. } => return true,
-                internal::SimpleSelector::PseudoElement { .. } => return true,
-                _ => {}
+            if matches!(simple, internal::SimpleSelector::Invalid { .. }) {
+                return true;
             }
         }
     }
@@ -515,9 +469,9 @@ fn convert_relative_selector(relative: &internal::RelativeSelector) -> serde_jso
     serde_json::json!({
         "type": "RelativeSelector",
         "combinator": combinator,
+        "selectors": selectors,
         "start": relative.span.start,
         "end": relative.span.end,
-        "selectors": selectors,
     })
 }
 
@@ -658,6 +612,58 @@ fn convert_simple_selector(simple: &internal::SimpleSelector) -> serde_json::Val
     }
 }
 
+/// Translate all byte-based positions in a JSON AST to character-based positions
+///
+/// CSS AST only has `start`/`end` (no `loc`), so this just translates those.
+/// For ASCII-only sources, this is a no-op (byte == char offset).
+pub fn translate_byte_to_char_offsets(
+    value: &mut serde_json::Value,
+    map: &tsv_lang::ByteToCharMap,
+) {
+    if !map.has_multibyte() {
+        return;
+    }
+    translate_positions_recursive(value, map);
+}
+
+fn translate_positions_recursive(value: &mut serde_json::Value, map: &tsv_lang::ByteToCharMap) {
+    match value {
+        serde_json::Value::Object(obj) => {
+            let orig_start = obj
+                .get("start")
+                .and_then(serde_json::Value::as_u64)
+                .map(|v| v as u32);
+            let orig_end = obj
+                .get("end")
+                .and_then(serde_json::Value::as_u64)
+                .map(|v| v as u32);
+
+            if let Some(start_byte) = orig_start {
+                obj.insert(
+                    "start".to_string(),
+                    serde_json::Value::Number(map.byte_to_char(start_byte).into()),
+                );
+            }
+            if let Some(end_byte) = orig_end {
+                obj.insert(
+                    "end".to_string(),
+                    serde_json::Value::Number(map.byte_to_char(end_byte).into()),
+                );
+            }
+
+            for val in obj.values_mut() {
+                translate_positions_recursive(val, map);
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for item in arr {
+                translate_positions_recursive(item, map);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Convert a list of CSS nodes to a typed StyleSheet structure
 pub fn convert_css_nodes(nodes: &[internal::CssNode], source: &str) -> super::public::StyleSheet {
     // Convert all nodes (comments are stored separately and not included in JSON output)
@@ -673,7 +679,7 @@ pub fn convert_css_nodes(nodes: &[internal::CssNode], source: &str) -> super::pu
     };
 
     super::public::StyleSheet {
-        node_type: "StyleSheet".to_string(),
+        node_type: "StyleSheetFile".to_string(),
         start: content_start,
         end: content_end,
         attributes: Vec::new(),

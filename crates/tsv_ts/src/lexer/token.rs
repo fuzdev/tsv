@@ -58,6 +58,7 @@ pub enum KeywordKind {
     Async = 25,
     Await = 26,
     // Class keywords
+    This = 50,
     Super = 27,
     Extends = 28,
     // Module keywords
@@ -68,6 +69,8 @@ pub enum KeywordKind {
     Satisfies = 47,
     // Generator keywords
     Yield = 48,
+    // Debugger
+    Debugger = 51,
 }
 
 impl KeywordKind {
@@ -117,6 +120,7 @@ impl KeywordKind {
             KeywordKind::Delete => "delete",
             KeywordKind::Async => "async",
             KeywordKind::Await => "await",
+            KeywordKind::This => "this",
             KeywordKind::Super => "super",
             KeywordKind::Extends => "extends",
             KeywordKind::Export => "export",
@@ -125,6 +129,7 @@ impl KeywordKind {
             KeywordKind::As => "as",
             KeywordKind::Satisfies => "satisfies",
             KeywordKind::Yield => "yield",
+            KeywordKind::Debugger => "debugger",
         }
     }
 
@@ -490,6 +495,7 @@ static KEYWORDS: phf::Map<&'static str, KeywordKind> = phf_map! {
     "async" => KeywordKind::Async,
     "await" => KeywordKind::Await,
     // Class keywords
+    "this" => KeywordKind::This,
     "super" => KeywordKind::Super,
     "extends" => KeywordKind::Extends,
     // Module keywords
@@ -500,6 +506,8 @@ static KEYWORDS: phf::Map<&'static str, KeywordKind> = phf_map! {
     "satisfies" => KeywordKind::Satisfies,
     // Generator keywords
     "yield" => KeywordKind::Yield,
+    // Debugger
+    "debugger" => KeywordKind::Debugger,
     // TODO: Expand keyword list for:
     // - Type keywords: interface, type, namespace, etc.
 };

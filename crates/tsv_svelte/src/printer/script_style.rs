@@ -79,10 +79,38 @@ impl<'a> Printer<'a> {
         self.write("</script>\n");
     }
 
+    /// Get the `lang` or `type` attribute value from element attributes.
+    /// Strips `text/` prefix (e.g., `type="text/less"` → `"less"`).
+    /// Returns `None` if no `lang`/`type` attribute is present.
+    pub(crate) fn get_lang_attribute(
+        &self,
+        attributes: &[internal::AttributeNode],
+    ) -> Option<String> {
+        let interner = self.interner.borrow();
+        for attr_node in attributes {
+            if let internal::AttributeNode::Attribute(attr) = attr_node {
+                let name = interner.resolve(attr.name).unwrap_or("");
+                if (name == "lang" || name == "type")
+                    && let Some(value_parts) = &attr.value
+                {
+                    for part in value_parts {
+                        if let internal::AttributeValue::Text(text) = part {
+                            let lang = text.raw.trim();
+                            let lang = lang.strip_prefix("text/").unwrap_or(lang);
+                            return Some(lang.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
     /// Format a Style tag
     ///
     /// Formats the `<style>` tag with its CSS content.
     /// The CSS is formatted using the CSS printer with indentation.
+    /// For non-CSS languages (less, scss, etc.), content is preserved raw.
     pub(super) fn print_style(&mut self, style: &internal::Style) {
         // Opening tag
         self.write("<style");
@@ -97,6 +125,19 @@ impl<'a> Printer<'a> {
 
         // Check if there was any original content (including whitespace)
         let had_content = style.content_span.start != style.content_span.end;
+
+        // Foreign languages (less, scss, etc.) — preserve content raw
+        if self
+            .get_lang_attribute(&style.attributes)
+            .is_some_and(|l| l != "css")
+        {
+            if had_content {
+                let content = style.content_span.extract(self.source()).to_string();
+                self.write(&content);
+            }
+            self.write("</style>\n");
+            return;
+        }
 
         // Format CSS content if present (nodes or comments)
         if !style.css_stylesheet.nodes.is_empty() || !style.css_stylesheet.comments.is_empty() {

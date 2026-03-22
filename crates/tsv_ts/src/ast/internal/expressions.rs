@@ -36,6 +36,7 @@ pub enum Expression {
     YieldExpression(YieldExpression),
     SequenceExpression(SequenceExpression),
     RegexLiteral(RegexLiteral),
+    ThisExpression(ThisExpression),
     Super(Super),
     // Assignment and patterns
     AssignmentExpression(AssignmentExpression),
@@ -84,6 +85,7 @@ impl Expression {
             Expression::YieldExpression(yield_expr) => yield_expr.span,
             Expression::SequenceExpression(seq) => seq.span,
             Expression::RegexLiteral(regex) => regex.span,
+            Expression::ThisExpression(t) => t.span,
             Expression::Super(s) => s.span,
             Expression::AssignmentExpression(assign) => assign.span,
             Expression::ObjectPattern(obj) => obj.span,
@@ -98,6 +100,20 @@ impl Expression {
             Expression::TSParameterProperty(param_prop) => param_prop.span,
             Expression::ImportExpression(import) => import.span,
             Expression::MetaProperty(meta) => meta.span,
+        }
+    }
+
+    /// Check if this expression is a chain root that needs ChainExpression wrapping.
+    ///
+    /// Returns true if this is a MemberExpression/CallExpression (or TSNonNullExpression
+    /// wrapping one) that contains at least one `optional: true` node anywhere in
+    /// the callee/object chain.
+    pub fn has_optional_in_chain(&self) -> bool {
+        match self {
+            Expression::MemberExpression(m) => m.optional || m.object.has_optional_in_chain(),
+            Expression::CallExpression(c) => c.optional || c.callee.has_optional_in_chain(),
+            Expression::TSNonNullExpression(n) => n.expression.has_optional_in_chain(),
+            _ => false,
         }
     }
 }
@@ -633,6 +649,12 @@ pub struct RegexLiteral {
     pub pattern: String,
     /// The flags after the closing slash (e.g., "gi")
     pub flags: String,
+    pub span: Span,
+}
+
+/// This expression: `this`
+#[derive(Debug, Clone)]
+pub struct ThisExpression {
     pub span: Span,
 }
 

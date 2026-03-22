@@ -185,21 +185,38 @@ const bomStrip: DivergencePattern = {
 
 const selfClosingNonvoid: DivergencePattern = {
 	id: 'self_closing_nonvoid',
-	description: 'Empty component normalized to self-closing',
+	description: 'Non-void HTML element self-closing normalization',
 	languages: ['svelte'],
 	conformanceSections: ['Svelte/HTML'],
 	fixtures: ['svelte/elements/self_closing_nonvoid_prettier_divergence'],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
 
-		const oursSelfClosing = /<[A-Z]\w*[^>]*\/>/;
-		const prettierExplicitClose = /<\/[A-Z]\w*>/;
+		// Two directions:
+		// 1. Components: ours normalizes <Component></Component> → <Component />
+		//    (ours adds self-closing, prettier has explicit close)
+		// 2. HTML elements: ours normalizes <div /> → <div></div>
+		//    (prettier has self-closing, ours has explicit close)
+		const selfClosingTag = /<[a-zA-Z][\w.-]*[^>]*\/>/;
+		const explicitCloseTag = /<\/[a-zA-Z][\w.-]*>/;
+		// Multiline elements: /> on its own line, ></tag> on the other
+		const selfClosingEnd = /^\s*\/>\s*$/;
+		const explicitCloseEnd = />\s*<\/[a-zA-Z][\w.-]*>\s*$/;
 
-		// Check hunks for self-closing vs explicit close differences
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
-			const addedHasSelfClose = hunk.addedLines.some((l) => oursSelfClosing.test(l));
-			const removedHasExplicitClose = hunk.removedLines.some((l) => prettierExplicitClose.test(l));
-			return addedHasSelfClose && removedHasExplicitClose;
+			// Direction 1: ours self-closes, prettier explicit-closes (components)
+			const oursAddsClose = hunk.addedLines.some((l) => selfClosingTag.test(l));
+			const prettierHasExplicit = hunk.removedLines.some((l) => explicitCloseTag.test(l));
+			if (oursAddsClose && prettierHasExplicit) return true;
+			// Direction 2: prettier self-closes, ours explicit-closes (HTML elements)
+			// Includes multiline: prettier has /> line, ours has ></tag> line
+			const prettierHasSelfClose = hunk.removedLines.some(
+				(l) => selfClosingTag.test(l) || selfClosingEnd.test(l),
+			);
+			const oursHasExplicit = hunk.addedLines.some(
+				(l) => explicitCloseTag.test(l) || explicitCloseEnd.test(l),
+			);
+			return prettierHasSelfClose && oursHasExplicit;
 		});
 
 		if (hunkIndices.length > 0) {
@@ -207,7 +224,7 @@ const selfClosingNonvoid: DivergencePattern = {
 				pattern: 'self_closing_nonvoid',
 				confidence: 'likely',
 				hunkIndices,
-				reason: 'Empty component normalized to self-closing',
+				reason: 'Non-void HTML element self-closing normalization',
 			};
 		}
 		return null;

@@ -1,27 +1,19 @@
 //! CSS escape sequence handling utilities
 //!
 //! This module provides centralized escape handling for CSS, consolidating logic
-//! previously spread across lexer, parser, and printer. It implements both
-//! standard CSS escaping rules AND Svelte compatibility quirks.
+//! previously spread across lexer, parser, and printer.
 //!
 //! # Architecture
 //!
 //! - **Decode**: Parse CSS escape sequences into their semantic meaning
 //! - **Encode**: Convert semantic strings back to valid CSS
-//! - **Svelte Quirks**: Apply Svelte-specific transformations for AST compatibility
 //!
-//! # Svelte Compatibility
+//! # Svelte Quirks (historical)
 //!
-//! **⚠️ IMPORTANT**: Quirks are ONLY applied during JSON conversion (extracted from
-//! source via span) for Svelte compatibility. The **printer normalizes these quirks away**
-//! to produce clean, standards-compliant CSS output.
-//!
-//! See SVELTE_COMPATIBILITY.md for full details. Summary:
-//! 1. **Backslash doubling**: All `\` become `\\` in CSS values (AST only)
-//! 2. **Unicode first-digit duplication**: `\0001F4A9` becomes `\00001F4A9` (AST only)
-//!
-//! Both quirks are applied together in [`apply_svelte_quirks()`] (conversion layer uses this).
-//! The printer outputs clean CSS without quirks.
+//! [`apply_svelte_quirks()`] implements backslash doubling and unicode first-digit
+//! duplication that older Svelte versions applied during CSS value parsing. Current
+//! Svelte versions no longer apply these quirks, so the conversion layer passes raw
+//! source values through unchanged. The function is retained for reference and testing.
 
 /// Apply Svelte compatibility quirks to CSS value string.
 ///

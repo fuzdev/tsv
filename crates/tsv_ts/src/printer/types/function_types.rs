@@ -347,10 +347,16 @@ impl<'a> Printer<'a> {
             internal::Expression::Identifier(id) => {
                 self.build_identifier_doc_with_wrapping_type(id)
             }
-            internal::Expression::RestElement(rest) => d.concat(&[
-                d.text("..."),
-                self.build_function_type_param_expression_doc(&rest.argument),
-            ]),
+            internal::Expression::RestElement(rest) => {
+                let mut parts = vec![
+                    d.text("..."),
+                    self.build_function_type_param_expression_doc(&rest.argument),
+                ];
+                if let Some(ta) = &rest.type_annotation {
+                    parts.push(self.build_type_annotation_doc(ta));
+                }
+                d.concat(&parts)
+            }
             _ => self.build_expression_doc(expr),
         }
     }

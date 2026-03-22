@@ -5,9 +5,7 @@ use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
-use super::super::scan::{
-    is_identifier_start, parse_number_literal, skip_identifier, skip_whitespace_and_comments,
-};
+use super::super::scan::{is_identifier_start, skip_identifier, skip_whitespace_and_comments};
 
 impl<'a> Parser<'a> {
     pub(in crate::parser) fn parse_type_annotation(
@@ -208,6 +206,14 @@ impl<'a> Parser<'a> {
         }
 
         match self.current_kind() {
+            // `this` keyword in type context (for `this` type, e.g., `this is T`)
+            TokenKind::Keyword(KeywordKind::This) => {
+                let (start, end) = self.current_pos();
+                self.advance()?;
+                Ok(TSType::ThisType(TSThisType {
+                    span: Span::new(start as u32, end as u32),
+                }))
+            }
             // `const` keyword in type context (for `as const`)
             // Treated as a type reference with name "const"
             TokenKind::Keyword(KeywordKind::Const) => {
@@ -226,26 +232,8 @@ impl<'a> Parser<'a> {
             }
             // Numeric literal types: `1`, `42.5`, `1n`
             TokenKind::Number => {
-                let (start, end) = self.current_pos();
-                let raw = self.current_value();
-                let is_bigint = raw.ends_with('n');
-
-                let literal = if is_bigint {
-                    // BigInt: strip the 'n' suffix for value
-                    let value = raw[..raw.len() - 1].to_string();
-                    Literal {
-                        value: LiteralValue::BigInt(value),
-                        span: Span::new(start as u32, end as u32),
-                    }
-                } else {
-                    // Regular number
-                    let number = parse_number_literal(raw)
-                        .map_err(|_| self.error_msg_at(&format!("Invalid number: {raw}"), start))?;
-                    Literal {
-                        value: LiteralValue::Number(number),
-                        span: Span::new(start as u32, end as u32),
-                    }
-                };
+                let literal = self.parse_number_or_bigint_literal()?;
+                let is_bigint = matches!(literal.value, LiteralValue::BigInt(_));
                 self.advance()?;
 
                 if is_bigint {
@@ -274,25 +262,10 @@ impl<'a> Parser<'a> {
                     return Err(self.error_expected("number after '-' in type context"));
                 }
 
-                let (num_start, num_end) = self.current_pos();
-                let raw = self.current_value();
-                let is_bigint = raw.ends_with('n');
-
-                let argument = if is_bigint {
-                    let value = raw[..raw.len() - 1].to_string();
-                    Literal {
-                        value: LiteralValue::BigInt(value),
-                        span: Span::new(num_start as u32, num_end as u32),
-                    }
-                } else {
-                    let number = parse_number_literal(raw).map_err(|_| {
-                        self.error_msg_at(&format!("Invalid number: {raw}"), num_start)
-                    })?;
-                    Literal {
-                        value: LiteralValue::Number(number),
-                        span: Span::new(num_start as u32, num_end as u32),
-                    }
-                };
+                let argument = self.parse_number_or_bigint_literal()?;
+                let num_end = self.current_pos().1;
+                // TODO should this be used?
+                let _is_bigint = matches!(argument.value, LiteralValue::BigInt(_));
                 self.advance()?;
 
                 let unary = UnaryExpression {
@@ -530,7 +503,7 @@ impl<'a> Parser<'a> {
             .as_ref()
             .map(|ta| ta.span.end)
             .or_else(|| qualifier.as_ref().map(|q| q.span().end))
-            .unwrap_or(self.prev_end as u32);
+            .unwrap_or(self.prev_token_end() as u32);
 
         Ok(TSImportType {
             argument,
@@ -636,12 +609,11 @@ impl<'a> Parser<'a> {
             return Err(self.error_msg("Type argument list cannot be empty"));
         }
 
-        let (_, end) = self.current_pos();
-        self.expect_greater_than_in_type()?;
+        let end = self.greater_than_end_in_type()?;
 
         Ok(TSTypeParameterInstantiation {
             params,
-            span: Span::new(start as u32, end as u32),
+            span: Span::new(start as u32, end),
         })
     }
 
@@ -655,8 +627,8 @@ impl<'a> Parser<'a> {
         // type operators (|, &), brackets, literals, etc.
         if self.is_definitely_type_start() {
             let inner_type = self.parse_type()?;
-            let end = self.current_pos().0;
             self.expect(&TokenKind::ParenClose)?;
+            let end = self.prev_token_end();
 
             return Ok(TSType::Parenthesized(TSParenthesizedType {
                 type_annotation: Box::new(inner_type),
@@ -691,7 +663,8 @@ impl<'a> Parser<'a> {
                     type_arguments: None,
                     span: id.span,
                 });
-                let end = params[0].span().end;
+                // Use end of closing paren, not end of inner type
+                let end = self.prev_token_end() as u32;
                 Ok(TSType::Parenthesized(TSParenthesizedType {
                     type_annotation: Box::new(type_ref),
                     span: Span::new(start as u32, end),
@@ -869,10 +842,23 @@ impl<'a> Parser<'a> {
         if self.check(&TokenKind::DotDotDot) {
             let (start, _) = self.current_pos();
             self.advance()?;
-            let arg = self.parse_function_type_param()?;
+            let mut arg = self.parse_function_type_param()?;
             let end = arg.span().end;
+            // Move type_annotation from Identifier to RestElement (matching acorn behavior)
+            let type_annotation = if let Expression::Identifier(ref mut id) = arg {
+                if let Some(ta) = id.type_annotation.take() {
+                    // Shrink identifier span to exclude type annotation
+                    id.span = Span::new(id.span.start, ta.span.start);
+                    Some(Box::new(ta))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
             return Ok(Expression::RestElement(RestElement {
                 argument: Box::new(arg),
+                type_annotation,
                 span: Span::new(start as u32, end),
             }));
         }
@@ -924,7 +910,7 @@ impl<'a> Parser<'a> {
         // - Index signature: `{ readonly [key: string]: T }` or `{ [key: string]: T }`
         // The distinction is `in` vs `:` after the identifier
         if self.check(&TokenKind::BracketOpen) {
-            return self.parse_bracket_type_member_or_mapped(start, false);
+            return self.parse_bracket_type_member_or_mapped(start, false, None);
         }
 
         // Check for `readonly [` - needs disambiguation
@@ -932,17 +918,19 @@ impl<'a> Parser<'a> {
             && self.current_value() == "readonly"
             && matches!(self.peek_kind(), TokenKind::BracketOpen)
         {
+            let readonly_start = self.current_pos().0;
             self.advance()?; // consume 'readonly'
-            return self.parse_bracket_type_member_or_mapped(start, true);
+            return self.parse_bracket_type_member_or_mapped(start, true, Some(readonly_start));
         }
 
         let mut members = Vec::new();
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-            members.push(self.parse_type_element()?);
-            // Consume separator (; or ,) if present
-            if !self.eat(TokenKind::Semicolon) {
-                self.eat(TokenKind::Comma);
+            let mut element = self.parse_type_element()?;
+            // Consume separator (; or ,) if present, extending the element span to include it
+            if self.eat(TokenKind::Semicolon) || self.eat(TokenKind::Comma) {
+                element.extend_span_to(self.prev_token_end() as u32);
             }
+            members.push(element);
         }
 
         let (_, end) = self.current_pos();
@@ -961,8 +949,10 @@ impl<'a> Parser<'a> {
         &mut self,
         start: usize,
         readonly: bool,
+        readonly_start: Option<usize>,
     ) -> Result<TSType, ParseError> {
         // At this point: current is `[`
+        let bracket_start = self.current_pos().0;
         self.expect(&TokenKind::BracketOpen)?;
 
         // Parse the identifier (parameter name for mapped type, or key name for index sig)
@@ -972,7 +962,7 @@ impl<'a> Parser<'a> {
             .ok_or_else(|| self.error_expected_after("identifier", "["))?
             .to_string();
         let param_symbol = self.intern(&param_name);
-        let (id_start, id_end) = self.current_pos();
+        let (id_start, _) = self.current_pos();
         self.advance()?;
 
         // NOW we can distinguish: `in` means mapped type, `:` means index signature
@@ -990,9 +980,9 @@ impl<'a> Parser<'a> {
             // Parse it as a type element, then continue with remaining members
             self.parse_type_literal_starting_with_index_sig(
                 start,
+                readonly_start.unwrap_or(bracket_start),
                 param_symbol,
                 id_start,
-                id_end,
                 readonly,
             )
         } else {
@@ -1006,59 +996,75 @@ impl<'a> Parser<'a> {
 
     /// Parse type literal that starts with an index signature
     /// Called after `[identifier` has been consumed and we saw `:`
-    fn parse_type_literal_starting_with_index_sig(
+    /// Parse the body of an index signature after `[identifier` has been consumed.
+    /// Expects current token to be `:` (the colon after the parameter name).
+    /// Returns the completed `TSTypeElement::IndexSignature`.
+    fn parse_index_signature_body(
         &mut self,
-        start: usize,
+        sig_start: usize,
         param_symbol: string_interner::DefaultSymbol,
         id_start: usize,
-        _id_end: usize,
         readonly: bool,
-    ) -> Result<TSType, ParseError> {
-        // We're at `:` after `[identifier`
-        // Parse: `: type]: value_type`
+    ) -> Result<TSTypeElement, ParseError> {
+        let param_colon_start = self.current_pos().0;
         self.expect(&TokenKind::Colon)?;
         let param_type = self.parse_type()?;
+        let param_type_end = param_type.span().end;
 
         let param = Identifier {
             name: param_symbol,
             optional: false,
             type_annotation: Some(TSTypeAnnotation {
-                type_annotation: Box::new(param_type.clone()),
-                span: param_type.span(),
+                type_annotation: Box::new(param_type),
+                span: Span::new(param_colon_start as u32, param_type_end),
             }),
             decorators: None,
-            span: Span::new(id_start as u32, param_type.span().end),
+            span: Span::new(id_start as u32, param_type_end),
         };
 
         self.expect(&TokenKind::BracketClose)?;
+        let value_colon_start = self.current_pos().0;
         self.expect(&TokenKind::Colon)?;
 
         let value_type = self.parse_type()?;
         let member_end = value_type.span().end;
 
-        let index_sig = TSTypeElement::IndexSignature(TSIndexSignature {
+        Ok(TSTypeElement::IndexSignature(TSIndexSignature {
             parameters: vec![param],
             type_annotation: TSTypeAnnotation {
                 type_annotation: Box::new(value_type),
-                span: Span::new(id_start as u32, member_end),
+                span: Span::new(value_colon_start as u32, member_end),
             },
             readonly,
-            span: Span::new(start as u32, member_end),
-        });
+            span: Span::new(sig_start as u32, member_end),
+        }))
+    }
+
+    fn parse_type_literal_starting_with_index_sig(
+        &mut self,
+        start: usize,
+        bracket_start: usize,
+        param_symbol: string_interner::DefaultSymbol,
+        id_start: usize,
+        readonly: bool,
+    ) -> Result<TSType, ParseError> {
+        let index_sig =
+            self.parse_index_signature_body(bracket_start, param_symbol, id_start, readonly)?;
 
         // Now parse remaining members
         let mut members = vec![index_sig];
 
-        // Consume separator (; or ,) if present
-        if !self.eat(TokenKind::Semicolon) {
-            self.eat(TokenKind::Comma);
+        // Consume separator (; or ,) if present, extending the element span to include it
+        if self.eat(TokenKind::Semicolon) || self.eat(TokenKind::Comma) {
+            members[0].extend_span_to(self.prev_token_end() as u32);
         }
 
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-            members.push(self.parse_type_element()?);
-            if !self.eat(TokenKind::Semicolon) {
-                self.eat(TokenKind::Comma);
+            let mut element = self.parse_type_element()?;
+            if self.eat(TokenKind::Semicolon) || self.eat(TokenKind::Comma) {
+                element.extend_span_to(self.prev_token_end() as u32);
             }
+            members.push(element);
         }
 
         let (_, end) = self.current_pos();
@@ -1273,7 +1279,7 @@ impl<'a> Parser<'a> {
                     });
                     return Ok(TSType::Optional(TSOptionalType {
                         type_annotation: Box::new(type_ref),
-                        span: Span::new(elem_start as u32, self.prev_end as u32),
+                        span: Span::new(elem_start as u32, self.prev_token_end() as u32),
                     }));
                 }
             } else {
@@ -1301,7 +1307,7 @@ impl<'a> Parser<'a> {
 
         // Check for optional suffix: `T?`
         if self.eat(TokenKind::Question) {
-            let end = self.prev_end;
+            let end = self.prev_token_end();
             Ok(TSType::Optional(TSOptionalType {
                 type_annotation: Box::new(inner_type),
                 span: Span::new(elem_start as u32, end as u32),
@@ -1486,11 +1492,12 @@ impl<'a> Parser<'a> {
 
     /// Parse type alias declaration inner - assumes 'type' keyword already consumed
     /// Used by export type X = T when 'type' is consumed to check for { vs identifier
-    pub(super) fn parse_type_alias_declaration_inner(&mut self) -> Result<Statement, ParseError> {
-        // Start position is before 'type' keyword, but we already consumed it
-        // Use current position as a reasonable approximation
-        let (start, _) = self.current_pos();
-        let decl = self.parse_type_alias_declaration_body(start)?;
+    /// `type_start` is the position of the 'type' keyword (captured before advancing)
+    pub(super) fn parse_type_alias_declaration_inner(
+        &mut self,
+        type_start: usize,
+    ) -> Result<Statement, ParseError> {
+        let decl = self.parse_type_alias_declaration_body(type_start)?;
         Ok(Statement::TSTypeAliasDeclaration(decl))
     }
 
@@ -1522,14 +1529,13 @@ impl<'a> Parser<'a> {
 
         // Parse the type
         let type_annotation = self.parse_type()?;
-        let type_end = type_annotation.span().end;
-        self.semicolon()?;
+        let end = self.semicolon_end()?;
 
         Ok(TSTypeAliasDeclaration {
             id,
             type_parameters,
             type_annotation,
-            span: Span::new(start as u32, type_end),
+            span: Span::new(start as u32, end),
         })
     }
 
@@ -1631,11 +1637,12 @@ impl<'a> Parser<'a> {
 
         let mut body = Vec::new();
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-            body.push(self.parse_type_element()?);
-            // Consume separator (; or ,) if present
-            if !self.eat(TokenKind::Semicolon) {
-                self.eat(TokenKind::Comma);
+            let mut element = self.parse_type_element()?;
+            // Consume separator (; or ,) if present, extending the element span to include it
+            if self.eat(TokenKind::Semicolon) || self.eat(TokenKind::Comma) {
+                element.extend_span_to(self.prev_token_end() as u32);
             }
+            body.push(element);
         }
 
         let (_, end) = self.current_pos();
@@ -1745,40 +1752,11 @@ impl<'a> Parser<'a> {
             if self.is_index_signature_start() {
                 self.advance()?; // consume '['
 
-                // Parse index parameter
                 let (param_start, _) = self.current_pos();
                 let param_symbol = self.intern_identifier();
                 self.advance()?;
 
-                self.expect(&TokenKind::Colon)?;
-                let param_type = self.parse_type()?;
-
-                let param = Identifier {
-                    name: param_symbol,
-                    optional: false,
-                    type_annotation: Some(TSTypeAnnotation {
-                        type_annotation: Box::new(param_type.clone()),
-                        span: param_type.span(),
-                    }),
-                    decorators: None,
-                    span: Span::new(param_start as u32, param_type.span().end),
-                };
-
-                self.expect(&TokenKind::BracketClose)?;
-                self.expect(&TokenKind::Colon)?;
-
-                let value_type = self.parse_type()?;
-                let end = value_type.span().end;
-
-                return Ok(TSTypeElement::IndexSignature(TSIndexSignature {
-                    parameters: vec![param],
-                    type_annotation: TSTypeAnnotation {
-                        type_annotation: Box::new(value_type),
-                        span: Span::new(start as u32, end),
-                    },
-                    readonly,
-                    span: Span::new(start as u32, end),
-                }));
+                return self.parse_index_signature_body(start, param_symbol, param_start, readonly);
             }
             // If not an index signature, fall through to computed property handling below
         }
@@ -1926,12 +1904,12 @@ impl<'a> Parser<'a> {
             TokenKind::Keyword(KeywordKind::Class) => self.parse_declare_class(start),
             TokenKind::Keyword(KeywordKind::Enum) => {
                 // declare enum
-                self.parse_enum_declaration(false, true)
+                self.parse_enum_declaration_with_start(false, true, start)
             }
             TokenKind::Keyword(KeywordKind::Const) => {
                 // declare const enum OR declare const variable
                 if self.peek_kind() == TokenKind::Keyword(KeywordKind::Enum) {
-                    self.parse_enum_declaration(true, true)
+                    self.parse_enum_declaration_with_start(true, true, start)
                 } else {
                     // declare const variable: `declare const x: T;`
                     self.parse_declare_variable(start)
@@ -1945,7 +1923,7 @@ impl<'a> Parser<'a> {
                 if self.current_value() == "namespace" || self.current_value() == "module" =>
             {
                 // declare namespace/module
-                self.parse_module_declaration(true, false)
+                self.parse_module_declaration_with_start(true, false, start)
             }
             TokenKind::Identifier if self.current_value() == "global" => {
                 // declare global { }
@@ -2027,11 +2005,7 @@ impl<'a> Parser<'a> {
             None
         };
 
-        let end = return_type
-            .as_ref()
-            .map_or_else(|| self.current_pos().0 as u32, |rt| rt.span.end);
-
-        self.semicolon()?;
+        let end = self.semicolon_end()?;
 
         Ok(Statement::TSDeclareFunction(TSDeclareFunction {
             id,
@@ -2063,11 +2037,22 @@ impl<'a> Parser<'a> {
         &mut self,
         start: u32,
     ) -> Result<TSTypeAnnotation, ParseError> {
+        // The predicate itself starts at the first token after `:`, not at `:`
+        let predicate_start = self.current_pos().0 as u32;
+
         // Check for 'asserts' keyword
         let asserts = self.eat_contextual_keyword("asserts");
 
-        // Check if current token is an identifier (for type predicates and asserts)
-        if let Some(param_symbol) = self.try_intern_identifier_or_keyword() {
+        // Check if current token is an identifier or `this` (for type predicates and asserts)
+        let param_symbol = self.try_intern_identifier_or_keyword().or_else(|| {
+            // `this` keyword is also valid in type predicates: `this is T`, `asserts this`
+            if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::This)) {
+                Some(self.intern("this"))
+            } else {
+                None
+            }
+        });
+        if let Some(param_symbol) = param_symbol {
             // Type predicate: `identifier is Type` or `asserts identifier is Type`
             if self.peek_is_contextual_keyword("is") {
                 let (id_start, id_end) = self.current_pos();
@@ -2087,7 +2072,7 @@ impl<'a> Parser<'a> {
                     parameter_name,
                     type_annotation: Some(Box::new(type_node)),
                     asserts,
-                    span: Span::new(start, end),
+                    span: Span::new(predicate_start, end),
                 };
 
                 return Ok(TSTypeAnnotation {
@@ -2108,7 +2093,7 @@ impl<'a> Parser<'a> {
                     parameter_name,
                     type_annotation: None,
                     asserts: true,
-                    span: Span::new(start, id_end as u32),
+                    span: Span::new(predicate_start, id_end as u32),
                 };
 
                 return Ok(TSTypeAnnotation {
@@ -2218,8 +2203,6 @@ impl<'a> Parser<'a> {
         let mut body = Vec::new();
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
             body.push(self.parse_declare_class_member()?);
-            // Consume separator if present
-            self.eat(TokenKind::Semicolon);
         }
 
         let (_, end) = self.current_pos();
@@ -2284,9 +2267,16 @@ impl<'a> Parser<'a> {
                 None
             };
 
-            let end = return_type
+            let body_end = return_type
                 .as_ref()
                 .map_or_else(|| self.current_pos().0 as u32, |rt| rt.span.end);
+
+            // Consume optional semicolon, including it in the span
+            let end = if self.eat(TokenKind::Semicolon) {
+                self.prev_token_end() as u32
+            } else {
+                body_end
+            };
 
             let kind = if is_constructor {
                 MethodKind::Constructor
@@ -2302,7 +2292,7 @@ impl<'a> Parser<'a> {
                 return_type,
                 body: BlockStatement {
                     body: Vec::new(),
-                    span: Span::new(end, end),
+                    span: Span::new(body_end, body_end),
                 },
                 generator: false,
                 r#async: false,
@@ -2340,9 +2330,14 @@ impl<'a> Parser<'a> {
                 None
             };
 
-            let end = type_annotation
+            let mut end = type_annotation
                 .as_ref()
                 .map_or_else(|| key.span().end, |ta| ta.span.end);
+
+            // Consume optional semicolon, including it in the span
+            if self.eat(TokenKind::Semicolon) {
+                end = self.prev_token_end() as u32;
+            }
 
             Ok(ClassMember::PropertyDefinition(PropertyDefinition {
                 decorators: None,
@@ -2371,6 +2366,7 @@ impl<'a> Parser<'a> {
         self.expect(&TokenKind::LessThan)?;
 
         let mut params = Vec::new();
+        let mut trailing_comma = None;
         loop {
             let param = self.parse_type_parameter()?;
             params.push(param);
@@ -2380,15 +2376,16 @@ impl<'a> Parser<'a> {
             }
             // Handle trailing comma
             if self.check_greater_than_in_type() {
+                trailing_comma = Some(self.prev_token_end() as u32 - 1);
                 break;
             }
         }
 
-        let end = self.current_pos().1 as u32;
-        self.expect_greater_than_in_type()?;
+        let end = self.greater_than_end_in_type()?;
 
         Ok(TSTypeParameterDeclaration {
             params,
+            trailing_comma,
             span: Span::new(start, end),
         })
     }
@@ -2492,8 +2489,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        let end = self.current_pos().1 as u32;
-        self.expect_greater_than_in_type()?;
+        let end = self.greater_than_end_in_type()?;
 
         Ok(TSTypeParameterInstantiation {
             params,
@@ -2518,7 +2514,15 @@ impl<'a> Parser<'a> {
         is_declare: bool,
     ) -> Result<Statement, ParseError> {
         let start = self.current_pos().0;
+        self.parse_enum_declaration_with_start(is_const, is_declare, start)
+    }
 
+    fn parse_enum_declaration_with_start(
+        &mut self,
+        is_const: bool,
+        is_declare: bool,
+        start: usize,
+    ) -> Result<Statement, ParseError> {
         // Consume 'const' if present
         if is_const {
             self.expect(&TokenKind::Keyword(KeywordKind::Const))?;
@@ -2623,7 +2627,15 @@ impl<'a> Parser<'a> {
         global: bool,
     ) -> Result<Statement, ParseError> {
         let start = self.current_pos().0;
+        self.parse_module_declaration_with_start(declare, global, start)
+    }
 
+    fn parse_module_declaration_with_start(
+        &mut self,
+        declare: bool,
+        global: bool,
+        start: usize,
+    ) -> Result<Statement, ParseError> {
         // Capture which keyword was used: 'namespace' or 'module'
         debug_assert!(
             matches!(self.current_kind(), TokenKind::Identifier)

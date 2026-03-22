@@ -83,23 +83,6 @@ impl<'a> Printer<'a> {
         call_formatting::build_call_doc_with_wrapping(self, call)
     }
 
-    /// Build a Doc for a chain (method chain or member chain) with wrapping
-    ///
-    /// Uses the chain module's grouping and doc building logic for proper
-    /// member chain formatting, including the 3+ calls rule.
-    fn build_chain_doc_with_wrapping(&self, expr: &internal::Expression) -> DocId {
-        let nodes = chain::linearize_chain(expr);
-        let base_start = get_chain_base_comment_start(&nodes, expr);
-        let groups = chain::group_chain_nodes(nodes);
-        let chain_doc = chain::build_chain_doc(&groups, self);
-
-        // Prepend comments from removed parentheses at the chain base.
-        // e.g., (/* comment */ obj).prop.method()
-        // For call chains, linearization extends member ranges to cover paren gaps
-        // with mid-chain comments — base_start excludes those to avoid duplication.
-        self.prepend_removed_paren_comments(expr.span().start, base_start, chain_doc)
-    }
-
     /// Build a Doc for a call expression (for nested contexts)
     ///
     /// Uses the chain module for:
@@ -190,7 +173,11 @@ impl<'a> Printer<'a> {
 
         if is_true_chain || callee_is_memberish {
             // Use chain wrapping for chains (nested calls) or memberish callees
-            self.build_chain_doc_with_wrapping(&internal::Expression::CallExpression(call.clone()))
+            let nodes = chain::linearize_chain_from_call(call);
+            let base_start = get_chain_base_comment_start(&nodes, &call.callee);
+            let groups = chain::group_chain_nodes(nodes);
+            let chain_doc = chain::build_chain_doc(&groups, self);
+            self.prepend_removed_paren_comments(call.span.start, base_start, chain_doc)
         } else {
             // Simple call (non-memberish callee) - wrap args directly
             self.build_call_doc_with_wrapping(call)
@@ -205,9 +192,8 @@ impl<'a> Printer<'a> {
     /// 3. Build doc with conditionalGroup for oneLine/expanded alternatives
     pub(super) fn build_member_doc(&self, member: &internal::MemberExpression) -> DocId {
         // Use chain-based implementation
-        let expr = internal::Expression::MemberExpression(member.clone());
-        let nodes = chain::linearize_chain(&expr);
-        let base_start = get_chain_base_comment_start(&nodes, &expr);
+        let nodes = chain::linearize_chain_from_member(member);
+        let base_start = get_chain_base_comment_start(&nodes, &member.object);
         let groups = chain::group_chain_nodes(nodes);
         let chain_doc = chain::build_chain_doc(&groups, self);
 

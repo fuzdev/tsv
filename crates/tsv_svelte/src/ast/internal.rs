@@ -223,6 +223,7 @@ pub struct OnDirective {
     pub expression: Option<Expression>, // Handler function
     pub modifiers: Vec<String>,         // "preventDefault", "stopPropagation", etc.
     pub span: Span,
+    pub name_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
     pub expression_tag_span: Option<Span>,
 }
@@ -236,6 +237,7 @@ pub struct BindDirective {
     pub name: String,           // Property name: "value", "checked", "this", etc.
     pub expression: Expression, // Binding target (always present - auto-generated for shorthand)
     pub span: Span,
+    pub name_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None for shorthand bindings)
     pub expression_tag_span: Option<Span>,
 }
@@ -249,6 +251,7 @@ pub struct ClassDirective {
     pub name: String,           // Class name: "class1", "class2", etc.
     pub expression: Expression, // Condition (always present - auto-generated for shorthand)
     pub span: Span,
+    pub name_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None for shorthand)
     pub expression_tag_span: Option<Span>,
 }
@@ -264,6 +267,7 @@ pub struct StyleDirective {
     pub value: StyleDirectiveValue, // true, ExpressionTag, or mixed text/expressions
     pub modifiers: Vec<String>,     // "important"
     pub span: Span,
+    pub name_span: Span,
 }
 
 /// Value of a style directive
@@ -285,6 +289,7 @@ pub struct UseDirective {
     pub name: String,                   // Action name: "action", "tooltip", etc.
     pub expression: Option<Expression>, // Parameters passed to the action
     pub span: Span,
+    pub name_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
     pub expression_tag_span: Option<Span>,
 }
@@ -345,6 +350,7 @@ pub struct TransitionDirective {
     pub modifiers: Vec<String>,         // "local", "global"
     pub direction: TransitionDirection, // Which animations to run
     pub span: Span,
+    pub name_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
     pub expression_tag_span: Option<Span>,
 }
@@ -357,6 +363,7 @@ pub struct AnimateDirective {
     pub name: String,                   // Animation name: "flip", etc.
     pub expression: Option<Expression>, // Animation parameters
     pub span: Span,
+    pub name_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
     pub expression_tag_span: Option<Span>,
 }
@@ -369,6 +376,7 @@ pub struct LetDirective {
     pub name: String,                   // Slot prop name: "item", "index", etc.
     pub expression: Option<Expression>, // Local binding pattern (Identifier, ArrayPattern, ObjectPattern)
     pub span: Span,
+    pub name_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
     pub expression_tag_span: Option<Span>,
 }
@@ -560,6 +568,7 @@ pub struct SpecialElement {
     pub attributes: Vec<AttributeNode>,
     pub fragment: Fragment,
     pub span: Span,
+    pub name_span: Span,
 }
 
 /// Svelte Options
@@ -633,6 +642,7 @@ pub struct Element {
     pub attributes: Vec<AttributeNode>,
     pub fragment: Fragment,
     pub span: Span,
+    pub name_span: Span,
 }
 
 /// Svelte Attribute - element attribute
@@ -648,6 +658,7 @@ pub struct Attribute {
     pub name: DefaultSymbol,
     pub value: Option<Vec<AttributeValue>>,
     pub span: Span,
+    pub name_span: Span,
 }
 
 /// Svelte SpreadAttribute - spread object as attributes

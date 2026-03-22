@@ -1,0 +1,221 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 93,
+		"end": 118,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 103,
+					"end": 105,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 103,
+							"end": 105,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "a",
+											"start": 103,
+											"end": 105
+										}
+									],
+									"start": 103,
+									"end": 105
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 106,
+					"end": 109,
+					"children": []
+				},
+				"start": 103,
+				"end": 109
+			}
+		],
+		"content": {
+			"start": 100,
+			"end": 110,
+			"styles": "\n  .a\n{\n}\n",
+			"comment": {
+				"type": "Comment",
+				"start": 68,
+				"end": 92,
+				"data": " prettier-ignore "
+			}
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 119,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 24,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "Text",
+				"start": 24,
+				"end": 25,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 51,
+				"end": 53,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 53,
+				"end": 66,
+				"name": "h1",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 54
+					},
+					"end": {
+						"line": 7,
+						"column": 3,
+						"character": 56
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 57,
+							"end": 61,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 66,
+				"end": 68,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 68,
+				"end": 92,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "Text",
+				"start": 92,
+				"end": 93,
+				"raw": "\n",
+				"data": "\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 25,
+		"end": 51,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 33,
+			"end": 42,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 36,
+					"end": 41,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 2
+						},
+						"end": {
+							"line": 4,
+							"column": 1
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 36,
+						"end": 41,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 2
+							},
+							"end": {
+								"line": 4,
+								"column": 1
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 36,
+							"end": 38,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 2
+								},
+								"end": {
+									"line": 3,
+									"column": 4
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module",
+			"leadingComments": [
+				{
+					"type": "Line",
+					"value": " prettier-ignore "
+				}
+			]
+		},
+		"attributes": []
+	}
+}

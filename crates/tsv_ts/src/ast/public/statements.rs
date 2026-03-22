@@ -47,6 +47,7 @@ pub enum Statement {
     ContinueStatement(ContinueStatement),
     LabeledStatement(LabeledStatement),
     EmptyStatement(EmptyStatement),
+    DebuggerStatement(DebuggerStatement),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -121,7 +122,6 @@ pub struct IfStatement {
     pub loc: SourceLocation,
     pub test: Box<Expression>,
     pub consequent: Box<Statement>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub alternate: Option<Box<Statement>>,
 }
 
@@ -133,11 +133,8 @@ pub struct ForStatement {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub init: Option<ForInit>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub test: Option<Box<Expression>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub update: Option<Box<Expression>>,
     pub body: Box<Statement>,
 }
@@ -171,10 +168,10 @@ pub struct ForOfStatement {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    pub left: ForInOfLeft,
-    pub right: Box<Expression>,
     #[serde(rename = "await")]
     pub r#await: bool,
+    pub left: ForInOfLeft,
+    pub right: Box<Expression>,
     pub body: Box<Statement>,
 }
 
@@ -230,7 +227,6 @@ pub struct SwitchCase {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub test: Option<Box<Expression>>,
     pub consequent: Vec<Statement>,
 }
@@ -244,9 +240,7 @@ pub struct TryStatement {
     pub end: u32,
     pub loc: SourceLocation,
     pub block: BlockStatement,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub handler: Option<CatchClause>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub finalizer: Option<BlockStatement>,
 }
 
@@ -258,7 +252,6 @@ pub struct CatchClause {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub param: Option<Box<Expression>>,
     pub body: BlockStatement,
 }
@@ -282,7 +275,6 @@ pub struct BreakStatement {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<Identifier>,
 }
 
@@ -294,7 +286,6 @@ pub struct ContinueStatement {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<Identifier>,
 }
 
@@ -320,6 +311,16 @@ pub struct EmptyStatement {
     pub loc: SourceLocation,
 }
 
+/// Debugger statement: `debugger;`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebuggerStatement {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VariableDeclaration {
     #[serde(rename = "type")]
@@ -329,6 +330,8 @@ pub struct VariableDeclaration {
     pub loc: SourceLocation,
     pub declarations: Vec<VariableDeclarator>,
     pub kind: String,
+    #[serde(skip_serializing_if = "is_false")]
+    pub declare: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

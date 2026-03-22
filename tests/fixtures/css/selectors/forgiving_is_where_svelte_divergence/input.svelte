@@ -1,25 +1,25 @@
 <style>
-	/* :is() with syntax error - preserves invalid selector */
+	/* :is() with syntax error - invalid selector skipped */
 	div:is(.a, ., .b) {
 		color: red;
 	}
 
-	/* :where() with syntax error - preserves invalid selector */
+	/* :where() with syntax error - invalid selector skipped */
 	span:where(.class1, [, .class2) {
 		color: blue;
 	}
 
-	/* :is() with pseudo-element - preserved (contextually invalid) */
+	/* :is() with pseudo-element - kept in AST (valid syntax) */
 	p:is(.class3, ::before, .class4) {
 		margin: 10px;
 	}
 
-	/* :where() with all invalid - preserves all */
+	/* :where() with pseudo-elements only - all kept (valid syntax) */
 	h1:where(::before, ::after) {
 		padding: 5px;
 	}
 
-	/* :is() with mixed valid/invalid - preserves all */
+	/* :is() with mixed valid/invalid/pseudo-element - syntax errors skipped, rest kept */
 	article:is(.a, ., ::marker, .b:hover, [attr, .c) {
 		background: gray;
 	}

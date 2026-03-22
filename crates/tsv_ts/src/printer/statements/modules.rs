@@ -26,11 +26,10 @@ impl<'a> Printer<'a> {
         decl: &internal::ExportNamedDeclaration,
     ) -> DocId {
         let d = self.d();
-        let export_keyword = match decl.export_kind {
-            internal::ExportKind::Value => "export ",
-            internal::ExportKind::Type => "export type ",
-        };
         if let Some(declaration) = &decl.declaration {
+            // When exporting a declaration, always use plain "export " because
+            // the type/interface/declare keyword is part of the declaration itself
+            let export_keyword = "export ";
             // For decorated classes, decorators come before export keyword
             if let internal::Statement::ClassDeclaration(class) = declaration.as_ref()
                 && let Some(dec_doc) = self.build_decorators_doc(class.decorators.as_ref())
@@ -47,6 +46,10 @@ impl<'a> Printer<'a> {
             ])
         } else {
             // export { x, y as z } or export { x } from "y"
+            let export_keyword = match decl.export_kind {
+                internal::ExportKind::Value => "export ",
+                internal::ExportKind::Type => "export type ",
+            };
             let mut parts = vec![d.text(export_keyword)];
 
             // Check if the overall export is type-only

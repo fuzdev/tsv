@@ -1,0 +1,86 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 133,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 59,
+				"data": " template with foreign lang - content preserved raw "
+			},
+			{
+				"type": "Text",
+				"start": 59,
+				"end": 60,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 60,
+				"end": 132,
+				"name": "template",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 61
+					},
+					"end": {
+						"line": 2,
+						"column": 9,
+						"character": 69
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 70,
+						"end": 80,
+						"name": "lang",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 10,
+								"character": 70
+							},
+							"end": {
+								"line": 2,
+								"column": 14,
+								"character": 74
+							}
+						},
+						"value": [
+							{
+								"start": 76,
+								"end": 79,
+								"type": "Text",
+								"raw": "pug",
+								"data": "pug"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 81,
+							"end": 121,
+							"raw": "\n    h1 My Title\n\n    div\n        p Hey\n",
+							"data": "\n    h1 My Title\n\n    div\n        p Hey\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -11,25 +11,71 @@ use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
 
 use super::{
-    CommentAttachmentContext, attach_comments_recursively, convert_attribute_node,
-    convert_fragment, to_json_value,
+    CommentAttachmentContext, attach_comments_recursively, comment_to_json, convert_attribute_node,
+    convert_fragment, span_to_name_loc, to_json_value,
 };
+
+/// Detect if a script tag has `lang="ts"` attribute.
+///
+/// When `lang="ts"` is present, the script is parsed by acorn-typescript (TypeScript context).
+/// Otherwise (plain `<script>`), it's parsed by Svelte's parser (Svelte context), which
+/// omits `importKind`/`exportKind` for "value" and always includes `attributes` on
+/// import/export declarations.
+fn script_has_lang_ts(script: &internal::Script, interner: &DefaultStringInterner) -> bool {
+    for attr_node in &script.attributes {
+        let internal::AttributeNode::Attribute(attr) = attr_node else {
+            continue;
+        };
+        let name = interner.resolve_infallible(attr.name);
+        if name == "lang"
+            && let Some(values) = &attr.value
+            && let Some(internal::AttributeValue::Text(text)) = values.first()
+            && text.data == "ts"
+        {
+            return true;
+        }
+    }
+    false
+}
 
 pub(super) fn convert_script(
     script: &internal::Script,
     source: &str,
     interner: &DefaultStringInterner,
+    html_leading_comment: Option<&internal::HtmlComment>,
 ) -> public::Script {
     let context = script.context.as_str();
 
     // Use full source LocationTracker for absolute line/column numbers everywhere
     let loc = LocationTracker::new(source);
 
-    // Delegate to tsv_ts for program conversion
-    let mut program = tsv_ts::ast::convert::convert_program(&script.content, source, &loc);
+    // Detect whether this is a TypeScript script (lang="ts") or plain script.
+    // Plain scripts use Svelte's parser conventions (no importKind/exportKind for "value",
+    // always include `attributes` on import/export declarations).
+    let is_lang_ts = script_has_lang_ts(script, interner);
 
-    // Svelte's quirk: loc.start is hardcoded to {line: 1, column: 0}
-    program.loc.start = tsv_ts::ast::public::Position { line: 1, column: 0 };
+    // Delegate to tsv_ts for program conversion, using the appropriate context
+    let mut program = if is_lang_ts {
+        tsv_ts::ast::convert::convert_program(&script.content, source, &loc)
+    } else {
+        tsv_ts::ast::convert::convert_program_svelte(&script.content, source, &loc)
+    };
+
+    // Svelte uses the actual line of the script content but always column 0
+    let start_pos = loc.offset_to_position(program.start as usize);
+    program.loc.start = tsv_ts::ast::public::Position {
+        line: start_pos.line,
+        column: 0,
+        character: None,
+    };
+
+    // Svelte's quirk: loc.end extends to the end of the </script> closing tag
+    let end_pos = loc.offset_to_position(script.span.end as usize);
+    program.loc.end = tsv_ts::ast::public::Position {
+        line: end_pos.line,
+        column: end_pos.column,
+        character: None,
+    };
 
     // Attach comments to all nodes (recursively)
     // Convert program to JSON so we can inject leadingComments/trailingComments
@@ -40,36 +86,63 @@ pub(super) fn convert_script(
     // but this is acceptable for the public API layer.
     let mut program_json = to_json_value(&program);
 
-    // Track which comments have been attached to prevent duplicates
-    let mut attached_indices = std::collections::HashSet::new();
+    // Convert comments to JSON and build the queue (sorted by position, already in order).
+    // Comments within acorn type re-parse ranges get duplicated (see collect_acorn_type_reparse_ranges).
+    // The duplicate appears just before the first original from each range, matching acorn's
+    // behavior where type re-parsing causes onComment to fire twice for the same comment.
+    let reparse_ranges = tsv_ts::ast::convert::collect_acorn_type_reparse_ranges(&script.content);
 
-    // Create context for comment attachment
+    let comment_queue: std::collections::VecDeque<serde_json::Value> =
+        tsv_ts::ast::convert::build_comments_with_duplicates(
+            &script.content.comments,
+            &reparse_ranges,
+            |c| comment_to_json(c, source),
+        )
+        .into_iter()
+        .collect();
+
+    // Create context for comment attachment (acorn-style queue algorithm)
     let mut ctx = CommentAttachmentContext {
-        all_comments: &script.content.comments,
+        comments: comment_queue,
         source,
-        attached_indices: &mut attached_indices,
     };
 
-    // Recursively attach comments to all nodes in the AST
-    attach_comments_recursively(
-        &mut program_json,
-        &mut ctx,
-        None, // No parent for root Program node
-        None,
-        false, // Root node is not in an array
-    );
+    // Recursively attach comments to all nodes using acorn's DFS queue algorithm
+    attach_comments_recursively(&mut program_json, &mut ctx);
 
-    // TODO: Consider handling orphaned comments (comments that didn't attach anywhere)
-    // Currently, comments that don't attach to any node are silently ignored.
-    // Svelte handles this by attaching remaining comments to the Program node's trailingComments
-    // See: acorn.js - "Special case: Trailing comments after the root node"
-    // Could add:
-    // if attached_indices.len() < script.content.comments.len() {
-    //     let orphaned: Vec<_> = script.content.comments.iter().enumerate()
-    //         .filter(|(i, _)| !attached_indices.contains(i))
-    //         .collect();
-    //     // Attach orphaned to Program.trailingComments or log warning
-    // }
+    // Vanilla acorn (non-TS) emits `"options": null` on ImportExpression nodes;
+    // acorn-typescript omits the field entirely. We inject it via JSON post-processing
+    // rather than adding an Option<Value> field to the typed public AST, because:
+    // 1. This is a Svelte-specific acorn quirk (tsv_ts shouldn't know about it)
+    // 2. serde's skip_serializing_if can't conditionally include a null field
+    // 3. The JSON roundtrip already exists for comment attachment (same pattern)
+    if !is_lang_ts {
+        inject_import_options_null(&mut program_json);
+    }
+
+    // Inject HTML comment immediately preceding <script> as leadingComments on Program.
+    // Svelte treats these as type "Line" (its convention for HTML comments) with just
+    // the comment content (no start/end/loc fields).
+    if let Some(comment) = html_leading_comment {
+        if let serde_json::Value::Object(ref mut map) = program_json {
+            let html_comment = serde_json::json!({
+                "type": "Line",
+                "value": comment.content,
+            });
+            match map.get_mut("leadingComments") {
+                Some(serde_json::Value::Array(arr)) => {
+                    // Prepend HTML comment before any JS comments
+                    arr.insert(0, html_comment);
+                }
+                _ => {
+                    map.insert(
+                        "leadingComments".to_string(),
+                        serde_json::Value::Array(vec![html_comment]),
+                    );
+                }
+            }
+        }
+    }
 
     // Return program_json directly (preserves leadingComments/trailingComments)
     public::Script {
@@ -87,41 +160,114 @@ pub(super) fn convert_script(
 }
 
 /// Convert internal SvelteOptions to public format
+/// Find a named attribute's value in `<svelte:options>` attributes.
+fn find_option_values<'a>(
+    attrs: &'a [internal::AttributeNode],
+    name: &str,
+    interner: &DefaultStringInterner,
+) -> Option<&'a Vec<internal::AttributeValue>> {
+    attrs.iter().find_map(|attr| {
+        if let internal::AttributeNode::Attribute(attr) = attr
+            && interner.resolve_infallible(attr.name) == name
+        {
+            attr.value.as_ref()
+        } else {
+            None
+        }
+    })
+}
+
+/// Extract a plain text value from attribute values.
+fn text_value(values: &[internal::AttributeValue]) -> Option<String> {
+    values.iter().find_map(|v| {
+        if let internal::AttributeValue::Text(text) = v {
+            Some(text.data.clone())
+        } else {
+            None
+        }
+    })
+}
+
 pub(super) fn convert_svelte_options(
     options: &internal::SvelteOptions,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::SvelteOptions {
-    // Check for `runes` attribute (boolean shorthand or explicit)
+    // `runes` — boolean shorthand (`runes`) or explicit (`runes={true}`)
     let runes = options.attributes.iter().find_map(|attr| {
-        if let internal::AttributeNode::Attribute(attr) = attr {
-            if interner.resolve_infallible(attr.name) == "runes" {
-                // Boolean shorthand: `runes` (no value) -> true
-                // Explicit: `runes={true}` or `runes={false}`
-                match &attr.value {
-                    None => Some(true), // Boolean shorthand
-                    Some(values) => {
-                        // Look for expression tag with boolean literal
-                        values.iter().find_map(|v| {
-                            if let internal::AttributeValue::ExpressionTag(expr) = v
-                                && let tsv_ts::ast::internal::Expression::Literal(lit) =
-                                    &expr.expression
-                                && let tsv_ts::ast::internal::LiteralValue::Boolean(b) = lit.value
-                            {
-                                return Some(b);
-                            }
-                            None
-                        })
+        if let internal::AttributeNode::Attribute(attr) = attr
+            && interner.resolve_infallible(attr.name) == "runes"
+        {
+            match &attr.value {
+                None => Some(true),
+                Some(values) => values.iter().find_map(|v| {
+                    if let internal::AttributeValue::ExpressionTag(expr) = v
+                        && let tsv_ts::ast::internal::Expression::Literal(lit) = &expr.expression
+                        && let tsv_ts::ast::internal::LiteralValue::Boolean(b) = lit.value
+                    {
+                        Some(b)
+                    } else {
+                        None
                     }
-                }
-            } else {
-                None
+                }),
             }
         } else {
             None
         }
     });
+
+    // `namespace` — plain text value
+    let namespace =
+        find_option_values(&options.attributes, "namespace", interner).and_then(|v| text_value(v));
+
+    // `customElement` — object expression, string expression, or plain text
+    let custom_element = find_option_values(&options.attributes, "customElement", interner)
+        .and_then(|values| {
+            values.iter().find_map(|v| {
+                // Expression tag: customElement={{ tag: '...', shadow: '...' }}
+                if let internal::AttributeValue::ExpressionTag(expr) = v
+                    && let tsv_ts::ast::internal::Expression::ObjectExpression(obj) =
+                        &expr.expression
+                {
+                    let mut map = serde_json::Map::new();
+                    for prop in &obj.properties {
+                        if let tsv_ts::ast::internal::ObjectProperty::Property(p) = prop
+                            && let tsv_ts::ast::internal::Expression::Identifier(key) = &p.key
+                            && let tsv_ts::ast::internal::Expression::Literal(val) = &p.value
+                        {
+                            let key_name = interner.resolve_infallible(key.name).to_string();
+                            let json_val = match &val.value {
+                                tsv_ts::ast::internal::LiteralValue::String { content, .. } => {
+                                    serde_json::Value::String(content.clone())
+                                }
+                                tsv_ts::ast::internal::LiteralValue::Boolean(b) => {
+                                    serde_json::Value::Bool(*b)
+                                }
+                                _ => continue,
+                            };
+                            map.insert(key_name, json_val);
+                        }
+                    }
+                    return Some(serde_json::Value::Object(map));
+                }
+                // Plain text or string literal: customElement="tag-name"
+                let tag_str = match v {
+                    internal::AttributeValue::Text(text) => Some(text.data.clone()),
+                    internal::AttributeValue::ExpressionTag(expr) => {
+                        if let tsv_ts::ast::internal::Expression::Literal(lit) = &expr.expression
+                            && let tsv_ts::ast::internal::LiteralValue::String { content, .. } =
+                                &lit.value
+                        {
+                            Some(content.clone())
+                        } else {
+                            None
+                        }
+                    }
+                };
+                tag_str.map(|tag| serde_json::json!({ "tag": tag }))
+            })
+        });
 
     public::SvelteOptions {
         start: options.span.start,
@@ -132,6 +278,8 @@ pub(super) fn convert_svelte_options(
             .map(|attr| convert_attribute_node(attr, source, loc, interner))
             .collect(),
         runes,
+        namespace,
+        custom_element,
     }
 }
 
@@ -139,6 +287,7 @@ pub(super) fn convert_style(
     style: &internal::Style,
     source: &str,
     interner: &DefaultStringInterner,
+    preceding_comment: Option<&internal::HtmlComment>,
 ) -> tsv_css::StyleSheet {
     // Create LocationTracker for the full source (for attributes)
     let full_loc = LocationTracker::new(source);
@@ -172,7 +321,14 @@ pub(super) fn convert_style(
             start: style.content_span.start,
             end: style.content_span.end,
             styles,
-            comment: None,
+            comment: preceding_comment.map(|c| {
+                serde_json::json!({
+                    "type": "Comment",
+                    "start": c.span.start,
+                    "end": c.span.end,
+                    "data": c.content,
+                })
+            }),
         },
     }
 }
@@ -184,10 +340,27 @@ pub(super) fn convert_special_element(
     interner: &DefaultStringInterner,
 ) -> public::SpecialElement {
     // Extract tag and expression from the kind enum
-    let tag = elem
-        .kind
-        .tag()
-        .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
+    let tag = elem.kind.tag().map(|e| {
+        // For plain string attributes (this="hello"), Svelte produces a Literal
+        // without loc and with single-quoted raw, rather than normal expression conversion
+        if let tsv_ts::ast::internal::Expression::Literal(lit) = e
+            && let tsv_ts::ast::internal::LiteralValue::String { content, .. } = &lit.value
+        {
+            let raw_source = lit.span.extract(source);
+            if !raw_source.starts_with('\'') && !raw_source.starts_with('"') {
+                return serde_json::json!({
+                    "type": "Literal",
+                    "value": content,
+                    "raw": format!("'{content}'"),
+                    "start": lit.span.start,
+                    "end": lit.span.end,
+                });
+            }
+        }
+        to_json_value(&tsv_ts::ast::convert::convert_expression(
+            e, source, loc, interner, 0,
+        ))
+    });
 
     let expression = elem
         .kind
@@ -199,6 +372,7 @@ pub(super) fn convert_special_element(
         start: elem.span.start,
         end: elem.span.end,
         name: elem.kind.tag_name().to_string(),
+        name_loc: span_to_name_loc(elem.name_span, loc),
         attributes: elem
             .attributes
             .iter()
@@ -207,5 +381,26 @@ pub(super) fn convert_special_element(
         fragment: convert_fragment(&elem.fragment, source, loc, interner),
         tag,
         expression,
+    }
+}
+
+/// Inject `"options": null` on all ImportExpression nodes in a JSON AST.
+/// Vanilla acorn (ecmaVersion 16) always emits this field; acorn-typescript omits it.
+fn inject_import_options_null(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(map) => {
+            if map.get("type").and_then(|v| v.as_str()) == Some("ImportExpression") {
+                map.entry("options").or_insert(serde_json::Value::Null);
+            }
+            for v in map.values_mut() {
+                inject_import_options_null(v);
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for v in arr {
+                inject_import_options_null(v);
+            }
+        }
+        _ => {}
     }
 }

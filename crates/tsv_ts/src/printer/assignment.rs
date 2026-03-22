@@ -300,6 +300,34 @@ fn unwrap_expression(expr: &Expression) -> &Expression {
     }
 }
 
+/// Check if a call expression has complex type arguments that provide internal break points.
+///
+/// Returns `true` (has complex type args) when:
+/// - More than 1 type argument
+/// - Single type argument is an object/type literal, mapped type, union, or intersection
+///
+/// These cases are NOT poorly breakable — the type arguments themselves can break,
+/// so we should not break at the assignment operator.
+///
+/// Matches Prettier's `isCallExpressionWithComplexTypeArguments` (assignment.js:421)
+fn is_call_with_complex_type_arguments(call: &internal::CallExpression) -> bool {
+    use internal::TSType;
+    let Some(type_args) = &call.type_arguments else {
+        return false;
+    };
+    if type_args.params.len() > 1 {
+        return true;
+    }
+    if let Some(first) = type_args.params.first() {
+        matches!(
+            first,
+            TSType::TypeLiteral(_) | TSType::Mapped(_) | TSType::Union(_) | TSType::Intersection(_)
+        )
+    } else {
+        false
+    }
+}
+
 /// A chain is poorly breakable if it doesn't have good internal break points:
 /// - Member-only chains: `a.b.c.d` (no calls to break on)
 /// - Trivial call chains: `a.b().c()` (calls with no/simple args)
@@ -341,6 +369,14 @@ fn is_poorly_breakable_chain_recursive(
                     && is_short_arg(&call.arguments[0], source, print_width));
 
             if !is_trivial_call {
+                return false;
+            }
+
+            // Calls with complex type arguments (object/mapped/union/intersection types,
+            // or multiple type args) are NOT poorly breakable - they have internal break
+            // points via the type arguments.
+            // Matches Prettier's `isCallExpressionWithComplexTypeArguments` (assignment.js:421)
+            if is_call_with_complex_type_arguments(call) {
                 return false;
             }
 
@@ -399,8 +435,8 @@ fn is_poorly_breakable_chain_recursive(
             is_poorly_breakable_chain_recursive(&member.object, true, source, print_width)
         }
 
-        // Base cases: identifiers and `this` are valid chain roots
-        Expression::Identifier(_) | Expression::Super(_) => deep,
+        // Base cases: identifiers, `this`, and `super` are valid chain roots
+        Expression::Identifier(_) | Expression::ThisExpression(_) | Expression::Super(_) => deep,
 
         // Everything else breaks the chain
         _ => false,
@@ -533,8 +569,8 @@ fn is_short_arg(expr: &Expression, source: &str, print_width: usize) -> bool {
         // Prettier: isLiteral(node) — numbers, booleans, null, bigint (line 483)
         Expression::Literal(_) => true,
 
-        // super — rare as standalone arg, but trivially short
-        Expression::Super(_) => true,
+        // this / super — trivially short
+        Expression::ThisExpression(_) | Expression::Super(_) => true,
 
         _ => false,
     }
@@ -572,7 +608,7 @@ fn is_member_only_chain(expr: &Expression) -> bool {
     match expr {
         Expression::MemberExpression(member) => is_member_only_chain(&member.object),
         Expression::TSNonNullExpression(non_null) => is_member_only_chain(&non_null.expression),
-        Expression::Identifier(_) | Expression::Super(_) => true,
+        Expression::Identifier(_) | Expression::ThisExpression(_) | Expression::Super(_) => true,
         _ => false,
     }
 }
@@ -636,7 +672,7 @@ fn is_factory_chain(expr: &Expression, source: &str) -> bool {
             name.chars().next().is_some_and(char::is_uppercase)
                 || (!name.is_empty() && name.chars().all(|c| c == '$' || c == '_'))
         }
-        Expression::Super(_) => true,
+        Expression::ThisExpression(_) | Expression::Super(_) => true,
         _ => false,
     }
 }

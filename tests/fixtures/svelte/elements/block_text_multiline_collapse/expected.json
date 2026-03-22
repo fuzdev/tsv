@@ -1,0 +1,427 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 615,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 79,
+				"data": " Text-only content across source lines collapses to inline when it fits "
+			},
+			{
+				"type": "Text",
+				"start": 79,
+				"end": 80,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 80,
+				"end": 98,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 81
+					},
+					"end": {
+						"line": 2,
+						"column": 2,
+						"character": 82
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 83,
+							"end": 94,
+							"raw": "text1 text2",
+							"data": "text1 text2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 98,
+				"end": 100,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 100,
+				"end": 136,
+				"data": " Multiple words across lines "
+			},
+			{
+				"type": "Text",
+				"start": 136,
+				"end": 137,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 137,
+				"end": 167,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 138
+					},
+					"end": {
+						"line": 5,
+						"column": 2,
+						"character": 139
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 140,
+							"end": 163,
+							"raw": "text1 text2 text3 text4",
+							"data": "text1 text2 text3 text4"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 167,
+				"end": 169,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 169,
+				"end": 202,
+				"data": " Different block elements "
+			},
+			{
+				"type": "Text",
+				"start": 202,
+				"end": 203,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 203,
+				"end": 223,
+				"name": "h1",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 204
+					},
+					"end": {
+						"line": 8,
+						"column": 3,
+						"character": 206
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 207,
+							"end": 218,
+							"raw": "text1 text2",
+							"data": "text1 text2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 223,
+				"end": 225,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 225,
+				"end": 253,
+				"data": " Nested in container "
+			},
+			{
+				"type": "Text",
+				"start": 253,
+				"end": 254,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 254,
+				"end": 308,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 255
+					},
+					"end": {
+						"line": 11,
+						"column": 4,
+						"character": 258
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 259,
+							"end": 261,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 261,
+							"end": 279,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 12,
+									"column": 2,
+									"character": 262
+								},
+								"end": {
+									"line": 12,
+									"column": 3,
+									"character": 263
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 264,
+										"end": 275,
+										"raw": "text1 text2",
+										"data": "text1 text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 279,
+							"end": 281,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 281,
+							"end": 301,
+							"name": "h2",
+							"name_loc": {
+								"start": {
+									"line": 13,
+									"column": 2,
+									"character": 282
+								},
+								"end": {
+									"line": 13,
+									"column": 4,
+									"character": 284
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 285,
+										"end": 296,
+										"raw": "text1 text2",
+										"data": "text1 text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 301,
+							"end": 302,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 308,
+				"end": 310,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 310,
+				"end": 382,
+				"data": " Text-only, too long for inline - stays multiline (control case) "
+			},
+			{
+				"type": "Text",
+				"start": 382,
+				"end": 383,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 383,
+				"end": 504,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 1,
+						"character": 384
+					},
+					"end": {
+						"line": 17,
+						"column": 2,
+						"character": 385
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 386,
+							"end": 500,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14 text15\n\ttext16 text17.\n",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14 text15\n\ttext16 text17.\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 504,
+				"end": 506,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 506,
+				"end": 578,
+				"data": " Text with inline element child - stays multiline (control case) "
+			},
+			{
+				"type": "Text",
+				"start": 578,
+				"end": 579,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 579,
+				"end": 614,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 23,
+						"column": 1,
+						"character": 580
+					},
+					"end": {
+						"line": 23,
+						"column": 2,
+						"character": 581
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 582,
+							"end": 591,
+							"raw": "\n\ttext1\n\t",
+							"data": "\n\ttext1\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 591,
+							"end": 609,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 25,
+									"column": 2,
+									"character": 592
+								},
+								"end": {
+									"line": 25,
+									"column": 6,
+									"character": 596
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 597,
+										"end": 602,
+										"raw": "text2",
+										"data": "text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 609,
+							"end": 610,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

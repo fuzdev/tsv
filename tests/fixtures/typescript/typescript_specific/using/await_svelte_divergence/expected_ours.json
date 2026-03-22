@@ -155,7 +155,7 @@
 				},
 				"end": {
 					"line": 49,
-					"column": 0
+					"column": 9
 				}
 			},
 			"body": [
@@ -211,7 +211,7 @@
 							{
 								"type": "VariableDeclaration",
 								"start": 83,
-								"end": 124,
+								"end": 125,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -219,7 +219,7 @@
 									},
 									"end": {
 										"line": 4,
-										"column": 43
+										"column": 44
 									}
 								},
 								"declarations": [
@@ -434,7 +434,7 @@
 							{
 								"type": "VariableDeclaration",
 								"start": 225,
-								"end": 283,
+								"end": 284,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -442,7 +442,7 @@
 									},
 									"end": {
 										"line": 10,
-										"column": 60
+										"column": 61
 									}
 								},
 								"declarations": [
@@ -517,7 +517,7 @@
 																"column": 39
 															}
 														},
-														"name": "__symbol_SymbolU32 { value: 7 }"
+														"name": "AsyncDisposable"
 													}
 												}
 											}
@@ -622,7 +622,7 @@
 							{
 								"type": "VariableDeclaration",
 								"start": 376,
-								"end": 393,
+								"end": 394,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -630,7 +630,7 @@
 									},
 									"end": {
 										"line": 15,
-										"column": 19
+										"column": 20
 									}
 								},
 								"declarations": [
@@ -687,7 +687,7 @@
 							{
 								"type": "VariableDeclaration",
 								"start": 397,
-								"end": 414,
+								"end": 415,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -695,7 +695,7 @@
 									},
 									"end": {
 										"line": 16,
-										"column": 19
+										"column": 20
 									}
 								},
 								"declarations": [
@@ -812,7 +812,7 @@
 							{
 								"type": "VariableDeclaration",
 								"start": 512,
-								"end": 538,
+								"end": 539,
 								"loc": {
 									"start": {
 										"line": 21,
@@ -820,7 +820,7 @@
 									},
 									"end": {
 										"line": 21,
-										"column": 28
+										"column": 29
 									}
 								},
 								"declarations": [
@@ -938,7 +938,7 @@
 							{
 								"type": "VariableDeclaration",
 								"start": 604,
-								"end": 626,
+								"end": 627,
 								"loc": {
 									"start": {
 										"line": 26,
@@ -946,7 +946,7 @@
 									},
 									"end": {
 										"line": 26,
-										"column": 24
+										"column": 25
 									}
 								},
 								"declarations": [
@@ -1020,7 +1020,7 @@
 							{
 								"type": "VariableDeclaration",
 								"start": 630,
-								"end": 663,
+								"end": 664,
 								"loc": {
 									"start": {
 										"line": 27,
@@ -1028,7 +1028,7 @@
 									},
 									"end": {
 										"line": 27,
-										"column": 35
+										"column": 36
 									}
 								},
 								"declarations": [
@@ -1177,7 +1177,7 @@
 									{
 										"type": "VariableDeclaration",
 										"start": 756,
-										"end": 789,
+										"end": 790,
 										"loc": {
 											"start": {
 												"line": 33,
@@ -1185,7 +1185,7 @@
 											},
 											"end": {
 												"line": 33,
-												"column": 36
+												"column": 37
 											}
 										},
 										"declarations": [
@@ -1360,9 +1360,9 @@
 												"column": 48
 											}
 										},
-										"name": "__symbol_SymbolU32 { value: 25 }"
+										"name": "AsyncIterable"
 									},
-									"typeParameters": {
+									"typeArguments": {
 										"type": "TSTypeParameterInstantiation",
 										"start": 884,
 										"end": 901,
@@ -1405,7 +1405,7 @@
 															"column": 64
 														}
 													},
-													"name": "__symbol_SymbolU32 { value: 7 }"
+													"name": "AsyncDisposable"
 												}
 											}
 										]
@@ -1443,6 +1443,7 @@
 										"column": 3
 									}
 								},
+								"await": true,
 								"left": {
 									"type": "VariableDeclaration",
 									"start": 918,
@@ -1509,7 +1510,6 @@
 									},
 									"name": "resources"
 								},
-								"await": true,
 								"body": {
 									"type": "BlockStatement",
 									"start": 953,
@@ -1739,7 +1739,7 @@
 							{
 								"type": "VariableDeclaration",
 								"start": 1075,
-								"end": 1116,
+								"end": 1117,
 								"loc": {
 									"start": {
 										"line": 46,
@@ -1747,7 +1747,7 @@
 									},
 									"end": {
 										"line": 46,
-										"column": 43
+										"column": 44
 									}
 								},
 								"declarations": [
@@ -1838,7 +1838,7 @@
 							{
 								"type": "VariableDeclaration",
 								"start": 1120,
-								"end": 1163,
+								"end": 1164,
 								"loc": {
 									"start": {
 										"line": 47,
@@ -1846,7 +1846,7 @@
 									},
 									"end": {
 										"line": 47,
-										"column": 45
+										"column": 46
 									}
 								},
 								"declarations": [
@@ -1954,11 +1954,23 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
 				"value": [
 					{
-						"type": "Text",
 						"start": 14,
 						"end": 16,
+						"type": "Text",
 						"raw": "ts",
 						"data": "ts"
 					}

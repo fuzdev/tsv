@@ -26,14 +26,14 @@
 				},
 				"end": {
 					"line": 6,
-					"column": 0
+					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 20,
-					"end": 64,
+					"end": 65,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -41,7 +41,7 @@
 						},
 						"end": {
 							"line": 5,
-							"column": 2
+							"column": 3
 						}
 					},
 					"declarations": [
@@ -123,14 +123,15 @@
 											},
 											"name": "x"
 										},
+										"kind": "get",
 										"value": {
 											"type": "FunctionExpression",
-											"start": 34,
+											"start": 42,
 											"end": 47,
 											"loc": {
 												"start": {
 													"line": 3,
-													"column": 2
+													"column": 10
 												},
 												"end": {
 													"line": 3,
@@ -170,22 +171,7 @@
 																"column": 9
 															}
 														},
-														"name": {
-															"type": "Identifier",
-															"start": 40,
-															"end": 41,
-															"loc": {
-																"start": {
-																	"line": 3,
-																	"column": 8
-																},
-																"end": {
-																	"line": 3,
-																	"column": 9
-																}
-															},
-															"name": "T"
-														}
+														"name": "T"
 													}
 												]
 											},
@@ -206,8 +192,7 @@
 												},
 												"body": []
 											}
-										},
-										"kind": "get"
+										}
 									},
 									{
 										"type": "Property",
@@ -242,14 +227,15 @@
 											},
 											"name": "x"
 										},
+										"kind": "init",
 										"value": {
 											"type": "FunctionExpression",
-											"start": 51,
+											"start": 55,
 											"end": 60,
 											"loc": {
 												"start": {
 													"line": 4,
-													"column": 2
+													"column": 6
 												},
 												"end": {
 													"line": 4,
@@ -289,22 +275,7 @@
 																"column": 5
 															}
 														},
-														"name": {
-															"type": "Identifier",
-															"start": 53,
-															"end": 54,
-															"loc": {
-																"start": {
-																	"line": 4,
-																	"column": 4
-																},
-																"end": {
-																	"line": 4,
-																	"column": 5
-																}
-															},
-															"name": "T"
-														}
+														"name": "T"
 													}
 												]
 											},
@@ -325,8 +296,7 @@
 												},
 												"body": []
 											}
-										},
-										"kind": "init"
+										}
 									}
 								]
 							}
@@ -343,11 +313,23 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
 				"value": [
 					{
-						"type": "Text",
 						"start": 14,
 						"end": 16,
+						"type": "Text",
 						"raw": "ts",
 						"data": "ts"
 					}

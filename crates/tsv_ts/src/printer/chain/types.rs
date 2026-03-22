@@ -4,7 +4,7 @@
 // - ChainNode: Individual elements in a linearized chain
 // - ChainGroup: Groups of nodes that stay together on the same line
 
-use crate::ast::internal::{self, Expression, LiteralValue};
+use crate::ast::internal::{self, LiteralValue};
 use string_interner::DefaultSymbol;
 
 /// A node in a linearized chain
@@ -15,12 +15,12 @@ use string_interner::DefaultSymbol;
 pub enum ChainNode<'a> {
     /// Base expression: identifier, literal, complex expr in parens
     Base {
-        expr: &'a Expression,
+        expr: &'a internal::Expression,
         needs_parens: bool,
     },
     /// Call expression: ()
     Call {
-        expr: &'a Expression,
+        call: &'a internal::CallExpression,
         optional: bool,
     },
     /// Member access: .prop
@@ -42,7 +42,7 @@ pub enum ChainNode<'a> {
     /// Computed member access: [expr]
     /// `bracket_end` is the position just before the closing `]` (for trailing comment detection)
     ComputedMember {
-        expr: &'a Expression,
+        expr: &'a internal::Expression,
         optional: bool,
         object_end: u32,
         bracket_end: u32,
@@ -53,22 +53,22 @@ pub enum ChainNode<'a> {
 
 impl<'a> ChainNode<'a> {
     /// Create a new base node
-    pub fn base(expr: &'a Expression, needs_parens: bool) -> Self {
+    pub fn base(expr: &'a internal::Expression, needs_parens: bool) -> Self {
         Self::Base { expr, needs_parens }
     }
 
     /// Create a new call node
-    pub fn call(expr: &'a Expression) -> Self {
+    pub fn call(call: &'a internal::CallExpression) -> Self {
         Self::Call {
-            expr,
+            call,
             optional: false,
         }
     }
 
     /// Create a new call node with optional chaining
-    pub fn call_optional(expr: &'a Expression) -> Self {
+    pub fn call_optional(call: &'a internal::CallExpression) -> Self {
         Self::Call {
-            expr,
+            call,
             optional: true,
         }
     }
@@ -105,7 +105,7 @@ impl<'a> ChainNode<'a> {
 
     /// Create a new computed member node
     pub fn computed_member(
-        expr: &'a Expression,
+        expr: &'a internal::Expression,
         optional: bool,
         object_end: u32,
         bracket_end: u32,
@@ -165,7 +165,7 @@ impl<'a> ChainNode<'a> {
     /// Check if this is a numeric computed accessor like [0], [1]
     pub fn is_numeric_accessor(&self) -> bool {
         if let Self::ComputedMember { expr, .. } = self
-            && let Expression::Literal(lit) = expr
+            && let internal::Expression::Literal(lit) = expr
         {
             return matches!(lit.value, LiteralValue::Number(_));
         }
@@ -186,13 +186,12 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Get the CallExpression if this is a Call node
-    pub fn as_call_expression(&self) -> Option<&internal::CallExpression> {
-        if let Self::Call { expr, .. } = self
-            && let Expression::CallExpression(call) = expr
-        {
-            return Some(call);
+    pub fn as_call_expression(&self) -> Option<&'a internal::CallExpression> {
+        if let Self::Call { call, .. } = self {
+            Some(call)
+        } else {
+            None
         }
-        None
     }
 }
 

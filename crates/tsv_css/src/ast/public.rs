@@ -24,5 +24,5 @@ pub struct StyleContent {
     pub start: u32,
     pub end: u32,
     pub styles: String,
-    pub comment: Option<String>,
+    pub comment: Option<serde_json::Value>,
 }

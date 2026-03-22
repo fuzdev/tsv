@@ -15,8 +15,8 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 pub fn parse_svelte(source: &str) -> Result<JsValue, JsError> {
     let ast = tsv_svelte::parse(source).map_err(|e| JsError::new(&e.to_string()))?;
-    let public = tsv_svelte::convert_ast(&ast, source);
-    serde_wasm_bindgen::to_value(&public).map_err(|e| JsError::new(&e.to_string()))
+    let json_value = tsv_svelte::convert_ast_json(&ast, source);
+    serde_wasm_bindgen::to_value(&json_value).map_err(|e| JsError::new(&e.to_string()))
 }
 
 /// Parse Svelte source to internal AST only (no conversion, no serialization).
@@ -48,8 +48,8 @@ pub fn format_svelte(source: &str) -> Result<String, JsError> {
 #[wasm_bindgen]
 pub fn parse_typescript(source: &str) -> Result<JsValue, JsError> {
     let ast = tsv_ts::parse(source).map_err(|e| JsError::new(&e.to_string()))?;
-    let public = tsv_ts::convert_ast(&ast, source);
-    serde_wasm_bindgen::to_value(&public).map_err(|e| JsError::new(&e.to_string()))
+    let json_value = tsv_ts::convert_ast_json(&ast, source);
+    serde_wasm_bindgen::to_value(&json_value).map_err(|e| JsError::new(&e.to_string()))
 }
 
 /// Parse TypeScript source to internal AST only (no conversion, no serialization).
@@ -79,8 +79,8 @@ pub fn format_typescript(source: &str) -> Result<String, JsError> {
 #[wasm_bindgen]
 pub fn parse_css(source: &str) -> Result<JsValue, JsError> {
     let ast = tsv_css::parse(source).map_err(|e| JsError::new(&e.to_string()))?;
-    let public = tsv_css::convert_ast(&ast, source);
-    serde_wasm_bindgen::to_value(&public).map_err(|e| JsError::new(&e.to_string()))
+    let json_value = tsv_css::convert_ast_json(&ast, source);
+    serde_wasm_bindgen::to_value(&json_value).map_err(|e| JsError::new(&e.to_string()))
 }
 
 /// Parse CSS source to internal AST only (no conversion, no serialization).

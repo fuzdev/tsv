@@ -1,0 +1,291 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 153,
+		"end": 193,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 162,
+					"end": 165,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 162,
+							"end": 165,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 162,
+											"end": 165
+										}
+									],
+									"start": 162,
+									"end": 165
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 166,
+					"end": 184,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 170,
+							"end": 180,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 162,
+				"end": 184
+			}
+		],
+		"content": {
+			"start": 160,
+			"end": 185,
+			"styles": "\n\tdiv {\n\t\tcolor: red;\n\t}\n",
+			"comment": {
+				"type": "Comment",
+				"start": 135,
+				"end": 152,
+				"data": " comment6 "
+			}
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 194,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 17,
+				"data": " comment1 "
+			},
+			{
+				"type": "Text",
+				"start": 17,
+				"end": 18,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 18,
+				"end": 35,
+				"data": " comment2 "
+			},
+			{
+				"type": "Text",
+				"start": 35,
+				"end": 36,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 66,
+				"end": 68,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 68,
+				"end": 85,
+				"data": " comment3 "
+			},
+			{
+				"type": "Text",
+				"start": 85,
+				"end": 86,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 86,
+				"end": 103,
+				"data": " comment4 "
+			},
+			{
+				"type": "Text",
+				"start": 103,
+				"end": 104,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 104,
+				"end": 115,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 105
+					},
+					"end": {
+						"line": 9,
+						"column": 4,
+						"character": 108
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 115,
+				"end": 117,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 117,
+				"end": 134,
+				"data": " comment5 "
+			},
+			{
+				"type": "Text",
+				"start": 134,
+				"end": 135,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 135,
+				"end": 152,
+				"data": " comment6 "
+			},
+			{
+				"type": "Text",
+				"start": 152,
+				"end": 153,
+				"raw": "\n",
+				"data": "\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 36,
+		"end": 66,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 44,
+			"end": 57,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 46,
+					"end": 56,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 50,
+							"end": 55,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 5
+								},
+								"end": {
+									"line": 4,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 50,
+								"end": 51,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 5
+									},
+									"end": {
+										"line": 4,
+										"column": 6
+									}
+								},
+								"name": "x"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 54,
+								"end": 55,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 9
+									},
+									"end": {
+										"line": 4,
+										"column": 10
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module",
+			"leadingComments": [
+				{
+					"type": "Line",
+					"value": " comment2 "
+				}
+			]
+		},
+		"attributes": []
+	}
+}

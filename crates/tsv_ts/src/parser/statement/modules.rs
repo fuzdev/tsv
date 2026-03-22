@@ -23,8 +23,7 @@ impl<'a> Parser<'a> {
             TokenKind::Equals => {
                 self.advance()?; // consume '='
                 let expression = self.parse_expression()?;
-                let end = expression.span().end;
-                self.semicolon()?;
+                let end = self.semicolon_end()?;
                 Ok(Statement::TSExportAssignment(TSExportAssignment {
                     expression,
                     span: Span::new(start as u32, end),
@@ -123,6 +122,7 @@ impl<'a> Parser<'a> {
                         // - export type * from "..." - type-only re-export all
                         // - export type * as ns from "..." - type-only namespace re-export
                         // - export type X = T - type alias declaration
+                        let type_start = self.current_pos().0;
                         self.advance()?; // consume 'type'
 
                         if matches!(self.current_kind(), TokenKind::BraceOpen) {
@@ -133,13 +133,14 @@ impl<'a> Parser<'a> {
                             self.parse_export_all_declaration(start as u32, ExportKind::Type)
                         } else {
                             // export type X = T - type alias declaration
-                            let declaration = self.parse_type_alias_declaration_inner()?;
+                            let declaration =
+                                self.parse_type_alias_declaration_inner(type_start)?;
                             let end = declaration.span().end;
                             Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
                                 declaration: Some(Box::new(declaration)),
                                 specifiers: Vec::new(),
                                 source: None,
-                                export_kind: ExportKind::Value,
+                                export_kind: ExportKind::Type,
                                 span: Span::new(start as u32, end),
                             }))
                         }
@@ -152,19 +153,19 @@ impl<'a> Parser<'a> {
                             declaration: Some(Box::new(declaration)),
                             specifiers: Vec::new(),
                             source: None,
-                            export_kind: ExportKind::Value,
+                            export_kind: ExportKind::Type,
                             span: Span::new(start as u32, end),
                         }))
                     }
                     "declare" => {
-                        // export declare function/class
+                        // export declare function/class — ambient declarations are type-level
                         let declaration = self.parse_declare_statement()?;
                         let end = declaration.span().end;
                         Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
                             declaration: Some(Box::new(declaration)),
                             specifiers: Vec::new(),
                             source: None,
-                            export_kind: ExportKind::Value,
+                            export_kind: ExportKind::Type,
                             span: Span::new(start as u32, end),
                         }))
                     }
@@ -282,8 +283,7 @@ impl<'a> Parser<'a> {
             _ => {
                 // Expression
                 let expr = self.parse_expression()?;
-                let end = expr.span().end;
-                self.semicolon()?;
+                let end = self.semicolon_end()?;
                 return Ok(Statement::ExportDefaultDeclaration(
                     ExportDefaultDeclaration {
                         declaration: ExportDefaultValue::Expression(expr),
@@ -342,8 +342,7 @@ impl<'a> Parser<'a> {
 
         // Parse source string
         let source = self.parse_string_literal()?;
-        let end = source.span.end;
-        self.semicolon()?;
+        let end = self.semicolon_end()?;
 
         Ok(Statement::ExportAllDeclaration(ExportAllDeclaration {
             exported,
@@ -408,21 +407,17 @@ impl<'a> Parser<'a> {
         if !matches!(self.current_kind(), TokenKind::BraceClose) {
             return Err(self.error_expected("'}' to close export specifiers"));
         }
-        let (_, brace_end) = self.current_pos();
         self.advance()?;
 
         // Check for 'from "source"'
-        let (source, end) = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::From))
-        {
+        let source = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::From)) {
             self.advance()?;
-            let source = self.parse_string_literal()?;
-            let end = source.span.end;
-            (Some(source), end)
+            Some(self.parse_string_literal()?)
         } else {
-            (None, brace_end as u32)
+            None
         };
 
-        self.semicolon()?;
+        let end = self.semicolon_end()?;
 
         Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
             declaration: None,
@@ -467,21 +462,17 @@ impl<'a> Parser<'a> {
         if !matches!(self.current_kind(), TokenKind::BraceClose) {
             return Err(self.error_expected("'}' to close export specifiers"));
         }
-        let (_, brace_end) = self.current_pos();
         self.advance()?;
 
         // Check for 'from "source"' - type exports typically require a source
-        let (source, end) = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::From))
-        {
+        let source = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::From)) {
             self.advance()?;
-            let source = self.parse_string_literal()?;
-            let end = source.span.end;
-            (Some(source), end)
+            Some(self.parse_string_literal()?)
         } else {
-            (None, brace_end as u32)
+            None
         };
 
-        self.semicolon()?;
+        let end = self.semicolon_end()?;
 
         Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
             declaration: None,
@@ -525,11 +516,8 @@ impl<'a> Parser<'a> {
                 self.advance()?; // consume 'as'
 
                 let (exp_start, exp_end) = self.current_pos();
-                let exported_name = match self.try_intern_identifier_name() {
-                    Some(sym) => sym,
-                    None => {
-                        return Err(self.error_expected_after("identifier", "as"));
-                    }
+                let Some(exported_name) = self.try_intern_identifier_name() else {
+                    return Err(self.error_expected_after("identifier", "as"));
                 };
                 self.advance()?;
 
@@ -569,9 +557,8 @@ impl<'a> Parser<'a> {
         if matches!(self.current_kind(), TokenKind::String) {
             let source = self.parse_string_literal()?;
             // Check for import attributes after source
-            let (attributes, attr_end) = self.parse_import_attributes()?;
-            let end = attr_end.unwrap_or(source.span.end);
-            self.semicolon()?;
+            let (attributes, _attr_end) = self.parse_import_attributes()?;
+            let end = self.semicolon_end()?;
 
             return Ok(Statement::ImportDeclaration(ImportDeclaration {
                 specifiers: Vec::new(),
@@ -686,11 +673,8 @@ impl<'a> Parser<'a> {
 
                 // Parse imported name (keywords can be specifier names: `import { object }`)
                 let (imp_start, imp_end) = self.current_pos();
-                let imported_symbol = match self.try_intern_identifier_or_keyword() {
-                    Some(sym) => sym,
-                    None => {
-                        return Err(self.error_expected("identifier in import specifier"));
-                    }
+                let Some(imported_symbol) = self.try_intern_identifier_or_keyword() else {
+                    return Err(self.error_expected("identifier in import specifier"));
                 };
                 self.advance()?;
 
@@ -705,11 +689,8 @@ impl<'a> Parser<'a> {
                         self.advance()?;
 
                         let (local_start, local_end) = self.current_pos();
-                        let local_symbol = match self.try_intern_binding_name() {
-                            Some(sym) => sym,
-                            None => {
-                                return Err(self.error_expected_after("identifier", "as"));
-                            }
+                        let Some(local_symbol) = self.try_intern_binding_name() else {
+                            return Err(self.error_expected_after("identifier", "as"));
                         };
                         self.advance()?;
 
@@ -756,10 +737,9 @@ impl<'a> Parser<'a> {
         let source = self.parse_string_literal()?;
 
         // Parse import attributes: `with { type: "json" }`
-        let (attributes, attr_end) = self.parse_import_attributes()?;
+        let (attributes, _attr_end) = self.parse_import_attributes()?;
 
-        let end = attr_end.unwrap_or(source.span.end);
-        self.semicolon()?;
+        let end = self.semicolon_end()?;
 
         Ok(Statement::ImportDeclaration(ImportDeclaration {
             specifiers,
@@ -883,8 +863,7 @@ impl<'a> Parser<'a> {
             TSModuleReference::EntityName(self.parse_entity_name()?)
         };
 
-        self.semicolon()?;
-        let end = self.prev_token_end() as u32;
+        let end = self.semicolon_end()?;
 
         Ok(Statement::TSImportEqualsDeclaration(
             TSImportEqualsDeclaration {

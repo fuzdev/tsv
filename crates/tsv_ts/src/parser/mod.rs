@@ -649,11 +649,8 @@ impl<'a> Parser<'a> {
 
         // Must be followed by an identifier (keywords like `async` are valid: `#async`)
         let (_, end) = self.current_pos();
-        let name = match self.try_intern_identifier_or_keyword() {
-            Some(sym) => sym,
-            None => {
-                return Err(self.error_expected_after("identifier", "#"));
-            }
+        let Some(name) = self.try_intern_identifier_or_keyword() else {
+            return Err(self.error_expected_after("identifier", "#"));
         };
         self.advance()?;
 
@@ -688,6 +685,14 @@ impl<'a> Parser<'a> {
     /// - Splits `>=` into `>` + re-lex (may become `=>`)
     /// - Splits `>>=` into `>` + re-lex (may become `>=` or `>` + `=`)
     /// - Splits `>>>=` into `>` + re-lex (may become `>>=`)
+    /// Consume a `>` in type context and return the end position of the consumed `>`.
+    /// Handles `>>`, `>>>`, `>=`, etc. by splitting the token.
+    pub(super) fn greater_than_end_in_type(&mut self) -> Result<u32, ParseError> {
+        let end = (self.current_pos().0 + 1) as u32;
+        self.expect_greater_than_in_type()?;
+        Ok(end)
+    }
+
     pub(super) fn expect_greater_than_in_type(&mut self) -> Result<(), ParseError> {
         match self.current_kind {
             TokenKind::GreaterThan => {
@@ -809,6 +814,13 @@ impl<'a> Parser<'a> {
     /// - ASI conditions allow implicit semicolon insertion
     ///
     /// Returns Err if neither explicit semicolon nor ASI conditions are met.
+    /// Consume a semicolon and return the end position (including the semicolon).
+    /// Use this for statement spans that include the trailing semicolon.
+    pub(super) fn semicolon_end(&mut self) -> Result<u32, ParseError> {
+        self.semicolon()?;
+        Ok(self.prev_token_end() as u32)
+    }
+
     pub(super) fn semicolon(&mut self) -> Result<(), ParseError> {
         // Check for stored lexer error first (from failed eat/peek operations)
         if let Some(err) = self.lexer_error.take() {
@@ -876,9 +888,17 @@ impl<'a> Parser<'a> {
     /// Does NOT handle parameter property modifiers (`public`, `private`, `readonly`).
     fn parse_simple_param(&mut self) -> Result<Expression, ParseError> {
         let (param_start, param_end) = self.current_pos();
+        // Accept `this` keyword as a parameter name (TypeScript `this` parameter)
         let symbol = self
             .try_intern_binding_name()
-            .ok_or_else(|| self.error_expected("parameter name"))?;
+            .or_else(|| {
+                if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::This)) {
+                    Some(self.intern("this"))
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| self.error_expected("parameter name or destructuring pattern"))?;
         self.advance()?;
 
         // Check for optional marker: param?
@@ -994,6 +1014,8 @@ impl<'a> Parser<'a> {
                     TokenKind::Keyword(kw) if kw.can_be_binding_name() => {
                         self.parse_simple_param()?
                     }
+                    // TypeScript `this` parameter: `function f(this: T) {}`
+                    TokenKind::Keyword(KeywordKind::This) => self.parse_simple_param()?,
                     TokenKind::BracketOpen => {
                         // Array destructuring pattern: [a, b] or [a, b]: Type
                         let expr = self.parse_array_expression()?;
@@ -1078,13 +1100,14 @@ impl<'a> Parser<'a> {
                         let argument = Expression::Identifier(Identifier {
                             name: symbol,
                             optional: false,
-                            type_annotation,
+                            type_annotation: None,
                             decorators: None,
-                            span: Span::new(id_start as u32, arg_end as u32),
+                            span: Span::new(id_start as u32, id_end as u32),
                         });
 
                         Expression::RestElement(RestElement {
                             argument: Box::new(argument),
+                            type_annotation: type_annotation.map(Box::new),
                             span: Span::new(rest_start as u32, arg_end as u32),
                         })
                     }

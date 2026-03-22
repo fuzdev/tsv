@@ -24,8 +24,8 @@ use napi_derive::napi;
 #[napi]
 pub fn parse_svelte(source: String) -> napi::Result<String> {
     let ast = tsv_svelte::parse(&source).map_err(|e| napi::Error::from_reason(e.to_string()))?;
-    let public_ast = tsv_svelte::convert_ast(&ast, &source);
-    serde_json::to_string(&public_ast)
+    let json_value = tsv_svelte::convert_ast_json(&ast, &source);
+    serde_json::to_string(&json_value)
         .map_err(|e| napi::Error::from_reason(format!("JSON serialization error: {e}")))
 }
 
@@ -53,8 +53,8 @@ pub fn format_svelte(source: String) -> napi::Result<String> {
 #[napi]
 pub fn parse_typescript(source: String) -> napi::Result<String> {
     let ast = tsv_ts::parse(&source).map_err(|e| napi::Error::from_reason(e.to_string()))?;
-    let public_ast = tsv_ts::convert_ast(&ast, &source);
-    serde_json::to_string(&public_ast)
+    let json_value = tsv_ts::convert_ast_json(&ast, &source);
+    serde_json::to_string(&json_value)
         .map_err(|e| napi::Error::from_reason(format!("JSON serialization error: {e}")))
 }
 
@@ -81,8 +81,8 @@ pub fn format_typescript(source: String) -> napi::Result<String> {
 #[napi]
 pub fn parse_css(source: String) -> napi::Result<String> {
     let ast = tsv_css::parse(&source).map_err(|e| napi::Error::from_reason(e.to_string()))?;
-    let public_ast = tsv_css::convert_ast(&ast, &source);
-    serde_json::to_string(&public_ast)
+    let json_value = tsv_css::convert_ast_json(&ast, &source);
+    serde_json::to_string(&json_value)
         .map_err(|e| napi::Error::from_reason(format!("JSON serialization error: {e}")))
 }
 

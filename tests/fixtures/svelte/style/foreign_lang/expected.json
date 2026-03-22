@@ -1,0 +1,166 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 84,
+		"end": 154,
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 91,
+				"end": 102,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 7,
+						"character": 91
+					},
+					"end": {
+						"line": 4,
+						"column": 11,
+						"character": 95
+					}
+				},
+				"value": [
+					{
+						"start": 97,
+						"end": 101,
+						"type": "Text",
+						"raw": "less",
+						"data": "less"
+					}
+				]
+			}
+		],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 105,
+				"end": 117,
+				"name": "color",
+				"prelude": ": red",
+				"block": null
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 120,
+					"end": 123,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 120,
+							"end": 123,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 120,
+											"end": 123
+										}
+									],
+									"start": 120,
+									"end": 123
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 124,
+					"end": 145,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 128,
+							"end": 141,
+							"property": "color",
+							"value": "@color"
+						}
+					]
+				},
+				"start": 120,
+				"end": 145
+			}
+		],
+		"content": {
+			"start": 103,
+			"end": 146,
+			"styles": "\n\t@color: red;\n\n\tdiv {\n\t\tcolor: @color;\n\t}\n",
+			"comment": {
+				"type": "Comment",
+				"start": 17,
+				"end": 83,
+				"data": " lang=\"less\" - content preserved raw, not formatted as CSS "
+			}
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 155,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 15,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 5,
+							"end": 9,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 15,
+				"end": 17,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 17,
+				"end": 83,
+				"data": " lang=\"less\" - content preserved raw, not formatted as CSS "
+			},
+			{
+				"type": "Text",
+				"start": 83,
+				"end": 84,
+				"raw": "\n",
+				"data": "\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

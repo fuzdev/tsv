@@ -87,8 +87,6 @@ impl ElementKind {
 /// The bools capture orthogonal properties needed by different builder methods.
 #[allow(clippy::struct_excessive_bools)]
 struct ElementContext {
-    /// Tag name resolved from symbol
-    tag_name: String,
     /// Element type classification
     kind: ElementKind,
     /// Whether element is void (br, img, etc.)
@@ -113,6 +111,8 @@ struct ElementContext {
     trim_boundaries: bool,
     /// Whether any attribute source contains embedded newlines (forces attr group break)
     has_multiline_attr: bool,
+    /// Whether all content children are text nodes (no elements, expressions, blocks)
+    only_text_content: bool,
 }
 
 impl<'a> Printer<'a> {
@@ -132,6 +132,15 @@ impl<'a> Printer<'a> {
         // Special handling for <style> and <script> elements
         if tag_name == "style" || tag_name == "script" {
             return self.build_raw_content_element_doc(&tag_name, element, attr_docs);
+        }
+
+        // Foreign language <template> elements (e.g., <template lang="pug">)
+        // preserve content raw — we can't format non-HTML template languages
+        if tag_name == "template"
+            && let Some(lang) = self.get_lang_attribute(&element.attributes)
+            && lang != "html"
+        {
+            return self.build_foreign_template_doc(element);
         }
 
         // Whitespace-sensitive elements (pre, textarea, etc.)
@@ -158,13 +167,7 @@ impl<'a> Printer<'a> {
                     ctx.is_empty,
                     ctx.has_multiline_attr,
                 );
-                self.build_empty_element_doc(
-                    &ctx.tag_name,
-                    element,
-                    opening_tag,
-                    !attr_docs.is_empty(),
-                    ctx.kind.is_component(),
-                )
+                self.build_empty_element_doc(element, opening_tag, !attr_docs.is_empty(), ctx.kind)
             }
             ElementLayout::WithContent {
                 start,
@@ -264,13 +267,7 @@ impl<'a> Printer<'a> {
             self.build_nodes_doc_trimmed(&element.fragment.nodes, ctx.trim_boundaries)
         } else {
             // Hug both: determine if we should trim
-            let is_block_parent = !ctx.kind.is_inline();
-            let only_text_children = element
-                .fragment
-                .nodes
-                .iter()
-                .all(|n| matches!(n, FragmentNode::Text(_)));
-            let trim_text = is_block_parent && only_text_children;
+            let trim_text = !ctx.kind.is_inline() && ctx.only_text_content;
             self.build_nodes_doc_with_context(&element.fragment.nodes, trim_text)
         };
 
@@ -314,8 +311,11 @@ impl<'a> Printer<'a> {
             }
             (_, BoundaryMode::Hug) => {
                 // Hug end: content hugs closing tag
+                let is_inline = ctx.kind.is_inline();
                 let leading_break = if start_mode == BoundaryMode::Hard {
                     d.hardline()
+                } else if is_inline && Self::first_child_has_leading_ws(&element.fragment.nodes) {
+                    d.line()
                 } else {
                     d.softline()
                 };
@@ -326,8 +326,19 @@ impl<'a> Printer<'a> {
                 } else {
                     d.softline()
                 };
+                // Rebuild children with trim=true for inline elements when
+                // trim_boundaries was false, since line()/softline now provides
+                // the boundary space that would otherwise duplicate.
+                // Skip when multiline_children is true — the multiline doc already
+                // handles whitespace correctly and must not be replaced with trimmed.
+                let effective_children = if is_inline && !ctx.trim_boundaries && !multiline_children
+                {
+                    self.build_nodes_doc_trimmed(&element.fragment.nodes, true)
+                } else {
+                    children_doc
+                };
                 let inner_group =
-                    d.group(d.concat(&[children_doc, d.text("</"), d.symbol(tag_sym)]));
+                    d.group(d.concat(&[effective_children, d.text("</"), d.symbol(tag_sym)]));
                 let indent_inner = d.indent(d.concat(&[leading_break, inner_group]));
                 d.group(d.concat(&[
                     opening_tag,
@@ -670,27 +681,56 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for empty element with no hugging
+    ///
+    /// For inline elements with whitespace-only content (e.g., `<span> </span>`),
+    /// the space is preserved. When attrs force multiline, `>` and `</tag>` go
+    /// on separate lines (matching Prettier behavior).
     fn build_empty_element_doc(
         &self,
-        tag_name: &str,
         element: &internal::Element,
         opening_tag: DocId,
         has_attrs: bool,
-        is_component: bool,
+        kind: ElementKind,
     ) -> DocId {
         let d = self.d();
         let tag_sym = element.name.to_u32();
-        // Empty element: <tag attrs></tag> with no content between > and </
-        // For inline elements with attrs, use conditional_group for proper hug mode:
-        // 1. All inline: <tag attrs></tag>
-        // 2. Hug mode: <tag attrs\n></tag> (attrs inline, > on new line)
-        // 3. Full multiline: <tag\n\tattr\n></tag> (attrs on separate lines)
-        let is_inline = tsv_html::is_inline_element(tag_name) || is_component;
-        if has_attrs && is_inline {
-            // Build three alternative layouts for conditional_group
-            let closing = d.concat(&[d.text("></"), d.symbol(tag_sym), d.text(">")]);
+        let is_inline = kind.is_inline();
 
-            // State 1: All inline (current structure with line separators)
+        // Inline elements with whitespace-only content preserve a space
+        // e.g., <span> </span> stays as-is, not collapsed to <span></span>
+        // Matches prettier-plugin-svelte: isInlineElement = !isBlockElement
+        let has_ws_content = is_inline
+            && !element.fragment.nodes.is_empty()
+            && element
+                .fragment
+                .nodes
+                .iter()
+                .all(FragmentNode::is_whitespace_only_text);
+
+        if has_attrs && is_inline {
+            // Closing for inline/hug states: "></tag>" or "> </tag>"
+            let closing = if has_ws_content {
+                d.concat(&[d.text("> </"), d.symbol(tag_sym), d.text(">")])
+            } else {
+                d.concat(&[d.text("></"), d.symbol(tag_sym), d.text(">")])
+            };
+
+            // Closing for full multiline state: with whitespace content,
+            // > and </tag> go on separate lines; without, same as inline (hugged)
+            let closing_multiline = if has_ws_content {
+                let hl = d.hardline();
+                d.concat(&[
+                    d.text(">"),
+                    hl,
+                    d.text("</"),
+                    d.symbol(tag_sym),
+                    d.text(">"),
+                ])
+            } else {
+                closing
+            };
+
+            // State 1: All inline
             let inline_state = d.concat(&[opening_tag, closing]);
 
             // State 2: Hug mode - attrs inline (space-separated), > on new line
@@ -703,7 +743,7 @@ impl<'a> Printer<'a> {
                 closing,
             ]);
 
-            // State 3: Full multiline - attrs on separate lines (line-separated), > on new line
+            // State 3: Full multiline - attrs on separate lines, > on new line
             let multiline_attrs = self.build_element_attrs_doc(&element.attributes);
             let multiline_concat = d.concat(&multiline_attrs);
             let multiline_indent = d.indent(multiline_concat);
@@ -712,14 +752,45 @@ impl<'a> Printer<'a> {
                 d.symbol(tag_sym),
                 multiline_indent,
                 d.hardline(),
-                closing,
+                closing_multiline,
             ]);
 
             d.conditional_group(&[inline_state, hug_state, multiline_state])
+        } else if has_ws_content {
+            // Inline element with whitespace content, no attrs: <span> </span>
+            d.concat(&[opening_tag, d.text("> </"), d.symbol(tag_sym), d.text(">")])
         } else {
-            // Block elements or no attrs - use simple structure
+            // Block elements or truly empty - use simple structure
             d.group(d.concat(&[opening_tag, d.text("></"), d.symbol(tag_sym), d.text(">")]))
         }
+    }
+
+    /// Build a doc for a `<template>` element with a foreign language (e.g., `lang="pug"`).
+    /// Content is preserved raw — we can't format non-HTML template languages.
+    /// Format: `<template lang="pug">\n{raw content}</template>`
+    fn build_foreign_template_doc(&self, element: &internal::Element) -> DocId {
+        let d = self.d();
+        let tag_sym = element.name.to_u32();
+
+        // Opening tag: <template attrs> — use space-separated attrs (no wrapping)
+        let space_attrs = self.build_element_attrs_doc_spaces(&element.attributes);
+        let mut parts = vec![d.text("<"), d.symbol(tag_sym)];
+        parts.extend(space_attrs);
+        parts.push(d.text(">"));
+
+        // Raw content from fragment text nodes
+        for node in &element.fragment.nodes {
+            if let FragmentNode::Text(text) = node {
+                parts.push(d.text_owned(text.raw.clone()));
+            }
+        }
+
+        // Closing tag
+        parts.push(d.text("</"));
+        parts.push(d.symbol(tag_sym));
+        parts.push(d.text(">"));
+
+        d.concat(&parts)
     }
 
     /// Build a doc for a nested <style> or <script> element with formatted CSS/JS content
@@ -828,7 +899,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let tag_sym = element.name.to_u32();
-        let is_inline = tsv_html::is_inline_element(tag_name);
+        let is_inline = !tsv_html::is_block_element(tag_name);
         let has_content = !element.fragment.nodes.is_empty();
 
         // Analyze text nodes in one pass for multiline content detection.
@@ -853,7 +924,7 @@ impl<'a> Printer<'a> {
                     if text.raw.contains('\n') {
                         has_newline = true;
                     }
-                    last_ends_newline = text.raw.ends_with('\n');
+                    last_ends_newline = text.raw.trim_end_matches([' ', '\t']).ends_with('\n');
                 }
                 is_first_node = false;
             }
@@ -1325,6 +1396,7 @@ impl<'a> Printer<'a> {
             | Expression::SpreadElement(_)
             | Expression::TaggedTemplateExpression(_)
             | Expression::RegexLiteral(_)
+            | Expression::ThisExpression(_)
             | Expression::Super(_)
             | Expression::ObjectPattern(_)
             | Expression::ArrayPattern(_)
@@ -1386,14 +1458,22 @@ impl<'a> Printer<'a> {
             return false;
         };
 
-        // Inline elements: preserve multiline when content starts with newline and has non-text.
-        // `<span>\n\t{expr}</span>` preserves, `<span>  \n  {expr}</span>` collapses (space before \n).
-        // Fill mode (`{a} {b}`) stays inline even with leading newline.
+        // Inline elements: preserve multiline when content starts with newline AND ends
+        // with any whitespace (space, tab, or newline), and has non-text children.
+        // `<a>\n\t{expr}\n</a>` preserves (leading newline + trailing newline).
+        // `<a>\n\t{expr} </a>` preserves (leading newline + trailing space).
+        // `<a>\n\t{expr}</a>` collapses (leading newline but no trailing whitespace).
+        // `<a>\n  text<span>text</span></a>` collapses (no trailing whitespace).
+        // `<span>  \n  {expr}</span>` collapses (space before \n, not leading).
+        // Fill mode (`{a} {b}`) stays inline even with both breaks.
         let first_text_starts_with_newline = nodes
             .first()
             .is_some_and(|n| matches!(n, FragmentNode::Text(t) if t.raw.starts_with('\n')));
+        let last_text_ends_with_whitespace = nodes.last().is_some_and(
+            |n| matches!(n, FragmentNode::Text(t) if t.raw.ends_with(char::is_whitespace)),
+        );
 
-        if first_text_starts_with_newline {
+        if first_text_starts_with_newline && last_text_ends_with_whitespace {
             let has_nontext_content = nodes[first..=last]
                 .iter()
                 .any(|n| !matches!(n, FragmentNode::Text(_)));
@@ -1500,6 +1580,14 @@ impl<'a> Printer<'a> {
         // Any attribute doc that will_break (forces attr group break + trim_boundaries)
         let has_multiline_attr = attr_docs.iter().any(|&doc| self.d().will_break(doc));
 
+        // Check if all content children are text nodes (no elements, expressions, blocks)
+        let only_text_content = !is_empty
+            && element
+                .fragment
+                .nodes
+                .iter()
+                .all(|n| matches!(n, FragmentNode::Text(_)));
+
         // Compute needs_multiline
         let needs_multiline = self.compute_needs_multiline(
             element,
@@ -1509,6 +1597,7 @@ impl<'a> Printer<'a> {
             source_has_leading_break,
             source_has_trailing_break,
             has_block_flow_children,
+            only_text_content,
         );
 
         // Compute trim_boundaries
@@ -1519,7 +1608,6 @@ impl<'a> Printer<'a> {
         let trim_boundaries = !kind.is_inline() || will_go_multiline;
 
         ElementContext {
-            tag_name,
             kind,
             is_void,
             is_self_closing,
@@ -1532,6 +1620,7 @@ impl<'a> Printer<'a> {
             has_block_flow_children,
             trim_boundaries,
             has_multiline_attr,
+            only_text_content,
         }
     }
 
@@ -1546,6 +1635,7 @@ impl<'a> Printer<'a> {
         source_has_leading_break: bool,
         source_has_trailing_break: bool,
         has_block_flow_children: bool,
+        only_text_content: bool,
     ) -> bool {
         if is_empty {
             return false;
@@ -1581,12 +1671,17 @@ impl<'a> Printer<'a> {
         }
 
         // Source breaks in content
-        if self.has_source_breaks_in_content(
-            &element.fragment.nodes,
-            kind,
-            source_has_leading_break,
-            source_has_trailing_break,
-        ) {
+        // Skip for block elements with text-only content — whitespace newlines between
+        // text words collapse to spaces, so the group mechanism should decide layout
+        // based on whether the joined text fits inline.
+        if !only_text_content
+            && self.has_source_breaks_in_content(
+                &element.fragment.nodes,
+                kind,
+                source_has_leading_break,
+                source_has_trailing_break,
+            )
+        {
             return true;
         }
 
@@ -1609,7 +1704,9 @@ impl<'a> Printer<'a> {
         }
 
         // Text with internal newlines
-        if self.text_has_internal_newlines(element, source_has_leading_break) {
+        // Skip for text-only content — newlines between words are just whitespace
+        if !only_text_content && self.text_has_internal_newlines(element, source_has_leading_break)
+        {
             return true;
         }
 
@@ -1684,11 +1781,12 @@ impl<'a> Printer<'a> {
         }
 
         // Determine boundary modes
+        // Text-only block content uses soft boundaries so the group can collapse to
+        // inline when content fits (e.g., `<p>text1 text2</p>` instead of multiline).
+        let preserve_breaks = ctx.kind.preserves_boundary_breaks() && !ctx.only_text_content;
         let start_mode = if ctx.hug_start {
             BoundaryMode::Hug
-        } else if ctx.needs_multiline
-            || (ctx.kind.preserves_boundary_breaks() && ctx.source_has_leading_break)
-        {
+        } else if ctx.needs_multiline || (preserve_breaks && ctx.source_has_leading_break) {
             BoundaryMode::Hard
         } else {
             BoundaryMode::Soft
@@ -1696,9 +1794,7 @@ impl<'a> Printer<'a> {
 
         let end_mode = if ctx.hug_end {
             BoundaryMode::Hug
-        } else if ctx.needs_multiline
-            || (ctx.kind.preserves_boundary_breaks() && ctx.source_has_trailing_break)
-        {
+        } else if ctx.needs_multiline || (preserve_breaks && ctx.source_has_trailing_break) {
             BoundaryMode::Hard
         } else {
             BoundaryMode::Soft

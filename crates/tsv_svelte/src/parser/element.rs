@@ -58,11 +58,15 @@ impl<'a> SvelteParser<'a> {
         }
 
         let tag_name = self.current_value().to_string();
+        let name_span = Span {
+            start: self.current_start as u32,
+            end: self.current_end as u32,
+        };
         self.advance()?;
 
         // Check if this is a special element
         if let Some(special_tag) = SpecialElementTag::from_tag_name(&tag_name, in_svelte_head) {
-            return self.parse_special_element_body(start, special_tag);
+            return self.parse_special_element_body(start, name_span, special_tag);
         }
 
         // Regular element or component
@@ -73,7 +77,14 @@ impl<'a> SvelteParser<'a> {
             ElementKind::Html
         };
 
-        self.parse_regular_element_body(start, tag_name, tag_symbol, kind, in_svelte_head)
+        self.parse_regular_element_body(
+            start,
+            tag_name,
+            tag_symbol,
+            kind,
+            name_span,
+            in_svelte_head,
+        )
     }
 
     /// Parse a regular element (HTML or component)
@@ -83,6 +94,7 @@ impl<'a> SvelteParser<'a> {
         tag_name: String,
         tag_symbol: string_interner::DefaultSymbol,
         kind: ElementKind,
+        name_span: Span,
         in_svelte_head: bool,
     ) -> Result<ParsedElement, ParseError> {
         // Parse attributes
@@ -109,6 +121,7 @@ impl<'a> SvelteParser<'a> {
                     start: start as u32,
                     end: opening_tag_end as u32,
                 },
+                name_span,
             }));
         }
 
@@ -126,6 +139,7 @@ impl<'a> SvelteParser<'a> {
                     start: start as u32,
                     end,
                 },
+                name_span,
             }));
         }
 
@@ -144,6 +158,7 @@ impl<'a> SvelteParser<'a> {
                 start: start as u32,
                 end,
             },
+            name_span,
         }))
     }
 
@@ -151,6 +166,7 @@ impl<'a> SvelteParser<'a> {
     fn parse_special_element_body(
         &mut self,
         start: usize,
+        name_span: Span,
         tag: SpecialElementTag,
     ) -> Result<ParsedElement, ParseError> {
         let tag_name = tag.tag_name();
@@ -181,6 +197,7 @@ impl<'a> SvelteParser<'a> {
                     start: start as u32,
                     end: opening_tag_end as u32,
                 },
+                name_span,
             }));
         }
 
@@ -198,6 +215,7 @@ impl<'a> SvelteParser<'a> {
                 start: start as u32,
                 end,
             },
+            name_span,
         }))
     }
 
@@ -439,19 +457,15 @@ impl<'a> SvelteParser<'a> {
         self.current_end = content_end + token_end;
         self.peek_cache = None;
 
-        // If there's content, create a single Text node
-        if content_end > content_start {
-            let raw_content = &self.source[content_start..content_end];
-            Ok(vec![FragmentNode::Text(Text {
-                data: raw_content.to_string(),
-                raw: raw_content.to_string(),
-                span: Span {
-                    start: content_start as u32,
-                    end: content_end as u32,
-                },
-            })])
-        } else {
-            Ok(Vec::new())
-        }
+        // Create a Text node (Svelte always emits one, even if empty)
+        let raw_content = &self.source[content_start..content_end];
+        Ok(vec![FragmentNode::Text(Text {
+            data: raw_content.to_string(),
+            raw: raw_content.to_string(),
+            span: Span {
+                start: content_start as u32,
+                end: content_end as u32,
+            },
+        })])
     }
 }

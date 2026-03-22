@@ -623,6 +623,17 @@ impl<'a> Printer<'a> {
 
         parts.push(d.text(";"));
 
+        // Handle comments between last declarator and semicolon
+        // Prettier prints these AFTER the semicolon: `const x = 1; /* comment */`
+        if let Some(last) = decl.declarations.last() {
+            let semicolon_pos = decl.span.end.saturating_sub(1);
+            if let Some(comments_doc) =
+                self.build_inline_comments_between_doc_opt(last.span.end, semicolon_pos)
+            {
+                parts.push(comments_doc);
+            }
+        }
+
         // Restore context flags
         self.declaration_indent_depth.set(old_indent_depth);
         self.in_top_level_assignment.set(false);

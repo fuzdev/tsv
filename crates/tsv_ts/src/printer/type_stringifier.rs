@@ -154,6 +154,7 @@ impl<'a> Printer<'a> {
             TSType::Infer(i) => {
                 format!("infer {}", self.resolve_symbol(i.type_parameter.name.name))
             }
+            TSType::ThisType(_) => "this".to_string(),
         }
     }
 

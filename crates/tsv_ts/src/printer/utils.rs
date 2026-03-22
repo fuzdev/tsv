@@ -240,7 +240,10 @@ pub fn is_simple_call_argument(expr: &Expression, depth: usize) -> bool {
 
         // Single-word types are simple (Prettier: isSingleWordType)
         // Includes: Identifier, ThisExpression, Super, MetaProperty
-        Expression::Identifier(_) | Expression::Super(_) | Expression::MetaProperty(_) => true,
+        Expression::Identifier(_)
+        | Expression::ThisExpression(_)
+        | Expression::Super(_)
+        | Expression::MetaProperty(_) => true,
 
         // Template literals: simple if no newlines and expressions are simple
         Expression::TemplateLiteral(template) => {
@@ -414,6 +417,7 @@ pub fn contains_call_expression(expr: &Expression) -> bool {
         Expression::Identifier(_)
         | Expression::Literal(_)
         | Expression::RegexLiteral(_)
+        | Expression::ThisExpression(_)
         | Expression::Super(_)
         | Expression::MetaProperty(_)
         | Expression::FunctionExpression(_)

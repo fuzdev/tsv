@@ -244,23 +244,10 @@ impl<'a> Printer<'a> {
                     self.expression_to_string(&cond.alternate)
                 )
             }
-            Expression::TemplateLiteral(template) => {
-                let mut result = String::from("`");
-                for (i, quasi) in template.quasis.iter().enumerate() {
-                    result.push_str(&quasi.raw);
-                    if i < template.expressions.len() {
-                        result.push_str("${");
-                        result.push_str(&self.expression_to_string(&template.expressions[i]));
-                        result.push('}');
-                    }
-                }
-                result.push('`');
-                result
-            }
+            Expression::TemplateLiteral(template) => self.template_literal_to_string(template),
             Expression::TaggedTemplateExpression(tagged) => {
                 let tag = self.expression_to_string(&tagged.tag);
-                let quasi =
-                    self.expression_to_string(&Expression::TemplateLiteral(tagged.quasi.clone()));
+                let quasi = self.template_literal_to_string(&tagged.quasi);
                 format!("{tag}{quasi}")
             }
             Expression::NewExpression(new_expr) => {
@@ -323,6 +310,7 @@ impl<'a> Printer<'a> {
             Expression::RegexLiteral(regex) => {
                 format!("/{}/{}", regex.pattern, regex.flags)
             }
+            Expression::ThisExpression(_) => "this".to_string(),
             Expression::Super(_) => "super".to_string(),
             Expression::AssignmentExpression(assign) => {
                 format!(
@@ -516,6 +504,21 @@ impl<'a> Printer<'a> {
             }
         }
 
+        result
+    }
+
+    /// Convert a template literal to a string
+    fn template_literal_to_string(&self, template: &internal::TemplateLiteral) -> String {
+        let mut result = String::from("`");
+        for (i, quasi) in template.quasis.iter().enumerate() {
+            result.push_str(&quasi.raw);
+            if i < template.expressions.len() {
+                result.push_str("${");
+                result.push_str(&self.expression_to_string(&template.expressions[i]));
+                result.push('}');
+            }
+        }
+        result.push('`');
         result
     }
 }

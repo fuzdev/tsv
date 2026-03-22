@@ -120,3 +120,18 @@ pub fn format_with_config(
 pub fn convert_ast(stylesheet: &CssStyleSheet, source: &str) -> StyleSheet {
     ast::convert::convert_css_nodes(&stylesheet.nodes, source)
 }
+
+/// Convert CSS AST to JSON with character-based positions
+///
+/// Like `convert_ast`, but returns `serde_json::Value` with all byte-based
+/// positions (`start`, `end`) translated to Unicode character offsets.
+///
+/// This is the preferred function for producing JSON AST output.
+#[allow(clippy::expect_used)]
+pub fn convert_ast_json(stylesheet: &CssStyleSheet, source: &str) -> serde_json::Value {
+    let public_ast = ast::convert::convert_css_nodes(&stylesheet.nodes, source);
+    let mut json = serde_json::to_value(&public_ast).expect("AST types derive Serialize correctly");
+    let map = tsv_lang::ByteToCharMap::new(source);
+    ast::convert::translate_byte_to_char_offsets(&mut json, &map);
+    json
+}

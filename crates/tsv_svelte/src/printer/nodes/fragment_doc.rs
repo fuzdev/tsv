@@ -160,24 +160,24 @@ impl<'a> Printer<'a> {
         for (i, node) in nodes.iter().enumerate() {
             // prettier-ignore: skip whitespace, emit raw source for ignored node
             if prettier_ignore_next {
-                if let FragmentNode::Text(text) = node {
-                    if text.raw.is_whitespace_only() {
-                        continue;
-                    }
+                if let FragmentNode::Text(text) = node
+                    && text.raw.is_whitespace_only()
+                {
+                    continue;
                 }
                 let raw = node.span().extract(self.source);
                 docs.push(self.d().text_owned(raw.to_string()));
                 prettier_ignore_next = false;
                 continue;
             }
-            if let FragmentNode::Comment(comment) = node {
-                if comment.content.trim() == "prettier-ignore" {
-                    if let Some(doc) = self.build_fragment_node_doc_with_context(node, trim_text) {
-                        docs.push(doc);
-                    }
-                    prettier_ignore_next = true;
-                    continue;
+            if let FragmentNode::Comment(comment) = node
+                && comment.content.trim() == "prettier-ignore"
+            {
+                if let Some(doc) = self.build_fragment_node_doc_with_context(node, trim_text) {
+                    docs.push(doc);
                 }
+                prettier_ignore_next = true;
+                continue;
             }
 
             // For control flow blocks, check if there's preceding breakable content
@@ -291,10 +291,10 @@ impl<'a> Printer<'a> {
 
             // prettier-ignore: skip whitespace, emit raw source for ignored node
             if prettier_ignore_next {
-                if let FragmentNode::Text(text) = node {
-                    if text.raw.is_whitespace_only() {
-                        continue;
-                    }
+                if let FragmentNode::Text(text) = node
+                    && text.raw.is_whitespace_only()
+                {
+                    continue;
                 }
                 let raw = node.span().extract(self.source);
                 child_docs.push(d.text_owned(raw.to_string()));
@@ -302,10 +302,10 @@ impl<'a> Printer<'a> {
                 prettier_ignore_next = false;
                 continue;
             }
-            if let FragmentNode::Comment(comment) = node {
-                if comment.content.trim() == "prettier-ignore" {
-                    prettier_ignore_next = true;
-                }
+            if let FragmentNode::Comment(comment) = node
+                && comment.content.trim() == "prettier-ignore"
+            {
+                prettier_ignore_next = true;
             }
 
             if let FragmentNode::Text(text) = node {
@@ -363,7 +363,7 @@ impl<'a> Printer<'a> {
 
     /// Check if a node is inline content (non-text node that participates in fill).
     ///
-    /// This is NOT the same as `tsv_html::is_inline_element` which checks HTML classification.
+    /// This is NOT the same as `!tsv_html::is_block_element` which checks HTML classification.
     /// Here we check if a fragment node is a non-text element that appears inline with text
     /// (elements, expressions, tags) for the purpose of fill whitespace handling.
     fn is_inline_content(node: &FragmentNode) -> bool {
@@ -566,10 +566,10 @@ impl<'a> Printer<'a> {
         for (i, node) in trimmed_nodes.iter().enumerate() {
             // prettier-ignore: skip whitespace, emit raw source for ignored node
             if prettier_ignore_next {
-                if let FragmentNode::Text(text) = node {
-                    if text.raw.is_whitespace_only() {
-                        continue;
-                    }
+                if let FragmentNode::Text(text) = node
+                    && text.raw.is_whitespace_only()
+                {
+                    continue;
                 }
                 let raw = node.span().extract(self.source);
                 let raw_doc = d.text_owned(raw.to_string());
@@ -582,10 +582,10 @@ impl<'a> Printer<'a> {
                 prettier_ignore_next = false;
                 continue;
             }
-            if let FragmentNode::Comment(comment) = node {
-                if comment.content.trim() == "prettier-ignore" {
-                    prettier_ignore_next = true;
-                }
+            if let FragmentNode::Comment(comment) = node
+                && comment.content.trim() == "prettier-ignore"
+            {
+                prettier_ignore_next = true;
             }
 
             let is_block = self.is_block_fragment_node(node);
@@ -715,23 +715,43 @@ impl<'a> Printer<'a> {
                         prev_text_has_trailing_space = true;
                     }
                 } else if text.raw.contains('\n') {
-                    // Text with newlines - split into lines
-                    // Track if current line was empty BEFORE we started (from previous block)
-                    let line_was_empty_before = current_line.is_empty();
+                    // Text with newlines - split into lines at structural boundaries.
+                    //
+                    // Per-newline: content-flow (both sides have content) → collapse
+                    // by joining parts with space into one fill doc for proper wrapping.
+                    // Structural (either side whitespace-only) → preserve as line break.
+                    //
+                    // First pass: identify content-flow newlines and join those parts.
                     let parts: Vec<&str> = text.raw.split('\n').collect();
-                    // Track consecutive blank lines to collapse them to max 1
-                    // Only count as "had blank" when we actually push an empty line
-                    let mut consecutive_blank_count = 0;
+                    let mut merged_parts: Vec<String> = Vec::new();
+
                     for (idx, part) in parts.iter().enumerate() {
-                        // Push new line for each newline in the text, EXCEPT:
-                        // - idx == 0: we're still on the "before first newline" part
-                        // - idx == 1 AND line was empty before AND first part was empty:
-                        //   reuse the empty line from previous block element
+                        if idx > 0 {
+                            let prev_has_content =
+                                parts[idx - 1].contains(|c: char| !c.is_whitespace());
+                            let curr_has_content = part.contains(|c: char| !c.is_whitespace());
+
+                            if prev_has_content && curr_has_content {
+                                // Content-flow: join with previous merged part
+                                if let Some(last) = merged_parts.last_mut() {
+                                    // Trim trailing ws from prev, add space, add curr trimmed
+                                    let prev_trimmed = last.trim_end().to_string();
+                                    *last = format!("{prev_trimmed} {}", part.trim_start());
+                                }
+                                continue;
+                            }
+                        }
+                        merged_parts.push((*part).to_string());
+                    }
+
+                    // Second pass: process merged parts with original structural logic
+                    let line_was_empty_before = current_line.is_empty();
+                    let mut consecutive_blank_count = 0;
+                    for (idx, part) in merged_parts.iter().enumerate() {
                         let should_skip =
                             idx == 0 || (idx == 1 && line_was_empty_before && parts[0].is_empty());
                         if !should_skip {
                             let is_pushing_blank = current_line.is_empty();
-                            // Only allow one consecutive blank line - skip the push but NOT the content
                             let should_push = !(is_pushing_blank && consecutive_blank_count >= 1);
                             if should_push {
                                 lines.push(std::mem::take(&mut current_line));
@@ -751,14 +771,10 @@ impl<'a> Printer<'a> {
                             self.build_text_fill_doc_trimmed(part, true, true, false)
                         {
                             current_line.push(fill_doc);
-                            consecutive_blank_count = 0; // Content resets blank tracking
+                            consecutive_blank_count = 0;
 
-                            // Preserve trailing space if:
-                            // - Part has trailing whitespace, AND
-                            // - There's more content after (not just empty trailing parts), OR
-                            // - This text node is followed by another node
                             let remaining_parts_have_content =
-                                parts[idx + 1..].iter().any(|p| !p.trim().is_empty());
+                                merged_parts[idx + 1..].iter().any(|p| !p.trim().is_empty());
                             let is_last_node = i == trimmed_nodes.len() - 1;
                             if part.ends_with(char::is_whitespace)
                                 && (remaining_parts_have_content || !is_last_node)
@@ -768,7 +784,7 @@ impl<'a> Printer<'a> {
                         }
                     }
                     // Last part's trailing space affects next node
-                    prev_text_has_trailing_space = parts
+                    prev_text_has_trailing_space = merged_parts
                         .last()
                         .is_some_and(|p| p.ends_with(char::is_whitespace));
                 } else {

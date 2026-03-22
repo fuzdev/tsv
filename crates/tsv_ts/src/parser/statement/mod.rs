@@ -78,6 +78,7 @@ impl<'a> Parser<'a> {
                 | KeywordKind::Void
                 | KeywordKind::Delete
                 | KeywordKind::Yield
+                | KeywordKind::This
                 | KeywordKind::Super => {
                     // These are literals or expression-starting keywords, parse as expression statement
                     self.parse_expression_statement()
@@ -92,6 +93,7 @@ impl<'a> Parser<'a> {
                 KeywordKind::Throw => self.parse_throw_statement(),
                 KeywordKind::Break => self.parse_break_statement(),
                 KeywordKind::Continue => self.parse_continue_statement(),
+                KeywordKind::Debugger => self.parse_debugger_statement(),
                 // Continuation keywords - these appear mid-statement, not at start
                 KeywordKind::Else
                 | KeywordKind::Case
@@ -184,8 +186,7 @@ impl<'a> Parser<'a> {
     fn parse_expression_statement(&mut self) -> Result<Statement, ParseError> {
         let start = self.current_pos().0 as u32;
         let expr = self.parse_expression()?;
-        self.semicolon()?;
-        let end = self.prev_token_end() as u32;
+        let end = self.semicolon_end()?;
         Ok(Statement::ExpressionStatement(ExpressionStatement {
             expression: expr,
             span: Span::new(start, end),

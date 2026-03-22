@@ -41,6 +41,18 @@ impl DirectiveType {
 }
 
 impl<'a> SvelteParser<'a> {
+    /// Return `end + 1` if the byte at `end` is a quote character, else `end`.
+    ///
+    /// Used when the last value part of a quoted attribute is an ExpressionTag:
+    /// the `}` is included in the ExpressionTag span but the closing `"` is not.
+    fn end_past_optional_quote(&self, end: usize) -> usize {
+        if end < self.source.len() && matches!(self.source.as_bytes()[end], b'"' | b'\'') {
+            end + 1
+        } else {
+            end
+        }
+    }
+
     /// Parse attribute list (e.g., `lang="ts" class="foo"`)
     /// Consumes tokens until we hit `>` or `/>`
     ///
@@ -136,6 +148,10 @@ impl<'a> SvelteParser<'a> {
     ) -> Result<AttributeNode, ParseError> {
         let start = self.current_start;
         let name_end = self.current_end;
+        let name_span = Span {
+            start: start as u32,
+            end: name_end as u32,
+        };
 
         // Extract directive name and modifiers from: prefix:name|mod1|mod2
         let after_colon = &full_name[colon_idx + 1..];
@@ -154,7 +170,13 @@ impl<'a> SvelteParser<'a> {
 
         // Style directives accept expression OR string values, handle separately
         if directive_type == DirectiveType::Style {
-            return self.parse_style_directive(directive_name, modifiers, start, name_end);
+            return self.parse_style_directive(
+                directive_name,
+                modifiers,
+                start,
+                name_end,
+                name_span,
+            );
         }
 
         // Check for = (directive with value)
@@ -185,6 +207,7 @@ impl<'a> SvelteParser<'a> {
                 expression,
                 modifiers,
                 span,
+                name_span,
                 expression_tag_span,
             })),
             DirectiveType::Bind => {
@@ -196,6 +219,7 @@ impl<'a> SvelteParser<'a> {
                     name: directive_name,
                     expression: expr,
                     span,
+                    name_span,
                     expression_tag_span,
                 }))
             }
@@ -208,6 +232,7 @@ impl<'a> SvelteParser<'a> {
                     name: directive_name,
                     expression: expr,
                     span,
+                    name_span,
                     expression_tag_span,
                 }))
             }
@@ -216,6 +241,7 @@ impl<'a> SvelteParser<'a> {
                 name: directive_name,
                 expression,
                 span,
+                name_span,
                 expression_tag_span,
             })),
             DirectiveType::Transition => {
@@ -225,6 +251,7 @@ impl<'a> SvelteParser<'a> {
                     modifiers,
                     direction: TransitionDirection::Both,
                     span,
+                    name_span,
                     expression_tag_span,
                 }))
             }
@@ -234,6 +261,7 @@ impl<'a> SvelteParser<'a> {
                 modifiers,
                 direction: TransitionDirection::In,
                 span,
+                name_span,
                 expression_tag_span,
             })),
             DirectiveType::Out => Ok(AttributeNode::TransitionDirective(TransitionDirective {
@@ -242,18 +270,21 @@ impl<'a> SvelteParser<'a> {
                 modifiers,
                 direction: TransitionDirection::Out,
                 span,
+                name_span,
                 expression_tag_span,
             })),
             DirectiveType::Animate => Ok(AttributeNode::AnimateDirective(AnimateDirective {
                 name: directive_name,
                 expression,
                 span,
+                name_span,
                 expression_tag_span,
             })),
             DirectiveType::Let => Ok(AttributeNode::LetDirective(LetDirective {
                 name: directive_name,
                 expression,
                 span,
+                name_span,
                 expression_tag_span,
             })),
         }
@@ -295,6 +326,7 @@ impl<'a> SvelteParser<'a> {
         modifiers: Vec<String>,
         start: usize,
         name_end: usize,
+        name_span: Span,
     ) -> Result<AttributeNode, ParseError> {
         // Check for = (directive with value)
         let value = if self.check(TokenKind::Equals) {
@@ -322,8 +354,10 @@ impl<'a> SvelteParser<'a> {
         let end = match &value {
             StyleDirectiveValue::ExpressionTag(et) => et.span.end_usize(),
             StyleDirectiveValue::Parts(parts) => parts.last().map_or(name_end, |p| match p {
-                AttributeValue::Text(t) => t.span.end_usize(),
-                AttributeValue::ExpressionTag(et) => et.span.end_usize(),
+                AttributeValue::Text(t) => t.span.end_usize() + 1,
+                AttributeValue::ExpressionTag(et) => {
+                    self.end_past_optional_quote(et.span.end_usize())
+                }
             }),
             StyleDirectiveValue::True => name_end,
         };
@@ -338,6 +372,7 @@ impl<'a> SvelteParser<'a> {
             value,
             modifiers,
             span,
+            name_span,
         }))
     }
 
@@ -571,6 +606,10 @@ impl<'a> SvelteParser<'a> {
                 start: start as u32,
                 end: end as u32,
             },
+            name_span: Span {
+                start: content_start as u32,
+                end: content_end as u32,
+            },
         })
     }
 
@@ -604,8 +643,7 @@ impl<'a> SvelteParser<'a> {
                         text.span.end_usize() + 1
                     }
                     AttributeValue::ExpressionTag(tag) => {
-                        // Expression span already includes the closing } so use as-is
-                        tag.span.end_usize()
+                        self.end_past_optional_quote(tag.span.end_usize())
                     }
                 }
             } else {
@@ -619,6 +657,10 @@ impl<'a> SvelteParser<'a> {
                     start: start as u32,
                     end: value_end as u32,
                 },
+                name_span: Span {
+                    start: start as u32,
+                    end: name_end as u32,
+                },
             })
         } else {
             // Boolean attribute (no value) - ends where the name ends
@@ -626,6 +668,10 @@ impl<'a> SvelteParser<'a> {
                 name,
                 value: None,
                 span: Span {
+                    start: start as u32,
+                    end: name_end as u32,
+                },
+                name_span: Span {
                     start: start as u32,
                     end: name_end as u32,
                 },

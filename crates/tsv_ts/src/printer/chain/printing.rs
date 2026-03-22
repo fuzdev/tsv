@@ -175,15 +175,11 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
             }
         }
 
-        ChainNode::Call { expr, optional } => {
-            if let Expression::CallExpression(call) = expr {
-                if expanded {
-                    printer.print_call_args_expanded(call, *optional)
-                } else {
-                    printer.print_call_args(call, *optional)
-                }
+        ChainNode::Call { call, optional } => {
+            if expanded {
+                printer.print_call_args_expanded(call, *optional)
             } else {
-                d.text("()")
+                printer.print_call_args(call, *optional)
             }
         }
 

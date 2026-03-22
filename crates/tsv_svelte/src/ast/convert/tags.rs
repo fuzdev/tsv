@@ -10,6 +10,8 @@ use crate::ast::{internal, public};
 use string_interner::DefaultStringInterner;
 use tsv_lang::LocationTracker;
 
+use super::convert_pattern_expression;
+
 pub(super) fn convert_html_tag(
     tag: &internal::HtmlTag,
     source: &str,
@@ -33,26 +35,24 @@ pub(super) fn convert_const_tag(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::ConstTag {
-    // Convert id and init to public expressions
-    let id = tsv_ts::ast::convert::convert_expression(&tag.id, source, loc, interner, 0);
+    let id_value = convert_pattern_expression(&tag.id, source, loc, interner);
     let init = tsv_ts::ast::convert::convert_expression(&tag.init, source, loc, interner, 0);
 
-    // Calculate declarator span (from id start to init end)
     let declarator_start = tag.id.span().start;
     let declarator_end = tag.init.span().end;
+    let declaration_start = tag.span.start + 2; // skip `{@`
 
-    // Construct a proper VariableDeclaration structure
     let declaration = serde_json::json!({
         "type": "VariableDeclaration",
         "kind": "const",
         "declarations": [{
             "type": "VariableDeclarator",
-            "id": id,
+            "id": id_value,
             "init": init,
             "start": declarator_start,
             "end": declarator_end
         }],
-        "start": declarator_start,
+        "start": declaration_start,
         "end": declarator_end
     });
 

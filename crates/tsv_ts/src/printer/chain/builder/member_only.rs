@@ -138,7 +138,9 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
         let base_is_identifier = matches!(
             all_nodes.first(),
             Some(ChainNode::Base {
-                expr: Expression::Identifier(_),
+                expr: Expression::Identifier(_)
+                    | Expression::ThisExpression(_)
+                    | Expression::Super(_),
                 ..
             })
         );

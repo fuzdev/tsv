@@ -73,6 +73,8 @@ pub enum TSType {
     NamedTupleMember(TSNamedTupleMember),
     /// Infer type: `infer U` (in conditional types)
     Infer(TSInferType),
+    /// This type: `this` (in type position)
+    ThisType(TSThisType),
 }
 
 impl TSType {
@@ -101,6 +103,7 @@ impl TSType {
             TSType::Optional(o) => o.span,
             TSType::NamedTupleMember(n) => n.span,
             TSType::Infer(i) => i.span,
+            TSType::ThisType(t) => t.span,
         }
     }
 }
@@ -238,6 +241,7 @@ impl TSKeywordKind {
             | KeywordKind::Delete
             | KeywordKind::Async
             | KeywordKind::Await
+            | KeywordKind::This
             | KeywordKind::Super
             | KeywordKind::Extends
             | KeywordKind::Export
@@ -264,7 +268,8 @@ impl TSKeywordKind {
             // Generator keywords
             | KeywordKind::Yield
             // Declaration keywords (not type keywords)
-            | KeywordKind::Enum => None,
+            | KeywordKind::Enum
+            | KeywordKind::Debugger => None,
         }
     }
 }
@@ -383,6 +388,8 @@ pub struct TSTypeParameterInstantiation {
 #[derive(Debug, Clone)]
 pub struct TSTypeParameterDeclaration {
     pub params: Vec<TSTypeParameter>,
+    /// Position of trailing comma if present (e.g., `<T,>`)
+    pub trailing_comma: Option<u32>,
     pub span: Span,
 }
 
@@ -427,6 +434,33 @@ impl TSTypeElement {
             TSTypeElement::CallSignature(c) => c.span,
             TSTypeElement::ConstructSignature(c) => c.span,
             TSTypeElement::IndexSignature(i) => i.span,
+        }
+    }
+
+    /// Get the end position of the member's content (before any trailing separator).
+    ///
+    /// The `span().end` may include a trailing `;` or `,` separator (to match acorn's
+    /// output). This method returns the end of the actual content, which is needed for
+    /// comment detection in the printer.
+    pub fn content_end(&self, source: &str) -> u32 {
+        let end = self.span().end;
+        if end > 0 {
+            let last_byte = source.as_bytes()[(end - 1) as usize];
+            if last_byte == b';' || last_byte == b',' {
+                return end - 1;
+            }
+        }
+        end
+    }
+
+    /// Extend the element's span end to include a trailing separator (`;` or `,`)
+    pub fn extend_span_to(&mut self, new_end: u32) {
+        match self {
+            TSTypeElement::PropertySignature(p) => p.span = Span::new(p.span.start, new_end),
+            TSTypeElement::MethodSignature(m) => m.span = Span::new(m.span.start, new_end),
+            TSTypeElement::CallSignature(c) => c.span = Span::new(c.span.start, new_end),
+            TSTypeElement::ConstructSignature(c) => c.span = Span::new(c.span.start, new_end),
+            TSTypeElement::IndexSignature(i) => i.span = Span::new(i.span.start, new_end),
         }
     }
 }
@@ -545,6 +579,12 @@ pub struct TSNamedTupleMember {
 pub struct TSInferType {
     /// The type parameter being inferred
     pub type_parameter: TSTypeParameter,
+    pub span: Span,
+}
+
+/// This type: `this` used as a type
+#[derive(Debug, Clone)]
+pub struct TSThisType {
     pub span: Span,
 }
 

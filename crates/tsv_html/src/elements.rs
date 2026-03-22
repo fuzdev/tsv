@@ -5,20 +5,13 @@
 // linter, type-checker, etc.)
 //
 // References:
-// - HTML spec phrasing content (inline): WHITESPACE_HTML.md line 13299
 // - HTML spec flow content (block): WHITESPACE_HTML.md line 145233
 // - Svelte void elements: node_modules/svelte/src/utils.js:16-41
+// - prettier-plugin-svelte: isInlineElement = !isBlockElement (negation, no positive list)
 //
 // Performance: Uses phf::Set for compile-time perfect hash O(1) lookups with no runtime initialization.
 
 use phf::phf_set;
-
-// Perfect hash sets compiled at build time for O(1) element classification
-static INLINE_ELEMENTS: phf::Set<&'static str> = phf_set! {
-    "a", "abbr", "b", "bdi", "bdo", "br", "button", "canvas", "cite", "code", "data", "dfn",
-    "em", "i", "img", "input", "kbd", "label", "mark", "q", "s", "samp", "small", "span",
-    "strong", "sub", "sup", "textarea", "time", "u", "var",
-};
 
 // Block elements for formatting purposes.
 // Elements NOT in this list are treated as inline for formatting (including table cells).
@@ -65,9 +58,12 @@ static BLOCK_ELEMENTS: phf::Set<&'static str> = phf_set! {
     "ul",
 };
 
+// Matches Svelte's VOID_ELEMENT_NAMES (node_modules/svelte/src/utils.js:16-41).
+// `command` and `keygen` are obsolete (removed from HTML spec) but included
+// for Svelte parity — the parser (tsv_svelte) also includes them.
 static VOID_ELEMENTS: phf::Set<&'static str> = phf_set! {
-    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param",
-    "source", "track", "wbr",
+    "area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link",
+    "meta", "param", "source", "track", "wbr",
 };
 
 // SVG elements - synced with Svelte's utils.js SVG_ELEMENTS
@@ -93,15 +89,6 @@ static MATHML_ELEMENTS: phf::Set<&'static str> = phf_set! {
     "msqrt", "mstyle", "msub", "msubsup", "msup", "mtable", "mtd", "mtext", "mtr", "munder",
     "munderover", "semantics",
 };
-
-/// Check if an HTML element is inline (phrasing content)
-///
-/// Inline elements flow with text and don't cause line breaks.
-/// Examples: `<span>`, `<strong>`, `<a>`
-#[inline]
-pub fn is_inline_element(tag_name: &str) -> bool {
-    INLINE_ELEMENTS.contains(tag_name)
-}
 
 /// Check if an HTML element is block (flow content)
 ///

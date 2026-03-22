@@ -1171,22 +1171,22 @@ pub fn format_with_our_formatter(content: &str, filepath: &str) -> Result<String
 pub fn parse_with_our_parser_to_string(content: &str, filepath: &str) -> Result<String, String> {
     if filepath.ends_with(".svelte") && !filepath.ends_with(".svelte.ts") {
         let ast = tsv_svelte::parse(content).map_err(|e| format!("Parse error: {e:?}"))?;
-        let public_ast = tsv_svelte::convert_ast(&ast, content);
-        let json = to_json_with_tabs(&public_ast)
+        let json_value = tsv_svelte::convert_ast_json(&ast, content);
+        let json = to_json_with_tabs(&json_value)
             .map_err(|e| format!("Failed to serialize AST to JSON: {e}"))?;
         // Add trailing newline to match fixtures_update_parsed format
         Ok(format!("{json}\n"))
     } else if filepath.ends_with(".svelte.ts") || filepath.ends_with(".ts") {
         let ast = tsv_ts::parse(content).map_err(|e| format!("Parse error: {e:?}"))?;
-        let public_ast = tsv_ts::convert_ast(&ast, content);
-        let json = to_json_with_tabs(&public_ast)
+        let json_value = tsv_ts::convert_ast_json(&ast, content);
+        let json = to_json_with_tabs(&json_value)
             .map_err(|e| format!("Failed to serialize AST to JSON: {e}"))?;
         // Add trailing newline to match fixtures_update_parsed format
         Ok(format!("{json}\n"))
     } else if filepath.ends_with(".css") {
         let ast = tsv_css::parse(content).map_err(|e| format!("Parse error: {e:?}"))?;
-        let public_ast = tsv_css::convert_ast(&ast, content);
-        let json = to_json_with_tabs(&public_ast)
+        let json_value = tsv_css::convert_ast_json(&ast, content);
+        let json = to_json_with_tabs(&json_value)
             .map_err(|e| format!("Failed to serialize AST to JSON: {e}"))?;
         // Add trailing newline to match fixtures_update_parsed format
         Ok(format!("{json}\n"))

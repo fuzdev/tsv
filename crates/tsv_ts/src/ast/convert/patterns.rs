@@ -3,7 +3,7 @@
 use super::super::{internal, public};
 use super::{convert_expression, convert_type_annotation, create_location};
 use string_interner::DefaultStringInterner;
-use tsv_lang::LocationTracker;
+use tsv_lang::{LocationTracker, Span};
 
 pub(in crate::ast) fn convert_template_literal(
     template: &internal::TemplateLiteral,
@@ -31,16 +31,26 @@ pub(in crate::ast) fn convert_template_literal(
     }
 }
 
-fn convert_template_element(
+pub(in crate::ast::convert) fn convert_template_element(
     element: &internal::TemplateElement,
     loc: &LocationTracker,
     offset: usize,
 ) -> public::TemplateElement {
+    // Acorn excludes delimiters from TemplateElement spans:
+    // - start: skip opening ` or } (+1)
+    // - end: skip closing ` (-1 if tail) or ${ (-2 if not tail)
+    let adjusted_start = element.span.start + 1;
+    let adjusted_end = if element.tail {
+        element.span.end - 1
+    } else {
+        element.span.end - 2
+    };
+    let adjusted_span = Span::new(adjusted_start, adjusted_end);
     public::TemplateElement {
         node_type: "TemplateElement".to_string(),
-        start: element.span.start,
-        end: element.span.end,
-        loc: create_location(element.span, loc, offset),
+        start: adjusted_start,
+        end: adjusted_end,
+        loc: create_location(adjusted_span, loc, offset),
         value: public::TemplateElementValue {
             raw: element.raw.clone(),
             cooked: element.cooked.clone(),
@@ -97,6 +107,10 @@ fn convert_object_pattern_property(
                     interner,
                     offset,
                 )),
+                type_annotation: r
+                    .type_annotation
+                    .as_ref()
+                    .map(|ta| convert_type_annotation(ta, source, loc, interner, offset)),
             })
         }
     }

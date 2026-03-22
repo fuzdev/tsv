@@ -204,7 +204,7 @@ impl<'a> Printer<'a> {
             || (!is_boundary_without_snippets
                 && (source_has_leading_break
                     || source_has_trailing_break
-                    || has_block_children
+                    || (has_block_children && !is_inline_element)
                     || is_boundary_with_snippets
                     || has_ws_around_expanding));
 

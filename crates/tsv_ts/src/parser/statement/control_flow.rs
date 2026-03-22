@@ -295,16 +295,15 @@ impl<'a> Parser<'a> {
         // Parse condition: (test)
         self.expect(&TokenKind::ParenOpen)?;
         let test = self.parse_expression()?;
-        let (_, test_end) = self.current_pos();
         self.expect(&TokenKind::ParenClose)?;
 
         // do-while requires semicolon (ASI applies)
-        self.semicolon()?;
+        let end = self.semicolon_end()?;
 
         Ok(Statement::DoWhileStatement(DoWhileStatement {
             body,
             test,
-            span: Span::new(start as u32, test_end as u32),
+            span: Span::new(start as u32, end),
         }))
     }
 
@@ -361,6 +360,7 @@ impl<'a> Parser<'a> {
         };
 
         self.expect(&TokenKind::Colon)?;
+        let colon_end = self.prev_token_end();
 
         // Parse consequent statements until next case/default or closing brace
         let mut consequent = Vec::new();
@@ -374,7 +374,9 @@ impl<'a> Parser<'a> {
             consequent.push(self.parse_statement()?);
         }
 
-        let end = consequent.last().map_or(start, |s| s.span().end_usize());
+        let end = consequent
+            .last()
+            .map_or(colon_end, |s| s.span().end_usize());
 
         Ok(SwitchCase {
             test,
@@ -544,8 +546,7 @@ impl<'a> Parser<'a> {
         }
 
         let argument = self.parse_expression()?;
-        let end = argument.span().end;
-        self.semicolon()?;
+        let end = self.semicolon_end()?;
 
         Ok(Statement::ThrowStatement(ThrowStatement {
             argument,
@@ -555,7 +556,7 @@ impl<'a> Parser<'a> {
 
     /// Parse break statement: `break;` or `break label;`
     pub(super) fn parse_break_statement(&mut self) -> Result<Statement, ParseError> {
-        let (start, keyword_end) = self.current_pos();
+        let (start, _) = self.current_pos();
 
         // Consume 'break' keyword
         debug_assert!(matches!(
@@ -566,34 +567,31 @@ impl<'a> Parser<'a> {
 
         // Check for optional label (no line terminator allowed)
         // If ASI can apply, treat as no label
-        let (label, end) = if !self.can_insert_semicolon()
+        let label = if !self.can_insert_semicolon()
             && matches!(self.current_kind(), TokenKind::Identifier)
         {
             let (label_start, label_end) = self.current_pos();
             let symbol = self.intern_identifier();
             self.advance()?;
-            (
-                Some(Identifier::simple(
-                    symbol,
-                    Span::new(label_start as u32, label_end as u32),
-                )),
-                label_end,
-            )
+            Some(Identifier::simple(
+                symbol,
+                Span::new(label_start as u32, label_end as u32),
+            ))
         } else {
-            (None, keyword_end)
+            None
         };
 
-        self.semicolon()?;
+        let end = self.semicolon_end()?;
 
         Ok(Statement::BreakStatement(BreakStatement {
             label,
-            span: Span::new(start as u32, end as u32),
+            span: Span::new(start as u32, end),
         }))
     }
 
     /// Parse continue statement: `continue;` or `continue label;`
     pub(super) fn parse_continue_statement(&mut self) -> Result<Statement, ParseError> {
-        let (start, keyword_end) = self.current_pos();
+        let (start, _) = self.current_pos();
 
         // Consume 'continue' keyword
         debug_assert!(matches!(
@@ -604,28 +602,42 @@ impl<'a> Parser<'a> {
 
         // Check for optional label (no line terminator allowed)
         // If ASI can apply, treat as no label
-        let (label, end) = if !self.can_insert_semicolon()
+        let label = if !self.can_insert_semicolon()
             && matches!(self.current_kind(), TokenKind::Identifier)
         {
             let (label_start, label_end) = self.current_pos();
             let symbol = self.intern_identifier();
             self.advance()?;
-            (
-                Some(Identifier::simple(
-                    symbol,
-                    Span::new(label_start as u32, label_end as u32),
-                )),
-                label_end,
-            )
+            Some(Identifier::simple(
+                symbol,
+                Span::new(label_start as u32, label_end as u32),
+            ))
         } else {
-            (None, keyword_end)
+            None
         };
 
-        self.semicolon()?;
+        let end = self.semicolon_end()?;
 
         Ok(Statement::ContinueStatement(ContinueStatement {
             label,
-            span: Span::new(start as u32, end as u32),
+            span: Span::new(start as u32, end),
+        }))
+    }
+
+    /// Parse debugger statement: `debugger;`
+    pub(super) fn parse_debugger_statement(&mut self) -> Result<Statement, ParseError> {
+        let (start, _) = self.current_pos();
+
+        debug_assert!(matches!(
+            self.current_kind(),
+            TokenKind::Keyword(KeywordKind::Debugger)
+        ));
+        self.advance()?;
+
+        let end = self.semicolon_end()?;
+
+        Ok(Statement::DebuggerStatement(DebuggerStatement {
+            span: Span::new(start as u32, end),
         }))
     }
 

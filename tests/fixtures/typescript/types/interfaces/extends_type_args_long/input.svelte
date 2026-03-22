@@ -5,7 +5,7 @@
 	}
 
 	// 101 boundary break - type args break at commas
-	interface A extends Omit<
+	interface B extends Omit<
 		Partial<BBBBBBBBBBBBBBBBBBBBBBBB>,
 		'aaaaaaaa' | 'bbbbbbbb' | 'cccccccc'
 	> {
@@ -13,7 +13,7 @@
 	}
 
 	// Class extends - same behavior (101 boundary)
-	class A extends Omit<
+	class C extends Omit<
 		Partial<BBBBBBBBBBBBBBBBBBBBBBBBBBBB>,
 		'aaaaaaaa' | 'bbbbbbbb' | 'cccccccc'
 	> {
@@ -21,7 +21,7 @@
 	}
 
 	// Class implements - same behavior (101 boundary)
-	class A implements Omit<
+	class D implements Omit<
 		Partial<BBBBBBBBBBBBBBBBBBBBBBBBB>,
 		'aaaaaaaa' | 'bbbbbbbb' | 'cccccccc'
 	> {
@@ -29,7 +29,7 @@
 	}
 
 	// Short control
-	interface A extends Omit<Partial<B>, 'a' | 'b' | 'c'> {
+	interface E extends Omit<Partial<B>, 'a' | 'b' | 'c'> {
 		a?: Partial<B['a']>;
 	}
 </script>

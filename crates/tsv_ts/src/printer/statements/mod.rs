@@ -63,6 +63,7 @@ impl<'a> Printer<'a> {
             Statement::ContinueStatement(stmt) => self.build_continue_statement_doc(stmt),
             Statement::LabeledStatement(stmt) => self.build_labeled_statement_doc(stmt),
             Statement::EmptyStatement(_) => d.text(";"),
+            Statement::DebuggerStatement(_) => d.concat(&[d.text("debugger"), d.text(";")]),
             Statement::TSInterfaceDeclaration(decl) => self.build_interface_declaration_doc(decl),
             Statement::TSDeclareFunction(decl) => self.build_declare_function_doc(decl),
             Statement::TSEnumDeclaration(decl) => self.build_enum_declaration_doc(decl),

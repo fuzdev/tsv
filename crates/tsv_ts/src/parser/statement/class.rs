@@ -20,11 +20,12 @@ impl<'a> Parser<'a> {
 
     /// Parse an abstract class declaration: `abstract class Foo { ... }`
     pub(super) fn parse_abstract_class(&mut self) -> Result<Statement, ParseError> {
-        // Consume 'abstract' contextual keyword
+        // Capture position of 'abstract' before consuming it
+        let abstract_start = self.current_pos().0;
         debug_assert!(self.current_value() == "abstract");
         self.advance()?;
 
-        let class = self.parse_class_declaration_inner(true, true)?;
+        let class = self.parse_class_declaration_inner_with_start(true, true, abstract_start)?;
         Ok(Statement::ClassDeclaration(class))
     }
 
@@ -236,8 +237,16 @@ impl<'a> Parser<'a> {
         name_required: bool,
         is_abstract: bool,
     ) -> Result<ClassDeclaration, ParseError> {
-        let (start, _) = self.current_pos();
+        let start = self.current_pos().0;
+        self.parse_class_declaration_inner_with_start(name_required, is_abstract, start)
+    }
 
+    fn parse_class_declaration_inner_with_start(
+        &mut self,
+        name_required: bool,
+        is_abstract: bool,
+        start: usize,
+    ) -> Result<ClassDeclaration, ParseError> {
         // Consume 'class' keyword
         debug_assert!(matches!(
             self.current_kind(),
@@ -582,15 +591,19 @@ impl<'a> Parser<'a> {
                 || self.check(&TokenKind::Semicolon)
                 || (self.can_insert_semicolon() && !self.check(&TokenKind::BraceOpen));
             let (body_block, end) = if is_overload_or_abstract {
-                let end = return_type
+                let body_end = return_type
                     .as_ref()
                     .map_or_else(|| self.current_pos().0 as u32, |rt| rt.span.end);
-                self.eat(TokenKind::Semicolon);
+                let end = if self.eat(TokenKind::Semicolon) {
+                    self.prev_token_end() as u32
+                } else {
+                    body_end
+                };
                 // Create empty body for abstract methods and overload signatures
                 (
                     BlockStatement {
                         body: Vec::new(),
-                        span: Span::new(end, end),
+                        span: Span::new(body_end, body_end),
                     },
                     end,
                 )
@@ -601,6 +614,7 @@ impl<'a> Parser<'a> {
             };
 
             // Create FunctionExpression for the method value
+            // span starts at params_start (the `(`) to match acorn's FunctionExpression positioning
             let value = FunctionExpression {
                 id: None,
                 type_parameters,
@@ -610,7 +624,7 @@ impl<'a> Parser<'a> {
                 generator: is_generator,
                 r#async: is_async,
                 params_start: params_start as u32,
-                span: Span::new(start as u32, end),
+                span: Span::new(params_start as u32, end),
             };
 
             Ok(ClassMember::MethodDefinition(MethodDefinition {
@@ -664,8 +678,11 @@ impl<'a> Parser<'a> {
                 |v| v.span().end,
             );
 
-            // Consume optional semicolon (ASI applies)
-            self.eat(TokenKind::Semicolon);
+            // Consume optional semicolon (ASI applies), including it in the span
+            let mut end = end;
+            if self.eat(TokenKind::Semicolon) {
+                end = self.prev_token_end() as u32;
+            }
 
             Ok(ClassMember::PropertyDefinition(PropertyDefinition {
                 decorators: if decorators.is_empty() {
@@ -855,9 +872,11 @@ impl<'a> Parser<'a> {
             return Err(self.error_expected("type annotation for index signature value"));
         };
 
-        // Consume semicolon
-        let end = value_type.span.end;
-        self.eat(TokenKind::Semicolon);
+        // Consume semicolon, including it in the span
+        let mut end = value_type.span.end;
+        if self.eat(TokenKind::Semicolon) {
+            end = self.prev_token_end() as u32;
+        }
 
         Ok(ClassMember::IndexSignature(TSIndexSignature {
             parameters: vec![parameter],

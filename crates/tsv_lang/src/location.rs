@@ -20,6 +20,86 @@ pub struct SourceLocation {
     pub end: Position,
 }
 
+/// Maps byte offsets to JavaScript-compatible character offsets (UTF-16 code units)
+///
+/// Rust strings are byte-indexed, but JavaScript (and Svelte/acorn) uses UTF-16
+/// code unit indices. For ASCII-only sources, byte == char offset, so the map is empty.
+/// For sources with multibyte UTF-8 characters, the map stores the UTF-16 code unit
+/// offset for each byte position.
+///
+/// Characters in the BMP (U+0000-U+FFFF) count as 1 UTF-16 code unit.
+/// Characters outside the BMP (U+10000+, e.g., most emoji) count as 2 (surrogate pair).
+///
+/// Only valid for byte positions at character boundaries (i.e., positions returned
+/// by the parser, which always point to the start of a character).
+#[derive(Debug)]
+pub struct ByteToCharMap {
+    /// For each byte position, the corresponding UTF-16 code unit offset.
+    /// Empty for ASCII-only sources (byte == char offset).
+    offsets: Vec<u32>,
+    has_multibyte: bool,
+}
+
+impl ByteToCharMap {
+    /// Build a byte-to-UTF-16-code-unit offset map from source text
+    ///
+    /// For ASCII-only sources, returns an empty map (fast path).
+    pub fn new(source: &str) -> Self {
+        if source.is_ascii() {
+            return Self {
+                offsets: Vec::new(),
+                has_multibyte: false,
+            };
+        }
+
+        let mut offsets = vec![0u32; source.len() + 1];
+        let mut utf16_idx = 0u32;
+        for (byte_idx, ch) in source.char_indices() {
+            offsets[byte_idx] = utf16_idx;
+            // Characters outside BMP need 2 UTF-16 code units (surrogate pair)
+            utf16_idx += ch.len_utf16() as u32;
+        }
+        offsets[source.len()] = utf16_idx;
+
+        // Fill intermediate bytes (inside multibyte characters) with the
+        // UTF-16 offset of the character they belong to. This handles
+        // cases where a byte position falls in the middle of a multibyte char.
+        let mut last = 0u32;
+        for offset in &mut offsets {
+            if *offset == 0 && last > 0 {
+                *offset = last;
+            } else {
+                last = *offset;
+            }
+        }
+
+        Self {
+            offsets,
+            has_multibyte: true,
+        }
+    }
+
+    /// Convert a byte offset to a UTF-16 code unit offset
+    ///
+    /// For ASCII-only sources, returns the byte offset unchanged.
+    #[inline]
+    pub fn byte_to_char(&self, byte_offset: u32) -> u32 {
+        if !self.has_multibyte {
+            return byte_offset;
+        }
+        self.offsets
+            .get(byte_offset as usize)
+            .copied()
+            .unwrap_or(byte_offset)
+    }
+
+    /// Whether the source contains multibyte UTF-8 characters
+    #[inline]
+    pub fn has_multibyte(&self) -> bool {
+        self.has_multibyte
+    }
+}
+
 #[derive(Debug)]
 pub struct LocationTracker {
     line_starts: Vec<usize>,
@@ -116,5 +196,16 @@ impl LocationTracker {
             end: span.end - offset as u32,
         };
         self.span_to_location(adjusted_span)
+    }
+
+    /// Get the byte offset of the start of the line containing the given byte offset
+    ///
+    /// Used to compute character-based columns: `char_column = byte_to_char(offset) - byte_to_char(line_start)`.
+    pub fn line_start_byte(&self, offset: usize) -> usize {
+        let line_idx = match self.line_starts.binary_search(&offset) {
+            Ok(idx) => idx,
+            Err(idx) => idx.saturating_sub(1),
+        };
+        self.line_starts[line_idx]
     }
 }

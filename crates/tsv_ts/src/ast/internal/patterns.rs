@@ -87,5 +87,6 @@ pub struct AssignmentPattern {
 pub struct RestElement {
     /// The binding for the rest (typically an identifier)
     pub argument: Box<Expression>,
+    pub type_annotation: Option<Box<TSTypeAnnotation>>,
     pub span: Span,
 }

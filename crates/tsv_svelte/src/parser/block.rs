@@ -579,7 +579,7 @@ impl<'a> SvelteParser<'a> {
                 let then_keyword_end = expr_end_pos + (after_expr.len() - value_str.len());
                 let value_trimmed = value_str.trim_start();
                 let value_offset = then_keyword_end + (value_str.len() - value_trimmed.len());
-                Some(self.parse_ts_expression(value_trimmed, value_offset)?)
+                Some(self.parse_ts_pattern(value_trimmed, value_offset)?)
             } else {
                 None
             };
@@ -603,7 +603,7 @@ impl<'a> SvelteParser<'a> {
                 let catch_keyword_end = expr_end_pos + (after_expr.len() - error_str.len());
                 let error_trimmed = error_str.trim_start();
                 let error_offset = catch_keyword_end + (error_str.len() - error_trimmed.len());
-                Some(self.parse_ts_expression(error_trimmed, error_offset)?)
+                Some(self.parse_ts_pattern(error_trimmed, error_offset)?)
             } else {
                 None
             };
@@ -657,7 +657,7 @@ impl<'a> SvelteParser<'a> {
                     if !value_str.is_empty() {
                         let value_offset =
                             then_tag_start + then_tag_content.find(value_str).unwrap_or(0);
-                        value = Some(self.parse_ts_expression(value_str, value_offset)?);
+                        value = Some(self.parse_ts_pattern(value_str, value_offset)?);
                     }
 
                     then_fragment =
@@ -675,7 +675,7 @@ impl<'a> SvelteParser<'a> {
                     if !error_str.is_empty() {
                         let error_offset =
                             catch_tag_start + catch_tag_content.find(error_str).unwrap_or(0);
-                        error = Some(self.parse_ts_expression(error_str, error_offset)?);
+                        error = Some(self.parse_ts_pattern(error_str, error_offset)?);
                     }
 
                     catch_fragment =
@@ -818,14 +818,35 @@ impl<'a> SvelteParser<'a> {
             let close_paren = content.rfind(')').unwrap_or(content.len());
             let params_str = &content[paren_pos + 1..close_paren];
             if !params_str.trim().is_empty() {
-                // Check if params contain TypeScript type annotations (: followed by type)
-                // If so, store raw string since our parser doesn't support type annotations yet
+                // Compute params_offset (shared by both branches)
+                let paren_in_tag = tag_content.find('(').map_or(0, |p| p + 1);
+                let params_offset = tag_content_start
+                    + paren_in_tag
+                    + tag_content[paren_in_tag..].find(params_str).unwrap_or(0);
+
                 if params_str.contains(':') {
-                    raw_parameters = Some(params_str.trim().to_string());
+                    // Parse typed parameters by wrapping as a function signature
+                    const WRAPPER_PREFIX: &str = "function f(";
+                    let wrapper = format!("{WRAPPER_PREFIX}{params_str}) {{}}");
+                    let base = params_offset.saturating_sub(WRAPPER_PREFIX.len());
+                    match tsv_ts::parse_with_interner(
+                        &wrapper,
+                        base,
+                        std::rc::Rc::clone(&self.interner),
+                    ) {
+                        Ok(program) => {
+                            if let Some(tsv_ts::Statement::FunctionDeclaration(func)) =
+                                program.body.into_iter().next()
+                            {
+                                parameters = func.params;
+                            }
+                        }
+                        Err(_) => {
+                            // Fall back to raw string if parsing fails
+                            raw_parameters = Some(params_str.trim().to_string());
+                        }
+                    }
                 } else {
-                    // Parse comma-separated parameters using pattern parsing
-                    let params_offset =
-                        tag_content_start + tag_content.find(params_str).unwrap_or(0);
                     parameters = self.parse_snippet_parameters(params_str, params_offset)?;
                 }
             }

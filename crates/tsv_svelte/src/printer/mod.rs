@@ -293,6 +293,31 @@ pub fn format_svelte(root: &internal::Root, source: &str) -> String {
 }
 
 impl<'a> Printer<'a> {
+    /// Check if the last non-whitespace fragment node before `target_start` is
+    /// a `<!-- prettier-ignore -->` comment.
+    fn has_prettier_ignore_before(&self, fragment: &internal::Fragment, target_start: u32) -> bool {
+        let mut last_comment = None;
+        for node in &fragment.nodes {
+            let node_end = node.span().end;
+            if node_end > target_start {
+                break;
+            }
+            match node {
+                FragmentNode::Comment(comment) => {
+                    last_comment = Some(comment);
+                }
+                FragmentNode::Text(text) if text.raw.is_whitespace_only() => {
+                    // Skip whitespace text nodes
+                }
+                _ => {
+                    // Non-comment, non-whitespace node resets
+                    last_comment = None;
+                }
+            }
+        }
+        last_comment.is_some_and(|c| c.content.trim() == "prettier-ignore")
+    }
+
     /// Format a Svelte Root node
     ///
     /// Orchestrates formatting of the four main sections of a .svelte file:
@@ -312,11 +337,24 @@ impl<'a> Printer<'a> {
             .map(|s| s.span.start)
             .min();
 
-        // Track which comments we've printed before scripts
+        // Track which comments we've printed (before options or scripts) to skip in fragment
         let mut printed_comment_indices: Vec<usize> = Vec::new();
 
         // Format svelte:options (if present) - always first
+        // Print comments before options so they stay attached
         if let Some(options) = &root.options {
+            for (i, node) in root.fragment.nodes.iter().enumerate() {
+                match node {
+                    FragmentNode::Comment(comment) if comment.span.end <= options.span.start => {
+                        self.print_comment(comment);
+                        self.write("\n");
+                        printed_comment_indices.push(i);
+                    }
+                    FragmentNode::Text(t) if t.raw.is_whitespace_only() => {}
+                    _ => break,
+                }
+            }
+
             self.print_svelte_options(options);
             has_previous_section = true;
         }
@@ -324,6 +362,9 @@ impl<'a> Printer<'a> {
         // Print comments that come before the first script
         if let Some(script_start) = first_script_start {
             for (i, node) in root.fragment.nodes.iter().enumerate() {
+                if printed_comment_indices.contains(&i) {
+                    continue;
+                }
                 if let FragmentNode::Comment(comment) = node
                     && comment.span.end <= script_start
                 {
@@ -342,21 +383,20 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Format module script (if present)
-        if let Some(script) = &root.module {
+        // Format scripts (module then instance)
+        for script in [root.module.as_ref(), root.instance.as_ref()]
+            .into_iter()
+            .flatten()
+        {
             if has_previous_section {
                 self.write("\n"); // Blank line between sections
             }
-            self.print_script(script);
-            has_previous_section = true;
-        }
-
-        // Format instance script (if present)
-        if let Some(script) = &root.instance {
-            if has_previous_section {
-                self.write("\n"); // Blank line between sections
+            if self.has_prettier_ignore_before(&root.fragment, script.span.start) {
+                self.write(script.span.extract(self.source));
+                self.write("\n");
+            } else {
+                self.print_script(script);
             }
-            self.print_script(script);
             has_previous_section = true;
         }
 
@@ -380,10 +420,34 @@ impl<'a> Printer<'a> {
 
         // Format style (if present)
         if let Some(style) = &root.css {
-            if has_previous_section {
-                self.write("\n"); // Blank line between sections
+            let ignore_style = self.has_prettier_ignore_before(&root.fragment, style.span.start);
+            if has_previous_section && !ignore_style {
+                // Skip section separator when template ends with a comment immediately
+                // before <style> (no blank line between). The template trailing newline
+                // already provides sufficient separation. Prettier attaches such comments
+                // to the style section, so no blank line appears.
+                let template_ends_with_comment_before_style = root
+                    .fragment
+                    .nodes
+                    .iter()
+                    .rev()
+                    .find(|n| !matches!(n, FragmentNode::Text(t) if t.raw.is_whitespace_only()))
+                    .is_some_and(|n| {
+                        matches!(n, FragmentNode::Comment(_))
+                            && n.span().end <= style.span.start
+                            && !self.source[n.span().end as usize..style.span.start as usize]
+                                .has_blank_line()
+                    });
+                if !template_ends_with_comment_before_style {
+                    self.write("\n"); // Blank line between sections
+                }
             }
-            self.print_style(style);
+            if ignore_style {
+                self.write(style.span.extract(self.source));
+                self.write("\n");
+            } else {
+                self.print_style(style);
+            }
         }
     }
 
@@ -642,15 +706,44 @@ impl<'a> Printer<'a> {
 
                     self.print_comment(comment);
 
+                    let trimmed = comment.content.trim();
+
+                    // prettier-ignore-start/end: preserve all nodes between as raw source
+                    // Only active at root level (nested ranges are treated as regular comments)
+                    if trimmed == "prettier-ignore-start" {
+                        // Find the matching prettier-ignore-end
+                        let mut end_idx = None;
+                        for j in (i + 1)..fragment.nodes.len() {
+                            if let FragmentNode::Comment(end_comment) = &fragment.nodes[j]
+                                && end_comment.content.trim() == "prettier-ignore-end"
+                            {
+                                end_idx = Some(j);
+                                break;
+                            }
+                        }
+                        if let Some(end_idx) = end_idx {
+                            // Emit raw source from after start comment through end comment
+                            let raw_start = comment.span.end as usize;
+                            let end_comment = &fragment.nodes[end_idx];
+                            let raw_end = end_comment.span().end as usize;
+                            self.write(&self.source[raw_start..raw_end]);
+                            state.has_output_content = true;
+                            state.prev_kind = PrevNodeKind::Block;
+                            state.pending_ws = PendingWhitespace::None;
+                            i = end_idx + 1;
+                            continue;
+                        }
+                    }
+
                     // prettier-ignore: preserve next non-whitespace node as raw source
-                    if comment.content.trim() == "prettier-ignore" {
+                    if trimmed == "prettier-ignore" {
                         let mut next_idx = i + 1;
                         while next_idx < fragment.nodes.len() {
-                            if let FragmentNode::Text(text) = &fragment.nodes[next_idx] {
-                                if text.raw.is_whitespace_only() {
-                                    next_idx += 1;
-                                    continue;
-                                }
+                            if let FragmentNode::Text(text) = &fragment.nodes[next_idx]
+                                && text.raw.is_whitespace_only()
+                            {
+                                next_idx += 1;
+                                continue;
                             }
                             break;
                         }

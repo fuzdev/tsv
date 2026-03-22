@@ -8,7 +8,7 @@
 
 use super::printing::ChainPrinter;
 use super::types::{ChainGroup, ChainNode};
-use crate::ast::internal::Expression;
+use crate::ast::internal::{self, Expression};
 use crate::printer::{ParenContext, needs_parens};
 use string_interner::DefaultSymbol;
 
@@ -37,29 +37,71 @@ pub trait SymbolLookup {
 /// to cover paren gaps where block comments may live (mid-chain comment placement).
 /// This only applies to call chains — prettier keeps comments at the chain start
 /// for member-only chains.
-pub fn linearize_chain<'a>(expr: &'a Expression) -> Vec<ChainNode<'a>> {
+/// General-purpose entry point (used by tests; production code uses typed entry points)
+#[cfg(test)]
+fn linearize_chain<'a>(expr: &'a Expression) -> Vec<ChainNode<'a>> {
     let mut nodes = Vec::new();
     let mut paren_gaps = Vec::new();
     linearize_recursive(expr, &mut nodes, &mut paren_gaps);
+    apply_paren_gaps(&mut nodes, &paren_gaps);
+    nodes
+}
 
-    // Only extend ranges for call chains — prettier places comments mid-chain
-    // only when the chain contains calls
+/// Linearize starting from a CallExpression (avoids cloning to wrap in Expression)
+pub fn linearize_chain_from_call<'a>(call: &'a internal::CallExpression) -> Vec<ChainNode<'a>> {
+    let mut nodes = Vec::new();
+    let mut paren_gaps = Vec::new();
+    linearize_recursive(&call.callee, &mut nodes, &mut paren_gaps);
+    if call.optional {
+        nodes.push(ChainNode::call_optional(call));
+    } else {
+        nodes.push(ChainNode::call(call));
+    }
+    apply_paren_gaps(&mut nodes, &paren_gaps);
+    nodes
+}
+
+/// Linearize starting from a MemberExpression (avoids cloning to wrap in Expression)
+pub fn linearize_chain_from_member<'a>(
+    member: &'a internal::MemberExpression,
+) -> Vec<ChainNode<'a>> {
+    let mut nodes = Vec::new();
+    let mut paren_gaps = Vec::new();
+    linearize_recursive(&member.object, &mut nodes, &mut paren_gaps);
+    linearize_member_node(member, &mut nodes, &mut paren_gaps);
+    apply_paren_gaps(&mut nodes, &paren_gaps);
+    nodes
+}
+
+/// Linearize starting from a TSNonNullExpression (avoids cloning to wrap in Expression)
+pub fn linearize_chain_from_non_null<'a>(
+    non_null: &'a internal::TSNonNullExpression,
+) -> Vec<ChainNode<'a>> {
+    let mut nodes = Vec::new();
+    let mut paren_gaps = Vec::new();
+    linearize_recursive(&non_null.expression, &mut nodes, &mut paren_gaps);
+    nodes.push(ChainNode::non_null());
+    apply_paren_gaps(&mut nodes, &paren_gaps);
+    nodes
+}
+
+/// Apply deferred paren gap extensions to member nodes.
+///
+/// Only extends ranges for call chains — prettier places comments mid-chain
+/// only when the chain contains calls.
+fn apply_paren_gaps(nodes: &mut [ChainNode<'_>], paren_gaps: &[ParenGap]) {
     if !paren_gaps.is_empty() && nodes.iter().any(ChainNode::is_call) {
-        for (node_index, gap_start) in paren_gaps {
-            if let Some(node) = nodes.get_mut(node_index) {
-                match node {
-                    ChainNode::Member { object_end, .. }
-                    | ChainNode::PrivateMember { object_end, .. }
-                    | ChainNode::ComputedMember { object_end, .. } => {
-                        *object_end = gap_start;
-                    }
-                    _ => {}
-                }
+        for &(node_index, gap_start) in paren_gaps {
+            if let Some(
+                ChainNode::Member { object_end, .. }
+                | ChainNode::PrivateMember { object_end, .. }
+                | ChainNode::ComputedMember { object_end, .. },
+            ) = nodes.get_mut(node_index)
+            {
+                *object_end = gap_start;
             }
         }
     }
-
-    nodes
 }
 
 /// A deferred paren gap extension: (node_index, gap_start)
@@ -75,70 +117,16 @@ fn linearize_recursive<'a>(
         Expression::CallExpression(call) => {
             linearize_recursive(&call.callee, nodes, paren_gaps);
             if call.optional {
-                nodes.push(ChainNode::call_optional(expr));
+                nodes.push(ChainNode::call_optional(call));
             } else {
-                nodes.push(ChainNode::call(expr));
+                nodes.push(ChainNode::call(call));
             }
         }
 
         // MemberExpression: recurse into object, then add Member node
         Expression::MemberExpression(member) => {
             linearize_recursive(&member.object, nodes, paren_gaps);
-
-            // When grouping parens are stripped (e.g., `/* comment */ (a).b` → `/* comment */ a.b`),
-            // the MemberExpression span extends earlier than its object span, creating a gap
-            // where comments from the stripped parens live. Record the gap so we can extend
-            // the last member node's comment range (only applied for call chains).
-            let member_start = member.span.start;
-            let object_start = member.object.span().start;
-            if member_start < object_start {
-                // Find the last member node in the sub-chain
-                for i in (0..nodes.len()).rev() {
-                    match &nodes[i] {
-                        ChainNode::Member { .. }
-                        | ChainNode::PrivateMember { .. }
-                        | ChainNode::ComputedMember { .. } => {
-                            paren_gaps.push((i, member_start));
-                            break;
-                        }
-                        ChainNode::Base { .. } => break,
-                        _ => continue,
-                    }
-                }
-            }
-
-            let object_end = member.object.span().end;
-            let property_start = member.property.span().start;
-            if member.computed {
-                nodes.push(ChainNode::computed_member(
-                    &member.property,
-                    member.optional,
-                    object_end,
-                    member.span.end,
-                ));
-            } else if let Expression::Identifier(id) = member.property.as_ref() {
-                nodes.push(ChainNode::member(
-                    id.name,
-                    member.optional,
-                    object_end,
-                    property_start,
-                ));
-            } else if let Expression::PrivateIdentifier(pid) = member.property.as_ref() {
-                nodes.push(ChainNode::private_member(
-                    pid.name,
-                    member.optional,
-                    object_end,
-                    property_start,
-                ));
-            } else {
-                // Non-identifier property (shouldn't happen for non-computed)
-                nodes.push(ChainNode::computed_member(
-                    &member.property,
-                    member.optional,
-                    object_end,
-                    member.span.end,
-                ));
-            }
+            linearize_member_node(member, nodes, paren_gaps);
         }
 
         // TSNonNullExpression: recurse into expression, then add NonNull node
@@ -158,6 +146,70 @@ fn linearize_recursive<'a>(
             let needs_parens = needs_parens(expr, ParenContext::ChainBase);
             nodes.push(ChainNode::base(expr, needs_parens));
         }
+    }
+}
+
+/// Process a MemberExpression node: handle paren gaps and push the appropriate ChainNode.
+///
+/// Extracted from `linearize_recursive` so it can be shared with `linearize_chain_from_member`.
+fn linearize_member_node<'a>(
+    member: &'a internal::MemberExpression,
+    nodes: &mut Vec<ChainNode<'a>>,
+    paren_gaps: &mut Vec<ParenGap>,
+) {
+    // When grouping parens are stripped (e.g., `/* comment */ (a).b` → `/* comment */ a.b`),
+    // the MemberExpression span extends earlier than its object span, creating a gap
+    // where comments from the stripped parens live. Record the gap so we can extend
+    // the last member node's comment range (only applied for call chains).
+    let member_start = member.span.start;
+    let object_start = member.object.span().start;
+    if member_start < object_start {
+        // Find the last member node in the sub-chain
+        for i in (0..nodes.len()).rev() {
+            match &nodes[i] {
+                ChainNode::Member { .. }
+                | ChainNode::PrivateMember { .. }
+                | ChainNode::ComputedMember { .. } => {
+                    paren_gaps.push((i, member_start));
+                    break;
+                }
+                ChainNode::Base { .. } => break,
+                _ => continue,
+            }
+        }
+    }
+
+    let object_end = member.object.span().end;
+    let property_start = member.property.span().start;
+    if member.computed {
+        nodes.push(ChainNode::computed_member(
+            &member.property,
+            member.optional,
+            object_end,
+            member.span.end,
+        ));
+    } else if let Expression::Identifier(id) = member.property.as_ref() {
+        nodes.push(ChainNode::member(
+            id.name,
+            member.optional,
+            object_end,
+            property_start,
+        ));
+    } else if let Expression::PrivateIdentifier(pid) = member.property.as_ref() {
+        nodes.push(ChainNode::private_member(
+            pid.name,
+            member.optional,
+            object_end,
+            property_start,
+        ));
+    } else {
+        // Non-identifier property (shouldn't happen for non-computed)
+        nodes.push(ChainNode::computed_member(
+            &member.property,
+            member.optional,
+            object_end,
+            member.span.end,
+        ));
     }
 }
 
@@ -286,12 +338,13 @@ pub fn should_not_wrap<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
             // super.method() → merge
             Expression::Super(_) => true,
 
-            // this.method() → merge (this is parsed as Identifier in our AST)
+            // this.method() → merge
+            Expression::ThisExpression(_) => true,
+
             // Object.keys() → merge (capital letter = factory)
             // d3.scale() → merge (short name ≤ tabWidth in expression statement context only)
             Expression::Identifier(id) => {
-                is_this_identifier(id.name, printer)
-                    || is_factory_name(id.name, printer)
+                is_factory_name(id.name, printer)
                     || has_computed
                     || (printer.is_expression_statement()
                         && is_short_name(id.name, printer, printer.get_tab_width()))
@@ -320,14 +373,6 @@ fn is_short_name(symbol: DefaultSymbol, interner: &impl SymbolLookup, tab_width:
         return false;
     };
     name.len() <= tab_width
-}
-
-/// Check if an identifier is `this`
-///
-/// In our AST, `this` is parsed as an Identifier with name "this" (not a separate ThisExpression).
-/// `this.method()` chains should be merged (keep `this` on same line as first method call).
-fn is_this_identifier(symbol: DefaultSymbol, interner: &impl SymbolLookup) -> bool {
-    interner.lookup(symbol).is_some_and(|name| name == "this")
 }
 
 /// Check if an identifier name is a factory pattern.

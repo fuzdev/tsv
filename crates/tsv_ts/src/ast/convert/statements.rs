@@ -2,16 +2,27 @@
 
 use super::super::{internal, public};
 use super::{
-    convert_break_statement, convert_class_declaration, convert_continue_statement,
-    convert_do_while_statement, convert_export_default_value, convert_export_specifier,
-    convert_expression, convert_for_in_statement, convert_for_of_statement, convert_for_statement,
-    convert_function_declaration, convert_if_statement, convert_import_attribute,
-    convert_import_specifier, convert_labeled_statement, convert_literal, convert_switch_statement,
-    convert_throw_statement, convert_try_statement, convert_type_alias_declaration,
-    convert_while_statement, create_location,
+    ConversionContext, convert_break_statement, convert_class_declaration,
+    convert_continue_statement, convert_do_while_statement, convert_export_default_value,
+    convert_export_specifier, convert_expression, convert_for_in_statement,
+    convert_for_of_statement, convert_for_statement, convert_function_declaration,
+    convert_if_statement, convert_import_attribute, convert_import_specifier,
+    convert_labeled_statement, convert_literal, convert_switch_statement, convert_throw_statement,
+    convert_try_statement, convert_type_alias_declaration, convert_while_statement,
+    create_location, types::convert_entity_name,
 };
 use string_interner::DefaultStringInterner;
-use tsv_lang::{InfallibleResolve, LocationTracker};
+use tsv_lang::{InfallibleResolve, LocationTracker, Span};
+
+/// Find the `export` keyword position in source, scanning past decorators.
+/// Used when a decorated class is exported — acorn's export node starts at
+/// `export`, not at the decorator.
+fn find_export_start(source: &str, span_start: u32, offset: usize) -> u32 {
+    let src_start = span_start as usize - offset;
+    source[src_start..]
+        .find("export")
+        .map_or(span_start, |pos| (src_start + pos + offset) as u32)
+}
 
 /// Main statement conversion dispatcher
 pub(in crate::ast) fn convert_statement(
@@ -20,6 +31,7 @@ pub(in crate::ast) fn convert_statement(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
+    ctx: ConversionContext,
 ) -> public::Statement {
     match stmt {
         internal::Statement::ExpressionStatement(expr_stmt) => {
@@ -38,18 +50,9 @@ pub(in crate::ast) fn convert_statement(
             })
         }
         internal::Statement::VariableDeclaration(var_decl) => {
-            public::Statement::VariableDeclaration(public::VariableDeclaration {
-                node_type: "VariableDeclaration".to_string(),
-                start: var_decl.span.start,
-                end: var_decl.span.end,
-                loc: create_location(var_decl.span, loc, offset),
-                declarations: var_decl
-                    .declarations
-                    .iter()
-                    .map(|d| convert_variable_declarator(d, source, loc, interner, offset))
-                    .collect(),
-                kind: var_decl.kind.as_str().to_string(),
-            })
+            public::Statement::VariableDeclaration(convert_variable_declaration(
+                var_decl, source, loc, interner, offset,
+            ))
         }
         internal::Statement::TSTypeAliasDeclaration(type_alias) => {
             public::Statement::TSTypeAliasDeclaration(convert_type_alias_declaration(
@@ -80,23 +83,49 @@ pub(in crate::ast) fn convert_statement(
             convert_class_declaration(class_decl, source, loc, interner, offset),
         ),
         internal::Statement::ExportNamedDeclaration(export_decl) => {
+            let export_kind = match export_decl.export_kind {
+                internal::ExportKind::Value => {
+                    if ctx.is_svelte_script {
+                        None
+                    } else {
+                        Some("value".to_string())
+                    }
+                }
+                internal::ExportKind::Type => Some("type".to_string()),
+            };
+            // Svelte parser always includes `attributes: []` on ExportNamedDeclaration;
+            // acorn-typescript omits it entirely. Internal struct doesn't have this field.
+            let attributes = if ctx.is_svelte_script {
+                Some(Vec::new())
+            } else {
+                None
+            };
+            let export_start = if let Some(internal::Statement::ClassDeclaration(class)) =
+                export_decl.declaration.as_deref()
+            {
+                if class.decorators.is_some() {
+                    find_export_start(source, export_decl.span.start, offset)
+                } else {
+                    export_decl.span.start
+                }
+            } else {
+                export_decl.span.start
+            };
+            let export_span = Span::new(export_start, export_decl.span.end);
             public::Statement::ExportNamedDeclaration(public::ExportNamedDeclaration {
                 node_type: "ExportNamedDeclaration".to_string(),
-                start: export_decl.span.start,
+                start: export_start,
                 end: export_decl.span.end,
-                loc: create_location(export_decl.span, loc, offset),
-                export_kind: match export_decl.export_kind {
-                    internal::ExportKind::Value => "value".to_string(),
-                    internal::ExportKind::Type => "type".to_string(),
-                },
+                loc: create_location(export_span, loc, offset),
+                export_kind,
                 declaration: export_decl
                     .declaration
                     .as_ref()
-                    .map(|d| Box::new(convert_statement(d, source, loc, interner, offset))),
+                    .map(|d| Box::new(convert_statement(d, source, loc, interner, offset, ctx))),
                 specifiers: export_decl
                     .specifiers
                     .iter()
-                    .map(|s| convert_export_specifier(s, loc, interner, offset))
+                    .map(|s| convert_export_specifier(s, loc, interner, offset, ctx))
                     .collect(),
                 // TODO: Consider whether source should be stored differently
                 // (e.g., just the module name string vs full Literal node)
@@ -104,15 +133,33 @@ pub(in crate::ast) fn convert_statement(
                     .source
                     .as_ref()
                     .map(|s| convert_literal(s, source, loc, offset)),
+                attributes,
             })
         }
         internal::Statement::ExportDefaultDeclaration(export_decl) => {
+            let export_kind = if ctx.is_svelte_script {
+                None
+            } else {
+                Some("value".to_string())
+            };
+            let export_start = if let internal::ExportDefaultValue::ClassDeclaration(class) =
+                &export_decl.declaration
+            {
+                if class.decorators.is_some() {
+                    find_export_start(source, export_decl.span.start, offset)
+                } else {
+                    export_decl.span.start
+                }
+            } else {
+                export_decl.span.start
+            };
+            let export_span = Span::new(export_start, export_decl.span.end);
             public::Statement::ExportDefaultDeclaration(public::ExportDefaultDeclaration {
                 node_type: "ExportDefaultDeclaration".to_string(),
-                start: export_decl.span.start,
+                start: export_start,
                 end: export_decl.span.end,
-                loc: create_location(export_decl.span, loc, offset),
-                export_kind: "value".to_string(),
+                loc: create_location(export_span, loc, offset),
+                export_kind,
                 declaration: convert_export_default_value(
                     &export_decl.declaration,
                     source,
@@ -123,20 +170,35 @@ pub(in crate::ast) fn convert_statement(
             })
         }
         internal::Statement::ExportAllDeclaration(export_decl) => {
+            let export_kind = match export_decl.export_kind {
+                internal::ExportKind::Value => {
+                    if ctx.is_svelte_script {
+                        None
+                    } else {
+                        Some("value".to_string())
+                    }
+                }
+                internal::ExportKind::Type => Some("type".to_string()),
+            };
+            // Svelte parser always includes `attributes: []` on ExportAllDeclaration;
+            // acorn-typescript omits it entirely. Internal struct doesn't have this field.
+            let attributes = if ctx.is_svelte_script {
+                Some(Vec::new())
+            } else {
+                None
+            };
             public::Statement::ExportAllDeclaration(public::ExportAllDeclaration {
                 node_type: "ExportAllDeclaration".to_string(),
                 start: export_decl.span.start,
                 end: export_decl.span.end,
                 loc: create_location(export_decl.span, loc, offset),
-                export_kind: match export_decl.export_kind {
-                    internal::ExportKind::Value => "value".to_string(),
-                    internal::ExportKind::Type => "type".to_string(),
-                },
+                export_kind,
                 exported: export_decl
                     .exported
                     .as_ref()
                     .map(|id| convert_identifier(id, loc, interner, offset)),
                 source: convert_literal(&export_decl.source, source, loc, offset),
+                attributes,
             })
         }
         internal::Statement::TSExportAssignment(export_assign) => {
@@ -155,26 +217,41 @@ pub(in crate::ast) fn convert_statement(
             })
         }
         internal::Statement::ImportDeclaration(import_decl) => {
+            let import_kind = match import_decl.import_kind {
+                internal::ImportKind::Value => {
+                    if ctx.is_svelte_script {
+                        None
+                    } else {
+                        Some("value".to_string())
+                    }
+                }
+                internal::ImportKind::Type => Some("type".to_string()),
+            };
+            let attrs: Vec<_> = import_decl
+                .attributes
+                .iter()
+                .map(|a| convert_import_attribute(a, source, loc, interner, offset))
+                .collect();
+            let attributes = if ctx.is_svelte_script {
+                Some(attrs)
+            } else if attrs.is_empty() {
+                None
+            } else {
+                Some(attrs)
+            };
             public::Statement::ImportDeclaration(public::ImportDeclaration {
                 node_type: "ImportDeclaration".to_string(),
                 start: import_decl.span.start,
                 end: import_decl.span.end,
                 loc: create_location(import_decl.span, loc, offset),
-                import_kind: match import_decl.import_kind {
-                    internal::ImportKind::Value => "value".to_string(),
-                    internal::ImportKind::Type => "type".to_string(),
-                },
+                import_kind,
                 specifiers: import_decl
                     .specifiers
                     .iter()
-                    .map(|s| convert_import_specifier(s, loc, interner, offset))
+                    .map(|s| convert_import_specifier(s, loc, interner, offset, ctx))
                     .collect(),
                 source: convert_literal(&import_decl.source, source, loc, offset),
-                attributes: import_decl
-                    .attributes
-                    .iter()
-                    .map(|a| convert_import_attribute(a, source, loc, interner, offset))
-                    .collect(),
+                attributes,
             })
         }
         internal::Statement::TSImportEqualsDeclaration(import_eq) => {
@@ -230,6 +307,14 @@ pub(in crate::ast) fn convert_statement(
                 start: empty.span.start,
                 end: empty.span.end,
                 loc: create_location(empty.span, loc, offset),
+            })
+        }
+        internal::Statement::DebuggerStatement(dbg) => {
+            public::Statement::DebuggerStatement(public::DebuggerStatement {
+                node_type: "DebuggerStatement".to_string(),
+                start: dbg.span.start,
+                end: dbg.span.end,
+                loc: create_location(dbg.span, loc, offset),
             })
         }
         internal::Statement::TSInterfaceDeclaration(iface) => {
@@ -326,6 +411,8 @@ fn convert_module_block(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::TSModuleBlock {
+    // TSModuleBlock is always in TypeScript context (declare namespace/module)
+    let ctx = ConversionContext::default();
     public::TSModuleBlock {
         node_type: "TSModuleBlock".to_string(),
         start: block.span.start,
@@ -334,7 +421,7 @@ fn convert_module_block(
         body: block
             .body
             .iter()
-            .map(|s| convert_statement(s, source, loc, interner, offset))
+            .map(|s| convert_statement(s, source, loc, interner, offset, ctx))
             .collect(),
     }
 }
@@ -346,6 +433,8 @@ pub(in crate::ast) fn convert_block_statement(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::BlockStatement {
+    // BlockStatement is always in TypeScript context (function bodies, etc.)
+    let ctx = ConversionContext::default();
     public::BlockStatement {
         node_type: "BlockStatement".to_string(),
         start: block.span.start,
@@ -354,8 +443,30 @@ pub(in crate::ast) fn convert_block_statement(
         body: block
             .body
             .iter()
-            .map(|s| convert_statement(s, source, loc, interner, offset))
+            .map(|s| convert_statement(s, source, loc, interner, offset, ctx))
             .collect(),
+    }
+}
+
+pub(in crate::ast) fn convert_variable_declaration(
+    var_decl: &internal::VariableDeclaration,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::VariableDeclaration {
+    public::VariableDeclaration {
+        node_type: "VariableDeclaration".to_string(),
+        start: var_decl.span.start,
+        end: var_decl.span.end,
+        loc: create_location(var_decl.span, loc, offset),
+        declarations: var_decl
+            .declarations
+            .iter()
+            .map(|d| convert_variable_declarator(d, source, loc, interner, offset))
+            .collect(),
+        kind: var_decl.kind.as_str().to_string(),
+        declare: var_decl.declare,
     }
 }
 
@@ -451,47 +562,6 @@ fn convert_module_reference(
                 interner,
                 offset,
             ))
-        }
-    }
-}
-
-fn convert_entity_name(
-    name: &internal::TSEntityName,
-    loc: &LocationTracker,
-    interner: &DefaultStringInterner,
-    offset: usize,
-) -> public::TSEntityName {
-    match name {
-        internal::TSEntityName::Identifier(id) => {
-            public::TSEntityName::Identifier(public::Identifier {
-                node_type: "Identifier".to_string(),
-                start: id.span.start,
-                end: id.span.end,
-                loc: create_location(id.span, loc, offset),
-                name: interner.resolve_infallible(id.name).to_string(),
-                optional: false,
-                type_annotation: None,
-                decorators: Vec::new(),
-            })
-        }
-        internal::TSEntityName::QualifiedName(qn) => {
-            public::TSEntityName::QualifiedName(public::TSQualifiedName {
-                node_type: "TSQualifiedName".to_string(),
-                start: qn.span.start,
-                end: qn.span.end,
-                loc: create_location(qn.span, loc, offset),
-                left: Box::new(convert_entity_name(&qn.left, loc, interner, offset)),
-                right: public::Identifier {
-                    node_type: "Identifier".to_string(),
-                    start: qn.right.span.start,
-                    end: qn.right.span.end,
-                    loc: create_location(qn.right.span, loc, offset),
-                    name: interner.resolve_infallible(qn.right.name).to_string(),
-                    optional: false,
-                    type_annotation: None,
-                    decorators: Vec::new(),
-                },
-            })
         }
     }
 }

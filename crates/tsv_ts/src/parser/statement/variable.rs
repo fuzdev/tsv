@@ -20,25 +20,20 @@ impl<'a> Parser<'a> {
         };
         self.advance()?;
 
-        // Parse first declarator
+        // Parse declarators (comma-separated)
         let first = self.parse_variable_declarator()?;
-        let mut decl_end = first.span.end;
-
-        // Parse additional declarators (comma-separated)
         let mut declarations = vec![first];
         while self.eat(TokenKind::Comma) {
-            let decl = self.parse_variable_declarator()?;
-            decl_end = decl.span.end;
-            declarations.push(decl);
+            declarations.push(self.parse_variable_declarator()?);
         }
 
-        self.semicolon()?;
+        let end = self.semicolon_end()?;
 
         Ok(Statement::VariableDeclaration(VariableDeclaration {
             kind,
             declarations,
             declare: false,
-            span: Span::new(start as u32, decl_end),
+            span: Span::new(start as u32, end),
         }))
     }
 
@@ -162,22 +157,18 @@ impl<'a> Parser<'a> {
 
         // Parse declarators (comma-separated)
         let first = self.parse_variable_declarator()?;
-        let mut decl_end = first.span.end;
-
         let mut declarations = vec![first];
         while self.eat(TokenKind::Comma) {
-            let decl = self.parse_variable_declarator()?;
-            decl_end = decl.span.end;
-            declarations.push(decl);
+            declarations.push(self.parse_variable_declarator()?);
         }
 
-        self.semicolon()?;
+        let end = self.semicolon_end()?;
 
         Ok(Statement::VariableDeclaration(VariableDeclaration {
             kind: VariableDeclarationKind::Using,
             declarations,
             declare: false,
-            span: Span::new(start as u32, decl_end),
+            span: Span::new(start as u32, end),
         }))
     }
 
@@ -196,22 +187,18 @@ impl<'a> Parser<'a> {
 
         // Parse declarators (comma-separated)
         let first = self.parse_variable_declarator()?;
-        let mut decl_end = first.span.end;
-
         let mut declarations = vec![first];
         while self.eat(TokenKind::Comma) {
-            let decl = self.parse_variable_declarator()?;
-            decl_end = decl.span.end;
-            declarations.push(decl);
+            declarations.push(self.parse_variable_declarator()?);
         }
 
-        self.semicolon()?;
+        let end = self.semicolon_end()?;
 
         Ok(Statement::VariableDeclaration(VariableDeclaration {
             kind: VariableDeclarationKind::AwaitUsing,
             declarations,
             declare: false,
-            span: Span::new(start as u32, decl_end),
+            span: Span::new(start as u32, end),
         }))
     }
 

@@ -290,11 +290,20 @@ impl<'a> Printer<'a> {
         let mut q_parts = vec![d.hardline(), d.text("?")];
 
         // Comments between ? and consequent
+        // When multiple comments exist, each subsequent one goes on its own line
         let mut has_line_comment_before_consequent = false;
+        let mut has_prev_comment_after_q = false;
         if let Some(q_pos) = question_pos {
             for comment in tsv_lang::comments_in_range(self.comments, q_pos + 1, consequent_start) {
-                q_parts.push(d.text(" "));
+                if has_prev_comment_after_q {
+                    // Subsequent comments go on their own line
+                    q_parts.push(d.hardline());
+                    q_parts.push(d.text(self.config.indent));
+                } else {
+                    q_parts.push(d.text(" "));
+                }
                 q_parts.push(self.build_comment_doc(comment));
+                has_prev_comment_after_q = true;
                 if !comment.is_block {
                     has_line_comment_before_consequent = true;
                 }
@@ -314,12 +323,12 @@ impl<'a> Printer<'a> {
                 (self.build_expression_doc(&cond.consequent), false)
             };
         if has_line_comment_before_consequent {
-            // Line comment needs hardline before consequent
+            // Line comment — consequent on new line
             q_parts.push(d.hardline());
             q_parts.push(d.text(self.config.indent));
             q_parts.push(consequent);
         } else {
-            // Block comment or no comment - space then consequent
+            // Single block comment or no comment - space then consequent
             q_parts.push(d.text(" "));
             if is_nested_cond {
                 // Nested conditional handles its own indent via chained structure
@@ -349,11 +358,20 @@ impl<'a> Printer<'a> {
         q_parts.push(d.text(":"));
 
         // Comments between : and alternate
+        // When multiple comments exist, each subsequent one goes on its own line
         let mut has_line_comment_before_alternate = false;
+        let mut has_prev_comment_after_colon = false;
         if let Some(c_pos) = colon_pos {
             for comment in tsv_lang::comments_in_range(self.comments, c_pos + 1, alternate_start) {
-                q_parts.push(d.text(" "));
+                if has_prev_comment_after_colon {
+                    // Subsequent comments go on their own line
+                    q_parts.push(d.hardline());
+                    q_parts.push(d.text(self.config.indent));
+                } else {
+                    q_parts.push(d.text(" "));
+                }
                 q_parts.push(self.build_comment_doc(comment));
+                has_prev_comment_after_colon = true;
                 if !comment.is_block {
                     has_line_comment_before_alternate = true;
                 }

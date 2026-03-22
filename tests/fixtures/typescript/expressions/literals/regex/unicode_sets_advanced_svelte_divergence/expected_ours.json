@@ -107,14 +107,14 @@
 				},
 				"end": {
 					"line": 16,
-					"column": 0
+					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 54,
-					"end": 81,
+					"end": 82,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -122,7 +122,7 @@
 						},
 						"end": {
 							"line": 3,
-							"column": 28
+							"column": 29
 						}
 					},
 					"declarations": [
@@ -192,7 +192,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 120,
-					"end": 156,
+					"end": 157,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -200,7 +200,7 @@
 						},
 						"end": {
 							"line": 6,
-							"column": 37
+							"column": 38
 						}
 					},
 					"declarations": [
@@ -270,7 +270,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 189,
-					"end": 214,
+					"end": 215,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -278,7 +278,7 @@
 						},
 						"end": {
 							"line": 9,
-							"column": 26
+							"column": 27
 						}
 					},
 					"declarations": [
@@ -348,7 +348,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 254,
-					"end": 310,
+					"end": 311,
 					"loc": {
 						"start": {
 							"line": 12,
@@ -356,7 +356,7 @@
 						},
 						"end": {
 							"line": 12,
-							"column": 57
+							"column": 58
 						}
 					},
 					"declarations": [
@@ -426,7 +426,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 362,
-					"end": 388,
+					"end": 389,
 					"loc": {
 						"start": {
 							"line": 15,
@@ -434,7 +434,7 @@
 						},
 						"end": {
 							"line": 15,
-							"column": 27
+							"column": 28
 						}
 					},
 					"declarations": [
@@ -510,11 +510,23 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
 				"value": [
 					{
-						"type": "Text",
 						"start": 14,
 						"end": 16,
+						"type": "Text",
 						"raw": "ts",
 						"data": "ts"
 					}

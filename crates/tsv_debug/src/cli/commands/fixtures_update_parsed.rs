@@ -273,8 +273,8 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
             Ok(ast) => ast,
             Err(e) => return FixtureResult::Failed(format!("Our parser error: {e:?}")),
         };
-        let public_ast = tsv_ts::convert_ast(&ast, source);
-        match to_json_with_tabs(&public_ast) {
+        let json_value = tsv_ts::convert_ast_json(&ast, source);
+        match to_json_with_tabs(&json_value) {
             Ok(json) => format!("{json}\n"),
             Err(e) => return FixtureResult::Failed(format!("Failed to serialize our AST: {e}")),
         }
@@ -284,8 +284,8 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
             Ok(ast) => ast,
             Err(e) => return FixtureResult::Failed(format!("Our parser error: {e:?}")),
         };
-        let public_ast = tsv_svelte::convert_ast(&ast, source);
-        match to_json_with_tabs(&public_ast) {
+        let json_value = tsv_svelte::convert_ast_json(&ast, source);
+        match to_json_with_tabs(&json_value) {
             Ok(json) => format!("{json}\n"),
             Err(e) => return FixtureResult::Failed(format!("Failed to serialize our AST: {e}")),
         }

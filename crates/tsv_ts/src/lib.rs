@@ -118,6 +118,23 @@ pub fn convert_ast(program: &Program, source: &str) -> ast::public::Program {
     ast::convert::convert_program(program, source, &tracker)
 }
 
+/// Convert internal AST to JSON with character-based positions
+///
+/// Like `convert_ast`, but returns `serde_json::Value` with all byte-based
+/// positions (`start`, `end`, `loc.*.column`) translated to Unicode character
+/// offsets to match acorn output.
+///
+/// This is the preferred function for producing JSON AST output.
+#[allow(clippy::expect_used)]
+pub fn convert_ast_json(program: &Program, source: &str) -> serde_json::Value {
+    let tracker = tsv_lang::LocationTracker::new(source);
+    let public_ast = ast::convert::convert_program(program, source, &tracker);
+    let mut json = serde_json::to_value(&public_ast).expect("AST types derive Serialize correctly");
+    let map = tsv_lang::ByteToCharMap::new(source);
+    ast::convert::translate_byte_to_char_offsets(&mut json, &map, &tracker);
+    json
+}
+
 /// Parse TypeScript with a shared string interner and base offset
 ///
 /// This is used when parsing embedded TypeScript in Svelte files.

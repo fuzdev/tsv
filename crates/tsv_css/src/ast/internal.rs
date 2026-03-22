@@ -323,8 +323,16 @@ impl AttributeMatcher {
 pub struct CssDeclaration {
     pub property: String,
     pub value: CssValue, // Semantic representation (normalized)
-    pub important: bool, // !important flag
+    /// End position including !important (span.end excludes it for the formatter).
+    /// `None` means no !important. Use `is_important()` for the bool check.
+    pub important_end: Option<u32>,
     pub span: Span,
+}
+
+impl CssDeclaration {
+    pub fn is_important(&self) -> bool {
+        self.important_end.is_some()
+    }
 }
 
 //

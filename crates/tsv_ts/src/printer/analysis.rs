@@ -180,8 +180,10 @@ pub(crate) fn is_pure_property_chain(expr: &internal::Expression) -> bool {
         internal::Expression::TSNonNullExpression(non_null) => {
             is_pure_property_chain(&non_null.expression)
         }
-        // Base case: identifiers are valid chain roots
-        internal::Expression::Identifier(_) => true,
+        // Base case: identifiers, this, super are valid chain roots
+        internal::Expression::Identifier(_)
+        | internal::Expression::ThisExpression(_)
+        | internal::Expression::Super(_) => true,
         // Everything else (calls, objects, arrays, ternaries, etc.) is NOT a pure chain
         _ => false,
     }
@@ -474,8 +476,8 @@ pub(crate) fn has_multiline_content(expr: &internal::Expression, source: &str) -
             .any(|e| has_multiline_content(e, source)),
         // Regex literals don't have multiline content
         internal::Expression::RegexLiteral(_) => false,
-        // Super is just a keyword, no multiline content
-        internal::Expression::Super(_) => false,
+        // this/super are just keywords, no multiline content
+        internal::Expression::ThisExpression(_) | internal::Expression::Super(_) => false,
         // Assignment expression: check both sides
         internal::Expression::AssignmentExpression(assign) => {
             has_multiline_content(&assign.left, source)

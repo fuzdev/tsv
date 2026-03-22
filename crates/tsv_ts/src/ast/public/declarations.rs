@@ -2,7 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::types::{TSEntityName, TSInterfaceBody, TSTypeAnnotation, TSTypeParameterInstantiation};
+use super::types::{
+    TSEntityName, TSInterfaceBody, TSTypeAnnotation, TSTypeParameterDeclaration,
+    TSTypeParameterInstantiation,
+};
 use super::{Expression, Identifier, Literal, SourceLocation, Statement};
 
 /// TypeScript interface declaration: `interface Foo { ... }`
@@ -14,6 +17,8 @@ pub struct TSInterfaceDeclaration {
     pub end: u32,
     pub loc: SourceLocation,
     pub id: Identifier,
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     #[serde(rename = "extends", skip_serializing_if = "Vec::is_empty")]
     pub extends: Vec<TSInterfaceHeritage>,
     pub body: TSInterfaceBody,
@@ -36,12 +41,15 @@ pub struct TSInterfaceHeritage {
 ///
 /// Also used for function overload signatures (no body).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct TSDeclareFunction {
     #[serde(rename = "type")]
     pub node_type: String,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub declare: bool,
     pub id: Identifier,
     /// Always false for function declarations (only true for function expressions).
     pub expression: bool,
@@ -50,6 +58,8 @@ pub struct TSDeclareFunction {
     /// Whether this is an async function.
     #[serde(rename = "async")]
     pub is_async: bool,
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub params: Vec<Expression>,
     #[serde(rename = "returnType", skip_serializing_if = "Option::is_none")]
     pub return_type: Option<TSTypeAnnotation>,
@@ -63,16 +73,16 @@ pub struct TSEnumDeclaration {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    /// Enum name
-    pub id: Identifier,
-    /// Enum members
-    pub members: Vec<TSEnumMember>,
     /// Whether this is a const enum (only serialized when true)
     #[serde(rename = "const", skip_serializing_if = "std::ops::Not::not")]
     pub is_const: bool,
     /// Whether this is a declare enum (ambient declaration, only serialized when true)
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub declare: bool,
+    /// Enum name
+    pub id: Identifier,
+    /// Enum members
+    pub members: Vec<TSEnumMember>,
 }
 
 /// Enum member: `A`, `A = 1`, `A = "value"`
@@ -106,6 +116,9 @@ pub struct TSModuleDeclaration {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
+    /// For `declare global {}` - uses module kind but has special semantics
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub global: bool,
     /// Module/namespace name - identifier for regular namespaces, string literal for ambient modules
     pub id: TSModuleName,
     /// Module body - either a block or nested module declaration (for `A.B.C`)
@@ -115,9 +128,6 @@ pub struct TSModuleDeclaration {
     /// Whether this is an ambient declaration (`declare namespace/module`)
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub declare: bool,
-    /// For `declare global {}` - uses module kind but has special semantics
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub global: bool,
 }
 
 /// Module/namespace name - can be an identifier or a string literal

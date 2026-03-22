@@ -13,7 +13,7 @@ use tsv_lang::{InfallibleResolve, LocationTracker};
 use super::{
     convert_animate_directive, convert_bind_directive, convert_class_directive,
     convert_expression_tag, convert_let_directive, convert_on_directive, convert_style_directive,
-    convert_text, convert_transition_directive, convert_use_directive, to_json_value,
+    convert_transition_directive, convert_use_directive, span_to_name_loc, to_json_value,
 };
 
 pub(super) fn convert_attribute_node(
@@ -126,7 +126,20 @@ fn convert_attribute(
                 Some(to_json_value(&converted))
             } else if values.len() == 1 {
                 // Single expression only: serialize as object
-                let converted = convert_attribute_value(&values[0], source, loc, interner);
+                let mut converted = convert_attribute_value(&values[0], source, loc, interner);
+
+                // Shorthand attributes ({name}): Svelte's parser creates the Identifier via
+                // read_identifier() which includes `character` in loc. Detect shorthand by
+                // checking if the ExpressionTag and its Identifier expression share the same span.
+                if let public::AttributeValue::ExpressionTag(ref mut et) = converted
+                    && let internal::AttributeValue::ExpressionTag(ref internal_tag) = values[0]
+                    && let tsv_ts::ast::internal::Expression::Identifier(ref id) =
+                        internal_tag.expression
+                    && internal_tag.span == id.span
+                {
+                    et.expression.inject_loc_character();
+                }
+
                 Some(to_json_value(&converted))
             } else {
                 // Multiple expressions: serialize as array
@@ -144,6 +157,7 @@ fn convert_attribute(
         start: attr.span.start,
         end: attr.span.end,
         name,
+        name_loc: span_to_name_loc(attr.name_span, loc),
         value,
     }
 }
@@ -155,9 +169,21 @@ pub(super) fn convert_attribute_value(
     interner: &DefaultStringInterner,
 ) -> public::AttributeValue {
     match value {
-        internal::AttributeValue::Text(text) => public::AttributeValue::Text(convert_text(text)),
+        internal::AttributeValue::Text(text) => {
+            public::AttributeValue::Text(convert_attribute_text(text))
+        }
         internal::AttributeValue::ExpressionTag(tag) => public::AttributeValue::ExpressionTag(
             convert_expression_tag(tag, source, loc, interner),
         ),
+    }
+}
+
+fn convert_attribute_text(text: &internal::Text) -> public::AttributeText {
+    public::AttributeText {
+        start: text.span.start,
+        end: text.span.end,
+        node_type: "Text".to_string(),
+        raw: text.raw.clone(),
+        data: text.data.clone(),
     }
 }

@@ -3,11 +3,11 @@
 use super::super::{internal, public};
 use super::types::convert_type_annotation as convert_type_annotation_from_types;
 use super::{
-    convert_block_statement, convert_expression, convert_statement, convert_type,
-    convert_type_annotation, create_location,
+    ConversionContext, convert_block_statement, convert_expression, convert_statement,
+    convert_type, convert_type_annotation, create_location,
 };
 use string_interner::DefaultStringInterner;
-use tsv_lang::{InfallibleResolve, LocationTracker};
+use tsv_lang::{InfallibleResolve, LocationTracker, Span};
 
 /// Convert a decorator from internal to public AST
 pub(super) fn convert_decorator(
@@ -17,12 +17,19 @@ pub(super) fn convert_decorator(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::Decorator {
+    let mut expression = convert_expression(&decorator.expression, source, loc, interner, offset);
+    // acorn-typescript omits `optional` on CallExpressions/MemberExpressions inside decorators
+    match &mut expression {
+        public::Expression::CallExpression(call) => call.optional = None,
+        public::Expression::MemberExpression(member) => member.optional = None,
+        _ => {}
+    }
     public::Decorator {
         node_type: "Decorator".to_string(),
         start: decorator.span.start,
         end: decorator.span.end,
         loc: create_location(decorator.span, loc, offset),
-        expression: convert_expression(&decorator.expression, source, loc, interner, offset),
+        expression,
     }
 }
 
@@ -48,6 +55,10 @@ pub(in crate::ast) fn convert_type_alias_declaration(
             type_annotation: None,
             decorators: Vec::new(),
         },
+        type_parameters: type_alias
+            .type_parameters
+            .as_ref()
+            .map(|tp| convert_type_parameter_declaration(tp, source, loc, interner, offset)),
         type_annotation: convert_type(&type_alias.type_annotation, source, loc, interner, offset),
     }
 }
@@ -101,6 +112,23 @@ pub(in crate::ast) fn convert_class_declaration(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::ClassDeclaration {
+    let mut super_class = class_decl
+        .super_class
+        .as_ref()
+        .map(|e| Box::new(convert_expression(e, source, loc, interner, offset)));
+    let mut super_type_parameters = class_decl
+        .super_type_parameters
+        .as_ref()
+        .map(|tp| convert_type_parameter_instantiation(tp, source, loc, interner, offset));
+    maybe_wrap_super_class(
+        &mut super_class,
+        &mut super_type_parameters,
+        class_decl.type_parameters.as_ref().map(|tp| tp.span),
+        source,
+        loc,
+        offset,
+    );
+
     public::ClassDeclaration {
         node_type: "ClassDeclaration".to_string(),
         start: class_decl.span.start,
@@ -112,6 +140,11 @@ pub(in crate::ast) fn convert_class_declaration(
                 .collect()
         }),
         declare: if class_decl.declare { Some(true) } else { None },
+        abstract_: if class_decl.r#abstract {
+            Some(true)
+        } else {
+            None
+        },
         id: class_decl.id.as_ref().map(|id| public::Identifier {
             node_type: "Identifier".to_string(),
             start: id.span.start,
@@ -126,14 +159,8 @@ pub(in crate::ast) fn convert_class_declaration(
             .type_parameters
             .as_ref()
             .map(|tp| convert_type_parameter_declaration(tp, source, loc, interner, offset)),
-        super_class: class_decl
-            .super_class
-            .as_ref()
-            .map(|e| Box::new(convert_expression(e, source, loc, interner, offset))),
-        super_type_parameters: class_decl
-            .super_type_parameters
-            .as_ref()
-            .map(|tp| convert_type_parameter_instantiation(tp, source, loc, interner, offset)),
+        super_class,
+        super_type_parameters,
         implements: if class_decl.implements.is_empty() {
             None
         } else {
@@ -158,6 +185,23 @@ pub(in crate::ast) fn convert_class_expression(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::ClassExpression {
+    let mut super_class = class_expr
+        .super_class
+        .as_ref()
+        .map(|e| Box::new(convert_expression(e, source, loc, interner, offset)));
+    let mut super_type_parameters = class_expr
+        .super_type_parameters
+        .as_ref()
+        .map(|tp| convert_type_parameter_instantiation(tp, source, loc, interner, offset));
+    maybe_wrap_super_class(
+        &mut super_class,
+        &mut super_type_parameters,
+        class_expr.type_parameters.as_ref().map(|tp| tp.span),
+        source,
+        loc,
+        offset,
+    );
+
     public::ClassExpression {
         node_type: "ClassExpression".to_string(),
         start: class_expr.span.start,
@@ -168,6 +212,11 @@ pub(in crate::ast) fn convert_class_expression(
                 .map(|d| convert_decorator(d, source, loc, interner, offset))
                 .collect()
         }),
+        abstract_: if class_expr.r#abstract {
+            Some(true)
+        } else {
+            None
+        },
         id: class_expr.id.as_ref().map(|id| public::Identifier {
             node_type: "Identifier".to_string(),
             start: id.span.start,
@@ -182,14 +231,8 @@ pub(in crate::ast) fn convert_class_expression(
             .type_parameters
             .as_ref()
             .map(|tp| convert_type_parameter_declaration(tp, source, loc, interner, offset)),
-        super_class: class_expr
-            .super_class
-            .as_ref()
-            .map(|e| Box::new(convert_expression(e, source, loc, interner, offset))),
-        super_type_parameters: class_expr
-            .super_type_parameters
-            .as_ref()
-            .map(|tp| convert_type_parameter_instantiation(tp, source, loc, interner, offset)),
+        super_class,
+        super_type_parameters,
         implements: if class_expr.implements.is_empty() {
             None
         } else {
@@ -205,6 +248,48 @@ pub(in crate::ast) fn convert_class_expression(
         },
         body: convert_class_body(&class_expr.body, source, loc, interner, offset),
     }
+}
+
+/// acorn-typescript quirk: when `extends Base<T>` is on a different line from the
+/// closing `>` of type parameters, superClass becomes a TSInstantiationExpression
+/// wrapping the expression and type arguments. When on the same line, superClass
+/// is the bare expression (Identifier, MemberExpression, etc.) with a separate
+/// superTypeParameters field.
+fn maybe_wrap_super_class(
+    super_class: &mut Option<Box<public::Expression>>,
+    super_type_parameters: &mut Option<public::TSTypeParameterInstantiation>,
+    type_params_span: Option<Span>,
+    source: &str,
+    loc: &LocationTracker,
+    offset: usize,
+) {
+    let Some(tp_span) = type_params_span else {
+        return;
+    };
+    let (Some(sc), Some(stp)) = (super_class.as_ref(), super_type_parameters.as_ref()) else {
+        return;
+    };
+    let sc_start = sc.start();
+
+    // Only wrap when extends is on a different line from >
+    if tsv_lang::printing::is_same_line(source, tp_span.end, sc_start) {
+        return;
+    }
+
+    // Wrap: superClass becomes TSInstantiationExpression, superTypeParameters is consumed
+    let combined_span = Span::new(sc_start, stp.end);
+    let inner = super_class.take().unwrap();
+    let type_arguments = super_type_parameters.take().unwrap();
+    *super_class = Some(Box::new(public::Expression::TSInstantiationExpression(
+        public::TSInstantiationExpression {
+            node_type: "TSInstantiationExpression".to_string(),
+            start: combined_span.start,
+            end: combined_span.end,
+            loc: create_location(combined_span, loc, offset),
+            expression: inner,
+            type_arguments,
+        },
+    )));
 }
 
 pub(in crate::ast) fn convert_class_body(
@@ -309,7 +394,17 @@ fn convert_static_block(
         body: block
             .body
             .iter()
-            .map(|s| convert_statement(s, source, loc, interner, offset))
+            // StaticBlock is always in TypeScript class context
+            .map(|s| {
+                convert_statement(
+                    s,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                    ConversionContext::default(),
+                )
+            })
             .collect(),
     }
 }
@@ -321,40 +416,68 @@ fn convert_method_definition(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::MethodDefinition {
-    // Convert the FunctionExpression value for the method
+    // Convert the FunctionExpression/TSDeclareMethod value for the method
+    // Note: typeParameters is placed on MethodDefinition, not FunctionExpression (acorn convention)
     let func = &method.value;
-    let value = public::FunctionExpression {
-        node_type: "FunctionExpression".to_string(),
-        start: func.span.start,
-        end: func.span.end,
-        loc: create_location(func.span, loc, offset),
-        id: func.id.as_ref().map(|id| public::Identifier {
-            node_type: "Identifier".to_string(),
-            start: id.span.start,
-            end: id.span.end,
-            loc: create_location(id.span, loc, offset),
-            name: interner.resolve_infallible(id.name).to_string(),
-            optional: id.optional,
-            type_annotation: None,
-            decorators: Vec::new(),
-        }),
-        expression: false,
-        generator: func.generator,
-        is_async: func.r#async,
-        type_parameters: func
-            .type_parameters
-            .as_ref()
-            .map(|tp| convert_type_parameter_declaration(tp, source, loc, interner, offset)),
-        params: func
-            .params
-            .iter()
-            .map(|p| convert_expression(p, source, loc, interner, offset))
-            .collect(),
-        return_type: func
-            .return_type
-            .as_ref()
-            .map(|rt| convert_type_annotation(rt, source, loc, interner, offset)),
-        body: convert_block_statement(&func.body, source, loc, interner, offset),
+    let type_parameters = func
+        .type_parameters
+        .as_ref()
+        .map(|tp| convert_type_parameter_declaration(tp, source, loc, interner, offset));
+
+    let params: Vec<_> = func
+        .params
+        .iter()
+        .map(|p| convert_expression(p, source, loc, interner, offset))
+        .collect();
+    let return_type = func
+        .return_type
+        .as_ref()
+        .map(|rt| convert_type_annotation(rt, source, loc, interner, offset));
+    let id = func.id.as_ref().map(|id| public::Identifier {
+        node_type: "Identifier".to_string(),
+        start: id.span.start,
+        end: id.span.end,
+        loc: create_location(id.span, loc, offset),
+        name: interner.resolve_infallible(id.name).to_string(),
+        optional: id.optional,
+        type_annotation: None,
+        decorators: Vec::new(),
+    });
+
+    // Abstract methods and overload signatures emit TSDeclareMethod (no body)
+    // Detect by: abstract flag OR empty body with zero-width span (synthetic body)
+    let is_bodyless = method.r#abstract
+        || (func.body.body.is_empty() && func.body.span.start == func.body.span.end);
+    // Value span starts at params_start (the `(`) not at the method keyword
+    let value_span = Span::new(func.params_start, func.span.end);
+    let value = if is_bodyless {
+        public::MethodValue::TSDeclareMethod(public::TSDeclareMethod {
+            node_type: "TSDeclareMethod".to_string(),
+            start: func.params_start,
+            end: func.span.end,
+            loc: create_location(value_span, loc, offset),
+            id,
+            expression: false,
+            generator: func.generator,
+            is_async: func.r#async,
+            params,
+            return_type,
+        })
+    } else {
+        public::MethodValue::FunctionExpression(public::FunctionExpression {
+            node_type: "FunctionExpression".to_string(),
+            start: func.params_start,
+            end: func.span.end,
+            loc: create_location(value_span, loc, offset),
+            id,
+            expression: false,
+            generator: func.generator,
+            is_async: func.r#async,
+            type_parameters: None, // Moved to MethodDefinition
+            params,
+            return_type,
+            body: convert_block_statement(&func.body, source, loc, interner, offset),
+        })
     };
 
     public::MethodDefinition {
@@ -368,6 +491,7 @@ fn convert_method_definition(
                 .collect()
         }),
         accessibility: method.accessibility.map(|a| a.as_str().to_string()),
+        is_abstract: if method.r#abstract { Some(true) } else { None },
         is_static: method.is_static,
         is_override: method.r#override,
         computed: method.computed,
@@ -379,6 +503,7 @@ fn convert_method_definition(
             offset,
         )),
         kind: method.kind.as_str().to_string(),
+        type_parameters,
         value,
     }
 }
@@ -400,6 +525,7 @@ fn convert_property_definition(
                 .map(|d| convert_decorator(d, source, loc, interner, offset))
                 .collect()
         }),
+        is_abstract: if prop.r#abstract { Some(true) } else { None },
         accessor: if prop.accessor { Some(true) } else { None },
         accessibility: prop.accessibility.map(|a| a.as_str().to_string()),
         readonly: if prop.readonly { Some(true) } else { None },
@@ -439,6 +565,11 @@ pub(in crate::ast) fn convert_type_parameter_declaration(
             .iter()
             .map(|p| convert_type_parameter(p, source, loc, interner, offset))
             .collect(),
+        extra: params
+            .trailing_comma
+            .map(|pos| public::TSTypeParameterExtra {
+                trailing_comma: pos + offset as u32,
+            }),
     }
 }
 
@@ -458,16 +589,7 @@ fn convert_type_parameter(
         is_const: param.is_const,
         is_in: param.is_in,
         is_out: param.is_out,
-        name: public::Identifier {
-            node_type: "Identifier".to_string(),
-            start: param.name.span.start,
-            end: param.name.span.end,
-            loc: create_location(param.name.span, loc, offset),
-            name: interner.resolve_infallible(param.name.name).to_string(),
-            optional: false,
-            type_annotation: None,
-            decorators: Vec::new(),
-        },
+        name: interner.resolve_infallible(param.name.name).to_string(),
         constraint: param
             .constraint
             .as_ref()
@@ -564,7 +686,7 @@ fn convert_entity_name_to_expression(
                     decorators: Vec::new(),
                 })),
                 computed: false,
-                optional: false,
+                optional: Some(false),
             })
         }
     }

@@ -2,11 +2,20 @@
 
 use super::super::{internal, public};
 use super::{
-    convert_block_statement, convert_expression, convert_statement, convert_variable_declarator,
-    create_location,
+    ConversionContext, convert_block_statement, convert_expression, convert_statement,
+    convert_variable_declaration, create_location,
 };
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
+
+/// Default conversion context for control flow statement bodies.
+///
+/// Control flow bodies (if/for/while/etc.) never contain import/export
+/// declarations, so the context doesn't matter. We use the default (non-Svelte)
+/// context for simplicity.
+const CTX: ConversionContext = ConversionContext {
+    is_svelte_script: false,
+};
 
 pub(in crate::ast) fn convert_if_statement(
     if_stmt: &internal::IfStatement,
@@ -33,11 +42,12 @@ pub(in crate::ast) fn convert_if_statement(
             loc,
             interner,
             offset,
+            CTX,
         )),
         alternate: if_stmt
             .alternate
             .as_ref()
-            .map(|alt| Box::new(convert_statement(alt, source, loc, interner, offset))),
+            .map(|alt| Box::new(convert_statement(alt, source, loc, interner, offset, CTX))),
     }
 }
 
@@ -71,6 +81,7 @@ pub(in crate::ast) fn convert_for_statement(
             loc,
             interner,
             offset,
+            CTX,
         )),
     }
 }
@@ -101,6 +112,7 @@ pub(in crate::ast) fn convert_for_in_statement(
             loc,
             interner,
             offset,
+            CTX,
         )),
     }
 }
@@ -132,6 +144,7 @@ pub(in crate::ast) fn convert_for_of_statement(
             loc,
             interner,
             offset,
+            CTX,
         )),
     }
 }
@@ -161,6 +174,7 @@ pub(in crate::ast) fn convert_while_statement(
             loc,
             interner,
             offset,
+            CTX,
         )),
     }
 }
@@ -183,6 +197,7 @@ pub(in crate::ast) fn convert_do_while_statement(
             loc,
             interner,
             offset,
+            CTX,
         )),
         test: Box::new(convert_expression(
             &do_while.test,
@@ -343,6 +358,7 @@ pub(in crate::ast) fn convert_labeled_statement(
             loc,
             interner,
             offset,
+            CTX,
         )),
     }
 }
@@ -357,20 +373,9 @@ fn convert_for_init(
     offset: usize,
 ) -> public::ForInit {
     match init {
-        internal::ForInit::VariableDeclaration(decl) => {
-            public::ForInit::VariableDeclaration(public::VariableDeclaration {
-                node_type: "VariableDeclaration".to_string(),
-                start: decl.span.start,
-                end: decl.span.end,
-                loc: create_location(decl.span, loc, offset),
-                kind: decl.kind.as_str().to_string(),
-                declarations: decl
-                    .declarations
-                    .iter()
-                    .map(|d| convert_variable_declarator(d, source, loc, interner, offset))
-                    .collect(),
-            })
-        }
+        internal::ForInit::VariableDeclaration(decl) => public::ForInit::VariableDeclaration(
+            convert_variable_declaration(decl, source, loc, interner, offset),
+        ),
         internal::ForInit::Expression(expr) => public::ForInit::Expression(Box::new(
             convert_expression(expr, source, loc, interner, offset),
         )),
@@ -386,22 +391,61 @@ fn convert_for_in_of_left(
 ) -> public::ForInOfLeft {
     match left {
         internal::ForInOfLeft::VariableDeclaration(decl) => {
-            public::ForInOfLeft::VariableDeclaration(public::VariableDeclaration {
-                node_type: "VariableDeclaration".to_string(),
-                start: decl.span.start,
-                end: decl.span.end,
-                loc: create_location(decl.span, loc, offset),
-                kind: decl.kind.as_str().to_string(),
-                declarations: decl
-                    .declarations
-                    .iter()
-                    .map(|d| convert_variable_declarator(d, source, loc, interner, offset))
+            public::ForInOfLeft::VariableDeclaration(convert_variable_declaration(
+                decl, source, loc, interner, offset,
+            ))
+        }
+        internal::ForInOfLeft::Pattern(expr) => {
+            let converted = convert_expression(expr, source, loc, interner, offset);
+            public::ForInOfLeft::Pattern(Box::new(expression_to_pattern(converted)))
+        }
+    }
+}
+
+/// Convert expression types to pattern types for for-in/of LHS.
+/// Acorn converts `ObjectExpression` → `ObjectPattern` and `ArrayExpression` → `ArrayPattern`
+/// when used in the left-hand side of for-in/of statements.
+fn expression_to_pattern(expr: public::Expression) -> public::Expression {
+    match expr {
+        public::Expression::ObjectExpression(obj) => {
+            public::Expression::ObjectPattern(public::ObjectPattern {
+                node_type: "ObjectPattern".to_string(),
+                start: obj.start,
+                end: obj.end,
+                loc: obj.loc,
+                properties: obj
+                    .properties
+                    .into_iter()
+                    .map(|p| match p {
+                        public::ObjectProperty::Property(p) => {
+                            public::ObjectPatternProperty::Property(p)
+                        }
+                        public::ObjectProperty::SpreadElement(s) => {
+                            public::ObjectPatternProperty::RestElement(public::RestElement {
+                                node_type: "RestElement".to_string(),
+                                start: s.start,
+                                end: s.end,
+                                loc: s.loc,
+                                argument: s.argument,
+                                type_annotation: None,
+                            })
+                        }
+                    })
                     .collect(),
+                type_annotation: None,
             })
         }
-        internal::ForInOfLeft::Pattern(expr) => public::ForInOfLeft::Pattern(Box::new(
-            convert_expression(expr, source, loc, interner, offset),
-        )),
+        public::Expression::ArrayExpression(arr) => {
+            public::Expression::ArrayPattern(public::ArrayPattern {
+                node_type: "ArrayPattern".to_string(),
+                start: arr.start,
+                end: arr.end,
+                loc: arr.loc,
+                elements: arr.elements,
+                type_annotation: None,
+            })
+        }
+        other => other,
     }
 }
 
@@ -424,7 +468,7 @@ fn convert_switch_case(
         consequent: case
             .consequent
             .iter()
-            .map(|s| convert_statement(s, source, loc, interner, offset))
+            .map(|s| convert_statement(s, source, loc, interner, offset, CTX))
             .collect(),
     }
 }

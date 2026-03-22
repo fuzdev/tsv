@@ -8,7 +8,7 @@ use super::super::Parser;
 
 impl<'a> Parser<'a> {
     pub(super) fn parse_return_statement(&mut self) -> Result<Statement, ParseError> {
-        let (start, return_end) = self.current_pos();
+        let (start, _) = self.current_pos();
 
         // Consume 'return' keyword
         debug_assert!(matches!(
@@ -21,21 +21,20 @@ impl<'a> Parser<'a> {
         // This handles: `return\n1+2` → `return;` (then `1+2;` as separate statement)
         // The `1+2` becomes an unreachable expression statement.
         if self.eat(TokenKind::Semicolon) || self.can_insert_semicolon() {
+            let end = self.prev_token_end() as u32;
             return Ok(Statement::ReturnStatement(ReturnStatement {
                 argument: None,
-                span: Span::new(start as u32, return_end as u32),
+                span: Span::new(start as u32, end),
             }));
         }
 
         // No ASI - parse the return value expression
         let argument = self.parse_expression()?;
-        self.semicolon()?;
-        // Span includes semicolon (current position after consuming it)
-        let end = self.prev_token_end();
+        let end = self.semicolon_end()?;
 
         Ok(Statement::ReturnStatement(ReturnStatement {
             argument: Some(argument),
-            span: Span::new(start as u32, end as u32),
+            span: Span::new(start as u32, end),
         }))
     }
 
@@ -72,11 +71,8 @@ impl<'a> Parser<'a> {
         // Parse function name (required for declarations)
         // Keywords like `object` and `async` can be function names
         let (id_start, id_end) = self.current_pos();
-        let symbol = match self.try_intern_identifier_or_keyword() {
-            Some(sym) => sym,
-            None => {
-                return Err(self.error_expected_after("function name", "function"));
-            }
+        let Some(symbol) = self.try_intern_identifier_or_keyword() else {
+            return Err(self.error_expected_after("function name", "function"));
         };
         self.advance()?;
 
@@ -106,10 +102,7 @@ impl<'a> Parser<'a> {
         // Overload signatures don't have a body block - they end with ; or ASI
         if !matches!(self.current_kind(), TokenKind::BraceOpen) {
             // Function overload signature - parse as TSDeclareFunction
-            let end = return_type
-                .as_ref()
-                .map_or_else(|| self.current_pos().0 as u32, |rt| rt.span.end);
-            self.semicolon()?;
+            let end = self.semicolon_end()?;
 
             Ok(Statement::TSDeclareFunction(TSDeclareFunction {
                 id,
@@ -232,10 +225,7 @@ impl<'a> Parser<'a> {
         // Check if this is an overload signature (no body) or implementation (has body)
         if !matches!(self.current_kind(), TokenKind::BraceOpen) {
             // No body - this is a declare function (ambient context)
-            let end = return_type
-                .as_ref()
-                .map_or_else(|| self.current_pos().0 as u32, |rt| rt.span.end);
-            self.semicolon()?;
+            let end = self.semicolon_end()?;
 
             Ok(ExportFunctionDeclaration::Declare(TSDeclareFunction {
                 id: id.unwrap_or_else(|| {

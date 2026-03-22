@@ -23,6 +23,9 @@ pub struct ClassDeclaration {
     /// Whether this is a declare class (ambient declaration)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub declare: Option<bool>,
+    /// Whether this is an abstract class
+    #[serde(rename = "abstract", skip_serializing_if = "Option::is_none")]
+    pub abstract_: Option<bool>,
     /// Class name (None for anonymous export default classes)
     pub id: Option<Identifier>,
     /// Type parameters (e.g., `<T>` in `class Foo<T>`)
@@ -53,6 +56,9 @@ pub struct ClassExpression {
     /// Decorators applied to this class
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decorators: Option<Vec<Decorator>>,
+    /// Whether this is an abstract class
+    #[serde(rename = "abstract", skip_serializing_if = "Option::is_none")]
+    pub abstract_: Option<bool>,
     /// Class name (always optional for expressions)
     pub id: Option<Identifier>,
     /// Type parameters (e.g., `<T>` in `class Foo<T>`)
@@ -118,15 +124,49 @@ pub struct MethodDefinition {
     /// Accessibility modifier (public, private, protected)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub accessibility: Option<String>,
+    /// Whether this is an abstract method (no body)
+    #[serde(rename = "abstract", skip_serializing_if = "Option::is_none")]
+    pub is_abstract: Option<bool>,
     #[serde(rename = "static")]
     pub is_static: bool,
     /// Whether this method overrides a base class method
-    #[serde(rename = "override")]
+    #[serde(rename = "override", skip_serializing_if = "super::is_false")]
     pub is_override: bool,
     pub computed: bool,
     pub key: Box<Expression>,
     pub kind: String,
-    pub value: FunctionExpression,
+    /// Type parameters for the method (moved from FunctionExpression)
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub value: MethodValue,
+}
+
+/// Either a FunctionExpression (for regular methods) or TSDeclareMethod (for abstract/overload methods)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MethodValue {
+    FunctionExpression(FunctionExpression),
+    TSDeclareMethod(TSDeclareMethod),
+}
+
+/// TSDeclareMethod: abstract method or overload signature (no body)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSDeclareMethod {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub id: Option<Identifier>,
+    pub expression: bool,
+    pub generator: bool,
+    #[serde(rename = "async")]
+    pub is_async: bool,
+    /// Function parameters
+    pub params: Vec<Expression>,
+    /// Return type annotation
+    #[serde(rename = "returnType", skip_serializing_if = "Option::is_none")]
+    pub return_type: Option<TSTypeAnnotation>,
 }
 
 /// Property definition in a class body: `name = value;`
@@ -140,6 +180,9 @@ pub struct PropertyDefinition {
     /// Decorators applied to this property
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decorators: Option<Vec<Decorator>>,
+    /// Whether this is an abstract property (no initializer)
+    #[serde(rename = "abstract", skip_serializing_if = "Option::is_none")]
+    pub is_abstract: Option<bool>,
     /// Whether this property uses the accessor keyword (ES decorator proposal)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub accessor: Option<bool>,

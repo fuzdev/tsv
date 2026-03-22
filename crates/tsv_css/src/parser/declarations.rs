@@ -258,20 +258,21 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
     }
 
     // Check for !important at the end of value
-    let important = if value_parts.len() >= 2 {
+    let important_end = if value_parts.len() >= 2 {
         let last = value_parts.last().map(String::as_str);
         let second_last = value_parts.get(value_parts.len() - 2).map(String::as_str);
         if second_last == Some("!") && last.is_some_and(|s| s.eq_ignore_ascii_case("important")) {
-            // Remove !important from value parts and adjust value_end
+            // Save end position including !important before shrinking value_end
+            let end_with_important = value_end;
             value_parts.pop();
             value_parts.pop();
             value_end = prev_prev_value_end;
-            true
+            Some(end_with_important as u32)
         } else {
-            false
+            None
         }
     } else {
-        false
+        None
     };
 
     // Join value parts intelligently - only add spaces when needed
@@ -350,7 +351,7 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
     Ok(CssDeclaration {
         property,
         value,
-        important,
+        important_end,
         span: decl_span,
     })
 }

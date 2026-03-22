@@ -2,14 +2,15 @@
 
 use super::super::{internal, public};
 use super::{
-    convert_arrow_function_expression, convert_await_expression, convert_call_expression,
-    convert_class_expression, convert_conditional_expression, convert_function_expression,
-    convert_member_expression, convert_new_expression, convert_object_pattern, convert_property,
-    convert_template_literal, convert_type, convert_type_annotation,
-    convert_type_parameter_instantiation, convert_yield_expression, create_location,
+    bigint_to_decimal, convert_arrow_function_expression, convert_await_expression,
+    convert_call_expression, convert_class_expression, convert_conditional_expression,
+    convert_function_expression, convert_member_expression, convert_new_expression,
+    convert_object_pattern, convert_property, convert_template_literal, convert_type,
+    convert_type_annotation, convert_type_parameter_instantiation, convert_yield_expression,
+    create_location,
 };
 use string_interner::DefaultStringInterner;
-use tsv_lang::{InfallibleResolve, LocationTracker};
+use tsv_lang::{InfallibleResolve, LocationTracker, Span};
 
 /// Main expression conversion dispatcher
 pub fn convert_expression(
@@ -18,6 +19,22 @@ pub fn convert_expression(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
+) -> public::Expression {
+    convert_expression_inner(expr, source, loc, interner, offset, false)
+}
+
+/// Inner dispatcher with chain-awareness to prevent double-wrapping ChainExpression.
+///
+/// When `in_chain` is false and a MemberExpression/CallExpression/TSNonNullExpression
+/// contains optional chaining (`?.`), it gets wrapped in ChainExpression. When `in_chain`
+/// is true (we're already inside a chain), no wrapping occurs.
+pub(in crate::ast::convert) fn convert_expression_inner(
+    expr: &internal::Expression,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+    in_chain: bool,
 ) -> public::Expression {
     match expr {
         internal::Expression::Literal(lit) => convert_literal_expression(lit, source, loc, offset),
@@ -173,15 +190,45 @@ pub fn convert_expression(
                 )),
             })
         }
-        internal::Expression::CallExpression(call) => public::Expression::CallExpression(
-            convert_call_expression(call, source, loc, interner, offset),
-        ),
+        internal::Expression::CallExpression(call) => {
+            let needs_chain = !in_chain && expr.has_optional_in_chain();
+            let converted = convert_call_expression(
+                call,
+                source,
+                loc,
+                interner,
+                offset,
+                needs_chain || in_chain,
+            );
+            maybe_wrap_chain(
+                public::Expression::CallExpression(converted),
+                call.span,
+                loc,
+                offset,
+                needs_chain,
+            )
+        }
         internal::Expression::NewExpression(new_expr) => public::Expression::NewExpression(
             convert_new_expression(new_expr, source, loc, interner, offset),
         ),
-        internal::Expression::MemberExpression(member) => public::Expression::MemberExpression(
-            convert_member_expression(member, source, loc, interner, offset),
-        ),
+        internal::Expression::MemberExpression(member) => {
+            let needs_chain = !in_chain && expr.has_optional_in_chain();
+            let converted = convert_member_expression(
+                member,
+                source,
+                loc,
+                interner,
+                offset,
+                needs_chain || in_chain,
+            );
+            maybe_wrap_chain(
+                public::Expression::MemberExpression(converted),
+                member.span,
+                loc,
+                offset,
+                needs_chain,
+            )
+        }
         internal::Expression::ConditionalExpression(cond) => {
             public::Expression::ConditionalExpression(convert_conditional_expression(
                 cond, source, loc, interner, offset,
@@ -241,6 +288,14 @@ pub fn convert_expression(
                 },
             })
         }
+        internal::Expression::ThisExpression(t) => {
+            public::Expression::ThisExpression(public::ThisExpression {
+                node_type: "ThisExpression".to_string(),
+                start: t.span.start,
+                end: t.span.end,
+                loc: create_location(t.span, loc, offset),
+            })
+        }
         internal::Expression::Super(s) => public::Expression::Super(public::Super {
             node_type: "Super".to_string(),
             start: s.span.start,
@@ -294,11 +349,38 @@ pub fn convert_expression(
             })
         }
         internal::Expression::AssignmentPattern(pattern) => {
+            let base_loc = create_location(pattern.span, loc, offset);
+            // acorn quirk: in non-arrow function params, when left side has a typeAnnotation
+            // (e.g., `a: number = 0`), `loc.start` becomes a SourceLocation covering the
+            // identifier+typeAnnotation span. Arrow function params always use normal loc.
+            // We produce the nested form here; arrow function conversion flattens it back.
+            let type_ann_end = match pattern.left.as_ref() {
+                internal::Expression::Identifier(id) => {
+                    id.type_annotation.as_ref().map(|ta| ta.span.end)
+                }
+                internal::Expression::ArrayPattern(arr) => {
+                    arr.type_annotation.as_ref().map(|ta| ta.span.end)
+                }
+                internal::Expression::ObjectPattern(obj) => {
+                    obj.type_annotation.as_ref().map(|ta| ta.span.end)
+                }
+                _ => None,
+            };
+            let ap_loc = if let Some(ta_end) = type_ann_end {
+                let left_span = pattern.left.span();
+                let ta_loc = create_location(Span::new(left_span.start, ta_end), loc, offset);
+                public::AssignmentPatternLoc::Nested {
+                    start: ta_loc,
+                    end: base_loc.end,
+                }
+            } else {
+                public::AssignmentPatternLoc::Normal(base_loc)
+            };
             public::Expression::AssignmentPattern(public::AssignmentPattern {
                 node_type: "AssignmentPattern".to_string(),
                 start: pattern.span.start,
                 end: pattern.span.end,
-                loc: create_location(pattern.span, loc, offset),
+                loc: ap_loc,
                 left: Box::new(convert_expression(
                     &pattern.left,
                     source,
@@ -328,6 +410,10 @@ pub fn convert_expression(
                     interner,
                     offset,
                 )),
+                type_annotation: rest
+                    .type_annotation
+                    .as_ref()
+                    .map(|ta| convert_type_annotation(ta, source, loc, interner, offset)),
             })
         }
         internal::Expression::TSTypeAssertion(type_assert) => {
@@ -419,19 +505,28 @@ pub fn convert_expression(
             })
         }
         internal::Expression::TSNonNullExpression(non_null_expr) => {
-            public::Expression::TSNonNullExpression(public::TSNonNullExpression {
+            let needs_chain = !in_chain && expr.has_optional_in_chain();
+            let converted = public::TSNonNullExpression {
                 node_type: "TSNonNullExpression".to_string(),
                 start: non_null_expr.span.start,
                 end: non_null_expr.span.end,
                 loc: create_location(non_null_expr.span, loc, offset),
-                expression: Box::new(convert_expression(
+                expression: Box::new(convert_expression_inner(
                     &non_null_expr.expression,
                     source,
                     loc,
                     interner,
                     offset,
+                    needs_chain || in_chain,
                 )),
-            })
+            };
+            maybe_wrap_chain(
+                public::Expression::TSNonNullExpression(converted),
+                non_null_expr.span,
+                loc,
+                offset,
+                needs_chain,
+            )
         }
         internal::Expression::ImportExpression(import_expr) => {
             public::Expression::ImportExpression(public::ImportExpression {
@@ -446,10 +541,11 @@ pub fn convert_expression(
                     interner,
                     offset,
                 )),
-                options: import_expr
+                arguments: import_expr
                     .options
                     .as_ref()
-                    .map(|opts| Box::new(convert_expression(opts, source, loc, interner, offset))),
+                    .map(|opts| vec![convert_expression(opts, source, loc, interner, offset)])
+                    .unwrap_or_default(),
             })
         }
         internal::Expression::MetaProperty(meta) => {
@@ -481,6 +577,27 @@ pub fn convert_expression(
             })
         }
         internal::Expression::TSParameterProperty(param_prop) => {
+            let mut parameter =
+                convert_expression(&param_prop.parameter, source, loc, interner, offset);
+            // acorn quirk: when parameter is AssignmentPattern without type annotation,
+            // the span/loc includes the accessibility modifier keyword
+            if let public::Expression::AssignmentPattern(ref mut ap) = parameter {
+                let has_type_ann = match ap.left.as_ref() {
+                    public::Expression::Identifier(id) => id.type_annotation.is_some(),
+                    public::Expression::ArrayPattern(arr) => arr.type_annotation.is_some(),
+                    public::Expression::ObjectPattern(obj) => obj.type_annotation.is_some(),
+                    _ => false,
+                };
+                if !has_type_ann {
+                    ap.start = param_prop.span.start;
+                    ap.end = param_prop.span.end;
+                    ap.loc = public::AssignmentPatternLoc::Normal(create_location(
+                        param_prop.span,
+                        loc,
+                        offset,
+                    ));
+                }
+            }
             public::Expression::TSParameterProperty(public::TSParameterProperty {
                 node_type: "TSParameterProperty".to_string(),
                 start: param_prop.span.start,
@@ -488,15 +605,31 @@ pub fn convert_expression(
                 loc: create_location(param_prop.span, loc, offset),
                 accessibility: param_prop.accessibility.map(|a| a.as_str().to_string()),
                 readonly: param_prop.readonly,
-                parameter: Box::new(convert_expression(
-                    &param_prop.parameter,
-                    source,
-                    loc,
-                    interner,
-                    offset,
-                )),
+                parameter: Box::new(parameter),
             })
         }
+    }
+}
+
+/// Conditionally wrap an expression in ChainExpression.
+/// Returns the expression as-is if `needs_chain` is false.
+fn maybe_wrap_chain(
+    inner: public::Expression,
+    span: Span,
+    loc: &LocationTracker,
+    offset: usize,
+    needs_chain: bool,
+) -> public::Expression {
+    if needs_chain {
+        public::Expression::ChainExpression(public::ChainExpression {
+            node_type: "ChainExpression".to_string(),
+            start: span.start,
+            end: span.end,
+            loc: create_location(span, loc, offset),
+            expression: Box::new(inner),
+        })
+    } else {
+        inner
     }
 }
 
@@ -506,6 +639,20 @@ fn convert_literal_expression(
     loc: &LocationTracker,
     offset: usize,
 ) -> public::Expression {
+    // undefined is a global identifier, not a literal
+    if matches!(lit.value, internal::LiteralValue::Undefined) {
+        return public::Expression::Identifier(public::Identifier {
+            node_type: "Identifier".to_string(),
+            start: lit.span.start,
+            end: lit.span.end,
+            loc: create_location(lit.span, loc, offset),
+            name: "undefined".to_string(),
+            optional: false,
+            type_annotation: None,
+            decorators: Vec::new(),
+        });
+    }
+
     let (value, bigint) = match &lit.value {
         internal::LiteralValue::Number(n) => (
             serde_json::Value::Number(
@@ -517,14 +664,16 @@ fn convert_literal_expression(
             (serde_json::Value::String(content.clone()), None)
         }
         internal::LiteralValue::BigInt(val) => {
-            // BigInt: value is the string, bigint field stores the same value
-            (serde_json::Value::String(val.clone()), Some(val.clone()))
+            // BigInt: acorn converts non-decimal BigInts to decimal string
+            let decimal_val = bigint_to_decimal(val);
+            (
+                serde_json::Value::String(decimal_val.clone()),
+                Some(decimal_val),
+            )
         }
         internal::LiteralValue::Boolean(b) => (serde_json::Value::Bool(*b), None),
         internal::LiteralValue::Null => (serde_json::Value::Null, None),
-        // undefined is represented as a special identifier in most ASTs
-        // but as a literal in ours - serialize as null for JSON compatibility
-        internal::LiteralValue::Undefined => (serde_json::Value::Null, None),
+        internal::LiteralValue::Undefined => unreachable!(),
     };
     // Extract raw from source using span
     let raw = lit.span.extract(source);

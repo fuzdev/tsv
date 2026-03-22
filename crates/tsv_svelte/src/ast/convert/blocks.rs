@@ -11,7 +11,7 @@ use crate::ast::{internal, public};
 use string_interner::DefaultStringInterner;
 use tsv_lang::LocationTracker;
 
-use super::convert_fragment;
+use super::{convert_fragment, convert_pattern_expression};
 
 pub(super) fn convert_if_block(
     block: &internal::IfBlock,
@@ -23,9 +23,9 @@ pub(super) fn convert_if_block(
 
     public::IfBlock {
         node_type: "IfBlock".to_string(),
+        elseif: block.elseif,
         start: block.span.start,
         end: block.span.end,
-        elseif: block.elseif,
         test: ts_expr,
         consequent: convert_fragment(&block.consequent, source, loc, interner),
         alternate: block
@@ -46,7 +46,7 @@ pub(super) fn convert_each_block(
     let context = block
         .context
         .as_ref()
-        .map(|c| tsv_ts::ast::convert::convert_expression(c, source, loc, interner, 0));
+        .map(|c| convert_pattern_expression(c, source, loc, interner));
     let key = block
         .key
         .as_ref()
@@ -57,10 +57,10 @@ pub(super) fn convert_each_block(
         start: block.span.start,
         end: block.span.end,
         expression,
+        body: convert_fragment(&block.body, source, loc, interner),
         context,
         index: block.index.clone(),
         key,
-        body: convert_fragment(&block.body, source, loc, interner),
         fallback: block
             .fallback
             .as_ref()
@@ -76,14 +76,16 @@ pub(super) fn convert_await_block(
 ) -> public::AwaitBlock {
     let expression =
         tsv_ts::ast::convert::convert_expression(&block.expression, source, loc, interner, 0);
+    // Simple identifier bindings get `character` in loc from Svelte's read_identifier().
+    // Destructure patterns go through read_pattern() which produces columns +1.
     let value = block
         .value
         .as_ref()
-        .map(|v| tsv_ts::ast::convert::convert_expression(v, source, loc, interner, 0));
+        .map(|v| convert_pattern_expression(v, source, loc, interner));
     let error = block
         .error
         .as_ref()
-        .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
+        .map(|e| convert_pattern_expression(e, source, loc, interner));
 
     public::AwaitBlock {
         node_type: "AwaitBlock".to_string(),
@@ -131,12 +133,21 @@ pub(super) fn convert_snippet_block(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::SnippetBlock {
-    let expression =
+    // Svelte's read_identifier() adds `character` to loc for the snippet name.
+    let mut expression =
         tsv_ts::ast::convert::convert_expression(&block.expression, source, loc, interner, 0);
+    expression.inject_loc_character();
     let parameters = block
         .parameters
         .iter()
-        .map(|p| tsv_ts::ast::convert::convert_expression(p, source, loc, interner, 0))
+        .map(|p| {
+            let mut expr = tsv_ts::ast::convert::convert_expression(p, source, loc, interner, 0);
+            // Snippet params don't get the nested loc.start quirk (same as arrow functions)
+            if let tsv_ts::ast::public::Expression::AssignmentPattern(ref mut ap) = expr {
+                tsv_ts::ast::convert::flatten_assignment_pattern_loc(ap);
+            }
+            expr
+        })
         .collect();
 
     public::SnippetBlock {
@@ -146,5 +157,6 @@ pub(super) fn convert_snippet_block(
         expression,
         parameters,
         body: convert_fragment(&block.body, source, loc, interner),
+        type_params: block.type_parameters.clone(),
     }
 }

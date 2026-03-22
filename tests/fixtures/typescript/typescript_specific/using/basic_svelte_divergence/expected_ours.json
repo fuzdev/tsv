@@ -139,14 +139,14 @@
 				},
 				"end": {
 					"line": 32,
-					"column": 0
+					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 48,
-					"end": 78,
+					"end": 79,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -154,7 +154,7 @@
 						},
 						"end": {
 							"line": 3,
-							"column": 31
+							"column": 32
 						}
 					},
 					"declarations": [
@@ -236,7 +236,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 113,
-					"end": 152,
+					"end": 153,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -244,7 +244,7 @@
 						},
 						"end": {
 							"line": 6,
-							"column": 40
+							"column": 41
 						}
 					},
 					"declarations": [
@@ -319,7 +319,7 @@
 													"column": 24
 												}
 											},
-											"name": "__symbol_SymbolU32 { value: 5 }"
+											"name": "Disposable"
 										}
 									}
 								}
@@ -372,7 +372,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 181,
-					"end": 201,
+					"end": 202,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -380,7 +380,7 @@
 						},
 						"end": {
 							"line": 10,
-							"column": 7
+							"column": 8
 						}
 					},
 					"declarations": [
@@ -492,7 +492,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 245,
-					"end": 265,
+					"end": 266,
 					"loc": {
 						"start": {
 							"line": 13,
@@ -500,7 +500,7 @@
 						},
 						"end": {
 							"line": 13,
-							"column": 21
+							"column": 22
 						}
 					},
 					"declarations": [
@@ -581,7 +581,7 @@
 						{
 							"type": "VariableDeclaration",
 							"start": 298,
-							"end": 326,
+							"end": 327,
 							"loc": {
 								"start": {
 									"line": 17,
@@ -589,7 +589,7 @@
 								},
 								"end": {
 									"line": 17,
-									"column": 30
+									"column": 31
 								}
 							},
 							"declarations": [
@@ -722,7 +722,7 @@
 							{
 								"type": "VariableDeclaration",
 								"start": 378,
-								"end": 404,
+								"end": 405,
 								"loc": {
 									"start": {
 										"line": 22,
@@ -730,7 +730,7 @@
 									},
 									"end": {
 										"line": 22,
-										"column": 28
+										"column": 29
 									}
 								},
 								"declarations": [
@@ -984,9 +984,9 @@
 												"column": 37
 											}
 										},
-										"name": "__symbol_SymbolU32 { value: 17 }"
+										"name": "Iterable"
 									},
-									"typeParameters": {
+									"typeArguments": {
 										"type": "TSTypeParameterInstantiation",
 										"start": 528,
 										"end": 540,
@@ -1029,7 +1029,7 @@
 															"column": 48
 														}
 													},
-													"name": "__symbol_SymbolU32 { value: 5 }"
+													"name": "Disposable"
 												}
 											}
 										]
@@ -1067,6 +1067,7 @@
 										"column": 3
 									}
 								},
+								"await": false,
 								"left": {
 									"type": "VariableDeclaration",
 									"start": 551,
@@ -1133,7 +1134,6 @@
 									},
 									"name": "resources"
 								},
-								"await": false,
 								"body": {
 									"type": "BlockStatement",
 									"start": 580,
@@ -1320,11 +1320,23 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
 				"value": [
 					{
-						"type": "Text",
 						"start": 14,
 						"end": 16,
+						"type": "Text",
 						"raw": "ts",
 						"data": "ts"
 					}

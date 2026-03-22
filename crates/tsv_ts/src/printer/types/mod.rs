@@ -192,6 +192,7 @@ impl<'a> Printer<'a> {
                 d.text("infer "),
                 d.symbol(i.type_parameter.name.name.to_u32()),
             ]),
+            TSType::ThisType(_) => d.text("this"),
         }
     }
 }

@@ -1,13 +1,15 @@
 // Svelte directive conversions
 //
 // Converts internal directive nodes to public format.
-// Only OnDirective, TransitionDirective, and StyleDirective have modifiers.
+// All directive types include a `modifiers` field in the public AST.
+// OnDirective, TransitionDirective, and StyleDirective populate modifiers from internal data;
+// the remaining types always emit an empty vec.
 
 use crate::ast::{internal, public};
 use string_interner::DefaultStringInterner;
 use tsv_lang::LocationTracker;
 
-use super::{convert_attribute_value, convert_expression_tag, to_json_value};
+use super::{convert_attribute_value, convert_expression_tag, span_to_name_loc, to_json_value};
 
 pub(super) fn convert_on_directive(
     d: &internal::OnDirective,
@@ -21,10 +23,11 @@ pub(super) fn convert_on_directive(
         .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
 
     public::OnDirective {
-        node_type: "OnDirective".to_string(),
         start: d.span.start,
         end: d.span.end,
+        node_type: "OnDirective".to_string(),
         name: d.name.clone(),
+        name_loc: span_to_name_loc(d.name_span, loc),
         expression,
         modifiers: d.modifiers.clone(),
     }
@@ -36,15 +39,22 @@ pub(super) fn convert_bind_directive(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::BindDirective {
-    let expression =
-        tsv_ts::ast::convert::convert_expression(&d.expression, source, loc, interner, 0);
+    let expression = convert_directive_expression(
+        &d.expression,
+        d.expression_tag_span.is_some(),
+        source,
+        loc,
+        interner,
+    );
 
     public::BindDirective {
-        node_type: "BindDirective".to_string(),
         start: d.span.start,
         end: d.span.end,
+        node_type: "BindDirective".to_string(),
         name: d.name.clone(),
+        name_loc: span_to_name_loc(d.name_span, loc),
         expression,
+        modifiers: vec![],
     }
 }
 
@@ -54,15 +64,22 @@ pub(super) fn convert_class_directive(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::ClassDirective {
-    let expression =
-        tsv_ts::ast::convert::convert_expression(&d.expression, source, loc, interner, 0);
+    let expression = convert_directive_expression(
+        &d.expression,
+        d.expression_tag_span.is_some(),
+        source,
+        loc,
+        interner,
+    );
 
     public::ClassDirective {
-        node_type: "ClassDirective".to_string(),
         start: d.span.start,
         end: d.span.end,
+        node_type: "ClassDirective".to_string(),
         name: d.name.clone(),
+        name_loc: span_to_name_loc(d.name_span, loc),
         expression,
+        modifiers: vec![],
     }
 }
 
@@ -89,10 +106,11 @@ pub(super) fn convert_style_directive(
     };
 
     public::StyleDirective {
-        node_type: "StyleDirective".to_string(),
         start: d.span.start,
         end: d.span.end,
+        node_type: "StyleDirective".to_string(),
         name: d.name.clone(),
+        name_loc: span_to_name_loc(d.name_span, loc),
         modifiers: d.modifiers.clone(),
         value,
     }
@@ -110,11 +128,13 @@ pub(super) fn convert_use_directive(
         .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
 
     public::UseDirective {
-        node_type: "UseDirective".to_string(),
         start: d.span.start,
         end: d.span.end,
+        node_type: "UseDirective".to_string(),
         name: d.name.clone(),
+        name_loc: span_to_name_loc(d.name_span, loc),
         expression,
+        modifiers: vec![],
     }
 }
 
@@ -130,10 +150,11 @@ pub(super) fn convert_transition_directive(
         .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
 
     public::TransitionDirective {
-        node_type: "TransitionDirective".to_string(),
         start: d.span.start,
         end: d.span.end,
+        node_type: "TransitionDirective".to_string(),
         name: d.name.clone(),
+        name_loc: span_to_name_loc(d.name_span, loc),
         expression,
         modifiers: d.modifiers.clone(),
         intro: d.direction.has_intro(),
@@ -153,11 +174,13 @@ pub(super) fn convert_animate_directive(
         .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
 
     public::AnimateDirective {
-        node_type: "AnimateDirective".to_string(),
         start: d.span.start,
         end: d.span.end,
+        node_type: "AnimateDirective".to_string(),
         name: d.name.clone(),
+        name_loc: span_to_name_loc(d.name_span, loc),
         expression,
+        modifiers: vec![],
     }
 }
 
@@ -173,10 +196,49 @@ pub(super) fn convert_let_directive(
         .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
 
     public::LetDirective {
-        node_type: "LetDirective".to_string(),
         start: d.span.start,
         end: d.span.end,
+        node_type: "LetDirective".to_string(),
         name: d.name.clone(),
+        name_loc: span_to_name_loc(d.name_span, loc),
         expression,
+        modifiers: vec![],
+    }
+}
+
+/// Convert a directive expression to JSON, handling shorthand vs explicit.
+///
+/// Shorthand directives (`bind:value`, `class:active`) produce a synthetic
+/// Identifier without `loc` and with Svelte field ordering (`start, end, type, name`).
+/// Explicit directives (`bind:value={a}`) use the normal acorn-style conversion.
+fn convert_directive_expression(
+    expr: &tsv_ts::ast::internal::Expression,
+    has_expression_tag: bool,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+) -> serde_json::Value {
+    if has_expression_tag {
+        // Explicit: normal conversion with loc
+        let converted = tsv_ts::ast::convert::convert_expression(expr, source, loc, interner, 0);
+        to_json_value(&converted)
+    } else {
+        // Shorthand: synthetic identifier without loc, Svelte field ordering
+        let tsv_ts::ast::internal::Expression::Identifier(id) = expr else {
+            unreachable!("shorthand directive expression is always an Identifier");
+        };
+        let name = interner.resolve(id.name).unwrap_or("").to_string();
+        let mut map = serde_json::Map::new();
+        map.insert(
+            "start".into(),
+            serde_json::Value::Number(id.span.start.into()),
+        );
+        map.insert("end".into(), serde_json::Value::Number(id.span.end.into()));
+        map.insert(
+            "type".into(),
+            serde_json::Value::String("Identifier".into()),
+        );
+        map.insert("name".into(), serde_json::Value::String(name));
+        serde_json::Value::Object(map)
     }
 }

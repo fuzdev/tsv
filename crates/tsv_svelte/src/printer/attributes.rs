@@ -326,12 +326,10 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = vec![d.text("let:"), d.text_owned(dir.name.clone())];
         // Only include expression if not shorthand (let:foo={foo} → let:foo)
-        if let Some(expr) = &dir.expression {
-            if !self.is_identifier_with_name(expr, &dir.name) {
-                parts.extend(
-                    self.build_expression_doc_parts_with_span(expr, dir.expression_tag_span),
-                );
-            }
+        if let Some(expr) = &dir.expression
+            && !self.is_identifier_with_name(expr, &dir.name)
+        {
+            parts.extend(self.build_expression_doc_parts_with_span(expr, dir.expression_tag_span));
         }
         d.concat(&parts)
     }

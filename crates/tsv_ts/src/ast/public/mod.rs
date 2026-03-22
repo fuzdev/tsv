@@ -25,11 +25,11 @@ pub use types::{
     TSMappedTypeModifier, TSMappedTypeParameter, TSMethodSignature, TSNamedTupleMember,
     TSNeverKeyword, TSNullKeyword, TSNumberKeyword, TSObjectKeyword, TSOptionalType,
     TSParenthesizedType, TSPropertySignature, TSQualifiedName, TSRestType, TSStringKeyword,
-    TSSymbolKeyword, TSTupleType, TSType, TSTypeAliasDeclaration, TSTypeAnnotation, TSTypeElement,
-    TSTypeLiteral, TSTypeOperator, TSTypeParameter, TSTypeParameterDeclaration,
-    TSTypeParameterInstantiation, TSTypePredicate, TSTypeQuery, TSTypeQueryExprName,
-    TSTypeReference, TSUndefinedKeyword, TSUnionType, TSUnknownKeyword, TSVoidKeyword,
-    TemplateLiteralType,
+    TSSymbolKeyword, TSThisType, TSTupleType, TSType, TSTypeAliasDeclaration, TSTypeAnnotation,
+    TSTypeElement, TSTypeLiteral, TSTypeOperator, TSTypeParameter, TSTypeParameterDeclaration,
+    TSTypeParameterExtra, TSTypeParameterInstantiation, TSTypePredicate,
+    TSTypePredicateParameterName, TSTypeQuery, TSTypeQueryExprName, TSTypeReference,
+    TSUndefinedKeyword, TSUnionType, TSUnknownKeyword, TSVoidKeyword, TemplateLiteralType,
 };
 
 // Declarations
@@ -49,33 +49,34 @@ pub use modules::{
 // Classes
 pub use classes::{
     ClassBody, ClassDeclaration, ClassExpression, ClassMember, FunctionExpression,
-    MethodDefinition, PropertyDefinition, StaticBlock, TSExpressionWithTypeArguments,
-    TSParameterProperty,
+    MethodDefinition, MethodValue, PropertyDefinition, StaticBlock, TSDeclareMethod,
+    TSExpressionWithTypeArguments, TSParameterProperty,
 };
 
 // Patterns
 pub use patterns::{
-    ArrayPattern, AssignmentPattern, ObjectPattern, ObjectPatternProperty, RestElement,
+    ArrayPattern, AssignmentPattern, AssignmentPatternLoc, ObjectPattern, ObjectPatternProperty,
+    RestElement,
 };
 
 // Statements
 pub use statements::{
-    BlockStatement, BreakStatement, CatchClause, ContinueStatement, DoWhileStatement,
-    EmptyStatement, ExpressionStatement, ForInOfLeft, ForInStatement, ForInit, ForOfStatement,
-    ForStatement, FunctionDeclaration, IfStatement, LabeledStatement, ReturnStatement, Statement,
-    SwitchCase, SwitchStatement, ThrowStatement, TryStatement, VariableDeclaration,
-    VariableDeclarator, WhileStatement,
+    BlockStatement, BreakStatement, CatchClause, ContinueStatement, DebuggerStatement,
+    DoWhileStatement, EmptyStatement, ExpressionStatement, ForInOfLeft, ForInStatement, ForInit,
+    ForOfStatement, ForStatement, FunctionDeclaration, IfStatement, LabeledStatement,
+    ReturnStatement, Statement, SwitchCase, SwitchStatement, ThrowStatement, TryStatement,
+    VariableDeclaration, VariableDeclarator, WhileStatement,
 };
 
 // Expressions
 pub use expressions::{
     ArrayExpression, ArrowFunctionBody, ArrowFunctionExpression, AssignmentExpression,
-    AwaitExpression, BinaryExpression, CallExpression, ConditionalExpression, Expression,
-    ImportExpression, MemberExpression, MetaProperty, NewExpression, ObjectExpression,
+    AwaitExpression, BinaryExpression, CallExpression, ChainExpression, ConditionalExpression,
+    Expression, ImportExpression, MemberExpression, MetaProperty, NewExpression, ObjectExpression,
     ObjectProperty, Property, RegexLiteral, RegexValue, SequenceExpression, SpreadElement, Super,
     TSAsExpression, TSInstantiationExpression, TSNonNullExpression, TSSatisfiesExpression,
     TSTypeAssertion, TaggedTemplateExpression, TemplateElement, TemplateElementValue,
-    TemplateLiteral, UnaryExpression, UpdateExpression, YieldExpression,
+    TemplateLiteral, ThisExpression, UnaryExpression, UpdateExpression, YieldExpression,
 };
 
 //
@@ -88,15 +89,17 @@ pub(crate) fn is_false(b: &bool) -> bool {
     !*b
 }
 
-/// Serialize numbers as integers if they have no fractional part
+/// Serialize numbers as integers if they have no fractional part and fit in i64
 fn serialize_literal_value<S>(value: &serde_json::Value, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
     // For numbers, ensure integers are serialized without decimals
+    // Only if the value fits safely in i64 (within ±2^53 for exact representation)
     if let Some(f) = value.as_f64()
         && f.fract() == 0.0
         && f.is_finite()
+        && f.abs() <= (1_i64 << 53) as f64
     {
         return serializer.serialize_i64(f as i64);
     }
@@ -125,10 +128,27 @@ pub struct SourceLocation {
     pub end: Position,
 }
 
+impl SourceLocation {
+    /// Add `character` (byte offset) to both start and end positions.
+    ///
+    /// Svelte's parser includes `character` in `loc` for Identifier nodes it creates
+    /// directly (via `read_identifier`), such as shorthand attributes, each/await bindings,
+    /// snippet names, and const tag variable names. Acorn-produced nodes don't have it.
+    pub fn with_character(mut self, start_offset: u32, end_offset: u32) -> Self {
+        self.start.character = Some(start_offset);
+        self.end.character = Some(end_offset);
+        self
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Position {
     pub line: usize,
     pub column: usize,
+    /// Byte offset in the source. Only present on nodes Svelte creates directly
+    /// (not from acorn). Matches the sibling `start`/`end` fields on the parent node.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub character: Option<u32>,
 }
 
 /// Decorator: `@expression` applied to classes and class members

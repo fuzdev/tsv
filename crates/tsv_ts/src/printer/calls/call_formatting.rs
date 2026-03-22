@@ -948,10 +948,19 @@ pub(super) fn build_call_doc_with_wrapping(
                     force_expansion = true;
                 }
 
-                arg_parts.push(printer.build_inline_comments_between_doc_no_leading_space(
-                    paren_open,
-                    first_arg_start,
-                ));
+                // Build leading comments with hardlines between consecutive comments.
+                // Line comments need hardline after them so subsequent comments/content
+                // don't get absorbed into the comment text.
+                let mut has_prev_comment = false;
+                for comment in
+                    tsv_lang::comments_in_range(printer.comments, paren_open, first_arg_start)
+                {
+                    if has_prev_comment {
+                        arg_parts.push(d.hardline());
+                    }
+                    arg_parts.push(printer.build_comment_doc(comment));
+                    has_prev_comment = true;
+                }
                 // Inline block comments on the same line as the first arg (e.g.,
                 // `fn(/** @type {T} */ arg)`) stay with the arg as a unit. Use text(" ")
                 // so when args break to multiline, the comment doesn't split onto its own line.

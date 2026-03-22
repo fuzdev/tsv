@@ -1,0 +1,260 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 367,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 66,
+				"data": " Closing tag on own line inside pre - tag should not break "
+			},
+			{
+				"type": "Text",
+				"start": 66,
+				"end": 67,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 67,
+				"end": 144,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 68
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 71
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 72,
+							"end": 79,
+							"raw": "\n      ",
+							"data": "\n      "
+						},
+						{
+							"type": "RegularElement",
+							"start": 79,
+							"end": 137,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 7,
+									"character": 80
+								},
+								"end": {
+									"line": 3,
+									"column": 11,
+									"character": 84
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 88,
+										"end": 130,
+										"raw": "nested\n\n        text\n\n        as is\n      ",
+										"data": "nested\n\n        text\n\n        as is\n      "
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 137,
+							"end": 138,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 144,
+				"end": 146,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 146,
+				"end": 201,
+				"data": " Closing tag on same line as content - no issue "
+			},
+			{
+				"type": "Text",
+				"start": 201,
+				"end": 202,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 202,
+				"end": 230,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 203
+					},
+					"end": {
+						"line": 13,
+						"column": 4,
+						"character": 206
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 207,
+							"end": 224,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 13,
+									"column": 6,
+									"character": 208
+								},
+								"end": {
+									"line": 13,
+									"column": 10,
+									"character": 212
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 213,
+										"end": 217,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 230,
+				"end": 232,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 232,
+				"end": 293,
+				"data": " Multi-line with closing on same line as last content "
+			},
+			{
+				"type": "Text",
+				"start": 293,
+				"end": 294,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 294,
+				"end": 366,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 16,
+						"column": 1,
+						"character": 295
+					},
+					"end": {
+						"line": 16,
+						"column": 4,
+						"character": 298
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 299,
+							"end": 306,
+							"raw": "\n      ",
+							"data": "\n      "
+						},
+						{
+							"type": "RegularElement",
+							"start": 306,
+							"end": 359,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 17,
+									"column": 7,
+									"character": 307
+								},
+								"end": {
+									"line": 17,
+									"column": 11,
+									"character": 311
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 315,
+										"end": 350,
+										"raw": "nested\n\n        text\n\n        as is",
+										"data": "nested\n\n        text\n\n        as is"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 359,
+							"end": 360,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

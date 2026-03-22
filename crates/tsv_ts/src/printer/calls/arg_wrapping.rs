@@ -172,6 +172,7 @@ pub(super) fn arg_needs_soft_wrap(arg: &internal::Expression) -> bool {
             | internal::Expression::MemberExpression(_)
             | internal::Expression::NewExpression(_)
             | internal::Expression::Identifier(_)
+            | internal::Expression::ThisExpression(_)
             | internal::Expression::ConditionalExpression(_)
     )
 }

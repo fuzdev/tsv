@@ -198,7 +198,7 @@ impl<'a> Printer<'a> {
         self.indent_level += 1;
         self.print_css_value_multiline(&decl.value);
         self.indent_level -= 1;
-        self.write_declaration_end(decl.important);
+        self.write_declaration_end(decl.is_important());
     }
 
     /// Print declaration with width-based wrapping
@@ -216,7 +216,7 @@ impl<'a> Printer<'a> {
             self.print_space_list_wrapped(&decl.value);
             self.indent_level -= 1;
         }
-        self.write_declaration_end(decl.important);
+        self.write_declaration_end(decl.is_important());
     }
 
     /// Print declaration with function value
@@ -236,7 +236,7 @@ impl<'a> Printer<'a> {
         } else {
             self.print_inline_function(decl_source, has_comments, &decl.value);
         }
-        self.write_declaration_end(decl.important);
+        self.write_declaration_end(decl.is_important());
     }
 
     /// Check if a function needs wrapping
@@ -325,7 +325,7 @@ impl<'a> Printer<'a> {
         } else {
             self.write(decl_source);
         }
-        self.write_declaration_end(decl.important);
+        self.write_declaration_end(decl.is_important());
     }
 
     /// Print declaration with string value
@@ -342,7 +342,7 @@ impl<'a> Printer<'a> {
             let formatted = source_fidelity::format_string_value("", quote);
             self.write(&formatted);
         }
-        self.write_declaration_end(decl.important);
+        self.write_declaration_end(decl.is_important());
     }
 
     /// Print declaration with default formatting
@@ -355,7 +355,7 @@ impl<'a> Printer<'a> {
             self.write(": ");
         }
         self.print_css_value(&decl.value);
-        self.write_declaration_end(decl.important);
+        self.write_declaration_end(decl.is_important());
     }
 
     /// Format a CSS value on multiple lines with greedy packing

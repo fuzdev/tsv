@@ -91,6 +91,7 @@ impl<'a> Printer<'a> {
             Expression::YieldExpression(yield_expr) => self.build_yield_doc(yield_expr),
             Expression::SequenceExpression(seq) => self.build_sequence_doc(seq),
             Expression::RegexLiteral(regex) => self.build_regex_doc(regex),
+            Expression::ThisExpression(_) => d.text("this"),
             Expression::Super(_) => d.text("super"),
             Expression::AssignmentExpression(assign) => self.build_assignment_doc(assign),
             Expression::ObjectPattern(obj) => self.build_object_pattern_doc(obj),
@@ -317,8 +318,7 @@ impl<'a> Printer<'a> {
             // When inner expression is a chain (member or call), use chain architecture
             // to properly handle breaking. This ensures the outer `!` is included
             // in the linearized chain for proper segment grouping.
-            let expr = Expression::TSNonNullExpression(non_null_expr.clone());
-            let nodes = chain::linearize_chain(&expr);
+            let nodes = chain::linearize_chain_from_non_null(non_null_expr);
             let groups = chain::group_chain_nodes(nodes);
             chain::build_chain_doc(&groups, self)
         } else {
@@ -808,6 +808,7 @@ impl<'a> Printer<'a> {
                 | Expression::UnaryExpression(_)
                 | Expression::UpdateExpression(_)
                 | Expression::MetaProperty(_)
+                | Expression::ThisExpression(_)
                 | Expression::Super(_)
         )
     }

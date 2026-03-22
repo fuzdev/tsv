@@ -266,7 +266,7 @@ fn build_short_chain_doc<'a, P: ChainPrinter>(
     let first_has_multiarg_calls = first_groups.iter().flat_map(|g| g.nodes.iter()).any(|n| {
         matches!(
             n,
-            ChainNode::Call { expr: Expression::CallExpression(call), .. }
+            ChainNode::Call { call, .. }
             if call.arguments.len() > 1
         )
     });

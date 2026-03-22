@@ -275,13 +275,22 @@ Deno.test('self_closing_nonvoid: negative - not svelte', () => {
 	assertEquals(match, null);
 });
 
-Deno.test('self_closing_nonvoid: negative - lowercase element (not component)', () => {
-	const prettier = '<div></div>';
-	const ours = '<div />';
+Deno.test('self_closing_nonvoid: positive - HTML element ours expands self-closing', () => {
+	const prettier = '<div />';
+	const ours = '<div></div>';
 	const ctx = makeContext(ours, prettier, 'svelte');
 	const match = runPattern('self_closing_nonvoid', ctx);
-	// Pattern checks for uppercase first letter - div won't match
-	assertEquals(match, null);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'self_closing_nonvoid');
+});
+
+Deno.test('self_closing_nonvoid: positive - multiline element /> vs ></div>', () => {
+	const prettier = '  data-my-prop\n/>';
+	const ours = '  data-my-prop\n></div>';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('self_closing_nonvoid', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'self_closing_nonvoid');
 });
 
 // ─── bom_strip ──────────────────────────────────────────────────────────────

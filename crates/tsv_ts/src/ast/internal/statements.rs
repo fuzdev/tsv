@@ -47,6 +47,7 @@ pub enum Statement {
     ContinueStatement(ContinueStatement),
     LabeledStatement(LabeledStatement),
     EmptyStatement(EmptyStatement),
+    DebuggerStatement(DebuggerStatement),
 }
 
 impl Statement {
@@ -83,6 +84,7 @@ impl Statement {
             Statement::ContinueStatement(stmt) => stmt.span,
             Statement::LabeledStatement(stmt) => stmt.span,
             Statement::EmptyStatement(stmt) => stmt.span,
+            Statement::DebuggerStatement(stmt) => stmt.span,
         }
     }
 }
@@ -260,6 +262,12 @@ pub struct LabeledStatement {
 /// Empty statement: `;`
 #[derive(Debug, Clone)]
 pub struct EmptyStatement {
+    pub span: Span,
+}
+
+/// Debugger statement: `debugger;`
+#[derive(Debug, Clone)]
+pub struct DebuggerStatement {
     pub span: Span,
 }
 

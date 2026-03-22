@@ -69,6 +69,7 @@ pub enum TSType {
     TSOptionalType(TSOptionalType),
     TSNamedTupleMember(TSNamedTupleMember),
     TSInferType(TSInferType),
+    TSThisType(TSThisType),
 }
 
 /// TypeScript array type: `number[]`, `string[]`, etc.
@@ -226,6 +227,8 @@ pub struct TSTypeAliasDeclaration {
     pub end: u32,
     pub loc: SourceLocation,
     pub id: Identifier,
+    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     #[serde(rename = "typeAnnotation")]
     pub type_annotation: TSType,
 }
@@ -260,8 +263,8 @@ pub struct TemplateLiteralType {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    pub quasis: Vec<TemplateElement>,
     pub expressions: Vec<TSType>,
+    pub quasis: Vec<TemplateElement>,
 }
 
 /// Entity name: `Foo` or `Foo.Bar.Baz`
@@ -304,6 +307,15 @@ pub struct TSTypeParameterDeclaration {
     pub end: u32,
     pub loc: SourceLocation,
     pub params: Vec<TSTypeParameter>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extra: Option<TSTypeParameterExtra>,
+}
+
+/// Extra metadata for type parameter declarations (trailing comma position)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSTypeParameterExtra {
+    #[serde(rename = "trailingComma")]
+    pub trailing_comma: u32,
 }
 
 /// Single type parameter: `T extends U = V`
@@ -324,7 +336,7 @@ pub struct TSTypeParameter {
     /// `out` variance modifier (TS 4.7): `<out T>`
     #[serde(rename = "out", skip_serializing_if = "is_false")]
     pub is_out: bool,
-    pub name: Identifier,
+    pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub constraint: Option<Box<TSType>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -361,10 +373,14 @@ pub struct TSPropertySignature {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    pub key: Expression,
-    pub computed: bool,
-    pub optional: bool,
+    #[serde(skip_serializing_if = "is_false")]
     pub readonly: bool,
+    /// acorn omits this field when key is `new` keyword
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub computed: Option<bool>,
+    pub key: Expression,
+    #[serde(skip_serializing_if = "is_false")]
+    pub optional: bool,
     #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
     pub type_annotation: Option<TSTypeAnnotation>,
 }
@@ -379,14 +395,17 @@ pub struct TSMethodSignature {
     pub loc: SourceLocation,
     pub computed: bool,
     pub key: Expression,
-    /// Method kind: "get" or "set" for accessor signatures (omitted for regular methods)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub kind: Option<String>,
+    /// Whether this is an optional method: `method?(): T`
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub optional: bool,
     #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub parameters: Vec<Expression>,
-    #[serde(rename = "returnType", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
     pub return_type: Option<TSTypeAnnotation>,
+    /// Method kind: "get" or "set" for accessor signatures (omitted for regular methods)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
 }
 
 /// Call signature: `(): T` or `<T>(): T`
@@ -399,8 +418,9 @@ pub struct TSCallSignatureDeclaration {
     pub loc: SourceLocation,
     #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
     pub type_parameters: Option<TSTypeParameterDeclaration>,
+    #[serde(rename = "parameters")]
     pub params: Vec<Expression>,
-    #[serde(rename = "returnType", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
     pub return_type: Option<TSTypeAnnotation>,
 }
 
@@ -414,8 +434,9 @@ pub struct TSConstructSignatureDeclaration {
     pub loc: SourceLocation,
     #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
     pub type_parameters: Option<TSTypeParameterDeclaration>,
+    #[serde(rename = "parameters")]
     pub params: Vec<Expression>,
-    #[serde(rename = "returnType", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
     pub return_type: Option<TSTypeAnnotation>,
 }
 
@@ -427,10 +448,11 @@ pub struct TSIndexSignature {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
+    #[serde(skip_serializing_if = "is_false")]
+    pub readonly: bool,
     pub parameters: Vec<Identifier>,
     #[serde(rename = "typeAnnotation")]
     pub type_annotation: TSTypeAnnotation,
-    pub readonly: bool,
 }
 
 /// Union type: `A | B | C`
@@ -465,8 +487,8 @@ pub struct TSTypeReference {
     pub loc: SourceLocation,
     #[serde(rename = "typeName")]
     pub type_name: TSEntityName,
-    #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
-    pub type_parameters: Option<TSTypeParameterInstantiation>,
+    #[serde(rename = "typeArguments", skip_serializing_if = "Option::is_none")]
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
 }
 
 /// Type literal (object type): `{ prop: T }`
@@ -490,8 +512,9 @@ pub struct TSFunctionType {
     pub loc: SourceLocation,
     #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
     pub type_parameters: Option<TSTypeParameterDeclaration>,
+    #[serde(rename = "parameters")]
     pub params: Vec<Expression>,
-    #[serde(rename = "returnType")]
+    #[serde(rename = "typeAnnotation")]
     pub return_type: Box<TSTypeAnnotation>,
 }
 
@@ -503,9 +526,11 @@ pub struct TSConstructorType {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
+    #[serde(rename = "abstract")]
     pub abstract_: bool,
     #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
     pub type_parameters: Option<TSTypeParameterDeclaration>,
+    #[serde(rename = "parameters")]
     pub params: Vec<Expression>,
     #[serde(rename = "typeAnnotation")]
     pub return_type: Box<TSTypeAnnotation>,
@@ -555,10 +580,10 @@ pub struct TSNamedTupleMember {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
+    pub optional: bool,
     pub label: Identifier,
     #[serde(rename = "elementType")]
     pub element_type: Box<TSType>,
-    pub optional: bool,
 }
 
 /// Infer type: `infer U` (in conditional types)
@@ -571,6 +596,16 @@ pub struct TSInferType {
     pub loc: SourceLocation,
     #[serde(rename = "typeParameter")]
     pub type_parameter: TSTypeParameter,
+}
+
+/// This type: `this` in type position
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TSThisType {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
 }
 
 /// Parenthesized type: `(T)`
@@ -594,10 +629,18 @@ pub struct TSTypePredicate {
     pub end: u32,
     pub loc: SourceLocation,
     #[serde(rename = "parameterName")]
-    pub parameter_name: Identifier,
-    #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
+    pub parameter_name: TSTypePredicateParameterName,
+    #[serde(rename = "typeAnnotation")]
     pub type_annotation: Option<Box<TSTypeAnnotation>>,
     pub asserts: bool,
+}
+
+/// Either an Identifier or TSThisType for the parameter name in a type predicate
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum TSTypePredicateParameterName {
+    Identifier(Identifier),
+    TSThisType(TSThisType),
 }
 
 /// TypeScript conditional type: `T extends U ? V : W`
@@ -626,20 +669,20 @@ pub struct TSMappedType {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
+    /// Readonly modifier: true, "+", "-", or absent
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub readonly: Option<TSMappedTypeModifier>,
     #[serde(rename = "typeParameter")]
     pub type_parameter: TSMappedTypeParameter,
     /// Optional key remapping: `as NewK`
     #[serde(rename = "nameType")]
     pub name_type: Option<Box<TSType>>,
-    /// The value type
-    #[serde(rename = "typeAnnotation")]
-    pub type_annotation: Option<Box<TSType>>,
-    /// Readonly modifier: true, "+", "-", or absent
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub readonly: Option<TSMappedTypeModifier>,
     /// Optional modifier: true, "+", "-", or absent
     #[serde(skip_serializing_if = "Option::is_none")]
     pub optional: Option<TSMappedTypeModifier>,
+    /// The value type
+    #[serde(rename = "typeAnnotation")]
+    pub type_annotation: Option<Box<TSType>>,
 }
 
 /// Type parameter in a mapped type: `K in keyof T`

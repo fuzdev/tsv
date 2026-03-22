@@ -35,6 +35,7 @@ pub enum Expression {
     YieldExpression(YieldExpression),
     SequenceExpression(SequenceExpression),
     RegexLiteral(RegexLiteral),
+    ThisExpression(ThisExpression),
     Super(Super),
     // Assignment and patterns
     AssignmentExpression(AssignmentExpression),
@@ -56,6 +57,65 @@ pub enum Expression {
     MetaProperty(MetaProperty),
     // TypeScript parameter property: constructor(public x)
     TSParameterProperty(TSParameterProperty),
+    // Optional chaining wrapper: a?.b, a?.b(), a?.b.c
+    ChainExpression(ChainExpression),
+}
+
+impl Expression {
+    /// Returns the byte offset of the start of this expression.
+    pub fn start(&self) -> u32 {
+        match self {
+            Self::Literal(n) => n.start,
+            Self::Identifier(n) => n.start,
+            Self::PrivateIdentifier(n) => n.start,
+            Self::ObjectExpression(n) => n.start,
+            Self::ArrayExpression(n) => n.start,
+            Self::UnaryExpression(n) => n.start,
+            Self::UpdateExpression(n) => n.start,
+            Self::BinaryExpression(n) => n.start,
+            Self::CallExpression(n) => n.start,
+            Self::NewExpression(n) => n.start,
+            Self::MemberExpression(n) => n.start,
+            Self::ConditionalExpression(n) => n.start,
+            Self::ArrowFunctionExpression(n) => n.start,
+            Self::FunctionExpression(n) => n.start,
+            Self::ClassExpression(n) => n.start,
+            Self::SpreadElement(n) => n.start,
+            Self::TemplateLiteral(n) => n.start,
+            Self::TaggedTemplateExpression(n) => n.start,
+            Self::AwaitExpression(n) => n.start,
+            Self::YieldExpression(n) => n.start,
+            Self::SequenceExpression(n) => n.start,
+            Self::RegexLiteral(n) => n.start,
+            Self::ThisExpression(n) => n.start,
+            Self::Super(n) => n.start,
+            Self::AssignmentExpression(n) => n.start,
+            Self::ObjectPattern(n) => n.start,
+            Self::ArrayPattern(n) => n.start,
+            Self::AssignmentPattern(n) => n.start,
+            Self::RestElement(n) => n.start,
+            Self::TSTypeAssertion(n) => n.start,
+            Self::TSAsExpression(n) => n.start,
+            Self::TSSatisfiesExpression(n) => n.start,
+            Self::TSInstantiationExpression(n) => n.start,
+            Self::TSNonNullExpression(n) => n.start,
+            Self::ImportExpression(n) => n.start,
+            Self::MetaProperty(n) => n.start,
+            Self::TSParameterProperty(n) => n.start,
+            Self::ChainExpression(n) => n.start,
+        }
+    }
+
+    /// Inject `character` (byte offset) into the top-level `loc` of this expression.
+    ///
+    /// Svelte's parser includes `character` in `loc` for certain Identifier nodes it creates
+    /// directly (not through acorn). This only sets `character` on `Identifier` nodes since
+    /// that's the only node type Svelte's `read_identifier()` creates.
+    pub fn inject_loc_character(&mut self) {
+        if let Expression::Identifier(id) = self {
+            id.loc = id.loc.clone().with_character(id.start, id.end);
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -131,10 +191,12 @@ pub struct CallExpression {
     pub end: u32,
     pub loc: SourceLocation,
     pub callee: Box<Expression>,
+    pub arguments: Vec<Expression>,
     #[serde(rename = "typeArguments", skip_serializing_if = "Option::is_none")]
     pub type_arguments: Option<TSTypeParameterInstantiation>,
-    pub arguments: Vec<Expression>,
-    pub optional: bool,
+    /// acorn-typescript omits `optional` when `typeArguments` is present or in decorator contexts
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub optional: Option<bool>,
 }
 
 /// New expression: `new Date()`, `new Map()`
@@ -146,9 +208,9 @@ pub struct NewExpression {
     pub end: u32,
     pub loc: SourceLocation,
     pub callee: Box<Expression>,
+    pub arguments: Vec<Expression>,
     #[serde(rename = "typeArguments", skip_serializing_if = "Option::is_none")]
     pub type_arguments: Option<TSTypeParameterInstantiation>,
-    pub arguments: Vec<Expression>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -159,9 +221,9 @@ pub struct ImportExpression {
     pub end: u32,
     pub loc: SourceLocation,
     pub source: Box<Expression>,
-    /// Optional second argument for import attributes: `{with: {type: 'json'}}`
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub options: Option<Box<Expression>>,
+    /// Import arguments for import attributes: `import('mod', {with: {type: 'json'}})`
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub arguments: Vec<Expression>,
 }
 
 /// Meta property: `import.meta`, `new.target`
@@ -188,7 +250,23 @@ pub struct MemberExpression {
     pub object: Box<Expression>,
     pub property: Box<Expression>,
     pub computed: bool,
-    pub optional: bool,
+    /// acorn omits `optional` in certain contexts (e.g., decorator expressions)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub optional: Option<bool>,
+}
+
+/// Optional chaining wrapper: `a?.b`, `a?.b()`, `a?.b.c.d()`
+///
+/// Wraps the outermost MemberExpression/CallExpression in a chain that
+/// contains at least one `?.` operator. Matches acorn's ChainExpression node.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChainExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub expression: Box<Expression>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -250,8 +328,8 @@ pub struct TemplateLiteral {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    pub quasis: Vec<TemplateElement>,
     pub expressions: Vec<Expression>,
+    pub quasis: Vec<TemplateElement>,
 }
 
 /// Template element - a static string part of a template literal
@@ -305,11 +383,10 @@ pub struct YieldExpression {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    /// The value to yield (None for `yield` with no argument)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub argument: Option<Box<Expression>>,
     /// Whether this is a delegating yield: `yield*`
     pub delegate: bool,
+    /// The value to yield (None for `yield` with no argument)
+    pub argument: Option<Box<Expression>>,
 }
 
 /// Sequence expression: `a, b, c`
@@ -348,6 +425,16 @@ pub struct RegexValue {
     pub flags: String,
 }
 
+/// This expression: `this`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThisExpression {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+}
+
 /// Super expression: `super`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Super {
@@ -382,8 +469,8 @@ pub struct Property {
     pub shorthand: bool,
     pub computed: bool,
     pub key: Box<Expression>,
-    pub value: Box<Expression>,
     pub kind: String,
+    pub value: Box<Expression>,
 }
 
 // TypeScript expression nodes

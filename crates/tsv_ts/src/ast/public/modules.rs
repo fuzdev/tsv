@@ -14,14 +14,18 @@ pub struct ExportNamedDeclaration {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    #[serde(rename = "exportKind")]
-    pub export_kind: String,
+    /// Omitted in Svelte (non-lang="ts") context when "value"; always present in TypeScript context
+    #[serde(rename = "exportKind", skip_serializing_if = "Option::is_none")]
+    pub export_kind: Option<String>,
     /// Declaration being exported (for `export const x = 1`), or null for specifiers
     pub declaration: Option<Box<Statement>>,
     /// Export specifiers: `export { a, b as c }`
     pub specifiers: Vec<ExportSpecifier>,
     /// Re-export source: `export { x } from "y"` or null for local exports
     pub source: Option<Literal>,
+    /// Import attributes: present in Svelte non-lang="ts" context; omitted in TypeScript context when empty
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<Vec<ImportAttribute>>,
 }
 
 /// Export default declaration: `export default x`, `export default function() {}`
@@ -32,8 +36,9 @@ pub struct ExportDefaultDeclaration {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    #[serde(rename = "exportKind")]
-    pub export_kind: String,
+    /// Omitted in Svelte (non-lang="ts") context; always present in TypeScript context
+    #[serde(rename = "exportKind", skip_serializing_if = "Option::is_none")]
+    pub export_kind: Option<String>,
     /// The expression or declaration being exported as default
     pub declaration: ExportDefaultValue,
 }
@@ -57,12 +62,16 @@ pub struct ExportAllDeclaration {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    #[serde(rename = "exportKind")]
-    pub export_kind: String,
+    /// Omitted in Svelte (non-lang="ts") context when "value"; always present in TypeScript context
+    #[serde(rename = "exportKind", skip_serializing_if = "Option::is_none")]
+    pub export_kind: Option<String>,
     /// For `export * as ns from "y"`, the namespace binding name, or null
     pub exported: Option<Identifier>,
     /// Module source
     pub source: Literal,
+    /// Import attributes: present in Svelte non-lang="ts" context; omitted in TypeScript context when empty
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<Vec<ImportAttribute>>,
 }
 
 /// TypeScript export assignment: `export = value;`
@@ -88,8 +97,9 @@ pub struct ExportSpecifier {
     pub local: Identifier,
     /// Exported name (what it's called externally)
     pub exported: Identifier,
-    #[serde(rename = "exportKind")]
-    pub export_kind: String,
+    /// Omitted in Svelte (non-lang="ts") context when "value"; always present in TypeScript context
+    #[serde(rename = "exportKind", skip_serializing_if = "Option::is_none")]
+    pub export_kind: Option<String>,
 }
 
 /// Import declaration: `import x from "y"`, `import { a, b } from "y"`, etc.
@@ -100,11 +110,14 @@ pub struct ImportDeclaration {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    #[serde(rename = "importKind")]
-    pub import_kind: String,
+    /// Omitted in Svelte (non-lang="ts") context when "value"; always present in TypeScript context
+    #[serde(rename = "importKind", skip_serializing_if = "Option::is_none")]
+    pub import_kind: Option<String>,
     pub specifiers: Vec<ImportSpecifier>,
     pub source: Literal,
-    pub attributes: Vec<ImportAttribute>,
+    /// Present in Svelte non-lang="ts" context (even when empty); omitted in TypeScript context when empty
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<Vec<ImportAttribute>>,
 }
 
 /// Import specifier: default, named, or namespace
@@ -137,8 +150,9 @@ pub struct ImportNamedSpecifier {
     pub loc: SourceLocation,
     pub imported: Identifier,
     pub local: Identifier,
-    #[serde(rename = "importKind")]
-    pub import_kind: String,
+    /// Omitted in Svelte (non-lang="ts") context when "value"; always present in TypeScript context
+    #[serde(rename = "importKind", skip_serializing_if = "Option::is_none")]
+    pub import_kind: Option<String>,
 }
 
 /// Namespace import: `import * as ns from "y"`

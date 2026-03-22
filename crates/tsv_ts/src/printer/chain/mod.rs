@@ -36,7 +36,10 @@ mod printing;
 mod types;
 
 // Re-export public API
-pub use analysis::{SymbolLookup, group_chain_nodes, linearize_chain};
+pub use analysis::{
+    SymbolLookup, group_chain_nodes, linearize_chain_from_call, linearize_chain_from_member,
+    linearize_chain_from_non_null,
+};
 pub use builder::build_chain_doc;
 pub use printing::ChainPrinter;
 pub use types::ChainNode;

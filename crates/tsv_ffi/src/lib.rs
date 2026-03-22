@@ -161,7 +161,7 @@ pub unsafe extern "C" fn tsv_parse_svelte(
     unsafe {
         with_source(source_ptr, source_len, out_len, |source| {
             let ast = tsv_svelte::parse(source).map_err(|e| e.to_string())?;
-            Ok(tsv_svelte::convert_ast(&ast, source))
+            Ok(tsv_svelte::convert_ast_json(&ast, source))
         })
     }
 }
@@ -225,7 +225,7 @@ pub unsafe extern "C" fn tsv_parse_typescript(
     unsafe {
         with_source(source_ptr, source_len, out_len, |source| {
             let ast = tsv_ts::parse(source).map_err(|e| e.to_string())?;
-            Ok(tsv_ts::convert_ast(&ast, source))
+            Ok(tsv_ts::convert_ast_json(&ast, source))
         })
     }
 }
@@ -289,7 +289,7 @@ pub unsafe extern "C" fn tsv_parse_css(
     unsafe {
         with_source(source_ptr, source_len, out_len, |source| {
             let ast = tsv_css::parse(source).map_err(|e| e.to_string())?;
-            Ok(tsv_css::convert_ast(&ast, source))
+            Ok(tsv_css::convert_ast_json(&ast, source))
         })
     }
 }

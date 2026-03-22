@@ -25,10 +25,10 @@ pub use types::{
     TSIndexedAccessType, TSInferType, TSIntersectionType, TSKeywordKind, TSKeywordType,
     TSLiteralType, TSMappedType, TSMappedTypeModifier, TSMappedTypeParameter, TSMethodSignature,
     TSNamedTupleMember, TSOptionalType, TSParenthesizedType, TSPropertySignature, TSQualifiedName,
-    TSRestType, TSTupleType, TSType, TSTypeAliasDeclaration, TSTypeAnnotation, TSTypeElement,
-    TSTypeLiteral, TSTypeOperator, TSTypeOperatorKind, TSTypeParameter, TSTypeParameterDeclaration,
-    TSTypeParameterInstantiation, TSTypePredicate, TSTypeQuery, TSTypeQueryExprName,
-    TSTypeReference, TSUnionType, TemplateLiteralType,
+    TSRestType, TSThisType, TSTupleType, TSType, TSTypeAliasDeclaration, TSTypeAnnotation,
+    TSTypeElement, TSTypeLiteral, TSTypeOperator, TSTypeOperatorKind, TSTypeParameter,
+    TSTypeParameterDeclaration, TSTypeParameterInstantiation, TSTypePredicate, TSTypeQuery,
+    TSTypeQueryExprName, TSTypeReference, TSUnionType, TemplateLiteralType,
 };
 
 // Declarations
@@ -60,11 +60,11 @@ pub use patterns::{
 
 // Statements
 pub use statements::{
-    BlockStatement, BreakStatement, CatchClause, ContinueStatement, DoWhileStatement,
-    EmptyStatement, ExpressionStatement, ForInOfLeft, ForInStatement, ForInit, ForOfStatement,
-    ForStatement, FunctionDeclaration, IfStatement, LabeledStatement, ReturnStatement, Statement,
-    SwitchCase, SwitchStatement, ThrowStatement, TryStatement, VariableDeclaration,
-    VariableDeclarationKind, VariableDeclarator, WhileStatement,
+    BlockStatement, BreakStatement, CatchClause, ContinueStatement, DebuggerStatement,
+    DoWhileStatement, EmptyStatement, ExpressionStatement, ForInOfLeft, ForInStatement, ForInit,
+    ForOfStatement, ForStatement, FunctionDeclaration, IfStatement, LabeledStatement,
+    ReturnStatement, Statement, SwitchCase, SwitchStatement, ThrowStatement, TryStatement,
+    VariableDeclaration, VariableDeclarationKind, VariableDeclarator, WhileStatement,
 };
 
 // Expressions
@@ -75,8 +75,8 @@ pub use expressions::{
     MetaProperty, NewExpression, ObjectExpression, ObjectProperty, Property, PropertyKind,
     RegexLiteral, SequenceExpression, SpreadElement, Super, TSAsExpression,
     TSInstantiationExpression, TSNonNullExpression, TSSatisfiesExpression, TSTypeAssertion,
-    TaggedTemplateExpression, TemplateElement, TemplateLiteral, UnaryExpression, UnaryOperator,
-    UpdateExpression, UpdateOperator, YieldExpression,
+    TaggedTemplateExpression, TemplateElement, TemplateLiteral, ThisExpression, UnaryExpression,
+    UnaryOperator, UpdateExpression, UpdateOperator, YieldExpression,
 };
 
 //

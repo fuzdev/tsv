@@ -1,7 +1,7 @@
 // TypeScript type conversions
 
 use super::super::{internal, public};
-use super::create_location;
+use super::{bigint_to_decimal, convert_expression, create_location};
 use internal::TSKeywordKind;
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
@@ -81,8 +81,8 @@ pub(in crate::ast) fn convert_type(
                 start: r.span.start,
                 end: r.span.end,
                 loc: create_location(r.span, loc, offset),
-                type_name: convert_entity_name(&r.type_name, loc, offset),
-                type_parameters: r.type_arguments.as_ref().map(|ta| {
+                type_name: convert_entity_name(&r.type_name, loc, interner, offset),
+                type_arguments: r.type_arguments.as_ref().map(|ta| {
                     convert_type_parameter_instantiation(ta, source, loc, interner, offset)
                 }),
             })
@@ -109,7 +109,7 @@ pub(in crate::ast) fn convert_type(
             params: f
                 .params
                 .iter()
-                .map(|p| super::convert_expression(p, source, loc, interner, offset))
+                .map(|p| convert_expression(p, source, loc, interner, offset))
                 .collect(),
             return_type: Box::new(convert_type_annotation(
                 &f.return_type,
@@ -132,7 +132,7 @@ pub(in crate::ast) fn convert_type(
                 params: c
                     .params
                     .iter()
-                    .map(|p| super::convert_expression(p, source, loc, interner, offset))
+                    .map(|p| convert_expression(p, source, loc, interner, offset))
                     .collect(),
                 return_type: Box::new(convert_type_annotation(
                     &c.return_type,
@@ -170,17 +170,27 @@ pub(in crate::ast) fn convert_type(
             })
         }
         internal::TSType::TypePredicate(p) => {
-            let parameter_name = public::Identifier {
-                node_type: "Identifier".to_string(),
-                start: p.parameter_name.span.start,
-                end: p.parameter_name.span.end,
-                loc: create_location(p.parameter_name.span, loc, offset),
-                name: interner
-                    .resolve_infallible(p.parameter_name.name)
-                    .to_string(),
-                optional: false,
-                type_annotation: None,
-                decorators: Vec::new(),
+            let name = interner
+                .resolve_infallible(p.parameter_name.name)
+                .to_string();
+            let parameter_name = if name == "this" {
+                public::TSTypePredicateParameterName::TSThisType(public::TSThisType {
+                    node_type: "TSThisType".to_string(),
+                    start: p.parameter_name.span.start,
+                    end: p.parameter_name.span.end,
+                    loc: create_location(p.parameter_name.span, loc, offset),
+                })
+            } else {
+                public::TSTypePredicateParameterName::Identifier(public::Identifier {
+                    node_type: "Identifier".to_string(),
+                    start: p.parameter_name.span.start,
+                    end: p.parameter_name.span.end,
+                    loc: create_location(p.parameter_name.span, loc, offset),
+                    name,
+                    optional: false,
+                    type_annotation: None,
+                    decorators: Vec::new(),
+                })
             };
             public::TSType::TSTypePredicate(public::TSTypePredicate {
                 node_type: "TSTypePredicate".to_string(),
@@ -294,15 +304,14 @@ pub(in crate::ast) fn convert_type(
                     raw: raw.to_string(),
                     bigint: None,
                 },
-                options: i.options.as_ref().map(|o| {
-                    Box::new(super::expressions::convert_expression(
-                        o, source, loc, interner, offset,
-                    ))
-                }),
+                options: i
+                    .options
+                    .as_ref()
+                    .map(|o| Box::new(convert_expression(o, source, loc, interner, offset))),
                 qualifier: i
                     .qualifier
                     .as_ref()
-                    .map(|q| convert_entity_name(q, loc, offset)),
+                    .map(|q| convert_entity_name(q, loc, interner, offset)),
                 type_arguments: i.type_arguments.as_ref().map(|ta| {
                     convert_type_parameter_instantiation(ta, source, loc, interner, offset)
                 }),
@@ -366,7 +375,7 @@ pub(in crate::ast) fn convert_type(
                     start: n.label.span.start,
                     end: n.label.span.end,
                     loc: create_location(n.label.span, loc, offset),
-                    name: format!("__symbol_{:?}", n.label.name), // Placeholder
+                    name: interner.resolve_infallible(n.label.name).to_string(),
                     optional: false,
                     type_annotation: None,
                     decorators: Vec::new(),
@@ -394,19 +403,18 @@ pub(in crate::ast) fn convert_type(
                 is_const: false, // infer doesn't have modifiers
                 is_in: false,
                 is_out: false,
-                name: public::Identifier {
-                    node_type: "Identifier".to_string(),
-                    start: i.type_parameter.name.span.start,
-                    end: i.type_parameter.name.span.end,
-                    loc: create_location(i.type_parameter.name.span, loc, offset),
-                    name: format!("__symbol_{:?}", i.type_parameter.name.name), // Placeholder
-                    optional: false,
-                    type_annotation: None,
-                    decorators: Vec::new(),
-                },
+                name: interner
+                    .resolve_infallible(i.type_parameter.name.name)
+                    .to_string(),
                 constraint: None, // infer doesn't have constraints
                 default: None,    // infer doesn't have defaults
             },
+        }),
+        internal::TSType::ThisType(t) => public::TSType::TSThisType(public::TSThisType {
+            node_type: "TSThisType".to_string(),
+            start: t.span.start,
+            end: t.span.end,
+            loc: create_location(t.span, loc, offset),
         }),
     }
 }
@@ -426,7 +434,7 @@ fn convert_type_query_expr_name(
                     start: id.span.start,
                     end: id.span.end,
                     loc: create_location(id.span, loc, offset),
-                    name: format!("__symbol_{:?}", id.name), // Placeholder
+                    name: interner.resolve_infallible(id.name).to_string(),
                     optional: false,
                     type_annotation: None,
                     decorators: Vec::new(),
@@ -438,13 +446,13 @@ fn convert_type_query_expr_name(
                     start: qn.span.start,
                     end: qn.span.end,
                     loc: create_location(qn.span, loc, offset),
-                    left: Box::new(convert_entity_name(&qn.left, loc, offset)),
+                    left: Box::new(convert_entity_name(&qn.left, loc, interner, offset)),
                     right: public::Identifier {
                         node_type: "Identifier".to_string(),
                         start: qn.right.span.start,
                         end: qn.right.span.end,
                         loc: create_location(qn.right.span, loc, offset),
-                        name: format!("__symbol_{:?}", qn.right.name),
+                        name: interner.resolve_infallible(qn.right.name).to_string(),
                         optional: false,
                         type_annotation: None,
                         decorators: Vec::new(),
@@ -474,15 +482,14 @@ fn convert_type_query_expr_name(
                     raw: raw.to_string(),
                     bigint: None,
                 },
-                options: i.options.as_ref().map(|o| {
-                    Box::new(super::expressions::convert_expression(
-                        o, source, loc, interner, offset,
-                    ))
-                }),
+                options: i
+                    .options
+                    .as_ref()
+                    .map(|o| Box::new(convert_expression(o, source, loc, interner, offset))),
                 qualifier: i
                     .qualifier
                     .as_ref()
-                    .map(|q| convert_entity_name(q, loc, offset)),
+                    .map(|q| convert_entity_name(q, loc, interner, offset)),
                 type_arguments: i.type_arguments.as_ref().map(|ta| {
                     convert_type_parameter_instantiation(ta, source, loc, interner, offset)
                 }),
@@ -566,7 +573,8 @@ fn convert_literal_type(
             let raw = literal.span.extract(source);
             let (value, bigint) = match &literal.value {
                 internal::LiteralValue::BigInt(val) => {
-                    (serde_json::Value::String(val.clone()), Some(val.clone()))
+                    let decimal = bigint_to_decimal(val);
+                    (serde_json::Value::String(decimal.clone()), Some(decimal))
                 }
                 _ => (serde_json::Value::Null, None),
             };
@@ -604,7 +612,8 @@ fn convert_literal_type(
                     None,
                 ),
                 internal::LiteralValue::BigInt(val) => {
-                    (serde_json::Value::String(val.clone()), Some(val.clone()))
+                    let decimal = bigint_to_decimal(val);
+                    (serde_json::Value::String(decimal.clone()), Some(decimal))
                 }
                 _ => (serde_json::Value::Null, None),
             };
@@ -651,7 +660,7 @@ fn convert_template_literal_type(
         quasis: template
             .quasis
             .iter()
-            .map(|q| convert_template_element_type(q, loc, offset))
+            .map(|q| super::convert_template_element(q, loc, offset))
             .collect(),
         expressions: template
             .types
@@ -661,23 +670,7 @@ fn convert_template_literal_type(
     }
 }
 
-fn convert_template_element_type(
-    elem: &internal::TemplateElement,
-    loc: &LocationTracker,
-    offset: usize,
-) -> public::TemplateElement {
-    public::TemplateElement {
-        node_type: "TemplateElement".to_string(),
-        start: elem.span.start,
-        end: elem.span.end,
-        loc: create_location(elem.span, loc, offset),
-        value: public::TemplateElementValue {
-            raw: elem.raw.clone(),
-            cooked: elem.cooked.clone(),
-        },
-        tail: elem.tail,
-    }
-}
+// Template element conversion reuses convert_template_element from patterns module
 
 /// Convert internal TSKeywordType to the appropriate public type variant
 fn convert_keyword_type(
@@ -710,28 +703,43 @@ fn convert_keyword_type(
         TSKeywordKind::Object => make_public!(TSObjectKeyword),
         TSKeywordKind::Symbol => make_public!(TSSymbolKeyword),
         TSKeywordKind::BigInt => make_public!(TSBigIntKeyword),
-        // Boolean literal types are handled as TSLiteralType in the public AST
-        // For now, we use TSBooleanKeyword as a placeholder (the formatter works correctly)
-        TSKeywordKind::True | TSKeywordKind::False => make_public!(TSBooleanKeyword),
+        // Boolean literal types: `true` and `false` as types → TSLiteralType with Literal
+        TSKeywordKind::True | TSKeywordKind::False => {
+            let is_true = matches!(kw.kind, TSKeywordKind::True);
+            public::TSType::TSLiteralType(public::TSLiteralType {
+                node_type: "TSLiteralType".to_string(),
+                start: kw.span.start,
+                end: kw.span.end,
+                loc: create_location(kw.span, loc, offset),
+                literal: public::TSLiteralTypeLiteral::Literal(public::Literal {
+                    node_type: "Literal".to_string(),
+                    start: kw.span.start,
+                    end: kw.span.end,
+                    loc: create_location(kw.span, loc, offset),
+                    value: serde_json::Value::Bool(is_true),
+                    raw: if is_true { "true" } else { "false" }.to_string(),
+                    bigint: None,
+                }),
+            })
+        }
     }
 }
 
 // Entity name conversion
-fn convert_entity_name(
+pub(super) fn convert_entity_name(
     name: &internal::TSEntityName,
     loc: &LocationTracker,
+    interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::TSEntityName {
     match name {
         internal::TSEntityName::Identifier(id) => {
-            // We don't have access to the interner here, so we use a placeholder
-            // This is a limitation - we'd need to pass interner through
             public::TSEntityName::Identifier(public::Identifier {
                 node_type: "Identifier".to_string(),
                 start: id.span.start,
                 end: id.span.end,
                 loc: create_location(id.span, loc, offset),
-                name: format!("__symbol_{:?}", id.name), // Placeholder
+                name: interner.resolve_infallible(id.name).to_string(),
                 optional: false,
                 type_annotation: None,
                 decorators: Vec::new(),
@@ -743,13 +751,13 @@ fn convert_entity_name(
                 start: qn.span.start,
                 end: qn.span.end,
                 loc: create_location(qn.span, loc, offset),
-                left: Box::new(convert_entity_name(&qn.left, loc, offset)),
+                left: Box::new(convert_entity_name(&qn.left, loc, interner, offset)),
                 right: public::Identifier {
                     node_type: "Identifier".to_string(),
                     start: qn.right.span.start,
                     end: qn.right.span.end,
                     loc: create_location(qn.right.span, loc, offset),
-                    name: format!("__symbol_{:?}", qn.right.name),
+                    name: interner.resolve_infallible(qn.right.name).to_string(),
                     optional: false,
                     type_annotation: None,
                     decorators: Vec::new(),
@@ -803,16 +811,7 @@ fn convert_type_parameter_declaration_simple(
                 is_const: p.is_const,
                 is_in: p.is_in,
                 is_out: p.is_out,
-                name: public::Identifier {
-                    node_type: "Identifier".to_string(),
-                    start: p.span.start, // Would need actual name span
-                    end: p.span.end,
-                    loc: create_location(p.span, loc, offset),
-                    name: "TODO".to_string(), // Would need interner to resolve symbol
-                    optional: false,
-                    type_annotation: None,
-                    decorators: Vec::new(),
-                },
+                name: interner.resolve_infallible(p.name.name).to_string(),
                 constraint: p
                     .constraint
                     .as_ref()
@@ -823,6 +822,11 @@ fn convert_type_parameter_declaration_simple(
                     .map(|d| Box::new(convert_type(d, source, loc, interner, offset))),
             })
             .collect(),
+        extra: params
+            .trailing_comma
+            .map(|pos| public::TSTypeParameterExtra {
+                trailing_comma: pos + offset as u32,
+            }),
     }
 }
 
@@ -840,17 +844,17 @@ fn convert_type_element(
                 start: p.span.start,
                 end: p.span.end,
                 loc: create_location(p.span, loc, offset),
-                key: public::Expression::Identifier(public::Identifier {
-                    node_type: "Identifier".to_string(),
-                    start: p.key.span().start,
-                    end: p.key.span().end,
-                    loc: create_location(p.key.span(), loc, offset),
-                    name: "TODO".to_string(), // Would need interner
-                    optional: false,
-                    type_annotation: None,
-                    decorators: Vec::new(),
-                }),
-                computed: p.computed,
+                key: convert_expression(&p.key, source, loc, interner, offset),
+                computed: {
+                    let is_new_key = matches!(&p.key, internal::Expression::Identifier(id)
+                        if interner.resolve_infallible(id.name) == "new");
+                    // acorn quirk: omits `computed` when key is `new` and not readonly
+                    if !p.computed && !p.readonly && is_new_key {
+                        None
+                    } else {
+                        Some(p.computed)
+                    }
+                },
                 optional: p.optional,
                 readonly: p.readonly,
                 type_annotation: p
@@ -860,11 +864,10 @@ fn convert_type_element(
             })
         }
         internal::TSTypeElement::MethodSignature(m) => {
-            // Only include kind for accessor signatures (get/set), not regular methods
             let kind = match m.kind {
                 internal::MethodKind::Get => Some("get".to_string()),
                 internal::MethodKind::Set => Some("set".to_string()),
-                _ => None, // Regular methods don't have a kind field
+                _ => Some("method".to_string()),
             };
             public::TSTypeElement::MethodSignature(public::TSMethodSignature {
                 node_type: "TSMethodSignature".to_string(),
@@ -872,21 +875,17 @@ fn convert_type_element(
                 end: m.span.end,
                 loc: create_location(m.span, loc, offset),
                 computed: m.computed,
-                key: public::Expression::Identifier(public::Identifier {
-                    node_type: "Identifier".to_string(),
-                    start: m.key.span().start,
-                    end: m.key.span().end,
-                    loc: create_location(m.key.span(), loc, offset),
-                    name: "TODO".to_string(), // Would need interner
-                    optional: false,
-                    type_annotation: None,
-                    decorators: Vec::new(),
-                }),
+                key: convert_expression(&m.key, source, loc, interner, offset),
+                optional: m.optional,
                 kind,
                 type_parameters: m.type_parameters.as_ref().map(|tp| {
                     convert_type_parameter_declaration_simple(tp, source, loc, interner, offset)
                 }),
-                parameters: Vec::new(), // TODO: Would need interner
+                parameters: m
+                    .params
+                    .iter()
+                    .map(|p| convert_expression(p, source, loc, interner, offset))
+                    .collect(),
                 return_type: m
                     .return_type
                     .as_ref()
@@ -902,7 +901,11 @@ fn convert_type_element(
                 type_parameters: c.type_parameters.as_ref().map(|tp| {
                     convert_type_parameter_declaration_simple(tp, source, loc, interner, offset)
                 }),
-                params: Vec::new(), // TODO
+                params: c
+                    .params
+                    .iter()
+                    .map(|p| convert_expression(p, source, loc, interner, offset))
+                    .collect(),
                 return_type: c
                     .return_type
                     .as_ref()
@@ -918,7 +921,11 @@ fn convert_type_element(
                 type_parameters: c.type_parameters.as_ref().map(|tp| {
                     convert_type_parameter_declaration_simple(tp, source, loc, interner, offset)
                 }),
-                params: Vec::new(), // TODO
+                params: c
+                    .params
+                    .iter()
+                    .map(|p| convert_expression(p, source, loc, interner, offset))
+                    .collect(),
                 return_type: c
                     .return_type
                     .as_ref()
@@ -939,7 +946,7 @@ fn convert_type_element(
                         start: p.span.start,
                         end: p.span.end,
                         loc: create_location(p.span, loc, offset),
-                        name: "TODO".to_string(), // Would need interner to resolve symbol
+                        name: interner.resolve_infallible(p.name).to_string(),
                         optional: p.optional,
                         type_annotation: p
                             .type_annotation
@@ -984,6 +991,10 @@ pub(in crate::ast) fn convert_interface_declaration(
             type_annotation: None,
             decorators: Vec::new(),
         },
+        type_parameters: iface
+            .type_parameters
+            .as_ref()
+            .map(|tp| convert_type_parameter_declaration_simple(tp, source, loc, interner, offset)),
         extends: iface
             .extends
             .iter()
@@ -1001,58 +1012,15 @@ fn convert_interface_heritage(
     offset: usize,
 ) -> public::TSInterfaceHeritage {
     public::TSInterfaceHeritage {
-        node_type: "TSInterfaceHeritage".to_string(),
+        node_type: "TSExpressionWithTypeArguments".to_string(),
         start: heritage.span.start,
         end: heritage.span.end,
         loc: create_location(heritage.span, loc, offset),
-        expression: convert_entity_name_with_interner(&heritage.expression, loc, interner, offset),
+        expression: convert_entity_name(&heritage.expression, loc, interner, offset),
         type_parameters: heritage
             .type_arguments
             .as_ref()
             .map(|ta| convert_type_parameter_instantiation(ta, source, loc, interner, offset)),
-    }
-}
-
-fn convert_entity_name_with_interner(
-    name: &internal::TSEntityName,
-    loc: &LocationTracker,
-    interner: &DefaultStringInterner,
-    offset: usize,
-) -> public::TSEntityName {
-    match name {
-        internal::TSEntityName::Identifier(id) => {
-            public::TSEntityName::Identifier(public::Identifier {
-                node_type: "Identifier".to_string(),
-                start: id.span.start,
-                end: id.span.end,
-                loc: create_location(id.span, loc, offset),
-                name: interner.resolve_infallible(id.name).to_string(),
-                optional: false,
-                type_annotation: None,
-                decorators: Vec::new(),
-            })
-        }
-        internal::TSEntityName::QualifiedName(qn) => {
-            public::TSEntityName::QualifiedName(public::TSQualifiedName {
-                node_type: "TSQualifiedName".to_string(),
-                start: qn.span.start,
-                end: qn.span.end,
-                loc: create_location(qn.span, loc, offset),
-                left: Box::new(convert_entity_name_with_interner(
-                    &qn.left, loc, interner, offset,
-                )),
-                right: public::Identifier {
-                    node_type: "Identifier".to_string(),
-                    start: qn.right.span.start,
-                    end: qn.right.span.end,
-                    loc: create_location(qn.right.span, loc, offset),
-                    name: interner.resolve_infallible(qn.right.name).to_string(),
-                    optional: false,
-                    type_annotation: None,
-                    decorators: Vec::new(),
-                },
-            })
-        }
     }
 }
 
@@ -1089,6 +1057,7 @@ pub(in crate::ast) fn convert_declare_function(
         start: func.span.start,
         end: func.span.end,
         loc: create_location(func.span, loc, offset),
+        declare: func.declare,
         id: public::Identifier {
             node_type: "Identifier".to_string(),
             start: func.id.span.start,
@@ -1102,7 +1071,16 @@ pub(in crate::ast) fn convert_declare_function(
         expression: false, // Always false for declarations
         generator: func.generator,
         is_async: func.r#async,
-        params: Vec::new(), // TODO: convert params properly
+        type_parameters: func.type_parameters.as_ref().map(|tp| {
+            super::declarations::convert_type_parameter_declaration(
+                tp, source, loc, interner, offset,
+            )
+        }),
+        params: func
+            .params
+            .iter()
+            .map(|p| convert_expression(p, source, loc, interner, offset))
+            .collect(),
         return_type: func
             .return_type
             .as_ref()
@@ -1157,8 +1135,9 @@ fn convert_enum_member(
         end: member.span.end,
         loc: create_location(member.span, loc, offset),
         id,
-        initializer: member.initializer.as_ref().map(|expr| {
-            super::expressions::convert_expression(expr, source, loc, interner, offset)
-        }),
+        initializer: member
+            .initializer
+            .as_ref()
+            .map(|expr| convert_expression(expr, source, loc, interner, offset)),
     }
 }

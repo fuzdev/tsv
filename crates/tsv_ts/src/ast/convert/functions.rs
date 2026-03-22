@@ -1,6 +1,7 @@
 // Function-related expression conversions
 
 use super::super::{internal, public};
+use super::expressions::convert_expression_inner;
 use super::{
     convert_block_statement, convert_expression, convert_type_annotation,
     convert_type_parameter_declaration, convert_type_parameter_instantiation, create_location,
@@ -37,7 +38,15 @@ pub(in crate::ast) fn convert_arrow_function_expression(
         params: arrow
             .params
             .iter()
-            .map(|p| convert_expression(p, source, loc, interner, offset))
+            .map(|p| {
+                let mut expr = convert_expression(p, source, loc, interner, offset);
+                // acorn quirk: arrow function params don't get the nested loc.start
+                // that function declarations/expressions do. Flatten it back.
+                if let public::Expression::AssignmentPattern(ref mut ap) = expr {
+                    flatten_assignment_pattern_loc(ap);
+                }
+                expr
+            })
             .collect(),
         body,
         type_parameters: arrow
@@ -93,35 +102,31 @@ pub(in crate::ast) fn convert_function_expression(
     }
 }
 
-pub(in crate::ast) fn convert_call_expression(
-    call: &internal::CallExpression,
-    source: &str,
-    loc: &LocationTracker,
-    interner: &DefaultStringInterner,
-    offset: usize,
-) -> public::CallExpression {
-    public::CallExpression {
-        node_type: "CallExpression".to_string(),
-        start: call.span.start,
-        end: call.span.end,
-        loc: create_location(call.span, loc, offset),
-        callee: Box::new(convert_expression(
-            &call.callee,
-            source,
-            loc,
-            interner,
-            offset,
-        )),
-        type_arguments: call
-            .type_arguments
-            .as_ref()
-            .map(|ta| convert_type_parameter_instantiation(ta, source, loc, interner, offset)),
-        arguments: call
-            .arguments
-            .iter()
-            .map(|arg| convert_expression(arg, source, loc, interner, offset))
-            .collect(),
-        optional: call.optional,
+/// Flatten AssignmentPattern's nested loc.start back to a plain Position.
+/// Arrow function and snippet params don't get the nested SourceLocation that function declarations do.
+pub fn flatten_assignment_pattern_loc(ap: &mut public::AssignmentPattern) {
+    if matches!(ap.loc, public::AssignmentPatternLoc::Nested { .. }) {
+        // Take ownership via replace, extract inner start position
+        let dummy = public::AssignmentPatternLoc::Normal(public::SourceLocation {
+            start: public::Position {
+                line: 0,
+                column: 0,
+                character: None,
+            },
+            end: public::Position {
+                line: 0,
+                column: 0,
+                character: None,
+            },
+        });
+        if let public::AssignmentPatternLoc::Nested { start, end } =
+            std::mem::replace(&mut ap.loc, dummy)
+        {
+            ap.loc = public::AssignmentPatternLoc::Normal(public::SourceLocation {
+                start: start.start,
+                end,
+            });
+        }
     }
 }
 
@@ -156,24 +161,71 @@ pub(in crate::ast) fn convert_new_expression(
     }
 }
 
+/// Chain-aware call expression conversion.
+/// When `in_chain` is true, uses `convert_expression_inner` with `in_chain=true`
+/// for the callee so nested chain expressions don't get double-wrapped.
+pub(in crate::ast) fn convert_call_expression(
+    call: &internal::CallExpression,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+    in_chain: bool,
+) -> public::CallExpression {
+    public::CallExpression {
+        node_type: "CallExpression".to_string(),
+        start: call.span.start,
+        end: call.span.end,
+        loc: create_location(call.span, loc, offset),
+        callee: Box::new(convert_expression_inner(
+            &call.callee,
+            source,
+            loc,
+            interner,
+            offset,
+            in_chain,
+        )),
+        type_arguments: call
+            .type_arguments
+            .as_ref()
+            .map(|ta| convert_type_parameter_instantiation(ta, source, loc, interner, offset)),
+        arguments: call
+            .arguments
+            .iter()
+            .map(|arg| convert_expression(arg, source, loc, interner, offset))
+            .collect(),
+        // acorn-typescript omits `optional` when typeArguments is present
+        optional: if call.type_arguments.is_some() {
+            None
+        } else {
+            Some(call.optional)
+        },
+    }
+}
+
+/// Chain-aware member expression conversion.
+/// When `in_chain` is true, uses `convert_expression_inner` with `in_chain=true`
+/// for the object so nested chain expressions don't get double-wrapped.
 pub(in crate::ast) fn convert_member_expression(
     member: &internal::MemberExpression,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
+    in_chain: bool,
 ) -> public::MemberExpression {
     public::MemberExpression {
         node_type: "MemberExpression".to_string(),
         start: member.span.start,
         end: member.span.end,
         loc: create_location(member.span, loc, offset),
-        object: Box::new(convert_expression(
+        object: Box::new(convert_expression_inner(
             &member.object,
             source,
             loc,
             interner,
             offset,
+            in_chain,
         )),
         property: Box::new(convert_expression(
             &member.property,
@@ -183,7 +235,7 @@ pub(in crate::ast) fn convert_member_expression(
             offset,
         )),
         computed: member.computed,
-        optional: member.optional,
+        optional: Some(member.optional),
     }
 }
 

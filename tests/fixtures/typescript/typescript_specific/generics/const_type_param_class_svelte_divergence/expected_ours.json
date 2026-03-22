@@ -73,22 +73,7 @@
 							}
 						},
 						"const": true,
-						"name": {
-							"type": "Identifier",
-							"start": 22,
-							"end": 23,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 22
-								},
-								"end": {
-									"line": 1,
-									"column": 23
-								}
-							},
-							"name": "T"
-						}
+						"name": "T"
 					}
 				]
 			},
@@ -111,7 +96,7 @@
 					{
 						"type": "PropertyDefinition",
 						"start": 28,
-						"end": 36,
+						"end": 37,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -119,7 +104,7 @@
 							},
 							"end": {
 								"line": 2,
-								"column": 9
+								"column": 10
 							}
 						},
 						"static": false,
@@ -182,7 +167,7 @@
 											"column": 9
 										}
 									},
-									"name": "__symbol_SymbolU32 { value: 2 }"
+									"name": "T"
 								}
 							}
 						},
@@ -203,7 +188,6 @@
 							}
 						},
 						"static": false,
-						"override": false,
 						"computed": false,
 						"key": {
 							"type": "Identifier",
@@ -224,12 +208,12 @@
 						"kind": "constructor",
 						"value": {
 							"type": "FunctionExpression",
-							"start": 40,
+							"start": 51,
 							"end": 88,
 							"loc": {
 								"start": {
 									"line": 4,
-									"column": 1
+									"column": 12
 								},
 								"end": {
 									"line": 6,
@@ -298,7 +282,7 @@
 														"column": 21
 													}
 												},
-												"name": "__symbol_SymbolU32 { value: 2 }"
+												"name": "T"
 											}
 										}
 									}
@@ -363,7 +347,7 @@
 													}
 												},
 												"object": {
-													"type": "Identifier",
+													"type": "ThisExpression",
 													"start": 66,
 													"end": 70,
 													"loc": {
@@ -375,8 +359,7 @@
 															"line": 5,
 															"column": 6
 														}
-													},
-													"name": "this"
+													}
 												},
 												"property": {
 													"type": "Identifier",
@@ -482,22 +465,7 @@
 							}
 						},
 						"const": true,
-						"name": {
-							"type": "Identifier",
-							"start": 112,
-							"end": 113,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 20
-								},
-								"end": {
-									"line": 9,
-									"column": 21
-								}
-							},
-							"name": "T"
-						}
+						"name": "T"
 					},
 					{
 						"type": "TSTypeParameter",
@@ -514,22 +482,7 @@
 							}
 						},
 						"const": true,
-						"name": {
-							"type": "Identifier",
-							"start": 121,
-							"end": 122,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 29
-								},
-								"end": {
-									"line": 9,
-									"column": 30
-								}
-							},
-							"name": "U"
-						}
+						"name": "U"
 					}
 				]
 			},
@@ -552,7 +505,7 @@
 					{
 						"type": "PropertyDefinition",
 						"start": 127,
-						"end": 135,
+						"end": 136,
 						"loc": {
 							"start": {
 								"line": 10,
@@ -560,7 +513,7 @@
 							},
 							"end": {
 								"line": 10,
-								"column": 9
+								"column": 10
 							}
 						},
 						"static": false,
@@ -623,7 +576,7 @@
 											"column": 9
 										}
 									},
-									"name": "__symbol_SymbolU32 { value: 2 }"
+									"name": "T"
 								}
 							}
 						},
@@ -632,7 +585,7 @@
 					{
 						"type": "PropertyDefinition",
 						"start": 138,
-						"end": 147,
+						"end": 148,
 						"loc": {
 							"start": {
 								"line": 11,
@@ -640,7 +593,7 @@
 							},
 							"end": {
 								"line": 11,
-								"column": 10
+								"column": 11
 							}
 						},
 						"static": false,
@@ -703,7 +656,7 @@
 											"column": 10
 										}
 									},
-									"name": "__symbol_SymbolU32 { value: 7 }"
+									"name": "U"
 								}
 							}
 						},
@@ -724,7 +677,6 @@
 							}
 						},
 						"static": false,
-						"override": false,
 						"computed": false,
 						"key": {
 							"type": "Identifier",
@@ -745,12 +697,12 @@
 						"kind": "constructor",
 						"value": {
 							"type": "FunctionExpression",
-							"start": 151,
+							"start": 162,
 							"end": 234,
 							"loc": {
 								"start": {
 									"line": 13,
-									"column": 1
+									"column": 12
 								},
 								"end": {
 									"line": 16,
@@ -819,7 +771,7 @@
 														"column": 21
 													}
 												},
-												"name": "__symbol_SymbolU32 { value: 2 }"
+												"name": "T"
 											}
 										}
 									}
@@ -881,7 +833,7 @@
 														"column": 32
 													}
 												},
-												"name": "__symbol_SymbolU32 { value: 7 }"
+												"name": "U"
 											}
 										}
 									}
@@ -946,7 +898,7 @@
 													}
 												},
 												"object": {
-													"type": "Identifier",
+													"type": "ThisExpression",
 													"start": 188,
 													"end": 192,
 													"loc": {
@@ -958,8 +910,7 @@
 															"line": 14,
 															"column": 6
 														}
-													},
-													"name": "this"
+													}
 												},
 												"property": {
 													"type": "Identifier",
@@ -1042,7 +993,7 @@
 													}
 												},
 												"object": {
-													"type": "Identifier",
+													"type": "ThisExpression",
 													"start": 210,
 													"end": 214,
 													"loc": {
@@ -1054,8 +1005,7 @@
 															"line": 15,
 															"column": 6
 														}
-													},
-													"name": "this"
+													}
 												},
 												"property": {
 													"type": "Identifier",
