@@ -350,7 +350,12 @@ impl<'a> Printer<'a> {
                 // assignment breaks at `=` with group(indent([line, rightDoc])).
                 let should_break_after_op_rhs = (is_module_path_fluid_call(init, &interner)
                     || is_pure_property_chain(init)
-                    || is_poorly_breakable_chain(init, self.source, self.config.print_width)
+                    || is_poorly_breakable_chain(
+                        init,
+                        self.source,
+                        self.config.print_width,
+                        self.comments,
+                    )
                     || is_string_literal(init)
                     || matches!(init, Expression::RegexLiteral(_)))
                     && is_layout_eligible;

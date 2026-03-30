@@ -49,7 +49,8 @@ impl<'a> Printer<'a> {
             self.write(&comment.content);
             self.write("*/ ");
         } else {
-            self.write("// ");
+            // Content already includes the space after // (e.g., " comment" from "// comment")
+            self.write("//");
             self.write(&comment.content);
             self.write("\n");
         }
@@ -65,7 +66,8 @@ impl<'a> Printer<'a> {
             self.write(&comment.content);
             self.write("*/");
         } else {
-            self.write(" // ");
+            // Content already includes the space after // (e.g., " comment" from "// comment")
+            self.write(" //");
             self.write(&comment.content);
         }
     }

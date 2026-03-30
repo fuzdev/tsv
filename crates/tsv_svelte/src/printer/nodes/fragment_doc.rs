@@ -88,6 +88,33 @@ fn indent_body(printer: &Printer, body_doc: DocId, has_leading_ws: bool) -> DocI
     }
 }
 
+/// Build an await block section body with newline-based whitespace detection.
+///
+/// Returns `(body_doc, has_trailing)` — the indented body doc and whether the
+/// fragment had trailing whitespace (needed for section separator logic).
+fn build_await_section_body(printer: &Printer, fragment: &Fragment) -> (DocId, bool) {
+    let has_leading = printer.fragment_has_leading_ws(fragment);
+    let has_trailing = printer.fragment_has_trailing_ws(fragment);
+    let force_break = printer.fragment_should_force_break_content(&fragment.nodes);
+    let is_inline = !has_leading && !has_trailing && !force_break;
+    let body_doc = if is_inline {
+        printer.build_fragment_doc(fragment)
+    } else {
+        printer.build_nodes_doc_multiline(&fragment.nodes)
+    };
+    (indent_body(printer, body_doc, has_leading), has_trailing)
+}
+
+/// Build `indent([line, body_doc])` for space-only await blocks.
+///
+/// In flat mode (fits): ` body_doc` (space + content)
+/// In break mode (exceeds print width): newline + indent + body_doc
+fn indent_body_soft(printer: &Printer, body_doc: DocId) -> DocId {
+    let line = printer.d().line();
+    let inner = printer.d().concat(&[line, body_doc]);
+    printer.d().indent(inner)
+}
+
 /// Split a raw parameter string at top-level commas, returning trimmed param strings.
 ///
 /// Handles nesting for `()`, `[]`, `{}`, `<>`, and string literals (`'...'`, `"..."`).
@@ -309,15 +336,28 @@ impl<'a> Printer<'a> {
             }
 
             if let FragmentNode::Text(text) = node {
-                let prev_is_inline = i > 0 && Self::is_inline_content(&trimmed_nodes[i - 1]);
-                let next_is_inline =
-                    i + 1 < trimmed_len && Self::is_inline_content(&trimmed_nodes[i + 1]);
+                let prev_node = if i > 0 {
+                    Some(&trimmed_nodes[i - 1])
+                } else {
+                    None
+                };
+                let prev_is_inline = prev_node.is_some_and(Self::is_inline_content);
+                let prev_is_tag = prev_node.is_some_and(Self::is_expression_tag);
+                let next_node = if i + 1 < trimmed_len {
+                    Some(&trimmed_nodes[i + 1])
+                } else {
+                    None
+                };
+                let next_is_inline = next_node.is_some_and(Self::is_inline_content);
+                let next_is_tag = next_node.is_some_and(Self::is_expression_tag);
                 let position =
                     SiblingPosition::new(is_first, is_last, prev_is_inline, next_is_inline);
                 self.handle_text_child(
                     &text.raw,
                     position,
                     trim_boundaries,
+                    prev_is_tag,
+                    next_is_tag,
                     &mut child_docs,
                     &mut handle_whitespace_of_prev_text,
                 );
@@ -377,12 +417,26 @@ impl<'a> Printer<'a> {
         )
     }
 
+    /// Check if a node is an expression-like tag (ExpressionTag, HtmlTag, RenderTag).
+    ///
+    /// These tags use the leading/trailing line fill approach instead of group wrapping,
+    /// because group wrapping forces line breaks after multiline expressions.
+    fn is_expression_tag(node: &FragmentNode) -> bool {
+        matches!(
+            node,
+            FragmentNode::ExpressionTag(_) | FragmentNode::HtmlTag(_) | FragmentNode::RenderTag(_)
+        )
+    }
+
     /// Handle a text child node - matches prettier-plugin-svelte's handleTextChild
+    #[allow(clippy::too_many_arguments)]
     fn handle_text_child(
         &self,
         raw: &str,
         position: SiblingPosition,
         trim_boundaries: bool,
+        prev_is_tag: bool,
+        next_is_tag: bool,
         child_docs: &mut Vec<DocId>,
         handle_whitespace_of_prev_text: &mut bool,
     ) {
@@ -451,50 +505,86 @@ impl<'a> Printer<'a> {
 
         // If text starts with whitespace and prev is inline element:
         // trim the leading ws and wrap the previous element with a trailing line.
-        // For last child: skip when the previous element will break (e.g. multiline attrs),
-        // because group([breaking_element, line()]) forces the line() to break too,
+        //
+        // For last child: match prettier's handleTextChild early return for idx===last
+        // which does NOT wrap the previous element. Instead, the fill starts with a
+        // line() element so it can continue on the expression's continuation line
+        // (line() → space in flat mode) or break to a new line (line() → newline).
+        //
+        // For non-last child with breaking prev: skip wrapping because
+        // group([breaking_element, line()]) forces the line() to break too,
         // incorrectly separating the closing tag from trailing text.
-        // Non-breaking elements still get wrapped so fill can break long lines.
         let prev_will_break = child_docs.last().is_some_and(|&doc| d.will_break(doc));
-        let skip_wrapping = is_last && prev_will_break;
-        if has_leading_ws && !is_first && !skip_wrapping && position.prev_is_inline() {
-            trim_left = true;
-            add_leading_space = false; // line() handles the space
-            // Pop the last doc (the inline element) and wrap it with trailing line
-            if let Some(last_doc) = child_docs.pop() {
-                let line = d.line();
-                let inner = d.concat(&[last_doc, line]);
-                child_docs.push(d.group(inner));
+        let mut leading_line = false;
+        if has_leading_ws && !is_first && position.prev_is_inline() {
+            if prev_is_tag && (is_last || !prev_will_break) {
+                // Text after expression/html/render tag: use leading_line in fill instead
+                // of wrapping the tag with group([tag, line()]). The group approach forces
+                // line() to break after multiline tags, pushing text to a new line.
+                // leading_line lets fill continue on the tag's continuation line
+                // (line() → space in flat, newline in break).
+                trim_left = true;
+                add_leading_space = false;
+                leading_line = true;
+            } else if is_last && prev_will_break {
+                // Last child after breaking element (e.g. multiline attrs):
+                // skip wrapping because group([breaking_element, line()]) forces
+                // line() to break too, incorrectly separating closing tag from text.
+                // Note: non-last text after a breaking tag (prev_is_tag && !is_last
+                // && prev_will_break) also falls through without action — group()
+                // would force line() to break, and leading_line is only for
+                // non-breaking continuation. The text's leading ws handles spacing.
+            } else if !prev_will_break {
+                trim_left = true;
+                add_leading_space = false; // line() handles the space
+                // Pop the last doc (the inline element) and wrap it with trailing line
+                if let Some(last_doc) = child_docs.pop() {
+                    let line = d.line();
+                    let inner = d.concat(&[last_doc, line]);
+                    child_docs.push(d.group(inner));
+                }
             }
         }
 
         // If text ends with whitespace and next is inline element:
-        // trim the trailing ws and set flag for the next element.
-        // For first child: matches prettier's handleTextChild early return for idx===0,
-        // where trailing whitespace stays as line() after the fill and the next inline
-        // element is pushed bare (not wrapped in group([line, element])).
-        let first_child_trailing_line =
-            if has_trailing_ws && is_first && !is_last && position.next_is_inline() {
+        // trim the trailing ws and either use trailing_line in fill or set flag for next element.
+        //
+        // For tags (ExpressionTag, HtmlTag, RenderTag): use trailing_line in the fill.
+        // group([line, expr]) wrapping forces a newline before multiline expressions;
+        // trailing_line lets fill decide whether to break (same approach as leading_line).
+        //
+        // For non-tag inline elements: set handle_whitespace_of_prev_text so the next
+        // element gets wrapped with group([line, element]).
+        let mut trailing_line = false;
+        if has_trailing_ws && !is_last && position.next_is_inline() {
+            if is_first || next_is_tag {
+                // First child or middle child before tag: trailing line in fill
                 add_trailing_space = false;
-                true
-            } else {
-                false
-            };
-        if has_trailing_ws && !is_first && !is_last && position.next_is_inline() {
-            trim_right = true;
-            add_trailing_space = false; // next element's line() handles the space
-            *handle_whitespace_of_prev_text = true;
+                trailing_line = true;
+                if !is_first {
+                    trim_right = true;
+                }
+            } else if !is_first {
+                // Middle child before non-tag inline element: wrap next element
+                trim_right = true;
+                add_trailing_space = false;
+                *handle_whitespace_of_prev_text = true;
+            }
         }
 
         // Build fill for this text node's words.
-        // For first-child text before inline: use line() as trailing separator inside the fill,
-        // matching prettier's splitTextToDocs where trailing whitespace becomes trailing line.
+        // leading_line: fill starts with line() (text after expression tag)
+        // trailing_line: fill ends with line() (text before expression tag or first-child)
         if add_leading_space {
             child_docs.push(d.text(" "));
         }
-        if let Some(fill_doc) =
-            self.build_text_fill_doc_trimmed(raw, trim_left, trim_right, first_child_trailing_line)
-        {
+        if let Some(fill_doc) = self.build_text_fill_doc_trimmed(
+            raw,
+            trim_left,
+            trim_right,
+            leading_line,
+            trailing_line,
+        ) {
             child_docs.push(fill_doc);
         }
         if add_trailing_space {
@@ -768,7 +858,7 @@ impl<'a> Printer<'a> {
                         }
                         // Use fill for word-level breaking
                         if let Some(fill_doc) =
-                            self.build_text_fill_doc_trimmed(part, true, true, false)
+                            self.build_text_fill_doc_trimmed(part, true, true, false, false)
                         {
                             current_line.push(fill_doc);
                             consecutive_blank_count = 0;
@@ -799,7 +889,7 @@ impl<'a> Printer<'a> {
 
                     // Use fill for multi-word text to enable word-level line breaking
                     if let Some(fill_doc) =
-                        self.build_text_fill_doc_trimmed(&text.raw, true, true, false)
+                        self.build_text_fill_doc_trimmed(&text.raw, true, true, false, false)
                     {
                         current_line.push(fill_doc);
                     }
@@ -1048,19 +1138,21 @@ impl<'a> Printer<'a> {
     /// Splits text on whitespace into words, joining with line() docs.
     /// This allows fill() to break at word boundaries when lines exceed width.
     fn build_text_fill_doc(&self, raw: &str, trim_completely: bool) -> Option<DocId> {
-        self.build_text_fill_doc_trimmed(raw, trim_completely, trim_completely, false)
+        self.build_text_fill_doc_trimmed(raw, trim_completely, trim_completely, false, false)
     }
 
     /// Build a fill doc for text with separate control over leading/trailing trimming.
     ///
     /// Used by build_nodes_doc_trimmed where first node trims leading, last trims trailing.
-    /// When `trailing_line` is true, trailing whitespace uses `line()` instead of `text(" ")`,
-    /// matching prettier's splitTextToDocs for first-child text before inline elements.
+    /// When `leading_line` or `trailing_line` is true, the fill uses `line()` at the
+    /// boundary instead of wrapping the adjacent expression in a group. This lets fill
+    /// continue on the expression's continuation line rather than forcing a newline.
     fn build_text_fill_doc_trimmed(
         &self,
         raw: &str,
         trim_leading: bool,
         trim_trailing: bool,
+        leading_line: bool,
         trailing_line: bool,
     ) -> Option<DocId> {
         let d = self.d();
@@ -1074,9 +1166,8 @@ impl<'a> Printer<'a> {
         }
 
         // Single word: return text (with boundary handling)
-        if words.len() == 1 {
+        if words.len() == 1 && !leading_line {
             if trailing_line && has_trailing_ws {
-                // Use fill with trailing line() for first-child text before inline element
                 let word = if !trim_leading && has_leading_ws {
                     format!(" {}", words[0])
                 } else {
@@ -1096,12 +1187,17 @@ impl<'a> Printer<'a> {
             return Some(d.text_owned(result));
         }
 
-        // Multiple words: build fill parts [word, line, word, line, ...]
-        // Leading/trailing whitespace is prepended/appended to the first/last word
-        // to maintain correct fill alternation (content, separator, content, ...).
-        let mut parts = Vec::with_capacity(words.len() * 2);
-        let prepend_space = !trim_leading && has_leading_ws;
+        // Multiple words (or leading_line): build fill parts
+        // leading_line: [line, word, line, word, ...] — text after expression tag
+        // trailing_line: [..., word, line] — text before expression tag
+        // both: [line, word, line, ..., word, line]
+        let prepend_space = !leading_line && !trim_leading && has_leading_ws;
         let append_space = !trim_trailing && has_trailing_ws && !trailing_line;
+        let mut parts = Vec::with_capacity(words.len() * 2 + 2);
+
+        if leading_line {
+            parts.push(d.line());
+        }
 
         for (i, word) in words.iter().enumerate() {
             if i > 0 {
@@ -1122,8 +1218,6 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // When trailing_line is set, use line() for trailing whitespace
-        // (first-child text before inline element)
         if trailing_line && has_trailing_ws {
             parts.push(d.line());
         }
@@ -1569,27 +1663,78 @@ impl<'a> Printer<'a> {
 
         let mut parts = vec![d.text("{#await "), expr_doc];
 
-        // Shorthand: {#await expr then value}
+        // Shorthand: {#await expr then value}...{/await}
+        // Also handles: {#await expr then value}...{:catch error}...{/await}
         if let (Some(value), None) = (&block.value, &block.pending) {
             parts.push(d.text(" then "));
             parts.push(self.build_pattern_doc(value));
             parts.push(d.text("}"));
-            if let Some(then_block) = &block.then {
-                // Await shorthands: only use newline-based detection (not space-only)
-                // Prettier keeps shorthand forms inline even with symmetric spaces
-                let has_leading = self.fragment_has_leading_ws(then_block);
-                let has_trailing = self.fragment_has_trailing_ws(then_block);
-                let force_break = self.fragment_should_force_break_content(&then_block.nodes);
-                let is_inline = !has_leading && !has_trailing && !force_break;
-                let body_doc = if is_inline {
-                    self.build_fragment_doc(then_block)
-                } else {
-                    self.build_nodes_doc_multiline(&then_block.nodes)
-                };
-                parts.push(indent_body(self, body_doc, has_leading));
-                if has_trailing {
-                    parts.push(d.hardline());
+
+            // Check if any section has space-only whitespace
+            let has_space_only = block
+                .then
+                .as_ref()
+                .is_some_and(|f| self.fragment_has_space_only_ws(f))
+                || block
+                    .catch
+                    .as_ref()
+                    .is_some_and(|f| self.fragment_has_space_only_ws(f));
+
+            if has_space_only {
+                if let Some(then_block) = &block.then {
+                    let body_doc = self.build_nodes_doc_multiline(&then_block.nodes);
+                    parts.push(indent_body_soft(self, body_doc));
                 }
+                if let Some(error) = &block.error {
+                    parts.push(d.line());
+                    parts.push(d.text("{:catch "));
+                    parts.push(self.build_pattern_doc(error));
+                    parts.push(d.text("}"));
+                } else if block.catch.as_ref().is_some_and(|c| !c.nodes.is_empty()) {
+                    parts.push(d.line());
+                    parts.push(d.text("{:catch}"));
+                }
+                if let Some(catch_block) = &block.catch {
+                    let body_doc = self.build_nodes_doc_multiline(&catch_block.nodes);
+                    parts.push(indent_body_soft(self, body_doc));
+                }
+                parts.push(d.line());
+                parts.push(d.text("{/await}"));
+                let concat = d.concat(&parts);
+                return d.group(concat);
+            }
+
+            let mut prev_has_trailing = false;
+            if let Some(then_block) = &block.then {
+                let (body, trailing) = build_await_section_body(self, then_block);
+                parts.push(body);
+                prev_has_trailing = trailing;
+            }
+
+            // Optional {:catch} continuation after then-shorthand
+            if block.catch.is_some() {
+                if let Some(error) = &block.error {
+                    if prev_has_trailing {
+                        parts.push(d.hardline());
+                    }
+                    parts.push(d.text("{:catch "));
+                    parts.push(self.build_pattern_doc(error));
+                    parts.push(d.text("}"));
+                } else if block.catch.as_ref().is_some_and(|c| !c.nodes.is_empty()) {
+                    if prev_has_trailing {
+                        parts.push(d.hardline());
+                    }
+                    parts.push(d.text("{:catch}"));
+                }
+                if let Some(catch_block) = &block.catch {
+                    let (body, trailing) = build_await_section_body(self, catch_block);
+                    parts.push(body);
+                    prev_has_trailing = trailing;
+                }
+            }
+
+            if prev_has_trailing {
+                parts.push(d.hardline());
             }
             parts.push(d.text("{/await}"));
             return d.concat(&parts);
@@ -1603,18 +1748,27 @@ impl<'a> Printer<'a> {
             parts.push(d.text(" catch "));
             parts.push(self.build_pattern_doc(error));
             parts.push(d.text("}"));
+
+            // Check if any section has space-only whitespace
+            let has_space_only = block
+                .catch
+                .as_ref()
+                .is_some_and(|f| self.fragment_has_space_only_ws(f));
+
+            if has_space_only {
+                if let Some(catch_block) = &block.catch {
+                    let body_doc = self.build_nodes_doc_multiline(&catch_block.nodes);
+                    parts.push(indent_body_soft(self, body_doc));
+                }
+                parts.push(d.line());
+                parts.push(d.text("{/await}"));
+                let concat = d.concat(&parts);
+                return d.group(concat);
+            }
+
             if let Some(catch_block) = &block.catch {
-                // Await shorthands: only use newline-based detection (not space-only)
-                let has_leading = self.fragment_has_leading_ws(catch_block);
-                let has_trailing = self.fragment_has_trailing_ws(catch_block);
-                let force_break = self.fragment_should_force_break_content(&catch_block.nodes);
-                let is_inline = !has_leading && !has_trailing && !force_break;
-                let body_doc = if is_inline {
-                    self.build_fragment_doc(catch_block)
-                } else {
-                    self.build_nodes_doc_multiline(&catch_block.nodes)
-                };
-                parts.push(indent_body(self, body_doc, has_leading));
+                let (body, has_trailing) = build_await_section_body(self, catch_block);
+                parts.push(body);
                 if has_trailing {
                     parts.push(d.hardline());
                 }
@@ -1625,25 +1779,65 @@ impl<'a> Printer<'a> {
 
         parts.push(d.text("}"));
 
+        // Check if any section has space-only whitespace (spaces, no newlines).
+        // Space-only await blocks stay inline when short but break when exceeding
+        // print width. Use group+line so the renderer decides based on width.
+        let has_space_only = [&block.pending, &block.then, &block.catch].iter().any(|f| {
+            f.as_ref()
+                .is_some_and(|f| self.fragment_has_space_only_ws(f))
+        });
+
+        if has_space_only {
+            // Build all sections with line() docs — space in flat, newline in break.
+            // All sections break together as a unit via the outer group.
+            if let Some(pending) = &block.pending {
+                let body_doc = self.build_nodes_doc_multiline(&pending.nodes);
+                parts.push(indent_body_soft(self, body_doc));
+            }
+
+            if let Some(value) = &block.value {
+                parts.push(d.line());
+                parts.push(d.text("{:then "));
+                parts.push(self.build_pattern_doc(value));
+                parts.push(d.text("}"));
+            } else if block.then.as_ref().is_some_and(|t| !t.nodes.is_empty()) {
+                parts.push(d.line());
+                parts.push(d.text("{:then}"));
+            }
+            if let Some(then_block) = &block.then {
+                let body_doc = self.build_nodes_doc_multiline(&then_block.nodes);
+                parts.push(indent_body_soft(self, body_doc));
+            }
+
+            if let Some(error) = &block.error {
+                parts.push(d.line());
+                parts.push(d.text("{:catch "));
+                parts.push(self.build_pattern_doc(error));
+                parts.push(d.text("}"));
+            } else if block.catch.as_ref().is_some_and(|c| !c.nodes.is_empty()) {
+                parts.push(d.line());
+                parts.push(d.text("{:catch}"));
+            }
+            if let Some(catch_block) = &block.catch {
+                let body_doc = self.build_nodes_doc_multiline(&catch_block.nodes);
+                parts.push(indent_body_soft(self, body_doc));
+            }
+
+            parts.push(d.line());
+            parts.push(d.text("{/await}"));
+            let concat = d.concat(&parts);
+            return d.group(concat);
+        }
+
         // Track whitespace status for each section
         // The final section's trailing determines break before {/await}
         let mut final_has_trailing = false;
         let mut prev_has_trailing = false;
 
-        // Pending - await blocks only use newline-based detection (NOT space-only)
-        // Unlike if/each/key, await blocks stay inline even with symmetric spaces:
-        // `{#await p} text {/await}` stays inline, not multiline
+        // Pending - newline-based detection only (space-only handled above via group)
         if let Some(pending) = &block.pending {
-            let has_leading = self.fragment_has_leading_ws(pending);
-            let has_trailing = self.fragment_has_trailing_ws(pending);
-            let force_break = self.fragment_should_force_break_content(&pending.nodes);
-            let is_inline = !has_leading && !has_trailing && !force_break;
-            let body_doc = if is_inline {
-                self.build_fragment_doc(pending)
-            } else {
-                self.build_nodes_doc_multiline(&pending.nodes)
-            };
-            parts.push(indent_body(self, body_doc, has_leading));
+            let (body, has_trailing) = build_await_section_body(self, pending);
+            parts.push(body);
             final_has_trailing = has_trailing;
             prev_has_trailing = has_trailing;
         }
@@ -1663,17 +1857,8 @@ impl<'a> Printer<'a> {
             parts.push(d.text("{:then}"));
         }
         if let Some(then_block) = &block.then {
-            // Await blocks only use newline-based detection
-            let has_leading = self.fragment_has_leading_ws(then_block);
-            let has_trailing = self.fragment_has_trailing_ws(then_block);
-            let force_break = self.fragment_should_force_break_content(&then_block.nodes);
-            let is_inline = !has_leading && !has_trailing && !force_break;
-            let body_doc = if is_inline {
-                self.build_fragment_doc(then_block)
-            } else {
-                self.build_nodes_doc_multiline(&then_block.nodes)
-            };
-            parts.push(indent_body(self, body_doc, has_leading));
+            let (body, has_trailing) = build_await_section_body(self, then_block);
+            parts.push(body);
             final_has_trailing = has_trailing;
             prev_has_trailing = has_trailing;
         }
@@ -1693,17 +1878,8 @@ impl<'a> Printer<'a> {
             parts.push(d.text("{:catch}"));
         }
         if let Some(catch_block) = &block.catch {
-            // Await blocks only use newline-based detection
-            let has_leading = self.fragment_has_leading_ws(catch_block);
-            let has_trailing = self.fragment_has_trailing_ws(catch_block);
-            let force_break = self.fragment_should_force_break_content(&catch_block.nodes);
-            let is_inline = !has_leading && !has_trailing && !force_break;
-            let body_doc = if is_inline {
-                self.build_fragment_doc(catch_block)
-            } else {
-                self.build_nodes_doc_multiline(&catch_block.nodes)
-            };
-            parts.push(indent_body(self, body_doc, has_leading));
+            let (body, has_trailing) = build_await_section_body(self, catch_block);
+            parts.push(body);
             final_has_trailing = has_trailing;
         }
 

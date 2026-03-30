@@ -125,9 +125,15 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_element_doc(&self, element: &internal::Element) -> DocId {
         let tag_name = self.resolve_symbol(element.name);
         let tag_sym = element.name.to_u32();
+        let is_html = element.kind == internal::ElementKind::Html;
 
         // Build attribute docs (needed for all paths)
-        let attr_docs = self.build_element_attrs_doc(&element.attributes);
+        let attr_docs = self.build_element_attrs_doc(
+            &element.attributes,
+            element.name_span.end,
+            element.open_tag_end,
+            is_html,
+        );
 
         // Special handling for <style> and <script> elements
         if tag_name == "style" || tag_name == "script" {
@@ -157,7 +163,9 @@ impl<'a> Printer<'a> {
         // Phase 3: Build doc based on layout
         match layout {
             ElementLayout::Void | ElementLayout::SelfClosing => {
-                self.build_void_element_doc(tag_sym, attr_docs)
+                // DOCTYPE uses > (no self-closing slash) — it's a declaration, not an element
+                let is_declaration = tag_name.starts_with('!');
+                self.build_void_element_doc(tag_sym, attr_docs, is_declaration)
             }
             ElementLayout::Empty => {
                 let opening_tag = self.build_opening_tag(
@@ -188,10 +196,31 @@ impl<'a> Printer<'a> {
     ///
     /// When any attribute doc will_break (e.g., multiline string value),
     /// forces attributes to break across multiple lines to match Prettier behavior.
-    fn build_void_element_doc(&self, tag_sym: u32, attr_docs: Vec<DocId>) -> DocId {
+    fn build_void_element_doc(
+        &self,
+        tag_sym: u32,
+        attr_docs: Vec<DocId>,
+        is_declaration: bool,
+    ) -> DocId {
         let d = self.d();
+        // Declarations (<!DOCTYPE>) use > without self-closing slash
         if attr_docs.is_empty() {
-            d.concat(&[d.text("<"), d.symbol(tag_sym), d.text(" />")])
+            if is_declaration {
+                d.concat(&[d.text("<"), d.symbol(tag_sym), d.text(">")])
+            } else {
+                d.concat(&[d.text("<"), d.symbol(tag_sym), d.text(" />")])
+            }
+        } else if is_declaration {
+            let attr_concat = d.concat(&attr_docs);
+            let attr_indent = d.indent(attr_concat);
+            let inner = d.concat(&[
+                d.text("<"),
+                d.symbol(tag_sym),
+                attr_indent,
+                d.softline(),
+                d.text(">"),
+            ]);
+            d.group(inner)
         } else {
             // Check if any attribute doc will break (contains hardline)
             let has_multiline = attr_docs.iter().any(|&doc| d.will_break(doc));
@@ -422,6 +451,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let tag_sym = element.name.to_u32();
         let has_attrs = !element.attributes.is_empty();
+        let is_html = element.kind == internal::ElementKind::Html;
 
         // Hug both sides: ><content></tag\n>
         // When attrs break, > stays inline with last attr:
@@ -542,7 +572,12 @@ impl<'a> Printer<'a> {
         } else {
             // With attrs - layout depends on whether there are block flow children
             // Rebuild attr_docs since we're in a different branch
-            let hug_attr_docs = self.build_element_attrs_doc(&element.attributes);
+            let hug_attr_docs = self.build_element_attrs_doc(
+                &element.attributes,
+                element.name_span.end,
+                element.open_tag_end,
+                is_html,
+            );
             // Expanding blocks (if/each/key) always force multiline
             // Note: await blocks do NOT force multiline - they stay inline in inline elements
             // But expanding blocks nested inside await blocks DO force multiline
@@ -586,7 +621,12 @@ impl<'a> Printer<'a> {
                         d.concat(&[d.text("<"), d.symbol(tag_sym), attr_indent1, closing]);
 
                     // State 2: Hug mode - attrs inline (space-separated), > on new line
-                    let hug_space_attrs = self.build_element_attrs_doc_spaces(&element.attributes);
+                    let hug_space_attrs = self.build_element_attrs_doc_spaces(
+                        &element.attributes,
+                        element.name_span.end,
+                        element.open_tag_end,
+                        is_html,
+                    );
                     let hug_state = d.concat(&[
                         d.text("<"),
                         d.symbol(tag_sym),
@@ -695,6 +735,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let tag_sym = element.name.to_u32();
         let is_inline = kind.is_inline();
+        let is_html = element.kind == internal::ElementKind::Html;
 
         // Inline elements with whitespace-only content preserve a space
         // e.g., <span> </span> stays as-is, not collapsed to <span></span>
@@ -707,7 +748,7 @@ impl<'a> Printer<'a> {
                 .iter()
                 .all(FragmentNode::is_whitespace_only_text);
 
-        if has_attrs && is_inline {
+        if has_attrs && (is_inline || kind.is_component()) {
             // Closing for inline/hug states: "></tag>" or "> </tag>"
             let closing = if has_ws_content {
                 d.concat(&[d.text("> </"), d.symbol(tag_sym), d.text(">")])
@@ -734,7 +775,12 @@ impl<'a> Printer<'a> {
             let inline_state = d.concat(&[opening_tag, closing]);
 
             // State 2: Hug mode - attrs inline (space-separated), > on new line
-            let hug_attrs = self.build_element_attrs_doc_spaces(&element.attributes);
+            let hug_attrs = self.build_element_attrs_doc_spaces(
+                &element.attributes,
+                element.name_span.end,
+                element.open_tag_end,
+                is_html,
+            );
             let hug_state = d.concat(&[
                 d.text("<"),
                 d.symbol(tag_sym),
@@ -744,7 +790,12 @@ impl<'a> Printer<'a> {
             ]);
 
             // State 3: Full multiline - attrs on separate lines, > on new line
-            let multiline_attrs = self.build_element_attrs_doc(&element.attributes);
+            let multiline_attrs = self.build_element_attrs_doc(
+                &element.attributes,
+                element.name_span.end,
+                element.open_tag_end,
+                is_html,
+            );
             let multiline_concat = d.concat(&multiline_attrs);
             let multiline_indent = d.indent(multiline_concat);
             let multiline_state = d.concat(&[
@@ -773,7 +824,13 @@ impl<'a> Printer<'a> {
         let tag_sym = element.name.to_u32();
 
         // Opening tag: <template attrs> — use space-separated attrs (no wrapping)
-        let space_attrs = self.build_element_attrs_doc_spaces(&element.attributes);
+        // Foreign template elements are always HTML, so is_html=true
+        let space_attrs = self.build_element_attrs_doc_spaces(
+            &element.attributes,
+            element.name_span.end,
+            element.open_tag_end,
+            true,
+        );
         let mut parts = vec![d.text("<"), d.symbol(tag_sym)];
         parts.extend(space_attrs);
         parts.push(d.text(">"));
@@ -900,6 +957,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let tag_sym = element.name.to_u32();
         let is_inline = !tsv_html::is_block_element(tag_name);
+        let is_html = element.kind == internal::ElementKind::Html;
         let has_content = !element.fragment.nodes.is_empty();
 
         // Analyze text nodes in one pass for multiline content detection.
@@ -985,7 +1043,12 @@ impl<'a> Printer<'a> {
         if is_inline && has_content && !attr_docs.is_empty() {
             let content_doc = self.build_whitespace_sensitive_content_doc(&element.fragment.nodes);
             // Rebuild as space-separated (caller passes line-separated which we can't use here)
-            let space_attrs = self.build_element_attrs_doc_spaces(&element.attributes);
+            let space_attrs = self.build_element_attrs_doc_spaces(
+                &element.attributes,
+                element.name_span.end,
+                element.open_tag_end,
+                is_html,
+            );
 
             // In break mode: \n\t>content</tag (closing > handled by outer group)
             let break_doc = d.indent(d.concat(&[
@@ -1121,8 +1184,14 @@ impl<'a> Printer<'a> {
             // This handles cases like <pre><code> where <code> inherits whitespace preservation
             FragmentNode::Element(element) => {
                 let tag_name = self.resolve_symbol(element.name);
+                let ws_is_html = element.kind == internal::ElementKind::Html;
                 // Always use whitespace-sensitive path when nested inside whitespace-sensitive elements
-                let attr_docs = self.build_element_attrs_doc(&element.attributes);
+                let attr_docs = self.build_element_attrs_doc(
+                    &element.attributes,
+                    element.name_span.end,
+                    element.open_tag_end,
+                    ws_is_html,
+                );
                 self.build_whitespace_sensitive_element_doc(&tag_name, element, attr_docs)
             }
             FragmentNode::SpecialElement(element) => {
@@ -1313,18 +1382,40 @@ impl<'a> Printer<'a> {
     }
 
     /// Build docs for element attributes (line-separated)
-    pub(crate) fn build_element_attrs_doc(&self, attrs: &[internal::AttributeNode]) -> Vec<DocId> {
-        self.build_element_attrs_doc_impl(attrs, self.d().line())
+    ///
+    /// `name_end`: end position of the element tag name (for finding comments before first attr).
+    /// `open_tag_end`: position of the `>` that closes the open tag (for trailing comment range).
+    /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
+    pub(crate) fn build_element_attrs_doc(
+        &self,
+        attrs: &[internal::AttributeNode],
+        name_end: u32,
+        open_tag_end: u32,
+        is_html: bool,
+    ) -> Vec<DocId> {
+        self.build_element_attrs_doc_impl(attrs, self.d().line(), name_end, open_tag_end, is_html)
     }
 
     /// Build docs for element attributes (space-separated, for hug mode)
     ///
     /// In hug mode, attributes stay on the same line with space separators.
+    /// `name_end`: end position of the element tag name (for finding comments before first attr).
+    /// `open_tag_end`: position of the `>` that closes the open tag (for trailing comment range).
+    /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
     pub(crate) fn build_element_attrs_doc_spaces(
         &self,
         attrs: &[internal::AttributeNode],
+        name_end: u32,
+        open_tag_end: u32,
+        is_html: bool,
     ) -> Vec<DocId> {
-        self.build_element_attrs_doc_impl(attrs, self.d().text(" "))
+        self.build_element_attrs_doc_impl(
+            attrs,
+            self.d().text(" "),
+            name_end,
+            open_tag_end,
+            is_html,
+        )
     }
 
     /// Build docs for element attributes with configurable separator
@@ -1332,13 +1423,109 @@ impl<'a> Printer<'a> {
         &self,
         attrs: &[internal::AttributeNode],
         separator: DocId,
+        name_end: u32,
+        open_tag_end: u32,
+        is_html: bool,
     ) -> Vec<DocId> {
         let mut docs = Vec::with_capacity(attrs.len() * 2);
-        for attr in attrs {
-            docs.push(separator);
-            docs.push(self.build_attribute_node_doc(attr));
-        }
+        self.push_attrs_with_comments(&mut docs, attrs, separator, name_end, open_tag_end, is_html);
         docs
+    }
+
+    /// Push attribute docs with interleaved JS comment handling.
+    ///
+    /// Shared between regular element and special element attr doc builders.
+    /// Handles comments between attributes (using `first_range_start` for the gap
+    /// before the first attr) and trailing comments after the last attribute
+    /// (bounded by `open_tag_end`).
+    pub(super) fn push_attrs_with_comments(
+        &self,
+        docs: &mut Vec<DocId>,
+        attrs: &[internal::AttributeNode],
+        separator: DocId,
+        first_range_start: u32,
+        open_tag_end: u32,
+        is_html: bool,
+    ) {
+        let d = self.d();
+        for (i, attr) in attrs.iter().enumerate() {
+            // Check for JS comments before this attribute
+            let range_start = if i == 0 {
+                first_range_start
+            } else {
+                attrs[i - 1].span().end
+            };
+            let range_end = attr.span().start;
+
+            if !tsv_lang::has_comments_in_range(self.comments, range_start, range_end) {
+                docs.push(separator);
+            } else {
+                let comments: Vec<_> =
+                    tsv_lang::comments_in_range(self.comments, range_start, range_end).collect();
+                let last_is_own_line = self.push_attr_comment_docs(docs, &comments, range_start);
+                // Separator before the next attribute
+                if last_is_own_line {
+                    docs.push(d.hardline());
+                } else {
+                    docs.push(d.text(" "));
+                }
+            }
+
+            docs.push(self.build_attribute_node_doc(attr, is_html));
+        }
+
+        // Check for trailing comments after last attribute
+        if let Some(last_attr) = attrs.last() {
+            let range_start = last_attr.span().end;
+            if tsv_lang::has_comments_in_range(self.comments, range_start, open_tag_end) {
+                let trailing: Vec<_> =
+                    tsv_lang::comments_in_range(self.comments, range_start, open_tag_end).collect();
+                self.push_attr_comment_docs(docs, &trailing, range_start);
+            }
+        }
+    }
+
+    /// Push docs for JS comments between attributes.
+    ///
+    /// Each comment gets a preceding separator (hardline for own-line, space for inline).
+    /// Returns whether the last comment was on its own line (caller uses this
+    /// to decide the separator before the next attribute).
+    pub(super) fn push_attr_comment_docs(
+        &self,
+        docs: &mut Vec<DocId>,
+        comments: &[&tsv_lang::Comment],
+        range_start: u32,
+    ) -> bool {
+        let d = self.d();
+        let mut last_was_own_line = false;
+        for comment in comments {
+            let is_own_line =
+                self.source[range_start as usize..comment.span.start as usize].contains('\n');
+
+            if comment.is_block && !is_own_line {
+                docs.push(d.text(" "));
+                last_was_own_line = false;
+            } else {
+                docs.push(d.hardline());
+                last_was_own_line = true;
+            }
+            docs.push(self.build_attr_js_comment_doc(comment));
+        }
+        last_was_own_line
+    }
+
+    /// Build a doc for a JS comment's text (without surrounding separators)
+    pub(super) fn build_attr_js_comment_doc(&self, comment: &tsv_lang::Comment) -> DocId {
+        let d = self.d();
+        if comment.is_block {
+            d.concat(&[
+                d.text("/*"),
+                d.text_owned(comment.content.clone()),
+                d.text("*/"),
+            ])
+        } else {
+            d.concat(&[d.text("//"), d.text_owned(comment.content.clone())])
+        }
     }
 
     /// Check if element was self-closing in source (for doc building)

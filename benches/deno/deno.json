@@ -1,12 +1,12 @@
 {
 	"imports": {
 		"@std/cli": "jsr:@std/cli@1",
-		"acorn": "npm:acorn@8.15.0",
-		"svelte": "npm:svelte@5.54.0",
-		"svelte/compiler": "npm:svelte@5.54.0/compiler",
-		"@sveltejs/acorn-typescript": "npm:@sveltejs/acorn-typescript@1.0.8",
-		"prettier": "npm:prettier@3.7.4",
-		"prettier-plugin-svelte": "npm:prettier-plugin-svelte@3.4.1",
+		"acorn": "npm:acorn@8.16.0",
+		"svelte": "npm:svelte@5.55.0",
+		"svelte/compiler": "npm:svelte@5.55.0/compiler",
+		"@sveltejs/acorn-typescript": "npm:@sveltejs/acorn-typescript@1.0.9",
+		"prettier": "npm:prettier@3.8.1",
+		"prettier-plugin-svelte": "npm:prettier-plugin-svelte@3.5.1",
 		"@biomejs/js-api": "npm:@biomejs/js-api@4.0.0",
 		"@biomejs/wasm-bundler": "npm:@biomejs/wasm-bundler@2.3.14",
 		"oxc-parser": "npm:oxc-parser@0.112.0",

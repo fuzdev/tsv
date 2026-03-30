@@ -210,6 +210,7 @@ impl<'a> SvelteParser<'a> {
                         start: (base_offset + start) as u32,
                         end: (base_offset + end) as u32,
                     },
+                    has_character_loc: false,
                 });
 
                 // Replace comment with spaces in result
@@ -232,6 +233,7 @@ impl<'a> SvelteParser<'a> {
                         start: (base_offset + start) as u32,
                         end: (base_offset + end) as u32,
                     },
+                    has_character_loc: false,
                 });
 
                 // Replace comment with spaces in result
@@ -256,6 +258,78 @@ impl<'a> SvelteParser<'a> {
         }
 
         result
+    }
+
+    /// Try to read a JS-style comment (`//` or `/* */`) at the current position.
+    ///
+    /// Called when the current token is `Slash`, to check whether the slash begins
+    /// a comment rather than a self-closing `/>`. If a comment is found, it is pushed
+    /// to `expression_comments` and the lexer is advanced past the comment.
+    ///
+    /// Returns `true` if a comment was consumed, `false` if it's a regular slash.
+    pub(crate) fn try_read_js_comment(&mut self) -> Result<bool, ParseError> {
+        let pos = self.current_start;
+        let bytes = self.source.as_bytes();
+
+        if pos + 1 >= bytes.len() {
+            return Ok(false);
+        }
+
+        match bytes[pos + 1] {
+            b'/' => {
+                // Line comment: // ... up to \n
+                let content_start = pos + 2;
+                let mut end = content_start;
+                while end < bytes.len() && bytes[end] != b'\n' {
+                    end += 1;
+                }
+
+                let content = &self.source[content_start..end];
+                self.expression_comments.push(Comment {
+                    content: content.to_string(),
+                    is_block: false,
+                    span: Span {
+                        start: pos as u32,
+                        end: end as u32,
+                    },
+                    has_character_loc: true,
+                });
+
+                self.advance_to_position(end)?;
+                Ok(true)
+            }
+            b'*' => {
+                // Block comment: /* ... */
+                let content_start = pos + 2;
+                let mut end = content_start;
+                while end + 1 < bytes.len() {
+                    if bytes[end] == b'*' && bytes[end + 1] == b'/' {
+                        break;
+                    }
+                    end += 1;
+                }
+
+                if end + 1 >= bytes.len() {
+                    return Err(self.error_unclosed_at("block comment", pos));
+                }
+
+                let content = &self.source[content_start..end];
+                let comment_end = end + 2; // past */
+                self.expression_comments.push(Comment {
+                    content: content.to_string(),
+                    is_block: true,
+                    span: Span {
+                        start: pos as u32,
+                        end: comment_end as u32,
+                    },
+                    has_character_loc: true,
+                });
+
+                self.advance_to_position(comment_end)?;
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
     }
 
     // Error Construction Helpers
@@ -369,8 +443,7 @@ impl<'a> SvelteParser<'a> {
     }
 
     /// Parse a TypeScript pattern (destructuring) and collect any comments.
-    ///
-    /// Comments are collected. Use this instead of `tsv_ts::parse_pattern` directly.
+    /// Also handles optional type annotations (`: Type`) after the pattern.
     pub(crate) fn parse_ts_pattern(
         &mut self,
         source: &str,

@@ -503,7 +503,7 @@ impl<'a> Parser<'a> {
             .as_ref()
             .map(|ta| ta.span.end)
             .or_else(|| qualifier.as_ref().map(|q| q.span().end))
-            .unwrap_or(self.prev_token_end() as u32);
+            .unwrap_or_else(|| self.prev_token_end() as u32);
 
         Ok(TSImportType {
             argument,

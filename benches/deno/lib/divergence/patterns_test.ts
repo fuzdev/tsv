@@ -10,7 +10,12 @@
 
 import { assertEquals, assertNotEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { diffLines, extractHunks } from '../diff.ts';
-import { type DetectionContext, type DivergenceMatch, PATTERNS } from './patterns.ts';
+import {
+	type DetectionContext,
+	type DivergenceMatch,
+	enrichDetectionContext,
+	PATTERNS,
+} from './patterns.ts';
 import type { Language } from '../types.ts';
 
 /**
@@ -24,7 +29,7 @@ function makeContext(
 ): DetectionContext {
 	const diff = diffLines(prettier, ours);
 	const hunks = extractHunks(diff);
-	return {
+	const ctx: DetectionContext = {
 		source: prettier, // simplification: source ≈ prettier for detection
 		ours,
 		prettier,
@@ -32,6 +37,8 @@ function makeContext(
 		hunks,
 		language,
 	};
+	enrichDetectionContext(ctx);
+	return ctx;
 }
 
 /** Calculate visual width of a line (tabs = 2 spaces). */
@@ -282,6 +289,17 @@ Deno.test('self_closing_nonvoid: positive - HTML element ours expands self-closi
 	const match = runPattern('self_closing_nonvoid', ctx);
 	assertNotEquals(match, null);
 	assertEquals(match!.pattern, 'self_closing_nonvoid');
+});
+
+Deno.test('self_closing_nonvoid: positive - split hunks from identical intervening line', () => {
+	// When <div /> → <div></div> has an identical <div></div> between them,
+	// the diff splits into two hunks (one remove-only, one add-only)
+	const prettier = '<div />\n<div></div>';
+	const ours = '<div></div>\n<div></div>';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('self_closing_nonvoid', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.hunkIndices.length, 2);
 });
 
 Deno.test('self_closing_nonvoid: positive - multiline element /> vs ></div>', () => {

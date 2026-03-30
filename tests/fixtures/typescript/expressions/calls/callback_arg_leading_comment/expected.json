@@ -1,0 +1,1206 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 709,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Expression-body arrow with leading comment, last arg is block arrow",
+			"start": 10,
+			"end": 80,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 88,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Block-body arrow with leading comment, last arg is block arrow",
+			"start": 148,
+			"end": 213,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 221,
+			"end": 234,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Function expression with leading comment, last arg is block arrow",
+			"start": 297,
+			"end": 365,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 373,
+			"end": 386,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 2
+				},
+				"end": {
+					"line": 22,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Multiple commented callbacks before last block-body arrow",
+			"start": 456,
+			"end": 516,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 524,
+			"end": 532,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 2
+				},
+				"end": {
+					"line": 32,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 546,
+			"end": 554,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 2
+				},
+				"end": {
+					"line": 33,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Short inline control - comment stays (no expand-last trigger)",
+			"start": 601,
+			"end": 665,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 1
+				},
+				"end": {
+					"line": 39,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 670,
+			"end": 683,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 4
+				},
+				"end": {
+					"line": 40,
+					"column": 17
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 708,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 699,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 41,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 82,
+					"end": 145,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 82,
+						"end": 144,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 82,
+							"end": 84,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 102,
+								"end": 111,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 16
+									},
+									"end": {
+										"line": 4,
+										"column": 25
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "Literal",
+									"start": 108,
+									"end": 111,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 22
+										},
+										"end": {
+											"line": 4,
+											"column": 25
+										}
+									},
+									"value": "a",
+									"raw": "'a'"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " comment ",
+										"start": 88,
+										"end": 101
+									}
+								]
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 115,
+								"end": 140,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 116,
+										"end": 117,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 3
+											},
+											"end": {
+												"line": 5,
+												"column": 4
+											}
+										},
+										"name": "b"
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 122,
+									"end": 140,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 9
+										},
+										"end": {
+											"line": 7,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ReturnStatement",
+											"start": 127,
+											"end": 136,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 3
+												},
+												"end": {
+													"line": 6,
+													"column": 12
+												}
+											},
+											"argument": {
+												"type": "Identifier",
+												"start": 134,
+												"end": 135,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 10
+													},
+													"end": {
+														"line": 6,
+														"column": 11
+													}
+												},
+												"name": "b"
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Expression-body arrow with leading comment, last arg is block arrow",
+							"start": 10,
+							"end": 80
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 215,
+					"end": 294,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 215,
+						"end": 293,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 1
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 215,
+							"end": 217,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 1
+								},
+								"end": {
+									"line": 11,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 235,
+								"end": 260,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 16
+									},
+									"end": {
+										"line": 14,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 236,
+										"end": 237,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 17
+											},
+											"end": {
+												"line": 12,
+												"column": 18
+											}
+										},
+										"name": "a"
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 242,
+									"end": 260,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 23
+										},
+										"end": {
+											"line": 14,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ReturnStatement",
+											"start": 247,
+											"end": 256,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 3
+												},
+												"end": {
+													"line": 13,
+													"column": 12
+												}
+											},
+											"argument": {
+												"type": "Identifier",
+												"start": 254,
+												"end": 255,
+												"loc": {
+													"start": {
+														"line": 13,
+														"column": 10
+													},
+													"end": {
+														"line": 13,
+														"column": 11
+													}
+												},
+												"name": "a"
+											}
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " comment ",
+										"start": 221,
+										"end": 234
+									}
+								]
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 264,
+								"end": 289,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 265,
+										"end": 266,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 3
+											},
+											"end": {
+												"line": 15,
+												"column": 4
+											}
+										},
+										"name": "b"
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 271,
+									"end": 289,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 9
+										},
+										"end": {
+											"line": 17,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ReturnStatement",
+											"start": 276,
+											"end": 285,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 3
+												},
+												"end": {
+													"line": 16,
+													"column": 12
+												}
+											},
+											"argument": {
+												"type": "Identifier",
+												"start": 283,
+												"end": 284,
+												"loc": {
+													"start": {
+														"line": 16,
+														"column": 10
+													},
+													"end": {
+														"line": 16,
+														"column": 11
+													}
+												},
+												"name": "b"
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block-body arrow with leading comment, last arg is block arrow",
+							"start": 148,
+							"end": 213
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 367,
+					"end": 453,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 367,
+						"end": 452,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 1
+							},
+							"end": {
+								"line": 28,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 367,
+							"end": 369,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 1
+								},
+								"end": {
+									"line": 21,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "FunctionExpression",
+								"start": 387,
+								"end": 419,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 16
+									},
+									"end": {
+										"line": 24,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 399,
+									"end": 419,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 28
+										},
+										"end": {
+											"line": 24,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ReturnStatement",
+											"start": 404,
+											"end": 415,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 3
+												},
+												"end": {
+													"line": 23,
+													"column": 14
+												}
+											},
+											"argument": {
+												"type": "Literal",
+												"start": 411,
+												"end": 414,
+												"loc": {
+													"start": {
+														"line": 23,
+														"column": 10
+													},
+													"end": {
+														"line": 23,
+														"column": 13
+													}
+												},
+												"value": "a",
+												"raw": "'a'"
+											}
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " comment ",
+										"start": 373,
+										"end": 386
+									}
+								]
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 423,
+								"end": 448,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 2
+									},
+									"end": {
+										"line": 27,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 424,
+										"end": 425,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 3
+											},
+											"end": {
+												"line": 25,
+												"column": 4
+											}
+										},
+										"name": "b"
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 430,
+									"end": 448,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 9
+										},
+										"end": {
+											"line": 27,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ReturnStatement",
+											"start": 435,
+											"end": 444,
+											"loc": {
+												"start": {
+													"line": 26,
+													"column": 3
+												},
+												"end": {
+													"line": 26,
+													"column": 12
+												}
+											},
+											"argument": {
+												"type": "Identifier",
+												"start": 442,
+												"end": 443,
+												"loc": {
+													"start": {
+														"line": 26,
+														"column": 10
+													},
+													"end": {
+														"line": 26,
+														"column": 11
+													}
+												},
+												"name": "b"
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Function expression with leading comment, last arg is block arrow",
+							"start": 297,
+							"end": 365
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 518,
+					"end": 598,
+					"loc": {
+						"start": {
+							"line": 31,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 518,
+						"end": 597,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 1
+							},
+							"end": {
+								"line": 37,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 518,
+							"end": 520,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 1
+								},
+								"end": {
+									"line": 31,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 533,
+								"end": 542,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 11
+									},
+									"end": {
+										"line": 32,
+										"column": 20
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "Literal",
+									"start": 539,
+									"end": 542,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 17
+										},
+										"end": {
+											"line": 32,
+											"column": 20
+										}
+									},
+									"value": "a",
+									"raw": "'a'"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 524,
+										"end": 532
+									}
+								]
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 555,
+								"end": 564,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 11
+									},
+									"end": {
+										"line": 33,
+										"column": 20
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "Literal",
+									"start": 561,
+									"end": 564,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 17
+										},
+										"end": {
+											"line": 33,
+											"column": 20
+										}
+									},
+									"value": "b",
+									"raw": "'b'"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 546,
+										"end": 554
+									}
+								]
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 568,
+								"end": 593,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 2
+									},
+									"end": {
+										"line": 36,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 569,
+										"end": 570,
+										"loc": {
+											"start": {
+												"line": 34,
+												"column": 3
+											},
+											"end": {
+												"line": 34,
+												"column": 4
+											}
+										},
+										"name": "c"
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 575,
+									"end": 593,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 9
+										},
+										"end": {
+											"line": 36,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ReturnStatement",
+											"start": 580,
+											"end": 589,
+											"loc": {
+												"start": {
+													"line": 35,
+													"column": 3
+												},
+												"end": {
+													"line": 35,
+													"column": 12
+												}
+											},
+											"argument": {
+												"type": "Identifier",
+												"start": 587,
+												"end": 588,
+												"loc": {
+													"start": {
+														"line": 35,
+														"column": 10
+													},
+													"end": {
+														"line": 35,
+														"column": 11
+													}
+												},
+												"name": "c"
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multiple commented callbacks before last block-body arrow",
+							"start": 456,
+							"end": 516
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 667,
+					"end": 698,
+					"loc": {
+						"start": {
+							"line": 40,
+							"column": 1
+						},
+						"end": {
+							"line": 40,
+							"column": 32
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 667,
+						"end": 697,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 1
+							},
+							"end": {
+								"line": 40,
+								"column": 31
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 667,
+							"end": 669,
+							"loc": {
+								"start": {
+									"line": 40,
+									"column": 1
+								},
+								"end": {
+									"line": 40,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 684,
+								"end": 693,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 18
+									},
+									"end": {
+										"line": 40,
+										"column": 27
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "Literal",
+									"start": 690,
+									"end": 693,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 24
+										},
+										"end": {
+											"line": 40,
+											"column": 27
+										}
+									},
+									"value": "a",
+									"raw": "'a'"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " comment ",
+										"start": 670,
+										"end": 683
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 695,
+								"end": 696,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 29
+									},
+									"end": {
+										"line": 40,
+										"column": 30
+									}
+								},
+								"name": "b"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Short inline control - comment stays (no expand-last trigger)",
+							"start": 601,
+							"end": 665
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

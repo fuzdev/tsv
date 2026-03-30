@@ -38,15 +38,7 @@ pub(in crate::ast) fn convert_arrow_function_expression(
         params: arrow
             .params
             .iter()
-            .map(|p| {
-                let mut expr = convert_expression(p, source, loc, interner, offset);
-                // acorn quirk: arrow function params don't get the nested loc.start
-                // that function declarations/expressions do. Flatten it back.
-                if let public::Expression::AssignmentPattern(ref mut ap) = expr {
-                    flatten_assignment_pattern_loc(ap);
-                }
-                expr
-            })
+            .map(|p| convert_expression(p, source, loc, interner, offset))
             .collect(),
         body,
         type_parameters: arrow
@@ -99,34 +91,6 @@ pub(in crate::ast) fn convert_function_expression(
             .as_ref()
             .map(|rt| convert_type_annotation(rt, source, loc, interner, offset)),
         body: convert_block_statement(&func.body, source, loc, interner, offset),
-    }
-}
-
-/// Flatten AssignmentPattern's nested loc.start back to a plain Position.
-/// Arrow function and snippet params don't get the nested SourceLocation that function declarations do.
-pub fn flatten_assignment_pattern_loc(ap: &mut public::AssignmentPattern) {
-    if matches!(ap.loc, public::AssignmentPatternLoc::Nested { .. }) {
-        // Take ownership via replace, extract inner start position
-        let dummy = public::AssignmentPatternLoc::Normal(public::SourceLocation {
-            start: public::Position {
-                line: 0,
-                column: 0,
-                character: None,
-            },
-            end: public::Position {
-                line: 0,
-                column: 0,
-                character: None,
-            },
-        });
-        if let public::AssignmentPatternLoc::Nested { start, end } =
-            std::mem::replace(&mut ap.loc, dummy)
-        {
-            ap.loc = public::AssignmentPatternLoc::Normal(public::SourceLocation {
-                start: start.start,
-                end,
-            });
-        }
     }
 }
 

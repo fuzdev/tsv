@@ -24,6 +24,12 @@ export interface DetectionContext {
 	hunks: DiffHunk[];
 	/** Source language */
 	language: Language;
+	/** Pre-computed by enrichDetectionContext — patterns use these instead of splitting */
+	oursLines?: string[];
+	prettierLines?: string[];
+	/** Pre-computed <style> block line ranges for Svelte files */
+	oursStyleBoundaries?: Array<{ start: number; end: number }>;
+	prettierStyleBoundaries?: Array<{ start: number; end: number }>;
 }
 
 export interface DivergenceMatch {
@@ -106,26 +112,72 @@ function oursLinesInHunk(oursLines: string[], hunk: DiffHunk): string[] {
 }
 
 /**
- * Check if a hunk's context (surrounding content, added/removed lines) is within
- * a CSS context. For Svelte files, looks for <style> context. For CSS files, always true.
+ * Compute <style> block line ranges from an array of lines.
+ * Returns an array of { start, end } (inclusive line indices).
+ */
+function computeStyleBoundaries(lines: string[]): Array<{ start: number; end: number }> {
+	const boundaries: Array<{ start: number; end: number }> = [];
+	let styleStart = -1;
+
+	for (let i = 0; i < lines.length; i++) {
+		if (/<style[\s>]/.test(lines[i]) && styleStart === -1) {
+			styleStart = i;
+		} else if (/<\/style>/.test(lines[i]) && styleStart !== -1) {
+			boundaries.push({ start: styleStart, end: i });
+			styleStart = -1;
+		}
+	}
+
+	return boundaries;
+}
+
+/**
+ * Check if a line index falls within any style block boundary.
+ */
+function isLineInStyleBlock(
+	line: number,
+	boundaries: Array<{ start: number; end: number }>,
+): boolean {
+	for (const b of boundaries) {
+		if (line >= b.start && line <= b.end) return true;
+	}
+	return false;
+}
+
+/**
+ * Pre-compute cached fields on a DetectionContext.
+ * Called by detectDivergences before running patterns.
+ */
+export function enrichDetectionContext(ctx: DetectionContext): void {
+	ctx.oursLines = ctx.ours.split('\n');
+	ctx.prettierLines = ctx.prettier.split('\n');
+	if (ctx.language === 'svelte') {
+		ctx.oursStyleBoundaries = computeStyleBoundaries(ctx.oursLines);
+		ctx.prettierStyleBoundaries = computeStyleBoundaries(ctx.prettierLines);
+	} else {
+		ctx.oursStyleBoundaries = [];
+		ctx.prettierStyleBoundaries = [];
+	}
+}
+
+/**
+ * Check if a hunk's context is within a CSS context.
+ * For Svelte files, uses pre-computed style boundaries.
+ * For removal-only hunks, checks prettier's boundaries (not ours).
  */
 function isInCssContext(hunk: DiffHunk, ctx: DetectionContext): boolean {
 	if (ctx.language === 'css') return true;
 	if (ctx.language !== 'svelte') return false;
 
-	// Check if the hunk lines are inside a <style> block
-	// Look at the full source for <style> boundaries
-	const oursLines = ctx.ours.split('\n');
-	let inStyle = false;
-	const startLine = hunk.oursRange?.start ?? hunk.prettierRange?.start ?? 0;
-
-	// Scan from beginning up to hunk start to determine if we're in <style>
-	for (let i = 0; i < startLine && i < oursLines.length; i++) {
-		if (/<style[\s>]/.test(oursLines[i])) inStyle = true;
-		if (/<\/style>/.test(oursLines[i])) inStyle = false;
+	// Use ours range when available; for removal-only hunks, use prettier range
+	// against prettier's style boundaries (fixes line index mismatch)
+	if (hunk.oursRange) {
+		return isLineInStyleBlock(hunk.oursRange.start, ctx.oursStyleBoundaries ?? []);
 	}
-
-	return inStyle;
+	if (hunk.prettierRange) {
+		return isLineInStyleBlock(hunk.prettierRange.start, ctx.prettierStyleBoundaries ?? []);
+	}
+	return false;
 }
 
 /**
@@ -203,6 +255,12 @@ const selfClosingNonvoid: DivergencePattern = {
 		const selfClosingEnd = /^\s*\/>\s*$/;
 		const explicitCloseEnd = />\s*<\/[a-zA-Z][\w.-]*>\s*$/;
 
+		// Orphaned hunk patterns: when <div /> → <div></div> has an identical
+		// <div></div> between them, the diff algorithm splits the change into
+		// two hunks (one remove-only, one add-only). Match these individually.
+		const selfClosingNonvoidTag = /<([a-z][\w.-]*)\s*\/>/; // lowercase = HTML element
+		const emptyExplicitClose = /<([a-z][\w.-]*)(\s[^>]*)?>(\s*)<\/\1>/; // <tag></tag>
+
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
 			// Direction 1: ours self-closes, prettier explicit-closes (components)
 			const oursAddsClose = hunk.addedLines.some((l) => selfClosingTag.test(l));
@@ -216,7 +274,17 @@ const selfClosingNonvoid: DivergencePattern = {
 			const oursHasExplicit = hunk.addedLines.some(
 				(l) => explicitCloseTag.test(l) || explicitCloseEnd.test(l),
 			);
-			return prettierHasSelfClose && oursHasExplicit;
+			if (prettierHasSelfClose && oursHasExplicit) return true;
+			// Orphaned remove-only: prettier has self-closing non-void HTML that we removed
+			if (
+				hunk.addedLines.length === 0 &&
+				hunk.removedLines.every((l) => selfClosingNonvoidTag.test(l))
+			) return true;
+			// Orphaned add-only: we added empty explicit-close HTML that prettier didn't have
+			if (
+				hunk.removedLines.length === 0 && hunk.addedLines.every((l) => emptyExplicitClose.test(l))
+			) return true;
+			return false;
 		});
 
 		if (hunkIndices.length > 0) {
@@ -359,7 +427,7 @@ const cssAtruleLongWrap: DivergencePattern = {
 	detect(ctx) {
 		if (ctx.language !== 'css' && ctx.language !== 'svelte') return null;
 
-		const prettierLines = ctx.prettier.split('\n');
+		const prettierLines = ctx.prettierLines!;
 		const atRulePattern = /@(?:container|media|import|supports)/;
 
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
@@ -730,7 +798,7 @@ const returnTypeGenericUnion: DivergencePattern = {
 		'typescript/declarations/function/return_type_generic_union_long_prettier_divergence',
 	],
 	detect(ctx) {
-		const prettierLines = ctx.prettier.split('\n');
+		const prettierLines = ctx.prettierLines!;
 
 		// Look for generic types with union (| null, | void, | undefined) in hunks
 		// where prettier's line exceeds 100 chars
@@ -773,8 +841,8 @@ const menuBlock: DivergencePattern = {
 
 		// Look for hunks involving <menu> elements where prettier hugs content
 		// (inline formatting) and we expand it (block formatting)
-		const oursLines = ctx.ours.split('\n');
-		const prettierLines = ctx.prettier.split('\n');
+		const oursLines = ctx.oursLines!;
+		const prettierLines = ctx.prettierLines!;
 
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
 			// Check for </menu in removed lines (prettier hugs: content</menu on same line,
@@ -866,7 +934,7 @@ const fillAfterInline: DivergencePattern = {
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
 
-		const prettierLines = ctx.prettier.split('\n');
+		const prettierLines = ctx.prettierLines!;
 		const inlineCloseTag = /<\/(?:span|a|strong|em|code|b|i|small|abbr|sub|sup)>/;
 
 		// Check each hunk for prettier lines with long inline element lines
@@ -898,8 +966,8 @@ const blockMultilineAttrsHug: DivergencePattern = {
 
 		// For each hunk, check if it involves a whitespace-sensitive element
 		// AND shows > placement differences
-		const oursLines = ctx.ours.split('\n');
-		const prettierLines = ctx.prettier.split('\n');
+		const oursLines = ctx.oursLines!;
+		const prettierLines = ctx.prettierLines!;
 
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
 			// Check for > on its own line in added lines (we break)
@@ -942,7 +1010,7 @@ const shortExpr100: DivergencePattern = {
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
 
-		const prettierLines = ctx.prettier.split('\n');
+		const prettierLines = ctx.prettierLines!;
 		const blockExprPattern = /\{#(?:if|each|await|key)/;
 
 		// Check each hunk for block expressions that exceed 100 chars in prettier range
@@ -977,7 +1045,7 @@ const cssValueWrap: DivergencePattern = {
 		'css/values/lists/space_separated_long_wrap_prettier_divergence',
 	],
 	detect(ctx) {
-		const prettierLines = ctx.prettier.split('\n');
+		const prettierLines = ctx.prettierLines!;
 
 		// Check each hunk for long CSS property values in prettier's range
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
@@ -1008,9 +1076,10 @@ const fill101Boundary: DivergencePattern = {
 		'css/values/lists/comma_space_separated_long_prettier_divergence',
 		'svelte/elements/inline_element_fill_long_prettier_divergence',
 		'svelte/elements/inline_component_fill_long_prettier_divergence',
+		'svelte/elements/fill_expr_break_boundary_long_prettier_divergence',
 	],
 	detect(ctx) {
-		const prettierLines = ctx.prettier.split('\n');
+		const prettierLines = ctx.prettierLines!;
 		let longestPrettierOverflow = 0;
 
 		// For each hunk, check if prettier lines in that hunk's range exceed 100 chars
@@ -1235,6 +1304,9 @@ export const PATTERNS: DivergencePattern[] = [
  * @returns Hunk coverage result with classification
  */
 export function detectDivergences(ctx: DetectionContext): HunkCoverageResult {
+	// Pre-compute cached fields (line arrays, style boundaries)
+	if (!ctx.oursLines) enrichDetectionContext(ctx);
+
 	const matches: DivergenceMatch[] = [];
 	const { hunks } = ctx;
 

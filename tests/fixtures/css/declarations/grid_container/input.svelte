@@ -3,7 +3,10 @@
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
 		grid-template-rows: auto 1fr auto;
-		grid-template-areas: 'header header' 'sidebar main' 'footer footer';
+		grid-template-areas:
+			'header header'
+			'sidebar main'
+			'footer footer';
 		grid-auto-rows: minmax(100px, auto);
 		grid-auto-columns: 1fr;
 		grid-auto-flow: dense;

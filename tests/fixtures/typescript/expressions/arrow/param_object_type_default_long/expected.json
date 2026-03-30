@@ -3300,14 +3300,8 @@
 							"end": 1181,
 							"loc": {
 								"start": {
-									"start": {
-										"line": 46,
-										"column": 14
-									},
-									"end": {
-										"line": 46,
-										"column": 90
-									}
+									"line": 46,
+									"column": 14
 								},
 								"end": {
 									"line": 46,
@@ -3776,14 +3770,8 @@
 							"end": 1338,
 							"loc": {
 								"start": {
-									"start": {
-										"line": 50,
-										"column": 2
-									},
-									"end": {
-										"line": 50,
-										"column": 79
-									}
+									"line": 50,
+									"column": 2
 								},
 								"end": {
 									"line": 50,

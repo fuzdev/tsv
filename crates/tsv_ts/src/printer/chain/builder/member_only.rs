@@ -154,16 +154,10 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
         return d.conditional_group(&[on_line, expanded]);
     }
 
-    // For 2+ segments: use conditional_group for proper break decisions
-    // fill() handles greedy packing - it prints as many items as fit on
-    // the current line, then breaks and continues.
-    //
-    // conditional_group([oneLine, expanded]) where:
-    // - oneLine: all segments concatenated flat (no breaks)
-    // - expanded: first_doc + indent(fill(segments with softlines))
-    //
-    // The fill starts at the position after first_doc and greedily packs.
-    // Since fill is inside indent, overflow lines get the extra indent.
+    // For 2+ segments: use conditional_group([oneLine, expanded]).
+    // Short chains (≤2 segments): fill includes the base for greedy packing from
+    // the base position, allowing the fill to break after the base when needed.
+    // Long chains (3+ segments): fill starts after the base and packs greedily.
 
     // Build on_line: everything concatenated flat
     // Note: on_line does NOT need trailing_reserve because fits_with_lookahead
@@ -175,24 +169,36 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
     }
     let on_line = d.concat(&on_line_parts);
 
-    // Build fill_parts with softlines between segments
-    let mut fill_parts = Vec::new();
-    for &segment in &segments {
-        if !fill_parts.is_empty() {
-            fill_parts.push(d.softline());
+    if segments.len() <= 2 {
+        // Short trailing members (≤2 segments like `.right.start`): include the base
+        // as the first item of the fill, with softlines between base and segments.
+        // Fill packs greedily: keeps items on the same line if they fit, breaks to
+        // the next indented line when they don't.
+        //
+        // This correctly handles both:
+        // - Long base + comments consuming the line: fill breaks after base, packs
+        //   short segments together: `...labeled\n\t.right.start`
+        // - Short base + long last segment: fill packs first segment with base,
+        //   breaks before long segment: `ssss.data\n\t.fallbackBBBB...`
+        let mut fill_with_base_parts = vec![first_doc];
+        for &segment in &segments {
+            fill_with_base_parts.push(d.softline());
+            fill_with_base_parts.push(segment);
         }
-        fill_parts.push(segment);
+        let fill_with_base = d.fill(&fill_with_base_parts);
+        let expanded = d.indent(fill_with_base);
+        d.conditional_group(&[on_line, expanded])
+    } else {
+        // Long chain (3+ segments): fill-based greedy packing after base
+        let mut fill_parts = Vec::new();
+        for &segment in &segments {
+            if !fill_parts.is_empty() {
+                fill_parts.push(d.softline());
+            }
+            fill_parts.push(segment);
+        }
+        let fill_doc = d.fill(&fill_parts);
+        let fill_expanded = d.concat(&[first_doc, d.indent(fill_doc)]);
+        d.conditional_group(&[on_line, fill_expanded])
     }
-
-    // Build fill with segments - this packs greedily at the current position.
-    // Note: The fill now uses rest_commands for width calculation, so we don't
-    // need to set a trailing_reserve here. The fill will see the actual trailing
-    // content in the document tree.
-    let fill_doc = d.fill(&fill_parts);
-
-    // Use conditional_group with on_line (flat) and expanded (fill-based) variants.
-    // The fill packs greedily, respecting print width including trailing content.
-    let expanded = d.concat(&[first_doc, d.indent(fill_doc)]);
-
-    d.conditional_group(&[on_line, expanded])
 }

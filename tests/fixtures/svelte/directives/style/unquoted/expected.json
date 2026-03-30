@@ -1,0 +1,153 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 85,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 36,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [
+					{
+						"start": 5,
+						"end": 29,
+						"type": "StyleDirective",
+						"name": "background",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 5,
+								"character": 5
+							},
+							"end": {
+								"line": 1,
+								"column": 21,
+								"character": 21
+							}
+						},
+						"modifiers": [],
+						"value": [
+							{
+								"start": 23,
+								"end": 28,
+								"type": "Text",
+								"raw": "green",
+								"data": "green"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 36,
+				"end": 37,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 37,
+				"end": 84,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 38
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 41
+					}
+				},
+				"attributes": [
+					{
+						"start": 42,
+						"end": 59,
+						"type": "StyleDirective",
+						"name": "color",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 5,
+								"character": 42
+							},
+							"end": {
+								"line": 2,
+								"column": 16,
+								"character": 53
+							}
+						},
+						"modifiers": [],
+						"value": [
+							{
+								"start": 55,
+								"end": 58,
+								"type": "Text",
+								"raw": "red",
+								"data": "red"
+							}
+						]
+					},
+					{
+						"start": 60,
+						"end": 77,
+						"type": "StyleDirective",
+						"name": "opacity",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 23,
+								"character": 60
+							},
+							"end": {
+								"line": 2,
+								"column": 36,
+								"character": 73
+							}
+						},
+						"modifiers": [],
+						"value": [
+							{
+								"start": 75,
+								"end": 76,
+								"type": "Text",
+								"raw": "1",
+								"data": "1"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

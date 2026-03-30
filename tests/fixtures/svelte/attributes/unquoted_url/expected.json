@@ -1,0 +1,139 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 74,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 34,
+				"name": "a",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 2,
+						"character": 2
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 3,
+						"end": 25,
+						"name": "href",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 3,
+								"character": 3
+							},
+							"end": {
+								"line": 1,
+								"column": 7,
+								"character": 7
+							}
+						},
+						"value": [
+							{
+								"start": 9,
+								"end": 24,
+								"type": "Text",
+								"raw": "https://tsv.dev",
+								"data": "https://tsv.dev"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 26,
+							"end": 30,
+							"raw": "link",
+							"data": "link"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 34,
+				"end": 35,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 35,
+				"end": 73,
+				"name": "a",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 36
+					},
+					"end": {
+						"line": 2,
+						"column": 2,
+						"character": 37
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 38,
+						"end": 64,
+						"name": "href",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 3,
+								"character": 38
+							},
+							"end": {
+								"line": 2,
+								"column": 7,
+								"character": 42
+							}
+						},
+						"value": [
+							{
+								"start": 44,
+								"end": 63,
+								"type": "Text",
+								"raw": "https://tsv.dev/a/b",
+								"data": "https://tsv.dev/a/b"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 65,
+							"end": 69,
+							"raw": "link",
+							"data": "link"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

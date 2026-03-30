@@ -135,14 +135,8 @@
 							"end": 187,
 							"loc": {
 								"start": {
-									"start": {
-										"line": 3,
-										"column": 14
-									},
-									"end": {
-										"line": 3,
-										"column": 90
-									}
+									"line": 3,
+									"column": 14
 								},
 								"end": {
 									"line": 3,
@@ -434,14 +428,8 @@
 							"end": 408,
 							"loc": {
 								"start": {
-									"start": {
-										"line": 6,
-										"column": 14
-									},
-									"end": {
-										"line": 14,
-										"column": 2
-									}
+									"line": 6,
+									"column": 14
 								},
 								"end": {
 									"line": 14,

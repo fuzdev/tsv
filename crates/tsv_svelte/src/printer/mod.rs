@@ -80,6 +80,17 @@ impl PendingWhitespace {
     }
 }
 
+/// Which section a fragment comment should travel with during canonical reordering.
+/// Comments attach to the nearest section that follows them in source order.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum CommentSection {
+    Options,
+    ModuleScript,
+    InstanceScript,
+    Template,
+    Style,
+}
+
 /// What kind of node was previously printed at root level
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 enum PrevNodeKind {
@@ -318,6 +329,103 @@ impl<'a> Printer<'a> {
         last_comment.is_some_and(|c| c.content.trim() == "prettier-ignore")
     }
 
+    /// Classify which section a fragment comment should travel with during
+    /// canonical reordering. Each comment attaches to the nearest section
+    /// that follows it in source order.
+    fn classify_fragment_comment(
+        &self,
+        comment: &internal::HtmlComment,
+        comment_idx: usize,
+        root: &internal::Root,
+    ) -> CommentSection {
+        // prettier-ignore-start/end mark ranges within the template —
+        // they must stay in the fragment so the range preservation logic sees them
+        let trimmed = comment.content.trim();
+        if trimmed == "prettier-ignore-start" || trimmed == "prettier-ignore-end" {
+            return CommentSection::Template;
+        }
+
+        let comment_end = comment.span.end;
+        let mut nearest: Option<(u32, CommentSection)> = None;
+
+        // Check next non-comment, non-whitespace fragment node
+        for node in root.fragment.nodes.iter().skip(comment_idx + 1) {
+            match node {
+                FragmentNode::Text(t) if t.raw.is_whitespace_only() => continue,
+                FragmentNode::Comment(_) => continue,
+                other => {
+                    let pos = other.span().start;
+                    if pos >= comment_end {
+                        nearest = Some((pos, CommentSection::Template));
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Check options
+        if let Some(options) = &root.options {
+            let start = options.span.start;
+            if start >= comment_end && nearest.as_ref().is_none_or(|(p, _)| start < *p) {
+                nearest = Some((start, CommentSection::Options));
+            }
+        }
+
+        // Check module script
+        if let Some(module) = &root.module {
+            let start = module.span.start;
+            if start >= comment_end && nearest.as_ref().is_none_or(|(p, _)| start < *p) {
+                nearest = Some((start, CommentSection::ModuleScript));
+            }
+        }
+
+        // Check instance script
+        if let Some(instance) = &root.instance {
+            let start = instance.span.start;
+            if start >= comment_end && nearest.as_ref().is_none_or(|(p, _)| start < *p) {
+                nearest = Some((start, CommentSection::InstanceScript));
+            }
+        }
+
+        // Check style
+        if let Some(css) = &root.css {
+            let start = css.span.start;
+            if start >= comment_end && nearest.as_ref().is_none_or(|(p, _)| start < *p) {
+                nearest = Some((start, CommentSection::Style));
+            }
+        }
+
+        nearest.map_or(CommentSection::Template, |(_, section)| section)
+    }
+
+    /// Print section-attached comments and preserve authorial blank lines.
+    /// Returns true if any comments were printed.
+    fn print_section_comments(
+        &mut self,
+        comment_indices: &[usize],
+        fragment: &internal::Fragment,
+        section_start: u32,
+    ) -> bool {
+        if comment_indices.is_empty() {
+            return false;
+        }
+        for &i in comment_indices {
+            if let FragmentNode::Comment(comment) = &fragment.nodes[i] {
+                self.print_comment(comment);
+                self.write("\n");
+            }
+        }
+        // Preserve authorial blank line between last comment and section
+        if let Some(&last_idx) = comment_indices.last() {
+            let last_end = fragment.nodes[last_idx].span().end;
+            let between = &self.source[last_end as usize..section_start as usize];
+            if between.has_blank_line() {
+                self.write("\n");
+            }
+        }
+        true
+    }
+
     /// Format a Svelte Root node
     ///
     /// Orchestrates formatting of the four main sections of a .svelte file:
@@ -327,81 +435,63 @@ impl<'a> Printer<'a> {
     /// 4. Style: `<style>`
     ///
     /// Sections are ordered canonically and separated by blank lines.
+    /// Comments travel with the section they immediately precede in source order.
     pub fn print_root(&mut self, root: &internal::Root) {
-        let mut has_previous_section = false;
+        // Classify fragment comments by the section they should travel with.
+        let mut options_comments: Vec<usize> = Vec::new();
+        let mut module_comments: Vec<usize> = Vec::new();
+        let mut instance_comments: Vec<usize> = Vec::new();
+        let mut style_comments: Vec<usize> = Vec::new();
 
-        // Find the earliest script position to determine which comments come before scripts
-        let first_script_start = [root.module.as_ref(), root.instance.as_ref()]
-            .into_iter()
-            .flatten()
-            .map(|s| s.span.start)
-            .min();
-
-        // Track which comments we've printed (before options or scripts) to skip in fragment
-        let mut printed_comment_indices: Vec<usize> = Vec::new();
-
-        // Format svelte:options (if present) - always first
-        // Print comments before options so they stay attached
-        if let Some(options) = &root.options {
-            for (i, node) in root.fragment.nodes.iter().enumerate() {
-                match node {
-                    FragmentNode::Comment(comment) if comment.span.end <= options.span.start => {
-                        self.print_comment(comment);
-                        self.write("\n");
-                        printed_comment_indices.push(i);
-                    }
-                    FragmentNode::Text(t) if t.raw.is_whitespace_only() => {}
-                    _ => break,
+        for (i, node) in root.fragment.nodes.iter().enumerate() {
+            if let FragmentNode::Comment(comment) = node {
+                match self.classify_fragment_comment(comment, i, root) {
+                    CommentSection::Options => options_comments.push(i),
+                    CommentSection::ModuleScript => module_comments.push(i),
+                    CommentSection::InstanceScript => instance_comments.push(i),
+                    CommentSection::Style => style_comments.push(i),
+                    CommentSection::Template => {}
                 }
             }
+        }
 
+        // Non-template comments are skipped during fragment printing
+        let mut printed_comment_indices: Vec<usize> = Vec::new();
+        printed_comment_indices.extend(&options_comments);
+        printed_comment_indices.extend(&module_comments);
+        printed_comment_indices.extend(&instance_comments);
+        printed_comment_indices.extend(&style_comments);
+
+        let mut has_previous_section = false;
+
+        // Format svelte:options (if present) - always first
+        if let Some(options) = &root.options {
+            self.print_section_comments(&options_comments, &root.fragment, options.span.start);
             self.print_svelte_options(options);
             has_previous_section = true;
         }
 
-        // Print comments that come before the first script
-        if let Some(script_start) = first_script_start {
-            for (i, node) in root.fragment.nodes.iter().enumerate() {
-                if printed_comment_indices.contains(&i) {
-                    continue;
-                }
-                if let FragmentNode::Comment(comment) = node
-                    && comment.span.end <= script_start
-                {
-                    if has_previous_section {
-                        self.write("\n");
-                    }
-                    self.print_comment(comment);
-                    self.write("\n");
-
-                    // Preserve authorial blank line between comment and next content
-                    let remaining = &self.source[comment.span.end as usize..script_start as usize];
-                    has_previous_section = remaining.leading_whitespace().has_blank_line();
-
-                    printed_comment_indices.push(i);
-                }
-            }
-        }
-
         // Format scripts (module then instance)
-        for script in [root.module.as_ref(), root.instance.as_ref()]
-            .into_iter()
-            .flatten()
-        {
-            if has_previous_section {
-                self.write("\n"); // Blank line between sections
+        for (script, comments) in [
+            (root.module.as_ref(), &module_comments),
+            (root.instance.as_ref(), &instance_comments),
+        ] {
+            if let Some(script) = script {
+                if has_previous_section {
+                    self.write("\n"); // Blank line between sections
+                }
+                self.print_section_comments(comments, &root.fragment, script.span.start);
+                if self.has_prettier_ignore_before(&root.fragment, script.span.start) {
+                    self.write(script.span.extract(self.source));
+                    self.write("\n");
+                } else {
+                    self.print_script(script);
+                }
+                has_previous_section = true;
             }
-            if self.has_prettier_ignore_before(&root.fragment, script.span.start) {
-                self.write(script.span.extract(self.source));
-                self.write("\n");
-            } else {
-                self.print_script(script);
-            }
-            has_previous_section = true;
         }
 
         // Format template fragment (if not empty)
-        // Check if there are any non-whitespace nodes (excluding already-printed comments)
         let has_content = root.fragment.nodes.iter().enumerate().any(|(i, node)| {
             if printed_comment_indices.contains(&i) {
                 return false;
@@ -421,27 +511,10 @@ impl<'a> Printer<'a> {
         // Format style (if present)
         if let Some(style) = &root.css {
             let ignore_style = self.has_prettier_ignore_before(&root.fragment, style.span.start);
-            if has_previous_section && !ignore_style {
-                // Skip section separator when template ends with a comment immediately
-                // before <style> (no blank line between). The template trailing newline
-                // already provides sufficient separation. Prettier attaches such comments
-                // to the style section, so no blank line appears.
-                let template_ends_with_comment_before_style = root
-                    .fragment
-                    .nodes
-                    .iter()
-                    .rev()
-                    .find(|n| !matches!(n, FragmentNode::Text(t) if t.raw.is_whitespace_only()))
-                    .is_some_and(|n| {
-                        matches!(n, FragmentNode::Comment(_))
-                            && n.span().end <= style.span.start
-                            && !self.source[n.span().end as usize..style.span.start as usize]
-                                .has_blank_line()
-                    });
-                if !template_ends_with_comment_before_style {
-                    self.write("\n"); // Blank line between sections
-                }
+            if has_previous_section {
+                self.write("\n"); // Blank line between sections
             }
+            self.print_section_comments(&style_comments, &root.fragment, style.span.start);
             if ignore_style {
                 self.write(style.span.extract(self.source));
                 self.write("\n");
@@ -454,16 +527,26 @@ impl<'a> Printer<'a> {
     /// Format `<svelte:options ... />` tag
     ///
     /// Always outputs self-closing form with attributes.
+    /// Uses doc-based attribute wrapping for width-aware line breaking.
     fn print_svelte_options(&mut self, options: &internal::SvelteOptions) {
-        self.write("<svelte:options");
-
-        // Format attributes
-        for attr in &options.attributes {
-            self.write(" ");
-            self.print_attribute_node(attr);
+        if options.attributes.is_empty() {
+            self.write("<svelte:options />\n");
+            return;
         }
 
-        self.write(" />\n");
+        let d = self.d();
+        let (attr_indent, has_multiline) = self.build_indented_attrs_doc(&options.attributes);
+        let line = d.line();
+        let inner = d.concat(&[d.text("<svelte:options"), attr_indent, line, d.text("/>")]);
+
+        let group = if has_multiline {
+            d.group_break(inner)
+        } else {
+            d.group(inner)
+        };
+
+        self.render_doc_immediate(group);
+        self.write("\n");
     }
 
     /// Format a Fragment with blank lines between root-level block elements

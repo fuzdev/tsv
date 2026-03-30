@@ -16,7 +16,7 @@
 
 mod blocks;
 mod functions;
-mod literals;
+pub(crate) mod literals;
 mod patterns;
 
 pub(super) use literals::{format_string_literal_from_ast, normalize_number_literal};
@@ -749,14 +749,15 @@ impl<'a> Printer<'a> {
     fn add_alignment_to_doc(&self, doc: DocId, size: usize) -> DocId {
         let d = self.d();
         let tab_width = self.config.tab_width;
-        let n = size / tab_width;
-        let r = size - n * tab_width;
+        // In prettier's useTabs renderer, align(n%tw) creates a WIDTH command
+        // that adds lastTabs=1 + lastSpaces=n%tw. When followed by INDENT,
+        // flushTabs() emits the pending tab and resetLast() drops the fractional
+        // spaces. So align(r) + indent effectively rounds up to a full tab.
+        // Match this by using ceiling division for the indent count.
+        let n = size.div_ceil(tab_width);
         let mut result = doc;
         for _ in 0..n {
             result = d.indent(result);
-        }
-        if r > 0 {
-            result = d.align_spaces(r, result);
         }
         // Reset to absolute indent 0. Uses align(0) not dedent because
         // dedent only decrements by 1 (saturating_sub), while we need
@@ -916,7 +917,12 @@ impl<'a> Printer<'a> {
             tag_doc,
         );
 
-        d.concat(&[tag_doc, self.build_template_literal_doc(&tagged.quasi)])
+        let mut parts = vec![tag_doc];
+        if let Some(type_args) = &tagged.type_arguments {
+            parts.push(self.build_type_parameter_instantiation_doc(type_args));
+        }
+        parts.push(self.build_template_literal_doc(&tagged.quasi));
+        d.concat(&parts)
     }
 
     /// Build a Doc for a TypeScript parameter property

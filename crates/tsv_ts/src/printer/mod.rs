@@ -117,6 +117,10 @@ pub struct Printer<'a> {
     /// When true, nested arrows always break after `=>` regardless of their own return type.
     /// Used for: const f = (x: T): H => (y) => expr - ALL arrows break, not just the typed ones.
     pub(crate) in_curried_typed_arrow: Cell<bool>,
+    /// Whether to skip curried arrow chain detection (non-id param check).
+    /// Set when formatting arrows in call arg expand-last context, matching
+    /// prettier's `!args.expandLastArg` in shouldPrintAsChain.
+    pub(crate) skip_arrow_chain: Cell<bool>,
     /// Whether the next ObjectExpression should be wrapped in parens.
     /// Set when printing arrow body with chained as/satisfies wrapping an object:
     /// `() => ({}) as unknown as Logger` — parens go around inner object only.
@@ -148,6 +152,7 @@ impl<'a> Printer<'a> {
             force_chain_expand: Cell::new(false),
             in_template_interpolation: Cell::new(false),
             in_curried_typed_arrow: Cell::new(false),
+            skip_arrow_chain: Cell::new(false),
             arrow_body_object_needs_parens: Cell::new(false),
         }
     }
@@ -611,6 +616,13 @@ impl<'a> Printer<'a> {
         let doc = self.build_program_doc(program);
         self.write_arena_doc(doc);
     }
+
+    /// Check if any comment in the range has content "prettier-ignore".
+    /// Used to emit the next node as raw source text instead of formatting.
+    fn has_prettier_ignore_in_range(&self, start: u32, end: u32) -> bool {
+        comments_in_range(self.comments, start, end)
+            .any(|c| c.content.trim() == "prettier-ignore")
+    }
 }
 
 impl<'a> Printer<'a> {
@@ -683,6 +695,7 @@ impl<'a> Printer<'a> {
             }
 
             // Leading comments (allow inline comments since statement will be printed)
+            let has_ignore = self.has_prettier_ignore_in_range(prev_end, statement.span().start);
             if let Some(leading_doc) = self.build_leading_comments_doc(
                 prev_end,
                 statement.span().start,
@@ -692,8 +705,13 @@ impl<'a> Printer<'a> {
                 parts.push(leading_doc);
             }
 
-            // Statement
-            parts.push(self.build_statement_doc(statement));
+            // Statement — if preceded by prettier-ignore, emit raw source
+            if has_ignore {
+                let raw = statement.span().extract(self.source);
+                parts.push(d.text_owned(raw.to_string()));
+            } else {
+                parts.push(self.build_statement_doc(statement));
+            }
 
             // Trailing same-line comments
             let trailing_docs = self.build_trailing_same_line_comments_doc(statement.span().end);
@@ -738,6 +756,7 @@ impl<'a> Printer<'a> {
         let mut parts = Vec::new();
         let mut last_comment_end = prev_end;
         let mut printed_any = false;
+        let mut last_was_inline = false;
 
         for comment in comments_in_range(self.comments, prev_end, curr_start) {
             let position = classify_comment_fast(comment, prev_end, curr_start, self.line_breaks);
@@ -751,11 +770,35 @@ impl<'a> Printer<'a> {
             // Handle inline leading comments (same line as statement)
             // These stay on the same line, so DON'T set printed_any (no separator needed)
             // Skip this behavior when force_non_inline is true (e.g., empty statements being skipped)
-            if !force_non_inline && matches!(position, CommentPosition::LeadingInline) {
+            //
+            // Also handle block comments classified as Trailing that are on the same line as
+            // curr_start when is_first. This happens with consecutive inline block comments
+            // at file start: `/** @type {A} */ /** @type {B} */ expr;` — classify_comment_fast
+            // returns Trailing (same line as prev_end=0) but these should stay inline with
+            // the expression since they're also on the same line as curr_start.
+            let is_inline = matches!(position, CommentPosition::LeadingInline)
+                || (is_first
+                    && comment.is_block
+                    && matches!(position, CommentPosition::Trailing)
+                    && self.is_same_line(comment.span.end, curr_start));
+            if !force_non_inline && is_inline {
+                // If a previous comment was printed on a DIFFERENT line, add a line break.
+                // E.g., `// line comment\n/** @type {A} */ expr;` — needs newline after
+                // the line comment. But consecutive inline comments on the SAME line
+                // should stay inline: `/** @type {A} */ /** @type {B} */ expr;`.
+                if printed_any && !self.is_same_line(last_comment_end, comment.span.start) {
+                    let has_blank = comment.span.start > last_comment_end
+                        && self.has_blank_line_between(last_comment_end, comment.span.start);
+                    if has_blank {
+                        parts.push(d.literalline());
+                    }
+                    parts.push(d.hardline());
+                }
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.text(" "));
                 // DON'T set printed_any - inline comments don't need separators
                 last_comment_end = comment.span.end;
+                last_was_inline = true;
                 continue;
             }
 
@@ -779,12 +822,15 @@ impl<'a> Printer<'a> {
 
             last_comment_end = comment.span.end;
             printed_any = true;
+            last_was_inline = false;
         }
 
         // After all comments: add separator for the statement (if one follows)
         // Skip this when force_non_inline is true - that means the statement is being skipped
-        // and there's nothing for the separator to separate from
-        if printed_any && !force_non_inline {
+        // and there's nothing for the separator to separate from.
+        // Skip when last comment was inline - it already has trailing space and the
+        // statement continues on the same line: `/** @type {A} */ expr;`
+        if printed_any && !force_non_inline && !last_was_inline {
             // Check if there's a blank line after the last comment
             let has_blank_after = last_comment_end < curr_start
                 && self.has_blank_line_between(last_comment_end, curr_start);

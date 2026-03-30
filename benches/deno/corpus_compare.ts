@@ -26,6 +26,7 @@ import { NativeImplementation } from './lib/ffi.ts';
 import { type Language, LANGUAGES, type SourceFile } from './lib/types.ts';
 import { loadAllVersions } from './lib/versions.ts';
 import {
+	checkExpectedError,
 	checkSafety,
 	detectDivergences,
 	type HunkCoverageResult,
@@ -54,6 +55,7 @@ interface LanguageStats {
 	partialDivergence: number;
 	unknownDiff: number;
 	safetyViolation: number;
+	expectedErrors: number;
 	errors: number;
 }
 
@@ -65,8 +67,11 @@ interface CompareResult {
 		| 'partial_divergence'
 		| 'unknown_diff'
 		| 'safety_violation'
+		| 'expected_error'
 		| 'error';
 	error?: string;
+	/** Reason the error is expected (only for expected_error status) */
+	expectedReason?: string;
 	ours?: string;
 	prettier?: string;
 	coverage?: HunkCoverageResult;
@@ -287,6 +292,7 @@ async function main(): Promise<void> {
 			partialDivergence: 0,
 			unknownDiff: 0,
 			safetyViolation: 0,
+			expectedErrors: 0,
 			errors: 0,
 		});
 	}
@@ -341,7 +347,10 @@ async function main(): Promise<void> {
 
 				// Safety check FIRST (always) - compare source vs OUR output
 				const safetyViolations = checkSafety(file.content, ours);
-				if (safetyViolations.length > 0) {
+				if (safetyViolations.length > 0 && ours !== prettier) {
+					// Only report safety violations when our output differs from prettier.
+					// If ours === prettier, the transformation is shared (e.g., shorthand
+					// collapsing: foo={foo} → {foo}) and not a bug in our formatter.
 					langStats.safetyViolation++;
 					langResults.push({
 						file,
@@ -444,17 +453,28 @@ async function main(): Promise<void> {
 					}
 				}
 			} catch (e) {
-				langStats.errors++;
 				const errorMsg = e instanceof Error ? e.message : String(e);
-				langResults.push({
-					file,
-					status: 'error',
-					error: errorMsg,
-				});
-				if (exitOnFirst) {
-					console.log(`\nError: ${relPath(file.path, resolvedPath)}`);
-					console.log(`  ${errorMsg}`);
-					shouldExit = true;
+				const expectedCheck = checkExpectedError(file.content);
+				if (expectedCheck.expected) {
+					langStats.expectedErrors++;
+					langResults.push({
+						file,
+						status: 'expected_error',
+						error: errorMsg,
+						expectedReason: expectedCheck.pattern!.reason,
+					});
+				} else {
+					langStats.errors++;
+					langResults.push({
+						file,
+						status: 'error',
+						error: errorMsg,
+					});
+					if (exitOnFirst) {
+						console.log(`\nError: ${relPath(file.path, resolvedPath)}`);
+						console.log(`  ${errorMsg}`);
+						shouldExit = true;
+					}
 				}
 			}
 
@@ -474,8 +494,21 @@ async function main(): Promise<void> {
 	let totalPartialDivergence = 0;
 	let totalUnknownDiff = 0;
 	let totalSafetyViolation = 0;
+	let totalExpectedErrors = 0;
 	let totalErrors = 0;
 	let totalCount = 0;
+
+	/** Build the detail parts array for a stats row */
+	function buildDetailParts(s: LanguageStats): string[] {
+		const parts: string[] = [];
+		if (s.knownDivergence > 0) parts.push(`${s.knownDivergence} known`);
+		if (s.partialDivergence > 0) parts.push(`\x1b[33m${s.partialDivergence} partial\x1b[0m`);
+		if (s.unknownDiff > 0) parts.push(`${s.unknownDiff} unknown`);
+		if (s.safetyViolation > 0) parts.push(`\x1b[31m${s.safetyViolation} SAFETY\x1b[0m`);
+		if (s.errors > 0) parts.push(`${s.errors} errors`);
+		if (s.expectedErrors > 0) parts.push(`\x1b[2m${s.expectedErrors} expected errors\x1b[0m`);
+		return parts;
+	}
 
 	for (const lang of LANGUAGES) {
 		const s = stats.get(lang)!;
@@ -486,19 +519,13 @@ async function main(): Promise<void> {
 		totalPartialDivergence += s.partialDivergence;
 		totalUnknownDiff += s.unknownDiff;
 		totalSafetyViolation += s.safetyViolation;
+		totalExpectedErrors += s.expectedErrors;
 		totalErrors += s.errors;
 		totalCount += s.total;
 
 		const pct = s.total > 0 ? ((s.match / s.total) * 100).toFixed(1) : '100.0';
 		const matchStr = `${s.match}/${s.total} match (${pct}%)`.padEnd(24);
-
-		const parts: string[] = [];
-		if (s.knownDivergence > 0) parts.push(`${s.knownDivergence} known`);
-		if (s.partialDivergence > 0) parts.push(`\x1b[33m${s.partialDivergence} partial\x1b[0m`);
-		if (s.unknownDiff > 0) parts.push(`${s.unknownDiff} unknown`);
-		if (s.safetyViolation > 0) parts.push(`\x1b[31m${s.safetyViolation} SAFETY\x1b[0m`);
-		if (s.errors > 0) parts.push(`${s.errors} errors`);
-
+		const parts = buildDetailParts(s);
 		const detailStr = parts.length > 0 ? parts.join(' | ') : 'all match';
 		console.log(`  ${lang.padEnd(12)} ${matchStr} | ${detailStr}`);
 	}
@@ -508,14 +535,17 @@ async function main(): Promise<void> {
 		const pct = totalCount > 0 ? ((totalMatch / totalCount) * 100).toFixed(1) : '100.0';
 		const matchStr = `${totalMatch}/${totalCount} match (${pct}%)`.padEnd(24);
 
-		const parts: string[] = [];
-		if (totalKnownDivergence > 0) parts.push(`${totalKnownDivergence} known`);
-		if (totalPartialDivergence > 0) {
-			parts.push(`\x1b[33m${totalPartialDivergence} partial\x1b[0m`);
-		}
-		if (totalUnknownDiff > 0) parts.push(`${totalUnknownDiff} unknown`);
-		if (totalSafetyViolation > 0) parts.push(`\x1b[31m${totalSafetyViolation} SAFETY\x1b[0m`);
-		if (totalErrors > 0) parts.push(`${totalErrors} errors`);
+		const totals: LanguageStats = {
+			total: totalCount,
+			match: totalMatch,
+			knownDivergence: totalKnownDivergence,
+			partialDivergence: totalPartialDivergence,
+			unknownDiff: totalUnknownDiff,
+			safetyViolation: totalSafetyViolation,
+			expectedErrors: totalExpectedErrors,
+			errors: totalErrors,
+		};
+		const parts = buildDetailParts(totals);
 
 		const detailStr = parts.length > 0 ? parts.join(' | ') : 'all match';
 		console.log(`  ${'total'.padEnd(12)} ${matchStr} | ${detailStr}`);
@@ -686,7 +716,7 @@ async function main(): Promise<void> {
 		}
 	}
 
-	// Show errors
+	// Show errors (unexpected only)
 	const allErrors = LANGUAGES.flatMap((lang) =>
 		results.get(lang)!.filter((r) => r.status === 'error')
 	).sort((a, b) => a.file.bytes - b.file.bytes);
@@ -699,6 +729,18 @@ async function main(): Promise<void> {
 		}
 		if (allErrors.length > 3) {
 			console.log(`  ... and ${allErrors.length - 3} more`);
+		}
+	}
+
+	// Show expected errors (dimmed, verbose/explain only for details)
+	const allExpectedErrors = LANGUAGES.flatMap((lang) =>
+		results.get(lang)!.filter((r) => r.status === 'expected_error')
+	).sort((a, b) => a.file.bytes - b.file.bytes);
+
+	if (allExpectedErrors.length > 0 && (verbose || explain)) {
+		console.log(`\n\x1b[2mExpected Errors (${allExpectedErrors.length} files):\x1b[0m`);
+		for (const r of allExpectedErrors) {
+			console.log(`\x1b[2m  ${relPath(r.file.path, resolvedPath)}: ${r.expectedReason}\x1b[0m`);
 		}
 	}
 

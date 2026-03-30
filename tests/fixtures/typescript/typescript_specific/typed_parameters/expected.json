@@ -522,14 +522,8 @@
 							"end": 186,
 							"loc": {
 								"start": {
-									"start": {
-										"line": 11,
-										"column": 14
-									},
-									"end": {
-										"line": 11,
-										"column": 23
-									}
+									"line": 11,
+									"column": 14
 								},
 								"end": {
 									"line": 11,

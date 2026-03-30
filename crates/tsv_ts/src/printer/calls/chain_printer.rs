@@ -129,10 +129,11 @@ impl<'a> ChainPrinter for Printer<'a> {
             return d.empty();
         }
 
-        let mut parts = Vec::with_capacity(comments.len());
+        // Emit block comments on their own lines (with hardline after each)
+        let mut parts = Vec::with_capacity(comments.len() * 2);
         for comment in comments {
-            // Different line block comments - no surrounding spaces
             parts.push(self.build_comment_doc(comment));
+            parts.push(d.hardline());
         }
         d.concat(&parts)
     }

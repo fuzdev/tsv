@@ -454,6 +454,9 @@ fn collect_ranges_from_expression(expr: &internal::Expression, ranges: &mut Vec<
         }
         Expression::TaggedTemplateExpression(t) => {
             collect_ranges_from_expression(&t.tag, ranges);
+            if let Some(ta) = &t.type_arguments {
+                collect_ranges_from_type_param_inst(ta, ranges);
+            }
             // TemplateLiteral quasi contains expressions - recurse into them
             for expr in &t.quasi.expressions {
                 collect_ranges_from_expression(expr, ranges);

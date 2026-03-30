@@ -227,9 +227,13 @@ impl<'a> Printer<'a> {
                     matches!(&**expr, internal::Expression::ArrowFunctionExpression(_));
 
                 // Check if this is a curried arrow where ANY arrow triggers chain breaking.
-                // Triggers: return type with params, type parameters, non-identifier params
-                let chain_has_return_type =
-                    is_arrow_body && crate::printer::arrow_chain_has_return_type(arrow);
+                // Triggers: return type with params, type parameters, non-identifier params.
+                // Skip when skip_arrow_chain is set (call arg expand-last context) — prettier's
+                // shouldPrintAsChain is false when expandLastArg is true, so chain detection
+                // is disabled and the body is hugged.
+                let chain_has_return_type = is_arrow_body
+                    && !self.skip_arrow_chain.get()
+                    && crate::printer::arrow_chain_has_return_type(arrow);
 
                 // Check if body arrow has trailing param comments (forces break)
                 let body_arrow_has_trailing_param_comments =

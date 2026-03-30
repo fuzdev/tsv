@@ -171,7 +171,13 @@ impl<'a> Printer<'a> {
                 self.build_leading_comments_with_blank_lines(&leading_comments, stmt_start),
             );
 
-            body_parts.push(self.build_statement_doc(stmt));
+            // prettier-ignore: emit raw source instead of formatting
+            if self.has_prettier_ignore_in_range(prev_end, stmt_start) {
+                let raw = stmt.span().extract(self.source);
+                body_parts.push(d.text_owned(raw.to_string()));
+            } else {
+                body_parts.push(self.build_statement_doc(stmt));
+            }
 
             // Handle trailing same-line comments after this statement
             let stmt_end = stmt.span().end;

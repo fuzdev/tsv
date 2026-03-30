@@ -106,7 +106,9 @@ impl<'a> SvelteParser<'a> {
             self.advance()?; // consume /
         }
 
-        // Save position before consuming > (needed for void/self-closing elements)
+        // Save positions before consuming > (needed for void/self-closing elements
+        // and for the printer to find trailing comments between last attr and >)
+        let open_tag_gt = self.current_start as u32;
         let opening_tag_end = self.current_end;
         self.expect(TokenKind::RightAngle)?;
 
@@ -122,6 +124,7 @@ impl<'a> SvelteParser<'a> {
                     end: opening_tag_end as u32,
                 },
                 name_span,
+                open_tag_end: open_tag_gt,
             }));
         }
 
@@ -140,6 +143,7 @@ impl<'a> SvelteParser<'a> {
                     end,
                 },
                 name_span,
+                open_tag_end: open_tag_gt,
             }));
         }
 
@@ -159,6 +163,7 @@ impl<'a> SvelteParser<'a> {
                 end,
             },
             name_span,
+            open_tag_end: open_tag_gt,
         }))
     }
 
@@ -184,6 +189,7 @@ impl<'a> SvelteParser<'a> {
             self.advance()?;
         }
 
+        let open_tag_gt = self.current_start as u32;
         let opening_tag_end = self.current_end;
         self.expect(TokenKind::RightAngle)?;
 
@@ -198,6 +204,7 @@ impl<'a> SvelteParser<'a> {
                     end: opening_tag_end as u32,
                 },
                 name_span,
+                open_tag_end: open_tag_gt,
             }));
         }
 
@@ -216,6 +223,7 @@ impl<'a> SvelteParser<'a> {
                 end,
             },
             name_span,
+            open_tag_end: open_tag_gt,
         }))
     }
 

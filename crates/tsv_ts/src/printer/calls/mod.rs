@@ -30,16 +30,15 @@ mod test_patterns;
 
 // Re-export items needed by other printer modules
 pub(crate) use arg_comments::{
-    PartitionedComments, find_comma_pos, has_inter_argument_comments_slice,
-    has_trailing_comments_slice, has_trailing_line_comments_slice, is_comment_after_comma,
-    is_comment_before_comma, skip_stripped_open_paren,
+    PartitionedComments, has_inter_argument_comments_slice, has_trailing_comments_slice,
+    has_trailing_line_comments_slice, skip_stripped_open_paren,
 };
 pub(crate) use arg_wrapping::{
-    arrow_has_type_reference_return, build_args_split_last, build_arrow_call_body_states,
-    build_arrow_sig_doc, build_break_body_state, build_expand_all_args, build_inline_args,
-    build_inline_or_expand_all, could_expand_arrow_chain, last_two_args_same_type,
-    prepend_arrow_body_comments, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
-    wrap_call_with_will_break_guard,
+    arrow_has_type_reference_return, build_args_joined_with_comments, build_args_split_last,
+    build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
+    build_expand_all_args, build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
+    last_two_args_same_type, prepend_arrow_body_comments, wrap_call_with_hard_breaks,
+    wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
 
 use super::Printer;
@@ -120,7 +119,7 @@ impl<'a> Printer<'a> {
                 && preceding_args_allow_expand_last(&call.arguments, self.line_breaks)
                 && !has_blank_lines_between_args
                 && !any_comment_forces_expansion(call, self, paren_open)
-                && !last_arg_has_comments(&call.arguments, self, call.span.end)
+                && !last_arg_has_comments(&call.arguments, self, call.span.end, paren_open)
                 && !inner_has_multiline_arg
             {
                 let d = self.d();

@@ -7,7 +7,8 @@
 
 use super::super::Printer;
 use super::arg_comments::{
-    find_comma_pos, is_inline_block_after_comma, is_inline_block_before_comma,
+    PartitionedComments, find_comma_pos, is_comment_after_comma, is_comment_before_comma,
+    is_inline_block_after_comma, is_inline_block_before_comma,
 };
 use crate::ast::internal;
 use tsv_lang::doc::arena::{DocArena, DocId};
@@ -304,9 +305,14 @@ pub(crate) fn could_expand_arrow_chain(arrow: &internal::ArrowFunctionExpression
 }
 
 /// Classify how an expression body should be formatted.
+///
+/// Note: for arrows without TSTypeReference return types, object/array bodies
+/// are caught earlier by the conditional_group path in chain_args.rs. This
+/// HugsNaturally classification is primarily reached for arrows with
+/// TSTypeReference returns (which bypass that path) and nested arrow chains.
 fn classify_expression_body(expr: &internal::Expression) -> ChainArgKind {
     match expr {
-        // Objects and arrays have their own trailing comma handling
+        // Objects and arrays hug naturally (reached mainly for typed-return arrows)
         internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_) => {
             ChainArgKind::HugsNaturally
         }
@@ -449,14 +455,20 @@ pub(crate) fn build_args_split_last(
 /// Build the "expand all args" doc structure: `callee(\n\tall_args,\n)`
 ///
 /// Used when all arguments must be expanded to separate lines.
+/// Wraps the args in `group_break` to force break mode, matching Prettier's
+/// `allArgsBrokenOut()` which uses `group(contents, { shouldBreak: true })`.
+/// Without the group, `line()` nodes would inherit the parent's mode and
+/// render as spaces when the parent is in flat mode.
 #[inline]
 pub(crate) fn build_expand_all_args(d: &DocArena, callee: DocId, all_args_broken: DocId) -> DocId {
     d.concat(&[
         callee,
-        d.text("("),
-        d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
-        d.line(),
-        d.text(")"),
+        d.group_break(d.concat(&[
+            d.text("("),
+            d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
+            d.line(),
+            d.text(")"),
+        ])),
     ])
 }
 
@@ -521,21 +533,14 @@ pub(crate) fn build_inline_or_expand_all(
     ])
 }
 
-/// Check if the last two arguments have the same "expandable" type (both arrays or both objects).
-/// Prettier disables expand-last-arg hug state in this case.
+/// Check if the last two arguments have the same outer AST type.
+/// Prettier disables expand-last-arg hug state when `penultimateArg.type === lastArg.type`
+/// (call-arguments.js:258). This covers both arrays, both objects, and also both TSAsExpression,
+/// both TSSatisfiesExpression, etc.
 pub(crate) fn last_two_args_same_type(args: &[internal::Expression]) -> bool {
     let last = &args[args.len() - 1];
     let penultimate = &args[args.len() - 2];
-    matches!(
-        (last, penultimate),
-        (
-            internal::Expression::ArrayExpression(_),
-            internal::Expression::ArrayExpression(_)
-        ) | (
-            internal::Expression::ObjectExpression(_),
-            internal::Expression::ObjectExpression(_)
-        )
-    )
+    std::mem::discriminant(last) == std::mem::discriminant(penultimate)
 }
 
 /// Build the "break body" state for expand-last-arg with an expression arrow.
@@ -614,4 +619,120 @@ pub(crate) fn build_arrow_call_body_states(
             d.text(")"),
         ]),
     ])
+}
+
+/// Build argument docs joined with breaks, preserving inter-argument comments.
+///
+/// Like `join_doc(args, separator)` but handles leading/trailing comments
+/// between arguments. Used by expansion paths (all-arrows, function composition)
+/// that would otherwise lose comments with simple `join_doc`.
+///
+/// When `use_hardline` is true, separators are hardlines (forced expansion).
+/// When false, separators are soft lines (break only when the group breaks).
+/// Trailing line comments always force a hardline regardless of this setting.
+pub(crate) fn build_args_joined_with_comments(
+    printer: &Printer,
+    arguments: &[internal::Expression],
+    paren_open: u32,
+    use_hardline: bool,
+    build_arg: impl Fn(&Printer, &internal::Expression) -> DocId,
+) -> DocId {
+    let d = printer.d();
+    let mut parts = Vec::new();
+
+    // Leading comments before first arg (e.g., `fn(/* c */ arg)`)
+    let first_arg_start = arguments[0].span().start;
+    if printer.has_comments_between(paren_open, first_arg_start) {
+        let pc = PartitionedComments::new(
+            printer.comments,
+            printer.line_breaks,
+            paren_open,
+            first_arg_start,
+        );
+        // Trailing block comments (same line as paren) are inline
+        for comment in &pc.trailing_block {
+            parts.push(printer.build_comment_doc(comment));
+            parts.push(d.text(" "));
+        }
+        // Leading comments: inline with first arg or own line
+        pc.emit_leading_comments_inline_aware(&mut parts, printer, first_arg_start);
+    }
+
+    let no_comment_sep = if use_hardline {
+        d.comma_hardline()
+    } else {
+        d.comma_line()
+    };
+
+    for (i, arg) in arguments.iter().enumerate() {
+        parts.push(build_arg(printer, arg));
+
+        if i < arguments.len() - 1 {
+            let arg_end = arg.span().end;
+            let next_arg_start = arguments[i + 1].span().start;
+
+            if printer.has_comments_between(arg_end, next_arg_start) {
+                let pc = PartitionedComments::new(
+                    printer.comments,
+                    printer.line_breaks,
+                    arg_end,
+                    next_arg_start,
+                );
+                let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start);
+
+                if pc.has_trailing_line() {
+                    // Trailing line comments always force hardline: `arg, // comment\n`
+                    parts.push(d.text(","));
+                    for comment in &pc.trailing_line {
+                        parts.push(d.text(" "));
+                        parts.push(printer.build_comment_doc(comment));
+                    }
+                    parts.push(d.hardline());
+                } else if pc.has_trailing_block() {
+                    // Before-comma block comments: `arg /* c */,`
+                    if let Some(cpos) = comma_pos {
+                        for comment in &pc.trailing_block {
+                            if is_comment_before_comma(comment, cpos) {
+                                parts.push(d.text(" "));
+                                parts.push(printer.build_comment_doc(comment));
+                            }
+                        }
+                    }
+                    parts.push(d.text(","));
+                    if use_hardline {
+                        // Hardline: break first, comment starts next line
+                        parts.push(d.hardline());
+                        if let Some(cpos) = comma_pos {
+                            for comment in &pc.trailing_block {
+                                if is_comment_after_comma(comment, cpos) {
+                                    parts.push(printer.build_comment_doc(comment));
+                                    parts.push(d.text(" "));
+                                }
+                            }
+                        }
+                    } else {
+                        // Soft: comment stays inline after comma, break follows
+                        if let Some(cpos) = comma_pos {
+                            for comment in &pc.trailing_block {
+                                if is_comment_after_comma(comment, cpos) {
+                                    parts.push(d.text(" "));
+                                    parts.push(printer.build_comment_doc(comment));
+                                }
+                            }
+                        }
+                        parts.push(d.line());
+                    }
+                } else {
+                    parts.push(no_comment_sep);
+                }
+
+                // Leading comments for next arg (own-line comments)
+                pc.emit_leading_comments_inline_aware(&mut parts, printer, next_arg_start);
+            } else {
+                parts.push(no_comment_sep);
+            }
+        }
+    }
+
+    d.concat(&parts)
 }

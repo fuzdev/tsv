@@ -1,0 +1,120 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 307,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 90,
+				"data": " fill continuation after multiline expression: 100-char boundary (stays under 100) "
+			},
+			{
+				"type": "Text",
+				"start": 90,
+				"end": 91,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 91,
+				"end": 306,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 92
+					},
+					"end": {
+						"line": 2,
+						"column": 2,
+						"character": 93
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 94,
+							"end": 181,
+							"raw": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq ",
+							"data": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 181,
+							"end": 200,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 182,
+								"end": 199,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 87
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"left": {
+									"type": "Literal",
+									"start": 182,
+									"end": 188,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 87
+										},
+										"end": {
+											"line": 3,
+											"column": 93
+										}
+									},
+									"value": "rrrr",
+									"raw": "'rrrr'"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 193,
+									"end": 199,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 8
+										}
+									},
+									"value": "ssss",
+									"raw": "'ssss'"
+								}
+							}
+						},
+						{
+							"type": "Text",
+							"start": 200,
+							"end": 302,
+							"raw": " aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq\n\trrrr ssss tttt\n",
+							"data": " aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq\n\trrrr ssss tttt\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -16,6 +16,56 @@ use crate::printer::Printer;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::{SymbolResolver, SymbolToU32};
 
+/// Normalize whitespace in a class attribute text value.
+///
+/// Matches prettier-plugin-svelte behavior for `class` attributes on HTML elements:
+/// - Collapses multiple spaces/tabs to a single space (within each line)
+/// - Trims trailing whitespace per line and at end of value
+/// - Preserves leading whitespace (spaces before first non-ws char on each line)
+/// - Preserves newlines as-is
+///
+/// `is_last_part`: when false, preserves one trailing space (for separation from
+/// subsequent expression tags in mixed-content attributes like `class="a {expr}"`).
+fn normalize_class_text(raw: &str, is_last_part: bool) -> String {
+    let mut result = String::with_capacity(raw.len());
+    let mut had_non_ws = false;
+    for (line_idx, line) in raw.split('\n').enumerate() {
+        if line_idx > 0 {
+            result.push('\n');
+        }
+        let mut in_leading = true;
+        let mut pending_space = false;
+        for ch in line.chars() {
+            if ch == ' ' || ch == '\t' {
+                if in_leading {
+                    result.push(ch);
+                } else {
+                    pending_space = true;
+                }
+            } else {
+                in_leading = false;
+                had_non_ws = true;
+                if pending_space {
+                    result.push(' ');
+                    pending_space = false;
+                }
+                result.push(ch);
+            }
+        }
+        // Trailing whitespace per line is dropped (pending_space not flushed)
+    }
+
+    // For non-last parts with content, keep one trailing space for separation
+    // from subsequent expression tags (e.g., class="text {expr}")
+    // All-whitespace text (e.g., " ") passes through unchanged — the regex-based
+    // approach in prettier-plugin-svelte only matches after non-ws characters.
+    if !is_last_part && had_non_ws && raw.ends_with([' ', '\t']) {
+        result.push(' ');
+    }
+
+    result
+}
+
 impl<'a> Printer<'a> {
     //
     // JS Comment Doc builders
@@ -34,8 +84,9 @@ impl<'a> Printer<'a> {
                 d.text("*/ "),
             ])
         } else {
+            // Content already includes the space after // (e.g., " comment" from "// comment")
             d.concat(&[
-                d.text("// "),
+                d.text("//"),
                 d.text_owned(comment.content.clone()),
                 d.hardline(),
             ])
@@ -55,7 +106,8 @@ impl<'a> Printer<'a> {
                 d.text("*/"),
             ])
         } else {
-            d.concat(&[d.text(" // "), d.text_owned(comment.content.clone())])
+            // Content already includes the space after // (e.g., " comment" from "// comment")
+            d.concat(&[d.text(" //"), d.text_owned(comment.content.clone())])
         }
     }
 
@@ -63,18 +115,16 @@ impl<'a> Printer<'a> {
     // Attribute node printing (unified via Doc)
     //
 
-    /// Format an attribute node (attribute, attach tag, directive, etc.)
-    ///
-    /// All formatting goes through the Doc IR for consistency.
-    pub(super) fn print_attribute_node(&mut self, node: &internal::AttributeNode) {
-        let doc = self.build_attribute_node_doc(node);
-        self.render_doc_immediate(doc);
-    }
-
     /// Build a Doc for an attribute node (used for line wrapping calculations)
-    pub(super) fn build_attribute_node_doc(&self, node: &internal::AttributeNode) -> DocId {
+    ///
+    /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
+    pub(super) fn build_attribute_node_doc(
+        &self,
+        node: &internal::AttributeNode,
+        is_html: bool,
+    ) -> DocId {
         match node {
-            internal::AttributeNode::Attribute(attr) => self.build_attribute_doc(attr),
+            internal::AttributeNode::Attribute(attr) => self.build_attribute_doc(attr, is_html),
             internal::AttributeNode::SpreadAttribute(spread) => {
                 self.build_spread_attribute_doc(spread)
             }
@@ -97,7 +147,9 @@ impl<'a> Printer<'a> {
     //
 
     /// Build a Doc for a single attribute (name="value" or name or {shorthand})
-    pub(super) fn build_attribute_doc(&self, attr: &internal::Attribute) -> DocId {
+    ///
+    /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
+    pub(super) fn build_attribute_doc(&self, attr: &internal::Attribute, is_html: bool) -> DocId {
         let d = self.d();
         let name_sym = attr.name.to_u32();
 
@@ -107,6 +159,9 @@ impl<'a> Printer<'a> {
                 let sym = d.symbol(name_sym);
                 return d.braces(sym);
             }
+
+            // Normalize whitespace in class attributes on HTML elements
+            let normalize_class = is_html && self.with_resolved_symbol(attr.name, |s| s == "class");
 
             let is_pure_expression = value_parts.len() == 1
                 && matches!(value_parts[0], internal::AttributeValue::ExpressionTag(_));
@@ -119,8 +174,13 @@ impl<'a> Printer<'a> {
                 parts.push(d.text("=\""));
             }
 
-            for part in value_parts {
-                parts.push(self.build_attribute_value_doc(part));
+            let last_idx = value_parts.len().saturating_sub(1);
+            for (i, part) in value_parts.iter().enumerate() {
+                if normalize_class {
+                    parts.push(self.build_class_attribute_value_doc(part, i == last_idx));
+                } else {
+                    parts.push(self.build_attribute_value_doc(part));
+                }
             }
 
             if !is_pure_expression {
@@ -140,30 +200,60 @@ impl<'a> Printer<'a> {
     /// allowing binary expressions to break when the attribute value exceeds print width.
     fn build_attribute_value_doc(&self, value: &internal::AttributeValue) -> DocId {
         match value {
+            internal::AttributeValue::Text(text) => self.build_attribute_text_doc(&text.raw),
+            internal::AttributeValue::ExpressionTag(expr_tag) => {
+                self.build_attribute_expression_doc(expr_tag)
+            }
+        }
+    }
+
+    /// Build a Doc for a class attribute value part with whitespace normalization.
+    ///
+    /// Normalizes text content per prettier-plugin-svelte behavior:
+    /// collapses multiple spaces, trims trailing whitespace per line.
+    /// Expression tags are passed through unchanged.
+    fn build_class_attribute_value_doc(
+        &self,
+        value: &internal::AttributeValue,
+        is_last_part: bool,
+    ) -> DocId {
+        match value {
             internal::AttributeValue::Text(text) => {
-                let d = self.d();
-                if text.raw.contains('\n') {
-                    // Split at newlines, join with literalline to preserve literal newlines
-                    // and trigger will_break on the attribute group
-                    let line_docs: Vec<DocId> = text
-                        .raw
-                        .split('\n')
-                        .map(|part| d.text_owned(part.to_string()))
-                        .collect();
-                    let sep = d.literalline();
-                    d.join_doc(line_docs, sep)
-                } else {
-                    d.text_owned(text.raw.clone())
-                }
+                let normalized = normalize_class_text(&text.raw, is_last_part);
+                self.build_attribute_text_doc(&normalized)
             }
             internal::AttributeValue::ExpressionTag(expr_tag) => {
-                // Allow binary breaks in attribute string contexts
-                let config = tsv_lang::PrintConfig {
-                    force_binary_breaks: true,
-                    ..self.config
-                };
-                self.build_expression_tag_doc_with_config(expr_tag, &config)
+                self.build_attribute_expression_doc(expr_tag)
             }
+        }
+    }
+
+    /// Build a Doc for an expression tag inside an attribute value.
+    ///
+    /// Uses `force_binary_breaks: true` so binary expressions can break when
+    /// the attribute value exceeds print width.
+    fn build_attribute_expression_doc(&self, expr_tag: &internal::ExpressionTag) -> DocId {
+        let config = tsv_lang::PrintConfig {
+            force_binary_breaks: true,
+            ..self.config
+        };
+        self.build_expression_tag_doc_with_config(expr_tag, &config)
+    }
+
+    /// Build a Doc for attribute text content, handling newlines as literallines.
+    fn build_attribute_text_doc(&self, raw: &str) -> DocId {
+        let d = self.d();
+        if raw.contains('\n') {
+            // Split at newlines, join with literalline to preserve literal newlines
+            // and trigger will_break on the attribute group
+            let line_docs: Vec<DocId> = raw
+                .split('\n')
+                .map(|part| d.text_owned(part.to_string()))
+                .collect();
+            let sep = d.literalline();
+            d.join_doc(line_docs, sep)
+        } else {
+            d.text_owned(raw.to_string())
         }
     }
 
@@ -603,7 +693,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = vec![d.text("{")];
 
-        // Add leading comments (block comments only in expression tags)
+        // Add leading comments between { and expression
         let expr_start = tag.expression.span().start;
         for comment in tsv_lang::comments_in_range(self.comments, tag.span.start + 1, expr_start) {
             if comment.is_block {

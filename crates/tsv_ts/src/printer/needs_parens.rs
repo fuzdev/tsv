@@ -65,6 +65,10 @@ pub enum ParenContext {
     /// Argument of await: `await <expr>`
     AwaitArgument,
 
+    /// Argument of yield: `yield <expr>`
+    /// Only AssignmentExpression needs parens (yield has lower precedence than binary/conditional)
+    YieldArgument,
+
     /// Arrow function body (expression form): `() => <expr>`
     ArrowBody,
 
@@ -195,13 +199,20 @@ pub fn needs_parens(expr: &Expression, ctx: ParenContext) -> bool {
 
         // Await argument: `await (a + b)`, `await (x as T)`, `await (<T>x)`, `await (a ? b : c)`
         // Parens needed for precedence/semantics - await has higher precedence than ?:
+        // Assignment: `await (x ??= y)` — without parens, parses as `(await x) ??= y` (syntax error)
         ParenContext::AwaitArgument => {
             is_type_assertion(expr)
                 || matches!(
                     expr,
-                    Expression::BinaryExpression(_) | Expression::ConditionalExpression(_)
+                    Expression::BinaryExpression(_)
+                        | Expression::ConditionalExpression(_)
+                        | Expression::AssignmentExpression(_)
                 )
         }
+
+        // Yield argument: `yield (x ??= y)` — assignment needs parens for clarity
+        // Unlike await, yield has lower precedence than binary/conditional, so those don't need parens
+        ParenContext::YieldArgument => matches!(expr, Expression::AssignmentExpression(_)),
 
         // Arrow body: `() => ({})`, `() => (x = y)`
         // Note: ConditionalExpression is handled specially in build_arrow_body_doc

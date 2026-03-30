@@ -594,9 +594,12 @@ pub struct TemplateElement {
 /// Tagged template expression: tag`content ${expr}`
 ///
 /// The tag is called with the template's static parts and interpolated values.
+/// When the tag has type arguments (e.g., `tag<T>\`content\``), they are stored
+/// separately rather than wrapping the tag in `TSInstantiationExpression`.
 #[derive(Debug, Clone)]
 pub struct TaggedTemplateExpression {
     pub tag: Box<Expression>,
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
     pub quasi: TemplateLiteral,
     pub span: Span,
 }

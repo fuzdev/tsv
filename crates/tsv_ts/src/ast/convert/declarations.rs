@@ -278,8 +278,12 @@ fn maybe_wrap_super_class(
 
     // Wrap: superClass becomes TSInstantiationExpression, superTypeParameters is consumed
     let combined_span = Span::new(sc_start, stp.end);
-    let inner = super_class.take().unwrap();
-    let type_arguments = super_type_parameters.take().unwrap();
+    let Some(inner) = super_class.take() else {
+        return;
+    };
+    let Some(type_arguments) = super_type_parameters.take() else {
+        return;
+    };
     *super_class = Some(Box::new(public::Expression::TSInstantiationExpression(
         public::TSInstantiationExpression {
             node_type: "TSInstantiationExpression".to_string(),

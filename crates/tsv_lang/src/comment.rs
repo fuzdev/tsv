@@ -8,6 +8,9 @@ pub struct Comment {
     pub content: String,
     pub is_block: bool, // true for /* */ or <!-- -->, false for //
     pub span: Span,
+    /// Whether this comment's loc should include a `character` field (byte offset).
+    /// True for JS comments in Svelte template open tags; false for script/expression comments.
+    pub has_character_loc: bool,
 }
 
 //

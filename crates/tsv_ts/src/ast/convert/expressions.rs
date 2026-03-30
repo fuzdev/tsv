@@ -251,6 +251,9 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                     offset,
                 )),
                 quasi: convert_template_literal(&tagged.quasi, source, loc, interner, offset),
+                type_arguments: tagged.type_arguments.as_ref().map(|ta| {
+                    convert_type_parameter_instantiation(ta, source, loc, interner, offset)
+                }),
             })
         }
         internal::Expression::AwaitExpression(await_expr) => public::Expression::AwaitExpression(
@@ -350,37 +353,11 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         }
         internal::Expression::AssignmentPattern(pattern) => {
             let base_loc = create_location(pattern.span, loc, offset);
-            // acorn quirk: in non-arrow function params, when left side has a typeAnnotation
-            // (e.g., `a: number = 0`), `loc.start` becomes a SourceLocation covering the
-            // identifier+typeAnnotation span. Arrow function params always use normal loc.
-            // We produce the nested form here; arrow function conversion flattens it back.
-            let type_ann_end = match pattern.left.as_ref() {
-                internal::Expression::Identifier(id) => {
-                    id.type_annotation.as_ref().map(|ta| ta.span.end)
-                }
-                internal::Expression::ArrayPattern(arr) => {
-                    arr.type_annotation.as_ref().map(|ta| ta.span.end)
-                }
-                internal::Expression::ObjectPattern(obj) => {
-                    obj.type_annotation.as_ref().map(|ta| ta.span.end)
-                }
-                _ => None,
-            };
-            let ap_loc = if let Some(ta_end) = type_ann_end {
-                let left_span = pattern.left.span();
-                let ta_loc = create_location(Span::new(left_span.start, ta_end), loc, offset);
-                public::AssignmentPatternLoc::Nested {
-                    start: ta_loc,
-                    end: base_loc.end,
-                }
-            } else {
-                public::AssignmentPatternLoc::Normal(base_loc)
-            };
             public::Expression::AssignmentPattern(public::AssignmentPattern {
                 node_type: "AssignmentPattern".to_string(),
                 start: pattern.span.start,
                 end: pattern.span.end,
-                loc: ap_loc,
+                loc: base_loc,
                 left: Box::new(convert_expression(
                     &pattern.left,
                     source,
@@ -591,11 +568,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 if !has_type_ann {
                     ap.start = param_prop.span.start;
                     ap.end = param_prop.span.end;
-                    ap.loc = public::AssignmentPatternLoc::Normal(create_location(
-                        param_prop.span,
-                        loc,
-                        offset,
-                    ));
+                    ap.loc = create_location(param_prop.span, loc, offset);
                 }
             }
             public::Expression::TSParameterProperty(public::TSParameterProperty {

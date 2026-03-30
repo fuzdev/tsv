@@ -61,8 +61,9 @@ pub(super) fn convert_script(
         tsv_ts::ast::convert::convert_program_svelte(&script.content, source, &loc)
     };
 
-    // Svelte uses the actual line of the script content but always column 0
-    let start_pos = loc.offset_to_position(program.start as usize);
+    // Svelte uses the line of the <script> tag itself, not the content start
+    // (matters when the opening tag spans multiple lines, e.g., multiline attr values)
+    let start_pos = loc.offset_to_position(script.span.start as usize);
     program.loc.start = tsv_ts::ast::public::Position {
         line: start_pos.line,
         column: 0,
@@ -123,23 +124,23 @@ pub(super) fn convert_script(
     // Inject HTML comment immediately preceding <script> as leadingComments on Program.
     // Svelte treats these as type "Line" (its convention for HTML comments) with just
     // the comment content (no start/end/loc fields).
-    if let Some(comment) = html_leading_comment {
-        if let serde_json::Value::Object(ref mut map) = program_json {
-            let html_comment = serde_json::json!({
-                "type": "Line",
-                "value": comment.content,
-            });
-            match map.get_mut("leadingComments") {
-                Some(serde_json::Value::Array(arr)) => {
-                    // Prepend HTML comment before any JS comments
-                    arr.insert(0, html_comment);
-                }
-                _ => {
-                    map.insert(
-                        "leadingComments".to_string(),
-                        serde_json::Value::Array(vec![html_comment]),
-                    );
-                }
+    if let Some(comment) = html_leading_comment
+        && let serde_json::Value::Object(ref mut map) = program_json
+    {
+        let html_comment = serde_json::json!({
+            "type": "Line",
+            "value": comment.content,
+        });
+        match map.get_mut("leadingComments") {
+            Some(serde_json::Value::Array(arr)) => {
+                // Prepend HTML comment before any JS comments
+                arr.insert(0, html_comment);
+            }
+            _ => {
+                map.insert(
+                    "leadingComments".to_string(),
+                    serde_json::Value::Array(vec![html_comment]),
+                );
             }
         }
     }

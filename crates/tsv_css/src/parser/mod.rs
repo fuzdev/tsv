@@ -90,6 +90,7 @@ impl<'a> CssParser<'a> {
                 start: comment_start as u32,
                 end: comment_end as u32,
             },
+            has_character_loc: false,
         });
     }
 
@@ -228,6 +229,7 @@ impl<'a> CssParser<'a> {
                 start: comment_start as u32,
                 end: comment_end as u32,
             },
+            has_character_loc: false,
         })
     }
 

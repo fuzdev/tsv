@@ -569,6 +569,9 @@ pub struct SpecialElement {
     pub fragment: Fragment,
     pub span: Span,
     pub name_span: Span,
+    /// Position of the `>` that closes the opening tag.
+    /// Used by the printer to find trailing comments between the last attribute and `>`.
+    pub open_tag_end: u32,
 }
 
 /// Svelte Options
@@ -643,6 +646,9 @@ pub struct Element {
     pub fragment: Fragment,
     pub span: Span,
     pub name_span: Span,
+    /// Position of the `>` that closes the opening tag.
+    /// Used by the printer to find trailing comments between the last attribute and `>`.
+    pub open_tag_end: u32,
 }
 
 /// Svelte Attribute - element attribute

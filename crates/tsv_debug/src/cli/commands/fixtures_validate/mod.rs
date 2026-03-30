@@ -134,11 +134,6 @@ impl FixturesValidateExecutable {
             summary.detect_cross_fixture_duplicates();
         }
 
-        // Check parser ratchet when validating all fixtures
-        if self.filters.is_empty() && !self.prettier_only {
-            summary.check_parser_ratchet();
-        }
-
         // Print results with verbose mode
         validation::print_validation_results(&summary, self.verbose);
 

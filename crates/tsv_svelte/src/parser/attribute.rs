@@ -81,8 +81,19 @@ impl<'a> SvelteParser<'a> {
     ) -> Result<Vec<AttributeNode>, ParseError> {
         let mut attributes = Vec::new();
 
-        // Parse attributes until we hit > or />
-        while !self.check(TokenKind::RightAngle) && !self.check(TokenKind::Slash) {
+        loop {
+            // Skip JS comments (// and /* */) between attributes
+            while self.check(TokenKind::Slash) {
+                if !self.try_read_js_comment()? {
+                    break; // Regular slash (self-closing />)
+                }
+            }
+
+            // Stop at > or />
+            if self.check(TokenKind::RightAngle) || self.check(TokenKind::Slash) {
+                break;
+            }
+
             if self.check(TokenKind::Identifier) {
                 attributes.push(self.parse_attribute_or_directive(parse_expressions)?);
             } else if self.check(TokenKind::TagOpen) {
@@ -292,15 +303,33 @@ impl<'a> SvelteParser<'a> {
 
     /// Parse directive expression (the part after `=`)
     /// Returns the expression and the span of the expression tag (for comment lookup)
+    ///
+    /// Accepts both `{expr}` and `"{expr}"` (quoted mustache) forms.
+    /// Svelte's parser accepts quoted expressions in directives; prettier strips the quotes.
     fn parse_directive_expression(&mut self) -> Result<(Expression, Span), ParseError> {
-        // Expect { for expression
-        if !self.check(TokenKind::LeftBrace) {
-            return Err(self.error_msg("Directive value must be an expression wrapped in {}"));
+        if self.check(TokenKind::LeftBrace) {
+            // Standard form: {expr}
+            let expr_tag = self.parse_expression_tag()?;
+            Ok((expr_tag.expression, expr_tag.span))
+        } else if self.check(TokenKind::String) {
+            // Quoted mustache form: "{expr}"
+            let mut parts = self.parse_attribute_value()?;
+            // Must be exactly one ExpressionTag with no text parts
+            match parts.as_mut_slice() {
+                [AttributeValue::ExpressionTag(_)] => {
+                    // Safety: slice match above confirmed exactly one ExpressionTag element
+                    let Some(AttributeValue::ExpressionTag(expr_tag)) = parts.pop() else {
+                        unreachable!("matched single ExpressionTag element")
+                    };
+                    Ok((expr_tag.expression, expr_tag.span))
+                }
+                _ => Err(self.error_msg(
+                    "Quoted directive value must contain a single expression, e.g. \"{expr}\"",
+                )),
+            }
+        } else {
+            Err(self.error_msg("Directive value must be an expression wrapped in {}"))
         }
-
-        // Parse as expression tag and extract the expression with its span
-        let expr_tag = self.parse_expression_tag()?;
-        Ok((expr_tag.expression, expr_tag.span))
     }
 
     /// Create an identifier expression for shorthand directives (bind:value, class:class1)
@@ -337,8 +366,22 @@ impl<'a> SvelteParser<'a> {
                 let expr_tag = self.parse_expression_tag()?;
                 StyleDirectiveValue::ExpressionTag(expr_tag)
             } else if self.check(TokenKind::String) {
-                // Parse string value like "red"
-                let parts = self.parse_attribute_value()?;
+                // Parse string value like "red" or quoted mustache like "{value}"
+                let mut parts = self.parse_attribute_value()?;
+                // Quoted mustache "{expr}" → ExpressionTag (quotes stripped)
+                match parts.as_mut_slice() {
+                    [AttributeValue::ExpressionTag(_)] => {
+                        // Safety: slice match above confirmed exactly one ExpressionTag element
+                        let Some(AttributeValue::ExpressionTag(expr_tag)) = parts.pop() else {
+                            unreachable!("matched single ExpressionTag element")
+                        };
+                        StyleDirectiveValue::ExpressionTag(expr_tag)
+                    }
+                    _ => StyleDirectiveValue::Parts(parts),
+                }
+            } else if self.check(TokenKind::Identifier) {
+                // Unquoted value: style:background=green
+                let parts = self.parse_unquoted_attribute_value()?;
                 StyleDirectiveValue::Parts(parts)
             } else {
                 return Err(
@@ -351,10 +394,13 @@ impl<'a> SvelteParser<'a> {
         };
 
         // Calculate end position
+        // For ExpressionTag from quoted mustache ("{expr}"), skip past the closing quote
         let end = match &value {
-            StyleDirectiveValue::ExpressionTag(et) => et.span.end_usize(),
+            StyleDirectiveValue::ExpressionTag(et) => {
+                self.end_past_optional_quote(et.span.end_usize())
+            }
             StyleDirectiveValue::Parts(parts) => parts.last().map_or(name_end, |p| match p {
-                AttributeValue::Text(t) => t.span.end_usize() + 1,
+                AttributeValue::Text(t) => self.end_past_optional_quote(t.span.end_usize()),
                 AttributeValue::ExpressionTag(et) => {
                     self.end_past_optional_quote(et.span.end_usize())
                 }
@@ -637,10 +683,10 @@ impl<'a> SvelteParser<'a> {
             let value_end = if let Some(last_part) = value.last() {
                 match last_part {
                     AttributeValue::Text(text) => {
-                        // For string values, the Text span covers content only (without quotes)
-                        // The attribute span must include the closing quote, so add 1 to content_end
-                        // Example: type="text" → Text span is "text" (positions 13-17), token is "text" (positions 12-18)
-                        text.span.end_usize() + 1
+                        // For quoted strings, Text span covers content only (without quotes),
+                        // so skip past the closing quote. For unquoted values, the span
+                        // already covers the full value (no quote to skip).
+                        self.end_past_optional_quote(text.span.end_usize())
                     }
                     AttributeValue::ExpressionTag(tag) => {
                         self.end_past_optional_quote(tag.span.end_usize())
@@ -698,24 +744,11 @@ impl<'a> SvelteParser<'a> {
             return Ok(parts);
         }
 
-        // Check for unquoted attribute value (identifier)
-        // HTML allows unquoted attribute values that don't contain whitespace or special chars
+        // Check for unquoted attribute value
+        // HTML allows unquoted attribute values: any chars except whitespace, ", ', =, <, >, `
+        // This handles simple identifiers (data-attr=value) and URLs (href=https://example.com)
         if self.check(TokenKind::Identifier) {
-            let (token_start, token_end) = self.current_pos();
-            let text_content = self.source[token_start..token_end].to_string();
-
-            let text = Text {
-                raw: text_content.clone(),
-                data: text_content,
-                span: Span {
-                    start: token_start as u32,
-                    end: token_end as u32,
-                },
-            };
-
-            self.advance()?;
-            parts.push(AttributeValue::Text(text));
-            return Ok(parts);
+            return self.parse_unquoted_attribute_value();
         }
 
         // Otherwise expect string value
@@ -880,5 +913,44 @@ impl<'a> SvelteParser<'a> {
         }
 
         Ok(parts)
+    }
+
+    /// Parse an unquoted attribute value by scanning raw bytes.
+    ///
+    /// HTML spec: unquoted values are any chars except whitespace, `"`, `'`, `=`, `<`, `>`, `` ` ``.
+    /// The lexer's identifier token only covers alphanumeric and a few special chars (`:`, `.`, `-`),
+    /// so URLs like `https://example.com/path` would be split across tokens. Instead, we start from
+    /// the current token position and scan raw bytes for the full unquoted value.
+    pub(crate) fn parse_unquoted_attribute_value(&mut self) -> Result<Vec<AttributeValue>, ParseError> {
+        let start = self.current_start;
+        let source_bytes = self.source.as_bytes();
+        let mut pos = start;
+
+        while pos < source_bytes.len() {
+            match source_bytes[pos] {
+                b' ' | b'\t' | b'\n' | b'\r' | b'\x0C' // whitespace
+                | b'"' | b'\'' | b'=' | b'<' | b'>' | b'`' => break,
+                _ => pos += 1,
+            }
+        }
+
+        if pos == start {
+            return Err(self.error_msg("Expected attribute value"));
+        }
+
+        let text_content = self.source[start..pos].to_string();
+        let text = Text {
+            raw: text_content.clone(),
+            data: text_content,
+            span: Span {
+                start: start as u32,
+                end: pos as u32,
+            },
+        };
+
+        // Advance the lexer past the raw-scanned value
+        self.advance_to_position(pos)?;
+
+        Ok(vec![AttributeValue::Text(text)])
     }
 }

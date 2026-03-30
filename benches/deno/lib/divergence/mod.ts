@@ -10,12 +10,19 @@
 export { checkSafety, type SafetyViolation } from './safety.ts';
 export {
 	detectDivergences,
+	enrichDetectionContext,
 	type DetectionContext,
 	type DivergenceMatch,
 	type DivergencePattern,
 	type HunkCoverageResult,
 	PATTERNS,
 } from './patterns.ts';
+export {
+	checkExpectedError,
+	EXPECTED_ERROR_PATTERNS,
+	type ExpectedErrorPattern,
+	type ExpectedErrorResult,
+} from './expected_errors.ts';
 export { type DiffHunk, extractHunks } from '../diff.ts';
 export {
 	type AuditReport,

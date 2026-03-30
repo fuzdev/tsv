@@ -105,7 +105,7 @@ pub fn is_block_element(tag_name: &str) -> bool {
 /// Examples: `<br>`, `<img>`, `<input>`
 #[inline]
 pub fn is_void_element(tag_name: &str) -> bool {
-    VOID_ELEMENTS.contains(tag_name)
+    VOID_ELEMENTS.contains(tag_name) || tag_name.eq_ignore_ascii_case("!doctype")
 }
 
 /// Check if an element is an SVG element

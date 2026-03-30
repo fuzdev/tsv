@@ -1,0 +1,408 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 549,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 76,
+				"data": " expression breaks to multiline, text continues on continuation line "
+			},
+			{
+				"type": "Text",
+				"start": 76,
+				"end": 77,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 77,
+				"end": 216,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 78
+					},
+					"end": {
+						"line": 2,
+						"column": 2,
+						"character": 79
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 80,
+							"end": 167,
+							"raw": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq ",
+							"data": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 167,
+							"end": 186,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 168,
+								"end": 185,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 87
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"left": {
+									"type": "Literal",
+									"start": 168,
+									"end": 174,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 87
+										},
+										"end": {
+											"line": 3,
+											"column": 93
+										}
+									},
+									"value": "rrrr",
+									"raw": "'rrrr'"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 179,
+									"end": 185,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 8
+										}
+									},
+									"value": "ssss",
+									"raw": "'ssss'"
+								}
+							}
+						},
+						{
+							"type": "Text",
+							"start": 186,
+							"end": 212,
+							"raw": " tttt uuuu vvvv wwww xxxx\n",
+							"data": " tttt uuuu vvvv wwww xxxx\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 216,
+				"end": 218,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 218,
+				"end": 293,
+				"data": " expression breaks, text and second expression on continuation line "
+			},
+			{
+				"type": "Text",
+				"start": 293,
+				"end": 294,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 294,
+				"end": 451,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 295
+					},
+					"end": {
+						"line": 8,
+						"column": 2,
+						"character": 296
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 297,
+							"end": 384,
+							"raw": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq ",
+							"data": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 384,
+							"end": 403,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 385,
+								"end": 402,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 87
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								},
+								"left": {
+									"type": "Literal",
+									"start": 385,
+									"end": 391,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 87
+										},
+										"end": {
+											"line": 9,
+											"column": 93
+										}
+									},
+									"value": "rrrr",
+									"raw": "'rrrr'"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 396,
+									"end": 402,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 8
+										}
+									},
+									"value": "ssss",
+									"raw": "'ssss'"
+								}
+							}
+						},
+						{
+							"type": "Text",
+							"start": 403,
+							"end": 414,
+							"raw": " tttt uuuu ",
+							"data": " tttt uuuu "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 414,
+							"end": 431,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 415,
+								"end": 430,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 21
+									},
+									"end": {
+										"line": 10,
+										"column": 36
+									}
+								},
+								"left": {
+									"type": "Literal",
+									"start": 415,
+									"end": 421,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 21
+										},
+										"end": {
+											"line": 10,
+											"column": 27
+										}
+									},
+									"value": "vvvv",
+									"raw": "'vvvv'"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 424,
+									"end": 430,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 30
+										},
+										"end": {
+											"line": 10,
+											"column": 36
+										}
+									},
+									"value": "wwww",
+									"raw": "'wwww'"
+								}
+							}
+						},
+						{
+							"type": "Text",
+							"start": 431,
+							"end": 447,
+							"raw": " xxxx yyyy zzzz\n",
+							"data": " xxxx yyyy zzzz\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 451,
+				"end": 453,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 453,
+				"end": 498,
+				"data": " expression doesn't break, all inline "
+			},
+			{
+				"type": "Text",
+				"start": 498,
+				"end": 499,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 499,
+				"end": 548,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 500
+					},
+					"end": {
+						"line": 14,
+						"column": 2,
+						"character": 501
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 502,
+							"end": 512,
+							"raw": "aaaa bbbb ",
+							"data": "aaaa bbbb "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 512,
+							"end": 529,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 513,
+								"end": 528,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 14
+									},
+									"end": {
+										"line": 14,
+										"column": 29
+									}
+								},
+								"left": {
+									"type": "Literal",
+									"start": 513,
+									"end": 519,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 14
+										},
+										"end": {
+											"line": 14,
+											"column": 20
+										}
+									},
+									"value": "cccc",
+									"raw": "'cccc'"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 522,
+									"end": 528,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 23
+										},
+										"end": {
+											"line": 14,
+											"column": 29
+										}
+									},
+									"value": "dddd",
+									"raw": "'dddd'"
+								}
+							}
+						},
+						{
+							"type": "Text",
+							"start": 529,
+							"end": 544,
+							"raw": " eeee ffff gggg",
+							"data": " eeee ffff gggg"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

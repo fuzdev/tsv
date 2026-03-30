@@ -687,41 +687,24 @@ fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span),
                 parser.advance()?;
                 parser.skip_whitespace()?;
             } else {
-                // Media query - capture the rest as raw identifier/text
-                // Normalize spacing: space around keywords, no space after ( or before ) or :
-                let media_start = (parser.base_offset() + parser.current_start) as u32;
-                let mut media_parts: Vec<String> = Vec::new();
-                let mut media_end = media_start;
+                // Media query - preserve original whitespace from source
+                let media_local_start = parser.current_start;
+                let media_start = (parser.base_offset() + media_local_start) as u32;
+                let mut media_local_end = parser.current_end;
 
                 while !parser.check(&TokenKind::Semicolon) && !parser.check(&TokenKind::Eof) {
-                    // Skip whitespace tokens
-                    if parser.check(&TokenKind::Whitespace) {
-                        parser.advance()?;
-                        continue;
+                    if !parser.check(&TokenKind::Whitespace) {
+                        media_local_end = parser.current_end;
                     }
-
-                    let token_value = parser.current_value().to_string();
-                    media_end = (parser.base_offset() + parser.current_end) as u32;
-
-                    // Determine spacing based on token type
-                    if let Some(last) = media_parts.last() {
-                        // No space after ( or before ) or before :
-                        let needs_space = last != "("
-                            && token_value != ")"
-                            && token_value != ":"
-                            && !last.ends_with('(');
-                        if needs_space {
-                            media_parts.push(" ".to_string());
-                        }
-                    }
-
-                    media_parts.push(token_value);
                     parser.advance()?;
                 }
 
-                if !media_parts.is_empty() {
+                let media_end = (parser.base_offset() + media_local_end) as u32;
+                let name = parser.source()[media_local_start..media_local_end].to_string();
+
+                if !name.is_empty() {
                     values.push(CssValue::Identifier {
-                        name: media_parts.concat(),
+                        name,
                         span: Span {
                             start: media_start,
                             end: media_end,

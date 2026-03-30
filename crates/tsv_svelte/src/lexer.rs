@@ -222,14 +222,17 @@ impl<'a> Lexer<'a> {
                         Ok(self.make_token(TokenKind::BlockContinue, start))
                     }
                     Some('/') => {
-                        // Check if next char is '*' - that means {/* (comment), not {/if (block close)
-                        if self.source.as_bytes().get(self.position + 1) == Some(&b'*') {
-                            // Comment inside expression: {/* ... */} - return just '{'
-                            Ok(self.make_token(TokenKind::LeftBrace, start))
-                        } else {
-                            // Block close: {/if}, {/each}, etc
-                            self.advance();
-                            Ok(self.make_token(TokenKind::BlockClose, start))
+                        // Check if next char is '*' or '/' - that means {/* or {// (comment), not {/if (block close)
+                        match self.source.as_bytes().get(self.position + 1) {
+                            Some(b'*') | Some(b'/') => {
+                                // Comment inside expression: {/* ... */} or {// ...} - return just '{'
+                                Ok(self.make_token(TokenKind::LeftBrace, start))
+                            }
+                            _ => {
+                                // Block close: {/if}, {/each}, etc
+                                self.advance();
+                                Ok(self.make_token(TokenKind::BlockClose, start))
+                            }
                         }
                     }
                     Some('@') => {
@@ -321,12 +324,15 @@ impl<'a> Lexer<'a> {
                     context: None,
                 })
             }
-            Some(ch) if ch.is_alphabetic() || ch == '_' || ch == '$' || ch == '-' => {
+            Some(ch) if ch.is_alphabetic() || ch == '_' || ch == '$' || ch == '-' || ch == '!' => {
                 // Tag names and identifiers
                 // Also include - as a start character for CSS custom property attributes (--margin)
                 // and include : and | for directive syntax (on:click|preventDefault)
                 // and -- for CSS custom properties (style:--custom)
                 // and . for dot notation components (ns.Comp)
+                // and ! for <!DOCTYPE> (Svelte treats !DOCTYPE as the element name)
+                // Advance past first char — ! is a valid start but not a continuation char
+                self.advance();
                 while let Some(ch) = self.current {
                     if ch.is_alphanumeric()
                         || ch == '_'

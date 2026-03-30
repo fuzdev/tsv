@@ -127,6 +127,29 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
                 self.use_hardline,
             ));
 
+            // When comments exist, build_chain_line_break skips blank line detection.
+            // Check for blank lines before the first comment and after the last comment.
+            let has_leading_comments =
+                !classified.leading_block.is_empty() || !classified.leading_line.is_empty();
+
+            // Blank line before first leading comment
+            if self.use_hardline && has_leading_comments {
+                let first_start = classified
+                    .leading_block
+                    .first()
+                    .map(|c| c.span.start)
+                    .into_iter()
+                    .chain(classified.leading_line.first().map(|c| c.span.start))
+                    .min();
+                if let Some(start) = first_start {
+                    let source = self.printer.get_source();
+                    if has_blank_line_between_strict(source, object_end, start) {
+                        let d = self.printer.arena();
+                        self.parts.push(d.hardline());
+                    }
+                }
+            }
+
             // Leading block comments (on their own line)
             self.parts.push(
                 self.printer
@@ -139,18 +162,14 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
                     .build_leading_line_doc(&classified.leading_line),
             );
 
-            // Preserve blank line between last comment and property
-            // (when there are comments, build_chain_line_break skips blank line detection,
-            // but a blank line after the last comment should still be preserved)
-            if self.use_hardline {
-                let last_comment_end = classified
+            // Blank line after last leading comment (before property)
+            if self.use_hardline && has_leading_comments {
+                let last_end = classified
                     .leading_line
                     .last()
                     .or_else(|| classified.leading_block.last())
-                    .or_else(|| classified.trailing_line.last())
-                    .or_else(|| classified.trailing_block.last())
                     .map(|c| c.span.end);
-                if let Some(end) = last_comment_end {
+                if let Some(end) = last_end {
                     let source = self.printer.get_source();
                     if has_blank_line_between_strict(source, end, property_start) {
                         let d = self.printer.arena();

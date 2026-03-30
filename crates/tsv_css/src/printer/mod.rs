@@ -141,6 +141,11 @@ impl<'a> Printer<'a> {
         self.buffer.pop_if_ends_with('\n');
     }
 
+    /// Check if the output buffer ends with a newline
+    pub(crate) fn output_ends_with_newline(&self) -> bool {
+        self.buffer.ends_with('\n')
+    }
+
     /// Get the current column position (for doc-builder width calculations)
     ///
     /// Includes base_indent_offset to account for Svelte wrapper indentation
@@ -204,8 +209,14 @@ impl<'a> Printer<'a> {
             let node_end = node.span().end;
 
             // Print comments between prev_end and this node
+            let idx_before = comment_idx;
             let comments_before =
                 self.print_leading_comments(prev_end, node_start, &mut comment_idx);
+
+            // Check printed comments for prettier-ignore (O(k) where k = comments_before)
+            let has_ignore = self.comments[idx_before..comment_idx]
+                .iter()
+                .any(|c| c.content.trim() == "prettier-ignore");
 
             // Add separator before node
             if printed_any || comments_before > 0 {
@@ -225,7 +236,12 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            self.print_css_node(node);
+            // prettier-ignore: emit raw source instead of formatting
+            if has_ignore {
+                self.write(node.span().extract(self.source));
+            } else {
+                self.print_css_node(node);
+            }
 
             // Check for inline comments on same line as node's closing brace
             let inline_count = self.print_inline_comments_after_node(node_end, &mut comment_idx);

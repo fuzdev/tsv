@@ -43,6 +43,7 @@ impl<'a> Printer<'a> {
         // Format declarations and comments with indentation
         self.indent_level += 1;
         let mut i = start_index;
+        let mut prettier_ignore_next = false;
         while i < rule.declarations.len() {
             let child = &rule.declarations[i];
             match child {
@@ -51,7 +52,19 @@ impl<'a> Printer<'a> {
                     if i > start_index && self.has_blank_line_before_child(&rule.declarations, i) {
                         self.write("\n");
                     }
-                    self.print_css_declaration(decl);
+                    if prettier_ignore_next {
+                        // Emit raw source instead of formatting
+                        // Span doesn't include semicolon — add it like write_declaration_end
+                        self.write_indent();
+                        self.write(decl.span.extract(self.source));
+                        if decl.is_important() {
+                            self.write(" !important");
+                        }
+                        self.write(";\n");
+                        prettier_ignore_next = false;
+                    } else {
+                        self.print_css_declaration(decl);
+                    }
 
                     // Check for inline comments after the declaration
                     let inline_count = self.try_print_inline_comments_after_decl(
@@ -70,6 +83,11 @@ impl<'a> Printer<'a> {
                         self.write("\n");
                     }
 
+                    // Check for prettier-ignore
+                    if comment.content.trim() == "prettier-ignore" {
+                        prettier_ignore_next = true;
+                    }
+
                     self.write_indent();
                     self.print_css_comment(comment);
                     self.write("\n");
@@ -81,7 +99,12 @@ impl<'a> Printer<'a> {
                         self.write("\n");
                     }
                     self.write_indent();
-                    self.print_css_rule(nested_rule);
+                    if prettier_ignore_next {
+                        self.write(nested_rule.span.extract(self.source));
+                        prettier_ignore_next = false;
+                    } else {
+                        self.print_css_rule(nested_rule);
+                    }
 
                     // Check for inline comment after nested rule's closing brace
                     let inline_count =
@@ -98,7 +121,12 @@ impl<'a> Printer<'a> {
                         self.write("\n");
                     }
                     self.write_indent();
-                    self.print_css_atrule(nested_atrule);
+                    if prettier_ignore_next {
+                        self.write(nested_atrule.span.extract(self.source));
+                        prettier_ignore_next = false;
+                    } else {
+                        self.print_css_atrule(nested_atrule);
+                    }
                     self.write("\n");
                 }
             }

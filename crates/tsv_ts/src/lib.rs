@@ -333,24 +333,10 @@ pub fn format_expression_with_config(
 ///
 /// * `Ok(Expression)` - The parsed pattern (ObjectPattern, ArrayPattern, etc.)
 /// * `Err(ParseError)` - If parsing or conversion fails
-pub fn parse_pattern(
-    source: &str,
-    base_offset: usize,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
-) -> Result<Expression> {
-    let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
-    let expr = parser
-        .parse_expression_public()
-        .map_err(|e| e.with_context(source))?;
-    parser
-        .expression_to_pattern(expr)
-        .map_err(|e| e.with_context(source))
-}
-
-/// Parse a pattern and return it with any collected comments.
+///   Parse a pattern with comments, handling optional type annotations.
 ///
-/// Like `parse_pattern`, but also returns comments for preservation
-/// in Svelte template contexts.
+/// Used in Svelte block contexts (`{:then}`, `{:catch}`) where patterns
+/// may have type annotations (e.g., `{:then num: number}`).
 pub fn parse_pattern_with_comments(
     source: &str,
     base_offset: usize,
@@ -360,11 +346,39 @@ pub fn parse_pattern_with_comments(
     let expr = parser
         .parse_expression_public()
         .map_err(|e| e.with_context(source))?;
-    let pattern = parser
+    let mut pattern = parser
         .expression_to_pattern(expr)
         .map_err(|e| e.with_context(source))?;
+    // Check for type annotation (`: Type`) — used in Svelte block contexts
+    // like `{:then num: number}` and `{:catch error: Error}`
+    if parser.at_colon() {
+        let ta = parser
+            .parse_type_annotation_public()
+            .map_err(|e| e.with_context(source))?;
+        if let Expression::Identifier(id) = &mut pattern {
+            id.type_annotation = Some(ta);
+        }
+    }
     let comments = parser.take_comments();
     Ok((pattern, comments))
+}
+
+/// Parse a type annotation (`: Type`) and return it with the position where parsing stopped.
+///
+/// Used in Svelte block contexts where patterns may have type annotations
+/// after simple identifiers (e.g., `{#each items as x: number}`).
+/// The source must start with `:`.
+pub fn parse_type_annotation_partial(
+    source: &str,
+    base_offset: usize,
+    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+) -> Result<(TSTypeAnnotation, usize)> {
+    let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
+    let ta = parser
+        .parse_type_annotation_public()
+        .map_err(|e| e.with_context(source))?;
+    let pos = parser.current_absolute_position();
+    Ok((ta, pos))
 }
 
 /// Parse a partial expression, stopping at top-level commas.

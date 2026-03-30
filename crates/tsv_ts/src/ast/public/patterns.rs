@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::expressions::Property;
 use super::types::TSTypeAnnotation;
-use super::{Expression, Position, SourceLocation};
+use super::{Expression, SourceLocation};
 
 /// Object pattern for destructuring: `{a, b}`
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,25 +47,9 @@ pub struct AssignmentPattern {
     pub node_type: String,
     pub start: u32,
     pub end: u32,
-    pub loc: AssignmentPatternLoc,
+    pub loc: SourceLocation,
     pub left: Box<Expression>,
     pub right: Box<Expression>,
-}
-
-/// acorn quirk: in function declaration/expression params, when the left side has a
-/// typeAnnotation (e.g., `a: number = 0`), `loc.start` becomes a SourceLocation
-/// `{start: {line,col}, end: {line,col}}` covering the identifier+typeAnnotation,
-/// instead of a plain Position `{line,col}`. Arrow/snippet params use the normal form.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum AssignmentPatternLoc {
-    /// Normal: `{start: Position, end: Position}`
-    Normal(SourceLocation),
-    /// Nested: `{start: SourceLocation, end: Position}` — acorn quirk for typed params
-    Nested {
-        start: SourceLocation,
-        end: Position,
-    },
 }
 
 /// Rest element in destructuring: `...rest`

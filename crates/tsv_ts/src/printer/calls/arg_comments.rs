@@ -270,7 +270,8 @@ pub(super) fn any_comment_forces_expansion(
 ///   `!hasComment(lastArg, CommentCheckFlags.Leading) &&
 ///    !hasComment(lastArg, CommentCheckFlags.Trailing)`
 ///
-/// Leading = comments after the comma, before the last arg's span.
+/// Leading = comments after the comma (or opening paren for single-arg),
+/// before the last arg's span.
 /// Trailing = comments after the last arg's span, before the closing paren.
 ///
 /// Used to prevent expand-last-arg layout when the last arg has comments,
@@ -279,18 +280,27 @@ pub(super) fn last_arg_has_comments(
     arguments: &[internal::Expression],
     printer: &Printer,
     call_end: u32,
+    paren_open: u32,
 ) -> bool {
-    let [.., prev, last] = arguments else {
+    let Some(last) = arguments.last() else {
         return false;
     };
-    let prev_end = prev.span().end;
     let last_start = last.span().start;
 
-    // Leading: comments after comma, before last arg
-    if let Some(cp) = find_comma_pos(printer.source, prev_end, last_start)
-        && printer.has_comments_between((cp + 1) as u32, last_start)
-    {
-        return true;
+    // Leading: comments before last arg
+    if arguments.len() >= 2 {
+        // Multi-arg: check after comma
+        let prev_end = arguments[arguments.len() - 2].span().end;
+        if let Some(cp) = find_comma_pos(printer.source, prev_end, last_start)
+            && printer.has_comments_between((cp + 1) as u32, last_start)
+        {
+            return true;
+        }
+    } else {
+        // Single-arg: check after opening paren
+        if printer.has_comments_between(paren_open + 1, last_start) {
+            return true;
+        }
     }
 
     // Trailing: comments after last arg, before closing paren
@@ -489,6 +499,11 @@ impl<'a> PartitionedComments<'a> {
     ///
     /// For comments on the same line as `next_pos`, emits them inline (comment + space).
     /// For comments on their own line, emits them with hardline after.
+    ///
+    /// For nested JSDoc casts like `/** @type {A} */ (\n\t/** @type {B} */ (expr))`,
+    /// after paren stripping both comments become leading. The inner comment is inline
+    /// with the arg, and the outer comment is followed by a stripped `(` on the same line.
+    /// Both should stay inline: `/** @type {A} */ /** @type {B} */ expr`.
     pub fn emit_leading_comments_inline_aware(
         &self,
         parts: &mut Vec<DocId>,
@@ -496,11 +511,31 @@ impl<'a> PartitionedComments<'a> {
         next_pos: u32,
     ) {
         let d = printer.d();
-        for comment in &self.leading {
-            parts.push(printer.build_comment_doc(comment));
-            // If comment is effectively inline with next element, keep it inline.
-            if comment.is_block && is_comment_inline_with_next(printer, comment.span.end, next_pos)
+
+        // Pre-compute which comments should be inline. Walk backwards: if the last
+        // block comment is inline with next_pos, check preceding block comments — if
+        // they're followed by a stripped open paren on the same line, they're also inline
+        // (nested JSDoc cast pattern).
+        let mut inline_flags: SmallVec<[bool; 4]> = SmallVec::new();
+        inline_flags.resize(self.leading.len(), false);
+
+        let mut next_inline_start = next_pos;
+        for (i, comment) in self.leading.iter().enumerate().rev() {
+            if comment.is_block
+                && is_comment_inline_with_next(printer, comment.span.end, next_inline_start)
             {
+                inline_flags[i] = true;
+                // This comment is inline — check if the PREVIOUS comment connects
+                // to this one via a stripped paren gap
+                next_inline_start = comment.span.start;
+            } else {
+                break;
+            }
+        }
+
+        for (i, comment) in self.leading.iter().enumerate() {
+            parts.push(printer.build_comment_doc(comment));
+            if inline_flags[i] {
                 parts.push(d.text(" "));
             } else {
                 parts.push(d.hardline());

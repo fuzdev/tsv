@@ -728,9 +728,18 @@ impl<'a> Parser<'a> {
                     let quasi_span = quasi.span();
                     if let Expression::TemplateLiteral(template) = quasi {
                         let span = Span::new(left.actual_start as u32, quasi_span.end);
+                        // When tag is TSInstantiationExpression (e.g., tag<T>), flatten:
+                        // TSInstantiationExpression + TaggedTemplate → TaggedTemplate with typeArguments
+                        let (tag, type_arguments) = match left.expr {
+                            Expression::TSInstantiationExpression(inst) => {
+                                (inst.expression, Some(inst.type_arguments))
+                            }
+                            other => (Box::new(other), None),
+                        };
                         left = ParsedExpr::with_end(
                             Expression::TaggedTemplateExpression(TaggedTemplateExpression {
-                                tag: Box::new(left.expr),
+                                tag,
+                                type_arguments,
                                 quasi: template,
                                 span,
                             }),
@@ -802,9 +811,9 @@ impl<'a> Parser<'a> {
     pub(crate) fn parse_number_or_bigint_literal(&self) -> Result<Literal, ParseError> {
         let (start, end) = self.current_pos();
         let raw = self.current_value();
-        if raw.ends_with('n') {
+        if let Some(stripped) = raw.strip_suffix('n') {
             Ok(Literal {
-                value: LiteralValue::BigInt(raw[..raw.len() - 1].to_string()),
+                value: LiteralValue::BigInt(stripped.to_string()),
                 span: Span::new(start as u32, end as u32),
             })
         } else {
@@ -1909,40 +1918,55 @@ impl<'a> Parser<'a> {
 
     /// Check if the current token can start an expression
     fn is_expression_start(&self) -> bool {
-        matches!(
-            self.current_kind(),
+        match self.current_kind() {
             TokenKind::Identifier
-                | TokenKind::Number
-                | TokenKind::String
-                | TokenKind::BraceOpen
-                | TokenKind::BracketOpen
-                | TokenKind::ParenOpen
-                | TokenKind::Bang
-                | TokenKind::Minus
-                | TokenKind::Plus
-                | TokenKind::Tilde
-                | TokenKind::PlusPlus
-                | TokenKind::MinusMinus
-                | TokenKind::NoSubstitutionTemplate
-                | TokenKind::TemplateHead
-                | TokenKind::RegexLiteral
-                | TokenKind::LessThan
-                | TokenKind::Keyword(KeywordKind::True)
-                | TokenKind::Keyword(KeywordKind::False)
-                | TokenKind::Keyword(KeywordKind::Null)
-                | TokenKind::Keyword(KeywordKind::Undefined)
-                | TokenKind::Keyword(KeywordKind::New)
-                | TokenKind::Keyword(KeywordKind::Function)
-                | TokenKind::Keyword(KeywordKind::Class)
-                | TokenKind::Keyword(KeywordKind::Async)
-                | TokenKind::Keyword(KeywordKind::Await)
-                | TokenKind::Keyword(KeywordKind::Yield)
-                | TokenKind::Keyword(KeywordKind::Typeof)
-                | TokenKind::Keyword(KeywordKind::Delete)
-                | TokenKind::Keyword(KeywordKind::Void)
-                | TokenKind::Keyword(KeywordKind::Super)
-                | TokenKind::Keyword(KeywordKind::Import)
-        )
+            | TokenKind::Number
+            | TokenKind::String
+            | TokenKind::BraceOpen
+            | TokenKind::BracketOpen
+            | TokenKind::ParenOpen
+            | TokenKind::Bang
+            | TokenKind::Minus
+            | TokenKind::Plus
+            | TokenKind::Tilde
+            | TokenKind::PlusPlus
+            | TokenKind::MinusMinus
+            | TokenKind::NoSubstitutionTemplate
+            | TokenKind::TemplateHead
+            | TokenKind::RegexLiteral
+            | TokenKind::LessThan
+            | TokenKind::Hash => true,
+            // Most keywords can start expressions (as primaries, unary ops, or contextual identifiers).
+            // Exclude only declaration/control-flow/binary-operator keywords that cannot.
+            TokenKind::Keyword(kw) => !matches!(
+                kw,
+                KeywordKind::Const
+                    | KeywordKind::Let
+                    | KeywordKind::Var
+                    | KeywordKind::If
+                    | KeywordKind::Else
+                    | KeywordKind::For
+                    | KeywordKind::While
+                    | KeywordKind::Do
+                    | KeywordKind::Switch
+                    | KeywordKind::Case
+                    | KeywordKind::Default
+                    | KeywordKind::Break
+                    | KeywordKind::Continue
+                    | KeywordKind::Try
+                    | KeywordKind::Catch
+                    | KeywordKind::Finally
+                    | KeywordKind::Throw
+                    | KeywordKind::Return
+                    | KeywordKind::Export
+                    | KeywordKind::Extends
+                    | KeywordKind::Instanceof
+                    | KeywordKind::In
+                    | KeywordKind::Enum
+                    | KeywordKind::Debugger
+            ),
+            _ => false,
+        }
     }
 
     /// Parse prefix update expression: `++x`, `--x`

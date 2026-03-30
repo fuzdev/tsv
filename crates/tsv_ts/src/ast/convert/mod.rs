@@ -41,7 +41,6 @@ pub(in crate::ast) use types::*;
 
 // Public API exports
 pub use expressions::convert_expression;
-pub use functions::flatten_assignment_pattern_loc;
 
 /// Translate all byte-based positions in a JSON AST to character-based positions
 ///

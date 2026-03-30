@@ -1,0 +1,141 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 167,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 158,
+				"name": "media",
+				"prelude": "screen",
+				"block": {
+					"type": "Block",
+					"start": 23,
+					"end": 158,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 51,
+								"end": 54,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 51,
+										"end": 54,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 51,
+														"end": 54
+													}
+												],
+												"start": 51,
+												"end": 54
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 57,
+								"end": 78,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 61,
+										"end": 73,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 51,
+							"end": 78
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 82,
+								"end": 86,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 82,
+										"end": 86,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "span",
+														"start": 82,
+														"end": 86
+													}
+												],
+												"start": 82,
+												"end": 86
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 87,
+								"end": 155,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 117,
+										"end": 135,
+										"property": "background",
+										"value": "blue"
+									},
+									{
+										"type": "Declaration",
+										"start": 140,
+										"end": 150,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 82,
+							"end": 155
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 159,
+			"styles": "\n\t@media screen {\n\t\t/* prettier-ignore */\n\t\tdiv   {   color:   red;   }\n\n\t\tspan {\n\t\t\t/* prettier-ignore */\n\t\t\tbackground:   blue;\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 168,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

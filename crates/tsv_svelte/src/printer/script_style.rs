@@ -6,7 +6,7 @@
 
 use crate::ast::internal;
 use crate::printer::Printer;
-use tsv_lang::doc;
+use tsv_lang::doc::{self, arena::DocId};
 
 impl<'a> Printer<'a> {
     /// Format a Script tag
@@ -18,22 +18,14 @@ impl<'a> Printer<'a> {
     /// naturally handles template literals correctly: `indent(doc)` only affects `Line` docs
     /// (hardline, softline, line), not newlines inside `text()` which output as-is.
     pub(super) fn print_script(&mut self, script: &internal::Script) {
-        // Opening tag
-        self.write("<script");
-
-        // Format attributes (includes "context" if this is a module script)
-        for attr in &script.attributes {
-            self.write(" ");
-            self.print_attribute_node(attr);
-        }
-
         // Check if script had any original content (including whitespace)
         let had_content = script.content.span.start != script.content.span.end;
 
+        // Opening tag with doc-based attribute wrapping
+        self.write_section_opening_tag("script", &script.attributes, had_content);
+
         if had_content {
-            self.write(">\n");
-        } else {
-            self.write(">");
+            self.write("\n");
         }
 
         // Build Doc for script content
@@ -112,28 +104,71 @@ impl<'a> Printer<'a> {
     /// The CSS is formatted using the CSS printer with indentation.
     /// For non-CSS languages (less, scss, etc.), content is preserved raw.
     pub(super) fn print_style(&mut self, style: &internal::Style) {
-        // Opening tag
-        self.write("<style");
-
-        // Format attributes
-        for attr in &style.attributes {
-            self.write(" ");
-            self.print_attribute_node(attr);
-        }
-
-        self.write(">");
-
         // Check if there was any original content (including whitespace)
         let had_content = style.content_span.start != style.content_span.end;
 
-        // Foreign languages (less, scss, etc.) — preserve content raw
+        // Opening tag with doc-based attribute wrapping
+        self.write_section_opening_tag("style", &style.attributes, had_content);
+
+        // Foreign languages (less, scss, etc.) — preserve content raw but normalize indentation
         if self
             .get_lang_attribute(&style.attributes)
             .is_some_and(|l| l != "css")
         {
             if had_content {
                 let content = style.content_span.extract(self.source()).to_string();
-                self.write(&content);
+                // Collect non-empty lines (skip leading/trailing blank lines)
+                let all_lines: Vec<&str> = content.lines().collect();
+                let start = all_lines.iter().position(|l| !l.trim().is_empty());
+                let end = all_lines.iter().rposition(|l| !l.trim().is_empty());
+                match (start, end) {
+                    (Some(start), Some(end)) => {
+                        let lines = &all_lines[start..=end];
+
+                        let leading_ws =
+                            |line: &&str| -> usize { line.len() - line.trim_start().len() };
+
+                        // Indentation levels from non-empty lines
+                        let indents: Vec<usize> = lines
+                            .iter()
+                            .filter(|line| !line.trim().is_empty())
+                            .map(leading_ws)
+                            .collect();
+
+                        let min_indent = indents.iter().copied().min().unwrap_or(0);
+
+                        // Detect indent unit: smallest indent level above the base
+                        let indent_unit = indents
+                            .iter()
+                            .copied()
+                            .filter(|&i| i > min_indent)
+                            .map(|i| i - min_indent)
+                            .min()
+                            .unwrap_or_else(|| 1.max(min_indent));
+
+                        self.write("\n");
+                        self.indent_level += 1;
+                        for line in lines {
+                            if line.trim().is_empty() {
+                                self.write("\n");
+                            } else {
+                                let extra_levels =
+                                    (leading_ws(line).saturating_sub(min_indent)) / indent_unit;
+                                self.write_indent();
+                                for _ in 0..extra_levels {
+                                    self.write("\t");
+                                }
+                                self.write(line.trim_start());
+                                self.write("\n");
+                            }
+                        }
+                        self.indent_level -= 1;
+                    }
+                    _ => {
+                        // Whitespace-only content — preserve block structure
+                        self.write("\n");
+                    }
+                }
             }
             self.write("</style>\n");
             return;
@@ -187,5 +222,90 @@ impl<'a> Printer<'a> {
 
         // Closing tag
         self.write("</style>\n");
+    }
+
+    /// Build indented attribute docs and detect multiline values.
+    ///
+    /// Returns `(indent([line, attr1, line, attr2, ...]), has_multiline)`.
+    /// Used by `write_section_opening_tag` (script/style) and `print_svelte_options`.
+    pub(crate) fn build_indented_attrs_doc(
+        &self,
+        attributes: &[internal::AttributeNode],
+    ) -> (DocId, bool) {
+        let d = self.d();
+        let mut parts = Vec::with_capacity(attributes.len() * 2);
+        let mut has_multiline = false;
+        for attr in attributes {
+            parts.push(d.line());
+            let attr_doc = self.build_attribute_node_doc(attr, false);
+            if d.will_break(attr_doc) {
+                has_multiline = true;
+            }
+            parts.push(attr_doc);
+        }
+        let concat = d.concat(&parts);
+        (d.indent(concat), has_multiline)
+    }
+
+    /// Build and render an opening tag for `<script>` or `<style>` with doc-based
+    /// attribute wrapping. Attributes wrap when any value contains embedded newlines
+    /// or the total line width exceeds print_width.
+    ///
+    /// `has_content`: when false, the closing tag follows on the same line
+    /// (e.g., `<script lang="ts"></script>`), so suffix_width accounts for it.
+    ///
+    /// Flat: `<tag attr1 attr2>`
+    /// Break: `<tag\n\tattr1\n\tattr2\n>`
+    fn write_section_opening_tag(
+        &mut self,
+        tag_name: &str,
+        attributes: &[internal::AttributeNode],
+        has_content: bool,
+    ) {
+        if attributes.is_empty() {
+            self.write("<");
+            self.write(tag_name);
+            self.write(">");
+            return;
+        }
+
+        let d = self.d();
+        let (attr_indent, has_multiline) = self.build_indented_attrs_doc(attributes);
+        let softline = d.softline();
+        let tag_text = d.text_owned(format!("<{tag_name}"));
+        let inner = d.concat(&[tag_text, attr_indent, softline, d.text(">")]);
+
+        let group = if has_multiline {
+            d.group_break(inner)
+        } else {
+            d.group(inner)
+        };
+
+        // When empty (no content), the closing tag follows on the same line:
+        // `<script lang="ts"></script>`. Account for it via suffix_width so
+        // fits() breaks when the full line exceeds print_width.
+        let closing_tag_width = if !has_content {
+            // "</tag>" = 3 + tag_name.len()
+            3 + tag_name.len()
+        } else {
+            0
+        };
+        let col = self.buffer.current_column(self.config.tab_width);
+        let config = tsv_lang::PrintConfig {
+            suffix_width: closing_tag_width,
+            ..self.config
+        };
+        let output = {
+            let interner = self.interner.borrow();
+            doc::arena_print_doc_with_indent_resolved_preserve_whitespace(
+                &self.arena,
+                group,
+                &config,
+                col,
+                self.indent_level,
+                &*interner,
+            )
+        };
+        self.write(&output);
     }
 }

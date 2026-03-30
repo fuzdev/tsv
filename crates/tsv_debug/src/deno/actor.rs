@@ -23,7 +23,7 @@ const READ_TIMEOUT: Duration = Duration::from_secs(30);
 const SIDECAR_SCRIPT: &str = include_str!("sidecar.ts");
 
 /// Deno config for import map (ensures acorn-typescript uses same acorn instance)
-const DENO_CONFIG: &str = r#"{"imports":{"acorn":"npm:acorn@8.15.0"}}"#;
+const DENO_CONFIG: &str = r#"{"imports":{"acorn":"npm:acorn@8.16.0"}}"#;
 
 /// Request ID counter
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);

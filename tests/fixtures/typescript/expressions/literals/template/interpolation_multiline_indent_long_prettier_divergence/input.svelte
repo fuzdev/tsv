@@ -55,12 +55,12 @@ ${
 	`;
 	};
 
-	// Case 8: 3 spaces template indent → base 1 tab + 1 space, content 2 tabs + 1 space, closing 1 tab + 1 space
+	// Case 8: 3 spaces template indent → base 2 tabs, content 3 tabs, closing 2 tabs
 	const gen8 = () => {
 		return `
    export const C = ffffff([${
-		aaaaaaaa.bbbbbbb_cccccccc_sssss.map((ssss) => `'${ssss.tttttt}'`).join(',')
-	}]);
+			aaaaaaaa.bbbbbbb_cccccccc_sssss.map((ssss) => `'${ssss.tttttt}'`).join(',')
+		}]);
 	`;
 	};
 
@@ -89,21 +89,21 @@ ${
 	}]);
 `;
 
-	// Case 12: 5 spaces template indent → base 2 tabs + 1 space, content 3 tabs + 1 space, closing 2 tabs + 1 space
+	// Case 12: 5 spaces template indent → base 3 tabs, content 4 tabs, closing 3 tabs
 	const gen12 = () => {
 		return `
      content prefix [${
-			aaaaaaaa.bbbbbbb_cccccccc_sssss.map((ssss) => `'${ssss.tttttt}'`).join(',')
-		}]
+				aaaaaaaa.bbbbbbb_cccccccc_sssss.map((ssss) => `'${ssss.tttttt}'`).join(',')
+			}]
 	`;
 	};
 
-	// Case 13: 2 tabs + 5 spaces template indent → base 4 tabs + 1 space, content 5 tabs + 1 space, closing 4 tabs + 1 space
+	// Case 13: 2 tabs + 5 spaces template indent → base 5 tabs, content 6 tabs, closing 5 tabs
 	const gen13 = () => {
 		return `
 		     deeply indented content [${
-					aaaaaaaa.bbbbbbb_cccccccc_sssss.map((ssss) => `'${ssss.tttttt}'`).join(',')
-				}]
+						aaaaaaaa.bbbbbbb_cccccccc_sssss.map((ssss) => `'${ssss.tttttt}'`).join(',')
+					}]
 	`;
 	};
 

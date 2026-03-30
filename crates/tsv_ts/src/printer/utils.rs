@@ -102,13 +102,14 @@ where
 
 /// Check if an arrow function body is a ternary expression
 ///
-/// Matches Prettier's `couldExpandArg` logic for conditional expressions in arrow bodies.
-/// When true, the arrow should be printed with conditional parens around the body:
+/// Check if an arrow body is a ternary that needs conditional paren treatment.
+///
+/// Matches Prettier's `couldExpandArg` logic for conditional expressions:
 /// - Flat: `(x) => (x ? y : z)` - parens prevent ambiguity with `<=`
 /// - Break: `(x) =>\n  x ? y : z,` - no parens needed, clearly arrow body
-pub(super) fn could_expand_arrow_body(body: &Expression) -> bool {
-    // Only ternary expressions need the special conditional paren treatment
-    // Call expressions, objects, arrays are handled by other code paths
+///
+/// Call expressions, objects, and arrays are handled by other code paths.
+pub(super) fn is_ternary_arrow_body(body: &Expression) -> bool {
     matches!(body, Expression::ConditionalExpression(_))
 }
 
@@ -204,6 +205,21 @@ pub(super) fn is_block_function(expr: &Expression) -> bool {
         Expression::ArrowFunctionExpression(arrow)
             if matches!(arrow.body, internal::ArrowFunctionBody::BlockStatement(_))
     ) || matches!(expr, Expression::FunctionExpression(_))
+}
+
+/// Check if an expression is a curried arrow (arrow whose body is another arrow).
+///
+/// Used to set `skip_arrow_chain` in call arg contexts, matching prettier's
+/// `!args.expandLastArg` in `shouldPrintAsChain` — curried arrows in call args
+/// should hug their body rather than chain-breaking.
+#[inline]
+pub(super) fn is_curried_arrow(expr: &Expression) -> bool {
+    matches!(
+        expr,
+        Expression::ArrowFunctionExpression(a)
+            if matches!(a.body, internal::ArrowFunctionBody::Expression(ref e)
+                if matches!(&**e, Expression::ArrowFunctionExpression(_)))
+    )
 }
 
 /// Check if an expression is a "simple" call argument (Prettier's `isSimpleCallArgument`)

@@ -80,13 +80,34 @@ pub(crate) fn convert_pattern_expression(
         tsv_ts::ast::public::Expression::ObjectPattern(_)
             | tsv_ts::ast::public::Expression::ArrayPattern(_)
     );
-    if is_destructure {
+    let mut value = if is_destructure {
         let mut value = to_json_value(&converted);
         adjust_read_pattern_columns(&mut value);
         value
     } else {
         converted.inject_loc_character();
         to_json_value(&converted)
+    };
+    strip_type_annotation_loc(&mut value);
+    value
+}
+
+/// Strip `loc` from TSTypeAnnotation nodes in block pattern context.
+///
+/// Svelte's block pattern parser doesn't include `loc` on TSTypeAnnotation,
+/// though acorn-typescript (used in script/snippet context) does.
+fn strip_type_annotation_loc(value: &mut serde_json::Value) {
+    if let serde_json::Value::Object(obj) = value {
+        if obj.get("type").and_then(|v| v.as_str()) == Some("TSTypeAnnotation") {
+            obj.remove("loc");
+        }
+        for v in obj.values_mut() {
+            strip_type_annotation_loc(v);
+        }
+    } else if let serde_json::Value::Array(arr) = value {
+        for v in arr.iter_mut() {
+            strip_type_annotation_loc(v);
+        }
     }
 }
 
@@ -310,12 +331,15 @@ fn walk_node(
 
     // --- Leading comments: consume from queue while comment.start < node.start ---
     let mut leading: Vec<serde_json::Value> = Vec::new();
-    while let Some(front) = ctx.comments.front() {
-        if comment_start(front) < n_start {
-            leading.push(ctx.comments.pop_front().unwrap());
-        } else {
+    while ctx
+        .comments
+        .front()
+        .is_some_and(|front| comment_start(front) < n_start)
+    {
+        let Some(comment) = ctx.comments.pop_front() else {
             break;
-        }
+        };
+        leading.push(comment);
     }
 
     if !leading.is_empty()
@@ -357,14 +381,16 @@ fn walk_node(
         // Stop at parent boundary
         let mut trailing: Vec<serde_json::Value> = Vec::new();
 
-        while !ctx.comments.is_empty() {
-            let c_start = comment_start(&ctx.comments[0]);
+        while let Some(c_start) = ctx.comments.front().map(comment_start) {
             if let Some(p_end) = parent_end_val
                 && c_start >= p_end
             {
                 break;
             }
-            trailing.push(ctx.comments.pop_front().unwrap());
+            let Some(comment) = ctx.comments.pop_front() else {
+                break;
+            };
+            trailing.push(comment);
         }
 
         if !trailing.is_empty()
@@ -381,14 +407,14 @@ fn walk_node(
         // Not last in body: attach at most ONE trailing comment on same line
         // Regex: /^[,) \t]*$/
         let slice = &ctx.source[n_end as usize..first_comment_start as usize];
-        if slice.chars().all(|c| matches!(c, ',' | ')' | ' ' | '\t')) {
-            let comment = ctx.comments.pop_front().unwrap();
-            if let Some(obj) = node.as_object_mut() {
-                obj.insert(
-                    "trailingComments".to_string(),
-                    serde_json::Value::Array(vec![comment]),
-                );
-            }
+        if slice.chars().all(|c| matches!(c, ',' | ')' | ' ' | '\t'))
+            && let Some(comment) = ctx.comments.pop_front()
+            && let Some(obj) = node.as_object_mut()
+        {
+            obj.insert(
+                "trailingComments".to_string(),
+                serde_json::Value::Array(vec![comment]),
+            );
         }
     }
 }
@@ -470,7 +496,9 @@ fn recurse_children(node: &mut serde_json::Value, ctx: &mut CommentAttachmentCon
     // Extract parent info BEFORE mutating the node (avoids full clone)
     let parent_info = extract_parent_info(node);
 
-    let obj = node.as_object_mut().unwrap();
+    let Some(obj) = node.as_object_mut() else {
+        return;
+    };
 
     for key in child_keys {
         let Some(value) = obj.get_mut(&key) else {
@@ -624,8 +652,20 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
                     "end".to_string(),
                     serde_json::Value::Number(comment.span.end.into()),
                 );
-                map.insert(
-                    "loc".to_string(),
+                let loc_value = if comment.has_character_loc {
+                    serde_json::json!({
+                        "start": {
+                            "line": location.start.line,
+                            "column": location.start.column,
+                            "character": comment.span.start,
+                        },
+                        "end": {
+                            "line": location.end.line,
+                            "column": location.end.column,
+                            "character": comment.span.end,
+                        },
+                    })
+                } else {
                     serde_json::json!({
                         "start": {
                             "line": location.start.line,
@@ -635,8 +675,9 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
                             "line": location.end.line,
                             "column": location.end.column,
                         },
-                    }),
-                );
+                    })
+                };
+                map.insert("loc".to_string(), loc_value);
                 serde_json::Value::Object(map)
             };
 

@@ -43,9 +43,12 @@ impl<'a> Printer<'a> {
                         && i == values.len() - 1
                         && let internal::CssValue::Identifier { name, .. } = value
                     {
+                        // Normalize whitespace (parser preserves original for AST fidelity)
+                        let normalized: String =
+                            name.split_whitespace().collect::<Vec<_>>().join(" ");
                         // Check if it's a media query (contains "and" or "or")
-                        if name.contains(" and ") || name.contains(" or ") {
-                            self.print_import_media_query(name);
+                        if normalized.contains(" and ") || normalized.contains(" or ") {
+                            self.print_import_media_query(&normalized);
                             continue;
                         }
                     }
@@ -99,6 +102,7 @@ impl<'a> Printer<'a> {
             self.indent_level += 1;
 
             let mut i = 0;
+            let mut prettier_ignore_next = false;
             while i < block.children.len() {
                 let child = &block.children[i];
 
@@ -117,14 +121,10 @@ impl<'a> Printer<'a> {
                             let has_blank_line =
                                 self.has_blank_line_before_child(&block.children, i);
 
-                            // Declarations end with \n, but rules/at-rules end with }
-                            // So only add separator newline if prev is not a declaration
-                            let prev_is_declaration = matches!(
-                                block.children.get(i - 1),
-                                Some(internal::CssBlockChild::Declaration(_))
-                            );
-
-                            if !prev_is_declaration {
+                            // Declarations end with \n, standalone comments end with \n,
+                            // but rules/at-rules end with } and inline comments end with */
+                            // Check the actual output buffer rather than child type
+                            if !self.output_ends_with_newline() {
                                 self.write("\n"); // Separator
                             }
                             if has_blank_line {
@@ -143,17 +143,27 @@ impl<'a> Printer<'a> {
                     internal::CssBlockChild::Rule(_) | internal::CssBlockChild::Atrule(_) => {
                         // Rules and at-rules need indentation
                         self.write_indent();
-                        self.print_atrule_block_child(child);
+                        if prettier_ignore_next {
+                            self.write(child.span().extract(self.source));
+                            prettier_ignore_next = false;
+                        } else {
+                            self.print_atrule_block_child(child);
+                        }
 
                         // Check if next child is an inline comment
                         let inline_count =
                             self.try_print_inline_comments(&block.children, i, child.span().end);
                         i += inline_count;
                     }
-                    internal::CssBlockChild::Comment(_) => {
+                    internal::CssBlockChild::Comment(comment) => {
+                        // Check for prettier-ignore
+                        if comment.content.trim() == "prettier-ignore" {
+                            prettier_ignore_next = true;
+                        }
                         // Standalone comment
                         self.write_indent();
                         self.print_atrule_block_child(child);
+                        self.write("\n");
                     }
                 }
 
@@ -206,6 +216,7 @@ impl<'a> Printer<'a> {
                 // Format declarations and comments with proper indentation
                 self.indent_level += 1;
                 let mut i = start_index;
+                let mut prettier_ignore_next = false;
                 while i < rule.declarations.len() {
                     let block_child = &rule.declarations[i];
                     match block_child {
@@ -216,7 +227,17 @@ impl<'a> Printer<'a> {
                             {
                                 self.write("\n");
                             }
-                            self.print_css_declaration(decl);
+                            if prettier_ignore_next {
+                                self.write_indent();
+                                self.write(decl.span.extract(self.source));
+                                if decl.is_important() {
+                                    self.write(" !important");
+                                }
+                                self.write(";\n");
+                                prettier_ignore_next = false;
+                            } else {
+                                self.print_css_declaration(decl);
+                            }
 
                             // Check for inline comments after the declaration
                             let inline_count = self.try_print_inline_comments_after_decl(
@@ -238,6 +259,10 @@ impl<'a> Printer<'a> {
                                 // Note: Previous element already ended with \n, so one more \n gives blank line
                                 self.write("\n");
                             }
+                            // Check for prettier-ignore
+                            if comment.content.trim() == "prettier-ignore" {
+                                prettier_ignore_next = true;
+                            }
                             self.write_indent();
                             self.print_css_comment(comment);
                             self.write("\n");
@@ -248,7 +273,12 @@ impl<'a> Printer<'a> {
                                 self.write("\n");
                             }
                             self.write_indent();
-                            self.print_css_rule(nested_rule);
+                            if prettier_ignore_next {
+                                self.write(nested_rule.span.extract(self.source));
+                                prettier_ignore_next = false;
+                            } else {
+                                self.print_css_rule(nested_rule);
+                            }
 
                             // Check for inline comment after nested rule's closing brace
                             let inline_count = self.try_print_inline_comments(
@@ -266,7 +296,12 @@ impl<'a> Printer<'a> {
                                 self.write("\n");
                             }
                             self.write_indent();
-                            self.print_css_atrule(nested_atrule);
+                            if prettier_ignore_next {
+                                self.write(nested_atrule.span.extract(self.source));
+                                prettier_ignore_next = false;
+                            } else {
+                                self.print_css_atrule(nested_atrule);
+                            }
                             self.write("\n");
                         }
                     }

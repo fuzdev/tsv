@@ -362,6 +362,8 @@ pub struct TaggedTemplateExpression {
     pub loc: SourceLocation,
     pub tag: Box<Expression>,
     pub quasi: TemplateLiteral,
+    #[serde(rename = "typeArguments", skip_serializing_if = "Option::is_none")]
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
 }
 
 /// Await expression: `await promise`

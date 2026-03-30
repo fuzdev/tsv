@@ -184,19 +184,21 @@ export async function generateAuditReport(): Promise<AuditReport> {
 		}
 	}
 
-	// Per-pattern coverage
+	// Per-pattern coverage — use fixtures array as primary link
+	// (conformanceSections is kept for display/grouping metadata only)
 	const patternCoverage: PatternCoverage[] = PATTERNS.map((pattern) => {
 		const claimed = pattern.fixtures || [];
-		const docFixtures = documented
-			.filter((d) => pattern.conformanceSections?.includes(d.section))
-			.map((d) => d.fixturePath);
+		// Fixtures the pattern claims that are documented in conformance_prettier.md
+		const documentedInClaimed = claimed.filter((f) => documentedPaths.has(f));
+		// Fixtures the pattern claims that aren't documented (orphaned at pattern level)
+		const undocumentedInClaimed = claimed.filter((f) => !documentedPaths.has(f));
 
 		return {
 			patternId: pattern.id,
 			description: pattern.description,
-			documentedFixtures: docFixtures,
+			documentedFixtures: documentedInClaimed,
 			claimedFixtures: claimed,
-			uncoveredFixtures: docFixtures.filter((f) => !claimed.includes(f)),
+			uncoveredFixtures: undocumentedInClaimed,
 		};
 	});
 

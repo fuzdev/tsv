@@ -91,6 +91,7 @@ impl<'a> Parser<'a> {
                 content: content.clone(),
                 is_block: *is_block,
                 span: Span::new((start + base_offset) as u32, (end + base_offset) as u32),
+                has_character_loc: false,
             });
             let token = lexer.next_token()?;
             kind = token.kind;
@@ -167,6 +168,7 @@ impl<'a> Parser<'a> {
                     (self.current_start + self.base_offset) as u32,
                     (self.current_end + self.base_offset) as u32,
                 ),
+                has_character_loc: false,
             });
             let token = self.lexer.next_token()?;
             self.current_kind = token.kind;
@@ -557,6 +559,7 @@ impl<'a> Parser<'a> {
                         (peek.start + self.base_offset) as u32,
                         (peek.end + self.base_offset) as u32,
                     ),
+                    has_character_loc: false,
                 });
             }
 
@@ -685,8 +688,8 @@ impl<'a> Parser<'a> {
     /// - Splits `>=` into `>` + re-lex (may become `=>`)
     /// - Splits `>>=` into `>` + re-lex (may become `>=` or `>` + `=`)
     /// - Splits `>>>=` into `>` + re-lex (may become `>>=`)
-    /// Consume a `>` in type context and return the end position of the consumed `>`.
-    /// Handles `>>`, `>>>`, `>=`, etc. by splitting the token.
+    ///   Consume a `>` in type context and return the end position of the consumed `>`.
+    ///   Handles `>>`, `>>>`, `>=`, etc. by splitting the token.
     pub(super) fn greater_than_end_in_type(&mut self) -> Result<u32, ParseError> {
         let end = (self.current_pos().0 + 1) as u32;
         self.expect_greater_than_in_type()?;
@@ -1205,6 +1208,22 @@ impl<'a> Parser<'a> {
         // Return the start of the current (unconsumed) token
         let next_pos = self.current_start + self.base_offset;
         Ok((expr, next_pos))
+    }
+
+    /// Check if the current token is a colon.
+    pub fn at_colon(&self) -> bool {
+        matches!(self.current_kind, TokenKind::Colon)
+    }
+
+    /// Parse a type annotation (`: Type`) at the current position.
+    /// Public wrapper for use from lib.rs.
+    pub fn parse_type_annotation_public(&mut self) -> Result<TSTypeAnnotation, ParseError> {
+        self.parse_type_annotation()
+    }
+
+    /// Get the current token's start position (absolute, with base_offset).
+    pub fn current_absolute_position(&self) -> usize {
+        self.current_start + self.base_offset
     }
 
     /// Convert an expression to a binding pattern.

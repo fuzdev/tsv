@@ -664,7 +664,7 @@ fn translate_positions_recursive(value: &mut serde_json::Value, map: &tsv_lang::
     }
 }
 
-/// Convert a list of CSS nodes to a typed StyleSheet structure
+/// Convert a list of CSS nodes to a typed StyleSheet structure (for Svelte embedding)
 pub fn convert_css_nodes(nodes: &[internal::CssNode], source: &str) -> super::public::StyleSheet {
     // Convert all nodes (comments are stored separately and not included in JSON output)
     let children: Vec<serde_json::Value> = nodes
@@ -690,5 +690,101 @@ pub fn convert_css_nodes(nodes: &[internal::CssNode], source: &str) -> super::pu
             styles: source[content_start as usize..content_end as usize].to_string(),
             comment: None,
         },
+    }
+}
+
+/// Convert a list of CSS nodes to a standalone StyleSheetFile JSON value
+///
+/// Unlike `convert_css_nodes` (used for Svelte `<style>` embedding which includes
+/// `attributes` and `content` fields), this produces the minimal `StyleSheetFile`
+/// structure matching Svelte's `parseCss()` output: just `type`, `start`, `end`,
+/// and `children`.
+///
+/// The `end` offset is set to the full source length (not the last node's span end),
+/// matching Svelte's behavior of including trailing whitespace in the file span.
+///
+/// Also adds `metadata` fields to `Rule`, `ComplexSelector`, and `RelativeSelector`
+/// nodes, matching Svelte's `parseCss()` output (which includes these for standalone
+/// CSS but not for embedded `<style>` in `.svelte` files).
+pub fn convert_css_nodes_standalone(
+    nodes: &[internal::CssNode],
+    source: &str,
+) -> serde_json::Value {
+    let children: Vec<serde_json::Value> = nodes
+        .iter()
+        .map(|node| convert_css_node(node, source))
+        .collect();
+
+    let mut result = serde_json::json!({
+        "type": "StyleSheetFile",
+        "start": 0,
+        "end": source.len() as u32,
+        "children": children,
+    });
+
+    // Add metadata fields matching parseCss() output
+    add_parsecss_metadata(&mut result);
+
+    result
+}
+
+/// Add `metadata` fields to CSS AST nodes for standalone `parseCss()` output
+///
+/// Svelte's `parseCss()` includes metadata on `Rule`, `ComplexSelector`, and
+/// `RelativeSelector` nodes. These metadata fields are NOT present in Svelte's
+/// `.svelte` file parser output, so they're added as a post-processing step
+/// only for standalone CSS files.
+fn add_parsecss_metadata(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(obj) => {
+            // Add metadata based on node type
+            if let Some(node_type) = obj.get("type").and_then(|v| v.as_str()).map(String::from) {
+                match node_type.as_str() {
+                    "Rule" => {
+                        obj.insert(
+                            "metadata".to_string(),
+                            serde_json::json!({
+                                "parent_rule": null,
+                                "has_local_selectors": false,
+                                "has_global_selectors": false,
+                                "is_global_block": false,
+                            }),
+                        );
+                    }
+                    "ComplexSelector" => {
+                        obj.insert(
+                            "metadata".to_string(),
+                            serde_json::json!({
+                                "rule": null,
+                                "is_global": false,
+                                "used": false,
+                            }),
+                        );
+                    }
+                    "RelativeSelector" => {
+                        obj.insert(
+                            "metadata".to_string(),
+                            serde_json::json!({
+                                "is_global": false,
+                                "is_global_like": false,
+                                "scoped": false,
+                            }),
+                        );
+                    }
+                    _ => {}
+                }
+            }
+
+            // Recurse into all values
+            for val in obj.values_mut() {
+                add_parsecss_metadata(val);
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for item in arr {
+                add_parsecss_metadata(item);
+            }
+        }
+        _ => {}
     }
 }

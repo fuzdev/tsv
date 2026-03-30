@@ -1,0 +1,62 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 148,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 46,
+				"data": " exactly 100 chars - stays on one line "
+			},
+			{
+				"type": "Text",
+				"start": 46,
+				"end": 47,
+				"raw": "\n",
+				"data": "\n"
+			}
+		]
+	},
+	"options": {
+		"start": 47,
+		"end": 147,
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 63,
+				"end": 144,
+				"name": "customElement",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 16,
+						"character": 63
+					},
+					"end": {
+						"line": 2,
+						"column": 29,
+						"character": 76
+					}
+				},
+				"value": [
+					{
+						"start": 78,
+						"end": 143,
+						"type": "Text",
+						"raw": "aaa-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"data": "aaa-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+					}
+				]
+			}
+		],
+		"customElement": {
+			"tag": "aaa-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		}
+	},
+	"comments": []
+}

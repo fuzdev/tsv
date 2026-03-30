@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 341,
+		"end": 350,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 332,
+					"end": 341,
 					"children": [
 						{
 							"type": "Declaration",
@@ -64,68 +64,68 @@
 						{
 							"type": "Declaration",
 							"start": 112,
-							"end": 179,
+							"end": 188,
 							"property": "grid-template-areas",
-							"value": "'header header' 'sidebar main' 'footer footer'"
+							"value": "'header header'\n\t\t\t'sidebar main'\n\t\t\t'footer footer'"
 						},
 						{
 							"type": "Declaration",
-							"start": 183,
-							"end": 218,
+							"start": 192,
+							"end": 227,
 							"property": "grid-auto-rows",
 							"value": "minmax(100px, auto)"
 						},
 						{
 							"type": "Declaration",
-							"start": 222,
-							"end": 244,
+							"start": 231,
+							"end": 253,
 							"property": "grid-auto-columns",
 							"value": "1fr"
 						},
 						{
 							"type": "Declaration",
-							"start": 248,
-							"end": 269,
+							"start": 257,
+							"end": 278,
 							"property": "grid-auto-flow",
 							"value": "dense"
 						},
 						{
 							"type": "Declaration",
-							"start": 273,
-							"end": 287,
+							"start": 282,
+							"end": 296,
 							"property": "gap",
 							"value": "1rem 2rem"
 						},
 						{
 							"type": "Declaration",
-							"start": 291,
-							"end": 306,
+							"start": 300,
+							"end": 315,
 							"property": "row-gap",
 							"value": "0.5rem"
 						},
 						{
 							"type": "Declaration",
-							"start": 310,
-							"end": 328,
+							"start": 319,
+							"end": 337,
 							"property": "column-gap",
 							"value": "1.5rem"
 						}
 					]
 				},
 				"start": 9,
-				"end": 332
+				"end": 341
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 333,
-			"styles": "\n\tdiv {\n\t\tdisplay: grid;\n\t\tgrid-template-columns: repeat(3, 1fr);\n\t\tgrid-template-rows: auto 1fr auto;\n\t\tgrid-template-areas: 'header header' 'sidebar main' 'footer footer';\n\t\tgrid-auto-rows: minmax(100px, auto);\n\t\tgrid-auto-columns: 1fr;\n\t\tgrid-auto-flow: dense;\n\t\tgap: 1rem 2rem;\n\t\trow-gap: 0.5rem;\n\t\tcolumn-gap: 1.5rem;\n\t}\n",
+			"end": 342,
+			"styles": "\n\tdiv {\n\t\tdisplay: grid;\n\t\tgrid-template-columns: repeat(3, 1fr);\n\t\tgrid-template-rows: auto 1fr auto;\n\t\tgrid-template-areas:\n\t\t\t'header header'\n\t\t\t'sidebar main'\n\t\t\t'footer footer';\n\t\tgrid-auto-rows: minmax(100px, auto);\n\t\tgrid-auto-columns: 1fr;\n\t\tgrid-auto-flow: dense;\n\t\tgap: 1rem 2rem;\n\t\trow-gap: 0.5rem;\n\t\tcolumn-gap: 1.5rem;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 342,
+	"end": 351,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

@@ -247,8 +247,14 @@ impl<'a> Printer<'a> {
             Expression::TemplateLiteral(template) => self.template_literal_to_string(template),
             Expression::TaggedTemplateExpression(tagged) => {
                 let tag = self.expression_to_string(&tagged.tag);
+                let type_args = if let Some(ta) = &tagged.type_arguments {
+                    let params: Vec<_> = ta.params.iter().map(|t| self.type_to_string(t)).collect();
+                    format!("<{}>", params.join(", "))
+                } else {
+                    String::new()
+                };
                 let quasi = self.template_literal_to_string(&tagged.quasi);
-                format!("{tag}{quasi}")
+                format!("{tag}{type_args}{quasi}")
             }
             Expression::NewExpression(new_expr) => {
                 let callee = self.expression_to_string(&new_expr.callee);

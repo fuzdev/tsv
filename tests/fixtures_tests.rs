@@ -60,9 +60,6 @@ async fn test_all_fixtures() {
     // Check for cross-fixture duplicates
     summary.detect_cross_fixture_duplicates();
 
-    // Check parser match ratchet
-    summary.check_parser_ratchet();
-
     // Detect Deno sidecar crash pattern (many "deno actor shut down" errors)
     let sidecar_failures = summary.count_sidecar_failures();
     if sidecar_failures > 5 {

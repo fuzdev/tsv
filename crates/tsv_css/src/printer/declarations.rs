@@ -175,7 +175,9 @@ impl<'a> Printer<'a> {
         self.write(&property_normalized);
 
         // Dispatch to appropriate handler based on value type and formatting needs
-        if self.should_use_multiline(decl) {
+        if self.is_grid_multirow_value(decl) {
+            self.print_decl_grid_multirow(decl);
+        } else if self.should_use_multiline(decl) {
             self.print_decl_multiline(decl);
         } else if let (true, is_comma) =
             self.should_wrap_value_width_based(&decl.value, &decl.property)
@@ -355,6 +357,59 @@ impl<'a> Printer<'a> {
             self.write(": ");
         }
         self.print_css_value(&decl.value);
+        self.write_declaration_end(decl.is_important());
+    }
+
+    /// Check if this is a grid property with multiple row string values
+    /// where consecutive values are on different source lines.
+    ///
+    /// Matches Prettier's source-position-dependent grid formatting
+    /// (comma-separated-value-group.js lines 421-436): if consecutive values
+    /// are on different source lines, wrap each to its own line.
+    /// Properties: `grid-template-areas`, `grid-template*`, `grid`
+    fn is_grid_multirow_value(&self, decl: &internal::CssDeclaration) -> bool {
+        let prop = &decl.property;
+        let is_grid_prop = prop == "grid" || prop.starts_with("grid-template");
+        if !is_grid_prop {
+            return false;
+        }
+        let values = match &decl.value {
+            CssValue::List { values, .. }
+                if values.len() >= 2
+                    && values.iter().all(|v| matches!(v, CssValue::String { .. })) =>
+            {
+                values
+            }
+            _ => return false,
+        };
+        // Check source positions: are consecutive values on different lines?
+        let source_bytes = self.source.as_bytes();
+        for pair in values.windows(2) {
+            let end = pair[0].span().end_usize();
+            let start = pair[1].span().start_usize();
+            if end <= start && source_bytes[end..start].contains(&b'\n') {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Print grid property with multiple row strings, one per line
+    ///
+    /// Format: `property:\n\t'row1'\n\t'row2'\n\t'row3';`
+    fn print_decl_grid_multirow(&mut self, decl: &internal::CssDeclaration) {
+        self.write(":\n");
+        if let CssValue::List { values, .. } = &decl.value {
+            self.indent_level += 1;
+            for (i, val) in values.iter().enumerate() {
+                self.write_indent();
+                self.print_css_value(val);
+                if i < values.len() - 1 {
+                    self.write("\n");
+                }
+            }
+            self.indent_level -= 1;
+        }
         self.write_declaration_end(decl.is_important());
     }
 

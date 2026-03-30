@@ -809,8 +809,15 @@ impl<'a> Printer<'a> {
             let argument_start = arg.span().start;
             if let Some(comments) = self.build_rhs_comments_opt(keyword_end, argument_start) {
                 parts.push(comments);
+                parts.push(self.build_expression_doc(arg));
+            } else if needs_parens(arg, ParenContext::YieldArgument) {
+                // Assignment needs parens: `yield (x ??= y)`
+                parts.push(d.text("("));
+                parts.push(self.build_expression_doc(arg));
+                parts.push(d.text(")"));
+            } else {
+                parts.push(self.build_expression_doc(arg));
             }
-            parts.push(self.build_expression_doc(arg));
         }
 
         d.concat(&parts)

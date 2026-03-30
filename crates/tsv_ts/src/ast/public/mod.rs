@@ -55,8 +55,7 @@ pub use classes::{
 
 // Patterns
 pub use patterns::{
-    ArrayPattern, AssignmentPattern, AssignmentPatternLoc, ObjectPattern, ObjectPatternProperty,
-    RestElement,
+    ArrayPattern, AssignmentPattern, ObjectPattern, ObjectPatternProperty, RestElement,
 };
 
 // Statements
@@ -99,7 +98,8 @@ where
     if let Some(f) = value.as_f64()
         && f.fract() == 0.0
         && f.is_finite()
-        && f.abs() <= (1_i64 << 53) as f64
+        && f.abs() <= 9_007_199_254_740_992.0
+    // 2^53, exactly representable as f64
     {
         return serializer.serialize_i64(f as i64);
     }

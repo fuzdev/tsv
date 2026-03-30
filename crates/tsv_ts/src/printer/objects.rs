@@ -9,7 +9,8 @@
 
 use super::Printer;
 use super::calls::skip_stripped_open_paren;
-use super::expression_stringifier::{escape_single_quote_string, is_valid_js_identifier};
+use super::expression_stringifier::is_valid_js_identifier;
+use super::expressions::literals::format_string_literal_from_ast;
 use crate::ast::internal::{self, Expression, Literal, LiteralValue};
 use tsv_lang::SymbolResolver;
 use tsv_lang::comments_in_range;
@@ -512,14 +513,16 @@ impl<'a> Printer<'a> {
                     self.build_assignment_layout(key_doc, ":", &prop.value, is_short_key, None)
                 }
             } else {
-                // Comments around colon: check if any post-colon comment is multiline
-                // Multiline block comments force break-after-operator layout
+                // Comments around colon: check if any post-colon comment forces a break.
+                // Line comments always force break (they extend to end of line).
+                // Multiline block comments also force break-after-operator layout.
                 // Prettier ref: hasLeadingOwnLineComment → break-after-operator in chooseLayout
-                let has_multiline_post_colon =
-                    self.has_multiline_block_comments_between(colon_pos + 1, value_start);
+                let has_line_comment_post_colon = post_colon_comments.iter().any(|c| !c.is_block);
+                let has_multiline_post_colon = has_line_comment_post_colon
+                    || self.has_multiline_block_comments_between(colon_pos + 1, value_start);
 
                 if has_multiline_post_colon {
-                    // Multiline block comment after colon: use BreakAfterOperator layout
+                    // Line comment or multiline block comment after colon: BreakAfterOperator
                     // Structure: group([group(key + pre_colon), ":", group(indent([line, rhs]))])
                     let mut lhs_parts = vec![key_doc];
                     for comment in &pre_colon_comments {
@@ -640,17 +643,18 @@ impl<'a> Printer<'a> {
     pub(super) fn build_property_key_doc(&self, key: &Expression) -> DocId {
         let d = self.d();
         match key {
-            Expression::Literal(Literal {
-                value: LiteralValue::String { content, quote: _ },
-                ..
-            }) => {
-                // Check if the string content is a valid JS identifier
+            Expression::Literal(
+                lit @ Literal {
+                    value: LiteralValue::String { content, .. },
+                    ..
+                },
+            ) => {
                 if is_valid_js_identifier(content) {
-                    // Output without quotes
                     d.text_owned(content.clone())
                 } else {
-                    // Keep as quoted string (normalized to single quotes)
-                    d.text_owned(format!("'{}'", escape_single_quote_string(content)))
+                    // Use quote optimization (switches to double quotes when
+                    // content contains single quotes to minimize escaping)
+                    d.text_owned(format_string_literal_from_ast(lit, self.source))
                 }
             }
             _ => self.build_expression_doc(key),

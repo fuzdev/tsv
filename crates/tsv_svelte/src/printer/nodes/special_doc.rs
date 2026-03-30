@@ -425,11 +425,19 @@ impl<'a> Printer<'a> {
             _ => {}
         }
 
-        // Add regular attributes
-        for attr in &element.attributes {
-            docs.push(separator);
-            docs.push(self.build_attribute_node_doc(attr));
-        }
+        // svelte:element renders as HTML, so normalize class attribute whitespace
+        let normalize_class = matches!(
+            element.kind,
+            internal::SpecialElementKind::SvelteElement { .. }
+        );
+        self.push_attrs_with_comments(
+            &mut docs,
+            &element.attributes,
+            separator,
+            element.name_span.end,
+            element.open_tag_end,
+            normalize_class,
+        );
 
         docs
     }

@@ -3,18 +3,17 @@
 // Handles: new Foo(), new Foo(arg1, arg2), new Foo<T>()
 
 use super::calls::{
-    PartitionedComments, arrow_has_type_reference_return, build_args_split_last,
-    build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
-    build_expand_all_args, build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
-    find_comma_pos, has_inter_argument_comments_slice, has_trailing_comments_slice,
-    has_trailing_line_comments_slice, is_comment_after_comma, is_comment_before_comma,
-    last_two_args_same_type, prepend_arrow_body_comments, wrap_call_with_hard_breaks,
-    wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
+    PartitionedComments, arrow_has_type_reference_return, build_args_joined_with_comments,
+    build_args_split_last, build_arrow_call_body_states, build_arrow_sig_doc,
+    build_break_body_state, build_expand_all_args, build_inline_args, build_inline_or_expand_all,
+    could_expand_arrow_chain, has_inter_argument_comments_slice, has_trailing_comments_slice,
+    has_trailing_line_comments_slice, last_two_args_same_type, prepend_arrow_body_comments,
+    wrap_call_with_hard_breaks, wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
 use super::utils::{
-    arrow_has_trailing_param_comments, could_expand_arrow_body, is_array_or_object_unwrapped,
-    is_block_function, is_concise_numeric_array, is_function_composition_args,
-    is_short_second_arg_for_expand_first, preceding_args_allow_expand_last,
+    arrow_has_trailing_param_comments, is_array_or_object_unwrapped, is_block_function,
+    is_concise_numeric_array, is_function_composition_args, is_short_second_arg_for_expand_first,
+    is_ternary_arrow_body, preceding_args_allow_expand_last,
 };
 use super::{
     ParenContext, Printer, has_multiline_content, has_newline_before_position,
@@ -182,7 +181,7 @@ impl<'a> Printer<'a> {
                         // Flat: `new Xy((x) => (x ? y : z))`
                         // Break: `new Xy((x) =>\n  x ? y : z,\n)`
                         // Arrows with TSTypeReference return types are NOT expandable.
-                        if could_expand_arrow_body(body_expr)
+                        if is_ternary_arrow_body(body_expr)
                             && !arrow_has_type_reference_return(arrow)
                         {
                             let sig_doc = build_arrow_sig_doc(self, arrow);
@@ -270,6 +269,12 @@ impl<'a> Printer<'a> {
             }
         }
 
+        // Compute paren_open: position after callee and type args (just before `(`)
+        let paren_open = new_expr
+            .type_arguments
+            .as_ref()
+            .map_or_else(|| new_expr.callee.span().end, |ta| ta.span.end);
+
         // Function composition pattern: when any argument is a call containing a callback
         // OR when there are multiple function arguments
         // e.g., new Cls(arr.map((x) => x), b) → new Cls(\n\t...,\n)
@@ -278,14 +283,14 @@ impl<'a> Printer<'a> {
         if is_function_composition_args(&new_expr.arguments)
             && !has_trailing_comments_slice(&new_expr.arguments, new_expr.span.end, self)
         {
-            let arg_parts = d.join_doc(
-                new_expr
-                    .arguments
-                    .iter()
-                    .map(|arg| self.build_arg_expression_doc(arg)),
-                d.comma_hardline(),
+            let arg_parts = build_args_joined_with_comments(
+                self,
+                &new_expr.arguments,
+                paren_open,
+                true,
+                #[allow(clippy::redundant_closure_for_method_calls)]
+                |p, a| p.build_arg_expression_doc(a),
             );
-
             return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
         }
 
@@ -322,22 +327,16 @@ impl<'a> Printer<'a> {
 
         if has_multiline {
             // Force expansion with hardlines for multiline content
-            let arg_parts = d.join_doc(
-                new_expr
-                    .arguments
-                    .iter()
-                    .map(|arg| self.build_arg_expression_doc(arg)),
-                d.comma_hardline(),
+            let arg_parts = build_args_joined_with_comments(
+                self,
+                &new_expr.arguments,
+                paren_open,
+                true,
+                #[allow(clippy::redundant_closure_for_method_calls)]
+                |p, a| p.build_arg_expression_doc(a),
             );
-
             return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
         }
-
-        // Compute paren_open: position after callee and type args (just before `(`)
-        let paren_open = new_expr
-            .type_arguments
-            .as_ref()
-            .map_or_else(|| new_expr.callee.span().end, |ta| ta.span.end);
 
         // "Expand first arg" pattern: callback first, short/empty container last
         // e.g., new Proxy((x) => { ... }, {}) - callback hugs, empty obj stays inline
@@ -577,7 +576,7 @@ impl<'a> Printer<'a> {
                 }
 
                 // Array/object last arg path (matches call_formatting.rs:870-999)
-                // Same type (both arrays or both objects): skip hug, use expand-all
+                // Same outer type: skip hug, use expand-all
                 if last_two_args_same_type(&new_expr.arguments) {
                     // Same type: Prettier uses expand-all when last arg will break
                     if d.will_break(last_arg_doc) {
@@ -625,83 +624,15 @@ impl<'a> Printer<'a> {
         let has_inter_arg_comments = has_inter_argument_comments_slice(&new_expr.arguments, self);
 
         if has_leading_comments || has_inter_arg_comments {
-            // Build arguments with explicit comment handling
-            let mut arg_parts = Vec::new();
-
-            for (i, arg) in new_expr.arguments.iter().enumerate() {
-                // Handle leading comments before first argument
-                if i == 0 && has_leading_comments {
-                    let first_arg_start = arg.span().start;
-                    arg_parts.push(self.build_inline_comments_between_doc_no_leading_space(
-                        paren_open,
-                        first_arg_start,
-                    ));
-                    arg_parts.push(d.line());
-                }
-
-                // Build the argument
-                arg_parts.push(self.build_expression_doc(arg));
-
-                // Check for comments after this argument (before next arg or closing paren)
-                if i < new_expr.arguments.len() - 1 {
-                    let arg_end = arg.span().end;
-                    let next_arg_start = new_expr.arguments[i + 1].span().start;
-
-                    if self.has_comments_between(arg_end, next_arg_start) {
-                        let pc = PartitionedComments::new(
-                            self.comments,
-                            self.line_breaks,
-                            arg_end,
-                            next_arg_start,
-                        );
-
-                        let comma_pos = find_comma_pos(self.source, arg_end, next_arg_start);
-
-                        if pc.has_trailing_line() {
-                            // Trailing line comments: comma, comment, hardline
-                            arg_parts.push(d.text(","));
-                            for comment in &pc.trailing_line {
-                                arg_parts.push(d.text(" "));
-                                arg_parts.push(self.build_comment_doc(comment));
-                            }
-                            arg_parts.push(d.hardline());
-                        } else if pc.has_trailing_block() {
-                            // Trailing block comments: place relative to comma based on source position
-                            if let Some(cpos) = comma_pos {
-                                for comment in &pc.trailing_block {
-                                    if is_comment_before_comma(comment, cpos) {
-                                        arg_parts.push(d.text(" "));
-                                        arg_parts.push(self.build_comment_doc(comment));
-                                    }
-                                }
-                            }
-                            arg_parts.push(d.text(","));
-                            if let Some(cpos) = comma_pos {
-                                for comment in &pc.trailing_block {
-                                    if is_comment_after_comma(comment, cpos) {
-                                        arg_parts.push(d.text(" "));
-                                        arg_parts.push(self.build_comment_doc(comment));
-                                    }
-                                }
-                            }
-                            arg_parts.push(d.line());
-                        } else {
-                            // No trailing comments, add comma and line
-                            arg_parts.push(d.text(","));
-                            arg_parts.push(d.line());
-                        }
-
-                        // Add leading comments for next arg
-                        pc.emit_leading_comments_inline_aware(&mut arg_parts, self, next_arg_start);
-                    } else {
-                        // No comments, just comma and line
-                        arg_parts.push(d.comma_line());
-                    }
-                }
-            }
-
-            let arg_doc = d.concat(&arg_parts);
-            return wrap_call_with_will_break_guard(d, callee_with_types, arg_doc);
+            let arg_parts = build_args_joined_with_comments(
+                self,
+                &new_expr.arguments,
+                paren_open,
+                false,
+                #[allow(clippy::redundant_closure_for_method_calls)]
+                |p, a| p.build_expression_doc(a),
+            );
+            return wrap_call_with_will_break_guard(d, callee_with_types, arg_parts);
         }
 
         // Build args with line separators (one per line when broken)

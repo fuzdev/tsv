@@ -2,6 +2,8 @@
 //
 // Handles: {#if}, {#each}, {#await}, {#key} blocks
 
+use std::rc::Rc;
+
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
@@ -403,8 +405,25 @@ impl<'a> SvelteParser<'a> {
                 return Err(self.error_expected_at("identifier or pattern", offset));
             }
             let ident_str = &trimmed[..end];
-            let expr = self.parse_ts_expression(ident_str, adjusted)?;
-            Ok((expr, adjusted + end))
+            let mut expr = self.parse_ts_expression(ident_str, adjusted)?;
+
+            // Check for type annotation (`: Type`) after identifier
+            let after_ident = trimmed[end..].trim_start();
+            if after_ident.starts_with(':') {
+                let ws_before_colon = trimmed.len() - end - after_ident.len();
+                let colon_offset = adjusted + end + ws_before_colon;
+                let (ta, type_end) = tsv_ts::parse_type_annotation_partial(
+                    after_ident,
+                    colon_offset,
+                    Rc::clone(&self.interner),
+                )?;
+                if let tsv_ts::Expression::Identifier(id) = &mut expr {
+                    id.type_annotation = Some(ta);
+                }
+                Ok((expr, type_end))
+            } else {
+                Ok((expr, adjusted + end))
+            }
         }
     }
 
@@ -584,18 +603,25 @@ impl<'a> SvelteParser<'a> {
                 None
             };
 
-            let then_content = self.parse_block_children(&["await"], content_start)?;
+            let then_content = self.parse_block_children(&["catch", "await"], content_start)?;
 
-            // Expect closing {/await}
-            let block_end = if self.check(TokenKind::BlockClose) {
-                let close_tag_start = self.current_end;
-                let (_, after_close) = self.scan_block_tag_content(close_tag_start)?;
-                after_close
+            // Check for optional {:catch} continuation after then-shorthand
+            let (catch_fragment, error) = if self.check_await_continuation("catch") {
+                self.parse_await_catch_continuation()?
             } else {
-                self.current_start
+                (None, None)
             };
 
-            (None, Some(then_content), None, value, None, block_end)
+            let block_end = self.expect_block_close();
+
+            (
+                None,
+                Some(then_content),
+                catch_fragment,
+                value,
+                error,
+                block_end,
+            )
         } else if let Some(error_str) = shorthand_catch {
             // Shorthand catch syntax: {#await promise catch error}...{/await}
             let error = if !error_str.is_empty() {
@@ -608,18 +634,25 @@ impl<'a> SvelteParser<'a> {
                 None
             };
 
-            let catch_content = self.parse_block_children(&["await"], content_start)?;
+            let catch_content = self.parse_block_children(&["then", "await"], content_start)?;
 
-            // Expect closing {/await}
-            let block_end = if self.check(TokenKind::BlockClose) {
-                let close_tag_start = self.current_end;
-                let (_, after_close) = self.scan_block_tag_content(close_tag_start)?;
-                after_close
+            // Check for optional {:then} continuation after catch-shorthand
+            let (then_fragment, value) = if self.check_await_continuation("then") {
+                self.parse_await_then_continuation(&["await"])?
             } else {
-                self.current_start
+                (None, None)
             };
 
-            (None, None, Some(catch_content), None, error, block_end)
+            let block_end = self.expect_block_close();
+
+            (
+                None,
+                then_fragment,
+                Some(catch_content),
+                value,
+                error,
+                block_end,
+            )
         } else {
             // Full syntax with pending block
             let pending_content =
@@ -636,63 +669,21 @@ impl<'a> SvelteParser<'a> {
             let mut error = None;
 
             // Parse :then and :catch blocks
-            while self.check(TokenKind::BlockContinue) {
-                let continue_start = self.current_end;
-                let remaining = &self.source[continue_start..];
-                let keyword_end = remaining
-                    .find(|c: char| !c.is_alphabetic() && c != ' ')
-                    .unwrap_or(remaining.len());
-                let keyword = remaining[..keyword_end].trim();
-
-                if keyword.starts_with("then") {
-                    let then_tag_start = self.current_end;
-                    let (then_tag_content, then_content_start) =
-                        self.scan_block_tag_content(then_tag_start)?;
-                    let value_str = then_tag_content
-                        .strip_prefix("then ")
-                        .or_else(|| then_tag_content.strip_prefix("then"))
-                        .unwrap_or("")
-                        .trim();
-
-                    if !value_str.is_empty() {
-                        let value_offset =
-                            then_tag_start + then_tag_content.find(value_str).unwrap_or(0);
-                        value = Some(self.parse_ts_pattern(value_str, value_offset)?);
-                    }
-
-                    then_fragment =
-                        Some(self.parse_block_children(&["catch", "await"], then_content_start)?);
-                } else if keyword.starts_with("catch") {
-                    let catch_tag_start = self.current_end;
-                    let (catch_tag_content, catch_content_start) =
-                        self.scan_block_tag_content(catch_tag_start)?;
-                    let error_str = catch_tag_content
-                        .strip_prefix("catch ")
-                        .or_else(|| catch_tag_content.strip_prefix("catch"))
-                        .unwrap_or("")
-                        .trim();
-
-                    if !error_str.is_empty() {
-                        let error_offset =
-                            catch_tag_start + catch_tag_content.find(error_str).unwrap_or(0);
-                        error = Some(self.parse_ts_pattern(error_str, error_offset)?);
-                    }
-
-                    catch_fragment =
-                        Some(self.parse_block_children(&["await"], catch_content_start)?);
+            loop {
+                if self.check_await_continuation("then") {
+                    let (frag, val) = self.parse_await_then_continuation(&["catch", "await"])?;
+                    then_fragment = frag;
+                    value = val;
+                } else if self.check_await_continuation("catch") {
+                    let (frag, err) = self.parse_await_catch_continuation()?;
+                    catch_fragment = frag;
+                    error = err;
                 } else {
                     break;
                 }
             }
 
-            // Expect closing {/await}
-            let block_end = if self.check(TokenKind::BlockClose) {
-                let close_tag_start = self.current_end;
-                let (_, after_close) = self.scan_block_tag_content(close_tag_start)?;
-                after_close
-            } else {
-                self.current_start
-            };
+            let block_end = self.expect_block_close();
 
             (
                 pending,
@@ -717,6 +708,82 @@ impl<'a> SvelteParser<'a> {
             },
             opening_tag_span,
         }))
+    }
+
+    /// Check if the next token is a BlockContinue with the given keyword (e.g., "catch", "then").
+    fn check_await_continuation(&self, keyword: &str) -> bool {
+        if !self.check(TokenKind::BlockContinue) {
+            return false;
+        }
+        let continue_start = self.current_end;
+        let remaining = &self.source[continue_start..];
+        let keyword_end = remaining
+            .find(|c: char| !c.is_alphabetic() && c != ' ')
+            .unwrap_or(remaining.len());
+        remaining[..keyword_end].trim().starts_with(keyword)
+    }
+
+    /// Parse a {:catch error} continuation block within an await block.
+    /// Returns (catch_fragment, error_pattern) if a catch continuation is found.
+    fn parse_await_catch_continuation(
+        &mut self,
+    ) -> Result<(Option<Fragment>, Option<tsv_ts::Expression>), ParseError> {
+        let catch_tag_start = self.current_end;
+        let (catch_tag_content, catch_content_start) =
+            self.scan_block_tag_content(catch_tag_start)?;
+        let error_str = catch_tag_content
+            .strip_prefix("catch ")
+            .or_else(|| catch_tag_content.strip_prefix("catch"))
+            .unwrap_or("")
+            .trim();
+
+        let error = if !error_str.is_empty() {
+            let error_offset = catch_tag_start + catch_tag_content.find(error_str).unwrap_or(0);
+            Some(self.parse_ts_pattern(error_str, error_offset)?)
+        } else {
+            None
+        };
+
+        let catch_fragment = self.parse_block_children(&["await"], catch_content_start)?;
+        Ok((Some(catch_fragment), error))
+    }
+
+    /// Parse a {:then value} continuation block within an await block.
+    /// Returns (then_fragment, value_pattern) if a then continuation is found.
+    fn parse_await_then_continuation(
+        &mut self,
+        stop_keywords: &[&str],
+    ) -> Result<(Option<Fragment>, Option<tsv_ts::Expression>), ParseError> {
+        let then_tag_start = self.current_end;
+        let (then_tag_content, then_content_start) = self.scan_block_tag_content(then_tag_start)?;
+        let value_str = then_tag_content
+            .strip_prefix("then ")
+            .or_else(|| then_tag_content.strip_prefix("then"))
+            .unwrap_or("")
+            .trim();
+
+        let value = if !value_str.is_empty() {
+            let value_offset = then_tag_start + then_tag_content.find(value_str).unwrap_or(0);
+            Some(self.parse_ts_pattern(value_str, value_offset)?)
+        } else {
+            None
+        };
+
+        let then_fragment = self.parse_block_children(stop_keywords, then_content_start)?;
+        Ok((Some(then_fragment), value))
+    }
+
+    /// Consume a closing block tag (e.g., {/await}, {/key}) and return the position after it.
+    fn expect_block_close(&mut self) -> usize {
+        if self.check(TokenKind::BlockClose) {
+            let close_tag_start = self.current_end;
+            // scan_block_tag_content can't fail for a valid BlockClose token
+            self.scan_block_tag_content(close_tag_start)
+                .map(|(_, after)| after)
+                .unwrap_or(self.current_start)
+        } else {
+            self.current_start
+        }
     }
 
     /// Parse a key block: {#key expression}...{/key}
@@ -829,11 +896,7 @@ impl<'a> SvelteParser<'a> {
                     const WRAPPER_PREFIX: &str = "function f(";
                     let wrapper = format!("{WRAPPER_PREFIX}{params_str}) {{}}");
                     let base = params_offset.saturating_sub(WRAPPER_PREFIX.len());
-                    match tsv_ts::parse_with_interner(
-                        &wrapper,
-                        base,
-                        std::rc::Rc::clone(&self.interner),
-                    ) {
+                    match tsv_ts::parse_with_interner(&wrapper, base, Rc::clone(&self.interner)) {
                         Ok(program) => {
                             if let Some(tsv_ts::Statement::FunctionDeclaration(func)) =
                                 program.body.into_iter().next()

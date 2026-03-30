@@ -140,14 +140,7 @@ pub(super) fn convert_snippet_block(
     let parameters = block
         .parameters
         .iter()
-        .map(|p| {
-            let mut expr = tsv_ts::ast::convert::convert_expression(p, source, loc, interner, 0);
-            // Snippet params don't get the nested loc.start quirk (same as arrow functions)
-            if let tsv_ts::ast::public::Expression::AssignmentPattern(ref mut ap) = expr {
-                tsv_ts::ast::convert::flatten_assignment_pattern_loc(ap);
-            }
-            expr
-        })
+        .map(|p| tsv_ts::ast::convert::convert_expression(p, source, loc, interner, 0))
         .collect();
 
     public::SnippetBlock {
