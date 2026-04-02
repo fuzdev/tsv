@@ -348,6 +348,28 @@ pub(super) fn build_call_doc_with_wrapping(
                             | internal::Expression::ArrayExpression(_)
                     )
                 {
+                    // When the arrow has own-line comments between => and body,
+                    // keep the arrow start on the same line as callee(, but add
+                    // trailing comma and break closing paren to its own line.
+                    // Matches Prettier's expandLastArg behavior where the arrow
+                    // is reprinted with trailingComma + softline appended.
+                    let body_start = body_expr.span().start;
+                    let arrow_token = printer.find_arrow_token_for(arrow);
+                    if printer.has_own_line_post_arrow_comment(arrow_token, body_start) {
+                        // group_break forces the arrow to break. Trailing comma
+                        // and softline after it cause `,\n)` when the group breaks.
+                        let inner = d.concat(&[
+                            d.text("("),
+                            d.group_break(arrow_doc),
+                            d.text(","),
+                            d.softline(),
+                            d.text(")"),
+                        ]);
+                        // The group wrapping the call args breaks because of
+                        // group_break, causing softline → newline.
+                        return d.concat(&[callee, d.group_break(inner)]);
+                    }
+
                     let state_hug = d.concat(&[callee, d.text("("), arrow_doc, d.text(")")]);
                     let state_arrow_break =
                         d.concat(&[callee, d.text("("), d.group_break(arrow_doc), d.text(")")]);
@@ -1015,6 +1037,16 @@ pub(super) fn build_call_doc_with_wrapping(
 
                     let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start);
 
+                    let has_blank_line = pc.has_blank_line_in_gap(
+                        printer.source,
+                        printer.line_breaks,
+                        arg_end,
+                        next_arg_start,
+                    );
+                    if has_blank_line {
+                        force_expansion = true;
+                    }
+
                     if pc.has_trailing_line() {
                         // Trailing line comments: comma, comment, hardline
                         force_expansion = true;
@@ -1022,6 +1054,9 @@ pub(super) fn build_call_doc_with_wrapping(
                         for comment in &pc.trailing_line {
                             arg_parts.push(d.text(" "));
                             arg_parts.push(printer.build_comment_doc(comment));
+                        }
+                        if has_blank_line {
+                            arg_parts.push(d.literalline());
                         }
                         arg_parts.push(d.hardline());
                     } else if pc.has_trailing_block() {
@@ -1035,6 +1070,9 @@ pub(super) fn build_call_doc_with_wrapping(
                             }
                         }
                         arg_parts.push(d.text(","));
+                        if has_blank_line {
+                            arg_parts.push(d.literalline());
+                        }
                         arg_parts.push(d.line());
                         // After-comma block comments (e.g., `arg1, /** @type {T} */ arg2`)
                         // go AFTER the line break so they stay with the next arg when breaking.
@@ -1049,14 +1087,31 @@ pub(super) fn build_call_doc_with_wrapping(
                     } else {
                         // No trailing comments, add comma and line
                         arg_parts.push(d.text(","));
+                        if has_blank_line {
+                            arg_parts.push(d.literalline());
+                        }
                         arg_parts.push(d.line());
                     }
 
                     // Add leading comments - inline with next arg if on same line
                     pc.emit_leading_comments_inline_aware(&mut arg_parts, printer, next_arg_start);
                 } else {
-                    // No comments, just comma and line
-                    arg_parts.push(d.comma_line());
+                    let has_blank_line = has_blank_line_between_args(
+                        printer.source,
+                        printer.line_breaks,
+                        arg_end,
+                        next_arg_start,
+                    );
+                    if has_blank_line {
+                        // No comments but blank line between args
+                        force_expansion = true;
+                        arg_parts.push(d.text(","));
+                        arg_parts.push(d.literalline());
+                        arg_parts.push(d.hardline());
+                    } else {
+                        // No comments, just comma and line
+                        arg_parts.push(d.comma_line());
+                    }
                 }
             } else {
                 // Last argument - check for trailing line comments before closing paren
@@ -1155,7 +1210,9 @@ pub(super) fn build_call_doc_with_wrapping(
         return wrap_call_with_soft_breaks(d, callee, arg_doc);
     }
 
-    // Check for blank lines between arguments (forces expansion and preservation)
+    // Check for blank lines between arguments (forces expansion and preservation).
+    // NOTE: This path is only reached when has_inter_arg_comments is false (the
+    // comment-handling path above returns early). No comment handling needed here.
     // Uses has_blank_line_between_args to skip stripped grouping paren span gaps.
     let has_blank_lines = call.arguments.windows(2).any(|window| {
         has_blank_line_between_args(

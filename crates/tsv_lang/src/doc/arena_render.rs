@@ -566,14 +566,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 let context = context.clone();
                 let merged_override = context.base_indent_override.or(cmd.base_indent_override);
 
-                // Check if inner is a Fill
-                let is_fill = matches!(&nodes[inner_doc.index()], DocNode::Fill(_));
-
-                if is_fill {
-                    let fill_range = match &nodes[inner_doc.index()] {
-                        DocNode::Fill(range) => *range,
-                        _ => unreachable!(),
-                    };
+                if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
                     let parts: Vec<DocId> = fill_range.resolve(&children_vec).to_vec();
                     drop(nodes);
                     drop(children_vec);
@@ -1177,12 +1170,8 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
 
                 if tracking_suffix {
                     let nodes = arena.borrow_nodes();
-                    let is_fill = matches!(&nodes[inner_doc.index()], DocNode::Fill(_));
-                    if is_fill {
-                        let fill_range = match &nodes[inner_doc.index()] {
-                            DocNode::Fill(range) => *range,
-                            _ => unreachable!(),
-                        };
+                    if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
+                        let fill_range = *fill_range;
                         let children_vec = arena.borrow_children();
                         let parts: Vec<DocId> = fill_range.resolve(&children_vec).to_vec();
                         drop(children_vec);

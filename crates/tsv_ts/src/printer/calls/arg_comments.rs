@@ -132,15 +132,9 @@ pub(crate) fn has_inter_argument_comments_slice(
         return false;
     }
 
-    for i in 0..arguments.len() - 1 {
-        let arg_end = arguments[i].span().end;
-        let next_arg_start = arguments[i + 1].span().start;
-        if printer.has_comments_between(arg_end, next_arg_start) {
-            return true;
-        }
-    }
-
-    false
+    arguments
+        .windows(2)
+        .any(|pair| printer.has_comments_between(pair[0].span().end, pair[1].span().start))
 }
 
 /// Check if the gap between two source positions contains only whitespace and parens,
@@ -467,6 +461,33 @@ impl<'a> PartitionedComments<'a> {
 
     pub fn has_trailing_block(&self) -> bool {
         !self.trailing_block.is_empty()
+    }
+
+    /// Check for a blank line in the gap between trailing and leading comments.
+    ///
+    /// When comments exist between arguments, we can't check the full arg-to-arg
+    /// range for blank lines because intermediate comment newlines would create
+    /// false positives. Instead, check the sub-range from:
+    /// - Start: after the last trailing line comment, or after the comma, or arg_end
+    /// - End: before the first leading comment, or next_arg_start
+    pub fn has_blank_line_in_gap(
+        &self,
+        source: &str,
+        line_breaks: &[u32],
+        arg_end: u32,
+        next_arg_start: u32,
+    ) -> bool {
+        let check_start = if self.has_trailing_line() {
+            self.trailing_line.last().unwrap().span.end
+        } else {
+            find_comma_pos(source, arg_end, next_arg_start).map_or(arg_end, |c| c as u32 + 1)
+        };
+        let check_end = if !self.leading.is_empty() {
+            self.leading[0].span.start
+        } else {
+            next_arg_start
+        };
+        tsv_lang::printing::has_blank_line_between_fast(line_breaks, check_start, check_end)
     }
 
     /// Emit trailing comments (block then line) with leading spaces to a parts vector.

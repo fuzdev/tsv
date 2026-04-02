@@ -7,9 +7,9 @@ use crate::deno::{PrettierParser, parse_css, parse_svelte, parse_typescript, run
 use crate::diff;
 use crate::fixtures::{
     self, Fixture, InputType, discover_invalid_variants, discover_prettier_intermediate_variants,
-    discover_prettier_quirk_variants, discover_prettier_stable_variants,
-    discover_unformatted_ours_variants, discover_unformatted_prettier_variants,
-    discover_unformatted_variants, discover_unknown_files, has_svelte_divergence_suffix, read_file,
+    discover_prettier_variant_variants, discover_unformatted_ours_variants,
+    discover_unformatted_prettier_variants, discover_unformatted_variants, discover_unknown_files,
+    discover_variant_variants, has_svelte_divergence_suffix, read_file,
 };
 use std::collections::HashMap;
 use std::fmt;
@@ -58,7 +58,7 @@ pub enum ValidationError {
     #[error("_prettier_divergence dir has unformatted_*.svelte: {}", .0.join(", "))]
     StructurePrettierDivergenceHasUnformatted(Vec<String>),
     #[error("{0} requires _prettier_divergence suffix")]
-    StructurePrettierQuirkWithoutPrettierDivergenceSuffix(String),
+    StructurePrettierVariantWithoutPrettierDivergenceSuffix(String),
     #[error("{0} requires _prettier_divergence suffix")]
     StructureUnformattedOursWithoutPrettierDivergenceSuffix(String),
 
@@ -101,9 +101,9 @@ pub enum ValidationError {
 
     // Normalization
     #[error("{0} not preserved by prettier")]
-    NormalizationPrettierQuirkNotPreserved(String),
+    NormalizationPrettierVariantNotPreserved(String),
     #[error("{0} doesn't normalize to input file")]
-    NormalizationPrettierQuirkNotNormalized(String),
+    NormalizationPrettierVariantNotNormalized(String),
     #[error("{0} doesn't normalize to input file (prettier)")]
     NormalizationUnformattedPrettierMismatch(String),
     #[error("{0} doesn't normalize to input file")]
@@ -121,15 +121,15 @@ pub enum ValidationError {
 
     // Prettier stable (dual-stable forms)
     #[error("{0} not preserved by prettier")]
-    NormalizationPrettierStableNotPreserved(String),
+    NormalizationVariantNotPreserved(String),
     #[error("{0} not idempotent with our formatter")]
-    NormalizationPrettierStableOursNotIdempotent(String),
-    #[error("{0} normalizes to input with our formatter (should be prettier_quirk_* instead)")]
-    NormalizationPrettierStableNormalizesToInput(String),
+    NormalizationVariantOursNotIdempotent(String),
+    #[error("{0} normalizes to input with our formatter (should be prettier_variant_* instead)")]
+    NormalizationVariantNormalizesToInput(String),
 
-    // Duplicates (within fixture) - prettier_stable
-    #[error("Duplicate prettier_stable files: {}", .0.join(", "))]
-    DuplicatePrettierStableWithinFixture(Vec<String>),
+    // Duplicates (within fixture) - variant
+    #[error("Duplicate variant files: {}", .0.join(", "))]
+    DuplicateVariantWithinFixture(Vec<String>),
 
     // Prettier intermediate (unstable first-pass output)
     #[error(
@@ -137,7 +137,7 @@ pub enum ValidationError {
     )]
     NormalizationPrettierIntermediateMismatch(String),
     #[error(
-        "{0} is stable (prettier preserves it) - should be prettier_quirk_* or prettier_stable_* instead"
+        "{0} is stable (prettier preserves it) - should be prettier_variant_* or variant_* instead"
     )]
     NormalizationPrettierIntermediateIsStable(String),
     #[error("{0} doesn't converge to input file after second pass")]
@@ -148,12 +148,12 @@ pub enum ValidationError {
     // Duplicates (within fixture)
     #[error("Duplicate unformatted files: {}", .0.join(", "))]
     DuplicateUnformattedWithinFixture(Vec<String>),
-    #[error("Duplicate prettier_quirk files: {}", .0.join(", "))]
-    DuplicatePrettierQuirkWithinFixture(Vec<String>),
+    #[error("Duplicate prettier_variant files: {}", .0.join(", "))]
+    DuplicatePrettierVariantWithinFixture(Vec<String>),
     #[error("{0} is redundant (identical to {1})")]
-    RedundantUnformattedMatchesQuirk(String, String),
+    RedundantUnformattedMatchesPrettierVariant(String, String),
     #[error("{0} is redundant (identical to output_prettier)")]
-    RedundantPrettierQuirkMatchesOutputPrettier(String),
+    RedundantPrettierVariantMatchesOutputPrettier(String),
 
     // Invalid syntax (input_invalid_* files)
     #[error("{0} parsed successfully by our parser (should fail)")]
@@ -195,7 +195,7 @@ impl ValidationError {
             Self::StructurePrettierDivergenceMissingSuffix
             | Self::StructurePrettierDivergenceSuffixWithoutFiles
             | Self::StructurePrettierDivergenceHasUnformatted(_)
-            | Self::StructurePrettierQuirkWithoutPrettierDivergenceSuffix(_)
+            | Self::StructurePrettierVariantWithoutPrettierDivergenceSuffix(_)
             | Self::StructureUnformattedOursWithoutPrettierDivergenceSuffix(_) => {
                 "See docs/fixture_overview.md for _prettier_divergence naming rules"
             }
@@ -244,10 +244,10 @@ impl ValidationError {
             Self::FormatterErrorInDivergence(_) => {
                 "Fix the formatter to support this syntax (svelte_divergence fixture)"
             }
-            Self::NormalizationPrettierQuirkNotPreserved(_) => {
+            Self::NormalizationPrettierVariantNotPreserved(_) => {
                 "Prettier doesn't preserve this file - rename to unformatted_*.svelte"
             }
-            Self::NormalizationPrettierQuirkNotNormalized(_)
+            Self::NormalizationPrettierVariantNotNormalized(_)
             | Self::NormalizationUnformattedNotNormalized(_)
             | Self::NormalizationUnformattedOursNotNormalized(_) => {
                 "Fix formatter to normalize this variant correctly"
@@ -264,23 +264,21 @@ impl ValidationError {
             Self::NormalizationUnformattedPrettierMissingTarget(_) => {
                 "Add output_prettier.* file or remove unformatted_prettier_* files"
             }
-            Self::NormalizationPrettierStableNotPreserved(_) => {
+            Self::NormalizationVariantNotPreserved(_) => {
                 "Prettier doesn't preserve this file - check if it should be a different variant type"
             }
-            Self::NormalizationPrettierStableOursNotIdempotent(_) => {
-                "Our formatter doesn't preserve this file - if it normalizes to input, use prettier_quirk_* instead"
+            Self::NormalizationVariantOursNotIdempotent(_) => {
+                "Our formatter doesn't preserve this file - if it normalizes to input, use prettier_variant_* instead"
             }
-            Self::NormalizationPrettierStableNormalizesToInput(_) => {
-                "Our formatter normalizes this to input - rename to prettier_quirk_* instead"
+            Self::NormalizationVariantNormalizesToInput(_) => {
+                "Our formatter normalizes this to input - rename to prettier_variant_* instead"
             }
-            Self::DuplicatePrettierStableWithinFixture(_) => {
-                "Remove duplicate files (identical content)"
-            }
+            Self::DuplicateVariantWithinFixture(_) => "Remove duplicate files (identical content)",
             Self::NormalizationPrettierIntermediateMismatch(_) => {
                 "Update prettier_intermediate_* to match prettier's actual first-pass output"
             }
             Self::NormalizationPrettierIntermediateIsStable(_) => {
-                "Rename to prettier_quirk_* or prettier_stable_* (prettier preserves this idempotently)"
+                "Rename to prettier_variant_* or variant_* (prettier preserves this idempotently)"
             }
             Self::NormalizationPrettierIntermediateNotConverging(_) => {
                 "Check prettier_intermediate_* content - should converge to input after re-formatting"
@@ -289,13 +287,13 @@ impl ValidationError {
                 "Add corresponding unformatted_ours_* file or remove prettier_intermediate_* file"
             }
             Self::DuplicateUnformattedWithinFixture(_)
-            | Self::DuplicatePrettierQuirkWithinFixture(_) => {
+            | Self::DuplicatePrettierVariantWithinFixture(_) => {
                 "Remove duplicate files (identical content)"
             }
-            Self::RedundantUnformattedMatchesQuirk(_, _) => {
-                "Remove redundant file (already covered by prettier_quirk_*)"
+            Self::RedundantUnformattedMatchesPrettierVariant(_, _) => {
+                "Remove redundant file (already covered by prettier_variant_*)"
             }
-            Self::RedundantPrettierQuirkMatchesOutputPrettier(_) => {
+            Self::RedundantPrettierVariantMatchesOutputPrettier(_) => {
                 "Remove redundant file (output_prettier already documents this prettier output)"
             }
             Self::InvalidSyntaxParsedByOurs(_) => {
@@ -335,7 +333,7 @@ impl ValidationError {
             | Self::StructurePrettierDivergenceMissingSuffix
             | Self::StructurePrettierDivergenceSuffixWithoutFiles
             | Self::StructurePrettierDivergenceHasUnformatted(_)
-            | Self::StructurePrettierQuirkWithoutPrettierDivergenceSuffix(_)
+            | Self::StructurePrettierVariantWithoutPrettierDivergenceSuffix(_)
             | Self::StructureUnformattedOursWithoutPrettierDivergenceSuffix(_)
             | Self::StructureVariantIdenticalToInput(_)
             | Self::StructureMissingReadme
@@ -354,8 +352,8 @@ impl ValidationError {
             | Self::FormatterError(_)
             | Self::FormatterErrorInDivergence(_) => "Formatter",
 
-            Self::NormalizationPrettierQuirkNotPreserved(_)
-            | Self::NormalizationPrettierQuirkNotNormalized(_)
+            Self::NormalizationPrettierVariantNotPreserved(_)
+            | Self::NormalizationPrettierVariantNotNormalized(_)
             | Self::NormalizationUnformattedNotNormalized(_)
             | Self::NormalizationUnformattedOursNotNormalized(_)
             | Self::NormalizationUnformattedPrettierMismatch(_)
@@ -363,18 +361,18 @@ impl ValidationError {
             | Self::NormalizationUnformattedPrettierNotNormalized(_)
             | Self::NormalizationUnformattedPrettierMissingTarget(_)
             | Self::NormalizationPrettierIntermediateMismatch(_)
-            | Self::NormalizationPrettierStableNotPreserved(_)
-            | Self::NormalizationPrettierStableOursNotIdempotent(_)
-            | Self::NormalizationPrettierStableNormalizesToInput(_)
+            | Self::NormalizationVariantNotPreserved(_)
+            | Self::NormalizationVariantOursNotIdempotent(_)
+            | Self::NormalizationVariantNormalizesToInput(_)
             | Self::NormalizationPrettierIntermediateIsStable(_)
             | Self::NormalizationPrettierIntermediateNotConverging(_)
             | Self::NormalizationPrettierIntermediateMissingSource(_) => "Normalization",
 
             Self::DuplicateUnformattedWithinFixture(_)
-            | Self::DuplicatePrettierQuirkWithinFixture(_)
-            | Self::DuplicatePrettierStableWithinFixture(_)
-            | Self::RedundantUnformattedMatchesQuirk(_, _)
-            | Self::RedundantPrettierQuirkMatchesOutputPrettier(_) => "Duplicates",
+            | Self::DuplicatePrettierVariantWithinFixture(_)
+            | Self::DuplicateVariantWithinFixture(_)
+            | Self::RedundantUnformattedMatchesPrettierVariant(_, _)
+            | Self::RedundantPrettierVariantMatchesOutputPrettier(_) => "Duplicates",
 
             Self::InvalidSyntaxParsedByOurs(_)
             | Self::InvalidSyntaxParsedBySvelte(_)
@@ -397,10 +395,10 @@ pub enum ValidationSuccess {
     ParserExpectedSvelteMatches,
     FormatterInputIdempotent,
     FormatterMatchesPrettier,
-    NormalizationVariantsOk(usize),  // number of variants checked
-    PrettierStableVariantsOk(usize), // number of prettier_stable_* checked
-    NormalizationSkipped,            // skipped due to formatter failure
-    InvalidSyntaxVariantsOk(usize),  // number of invalid syntax files validated
+    NormalizationVariantsOk(usize), // number of variants checked
+    VariantVariantsOk(usize),       // number of variant_* checked
+    NormalizationSkipped,           // skipped due to formatter failure
+    InvalidSyntaxVariantsOk(usize), // number of invalid syntax files validated
 }
 
 impl fmt::Display for ValidationSuccess {
@@ -418,8 +416,8 @@ impl fmt::Display for ValidationSuccess {
             Self::FormatterInputIdempotent => write!(f, "input file is idempotent"),
             Self::FormatterMatchesPrettier => write!(f, "input file matches prettier"),
             Self::NormalizationVariantsOk(n) => write!(f, "{n} variants normalize correctly"),
-            Self::PrettierStableVariantsOk(n) => {
-                write!(f, "{n} prettier_stable_* variants validated")
+            Self::VariantVariantsOk(n) => {
+                write!(f, "{n} variant_* variants validated")
             }
             Self::NormalizationSkipped => write!(f, "SKIPPED (formatter not idempotent)"),
             Self::InvalidSyntaxVariantsOk(n) => {
@@ -439,12 +437,14 @@ pub struct FixtureValidation {
     pub unformatted_count: usize,
     pub unformatted_ours_count: usize,
     pub unformatted_prettier_count: usize,
-    pub prettier_quirk_count: usize,
-    pub prettier_stable_count: usize,
+    pub prettier_variant_count: usize,
+    pub variant_count: usize,
     pub prettier_intermediate_count: usize,
     pub invalid_syntax_count: usize,
     /// Input content for cross-fixture duplicate detection (populated during validation)
     pub input_content: Option<String>,
+    /// Input file name for cross-fixture duplicate detection (e.g., "input.svelte", "input.ts")
+    pub input_file_name: Option<String>,
     /// Undocumented Prettier outputs from unformatted_ours_* files (informational, not blocking)
     pub undocumented_prettier_outputs: Vec<UndocumentedPrettierOutput>,
 }
@@ -468,11 +468,12 @@ impl FixtureValidation {
             unformatted_count: 0,
             unformatted_ours_count: 0,
             unformatted_prettier_count: 0,
-            prettier_quirk_count: 0,
-            prettier_stable_count: 0,
+            prettier_variant_count: 0,
+            variant_count: 0,
             prettier_intermediate_count: 0,
             invalid_syntax_count: 0,
             input_content: None,
+            input_file_name: None,
             undocumented_prettier_outputs: Vec::new(),
         }
     }
@@ -502,8 +503,11 @@ struct DuplicateDetector {
 }
 
 impl DuplicateDetector {
-    fn record(&mut self, fixture_path: &str, content: &str) {
+    fn record(&mut self, fixture_path: &str, content: &str, input_file: &str) {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        // Include input file name so different file types (input.ts, input.css, input.svelte)
+        // with identical content don't collide
+        input_file.hash(&mut hasher);
         content.hash(&mut hasher);
         let hash = hasher.finish();
 
@@ -554,8 +558,9 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
         }
     };
 
-    // Store input content for cross-fixture duplicate detection (done after collection)
+    // Store input content and file name for cross-fixture duplicate detection
     result.input_content = Some(input.clone());
+    result.input_file_name = Some(fixture.input_file.clone());
 
     // Get directory info and input type
     let fixture_dir = &fixture.path;
@@ -763,31 +768,31 @@ fn validate_normalization_ours(
     let fixture_dir = &fixture.path;
     let mut total_variants = 0;
 
-    // N2: prettier_quirk_* → input file (our formatter)
-    let prettier_quirk_variants = discover_prettier_quirk_variants(fixture_dir, input_ext);
-    result.prettier_quirk_count = prettier_quirk_variants.len();
-    let mut quirk_contents: HashMap<String, Vec<String>> = HashMap::new();
+    // N2: prettier_variant_* → input file (our formatter)
+    let prettier_variant_variants = discover_prettier_variant_variants(fixture_dir, input_ext);
+    result.prettier_variant_count = prettier_variant_variants.len();
+    let mut pv_contents: HashMap<String, Vec<String>> = HashMap::new();
 
-    for quirk_name in &prettier_quirk_variants {
-        let quirk_path = fixture_dir.join(quirk_name);
-        let Ok(quirk_content) = read_file(&quirk_path) else {
+    for pv_name in &prettier_variant_variants {
+        let pv_path = fixture_dir.join(pv_name);
+        let Ok(pv_content) = read_file(&pv_path) else {
             continue;
         };
 
         // Track for duplicate detection
-        quirk_contents
-            .entry(quirk_content.clone())
+        pv_contents
+            .entry(pv_content.clone())
             .or_default()
-            .push(quirk_name.clone());
+            .push(pv_name.clone());
 
-        match fixtures::format_with_our_formatter(&quirk_content, quirk_name) {
+        match fixtures::format_with_our_formatter(&pv_content, pv_name) {
             Ok(formatted) => {
                 if formatted != *input {
-                    result.add_error(ValidationError::NormalizationPrettierQuirkNotNormalized(
-                        quirk_name.clone(),
+                    result.add_error(ValidationError::NormalizationPrettierVariantNotNormalized(
+                        pv_name.clone(),
                     ));
                     diff::print_diff_with_options(
-                        &format!("normalization: {}/{}", fixture.relative_path, quirk_name),
+                        &format!("normalization: {}/{}", fixture.relative_path, pv_name),
                         &formatted,
                         input,
                         &diff::DiffOptions::idempotency(),
@@ -797,33 +802,31 @@ fn validate_normalization_ours(
                 }
             }
             Err(e) => {
-                result.add_error(ValidationError::FormatterError(format!(
-                    "{quirk_name}: {e}"
-                )));
+                result.add_error(ValidationError::FormatterError(format!("{pv_name}: {e}")));
             }
         }
     }
 
-    // Check for duplicate prettier_quirk files
-    for variants in quirk_contents.values() {
+    // Check for duplicate prettier_variant files
+    for variants in pv_contents.values() {
         if variants.len() > 1 {
-            result.add_error(ValidationError::DuplicatePrettierQuirkWithinFixture(
+            result.add_error(ValidationError::DuplicatePrettierVariantWithinFixture(
                 variants.clone(),
             ));
         }
     }
 
-    // Check for prettier_quirk files identical to output_prettier (redundant)
+    // Check for prettier_variant files identical to output_prettier (redundant)
     let output_prettier_path = fixture.output_prettier_path();
     if output_prettier_path.exists()
         && let Ok(output_prettier_content) = read_file(&output_prettier_path)
     {
-        for (quirk_content, quirk_files) in &quirk_contents {
-            if *quirk_content == output_prettier_content {
-                for quirk_file in quirk_files {
+        for (pv_content, pv_files) in &pv_contents {
+            if *pv_content == output_prettier_content {
+                for pv_file in pv_files {
                     result.add_error(
-                        ValidationError::RedundantPrettierQuirkMatchesOutputPrettier(
-                            quirk_file.clone(),
+                        ValidationError::RedundantPrettierVariantMatchesOutputPrettier(
+                            pv_file.clone(),
                         ),
                     );
                 }
@@ -881,14 +884,14 @@ fn validate_normalization_ours(
         }
     }
 
-    // Check for redundant unformatted files (identical to prettier_quirk)
+    // Check for redundant unformatted files (identical to prettier_variant)
     for (unformatted_content, unformatted_files) in &unformatted_contents {
-        for (quirk_content, quirk_files) in &quirk_contents {
-            if unformatted_content == quirk_content {
+        for (pv_content, pv_files) in &pv_contents {
+            if unformatted_content == pv_content {
                 for unformatted_file in unformatted_files {
-                    result.add_error(ValidationError::RedundantUnformattedMatchesQuirk(
+                    result.add_error(ValidationError::RedundantUnformattedMatchesPrettierVariant(
                         unformatted_file.clone(),
-                        quirk_files[0].clone(),
+                        pv_files[0].clone(),
                     ));
                 }
             }
@@ -929,22 +932,22 @@ fn validate_normalization_ours(
         }
     }
 
-    // N9b, N9c: prettier_stable_* validation (our formatter)
+    // N9b, N9c: variant_* validation (our formatter)
     // N9b: ours(ours(file)) == ours(file) — our output is idempotent
-    // N9c: ours(file) != input — must NOT normalize to input (else should be prettier_quirk_*)
-    let prettier_stable_variants = discover_prettier_stable_variants(fixture_dir, input_ext);
-    result.prettier_stable_count = prettier_stable_variants.len();
-    let mut prettier_stable_contents: HashMap<String, Vec<String>> = HashMap::new();
-    let mut prettier_stable_ok = 0;
+    // N9c: ours(file) != input — must NOT normalize to input (else should be prettier_variant_*)
+    let variant_variants = discover_variant_variants(fixture_dir, input_ext);
+    result.variant_count = variant_variants.len();
+    let mut variant_contents: HashMap<String, Vec<String>> = HashMap::new();
+    let mut variant_ok = 0;
 
-    for stable_name in &prettier_stable_variants {
+    for stable_name in &variant_variants {
         let stable_path = fixture_dir.join(stable_name);
         let Ok(stable_content) = read_file(&stable_path) else {
             continue;
         };
 
         // Track for duplicate detection
-        prettier_stable_contents
+        variant_contents
             .entry(stable_content.clone())
             .or_default()
             .push(stable_name.clone());
@@ -953,11 +956,9 @@ fn validate_normalization_ours(
             Ok(formatted) => {
                 // N9c: Must NOT normalize to input
                 if formatted == *input {
-                    result.add_error(
-                        ValidationError::NormalizationPrettierStableNormalizesToInput(
-                            stable_name.clone(),
-                        ),
-                    );
+                    result.add_error(ValidationError::NormalizationVariantNormalizesToInput(
+                        stable_name.clone(),
+                    ));
                     continue;
                 }
 
@@ -966,13 +967,13 @@ fn validate_normalization_ours(
                     Ok(second_pass) => {
                         if second_pass != formatted {
                             result.add_error(
-                                ValidationError::NormalizationPrettierStableOursNotIdempotent(
+                                ValidationError::NormalizationVariantOursNotIdempotent(
                                     stable_name.clone(),
                                 ),
                             );
                             diff::print_diff_with_options(
                                 &format!(
-                                    "prettier_stable idempotency: {}/{}",
+                                    "variant idempotency: {}/{}",
                                     fixture.relative_path, stable_name
                                 ),
                                 &formatted,
@@ -980,7 +981,7 @@ fn validate_normalization_ours(
                                 &diff::DiffOptions::idempotency(),
                             );
                         } else {
-                            prettier_stable_ok += 1;
+                            variant_ok += 1;
                         }
                     }
                     Err(e) => {
@@ -998,19 +999,17 @@ fn validate_normalization_ours(
         }
     }
 
-    // Check for duplicate prettier_stable files
-    for variants in prettier_stable_contents.values() {
+    // Check for duplicate variant files
+    for variants in variant_contents.values() {
         if variants.len() > 1 {
-            result.add_error(ValidationError::DuplicatePrettierStableWithinFixture(
+            result.add_error(ValidationError::DuplicateVariantWithinFixture(
                 variants.clone(),
             ));
         }
     }
 
-    if prettier_stable_ok > 0 {
-        result.add_success(ValidationSuccess::PrettierStableVariantsOk(
-            prettier_stable_ok,
-        ));
+    if variant_ok > 0 {
+        result.add_success(ValidationSuccess::VariantVariantsOk(variant_ok));
     }
 
     if total_variants > 0 {
@@ -1235,26 +1234,26 @@ async fn validate_normalization_prettier(
     let fixture_dir = &fixture.path;
     let prettier_parser = fixture.input_type().prettier_parser();
 
-    // N1: prettier(prettier_quirk_*) == prettier_quirk_* (prettier preserves its stable variants)
-    let prettier_quirk_variants = discover_prettier_quirk_variants(fixture_dir, input_ext);
-    for quirk_name in &prettier_quirk_variants {
-        let quirk_path = fixture_dir.join(quirk_name);
-        let Ok(quirk_content) = read_file(&quirk_path) else {
+    // N1: prettier(prettier_variant_*) == prettier_variant_* (prettier preserves its stable variants)
+    let prettier_variant_variants = discover_prettier_variant_variants(fixture_dir, input_ext);
+    for pv_name in &prettier_variant_variants {
+        let pv_path = fixture_dir.join(pv_name);
+        let Ok(pv_content) = read_file(&pv_path) else {
             continue;
         };
 
-        match run_prettier(&quirk_content, prettier_parser).await {
+        match run_prettier(&pv_content, prettier_parser).await {
             Ok(formatted) => {
-                if formatted != quirk_content {
-                    result.add_error(ValidationError::NormalizationPrettierQuirkNotPreserved(
-                        quirk_name.clone(),
+                if formatted != pv_content {
+                    result.add_error(ValidationError::NormalizationPrettierVariantNotPreserved(
+                        pv_name.clone(),
                     ));
                     diff::print_diff_with_options(
                         &format!(
-                            "quirk not preserved: {}/{}",
-                            fixture.relative_path, quirk_name
+                            "prettier_variant not preserved: {}/{}",
+                            fixture.relative_path, pv_name
                         ),
-                        &quirk_content,
+                        &pv_content,
                         &formatted,
                         &diff::DiffOptions::prettier_behavior(),
                     );
@@ -1264,9 +1263,9 @@ async fn validate_normalization_prettier(
         }
     }
 
-    // N9a: prettier(prettier_stable_*) == prettier_stable_* (prettier preserves these too)
-    let prettier_stable_variants = discover_prettier_stable_variants(fixture_dir, input_ext);
-    for stable_name in &prettier_stable_variants {
+    // N9a: prettier(variant_*) == variant_* (prettier preserves these too)
+    let variant_variants = discover_variant_variants(fixture_dir, input_ext);
+    for stable_name in &variant_variants {
         let stable_path = fixture_dir.join(stable_name);
         let Ok(stable_content) = read_file(&stable_path) else {
             continue;
@@ -1275,12 +1274,12 @@ async fn validate_normalization_prettier(
         match run_prettier(&stable_content, prettier_parser).await {
             Ok(formatted) => {
                 if formatted != stable_content {
-                    result.add_error(ValidationError::NormalizationPrettierStableNotPreserved(
+                    result.add_error(ValidationError::NormalizationVariantNotPreserved(
                         stable_name.clone(),
                     ));
                     diff::print_diff_with_options(
                         &format!(
-                            "prettier_stable not preserved: {}/{}",
+                            "variant not preserved: {}/{}",
                             fixture.relative_path, stable_name
                         ),
                         &stable_content,
@@ -1294,8 +1293,8 @@ async fn validate_normalization_prettier(
     }
 
     // N3: prettier(unformatted_*) == input
-    // Skip if prettier_quirks exist (prettier won't normalize due to quirks)
-    if !prettier_quirk_variants.is_empty() {
+    // Skip if prettier_variants exist (prettier won't normalize due to variants)
+    if !prettier_variant_variants.is_empty() {
         return;
     }
 
@@ -1427,7 +1426,7 @@ async fn validate_normalization_prettier(
         match run_prettier(&intermediate_content, prettier_parser).await {
             Ok(second_pass) => {
                 if second_pass == intermediate_content {
-                    // It's stable - should be prettier_quirk_* instead
+                    // It's stable - should be prettier_variant_* instead
                     result.add_error(ValidationError::NormalizationPrettierIntermediateIsStable(
                         intermediate_name.clone(),
                     ));
@@ -1519,7 +1518,7 @@ async fn validate_normalization_prettier(
 
     // N10: Cross-path discovery — find undocumented Prettier outputs
     // After N7, check which unformatted_ours_* prettier outputs weren't consumed by prettier_intermediate_*
-    // Then check if those outputs match any known file content (output_prettier, prettier_quirk_*, prettier_stable_*)
+    // Then check if those outputs match any known file content (output_prettier, prettier_variant_*, variant_*)
     {
         // Build set of suffixes claimed by prettier_intermediate_*
         let mut claimed_suffixes: std::collections::HashSet<String> =
@@ -1536,7 +1535,7 @@ async fn validate_normalization_prettier(
         // Also claim suffixes where prettier(unformatted_ours_*) == input (those got N6 errors, not novel)
         // These are already not in unformatted_ours_prettier_outputs (they were flagged as errors)
 
-        // Build known content set from output_prettier, prettier_quirk_*, prettier_stable_*
+        // Build known content set from output_prettier, prettier_variant_*, variant_*
         let mut known_contents: Vec<String> = Vec::new();
 
         // output_prettier content
@@ -1547,16 +1546,16 @@ async fn validate_normalization_prettier(
             known_contents.push(content);
         }
 
-        // prettier_quirk_* contents
-        for quirk_name in &prettier_quirk_variants {
-            let quirk_path = fixture_dir.join(quirk_name);
-            if let Ok(content) = read_file(&quirk_path) {
+        // prettier_variant_* contents
+        for pv_name in &prettier_variant_variants {
+            let pv_path = fixture_dir.join(pv_name);
+            if let Ok(content) = read_file(&pv_path) {
                 known_contents.push(content);
             }
         }
 
-        // prettier_stable_* contents
-        for stable_name in &prettier_stable_variants {
+        // variant_* contents
+        for stable_name in &variant_variants {
             let stable_path = fixture_dir.join(stable_name);
             if let Ok(content) = read_file(&stable_path) {
                 known_contents.push(content);
@@ -1695,8 +1694,8 @@ pub struct ValidationSummary {
     pub total_unformatted: usize,
     pub total_unformatted_ours: usize,
     pub total_unformatted_prettier: usize,
-    pub total_prettier_quirk: usize,
-    pub total_prettier_stable: usize,
+    pub total_prettier_variant: usize,
+    pub total_variant: usize,
     pub total_prettier_intermediate: usize,
     pub total_invalid_syntax: usize,
     pub results: Vec<FixtureValidation>,
@@ -1714,8 +1713,8 @@ impl ValidationSummary {
         self.total_unformatted += result.unformatted_count;
         self.total_unformatted_ours += result.unformatted_ours_count;
         self.total_unformatted_prettier += result.unformatted_prettier_count;
-        self.total_prettier_quirk += result.prettier_quirk_count;
-        self.total_prettier_stable += result.prettier_stable_count;
+        self.total_prettier_variant += result.prettier_variant_count;
+        self.total_variant += result.variant_count;
         self.total_prettier_intermediate += result.prettier_intermediate_count;
         self.total_invalid_syntax += result.invalid_syntax_count;
         self.total_undocumented_prettier += result.undocumented_prettier_outputs.len();
@@ -1734,7 +1733,8 @@ impl ValidationSummary {
         let mut detector = DuplicateDetector::default();
         for result in &self.results {
             if let Some(ref content) = result.input_content {
-                detector.record(&result.fixture_path, content);
+                let input_file = result.input_file_name.as_deref().unwrap_or("input.svelte");
+                detector.record(&result.fixture_path, content, input_file);
             }
         }
         self.cross_fixture_duplicates = detector.find_duplicates();
@@ -1879,14 +1879,14 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
                 summary.total_unformatted_prettier
             ));
         }
-        if summary.total_prettier_quirk > 0 {
-            variant_parts.push(format!("{} prettier_quirk_*", summary.total_prettier_quirk));
-        }
-        if summary.total_prettier_stable > 0 {
+        if summary.total_prettier_variant > 0 {
             variant_parts.push(format!(
-                "{} prettier_stable_*",
-                summary.total_prettier_stable
+                "{} prettier_variant_*",
+                summary.total_prettier_variant
             ));
+        }
+        if summary.total_variant > 0 {
+            variant_parts.push(format!("{} variant_*", summary.total_variant));
         }
         if summary.total_prettier_intermediate > 0 {
             variant_parts.push(format!(

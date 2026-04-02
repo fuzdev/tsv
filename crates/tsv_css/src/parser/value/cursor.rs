@@ -171,8 +171,8 @@ impl<'a> ValueCursor<'a> {
     /// nested structures (don't split on delimiters inside these).
     fn update_state(&mut self, ch: char) {
         match ch {
-            '(' => self.paren_depth += 1,
-            ')' => self.paren_depth = self.paren_depth.saturating_sub(1),
+            '(' if !self.in_quote => self.paren_depth += 1,
+            ')' if !self.in_quote => self.paren_depth = self.paren_depth.saturating_sub(1),
             '\'' | '"' if !self.in_quote => {
                 self.in_quote = true;
                 self.quote_char = ch;
@@ -536,6 +536,33 @@ mod tests {
         cursor.update_state('"');
         assert!(cursor.in_quote);
         assert_eq!(cursor.quote_char, '"');
+        cursor.update_state('"');
+        assert!(!cursor.in_quote);
+    }
+
+    #[test]
+    fn test_parens_inside_quotes_ignored() {
+        // Parens inside strings must not affect paren_depth
+        let source = r#""(" b"#;
+        let span = Span { start: 0, end: 5 };
+        let mut cursor = ValueCursor::new(source, span);
+
+        // consume_until whitespace should split at the space between "(" and b
+        let (start, end) = cursor.consume_until(char::is_whitespace);
+        assert_eq!(&source[start..end], r#""(""#);
+        assert_eq!(cursor.paren_depth, 0);
+    }
+
+    #[test]
+    fn test_update_state_parens_inside_quotes() {
+        let source = r#""(""#;
+        let span = Span { start: 0, end: 3 };
+        let mut cursor = ValueCursor::new(source, span);
+
+        cursor.update_state('"');
+        assert!(cursor.in_quote);
+        cursor.update_state('(');
+        assert_eq!(cursor.paren_depth, 0); // Must stay 0 — inside quotes
         cursor.update_state('"');
         assert!(!cursor.in_quote);
     }

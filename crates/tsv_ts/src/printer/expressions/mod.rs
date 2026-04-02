@@ -556,12 +556,12 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a template literal.
     ///
-    /// Based on Prettier's two-phase approach (template-literal.js), with
-    /// divergences for width enforcement and user intent preservation:
-    /// 1. Render each `${}` expression at infinite width
-    /// 2. If NO newlines → wrap with softline (divergence: Prettier uses atomic text)
-    /// 3. If HAS newlines → qualifying types get softline wrap, others keep doc as-is
-    /// 4. Wrap in group; use group_break when user wrote `${\n expr \n}`
+    /// Two formatting strategies based on expression type:
+    /// - **Qualifying types** (Identifier, MemberExpression, Conditional, etc.):
+    ///   softline wrapping in a regular group — `${/}` breaks when line exceeds width.
+    /// - **Non-qualifying types** (CallExpression, chains, arrows, etc.):
+    ///   no softlines at `${/}` — expression breaks internally, boundaries hug.
+    ///   Matches Prettier's approach where these types keep their doc structure.
     fn build_template_literal_doc(
         &self,
         template: &crate::ast::internal::TemplateLiteral,
@@ -572,12 +572,6 @@ impl<'a> Printer<'a> {
         parts.push(d.text("`"));
 
         let mut previous_quasi_indent_size: usize = 0;
-        // Track whether any quasi before the current interpolation contains a newline.
-        // When true, literalline has been emitted (resetting output column to 0) but the
-        // indent level on the command stack still carries the code context. We use align(0)
-        // to reset the indent to absolute 0. When false, the template is inline and the
-        // code context indent is correct — no reset needed.
-        let mut any_quasi_had_newline = false;
 
         for (i, quasi) in template.quasis.iter().enumerate() {
             // Template content — split at newlines and join with literalline
@@ -593,9 +587,7 @@ impl<'a> Printer<'a> {
 
                 // Calculate indent size from quasi text (Prettier's getIndentSize)
                 let text = &quasi.raw;
-                let quasi_has_newline = text.contains('\n');
-                any_quasi_had_newline = any_quasi_had_newline || quasi_has_newline;
-                let indent_size = if quasi_has_newline {
+                let indent_size = if text.contains('\n') {
                     self.get_template_indent_size(text)
                 } else {
                     previous_quasi_indent_size
@@ -603,14 +595,11 @@ impl<'a> Printer<'a> {
                 previous_quasi_indent_size = indent_size;
 
                 // Build expression doc
-                let prev_in_template = self.in_template_interpolation.get();
-                self.in_template_interpolation.set(true);
                 let expr_doc = if needs_parens(expr, ParenContext::TemplateLiteralExpression) {
                     d.parens(self.build_expression_doc(expr))
                 } else {
                     self.build_expression_doc(expr)
                 };
-                self.in_template_interpolation.set(prev_in_template);
 
                 // Collect comments in the interpolation region
                 let leading_comments: Vec<_> =
@@ -644,73 +633,44 @@ impl<'a> Printer<'a> {
                     d.concat(&[leading_comments_doc, expr_doc, trailing_comments_doc])
                 };
 
-                // Detect if user deliberately wrapped ${...} across lines by
-                // checking for newlines BETWEEN ${ and the expression start, or
-                // between the expression end and }. This distinguishes:
-                //   `${  \n  expr  \n  }` → user wrapped (preserve with group_break)
-                //   `${obj\n.method()}` → expression-internal newline (don't force break)
-                let interp_start = quasi.span.end as usize + 2; // skip "${"
-                let interp_end = next_quasi.span.start as usize - 1; // before "}"
-                let expr_start = expr.span().start as usize;
-                let expr_end = expr.span().end as usize;
-                let before_expr = self.source.get(interp_start..expr_start).unwrap_or("");
-                let after_expr = self.source.get(expr_end..interp_end).unwrap_or("");
-                let user_wrapped_expression =
-                    before_expr.contains('\n') || after_expr.contains('\n');
-
-                // Check whether expression doc has structural newlines (hardlines)
-                // by rendering at infinite width. Softlines/lines become spaces;
-                // only hardlines (from block bodies, literalline in templates, etc.)
-                // produce newlines. This matches Prettier's two-phase approach.
-                let rendered = self.render_arena_doc_flat(full_expr_doc);
-                let interpolation_has_newline = rendered.contains('\n');
-
                 let has_comments = !leading_comments.is_empty() || !trailing_comments.is_empty();
+                let has_trailing_line_comment = trailing_comments.iter().any(|c| !c.is_block);
 
-                let expression_doc = if !interpolation_has_newline {
-                    // No structural newlines: wrap ALL types with softline.
-                    // The group breaks when the line exceeds print_width.
-                    // Diverges from Prettier (which uses atomic text here) —
-                    // we keep doc structure so ${/} can break to respect print_width.
-                    d.concat(&[
-                        d.indent(d.concat(&[d.softline(), full_expr_doc])),
-                        d.softline(),
-                    ])
-                } else if Self::is_template_softline_expression(expr, has_comments)
-                    || user_wrapped_expression
-                {
-                    // Structural newlines + qualifying type or user-wrapped:
-                    // wrap with softline. Qualifying types match Prettier.
-                    // User-wrapped preserves intent.
+                // Qualifying types and trailing line comments use softline wrapping
+                // at ${/} boundaries so the group can break there.
+                // Non-qualifying types keep expression doc as-is (no ${/} softlines)
+                // so ${ hugs while the expression breaks internally.
+                let use_softline_wrap = has_trailing_line_comment
+                    || Self::is_template_softline_expression(expr, has_comments);
+                let inner = if use_softline_wrap {
                     d.concat(&[
                         d.indent(d.concat(&[d.softline(), full_expr_doc])),
                         d.softline(),
                     ])
                 } else {
-                    // Structural newlines + non-qualifying type (chains, calls,
-                    // arrows with block bodies): keep doc as-is.
-                    // Chain starts inline after ${. Matches Prettier.
                     full_expr_doc
                 };
 
                 // Apply alignment based on quasi indent (Prettier's addAlignmentToDoc).
-                // Only when a preceding quasi had a newline (literalline was emitted),
-                // because that resets output column to 0 but leaves the command stack's
-                // indent at the code context level. align(0) inside add_alignment_to_doc
-                // resets to absolute 0, then indent^n positions at the template indent.
-                // For inline templates (no newline in any quasi), skip — code context is correct.
-                let aligned = if any_quasi_had_newline {
-                    self.add_alignment_to_doc(expression_doc, indent_size)
+                // Three paths matching Prettier's template-literal.js:262-265:
+                // 1. indent_size==0 && quasi ends with \n: expression starts at column 0
+                //    on a new line — reset indent to absolute 0 (align(-∞)).
+                // 2. indent_size>0: expression follows indented template content —
+                //    apply full alignment (indent levels + reset).
+                // 3. indent_size==0 && quasi doesn't end with \n: inline quasi (e.g. ", ")
+                //    — preserve code context indent, no wrapping.
+                let aligned = if indent_size == 0 && text.ends_with('\n') {
+                    d.align(0, inner)
+                } else if indent_size > 0 {
+                    self.add_alignment_to_doc(inner, indent_size)
                 } else {
-                    expression_doc
+                    inner
                 };
-
-                // Wrap in group: group(["${", aligned, lineSuffixBoundary, "}"])
-                // Use group_break when user wrapped the expression across lines —
-                // preserves their formatting choice (unlike Prettier which collapses).
                 let group_doc =
                     d.concat(&[d.text("${"), aligned, d.line_suffix_boundary(), d.text("}")]);
-                parts.push(if user_wrapped_expression {
+                // Force break when trailing line comments are present — a line
+                // comment on a flat line would swallow the closing `}`.
+                parts.push(if has_trailing_line_comment {
                     d.group_break(group_doc)
                 } else {
                     d.group(group_doc)
@@ -740,13 +700,18 @@ impl<'a> Printer<'a> {
     /// Apply alignment to a doc based on indent size.
     /// Equivalent to Prettier's `addAlignmentToDoc(doc, size, tabWidth)`.
     ///
-    /// Always wraps with `align(0)` to reset indent to absolute 0,
+    /// When size > 0: wraps with `align(0)` to reset indent to absolute 0,
     /// then applies indent levels from zero. This is critical because
     /// after `literalline` in template content, the output column resets
     /// to 0 but the indent level on the command stack still carries the
     /// code context. Without the reset, softlines would break at the
     /// inherited code indent instead of the template's visual position.
+    ///
+    /// When size == 0: returns doc unchanged (matching Prettier's behavior).
     fn add_alignment_to_doc(&self, doc: DocId, size: usize) -> DocId {
+        if size == 0 {
+            return doc;
+        }
         let d = self.d();
         let tab_width = self.config.tab_width;
         // In prettier's useTabs renderer, align(n%tw) creates a WIDTH command
@@ -784,33 +749,40 @@ impl<'a> Printer<'a> {
         d.concat(&doc_parts)
     }
 
-    /// Whether this expression type qualifies for softline wrapping when it
-    /// contains structural newlines (hardlines). Matches Prettier's handling
-    /// of "simple" template expressions.
+    /// Whether this expression type qualifies for softline wrapping at
+    /// `${`/`}` boundaries. Matches Prettier's qualifying type list
+    /// (template-literal.js:230-238).
     ///
-    /// Qualifying types: their docs don't inherently produce hardlines from
-    /// block structure. Any hardlines come from nested content (e.g., a
-    /// ternary whose branch contains a multiline template).
+    /// Qualifying types: simple expressions with no inherent block structure.
+    /// Softline wrapping lets the `${}` group break when the line exceeds width.
     ///
-    /// Non-qualifying types (CallExpression, ArrowFunctionExpression, etc.):
-    /// their hardlines come from block bodies / argument lists. Softline
-    /// wrapping would force the ${/} group to break unnecessarily.
+    /// Non-qualifying types (CallExpression, ArrowFunctionExpression,
+    /// TemplateLiteral, etc.): have internal break points or their own
+    /// visual formatting. `${}` hugs while the expression breaks internally.
     fn is_template_softline_expression(expr: &Expression, has_comments: bool) -> bool {
         if has_comments {
             return true;
         }
+        // Matches Prettier's qualifying types (template-literal.js:230-238):
+        // Identifier, MemberExpression, ConditionalExpression, SequenceExpression,
+        // isBinaryCastExpression (TSAsExpression, TSSatisfiesExpression),
+        // isBinaryish (BinaryExpression — includes &&, ||, ??).
+        // Plus additional simple types that have no internal break points.
         matches!(
             expr,
             Expression::Identifier(_)
                 | Expression::Literal(_)
                 | Expression::MemberExpression(_)
                 | Expression::ConditionalExpression(_)
-                | Expression::TemplateLiteral(_)
                 | Expression::UnaryExpression(_)
                 | Expression::UpdateExpression(_)
                 | Expression::MetaProperty(_)
                 | Expression::ThisExpression(_)
                 | Expression::Super(_)
+                | Expression::BinaryExpression(_)
+                | Expression::SequenceExpression(_)
+                | Expression::TSAsExpression(_)
+                | Expression::TSSatisfiesExpression(_)
         )
     }
 

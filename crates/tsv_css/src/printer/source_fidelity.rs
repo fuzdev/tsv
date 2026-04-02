@@ -261,9 +261,9 @@ fn format_color_channel(channel: &ColorChannel) -> String {
         ColorChannel::Number(n) => {
             // Format number, removing unnecessary decimals
             if n.fract() == 0.0 {
-                format!("{}", *n as i64)
+                (*n as i64).to_string()
             } else {
-                format!("{n}")
+                n.to_string()
             }
         }
         ColorChannel::Percentage(p) => {

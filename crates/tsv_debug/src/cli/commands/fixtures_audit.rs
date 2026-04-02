@@ -1,9 +1,9 @@
 use crate::deno::run_prettier;
 use crate::fixtures::{
     self, Fixture, InputType, discover_prettier_intermediate_variants,
-    discover_prettier_quirk_variants, discover_prettier_stable_variants,
-    discover_unformatted_ours_variants, discover_unformatted_variants,
-    has_prettier_divergence_suffix, read_file,
+    discover_prettier_variant_variants, discover_unformatted_ours_variants,
+    discover_unformatted_variants, discover_variant_variants, has_prettier_divergence_suffix,
+    read_file,
 };
 use futures_util::stream::{self, StreamExt};
 use std::collections::HashMap;
@@ -73,10 +73,10 @@ enum FormatResult {
     MatchesInput,
     /// Output matches output_prettier.*
     MatchesOutputPrettier,
-    /// Output matches a prettier_quirk_* file
-    MatchesPrettierQuirk(String),
-    /// Output matches a prettier_stable_* file
-    MatchesPrettierStable(String),
+    /// Output matches a prettier_variant_* file
+    MatchesPrettierVariant(String),
+    /// Output matches a variant_* file
+    MatchesVariant(String),
     /// Output matches a prettier_intermediate_* file
     MatchesPrettierIntermediate(String),
     /// Novel output not matching any known file
@@ -86,10 +86,10 @@ enum FormatResult {
 /// Suggestion for a novel result
 #[derive(Debug, Clone, serde::Serialize)]
 enum Suggestion {
-    /// Suggest creating a prettier_quirk_* file
-    PrettierQuirk(String),
-    /// Suggest creating a prettier_stable_* file
-    PrettierStable(String),
+    /// Suggest creating a prettier_variant_* file
+    PrettierVariant(String),
+    /// Suggest creating a variant_* file
+    Variant(String),
     /// Suggest creating a prettier_intermediate_* file
     PrettierIntermediate(String),
     /// Needs investigation
@@ -252,8 +252,8 @@ fn format_result_label(result: &FormatResult) -> String {
         FormatResult::IdempotentSelf => "self".to_string(),
         FormatResult::MatchesInput => "input".to_string(),
         FormatResult::MatchesOutputPrettier => "output_prettier".to_string(),
-        FormatResult::MatchesPrettierQuirk(name) => name.clone(),
-        FormatResult::MatchesPrettierStable(name) => name.clone(),
+        FormatResult::MatchesPrettierVariant(name) => name.clone(),
+        FormatResult::MatchesVariant(name) => name.clone(),
         FormatResult::MatchesPrettierIntermediate(name) => name.clone(),
         FormatResult::Novel => "[novel]".to_string(),
     }
@@ -261,11 +261,11 @@ fn format_result_label(result: &FormatResult) -> String {
 
 fn format_suggestion(suggestion: &Suggestion) -> String {
     match suggestion {
-        Suggestion::PrettierQuirk(suffix) => {
-            format!("suggest prettier_quirk_{suffix} (prettier stable, ours normalizes to input)")
+        Suggestion::PrettierVariant(suffix) => {
+            format!("suggest prettier_variant_{suffix} (prettier stable, ours normalizes to input)")
         }
-        Suggestion::PrettierStable(suffix) => {
-            format!("suggest prettier_stable_{suffix} (both formatters keep stable)")
+        Suggestion::Variant(suffix) => {
+            format!("suggest variant_{suffix} (both formatters keep stable)")
         }
         Suggestion::PrettierIntermediate(suffix) => {
             format!(
@@ -302,15 +302,15 @@ async fn audit_fixture(fixture: &Fixture) -> FixtureAudit {
         known_files.insert(fixture.output_prettier_filename().to_string(), opc.clone());
     }
 
-    let prettier_quirk_variants = discover_prettier_quirk_variants(fixture_dir, input_ext);
-    for name in &prettier_quirk_variants {
+    let prettier_variant_variants = discover_prettier_variant_variants(fixture_dir, input_ext);
+    for name in &prettier_variant_variants {
         if let Ok(content) = read_file(&fixture_dir.join(name)) {
             known_files.insert(name.clone(), content);
         }
     }
 
-    let prettier_stable_variants = discover_prettier_stable_variants(fixture_dir, input_ext);
-    for name in &prettier_stable_variants {
+    let variant_variants = discover_variant_variants(fixture_dir, input_ext);
+    for name in &variant_variants {
         if let Ok(content) = read_file(&fixture_dir.join(name)) {
             known_files.insert(name.clone(), content);
         }
@@ -337,8 +337,8 @@ async fn audit_fixture(fixture: &Fixture) -> FixtureAudit {
     let unformatted_ours_variants = discover_unformatted_ours_variants(fixture_dir, input_ext);
     files_to_audit.extend(unformatted_ours_variants);
 
-    files_to_audit.extend(prettier_quirk_variants);
-    files_to_audit.extend(prettier_stable_variants);
+    files_to_audit.extend(prettier_variant_variants);
+    files_to_audit.extend(variant_variants);
     files_to_audit.extend(prettier_intermediate_variants);
 
     let mut file_audits = Vec::new();
@@ -382,11 +382,9 @@ async fn audit_fixture(fixture: &Fixture) -> FixtureAudit {
         )
         .await;
 
-        if novel_suggestion.is_some() {
+        if let Some(ref s) = novel_suggestion {
             has_novel = true;
-            if let Some(ref s) = novel_suggestion {
-                suggestions.push(s.clone());
-            }
+            suggestions.push(s.clone());
         }
 
         file_audits.push(FileAudit {
@@ -423,10 +421,10 @@ fn classify_output(
                 return FormatResult::MatchesInput;
             } else if name.starts_with("output_prettier.") {
                 return FormatResult::MatchesOutputPrettier;
-            } else if name.starts_with("prettier_quirk_") {
-                return FormatResult::MatchesPrettierQuirk(name.clone());
-            } else if name.starts_with("prettier_stable_") {
-                return FormatResult::MatchesPrettierStable(name.clone());
+            } else if name.starts_with("prettier_variant_") {
+                return FormatResult::MatchesPrettierVariant(name.clone());
+            } else if name.starts_with("variant_") {
+                return FormatResult::MatchesVariant(name.clone());
             } else if name.starts_with("prettier_intermediate_") {
                 return FormatResult::MatchesPrettierIntermediate(name.clone());
             }
@@ -458,7 +456,7 @@ async fn classify_novel(
     } else if let Some(rest) = filename.strip_prefix("unformatted_") {
         rest.strip_suffix(input_ext).unwrap_or(rest)
     } else {
-        // Non-variant source files (input.*, output_prettier.*, prettier_quirk_*, etc.)
+        // Non-variant source files (input.*, output_prettier.*, prettier_variant_*, etc.)
         // can't generate meaningful variant names — flag for investigation
         return Some(Suggestion::Investigate(format!(
             "prettier({filename}) produces novel output — investigate manually"
@@ -498,14 +496,14 @@ async fn classify_novel(
         match fixtures::format_with_our_formatter(&novel_output, &fixture.input_file) {
             Ok(ours_of_novel) => {
                 if ours_of_novel == *input_content {
-                    // Our formatter normalizes it to input -> prettier_quirk_*
-                    Some(Suggestion::PrettierQuirk(suffix.to_string()))
+                    // Our formatter normalizes it to input -> prettier_variant_*
+                    Some(Suggestion::PrettierVariant(suffix.to_string()))
                 } else {
                     // Check if our formatter keeps it stable
                     match fixtures::format_with_our_formatter(&ours_of_novel, &fixture.input_file) {
                         Ok(second) if second == ours_of_novel => {
-                            // Our formatter is idempotent on this -> prettier_stable_*
-                            Some(Suggestion::PrettierStable(suffix.to_string()))
+                            // Our formatter is idempotent on this -> variant_*
+                            Some(Suggestion::Variant(suffix.to_string()))
                         }
                         _ => Some(Suggestion::Investigate(
                             "prettier stable but our formatter not idempotent on novel output"

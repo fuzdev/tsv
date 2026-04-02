@@ -409,10 +409,19 @@ impl<'a> Printer<'a> {
         if comment_indices.is_empty() {
             return false;
         }
+        let mut prev_end: Option<u32> = None;
         for &i in comment_indices {
             if let FragmentNode::Comment(comment) = &fragment.nodes[i] {
+                // Preserve authorial blank line between consecutive comments
+                if let Some(end) = prev_end {
+                    let between = &self.source[end as usize..comment.span.start as usize];
+                    if between.has_blank_line() {
+                        self.write("\n");
+                    }
+                }
                 self.print_comment(comment);
                 self.write("\n");
+                prev_end = Some(comment.span.end);
             }
         }
         // Preserve authorial blank line between last comment and section

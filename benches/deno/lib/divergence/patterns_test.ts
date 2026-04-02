@@ -110,6 +110,61 @@ Deno.test('template_literal_width: negative - both sides have ${ breaks', () => 
 	assertEquals(ctx.hunks.length, 0);
 });
 
+Deno.test('template_literal_width: positive - atomization divergence (both sides break, different interpolation)', () => {
+	// Both sides break at ${} boundaries, but at different interpolations.
+	// Prettier atomizes simple expressions (keeps ${indent} inline) and breaks elsewhere.
+	// We break the simple expression instead. Key signal: isolated simple expression in
+	// our added lines that appears inline as ${expr} in prettier's removed lines.
+	const prettier =
+		'\t\t\treturn `<span style="--indent: ${indent}ch">${\n\t\t\t\tline ?? \'\'\n\t\t\t}</span>`;';
+	const ours =
+		'\t\t\treturn `<span style="--indent: ${\n\t\t\t\tindent\n\t\t\t}ch">${line ?? \'\'}</span>`;';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	ctx.source = 'return `<span style="--indent: ${indent}ch">${line ?? \'\'}</span>`;';
+	const match = runPattern('template_literal_width', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'template_literal_width');
+});
+
+Deno.test('template_literal_width: positive - atomization divergence (more breaks in ours)', () => {
+	// Prettier keeps ${spec.method} inline (atomized), we break it.
+	// Both sides end with ${ but ours has an additional break.
+	const prettier = '\t\t\treturn `${spec.method}: (${';
+	const ours = '\t\t\treturn `${\n\t\t\t\tspec.method\n\t\t\t}: (${';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	ctx.source = 'return `${spec.method}: (${...';
+	const match = runPattern('template_literal_width', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'template_literal_width');
+});
+
+Deno.test('template_literal_width: positive - atomization divergence (prettier breaks simple expr, ours keeps inline)', () => {
+	// Reverse of the typical atomization case: prettier breaks the simple expression
+	// (response.status) while ours keeps it inline and breaks a different expression.
+	// From load_data.js: `...value: "${response.status}" type: ${typeof response.status}`
+	const prettier =
+		'\t\t\t\t\t\t\t`response.status is not a number. value: "${\n\t\t\t\t\t\t\t\tresponse.status\n\t\t\t\t\t\t\t}" type: ${typeof response.status}`,';
+	const ours =
+		'\t\t\t\t\t\t\t`response.status is not a number. value: "${response.status}" type: ${\n\t\t\t\t\t\t\t\ttypeof response.status\n\t\t\t\t\t\t\t}`,';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	ctx.source =
+		'`response.status is not a number. value: "${response.status}" type: ${typeof response.status}`,';
+	const match = runPattern('template_literal_width', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'template_literal_width');
+});
+
+Deno.test('template_literal_width: negative - both sides break same complex expr', () => {
+	// Both sides break at ${} but with complex expressions (not atomizable)
+	// — not a template atomization divergence
+	const prettier = '\t\tconst x = `${\n\t\t\tfoo() + bar()\n\t\t}`;';
+	const ours = '\t\tconst x = `${\n\t\t\tfoo() +\n\t\t\tbar()\n\t\t}`;';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	ctx.source = 'const x = `${foo() + bar()}`;';
+	const match = runPattern('template_literal_width', ctx);
+	assertEquals(match, null);
+});
+
 // ─── block_expression_logical ───────────────────────────────────────────────
 
 Deno.test('block_expression_logical: positive - && at start of line in ours', () => {
@@ -309,6 +364,28 @@ Deno.test('self_closing_nonvoid: positive - multiline element /> vs ></div>', ()
 	const match = runPattern('self_closing_nonvoid', ctx);
 	assertNotEquals(match, null);
 	assertEquals(match!.pattern, 'self_closing_nonvoid');
+});
+
+Deno.test('self_closing_nonvoid: negative - different elements in wrapping diff', () => {
+	// Self-closing <Glyph /> is same in both outputs (just rewrapped),
+	// </ProviderLink> is an unrelated close tag also rewrapped
+	const prettier = '><span><Glyph glyph={GLYPH} /> text</span\n> provider</ProviderLink';
+	const ours = '><span><Glyph glyph={GLYPH} /> text</span> provider</ProviderLink';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('self_closing_nonvoid', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('self_closing_nonvoid: negative - dotted component name regex escape', () => {
+	// <X.Y /> (member expression component) self-closes in ours,
+	// </X_Y> is a different component's close tag in prettier.
+	// Without escaping `.` in the regex, `X.Y` matches `X_Y`
+	// because `.` is a regex wildcard — false positive.
+	const prettier = '</X_Y>';
+	const ours = '<X.Y />';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('self_closing_nonvoid', ctx);
+	assertEquals(match, null);
 });
 
 // ─── bom_strip ──────────────────────────────────────────────────────────────
@@ -687,4 +764,142 @@ Deno.test('return_type_generic_union: negative - generic without union', () => {
 	const ctx = makeContext(ours, prettier, 'typescript');
 	const match = runPattern('return_type_generic_union', ctx);
 	assertEquals(match, null);
+});
+
+// ─── instantiation_parens ─────────────────────────────────────────────────
+
+Deno.test('instantiation_parens: positive - ternary parens stripped', () => {
+	const prettier = '\tlet c = x ? y : z<T>;';
+	const ours = '\tlet c = (x ? y : z)<T>;';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('instantiation_parens', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'instantiation_parens');
+	assertEquals(match!.confidence, 'certain');
+});
+
+Deno.test('instantiation_parens: positive - binary parens stripped', () => {
+	const prettier = '\tlet d = a + b<T>;';
+	const ours = '\tlet d = (a + b)<T>;';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('instantiation_parens', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('instantiation_parens: negative - assignment parens (both agree)', () => {
+	// Both formatters preserve parens for assignment — no diff
+	const prettier = '\tlet a = (x = y)<T>;';
+	const ours = '\tlet a = (x = y)<T>;';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('instantiation_parens', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('instantiation_parens: positive - lowercase type param', () => {
+	const prettier = '\tlet e = x ? y : z<string>;';
+	const ours = '\tlet e = (x ? y : z)<string>;';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('instantiation_parens', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('instantiation_parens: negative - normal generic usage', () => {
+	const prettier = '\tconst x = foo<T>();';
+	const ours = '\tconst x = foo<T>();';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('instantiation_parens', ctx);
+	assertEquals(match, null);
+});
+
+// ─── block_comment_computed_member ────────────────────────────────────────
+
+Deno.test('block_comment_computed_member: positive - JSDoc hoisted from brackets', () => {
+	const prettier = '\t/** @type {string} */ obj.aaaa.bbbb.cccc?.[\n\t\td\n\t];';
+	const ours = '\tobj.aaaa.bbbb.cccc?.[\n\t\t/** @type {string} */ d\n\t];';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('block_comment_computed_member', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'block_comment_computed_member');
+	assertEquals(match!.confidence, 'certain');
+});
+
+Deno.test('block_comment_computed_member: negative - JSDoc in normal position', () => {
+	const prettier = '\t/** @type {string} */ const x = 1;';
+	const ours = '\t/** @type {string} */ const x = 1;';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('block_comment_computed_member', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('block_comment_computed_member: positive - non-optional computed', () => {
+	// Same pattern with non-optional computed member (still detects)
+	const prettier = '\t/** @type {string} */ obj.aaaa.bbbb.cccc[\n\t\td\n\t];';
+	const ours = '\tobj.aaaa.bbbb.cccc[\n\t\t/** @type {string} */ d\n\t];';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('block_comment_computed_member', ctx);
+	assertNotEquals(match, null);
+});
+
+// ─── block_comment_chain ──────────────────────────────────────────────────
+
+Deno.test('block_comment_chain: positive - comment spacing before dot differs', () => {
+	// Prettier intermediate: `a/* inner */ .b` (space before dot)
+	// Ours/stable: `a /* inner */.b` (no space before dot)
+	const prettier = '\t/* outer */ a/* inner */ .b\n\t\t.c(a);';
+	const ours = '\t/* outer */ a /* inner */.b\n\t\t.c(a);';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('block_comment_chain', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'block_comment_chain');
+	assertEquals(match!.confidence, 'likely');
+});
+
+Deno.test('block_comment_chain: positive - deeper chain member', () => {
+	const prettier = '\t/* outer */ a.b/* inner */ .c\n\t\t.d(a);';
+	const ours = '\t/* outer */ a.b /* inner */.c\n\t\t.d(a);';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('block_comment_chain', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('block_comment_chain: negative - identical comment spacing', () => {
+	const prettier = '\t/* comment */ a.b\n\t\t.c(a);';
+	const ours = '\t/* comment */ a.b\n\t\t.c(a);';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('block_comment_chain', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('block_comment_chain: negative - CSS (not applicable)', () => {
+	const prettier = '\t/* comment */ .class { color: red; }';
+	const ours = '\t/* comment */.class { color: red; }';
+	const ctx = makeContext(ours, prettier, 'css');
+	const match = runPattern('block_comment_chain', ctx);
+	assertEquals(match, null);
+});
+
+// ─── fill_101_boundary covers multiline_value_inline_long ─────────────────
+
+Deno.test('fill_101_boundary: positive - multiline attr inline long text', () => {
+	// Prettier keeps trailing text on one line (102 chars), we break at word boundary
+	const prettier =
+		'\t> text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14 text15_ x';
+	const ours =
+		'\t> text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14 text15_\n\tx';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('fill_101_boundary', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'fill_101_boundary');
+});
+
+// ─── jsdoc_type_cast_parens covers arrow_jsdoc_cast_body_long ─────────────
+
+Deno.test('jsdoc_type_cast_parens: positive - arrow callback body', () => {
+	// prettier-plugin-svelte preserves parens, we strip them
+	const prettier = '\tconst a = b.map((x) => /** @type {A} */ (fn(x)));';
+	const ours = '\tconst a = b.map((x) => /** @type {A} */ fn(x));';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('jsdoc_type_cast_parens', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'jsdoc_type_cast_parens');
 });

@@ -17,9 +17,38 @@
 
 #![allow(unsafe_code)]
 
+use std::panic;
 use std::slice;
 
+/// Extract a &str from source pointer, or return an error result.
+///
+/// # Safety
+/// Caller must ensure `source_ptr` points to valid UTF-8 of `source_len` bytes.
+unsafe fn extract_source<'a>(
+    source_ptr: *const u8,
+    source_len: usize,
+    out_len: *mut usize,
+) -> Result<&'a str, *mut u8> {
+    let bytes = unsafe { slice::from_raw_parts(source_ptr, source_len) };
+    match std::str::from_utf8(bytes) {
+        Ok(s) => Ok(s),
+        Err(e) => Err(error_result(&format!("Invalid UTF-8: {e}"), out_len)),
+    }
+}
+
+/// Format a panic payload into a string for error reporting.
+fn format_panic(payload: Box<dyn std::any::Any + Send>) -> String {
+    if let Some(s) = payload.downcast_ref::<&str>() {
+        format!("panic: {s}")
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        format!("panic: {s}")
+    } else {
+        "panic: <unknown>".to_string()
+    }
+}
+
 /// Helper to convert source pointer to &str and run a closure, returning serialized JSON.
+/// Catches panics (when built with `panic = "unwind"`) and returns them as error JSON.
 ///
 /// # Safety
 /// Caller must ensure `source_ptr` points to valid UTF-8 of `source_len` bytes.
@@ -30,22 +59,16 @@ unsafe fn with_source<F, T>(
     f: F,
 ) -> *mut u8
 where
-    F: FnOnce(&str) -> Result<T, String>,
+    F: FnOnce(&str) -> Result<T, String> + panic::UnwindSafe,
     T: serde::Serialize,
 {
-    // Safety: Caller guarantees valid UTF-8 pointer and length
-    let source = unsafe {
-        let bytes = slice::from_raw_parts(source_ptr, source_len);
-        match std::str::from_utf8(bytes) {
-            Ok(s) => s,
-            Err(e) => {
-                return error_result(&format!("Invalid UTF-8: {e}"), out_len);
-            }
-        }
+    let source = match unsafe { extract_source(source_ptr, source_len, out_len) } {
+        Ok(s) => s,
+        Err(ptr) => return ptr,
     };
 
-    match f(source) {
-        Ok(result) => {
+    match panic::catch_unwind(|| f(source)) {
+        Ok(Ok(result)) => {
             let json = match serde_json::to_string(&result) {
                 Ok(j) => j,
                 Err(e) => {
@@ -54,11 +77,13 @@ where
             };
             string_to_ptr(json, out_len)
         }
-        Err(e) => error_result(&e, out_len),
+        Ok(Err(e)) => error_result(&e, out_len),
+        Err(payload) => error_result(&format_panic(payload), out_len),
     }
 }
 
 /// Helper to convert source pointer to &str and run a formatter.
+/// Catches panics (when built with `panic = "unwind"`) and returns them as error JSON.
 ///
 /// # Safety
 /// Caller must ensure `source_ptr` points to valid UTF-8 of `source_len` bytes.
@@ -69,27 +94,23 @@ unsafe fn with_source_format<F>(
     f: F,
 ) -> *mut u8
 where
-    F: FnOnce(&str) -> Result<String, String>,
+    F: FnOnce(&str) -> Result<String, String> + panic::UnwindSafe,
 {
-    // Safety: Caller guarantees valid UTF-8 pointer and length
-    let source = unsafe {
-        let bytes = slice::from_raw_parts(source_ptr, source_len);
-        match std::str::from_utf8(bytes) {
-            Ok(s) => s,
-            Err(e) => {
-                return error_result(&format!("Invalid UTF-8: {e}"), out_len);
-            }
-        }
+    let source = match unsafe { extract_source(source_ptr, source_len, out_len) } {
+        Ok(s) => s,
+        Err(ptr) => return ptr,
     };
 
-    match f(source) {
-        Ok(result) => string_to_ptr(result, out_len),
-        Err(e) => error_result(&e, out_len),
+    match panic::catch_unwind(|| f(source)) {
+        Ok(Ok(result)) => string_to_ptr(result, out_len),
+        Ok(Err(e)) => error_result(&e, out_len),
+        Err(payload) => error_result(&format_panic(payload), out_len),
     }
 }
 
 /// Helper for internal parse (no conversion, no JSON serialization).
 /// Returns empty string on success, error JSON on failure.
+/// Catches panics (when built with `panic = "unwind"`) and returns them as error JSON.
 ///
 /// Uses `std::hint::black_box` to prevent the compiler from optimizing away
 /// the parse when the AST result is unused.
@@ -103,26 +124,21 @@ unsafe fn with_source_parse_internal<F, T>(
     f: F,
 ) -> *mut u8
 where
-    F: FnOnce(&str) -> Result<T, String>,
+    F: FnOnce(&str) -> Result<T, String> + panic::UnwindSafe,
 {
-    // Safety: Caller guarantees valid UTF-8 pointer and length
-    let source = unsafe {
-        let bytes = slice::from_raw_parts(source_ptr, source_len);
-        match std::str::from_utf8(bytes) {
-            Ok(s) => s,
-            Err(e) => {
-                return error_result(&format!("Invalid UTF-8: {e}"), out_len);
-            }
-        }
+    let source = match unsafe { extract_source(source_ptr, source_len, out_len) } {
+        Ok(s) => s,
+        Err(ptr) => return ptr,
     };
 
-    match f(source) {
-        Ok(ast) => {
+    match panic::catch_unwind(|| f(source)) {
+        Ok(Ok(ast)) => {
             // Prevent compiler from optimizing away the parse
             std::hint::black_box(ast);
             string_to_ptr(String::new(), out_len) // Success: empty string
         }
-        Err(e) => error_result(&e, out_len),
+        Ok(Err(e)) => error_result(&e, out_len),
+        Err(payload) => error_result(&format_panic(payload), out_len),
     }
 }
 

@@ -249,8 +249,12 @@ const selfClosingNonvoid: DivergencePattern = {
 		//    (ours adds self-closing, prettier has explicit close)
 		// 2. HTML elements: ours normalizes <div /> → <div></div>
 		//    (prettier has self-closing, ours has explicit close)
-		const selfClosingTag = /<[a-zA-Z][\w.-]*[^>]*\/>/;
-		const explicitCloseTag = /<\/[a-zA-Z][\w.-]*>/;
+		//
+		// Tag name matching required: a self-closing <Foo /> in one side must
+		// have a matching </Foo> in the other side. Without this, wrapping diffs
+		// that incidentally contain self-closing components (e.g. <Glyph />) and
+		// unrelated close tags (e.g. </ProviderLink>) would false-positive.
+
 		// Multiline elements: /> on its own line, ></tag> on the other
 		const selfClosingEnd = /^\s*\/>\s*$/;
 		const explicitCloseEnd = />\s*<\/[a-zA-Z][\w.-]*>\s*$/;
@@ -262,19 +266,34 @@ const selfClosingNonvoid: DivergencePattern = {
 		const emptyExplicitClose = /<([a-z][\w.-]*)(\s[^>]*)?>(\s*)<\/\1>/; // <tag></tag>
 
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
-			// Direction 1: ours self-closes, prettier explicit-closes (components)
-			const oursAddsClose = hunk.addedLines.some((l) => selfClosingTag.test(l));
-			const prettierHasExplicit = hunk.removedLines.some((l) => explicitCloseTag.test(l));
-			if (oursAddsClose && prettierHasExplicit) return true;
-			// Direction 2: prettier self-closes, ours explicit-closes (HTML elements)
-			// Includes multiline: prettier has /> line, ours has ></tag> line
-			const prettierHasSelfClose = hunk.removedLines.some(
-				(l) => selfClosingTag.test(l) || selfClosingEnd.test(l),
-			);
-			const oursHasExplicit = hunk.addedLines.some(
-				(l) => explicitCloseTag.test(l) || explicitCloseEnd.test(l),
-			);
-			if (prettierHasSelfClose && oursHasExplicit) return true;
+			// Full-tag: require self-closing <Tag /> on one side and </Tag> on other
+			// Covers both directions (components and HTML elements)
+			for (
+				const [selfLines, closeLines] of [
+					[hunk.addedLines, hunk.removedLines],
+					[hunk.removedLines, hunk.addedLines],
+				]
+			) {
+				for (const line of selfLines) {
+					const re = /<([a-zA-Z][\w.-]*)[^>]*\/>/g;
+					let m;
+					while ((m = re.exec(line)) !== null) {
+						const tagName = m[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+						if (closeLines.some((l) => new RegExp(`</${tagName}\\b`).test(l))) {
+							return true;
+						}
+					}
+				}
+			}
+			// Multiline: /> on its own line ↔ ></tag> (inherently paired by position)
+			if (
+				hunk.removedLines.some((l) => selfClosingEnd.test(l)) &&
+				hunk.addedLines.some((l) => explicitCloseEnd.test(l))
+			) return true;
+			if (
+				hunk.addedLines.some((l) => selfClosingEnd.test(l)) &&
+				hunk.removedLines.some((l) => explicitCloseEnd.test(l))
+			) return true;
 			// Orphaned remove-only: prettier has self-closing non-void HTML that we removed
 			if (
 				hunk.addedLines.length === 0 &&
@@ -653,15 +672,12 @@ const templateLiteralWidth: DivergencePattern = {
 	fixtures: [
 		'typescript/expressions/literals/template/long_prettier_divergence',
 		'typescript/expressions/literals/template/interpolation_expression_long_prettier_divergence',
-		'typescript/expressions/literals/template/interpolation_method_chain_long_prettier_divergence',
 		'typescript/expressions/literals/template/interpolation_multiline_indent_long_prettier_divergence',
 		'typescript/expressions/literals/template/interpolation_nested_template_prettier_divergence',
-		'typescript/expressions/literals/template/interpolation_short_multiline_prettier_divergence',
 		'typescript/types/template_literal_type_long_prettier_divergence',
 		'typescript/types/template_literal_type_conditional_long_prettier_divergence',
 		'typescript/expressions/ternary/template_consequent_long_prettier_divergence',
 		'typescript/expressions/logical/template_operand_long_prettier_divergence',
-		'typescript/expressions/calls/template_interpolation_call_break_prettier_divergence',
 	],
 	detect(ctx) {
 		// Template literal break patterns — we break inside ${...} to respect print width.
@@ -671,6 +687,10 @@ const templateLiteralWidth: DivergencePattern = {
 		const breakAfterDollarBrace = /\$\{\s*$/;
 		const closingBraceBacktick = /^\t+\}\`/;
 
+		// Simple expression on its own line: identifier or member chain (a.b.c, a?.b)
+		// These are expressions Prettier atomizes (pre-renders at infinite width).
+		const simpleExprLine = /^\t+(\w+(?:[.?]+\w+)*)\s*$/;
+
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
 			const addedHasBreak = hunk.addedLines.some(
 				(l) => breakAfterDollarBrace.test(l) || closingBraceBacktick.test(l),
@@ -678,7 +698,40 @@ const templateLiteralWidth: DivergencePattern = {
 			const removedHasBreak = hunk.removedLines.some(
 				(l) => breakAfterDollarBrace.test(l) || closingBraceBacktick.test(l),
 			);
-			return addedHasBreak && !removedHasBreak;
+
+			// Case 1: Only our side has template breaks
+			if (addedHasBreak && !removedHasBreak) return true;
+
+			// Case 2: Both sides break at ${} boundaries, but at different interpolations.
+			// Prettier atomizes simple expressions (Identifier, MemberExpression) so they
+			// stay inline, then breaks at a different ${} if needed. We break the simple
+			// expression instead (or vice versa — either side can have the simple expression
+			// broken). Detect by finding isolated simple expressions on one side that appear
+			// inline as ${expr} on the other side.
+			if (addedHasBreak && removedHasBreak) {
+				// Check ours→prettier: simple expr in added, inline in removed
+				for (const line of hunk.addedLines) {
+					const m = simpleExprLine.exec(line);
+					if (m) {
+						const expr = m[1];
+						if (hunk.removedLines.some((l) => l.includes(`\${${expr}}`))) {
+							return true;
+						}
+					}
+				}
+				// Check prettier→ours: simple expr in removed, inline in added
+				for (const line of hunk.removedLines) {
+					const m = simpleExprLine.exec(line);
+					if (m) {
+						const expr = m[1];
+						if (hunk.addedLines.some((l) => l.includes(`\${${expr}}`))) {
+							return true;
+						}
+					}
+				}
+			}
+
+			return false;
 		});
 
 		if (hunkIndices.length > 0 && ctx.source.includes('${')) {
@@ -1077,6 +1130,7 @@ const fill101Boundary: DivergencePattern = {
 		'svelte/elements/inline_element_fill_long_prettier_divergence',
 		'svelte/elements/inline_component_fill_long_prettier_divergence',
 		'svelte/elements/fill_expr_break_boundary_long_prettier_divergence',
+		'svelte/attributes/multiline_value_inline_long_prettier_divergence',
 	],
 	detect(ctx) {
 		const prettierLines = ctx.prettierLines!;
@@ -1220,12 +1274,128 @@ const commentPosition: DivergencePattern = {
 	},
 };
 
+const instantiationParens: DivergencePattern = {
+	id: 'instantiation_parens',
+	description: 'Parens preserved in ternary/binary instantiation expressions',
+	languages: ['typescript', 'svelte'],
+	conformanceSections: ['TypeScript'],
+	fixtures: [
+		'typescript/typescript_specific/assertions/instantiation_parens_prettier_divergence',
+	],
+	detect(ctx) {
+		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
+
+		// Ours preserves: (x ? y : z)<T> or (a + b)<T> — has )<
+		// Prettier strips:  x ? y : z<T>  or  a + b<T>  — no )<
+		const parenBeforeTypeArgs = /\)<[a-zA-Z]/;
+
+		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
+			const oursHasParens = hunk.addedLines.some((l) => parenBeforeTypeArgs.test(l));
+			const prettierMissing = hunk.removedLines.some(
+				(l) => !parenBeforeTypeArgs.test(l) && /[?+\-]\s.*<[a-zA-Z]/.test(l),
+			);
+			return oursHasParens && prettierMissing;
+		});
+
+		if (hunkIndices.length > 0) {
+			return {
+				pattern: 'instantiation_parens',
+				confidence: 'certain',
+				hunkIndices,
+				reason:
+					'Parens preserved around ternary/binary in instantiation expression (changes semantics)',
+			};
+		}
+		return null;
+	},
+};
+
+const blockCommentComputedMember: DivergencePattern = {
+	id: 'block_comment_computed_member',
+	description: 'Block comment preserved inside computed member brackets',
+	languages: ['typescript', 'svelte'],
+	conformanceSections: ['TypeScript: Comments'],
+	fixtures: [
+		'typescript/syntax/comments/block_comment_computed_member_long_prettier_divergence',
+	],
+	detect(ctx) {
+		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
+
+		// Prettier hoists JSDoc from inside brackets to before the chain:
+		//   removed: /** @type {T} */ obj.aaa.bbb?.[
+		//   added:   obj.aaa.bbb?.[
+		//            /** @type {T} */ d
+		const jsdocBeforeChain = /\/\*\*.*?\*\/\s+\w+\.\w+/;
+		const jsdocBeforeIdent = /\/\*\*.*?\*\/\s+\w+\s*$/;
+
+		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
+			const prettierHoisted = hunk.removedLines.some((l) => jsdocBeforeChain.test(l));
+			const oursPreserved = hunk.addedLines.some((l) => jsdocBeforeIdent.test(l));
+			return prettierHoisted && oursPreserved;
+		});
+
+		if (hunkIndices.length > 0) {
+			return {
+				pattern: 'block_comment_computed_member',
+				confidence: 'certain',
+				hunkIndices,
+				reason:
+					'Block comment preserved inside computed member brackets (Prettier hoists, changing association)',
+			};
+		}
+		return null;
+	},
+};
+
+const blockCommentChain: DivergencePattern = {
+	id: 'block_comment_chain',
+	description: 'Block comment spacing in member chain normalization',
+	languages: ['typescript', 'svelte'],
+	conformanceSections: ['TypeScript: Comments'],
+	fixtures: [
+		'typescript/expressions/calls/chained/block_comment_chain_prettier_divergence',
+	],
+	detect(ctx) {
+		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
+
+		// Prettier intermediate: `a/* comment */ .b` (space before dot)
+		// Ours/stable:           `a /* comment */.b` (no space before dot)
+		// One side has `*/ .` and the other has `*/.` — different comment-dot spacing
+		const commentSpaceDot = /\*\/\s+\./;
+		const commentDot = /\*\/\./;
+
+		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
+			const prettierSpaced = hunk.removedLines.some((l) => commentSpaceDot.test(l));
+			const oursCompact = hunk.addedLines.some((l) => commentDot.test(l));
+			if (prettierSpaced && oursCompact) return true;
+			// Reverse direction (ours spaced, prettier compact)
+			const oursSpaced = hunk.addedLines.some((l) => commentSpaceDot.test(l));
+			const prettierCompact = hunk.removedLines.some((l) => commentDot.test(l));
+			return oursSpaced && prettierCompact;
+		});
+
+		if (hunkIndices.length > 0) {
+			return {
+				pattern: 'block_comment_chain',
+				confidence: 'likely',
+				hunkIndices,
+				reason:
+					'Block comment spacing in member chain differs (normalization-only, both reach same stable output)',
+			};
+		}
+		return null;
+	},
+};
+
 const jsdocTypeCastParens: DivergencePattern = {
 	id: 'jsdoc_type_cast_parens',
 	description: 'JSDoc type cast parens stripped',
 	languages: ['svelte'],
 	conformanceSections: ['TypeScript: Comments'],
-	fixtures: ['typescript/syntax/comments/jsdoc_type_cast_prettier_divergence'],
+	fixtures: [
+		'typescript/syntax/comments/jsdoc_type_cast_prettier_divergence',
+		'typescript/calls/arrow_jsdoc_cast_body_long_prettier_divergence',
+	],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
 
@@ -1285,7 +1455,10 @@ export const PATTERNS: DivergencePattern[] = [
 	blockMultilineAttrsHug,
 	shortExpr100,
 
-	// 5. Comment-specific patterns
+	// 5. Semantic preservation patterns
+	instantiationParens,
+	blockCommentComputedMember,
+	blockCommentChain,
 	jsdocTypeCastParens,
 
 	// 6. Broad patterns (run last)

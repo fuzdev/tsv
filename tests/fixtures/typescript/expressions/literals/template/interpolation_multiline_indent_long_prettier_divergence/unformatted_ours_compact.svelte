@@ -101,7 +101,7 @@ ${aaaaaaaa.bbbbbbb_cccccccc_ssssssssssssssssssssssssss.map((ssss) => `'${ssss.tt
 									export const Items = [${aaaaaaaa.bbbbbbb_cccccccc_sssss.map((ssss) => {const name = ssss.tttttt();return `{
 													// Short, no newline
 													a: '${ssss.a}',
-													// Short, user wrote newline - preserve intent
+													// Short - stays inline
 													b: '${
 														ssss.b
 													}',
@@ -117,7 +117,7 @@ ${aaaaaaaa.bbbbbbb_cccccccc_ssssssssssssssssssssssssss.map((ssss) => `'${ssss.tt
 													g1: '${ssss.flagAAAAAAAA ? 'valXXXXXXXXXXXXXXXX' : 'valYYYYYYYYYYYYYYY'}',
 													// Ternary at 101 chars - exceeds, breaks
 													g2: '${ssss.flagAAAAAAAAA ? 'valXXXXXXXXXXXXXXXX' : 'valYYYYYYYYYYYYYYY'}',
-													// Ternary at 100 chars, user wrote newline - preserve intent
+													// Ternary at 100 chars - stays inline
 													g3: '${
 														ssss.flagAAAAAAAA ? 'valXXXXXXXXXXXXXXXX' : 'valYYYYYYYYYYYYYYY'
 													}',

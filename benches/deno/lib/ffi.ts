@@ -57,20 +57,34 @@ type FfiFn = (
 ) => Deno.PointerValue;
 type LibSymbols = Deno.DynamicLibrary<typeof symbols>['symbols'];
 
-/** Get the native library path based on platform */
+/** Get the native library path based on platform.
+ * Checks `target/corpus/` first (built with panic=unwind for catch_unwind),
+ * then falls back to `target/release/`.
+ */
 function getLibraryPath(): string {
-	const base = new URL('../../../target/release', import.meta.url).pathname;
+	const libName =
+		Deno.build.os === 'linux'
+			? 'libtsv_ffi.so'
+			: Deno.build.os === 'darwin'
+				? 'libtsv_ffi.dylib'
+				: Deno.build.os === 'windows'
+					? 'tsv_ffi.dll'
+					: (() => {
+							throw new Error(`Unsupported platform: ${Deno.build.os}`);
+						})();
 
-	switch (Deno.build.os) {
-		case 'linux':
-			return `${base}/libtsv_ffi.so`;
-		case 'darwin':
-			return `${base}/libtsv_ffi.dylib`;
-		case 'windows':
-			return `${base}/tsv_ffi.dll`;
-		default:
-			throw new Error(`Unsupported platform: ${Deno.build.os}`);
+	const targetDir = new URL('../../../target', import.meta.url).pathname;
+
+	// Prefer corpus profile (panic=unwind, catches panics gracefully)
+	const corpusPath = `${targetDir}/corpus/${libName}`;
+	try {
+		Deno.statSync(corpusPath);
+		return corpusPath;
+	} catch {
+		// Fall back to release
 	}
+
+	return `${targetDir}/release/${libName}`;
 }
 
 export class NativeImplementation implements TsvImplementation {

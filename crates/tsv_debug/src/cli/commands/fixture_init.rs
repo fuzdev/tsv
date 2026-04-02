@@ -76,11 +76,11 @@ impl FixtureInitExecutable {
         let dir = Path::new(&self.dir);
 
         // Determine input type from --parser flag, existing file, or default
-        let input_type = resolve_input_type(self.parser.as_ref(), dir);
+        let input_type = resolve_input_type(self.parser.as_deref(), dir);
 
         // Get content from --content, --stdin, or existing file
         let raw_content = match resolve_content(
-            self.content.as_ref(),
+            self.content.as_deref(),
             self.use_stdin,
             self.force,
             dir,
@@ -166,10 +166,10 @@ impl FixtureInitExecutable {
 }
 
 /// Resolve input type from --parser flag, existing file, or default (svelte)
-fn resolve_input_type(parser: Option<&String>, dir: &Path) -> InputType {
+fn resolve_input_type(parser: Option<&str>, dir: &Path) -> InputType {
     // --parser flag takes priority
     if let Some(parser) = parser {
-        return match parser.as_str() {
+        return match parser {
             "svelte" => InputType::Svelte,
             "typescript" | "ts" => InputType::TypeScript,
             "css" => InputType::Css,
@@ -194,7 +194,7 @@ fn resolve_input_type(parser: Option<&String>, dir: &Path) -> InputType {
 
 /// Resolve content from --content, --stdin, or existing input file
 fn resolve_content(
-    content_flag: Option<&String>,
+    content_flag: Option<&str>,
     use_stdin: bool,
     force: bool,
     dir: &Path,
@@ -205,7 +205,7 @@ fn resolve_content(
         if !force && find_input_file(dir).is_some() {
             return Err("Input file already exists. Use --force to overwrite.".to_string());
         }
-        return Ok(content.clone());
+        return Ok(content.to_string());
     }
 
     // --stdin flag (explicit, consistent with other tsv_debug commands)

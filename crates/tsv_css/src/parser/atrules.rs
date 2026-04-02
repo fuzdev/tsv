@@ -42,14 +42,14 @@ fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, 
     let mut current_connector: Option<SupportsConnector> = None;
     let mut end_pos = start;
 
-    while !parser.check(&TokenKind::LeftBrace)
-        && !parser.check(&TokenKind::Semicolon)
-        && !parser.check(&TokenKind::Eof)
+    while !parser.check(TokenKind::LeftBrace)
+        && !parser.check(TokenKind::Semicolon)
+        && !parser.check(TokenKind::Eof)
     {
         parser.skip_whitespace()?;
 
         // Register comments between condition parts (e.g., `(a) /* comment */ and (b)`)
-        while parser.check(&TokenKind::Comment) {
+        while parser.check(TokenKind::Comment) {
             parser.register_current_comment();
             end_pos = parser.base_offset() + parser.current_end;
             parser.advance()?;
@@ -57,7 +57,7 @@ fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, 
         }
 
         // Check for `and`/`or` connector
-        if parser.check(&TokenKind::Identifier) {
+        if parser.check(TokenKind::Identifier) {
             let ident = parser
                 .current_identifier()
                 .unwrap_or_else(|| parser.current_value());
@@ -72,7 +72,7 @@ fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, 
                 parser.advance()?;
                 // Register comments after connector (e.g., `and /* comment */ (b)`)
                 parser.skip_whitespace()?;
-                while parser.check(&TokenKind::Comment) {
+                while parser.check(TokenKind::Comment) {
                     parser.register_current_comment();
                     end_pos = parser.base_offset() + parser.current_end;
                     parser.advance()?;
@@ -88,7 +88,7 @@ fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, 
         let mut paren_depth: usize = 0;
 
         // Check for leading `not`
-        if parser.check(&TokenKind::Identifier) {
+        if parser.check(TokenKind::Identifier) {
             let ident = parser
                 .current_identifier()
                 .unwrap_or_else(|| parser.current_value());
@@ -99,7 +99,7 @@ fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, 
                 // Include comments after `not` in content (e.g., `not /* comment */ (...)`)
                 // These go in part_content rather than being registered, since they're
                 // inside the condition part's span
-                while parser.check(&TokenKind::Comment) {
+                while parser.check(TokenKind::Comment) {
                     part_content.push(" ".to_string());
                     part_content.push(parser.current_value().to_string());
                     end_pos = parser.base_offset() + parser.current_end;
@@ -111,7 +111,7 @@ fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, 
         }
 
         // Check for function-style condition like `selector(:has(...))`
-        if parser.check(&TokenKind::Identifier) {
+        if parser.check(TokenKind::Identifier) {
             let ident = parser
                 .current_identifier()
                 .unwrap_or_else(|| parser.current_value());
@@ -127,7 +127,7 @@ fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, 
         }
 
         // Now parse the parenthesized condition
-        if !parser.check(&TokenKind::LeftParen) {
+        if !parser.check(TokenKind::LeftParen) {
             // Not a valid @supports part - break out
             break;
         }
@@ -137,11 +137,11 @@ fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, 
         let mut prev_token_kind: Option<TokenKind> = None;
         let mut last_non_whitespace_kind: Option<TokenKind> = None;
 
-        while !parser.check(&TokenKind::Eof) {
+        while !parser.check(TokenKind::Eof) {
             // Track paren depth
-            if parser.check(&TokenKind::LeftParen) {
+            if parser.check(TokenKind::LeftParen) {
                 paren_depth += 1;
-            } else if parser.check(&TokenKind::RightParen) {
+            } else if parser.check(TokenKind::RightParen) {
                 if paren_depth == 0 {
                     break;
                 }
@@ -149,7 +149,7 @@ fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, 
             }
 
             // Check for end of part (at top level)
-            if paren_depth == 0 && parser.check(&TokenKind::RightParen) {
+            if paren_depth == 0 && parser.check(TokenKind::RightParen) {
                 // Include the closing paren
                 part_content.push(")".to_string());
                 end_pos = parser.base_offset() + parser.current_end;
@@ -158,7 +158,7 @@ fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, 
             }
 
             // Handle whitespace normalization
-            if parser.check(&TokenKind::Whitespace) {
+            if parser.check(TokenKind::Whitespace) {
                 let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
                     || matches!(parser.peek(), Ok(TokenKind::RightParen));
 
@@ -214,26 +214,26 @@ fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, 
             }
 
             part_content.push(part);
-            let current_kind = parser.current_kind.clone();
+            let current_kind = parser.current_kind;
             end_pos = parser.base_offset() + parser.current_end;
             parser.advance()?;
 
             // Add space after boolean operators
-            if is_bool_op && !parser.check(&TokenKind::Whitespace) {
+            if is_bool_op && !parser.check(TokenKind::Whitespace) {
                 part_content.push(" ".to_string());
             }
 
             // Add space after comment if followed by non-whitespace
             // (e.g., `/* comment */ grid` needs space before `grid`)
             if is_comment
-                && !parser.check(&TokenKind::Whitespace)
-                && !parser.check(&TokenKind::RightParen)
+                && !parser.check(TokenKind::Whitespace)
+                && !parser.check(TokenKind::RightParen)
             {
                 part_content.push(" ".to_string());
             }
 
             // Add space after ':' for property:value pairs
-            if !parser.check(&TokenKind::Whitespace)
+            if !parser.check(TokenKind::Whitespace)
                 && matches!(current_kind, TokenKind::Colon)
                 && matches!(
                     last_non_whitespace_kind,
@@ -246,7 +246,7 @@ fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, 
                 part_content.push(" ".to_string());
             }
 
-            prev_token_kind = Some(current_kind.clone());
+            prev_token_kind = Some(current_kind);
             if !matches!(current_kind, TokenKind::Whitespace) {
                 last_non_whitespace_kind = Some(current_kind);
             }
@@ -292,7 +292,7 @@ fn parse_container_prelude(
     // Check for optional container name (identifier before first '(')
     // Container name is an identifier followed by whitespace then '('
     // NOT a function call like style(...) where there's no whitespace
-    let container_name = if parser.check(&TokenKind::Identifier) {
+    let container_name = if parser.check(TokenKind::Identifier) {
         let ident = parser
             .current_identifier()
             .unwrap_or_else(|| parser.current_value())
@@ -317,14 +317,14 @@ fn parse_container_prelude(
     let mut current_connector: Option<SupportsConnector> = None;
     let mut end_pos = parser.base_offset() + parser.current_start;
 
-    while !parser.check(&TokenKind::LeftBrace)
-        && !parser.check(&TokenKind::Semicolon)
-        && !parser.check(&TokenKind::Eof)
+    while !parser.check(TokenKind::LeftBrace)
+        && !parser.check(TokenKind::Semicolon)
+        && !parser.check(TokenKind::Eof)
     {
         parser.skip_whitespace()?;
 
         // Register comments between condition parts (e.g., `(a) /* comment */ and (b)`)
-        while parser.check(&TokenKind::Comment) {
+        while parser.check(TokenKind::Comment) {
             parser.register_current_comment();
             end_pos = parser.base_offset() + parser.current_end;
             parser.advance()?;
@@ -332,7 +332,7 @@ fn parse_container_prelude(
         }
 
         // Check for `and`/`or` connector
-        if parser.check(&TokenKind::Identifier) {
+        if parser.check(TokenKind::Identifier) {
             let ident = parser
                 .current_identifier()
                 .unwrap_or_else(|| parser.current_value());
@@ -346,7 +346,7 @@ fn parse_container_prelude(
                 parser.advance()?;
                 // Register comments after connector (e.g., `and /* comment */ (b)`)
                 parser.skip_whitespace()?;
-                while parser.check(&TokenKind::Comment) {
+                while parser.check(TokenKind::Comment) {
                     parser.register_current_comment();
                     end_pos = parser.base_offset() + parser.current_end;
                     parser.advance()?;
@@ -362,7 +362,7 @@ fn parse_container_prelude(
         let mut paren_depth: usize = 0;
 
         // Check for leading `not`
-        if parser.check(&TokenKind::Identifier) {
+        if parser.check(TokenKind::Identifier) {
             let ident = parser
                 .current_identifier()
                 .unwrap_or_else(|| parser.current_value());
@@ -373,7 +373,7 @@ fn parse_container_prelude(
                 // Include comments after `not` in content (e.g., `not /* comment */ (...)`)
                 // These go in part_content rather than being registered, since they're
                 // inside the condition part's span
-                while parser.check(&TokenKind::Comment) {
+                while parser.check(TokenKind::Comment) {
                     part_content.push(" ".to_string());
                     part_content.push(parser.current_value().to_string());
                     end_pos = parser.base_offset() + parser.current_end;
@@ -385,7 +385,7 @@ fn parse_container_prelude(
         }
 
         // Check for function-style condition like `style(--custom: value)`
-        if parser.check(&TokenKind::Identifier) {
+        if parser.check(TokenKind::Identifier) {
             let ident = parser
                 .current_identifier()
                 .unwrap_or_else(|| parser.current_value());
@@ -398,7 +398,7 @@ fn parse_container_prelude(
         }
 
         // Now parse the parenthesized condition
-        if !parser.check(&TokenKind::LeftParen) {
+        if !parser.check(TokenKind::LeftParen) {
             break;
         }
 
@@ -406,17 +406,17 @@ fn parse_container_prelude(
         let mut prev_token_kind: Option<TokenKind> = None;
         let mut last_non_whitespace_kind: Option<TokenKind> = None;
 
-        while !parser.check(&TokenKind::Eof) {
-            if parser.check(&TokenKind::LeftParen) {
+        while !parser.check(TokenKind::Eof) {
+            if parser.check(TokenKind::LeftParen) {
                 paren_depth += 1;
-            } else if parser.check(&TokenKind::RightParen) {
+            } else if parser.check(TokenKind::RightParen) {
                 if paren_depth == 0 {
                     break;
                 }
                 paren_depth -= 1;
             }
 
-            if paren_depth == 0 && parser.check(&TokenKind::RightParen) {
+            if paren_depth == 0 && parser.check(TokenKind::RightParen) {
                 part_content.push(")".to_string());
                 end_pos = parser.base_offset() + parser.current_end;
                 parser.advance()?;
@@ -424,7 +424,7 @@ fn parse_container_prelude(
             }
 
             // Handle whitespace normalization
-            if parser.check(&TokenKind::Whitespace) {
+            if parser.check(TokenKind::Whitespace) {
                 let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
                     || matches!(parser.peek(), Ok(TokenKind::RightParen));
 
@@ -472,23 +472,23 @@ fn parse_container_prelude(
             }
 
             part_content.push(part);
-            let current_kind = parser.current_kind.clone();
+            let current_kind = parser.current_kind;
             end_pos = parser.base_offset() + parser.current_end;
             parser.advance()?;
 
-            if is_bool_op && !parser.check(&TokenKind::Whitespace) {
+            if is_bool_op && !parser.check(TokenKind::Whitespace) {
                 part_content.push(" ".to_string());
             }
 
             if is_comment
-                && !parser.check(&TokenKind::Whitespace)
-                && !parser.check(&TokenKind::RightParen)
+                && !parser.check(TokenKind::Whitespace)
+                && !parser.check(TokenKind::RightParen)
             {
                 part_content.push(" ".to_string());
             }
 
             // Add space after ':' for property:value pairs
-            if !parser.check(&TokenKind::Whitespace)
+            if !parser.check(TokenKind::Whitespace)
                 && matches!(current_kind, TokenKind::Colon)
                 && matches!(
                     last_non_whitespace_kind,
@@ -501,7 +501,7 @@ fn parse_container_prelude(
                 part_content.push(" ".to_string());
             }
 
-            prev_token_kind = Some(current_kind.clone());
+            prev_token_kind = Some(current_kind);
             if !matches!(current_kind, TokenKind::Whitespace) {
                 last_non_whitespace_kind = Some(current_kind);
             }
@@ -542,7 +542,7 @@ fn parse_scope_prelude(
     let start = parser.base_offset() + parser.current_start;
 
     // Expect opening paren
-    if !parser.check(&TokenKind::LeftParen) {
+    if !parser.check(TokenKind::LeftParen) {
         return Err(parser.error_expected("'(' in @scope prelude"));
     }
     parser.advance()?; // consume '('
@@ -554,7 +554,7 @@ fn parse_scope_prelude(
     parser.skip_whitespace()?;
 
     // Expect closing paren
-    if !parser.check(&TokenKind::RightParen) {
+    if !parser.check(TokenKind::RightParen) {
         return Err(parser.error_expected_after("')'", "@scope root selectors"));
     }
     let end_after_root_paren = parser.base_offset() + parser.current_end;
@@ -563,7 +563,7 @@ fn parse_scope_prelude(
     // Note: Don't skip whitespace yet - we need to check for "to" keyword
     // Check for optional "to" clause
     parser.skip_whitespace()?;
-    let (limit, end_pos) = if parser.check(&TokenKind::Identifier) {
+    let (limit, end_pos) = if parser.check(TokenKind::Identifier) {
         let identifier = parser
             .current_identifier()
             .unwrap_or_else(|| parser.current_value());
@@ -572,7 +572,7 @@ fn parse_scope_prelude(
             parser.skip_whitespace()?;
 
             // Expect opening paren
-            if !parser.check(&TokenKind::LeftParen) {
+            if !parser.check(TokenKind::LeftParen) {
                 return Err(parser.error_expected_after("'('", "'to' in @scope prelude"));
             }
             parser.advance()?; // consume '('
@@ -584,7 +584,7 @@ fn parse_scope_prelude(
             parser.skip_whitespace()?;
 
             // Expect closing paren
-            if !parser.check(&TokenKind::RightParen) {
+            if !parser.check(TokenKind::RightParen) {
                 return Err(parser.error_expected_after("')'", "@scope limit selectors"));
             }
             let end_after_limit_paren = parser.base_offset() + parser.current_end;
@@ -625,7 +625,7 @@ fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span),
     parser.skip_whitespace()?;
 
     // Parse first value: url() function or bare string
-    let is_function = parser.check(&TokenKind::Identifier) && {
+    let is_function = parser.check(TokenKind::Identifier) && {
         // Check if next char in source is '(' (function call)
         let end_pos = parser.current_end;
         parser.source.get(end_pos..=end_pos) == Some("(")
@@ -656,8 +656,8 @@ fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span),
     parser.skip_whitespace()?;
 
     // Parse optional layer(), supports() functions and other conditions
-    while !parser.check(&TokenKind::Semicolon) && !parser.check(&TokenKind::Eof) {
-        let is_function = parser.check(&TokenKind::Identifier) && {
+    while !parser.check(TokenKind::Semicolon) && !parser.check(TokenKind::Eof) {
+        let is_function = parser.check(TokenKind::Identifier) && {
             let end_pos = parser.current_end;
             parser.source.get(end_pos..=end_pos) == Some("(")
         };
@@ -666,7 +666,7 @@ fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span),
             // layer() or supports() function
             values.push(parse_function_value(parser)?);
             parser.skip_whitespace()?;
-        } else if parser.check(&TokenKind::Identifier) {
+        } else if parser.check(TokenKind::Identifier) {
             // Check for bare "layer" keyword or media query
             let ident = parser
                 .current_identifier()
@@ -692,8 +692,8 @@ fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span),
                 let media_start = (parser.base_offset() + media_local_start) as u32;
                 let mut media_local_end = parser.current_end;
 
-                while !parser.check(&TokenKind::Semicolon) && !parser.check(&TokenKind::Eof) {
-                    if !parser.check(&TokenKind::Whitespace) {
+                while !parser.check(TokenKind::Semicolon) && !parser.check(TokenKind::Eof) {
+                    if !parser.check(TokenKind::Whitespace) {
                         media_local_end = parser.current_end;
                     }
                     parser.advance()?;
@@ -734,7 +734,7 @@ fn parse_function_value(parser: &mut CssParser) -> Result<CssValue, ParseError> 
     let value_start = (parser.base_offset() + parser.current_start) as u32;
 
     // Get function name (current token should be identifier)
-    let name = if parser.check(&TokenKind::Identifier) {
+    let name = if parser.check(TokenKind::Identifier) {
         parser
             .current_identifier()
             .unwrap_or_else(|| parser.current_value())
@@ -746,7 +746,7 @@ fn parse_function_value(parser: &mut CssParser) -> Result<CssValue, ParseError> 
     parser.advance()?; // consume function name
 
     // Expect '('
-    if !parser.check(&TokenKind::LeftParen) {
+    if !parser.check(TokenKind::LeftParen) {
         return Err(parser.error_expected_after("'('", "function name"));
     }
 
@@ -778,7 +778,7 @@ fn parse_function_value(parser: &mut CssParser) -> Result<CssValue, ParseError> 
     } else if name == "layer" {
         // layer(name) - parse the layer name as identifier
         parser.skip_whitespace()?;
-        if parser.check(&TokenKind::Identifier) {
+        if parser.check(TokenKind::Identifier) {
             let arg_start = (parser.base_offset() + parser.current_start) as u32;
             let arg_end = (parser.base_offset() + parser.current_end) as u32;
             let ident = parser
@@ -806,9 +806,9 @@ fn parse_function_value(parser: &mut CssParser) -> Result<CssValue, ParseError> 
         let mut last_non_whitespace_kind: Option<TokenKind> = None;
         let mut condition_end = condition_start;
 
-        while !parser.check(&TokenKind::RightParen) && !parser.check(&TokenKind::Eof) {
+        while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
             // Skip whitespace after '(' or before ')'
-            if parser.check(&TokenKind::Whitespace) {
+            if parser.check(TokenKind::Whitespace) {
                 let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
                     || matches!(parser.peek(), Ok(TokenKind::RightParen));
 
@@ -853,12 +853,12 @@ fn parse_function_value(parser: &mut CssParser) -> Result<CssValue, ParseError> 
 
             condition_parts.push(part);
 
-            let current_kind = parser.current_kind.clone();
+            let current_kind = parser.current_kind;
             condition_end = (parser.base_offset() + parser.current_end) as u32;
             parser.advance()?;
 
             // Add space after boolean operators or ':'
-            if !parser.check(&TokenKind::Whitespace) {
+            if !parser.check(TokenKind::Whitespace) {
                 if is_bool_op {
                     condition_parts.push(" ".to_string());
                 } else if matches!(current_kind, TokenKind::Colon) {
@@ -875,7 +875,7 @@ fn parse_function_value(parser: &mut CssParser) -> Result<CssValue, ParseError> 
                 }
             }
 
-            prev_token_kind = Some(current_kind.clone());
+            prev_token_kind = Some(current_kind);
             if !matches!(current_kind, TokenKind::Whitespace) {
                 last_non_whitespace_kind = Some(current_kind);
             }
@@ -896,12 +896,12 @@ fn parse_function_value(parser: &mut CssParser) -> Result<CssValue, ParseError> 
         parser.skip_whitespace()?;
     } else {
         // Other unknown functions - consume everything until )
-        while !parser.check(&TokenKind::RightParen) && !parser.check(&TokenKind::Eof) {
+        while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
             parser.advance()?;
         }
     }
 
-    if !parser.check(&TokenKind::RightParen) {
+    if !parser.check(TokenKind::RightParen) {
         return Err(parser.error_expected("')' to close function"));
     }
 
@@ -928,10 +928,10 @@ pub(crate) fn parse_atrule(
     let start = parser.base_offset() + parser.current_start;
 
     // Expect @ symbol
-    parser.expect(&TokenKind::AtSign)?;
+    parser.expect(TokenKind::AtSign)?;
 
     // Parse at-rule name (identifier after @)
-    if !parser.check(&TokenKind::Identifier) {
+    if !parser.check(TokenKind::Identifier) {
         return Err(parser.error_expected_after("at-rule name", "@"));
     }
 
@@ -978,11 +978,11 @@ pub(crate) fn parse_atrule(
     };
 
     // Parse block (if present)
-    let (block, end) = if parser.check(&TokenKind::LeftBrace) {
+    let (block, end) = if parser.check(TokenKind::LeftBrace) {
         let block = parse_atrule_block(parser, &name, nested_in_rule)?;
         let end = block.span.end;
         (Some(block), end)
-    } else if parser.check(&TokenKind::Semicolon) {
+    } else if parser.check(TokenKind::Semicolon) {
         // Statement at-rule (no block)
         let end = parser.base_offset() + parser.current_end;
         parser.advance()?;
@@ -1029,11 +1029,11 @@ fn parse_raw_prelude_content(
     // - No prelude (@font-face, @starting-style): No prelude to normalize
     // - Identifier preludes (@keyframes, @layer): No colons to worry about
 
-    while !parser.check(&TokenKind::LeftBrace)
-        && !parser.check(&TokenKind::Semicolon)
-        && !parser.check(&TokenKind::Eof)
+    while !parser.check(TokenKind::LeftBrace)
+        && !parser.check(TokenKind::Semicolon)
+        && !parser.check(TokenKind::Eof)
     {
-        if parser.check(&TokenKind::Whitespace) {
+        if parser.check(TokenKind::Whitespace) {
             // Skip whitespace in selector list preludes (inside parentheses for @scope):
             // - After '(' or before ')'
             // - After ':' (pseudo-classes like :hover) - only for selector list preludes
@@ -1107,7 +1107,7 @@ fn parse_raw_prelude_content(
 
         prelude_parts.push(part);
 
-        let current_kind = parser.current_kind.clone();
+        let current_kind = parser.current_kind;
 
         // Track parenthesis depth for selector detection
         if matches!(current_kind, TokenKind::LeftParen) {
@@ -1120,7 +1120,7 @@ fn parse_raw_prelude_content(
 
         // Add space after boolean operators, comments, commas, or ':' if not followed by whitespace
         // Note: @scope preludes are now parsed structurally, so they don't go through this code
-        if !parser.check(&TokenKind::Whitespace) {
+        if !parser.check(TokenKind::Whitespace) {
             if is_bool_op {
                 prelude_parts.push(" ".to_string());
             } else if is_comment {
@@ -1154,7 +1154,7 @@ fn parse_raw_prelude_content(
             }
         }
 
-        prev_token_kind = Some(current_kind.clone());
+        prev_token_kind = Some(current_kind);
         // Track last non-whitespace token for colon spacing logic
         if !matches!(current_kind, TokenKind::Whitespace) {
             last_non_whitespace_kind = Some(current_kind);
@@ -1186,7 +1186,7 @@ fn parse_atrule_block(
     let start = parser.base_offset() + parser.current_start;
 
     // Expect {
-    parser.expect(&TokenKind::LeftBrace)?;
+    parser.expect(TokenKind::LeftBrace)?;
     parser.skip_whitespace()?;
 
     let mut children = Vec::new();
@@ -1219,7 +1219,7 @@ fn parse_atrule_block(
     // can contain BOTH declarations and nested rules — they fall through to the
     // generic fallback which uses is_nested_rule_start() to disambiguate.
 
-    while !parser.check(&TokenKind::RightBrace) && !parser.check(&TokenKind::Eof) {
+    while !parser.check(TokenKind::RightBrace) && !parser.check(TokenKind::Eof) {
         if matches!(&parser.current_kind, TokenKind::Comment) {
             let comment = parser.parse_block_comment()?;
             children.push(CssBlockChild::Comment(comment));
@@ -1227,7 +1227,7 @@ fn parse_atrule_block(
         }
 
         // Handle nested at-rules
-        if parser.check(&TokenKind::AtSign) {
+        if parser.check(TokenKind::AtSign) {
             // Nested at-rules inside at-rules are not "nested in rule" context
             let atrule = parse_atrule(parser, false)?;
             children.push(CssBlockChild::Atrule(atrule));
@@ -1236,7 +1236,7 @@ fn parse_atrule_block(
         }
 
         // For @font-face and @page, parse declarations
-        if expect_declarations && parser.check(&TokenKind::Identifier) {
+        if expect_declarations && parser.check(TokenKind::Identifier) {
             let decl = super::declarations::parse_declaration(parser)?;
             children.push(CssBlockChild::Declaration(decl));
             parser.skip_whitespace()?;
@@ -1260,7 +1260,7 @@ fn parse_atrule_block(
             children.push(CssBlockChild::Rule(rule));
             parser.skip_whitespace()?;
             continue;
-        } else if parser.check(&TokenKind::Identifier) {
+        } else if parser.check(TokenKind::Identifier) {
             // Parse as declaration (property: value)
             let decl = super::declarations::parse_declaration(parser)?;
             children.push(CssBlockChild::Declaration(decl));
@@ -1273,7 +1273,7 @@ fn parse_atrule_block(
     }
 
     // Expect }
-    if !parser.check(&TokenKind::RightBrace) {
+    if !parser.check(TokenKind::RightBrace) {
         return Err(parser.error_expected("'}'"));
     }
     let end = parser.base_offset() + parser.current_end;

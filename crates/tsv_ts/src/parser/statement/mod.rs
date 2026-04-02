@@ -43,8 +43,11 @@ impl<'a> Parser<'a> {
                 KeywordKind::Export => self.parse_export_declaration(),
                 KeywordKind::Import => {
                     // `import(...)` is a dynamic import expression
+                    // `import.meta` is a meta property expression
                     // `import ...` is an import declaration
-                    if self.peek_kind() == TokenKind::ParenOpen {
+                    if self.peek_kind() == TokenKind::ParenOpen
+                        || self.peek_kind() == TokenKind::Dot
+                    {
                         self.parse_expression_statement()
                     } else {
                         self.parse_import_declaration()

@@ -158,9 +158,7 @@ impl<'a> Printer<'a> {
                 } else {
                     stmt_start
                 };
-                if !self.in_template_interpolation.get()
-                    && self.has_blank_line_between(prev_end, blank_line_check_end)
-                {
+                if self.has_blank_line_between(prev_end, blank_line_check_end) {
                     body_parts.push(d.literalline());
                 }
                 body_parts.push(d.hardline());
@@ -196,9 +194,7 @@ impl<'a> Printer<'a> {
                     continue; // Skip same-line comments (already handled above)
                 }
                 // Check for blank line before this comment
-                if !self.in_template_interpolation.get()
-                    && self.has_blank_line_between(trailing_prev_end, comment.span.start)
-                {
+                if self.has_blank_line_between(trailing_prev_end, comment.span.start) {
                     body_parts.push(d.literalline());
                 }
                 body_parts.push(d.hardline());

@@ -701,7 +701,7 @@ pub struct TSMappedTypeParameter {
 }
 
 /// Mapped type modifier value: true, "+", or "-"
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum TSMappedTypeModifier {
     True,
     Plus,

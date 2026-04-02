@@ -32,7 +32,7 @@ impl<'a> Printer<'a> {
             let export_keyword = "export ";
             // For decorated classes, decorators come before export keyword
             if let internal::Statement::ClassDeclaration(class) = declaration.as_ref()
-                && let Some(dec_doc) = self.build_decorators_doc(class.decorators.as_ref())
+                && let Some(dec_doc) = self.build_decorators_doc(class.decorators.as_deref())
             {
                 return d.concat(&[
                     dec_doc,
@@ -126,7 +126,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // For decorated classes, decorators come before export keyword
         if let internal::ExportDefaultValue::ClassDeclaration(class) = &decl.declaration
-            && let Some(dec_doc) = self.build_decorators_doc(class.decorators.as_ref())
+            && let Some(dec_doc) = self.build_decorators_doc(class.decorators.as_deref())
         {
             return d.concat(&[
                 dec_doc,

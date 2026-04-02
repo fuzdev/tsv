@@ -14,12 +14,12 @@ pub(crate) fn parse_pseudo_selector(
     parser.advance()?; // consume first :
 
     // Check for :: (pseudo-element)
-    let is_pseudo_element = parser.check(&TokenKind::Colon);
+    let is_pseudo_element = parser.check(TokenKind::Colon);
     if is_pseudo_element {
         parser.advance()?; // consume second :
     }
 
-    if !parser.check(&TokenKind::Identifier) {
+    if !parser.check(TokenKind::Identifier) {
         return Err(parser.error_expected("pseudo-class or pseudo-element name"));
     }
 
@@ -32,7 +32,7 @@ pub(crate) fn parse_pseudo_selector(
     parser.advance()?;
 
     // Check for arguments: :nth-child(2n+1), :is(), :not(), etc.
-    let args = if parser.check(&TokenKind::LeftParen) {
+    let args = if parser.check(TokenKind::LeftParen) {
         let (args_opt, args_end) = parse_pseudo_args(parser, &name)?;
         end = args_end; // Use end of closing paren
         args_opt
@@ -72,7 +72,7 @@ fn parse_pseudo_args(
     parser: &mut CssParser,
     pseudo_name: &str,
 ) -> Result<(Option<PseudoClassArgs>, u32), ParseError> {
-    parser.expect(&TokenKind::LeftParen)?;
+    parser.expect(TokenKind::LeftParen)?;
 
     let args_start = parser.current_start;
 
@@ -88,18 +88,18 @@ fn parse_pseudo_args(
         let mut compound_selectors = Vec::new();
 
         // Parse simple selectors until we hit a combinator or closing paren
-        while !parser.check(&TokenKind::RightParen) && !parser.check(&TokenKind::Eof) {
+        while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
             parser.skip_whitespace_and_comments()?;
 
-            if parser.check(&TokenKind::RightParen) {
+            if parser.check(TokenKind::RightParen) {
                 break;
             }
 
             // Check for combinators (not allowed in compound selectors)
-            if parser.check(&TokenKind::GreaterThan)
-                || parser.check(&TokenKind::Plus)
-                || parser.check(&TokenKind::Tilde)
-                || parser.check(&TokenKind::ColumnCombinator)
+            if parser.check(TokenKind::GreaterThan)
+                || parser.check(TokenKind::Plus)
+                || parser.check(TokenKind::Tilde)
+                || parser.check(TokenKind::ColumnCombinator)
             {
                 return Err(
                     parser.error_msg("Combinators not allowed in ::slotted() compound selector")
@@ -121,7 +121,7 @@ fn parse_pseudo_args(
             ));
         }
 
-        let end = parser.expect_and_capture(&TokenKind::RightParen)?;
+        let end = parser.expect_and_capture(TokenKind::RightParen)?;
 
         return Ok((
             Some(PseudoClassArgs::Slotted {
@@ -145,8 +145,8 @@ fn parse_pseudo_args(
         let mut idents = Vec::new();
 
         // Parse space-separated identifiers
-        while !parser.check(&TokenKind::RightParen) && !parser.check(&TokenKind::Eof) {
-            if !parser.check(&TokenKind::Identifier) {
+        while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
+            if !parser.check(TokenKind::Identifier) {
                 return Err(parser.error_msg("::part() requires identifier arguments"));
             }
 
@@ -167,7 +167,7 @@ fn parse_pseudo_args(
             ));
         }
 
-        let end = parser.expect_and_capture(&TokenKind::RightParen)?;
+        let end = parser.expect_and_capture(TokenKind::RightParen)?;
 
         return Ok((
             Some(PseudoClassArgs::Part {
@@ -197,8 +197,8 @@ fn parse_pseudo_args(
         let mut ident_parts = Vec::new();
 
         // Collect tokens that form the identifier (may include hyphens, etc.)
-        while !parser.check(&TokenKind::RightParen) && !parser.check(&TokenKind::Eof) {
-            if parser.check(&TokenKind::Whitespace) {
+        while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
+            if parser.check(TokenKind::Whitespace) {
                 parser.advance()?;
                 continue;
             }
@@ -209,7 +209,7 @@ fn parse_pseudo_args(
         let ident_value = ident_parts.join("");
         let ident_end = parser.current_start;
 
-        let paren_end = parser.expect_and_capture(&TokenKind::RightParen)?;
+        let paren_end = parser.expect_and_capture(TokenKind::RightParen)?;
 
         return Ok((
             Some(PseudoClassArgs::Identifier {
@@ -252,7 +252,7 @@ fn parse_pseudo_args(
 
         parser.skip_whitespace_and_comments()?;
 
-        let end = parser.expect_and_capture(&TokenKind::RightParen)?;
+        let end = parser.expect_and_capture(TokenKind::RightParen)?;
 
         return Ok((
             Some(PseudoClassArgs::SelectorList {
@@ -280,19 +280,19 @@ fn parse_pseudo_args(
             let mut found_of = false;
             let mut depth = 0;
 
-            while !parser.check(&TokenKind::Eof) {
-                if parser.check(&TokenKind::RightParen) && depth == 0 {
+            while !parser.check(TokenKind::Eof) {
+                if parser.check(TokenKind::RightParen) && depth == 0 {
                     // End of nth args
                     break;
-                } else if parser.check(&TokenKind::LeftParen) {
+                } else if parser.check(TokenKind::LeftParen) {
                     depth += 1;
                     anb_end = parser.current_end;
                     parser.advance()?;
-                } else if parser.check(&TokenKind::RightParen) {
+                } else if parser.check(TokenKind::RightParen) {
                     depth -= 1;
                     anb_end = parser.current_end;
                     parser.advance()?;
-                } else if parser.check(&TokenKind::Identifier) && depth == 0 {
+                } else if parser.check(TokenKind::Identifier) && depth == 0 {
                     let ident = parser
                         .current_identifier()
                         .unwrap_or_else(|| parser.current_value());
@@ -325,7 +325,7 @@ fn parse_pseudo_args(
 
             parser.skip_whitespace_and_comments()?;
             let span_end = (parser.base_offset() + parser.current_start) as u32; // End before closing paren
-            let paren_end = parser.expect_and_capture(&TokenKind::RightParen)?; // End after closing paren
+            let paren_end = parser.expect_and_capture(TokenKind::RightParen)?; // End after closing paren
 
             (
                 Some(PseudoClassArgs::Nth {
@@ -354,7 +354,7 @@ fn parse_pseudo_args(
             match selector_result {
                 Ok(selector_list) => {
                     parser.skip_whitespace_and_comments()?;
-                    let end = parser.expect_and_capture(&TokenKind::RightParen)?;
+                    let end = parser.expect_and_capture(TokenKind::RightParen)?;
 
                     (
                         Some(PseudoClassArgs::SelectorList {
@@ -371,10 +371,10 @@ fn parse_pseudo_args(
                     // Parsing as selector list failed - skip arguments
                     // This handles pseudo-classes with non-selector arguments
                     let mut depth = 1;
-                    while depth > 0 && !parser.check(&TokenKind::Eof) {
-                        if parser.check(&TokenKind::LeftParen) {
+                    while depth > 0 && !parser.check(TokenKind::Eof) {
+                        if parser.check(TokenKind::LeftParen) {
                             depth += 1;
-                        } else if parser.check(&TokenKind::RightParen) {
+                        } else if parser.check(TokenKind::RightParen) {
                             depth -= 1;
                             if depth == 0 {
                                 break;
@@ -384,7 +384,7 @@ fn parse_pseudo_args(
                             parser.advance()?;
                         }
                     }
-                    let end = parser.expect_and_capture(&TokenKind::RightParen)?;
+                    let end = parser.expect_and_capture(TokenKind::RightParen)?;
                     (None, end)
                 }
             }

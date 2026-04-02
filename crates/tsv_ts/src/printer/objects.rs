@@ -556,33 +556,52 @@ impl<'a> Printer<'a> {
                         d.group(d.indent(d.concat(&[d.line(), rhs_doc]))),
                     ]))
                 } else {
-                    // Inline comments: build manually (existing behavior)
-                    let mut parts = vec![key_doc];
+                    // Inline block comments: use assignment layout so choose_layout
+                    // applies (e.g., ternary with binaryish test → BreakAfterOperator).
+                    // Pre-colon comments become part of the LHS doc.
+                    let lhs_doc = if pre_colon_comments.is_empty() {
+                        key_doc
+                    } else {
+                        let mut lhs_parts = vec![key_doc];
+                        for comment in &pre_colon_comments {
+                            lhs_parts.push(d.text(" "));
+                            lhs_parts.push(self.build_comment_doc(comment));
+                        }
+                        d.concat(&lhs_parts)
+                    };
 
-                    // Add comments between key and colon
-                    for comment in &pre_colon_comments {
-                        parts.push(d.text(" "));
-                        parts.push(self.build_comment_doc(comment));
-                    }
+                    // Post-colon inline comments become rhs_comments
+                    let rhs_comments = if post_colon_comments.is_empty() {
+                        None
+                    } else {
+                        let mut comment_parts = Vec::new();
+                        for comment in &post_colon_comments {
+                            comment_parts.push(self.build_comment_doc(comment));
+                            comment_parts.push(d.text(" "));
+                        }
+                        Some(d.concat(&comment_parts))
+                    };
 
-                    parts.push(d.text(": "));
-
-                    // Add comments between colon and value
-                    for comment in &post_colon_comments {
-                        parts.push(self.build_comment_doc(comment));
-                        parts.push(d.text(" "));
-                    }
-
-                    // Add parens around assignment expressions
                     if needs_parens {
+                        // Rare: assignment expression in object value needs parens
+                        let mut parts = vec![lhs_doc, d.text(": ")];
+                        if let Some(rc) = rhs_comments {
+                            parts.push(rc);
+                        }
                         parts.push(d.text("("));
-                    }
-                    parts.push(self.build_expression_doc(&prop.value));
-                    if needs_parens {
+                        parts.push(self.build_expression_doc(&prop.value));
                         parts.push(d.text(")"));
+                        d.concat(&parts)
+                    } else {
+                        let is_short_key = self.is_short_property_key(&prop.key, prop.computed);
+                        self.build_assignment_layout(
+                            lhs_doc,
+                            ":",
+                            &prop.value,
+                            is_short_key,
+                            rhs_comments,
+                        )
                     }
-
-                    d.concat(&parts)
                 }
             }
         }

@@ -9,7 +9,7 @@ pub(crate) fn parse_attribute_selector(
     parser: &mut CssParser,
     start: usize,
 ) -> Result<SimpleSelector, ParseError> {
-    parser.expect(&TokenKind::LeftBracket)?;
+    parser.expect(TokenKind::LeftBracket)?;
     parser.skip_whitespace()?;
 
     // Parse namespace prefix (optional):
@@ -17,21 +17,21 @@ pub(crate) fn parse_attribute_selector(
     // - [*|attr] - universal namespace "*"
     // - [|attr] - explicit no namespace ""
     // - [attr] - implicit no namespace (None)
-    let namespace = if parser.check(&TokenKind::Asterisk) {
+    let namespace = if parser.check(TokenKind::Asterisk) {
         // Universal namespace: *|attr
         parser.advance()?;
-        if !parser.check(&TokenKind::Pipe) {
+        if !parser.check(TokenKind::Pipe) {
             return Err(parser.error_expected_after("'|'", "'*' in attribute selector"));
         }
         parser.advance()?; // consume |
         parser.skip_whitespace()?;
         Some("*".to_string())
-    } else if parser.check(&TokenKind::Pipe) {
+    } else if parser.check(TokenKind::Pipe) {
         // Explicit no namespace: |attr
         parser.advance()?; // consume |
         parser.skip_whitespace()?;
         Some(String::new())
-    } else if parser.check(&TokenKind::Identifier) {
+    } else if parser.check(TokenKind::Identifier) {
         // Could be: ns|attr or just attr (or lang with |= operator)
         let maybe_namespace = parser
             .current_identifier()
@@ -42,13 +42,13 @@ pub(crate) fn parse_attribute_selector(
 
         // Check if this is a namespace prefix (identifier|identifier)
         // vs dash-match operator (identifier|=value)
-        if parser.check(&TokenKind::Pipe) {
+        if parser.check(TokenKind::Pipe) {
             // Peek ahead to distinguish namespace from |= operator
             parser.advance()?; // consume |
             parser.skip_whitespace()?;
 
             // If next token is =, this was the |= operator, not a namespace
-            if parser.check(&TokenKind::Equals) {
+            if parser.check(TokenKind::Equals) {
                 // Backtrack: restore the identifier as attribute name
                 // and let matcher parsing handle |=
                 // We need to restore state...
@@ -83,7 +83,7 @@ pub(crate) fn parse_attribute_selector(
                 parser.skip_whitespace()?;
 
                 // Parse attribute flags (i/I=case-insensitive, s/S=case-sensitive) - optional
-                let flags = if parser.check(&TokenKind::Identifier) {
+                let flags = if parser.check(TokenKind::Identifier) {
                     let flag = parser.current_value().to_string();
                     let flag_lower = flag.to_lowercase();
                     if flag_lower == "i" || flag_lower == "s" {
@@ -98,7 +98,7 @@ pub(crate) fn parse_attribute_selector(
                 };
 
                 // Expect ] and capture its end position
-                let end = parser.expect_and_capture(&TokenKind::RightBracket)?;
+                let end = parser.expect_and_capture(TokenKind::RightBracket)?;
 
                 return Ok(SimpleSelector::Attribute {
                     namespace: None,
@@ -121,7 +121,7 @@ pub(crate) fn parse_attribute_selector(
             let name = maybe_namespace;
 
             // Check for matcher and value: =, ~=, |=, ^=, $=, *=
-            let (matcher, value) = if parser.check(&TokenKind::RightBracket) {
+            let (matcher, value) = if parser.check(TokenKind::RightBracket) {
                 (None, None) // Just [attr]
             } else {
                 let matcher = parse_attribute_matcher(parser)?;
@@ -154,7 +154,7 @@ pub(crate) fn parse_attribute_selector(
             };
 
             // Parse attribute flags (i/I=case-insensitive, s/S=case-sensitive) - optional
-            let flags = if parser.check(&TokenKind::Identifier) {
+            let flags = if parser.check(TokenKind::Identifier) {
                 let flag = parser.current_value().to_string();
                 let flag_lower = flag.to_lowercase();
                 // Accept both lowercase and uppercase flag letters
@@ -170,7 +170,7 @@ pub(crate) fn parse_attribute_selector(
             };
 
             // Expect ] and capture its end position
-            let end = parser.expect_and_capture(&TokenKind::RightBracket)?;
+            let end = parser.expect_and_capture(TokenKind::RightBracket)?;
 
             return Ok(SimpleSelector::Attribute {
                 namespace: None, // No namespace prefix (implicit)
@@ -189,7 +189,7 @@ pub(crate) fn parse_attribute_selector(
     };
 
     // Now parse the attribute name (after namespace|)
-    if !parser.check(&TokenKind::Identifier) {
+    if !parser.check(TokenKind::Identifier) {
         return Err(parser.error_expected_after("attribute name", "namespace"));
     }
 
@@ -202,7 +202,7 @@ pub(crate) fn parse_attribute_selector(
     parser.skip_whitespace()?;
 
     // Check for matcher and value: =, ~=, |=, ^=, $=, *=
-    let (matcher, value) = if parser.check(&TokenKind::RightBracket) {
+    let (matcher, value) = if parser.check(TokenKind::RightBracket) {
         (None, None) // Just [attr]
     } else {
         let matcher = parse_attribute_matcher(parser)?;
@@ -232,7 +232,7 @@ pub(crate) fn parse_attribute_selector(
     };
 
     // Parse attribute flags (i/I=case-insensitive, s/S=case-sensitive) - optional
-    let flags = if parser.check(&TokenKind::Identifier) {
+    let flags = if parser.check(TokenKind::Identifier) {
         let flag = parser.current_value().to_string();
         let flag_lower = flag.to_lowercase();
         // Accept both lowercase and uppercase flag letters
@@ -248,7 +248,7 @@ pub(crate) fn parse_attribute_selector(
     };
 
     // Expect ] and capture its end position
-    let end = parser.expect_and_capture(&TokenKind::RightBracket)?;
+    let end = parser.expect_and_capture(TokenKind::RightBracket)?;
 
     Ok(SimpleSelector::Attribute {
         namespace,
@@ -270,7 +270,7 @@ fn parse_attribute_matcher(parser: &mut CssParser) -> Result<AttributeMatcher, P
         TokenKind::Tilde => {
             // ~= (contains in whitespace-separated list)
             parser.advance()?;
-            if !parser.check(&TokenKind::Equals) {
+            if !parser.check(TokenKind::Equals) {
                 return Err(parser.error_expected_after("'='", "'~'"));
             }
             parser.advance()?; // consume =
@@ -279,7 +279,7 @@ fn parse_attribute_matcher(parser: &mut CssParser) -> Result<AttributeMatcher, P
         TokenKind::Pipe => {
             // |= (dash-match)
             parser.advance()?;
-            if !parser.check(&TokenKind::Equals) {
+            if !parser.check(TokenKind::Equals) {
                 return Err(parser.error_expected_after("'='", "'|'"));
             }
             parser.advance()?; // consume =
@@ -288,7 +288,7 @@ fn parse_attribute_matcher(parser: &mut CssParser) -> Result<AttributeMatcher, P
         TokenKind::Caret => {
             // ^= (prefix match)
             parser.advance()?;
-            if !parser.check(&TokenKind::Equals) {
+            if !parser.check(TokenKind::Equals) {
                 return Err(parser.error_expected_after("'='", "'^'"));
             }
             parser.advance()?; // consume =
@@ -297,7 +297,7 @@ fn parse_attribute_matcher(parser: &mut CssParser) -> Result<AttributeMatcher, P
         TokenKind::Dollar => {
             // $= (suffix match)
             parser.advance()?;
-            if !parser.check(&TokenKind::Equals) {
+            if !parser.check(TokenKind::Equals) {
                 return Err(parser.error_expected_after("'='", "'$'"));
             }
             parser.advance()?; // consume =
@@ -306,7 +306,7 @@ fn parse_attribute_matcher(parser: &mut CssParser) -> Result<AttributeMatcher, P
         TokenKind::Asterisk => {
             // *= (substring match)
             parser.advance()?;
-            if !parser.check(&TokenKind::Equals) {
+            if !parser.check(TokenKind::Equals) {
                 return Err(parser.error_expected_after("'='", "'*'"));
             }
             parser.advance()?; // consume =

@@ -186,7 +186,7 @@ pub(super) fn build_call_args_doc_for_chain(
     call: &internal::CallExpression,
     optional: bool,
 ) -> DocId {
-    build_call_args_doc_for_chain_impl(printer, call, optional, false)
+    build_call_args_doc_for_chain_impl(printer, call, optional, false, false)
 }
 
 /// Check if a single argument is an arrow function with a breakable body
@@ -213,7 +213,22 @@ pub(super) fn build_call_args_doc_for_chain_expanded(
     call: &internal::CallExpression,
     optional: bool,
 ) -> DocId {
-    build_call_args_doc_for_chain_impl(printer, call, optional, true)
+    build_call_args_doc_for_chain_impl(printer, call, optional, true, false)
+}
+
+/// Build a Doc for call arguments with standard forced expansion
+///
+/// Like `build_call_args_doc_for_chain_expanded`, but always uses the standard
+/// `(\n  args,\n)` form — never the arrow-hugging `(sig =>\n  body,\n)` form.
+/// Used for the "first call inline, rest expanded" state in short chains where
+/// the chain doesn't break between groups, so the arrow signature would add
+/// too much to the first line.
+pub(super) fn build_call_args_doc_for_chain_standard_expanded(
+    printer: &Printer,
+    call: &internal::CallExpression,
+    optional: bool,
+) -> DocId {
+    build_call_args_doc_for_chain_impl(printer, call, optional, true, true)
 }
 
 /// Implementation for call args doc building
@@ -222,6 +237,7 @@ fn build_call_args_doc_for_chain_impl(
     call: &internal::CallExpression,
     optional: bool,
     force_expand: bool,
+    standard_expansion: bool,
 ) -> DocId {
     let d = printer.d();
     // Build type arguments if present: `<T, U>`
@@ -327,7 +343,7 @@ fn build_call_args_doc_for_chain_impl(
         // Exception: when there are trailing comments, we use the full expansion
         // path which produces the extra-indented style that Prettier uses:
         // `fn(\n  {...} /* comment */,\n)` not `fn({...} /* comment */)`
-        if call.arguments.len() == 1 && !has_trailing_block_comments {
+        if call.arguments.len() == 1 && !has_trailing_block_comments && !comments_force_expansion {
             let arg = &call.arguments[0];
             if matches!(
                 arg,
@@ -344,7 +360,10 @@ fn build_call_args_doc_for_chain_impl(
 
         // Special case: single arrow arg with array body — the array expands internally.
         // Layout: `(sig => [\n  items,\n])` — array content on new lines, bracket hugged.
+        // Skip when comments_force_expansion — own-line comments would be lost since
+        // leading_comment_doc only captures inline block comments.
         if call.arguments.len() == 1
+            && !comments_force_expansion
             && let Expression::ArrowFunctionExpression(arrow) = &call.arguments[0]
             && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
             && matches!(&**body_expr, Expression::ArrayExpression(_))
@@ -368,7 +387,14 @@ fn build_call_args_doc_for_chain_impl(
         // This matches prettier which keeps the signature hugged even when forcing expansion.
         // Arrows with TSTypeReference return types fall through — prettier's couldExpandArg
         // returns false for them, so they use default wrapping.
-        if call.arguments.len() == 1 && is_single_arrow_with_breakable_body(&call.arguments[0]) {
+        // Skip when standard_expansion is requested — short chains where the chain
+        // doesn't break between groups need the standard `(\n  args,\n)` form to keep
+        // the first line short enough for fits().
+        if !standard_expansion
+            && !comments_force_expansion
+            && call.arguments.len() == 1
+            && is_single_arrow_with_breakable_body(&call.arguments[0])
+        {
             let arg = &call.arguments[0];
             if let Expression::ArrowFunctionExpression(arrow) = arg
                 && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
@@ -448,7 +474,7 @@ fn build_call_args_doc_for_chain_impl(
 
             // Check for blank line before this arg (from previous arg)
             // Only add blank line preservation when there are no comments between args,
-            // since comments will be emitted with their own line breaks.
+            // since comments with blank lines are handled in the separator logic below.
             if i > 0 {
                 let prev_end = call.arguments[i - 1].span().end;
                 let has_comments_before = printer.has_comments_between(prev_end, arg_start);
@@ -515,20 +541,36 @@ fn build_call_args_doc_for_chain_impl(
                     }
                 }
 
-                // Skip hardline if next arg has blank line AND no comments between
-                // (blank line preservation handles the line break)
+                // Skip hardline if next arg has blank line
+                // (blank line preservation at the top of the loop handles the line break)
                 let has_comments_before_next =
                     printer.has_comments_between(arg_end, next_arg_start);
-                let next_has_blank = !has_comments_before_next
-                    && has_blank_line_between_args(
+                let next_has_blank = if has_comments_before_next {
+                    pc.has_blank_line_in_gap(
                         printer.source,
                         printer.line_breaks,
                         arg_end,
                         next_arg_start,
-                    );
-                if !next_has_blank {
+                    )
+                } else {
+                    has_blank_line_between_args(
+                        printer.source,
+                        printer.line_breaks,
+                        arg_end,
+                        next_arg_start,
+                    )
+                };
+                if next_has_blank && has_comments_before_next {
+                    // Blank line before next arg's leading comments — emit literalline
+                    // before the hardline separator. When there are no comments, the
+                    // blank line is handled at the top of the next iteration.
+                    arg_parts.push(d.literalline());
+                    arg_parts.push(d.hardline());
+                } else if !next_has_blank {
                     arg_parts.push(d.hardline());
                 }
+                // else: next_has_blank && !has_comments_before_next — skip hardline,
+                // blank line preservation at top of next iteration adds literalline + hardline
                 pc.emit_leading_comments_inline_aware(&mut arg_parts, printer, next_arg_start);
             } else {
                 // Last argument - check for trailing comments before closing paren
@@ -830,7 +872,15 @@ fn build_call_args_doc_for_chain_impl(
                 return d.concat(&parts);
             }
 
-            match classify_chain_arg(arg) {
+            // Leading comments prevent hugging — prettier's shouldExpandLastArg
+            // returns false when hasComment(lastArg, Leading), so the default
+            // expansion path is used instead of expand-last hugging.
+            let kind = if has_leading_comments {
+                ChainArgKind::NeedsSoftWrap
+            } else {
+                classify_chain_arg(arg)
+            };
+            match kind {
                 ChainArgKind::NeedsSoftWrap => {
                     // Needs soft-break wrapping - e.g., long strings
                     parts.push(wrap_args_with_soft_breaks(d, prefix, arg_with_comments));

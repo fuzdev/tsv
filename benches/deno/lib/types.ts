@@ -43,18 +43,6 @@ export interface SourceFile {
 	bytes: number;
 }
 
-/** Statistics about the loaded corpus */
-export interface CorpusStats {
-	/** Total number of files */
-	totalFiles: number;
-	/** Total bytes across all files */
-	totalBytes: number;
-	/** Breakdown by language */
-	byLanguage: Record<Language, { files: number; bytes: number }>;
-	/** List of repos included */
-	repos: string[];
-}
-
 /** Implementation names for benchmarking */
 export type ImplementationName =
 	| 'canonical'

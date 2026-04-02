@@ -362,9 +362,6 @@ impl<'a> Printer<'a> {
     /// ```
     fn build_if_statement_with_wrapping_doc(&self, stmt: &internal::IfStatement) -> DocId {
         let d = self.d();
-        let is_block = matches!(stmt.consequent.as_ref(), Statement::BlockStatement(_));
-        let is_empty = matches!(stmt.consequent.as_ref(), Statement::EmptyStatement(_));
-
         // Find paren positions for comment handling
         let open_paren = self.find_open_paren_after(stmt.span.start);
         let close_paren = self.find_close_paren_after(stmt.test.span().end);
@@ -376,14 +373,12 @@ impl<'a> Printer<'a> {
             self.build_condition_group(&stmt.test)
         };
 
-        if is_block {
+        if let Statement::BlockStatement(block) = stmt.consequent.as_ref() {
             // Block consequent: group(["if (" + condition + ") " + block])
             // Outer group controls whether the whole if statement breaks
             let mut parts = vec![d.text("if ("), condition_group, d.text(") ")];
 
-            if let Statement::BlockStatement(block) = stmt.consequent.as_ref() {
-                parts.push(self.build_block_statement_expand_empty_doc(block));
-            }
+            parts.push(self.build_block_statement_expand_empty_doc(block));
 
             // Handle else clause
             if let Some(alternate) = &stmt.alternate {
@@ -400,7 +395,7 @@ impl<'a> Printer<'a> {
 
             // Outer group for the whole if statement
             d.group(d.concat(&parts))
-        } else if is_empty {
+        } else if matches!(stmt.consequent.as_ref(), Statement::EmptyStatement(_)) {
             // Empty statement: `if (cond);`
             d.group(d.concat(&[d.text("if ("), condition_group, d.text(");")]))
         } else {
@@ -466,24 +461,17 @@ impl<'a> Printer<'a> {
     fn build_for_statement_with_body_doc(&self, stmt: &internal::ForStatement) -> DocId {
         let d = self.d();
         let header_doc = self.build_for_header_doc(stmt);
-        let is_empty = matches!(stmt.body.as_ref(), Statement::EmptyStatement(_));
-        let is_block = matches!(stmt.body.as_ref(), Statement::BlockStatement(_));
-
-        if is_empty {
+        if matches!(stmt.body.as_ref(), Statement::EmptyStatement(_)) {
             // No space before empty statement: `for (...);`
             d.concat(&[header_doc, self.build_statement_doc(&stmt.body)])
-        } else if is_block {
+        } else if let Statement::BlockStatement(block) = stmt.body.as_ref() {
             // Block body: `for (...) { ... }`
             // Note: Unlike for-in/for-of, standard for loops keep empty blocks inline `{}`
-            if let Statement::BlockStatement(block) = stmt.body.as_ref() {
-                d.concat(&[
-                    header_doc,
-                    d.text(" "),
-                    self.build_block_statement_doc(block),
-                ])
-            } else {
-                unreachable!()
-            }
+            d.concat(&[
+                header_doc,
+                d.text(" "),
+                self.build_block_statement_doc(block),
+            ])
         } else {
             // Non-block body: `for (...) stmt;`
             d.concat(&[
@@ -1324,39 +1312,30 @@ impl<'a> Printer<'a> {
             self.build_condition_group(&stmt.test)
         };
 
-        let is_block = matches!(stmt.body.as_ref(), Statement::BlockStatement(_));
-        let is_empty = matches!(stmt.body.as_ref(), Statement::EmptyStatement(_));
-
-        if is_block {
+        if let Statement::BlockStatement(block) = stmt.body.as_ref() {
             // Block body: while (cond) { ... }
             let mut parts = vec![d.text("while ("), condition_group, d.text(")")];
 
-            if let Statement::BlockStatement(block) = stmt.body.as_ref() {
-                // Check for comments between ) and {
-                let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end);
-                let block_start = block.span.start;
+            // Check for comments between ) and {
+            let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end);
+            let block_start = block.span.start;
 
-                if self.has_comments_between(paren_end, block_start) {
-                    let (inline_prev, own_line, _) =
-                        self.partition_comments_by_line(paren_end, block_start);
+            if self.has_comments_between(paren_end, block_start) {
+                let (inline_prev, own_line, _) =
+                    self.partition_comments_by_line(paren_end, block_start);
 
-                    // Add comments preserving their position
-                    self.build_comments_between_parts(
-                        &mut parts,
-                        &inline_prev,
-                        &own_line,
-                        paren_end,
-                    );
+                // Add comments preserving their position
+                self.build_comments_between_parts(&mut parts, &inline_prev, &own_line, paren_end);
 
-                    parts.push(d.hardline());
-                    parts.push(self.build_block_statement_doc(block));
-                } else {
-                    parts.push(d.text(" "));
-                    parts.push(self.build_block_statement_doc(block));
-                }
+                parts.push(d.hardline());
+                parts.push(self.build_block_statement_doc(block));
+            } else {
+                parts.push(d.text(" "));
+                parts.push(self.build_block_statement_doc(block));
             }
+
             d.group(d.concat(&parts))
-        } else if is_empty {
+        } else if matches!(stmt.body.as_ref(), Statement::EmptyStatement(_)) {
             // Empty statement: while (cond);
             d.group(d.concat(&[d.text("while ("), condition_group, d.text(");")]))
         } else {
@@ -1675,8 +1654,6 @@ impl<'a> Printer<'a> {
     /// Build if statement doc with comments between consequent and alternate
     fn build_if_statement_with_comments_doc(&self, stmt: &internal::IfStatement) -> DocId {
         let d = self.d();
-        let is_block = matches!(stmt.consequent.as_ref(), Statement::BlockStatement(_));
-
         // Build condition group (same as build_if_statement_with_wrapping_doc)
         let open_paren = self.find_open_paren_after(stmt.span.start);
         let close_paren = self.find_close_paren_after(stmt.test.span().end);
@@ -1689,11 +1666,9 @@ impl<'a> Printer<'a> {
         let mut parts = vec![d.text("if ("), condition_group];
 
         // Build consequent
-        if is_block {
+        if let Statement::BlockStatement(block) = stmt.consequent.as_ref() {
             parts.push(d.text(") "));
-            if let Statement::BlockStatement(block) = stmt.consequent.as_ref() {
-                parts.push(self.build_block_statement_expand_empty_doc(block));
-            }
+            parts.push(self.build_block_statement_expand_empty_doc(block));
         } else if matches!(stmt.consequent.as_ref(), Statement::EmptyStatement(_)) {
             parts.push(d.text(");"));
         } else if is_inline_consequent(&stmt.consequent) {
@@ -1720,7 +1695,9 @@ impl<'a> Printer<'a> {
             // Determine if else can stay on same line (block consequent only):
             // - No own-line comments AND all inline comments are block comments
             let has_inline_line_comment = inline_prev.iter().any(|c| !c.is_block);
-            if is_block && own_line.is_empty() && !has_inline_line_comment {
+            let is_block_consequent =
+                matches!(stmt.consequent.as_ref(), Statement::BlockStatement(_));
+            if is_block_consequent && own_line.is_empty() && !has_inline_line_comment {
                 parts.push(d.text(" else "));
             } else {
                 parts.push(d.hardline());

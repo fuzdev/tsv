@@ -203,7 +203,7 @@ impl<'a> Printer<'a> {
 
         // Decorators, each on its own line
         if include_decorators
-            && let Some(dec_doc) = self.build_decorators_doc(decl.decorators.as_ref())
+            && let Some(dec_doc) = self.build_decorators_doc(decl.decorators.as_deref())
         {
             parts.push(dec_doc);
         }
@@ -462,8 +462,8 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = vec![];
 
-        // Decorators
-        if let Some(dec_doc) = self.build_decorators_doc(prop.decorators.as_ref()) {
+        // Decorators (inline or own-line depending on original source)
+        if let Some(dec_doc) = self.build_class_member_decorators_doc(prop.decorators.as_deref()) {
             parts.push(dec_doc);
         }
 
@@ -542,25 +542,24 @@ impl<'a> Printer<'a> {
                 self.build_rhs_comments_opt(before_value, value.span().start)
             };
 
-            if let Some(comments) = rhs_comments {
-                // Comments between = and value: inline the comment, indent the expression.
-                parts.push(d.text(" = "));
-                let expr_doc = self.build_expression_doc(value);
-                if has_line_comment {
+            if has_line_comment {
+                if let Some(comments) = rhs_comments {
                     // Line comment stays inline with `=`, expression indented on next line:
                     // `= // comment\n      c`
+                    parts.push(d.text(" = "));
+                    let expr_doc = self.build_expression_doc(value);
                     parts.push(comments);
                     parts.push(d.indent(d.concat(&[d.hardline(), expr_doc])));
-                } else {
-                    // Block comment inline: `= /* comment */ c`
-                    parts.push(comments);
-                    parts.push(expr_doc);
                 }
             } else {
-                // No comments: use assignment layout for proper line-breaking
+                // Use assignment layout for proper line-breaking (handles
+                // both no-comment and inline block comment cases).
+                // Inline block comments are passed as rhs_comments so
+                // choose_layout still applies (e.g., ternary with binaryish
+                // test → BreakAfterOperator).
                 let left_doc = d.concat(&parts);
                 let assignment_doc =
-                    self.build_assignment_layout(left_doc, " =", value, false, None);
+                    self.build_assignment_layout(left_doc, " =", value, false, rhs_comments);
                 parts = vec![assignment_doc];
             }
         }
@@ -575,8 +574,8 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = vec![];
 
-        // Decorators
-        if let Some(dec_doc) = self.build_decorators_doc(method.decorators.as_ref()) {
+        // Decorators (inline or own-line depending on original source)
+        if let Some(dec_doc) = self.build_class_member_decorators_doc(method.decorators.as_deref()) {
             parts.push(dec_doc);
         }
 

@@ -258,10 +258,15 @@ impl<'a> Printer<'a> {
         }
 
         // Print trailing comments after all nodes
-        self.print_trailing_comments(prev_end, &mut comment_idx);
+        let had_trailing = self.print_trailing_comments(prev_end, &mut comment_idx);
+        if had_trailing {
+            printed_any = true;
+        }
 
-        // Add trailing newline (matches prettier)
-        self.write("\n");
+        // Add trailing newline (only if there's content — empty files stay empty)
+        if printed_any {
+            self.write("\n");
+        }
     }
 
     /// Print leading comments between prev_end and curr_start
@@ -352,8 +357,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Print trailing comments after all nodes
-    fn print_trailing_comments(&mut self, prev_end: u32, comment_idx: &mut usize) {
+    /// Returns true if any comments were printed
+    fn print_trailing_comments(&mut self, prev_end: u32, comment_idx: &mut usize) -> bool {
         let mut last_end = prev_end;
+        let mut printed = false;
 
         while *comment_idx < self.comments.len() {
             let comment = &self.comments[*comment_idx];
@@ -385,7 +392,10 @@ impl<'a> Printer<'a> {
             self.print_css_comment(comment);
             last_end = comment.span.end;
             *comment_idx += 1;
+            printed = true;
         }
+
+        printed
     }
 
     /// Check if there's an opening brace between two spans

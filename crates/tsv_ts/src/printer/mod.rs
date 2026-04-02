@@ -109,10 +109,6 @@ pub struct Printer<'a> {
     /// Set when inside template expressions with original breaks, where the chain
     /// would exceed print width if kept flat.
     pub(crate) force_chain_expand: Cell<bool>,
-    /// Whether we're inside a template literal interpolation (${ ... })
-    /// Used to collapse blank lines - in template interpolations, blank lines are
-    /// normalized to single line breaks rather than preserved.
-    pub(crate) in_template_interpolation: Cell<bool>,
     /// Whether we're inside a curried arrow function with return type.
     /// When true, nested arrows always break after `=>` regardless of their own return type.
     /// Used for: const f = (x: T): H => (y) => expr - ALL arrows break, not just the typed ones.
@@ -150,7 +146,6 @@ impl<'a> Printer<'a> {
             is_expression_statement: Cell::new(false),
             in_top_level_assignment: Cell::new(false),
             force_chain_expand: Cell::new(false),
-            in_template_interpolation: Cell::new(false),
             in_curried_typed_arrow: Cell::new(false),
             skip_arrow_chain: Cell::new(false),
             arrow_body_object_needs_parens: Cell::new(false),
@@ -589,9 +584,10 @@ impl<'a> Printer<'a> {
     ///
     /// Returns None if there are no decorators.
     /// Each decorator is formatted as `@expression` followed by hardline.
+    /// Used for class-level decorators which always go on their own line.
     pub(crate) fn build_decorators_doc(
         &self,
-        decorators: Option<&Vec<internal::Decorator>>,
+        decorators: Option<&[internal::Decorator]>,
     ) -> Option<DocId> {
         let decorators = decorators?;
         if decorators.is_empty() {
@@ -607,6 +603,57 @@ impl<'a> Printer<'a> {
         Some(d.concat(&parts))
     }
 
+    /// Build a Doc for class member decorators (properties and methods)
+    ///
+    /// Returns None if there are no decorators.
+    /// Prettier preserves the original formatting: if any decorator has a newline
+    /// after it in the source, all decorators go on their own lines. Otherwise,
+    /// decorators stay inline (separated by spaces).
+    ///
+    /// Prettier ref: `printClassMemberDecorators` in print/decorators.js
+    /// uses `hasNewlineBetweenOrAfterDecorators` to decide `hardline` vs `line`.
+    pub(crate) fn build_class_member_decorators_doc(
+        &self,
+        decorators: Option<&[internal::Decorator]>,
+    ) -> Option<DocId> {
+        let decorators = decorators?;
+        if decorators.is_empty() {
+            return None;
+        }
+        let d = self.d();
+
+        // Check if any decorator has a newline after it in the original source.
+        // Mirrors prettier's hasNewlineBetweenOrAfterDecorators: skip spaces
+        // from locEnd(decorator), check if the next non-space char is a newline.
+        let has_newline_after = decorators.iter().any(|dec| {
+            let end = dec.span.end as usize;
+            self.source[end..]
+                .bytes()
+                .find(|&b| b != b' ' && b != b'\t')
+                .is_some_and(|b| b == b'\n' || b == b'\r')
+        });
+
+        let mut dec_docs = Vec::new();
+        for decorator in decorators {
+            dec_docs.push(d.concat(&[
+                d.text("@"),
+                self.build_expression_doc(&decorator.expression),
+            ]));
+        }
+
+        // group([join(line, decorators), hardline_or_line])
+        // Between decorators: always `line` (space in flat, newline in break)
+        // After last decorator: `hardline` if source has newlines (forces group
+        // to break), `line` otherwise (stays flat if group fits)
+        let trailing = if has_newline_after {
+            d.hardline()
+        } else {
+            d.line()
+        };
+        let joined = d.join_doc(dec_docs.into_iter(), d.line());
+        Some(d.group(d.concat(&[joined, trailing])))
+    }
+
     /// Print a TypeScript program
     ///
     /// Delegates to `build_program_doc` to build the doc tree, then renders it.
@@ -620,8 +667,7 @@ impl<'a> Printer<'a> {
     /// Check if any comment in the range has content "prettier-ignore".
     /// Used to emit the next node as raw source text instead of formatting.
     fn has_prettier_ignore_in_range(&self, start: u32, end: u32) -> bool {
-        comments_in_range(self.comments, start, end)
-            .any(|c| c.content.trim() == "prettier-ignore")
+        comments_in_range(self.comments, start, end).any(|c| c.content.trim() == "prettier-ignore")
     }
 }
 
@@ -725,10 +771,15 @@ impl<'a> Printer<'a> {
 
         // Trailing program comments
         let trailing_comments_doc = self.build_program_trailing_comments_doc(prev_end);
+        if !trailing_comments_doc.is_empty() {
+            has_output = true;
+        }
         parts.extend(trailing_comments_doc);
 
-        // Trailing newline
-        parts.push(d.hardline());
+        // Trailing newline (only if there's content — empty files stay empty)
+        if has_output {
+            parts.push(d.hardline());
+        }
 
         d.concat(&parts)
     }

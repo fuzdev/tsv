@@ -9,6 +9,7 @@ use super::super::utils::is_expandable_object;
 use super::arg_comments::PartitionedComments;
 use crate::ast::internal;
 use tsv_lang::SymbolResolver;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
 
 /// Build a Doc for a dynamic import expression: `import('module')` or `import('module', options)`
@@ -22,14 +23,31 @@ pub(super) fn build_import_expression_doc(
 ) -> DocId {
     let d = printer.d();
 
-    // Extract inline block comments between `import(` and the source expression
+    // Extract block comments between `import(` and the source expression
     // e.g., import(/* @vite-ignore */ expr) — the comment would otherwise be lost
     let open_paren_end = import_expr.span.start + 7; // "import(" is 7 chars
     let source_start = import_expr.source.span().start;
-    let leading_comment_doc = printer.build_rhs_comments_opt(open_paren_end, source_start);
+
+    // Prettier preserves own-line comment positioning: if the block comment was on its
+    // own line in the source, it stays on its own line in the output (dual-stable).
+    // Check this BEFORE building the concat doc so we can use hardlines when needed.
+    let has_own_line_leading_comment =
+        comments_in_range(printer.comments, open_paren_end, source_start)
+            .any(|c| c.is_block && printer.has_newline_between(open_paren_end, c.span.start));
 
     let raw_source_doc = printer.build_expression_doc(&import_expr.source);
-    let source_doc = if let Some(comment_doc) = leading_comment_doc {
+    let source_doc = if has_own_line_leading_comment {
+        // Own-line: each comment on its own line, separated by hardlines.
+        // Can't use build_rhs_comments_opt — it joins block comments with " ".
+        let mut parts = Vec::new();
+        for comment in comments_in_range(printer.comments, open_paren_end, source_start) {
+            parts.push(printer.build_comment_doc(comment));
+            parts.push(d.hardline());
+        }
+        parts.push(raw_source_doc);
+        d.concat(&parts)
+    } else if let Some(comment_doc) = printer.build_rhs_comments_opt(open_paren_end, source_start) {
+        // Inline: standard space-separated comments
         d.concat(&[comment_doc, raw_source_doc])
     } else {
         raw_source_doc
@@ -80,6 +98,17 @@ pub(super) fn build_import_expression_doc(
             ]));
         }
 
+        // Own-line leading comment: force hardline layout to preserve comment position.
+        // Prettier's printLeadingComment() keeps own-line comments on their own line.
+        if has_own_line_leading_comment {
+            return d.concat(&[
+                d.text("import("),
+                d.indent(d.concat(&[d.hardline(), source_doc])),
+                d.hardline(),
+                d.text(")"),
+            ]);
+        }
+
         // Wrap in group with softline break points so the outer import()
         // can break when the line exceeds print width, matching Prettier's
         // call-arg expansion behavior. Without this, only the inner arg's
@@ -104,17 +133,18 @@ pub(super) fn build_import_expression_doc(
 
     // Comment paths are the same regardless of whether options is an expandable object.
     // The is_expandable_object check only matters for the no-comment expand-last-arg pattern.
-    if has_trailing_line_comments {
-        // Line comments force hardline layout: import(\n\t'source',\n\t{opts} // comment\n)
-        let pc = PartitionedComments::new(
-            printer.comments,
-            printer.line_breaks,
-            options_end,
-            paren_close,
-        );
-
-        let mut parts = vec![options_doc];
-        pc.emit_trailing_comments(&mut parts, printer);
+    if has_trailing_line_comments || has_own_line_leading_comment {
+        // Line comments or own-line leading comments force hardline layout
+        let mut opts_parts = vec![options_doc];
+        if has_trailing_comments {
+            let pc = PartitionedComments::new(
+                printer.comments,
+                printer.line_breaks,
+                options_end,
+                paren_close,
+            );
+            pc.emit_trailing_comments(&mut opts_parts, printer);
+        }
 
         d.concat(&[
             d.text("import("),
@@ -123,7 +153,7 @@ pub(super) fn build_import_expression_doc(
                 source_doc,
                 d.text(","),
                 d.hardline(),
-                d.concat(&parts),
+                d.concat(&opts_parts),
             ])),
             d.hardline(),
             d.text(")"),

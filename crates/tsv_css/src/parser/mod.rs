@@ -142,11 +142,11 @@ impl<'a> CssParser<'a> {
         }
     }
 
-    pub(crate) fn check(&self, kind: &TokenKind) -> bool {
-        &self.current_kind == kind
+    pub(crate) fn check(&self, kind: TokenKind) -> bool {
+        self.current_kind == kind
     }
 
-    pub(crate) fn expect(&mut self, kind: &TokenKind) -> Result<(), ParseError> {
+    pub(crate) fn expect(&mut self, kind: TokenKind) -> Result<(), ParseError> {
         if !self.check(kind) {
             return Err(self.error_expected_found(&format!("{kind:?}")));
         }
@@ -155,7 +155,7 @@ impl<'a> CssParser<'a> {
 
     /// Expect a token and capture its end position before advancing.
     /// Used for nodes whose span should end at the delimiter token.
-    pub(crate) fn expect_and_capture(&mut self, kind: &TokenKind) -> Result<u32, ParseError> {
+    pub(crate) fn expect_and_capture(&mut self, kind: TokenKind) -> Result<u32, ParseError> {
         if !self.check(kind) {
             return Err(self.error_expected_found(&format!("{kind:?}")));
         }
@@ -165,7 +165,7 @@ impl<'a> CssParser<'a> {
     }
 
     pub(crate) fn skip_whitespace(&mut self) -> Result<(), ParseError> {
-        while self.check(&TokenKind::Whitespace) {
+        while self.check(TokenKind::Whitespace) {
             self.advance()?;
         }
         Ok(())
@@ -174,8 +174,7 @@ impl<'a> CssParser<'a> {
     /// Skip whitespace and comments (comments are not included in AST)
     pub(crate) fn skip_whitespace_and_comments(&mut self) -> Result<(), ParseError> {
         loop {
-            if self.check(&TokenKind::Whitespace)
-                || matches!(&self.current_kind, TokenKind::Comment)
+            if self.check(TokenKind::Whitespace) || matches!(&self.current_kind, TokenKind::Comment)
             {
                 self.advance()?;
             } else {
@@ -304,7 +303,7 @@ impl<'a> CssParser<'a> {
 
         self.skip_whitespace()?;
 
-        while !self.check(&TokenKind::Eof) {
+        while !self.check(TokenKind::Eof) {
             // Handle comments at top level - add to comments Vec
             if matches!(&self.current_kind, TokenKind::Comment) {
                 self.register_current_comment();
@@ -314,7 +313,7 @@ impl<'a> CssParser<'a> {
             }
 
             // Handle at-rules (@media, @keyframes, etc.)
-            if self.check(&TokenKind::AtSign) {
+            if self.check(TokenKind::AtSign) {
                 // Top-level at-rules are not nested in rules
                 let atrule = atrules::parse_atrule(self, false)?;
                 nodes.push(CssNode::Atrule(atrule));

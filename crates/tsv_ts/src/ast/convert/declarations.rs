@@ -139,12 +139,8 @@ pub(in crate::ast) fn convert_class_declaration(
                 .map(|d| convert_decorator(d, source, loc, interner, offset))
                 .collect()
         }),
-        declare: if class_decl.declare { Some(true) } else { None },
-        abstract_: if class_decl.r#abstract {
-            Some(true)
-        } else {
-            None
-        },
+        declare: class_decl.declare.then_some(true),
+        abstract_: class_decl.r#abstract.then_some(true),
         id: class_decl.id.as_ref().map(|id| public::Identifier {
             node_type: "Identifier".to_string(),
             start: id.span.start,
@@ -212,11 +208,7 @@ pub(in crate::ast) fn convert_class_expression(
                 .map(|d| convert_decorator(d, source, loc, interner, offset))
                 .collect()
         }),
-        abstract_: if class_expr.r#abstract {
-            Some(true)
-        } else {
-            None
-        },
+        abstract_: class_expr.r#abstract.then_some(true),
         id: class_expr.id.as_ref().map(|id| public::Identifier {
             node_type: "Identifier".to_string(),
             start: id.span.start,
@@ -495,7 +487,7 @@ fn convert_method_definition(
                 .collect()
         }),
         accessibility: method.accessibility.map(|a| a.as_str().to_string()),
-        is_abstract: if method.r#abstract { Some(true) } else { None },
+        is_abstract: method.r#abstract.then_some(true),
         is_static: method.is_static,
         is_override: method.r#override,
         computed: method.computed,
@@ -529,12 +521,12 @@ fn convert_property_definition(
                 .map(|d| convert_decorator(d, source, loc, interner, offset))
                 .collect()
         }),
-        is_abstract: if prop.r#abstract { Some(true) } else { None },
-        accessor: if prop.accessor { Some(true) } else { None },
+        is_abstract: prop.r#abstract.then_some(true),
+        accessor: prop.accessor.then_some(true),
         accessibility: prop.accessibility.map(|a| a.as_str().to_string()),
-        readonly: if prop.readonly { Some(true) } else { None },
-        r#override: if prop.r#override { Some(true) } else { None },
-        declare: if prop.declare { Some(true) } else { None },
+        readonly: prop.readonly.then_some(true),
+        r#override: prop.r#override.then_some(true),
+        declare: prop.declare.then_some(true),
         is_static: prop.is_static,
         computed: prop.computed,
         key: Box::new(convert_expression(&prop.key, source, loc, interner, offset)),

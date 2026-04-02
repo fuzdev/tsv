@@ -476,18 +476,23 @@ pub(crate) fn build_expand_all_args(d: &DocArena, callee: DocId, all_args_broken
 ///
 /// Like `build_expand_all_args` but takes a string prefix (e.g., `"("` or `"?.("`)
 /// instead of a callee DocId, since chain contexts handle the callee separately.
+///
+/// Wraps in `group_break` to match Prettier's `allArgsBrokenOut()` which uses
+/// `group({shouldBreak: true})`. This ensures the `line()` docs render as newlines
+/// even when the parent context evaluates them in Flat mode (e.g., short chains
+/// inside assignment layout's `fits()` check).
 #[inline]
 pub(super) fn build_chain_expand_all_args(
     d: &DocArena,
     prefix: &'static str,
     all_args_broken: DocId,
 ) -> DocId {
-    d.concat(&[
+    d.group_break(d.concat(&[
         d.text(prefix),
         d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
         d.line(),
         d.text(")"),
-    ])
+    ]))
 }
 
 /// Build the "inline" doc structure: `callee(head_parts + last_arg)`

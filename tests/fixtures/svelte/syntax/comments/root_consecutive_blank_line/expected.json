@@ -1,0 +1,137 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 69,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 17,
+				"data": " comment1 "
+			},
+			{
+				"type": "Text",
+				"start": 17,
+				"end": 19,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 19,
+				"end": 36,
+				"data": " comment2 "
+			},
+			{
+				"type": "Text",
+				"start": 36,
+				"end": 38,
+				"raw": "\n\n",
+				"data": "\n\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 38,
+		"end": 68,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 46,
+			"end": 59,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 48,
+					"end": 58,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 52,
+							"end": 57,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 5
+								},
+								"end": {
+									"line": 6,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 52,
+								"end": 53,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 5
+									},
+									"end": {
+										"line": 6,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 56,
+								"end": 57,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 9
+									},
+									"end": {
+										"line": 6,
+										"column": 10
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module",
+			"leadingComments": [
+				{
+					"type": "Line",
+					"value": " comment2 "
+				}
+			]
+		},
+		"attributes": []
+	}
+}

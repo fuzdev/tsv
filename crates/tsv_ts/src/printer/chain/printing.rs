@@ -38,6 +38,14 @@ pub trait ChainPrinter: SymbolLookup {
     /// Used for the "args broken, chain inline" state in conditionalGroup
     fn print_call_args_expanded(&self, call: &internal::CallExpression, optional: bool) -> DocId;
 
+    /// Print call arguments with standard forced expansion (hardlines, no arrow hugging)
+    /// Always uses `(\n  args,\n)`, never `(sig =>\n  body,\n)`
+    fn print_call_args_standard_expanded(
+        &self,
+        call: &internal::CallExpression,
+        optional: bool,
+    ) -> DocId;
+
     /// Build a doc for block comments between two positions.
     ///
     /// When `same_line_only` is true, only includes comments on the same line as `start`.
@@ -316,6 +324,29 @@ pub(crate) fn print_group_expanded<'a, P: ChainPrinter>(
     printer: &P,
 ) -> DocId {
     print_group_inner(group, printer, true, false)
+}
+
+/// Print a chain group with standard forced call expansion (no arrow hugging)
+///
+/// Like `print_group_expanded`, but uses `(\n  args,\n)` instead of `(sig =>\n  body,\n)`
+/// for single-arg arrows with breakable bodies. Used in short chain states where the
+/// chain doesn't break between groups.
+pub(crate) fn print_group_standard_expanded<'a, P: ChainPrinter>(
+    group: &ChainGroup<'a>,
+    printer: &P,
+) -> DocId {
+    let d = printer.arena();
+    let docs: Vec<DocId> = group
+        .nodes
+        .iter()
+        .map(|n| match n {
+            ChainNode::Call { call, optional } => {
+                printer.print_call_args_standard_expanded(call, *optional)
+            }
+            _ => print_node_inner(n, printer, false, false),
+        })
+        .collect();
+    d.concat(&docs)
 }
 
 /// Print a chain group, skipping block comments for the first member node

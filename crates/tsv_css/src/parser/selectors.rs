@@ -26,7 +26,7 @@ pub(crate) fn parse_complex_selector_list(
     selectors.push(first);
 
     // Parse additional selectors separated by commas
-    while parser.check(&TokenKind::Comma) {
+    while parser.check(TokenKind::Comma) {
         parser.advance()?; // consume comma
         parser.skip_whitespace_and_comments()?; // Skip whitespace and comments
         let sel = parse_complex_selector(parser)?;
@@ -95,7 +95,7 @@ pub(crate) fn parse_forgiving_selector_list(
 
         // Check for comma (more selectors) or end of list
         parser.skip_whitespace_and_comments()?;
-        if parser.check(&TokenKind::Comma) {
+        if parser.check(TokenKind::Comma) {
             parser.advance()?; // consume comma
             parser.skip_whitespace_and_comments()?;
         } else {
@@ -219,7 +219,7 @@ pub(crate) fn parse_relative_selector_list(
     selectors.push(first);
 
     // Parse additional selectors separated by commas
-    while parser.check(&TokenKind::Comma) {
+    while parser.check(TokenKind::Comma) {
         parser.advance()?; // consume comma
         parser.skip_whitespace_and_comments()?; // Skip whitespace and comments
         let sel = parse_relative_complex_selector(parser)?;
@@ -272,10 +272,10 @@ fn parse_relative_complex_selector(parser: &mut CssParser) -> Result<ComplexSele
     // Parse additional relative selectors with combinators
     loop {
         // Stop at ), ,, or EOF (used in pseudo-class argument contexts)
-        if parser.check(&TokenKind::LeftBrace)
-            || parser.check(&TokenKind::Comma)
-            || parser.check(&TokenKind::RightParen)
-            || parser.check(&TokenKind::Eof)
+        if parser.check(TokenKind::LeftBrace)
+            || parser.check(TokenKind::Comma)
+            || parser.check(TokenKind::RightParen)
+            || parser.check(TokenKind::Eof)
             || matches!(&parser.current_kind, TokenKind::Comment)
         {
             break;
@@ -317,10 +317,10 @@ pub(crate) fn parse_complex_selector(
         // Don't skip comments here - let parse_combinator handle them
         // Comments before {, ,, or EOF will cause parse_combinator to return None
         // Also check for ) to support selector lists inside pseudo-class arguments
-        if parser.check(&TokenKind::LeftBrace)
-            || parser.check(&TokenKind::Comma)
-            || parser.check(&TokenKind::RightParen)
-            || parser.check(&TokenKind::Eof)
+        if parser.check(TokenKind::LeftBrace)
+            || parser.check(TokenKind::Comma)
+            || parser.check(TokenKind::RightParen)
+            || parser.check(TokenKind::Eof)
             || matches!(&parser.current_kind, TokenKind::Comment)
         {
             break;
@@ -519,12 +519,12 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
             parser.advance()?;
 
             // Check for namespace: identifier|element
-            if parser.check(&TokenKind::Pipe) {
+            if parser.check(TokenKind::Pipe) {
                 let namespace = Some(name); // Store the namespace prefix
                 parser.advance()?; // consume pipe
 
                 // Must be followed by an identifier (element name)
-                if !parser.check(&TokenKind::Identifier) {
+                if !parser.check(TokenKind::Identifier) {
                     return Err(parser.error_expected_after("element name", "namespace prefix"));
                 }
 
@@ -559,7 +559,7 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
         TokenKind::Dot => {
             // Class selector: .class
             parser.advance()?; // consume .
-            if !parser.check(&TokenKind::Identifier) {
+            if !parser.check(TokenKind::Identifier) {
                 return Err(parser.error_expected_after("class name", "."));
             }
             let name = parser
@@ -579,7 +579,7 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
         TokenKind::Hash => {
             // ID selector: #id
             parser.advance()?; // consume #
-            if !parser.check(&TokenKind::Identifier) {
+            if !parser.check(TokenKind::Identifier) {
                 return Err(parser.error_expected_after("ID name", "#"));
             }
             let name = parser
@@ -602,11 +602,11 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
             parser.advance()?;
 
             // Check for namespace: *|element
-            if parser.check(&TokenKind::Pipe) {
+            if parser.check(TokenKind::Pipe) {
                 parser.advance()?; // consume pipe
 
                 // Must be followed by an identifier (element name)
-                if !parser.check(&TokenKind::Identifier) {
+                if !parser.check(TokenKind::Identifier) {
                     return Err(
                         parser.error_expected_after("element name", "universal namespace prefix")
                     );
@@ -681,7 +681,7 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
             parser.advance()?; // consume pipe
 
             // Must be followed by an identifier (element name) or asterisk (universal)
-            if parser.check(&TokenKind::Identifier) {
+            if parser.check(TokenKind::Identifier) {
                 let element_name = parser
                     .current_identifier()
                     .ok_or_else(|| parser.error_expected("identifier"))?
@@ -697,7 +697,7 @@ pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSele
                         end: end as u32,
                     },
                 })
-            } else if parser.check(&TokenKind::Asterisk) {
+            } else if parser.check(TokenKind::Asterisk) {
                 // |* - universal selector with explicit no namespace
                 let end = parser.base_offset() + parser.current_end;
                 parser.advance()?;

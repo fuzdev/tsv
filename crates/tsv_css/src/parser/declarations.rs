@@ -105,11 +105,11 @@ pub(crate) fn parse_rule(parser: &mut CssParser, nested: bool) -> Result<CssRule
 
     // Expect { and capture its start
     let block_start = parser.base_offset() + parser.current_start;
-    parser.expect(&TokenKind::LeftBrace)?;
+    parser.expect(TokenKind::LeftBrace)?;
     parser.skip_whitespace()?;
 
     // Parse declarations, comments, and nested rules
-    while !parser.check(&TokenKind::RightBrace) && !parser.check(&TokenKind::Eof) {
+    while !parser.check(TokenKind::RightBrace) && !parser.check(TokenKind::Eof) {
         if matches!(&parser.current_kind, TokenKind::Comment) {
             let comment = parser.parse_block_comment()?;
             declarations.push(CssBlockChild::Comment(comment));
@@ -117,7 +117,7 @@ pub(crate) fn parse_rule(parser: &mut CssParser, nested: bool) -> Result<CssRule
         }
 
         // Check for nested at-rule (CSS Nesting Module)
-        if parser.check(&TokenKind::AtSign) {
+        if parser.check(TokenKind::AtSign) {
             // Parse nested at-rule (e.g., @media inside a rule)
             // Pass true for nested_in_rule since we're inside a regular rule's declaration block
             let nested_atrule = super::atrules::parse_atrule(parser, true)?;
@@ -136,7 +136,7 @@ pub(crate) fn parse_rule(parser: &mut CssParser, nested: bool) -> Result<CssRule
         }
 
         // Otherwise, parse as declaration
-        if parser.check(&TokenKind::Identifier) {
+        if parser.check(TokenKind::Identifier) {
             let decl = parse_declaration(parser)?;
             declarations.push(CssBlockChild::Declaration(decl));
         } else {
@@ -147,7 +147,7 @@ pub(crate) fn parse_rule(parser: &mut CssParser, nested: bool) -> Result<CssRule
     }
 
     // Expect } and capture its end position
-    if !parser.check(&TokenKind::RightBrace) {
+    if !parser.check(TokenKind::RightBrace) {
         return Err(parser.error_expected("'}'"));
     }
     let block_end = parser.base_offset() + parser.current_end;
@@ -172,7 +172,7 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
     let start = parser.base_offset() + parser.current_start;
 
     // Parse property
-    if !parser.check(&TokenKind::Identifier) {
+    if !parser.check(TokenKind::Identifier) {
         return Err(parser.error_expected_at("property name", start));
     }
     // Internal AST: use decoded value (spec-compliant)
@@ -186,7 +186,7 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
     parser.skip_whitespace_and_comments()?;
 
     // Expect :
-    parser.expect(&TokenKind::Colon)?;
+    parser.expect(TokenKind::Colon)?;
     // Only skip whitespace, NOT comments - comments in values need to be preserved
     parser.skip_whitespace()?;
 
@@ -202,9 +202,9 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
     let mut prev_value_end = value_start;
     let mut prev_prev_value_end = value_start;
     let mut paren_depth: i32 = 0; // Track nesting level of parentheses
-    while !parser.check(&TokenKind::Eof)
+    while !parser.check(TokenKind::Eof)
         && !(paren_depth == 0
-            && (parser.check(&TokenKind::Semicolon) || parser.check(&TokenKind::RightBrace)))
+            && (parser.check(TokenKind::Semicolon) || parser.check(TokenKind::RightBrace)))
     {
         // Convert token to string representation for value
         let value_str = match &parser.current_kind {
@@ -337,7 +337,7 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
     let end = value_end;
 
     // Optionally consume semicolon (but don't include it in the declaration span)
-    if parser.check(&TokenKind::Semicolon) {
+    if parser.check(TokenKind::Semicolon) {
         parser.advance()?;
     }
 

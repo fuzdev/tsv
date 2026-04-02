@@ -921,7 +921,9 @@ impl<'a> SvelteParser<'a> {
     /// The lexer's identifier token only covers alphanumeric and a few special chars (`:`, `.`, `-`),
     /// so URLs like `https://example.com/path` would be split across tokens. Instead, we start from
     /// the current token position and scan raw bytes for the full unquoted value.
-    pub(crate) fn parse_unquoted_attribute_value(&mut self) -> Result<Vec<AttributeValue>, ParseError> {
+    pub(crate) fn parse_unquoted_attribute_value(
+        &mut self,
+    ) -> Result<Vec<AttributeValue>, ParseError> {
         let start = self.current_start;
         let source_bytes = self.source.as_bytes();
         let mut pos = start;

@@ -6,9 +6,10 @@ use super::calls::{
     PartitionedComments, arrow_has_type_reference_return, build_args_joined_with_comments,
     build_args_split_last, build_arrow_call_body_states, build_arrow_sig_doc,
     build_break_body_state, build_expand_all_args, build_inline_args, build_inline_or_expand_all,
-    could_expand_arrow_chain, has_inter_argument_comments_slice, has_trailing_comments_slice,
-    has_trailing_line_comments_slice, last_two_args_same_type, prepend_arrow_body_comments,
-    wrap_call_with_hard_breaks, wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
+    could_expand_arrow_chain, has_blank_line_between_args, has_inter_argument_comments_slice,
+    has_trailing_comments_slice, has_trailing_line_comments_slice, last_two_args_same_type,
+    prepend_arrow_body_comments, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
+    wrap_call_with_will_break_guard,
 };
 use super::utils::{
     arrow_has_trailing_param_comments, is_array_or_object_unwrapped, is_block_function,
@@ -336,6 +337,87 @@ impl<'a> Printer<'a> {
                 |p, a| p.build_arg_expression_doc(a),
             );
             return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
+        }
+
+        // Check for blank lines between arguments (forces expansion and preservation)
+        let has_blank_lines = new_expr.arguments.windows(2).any(|window| {
+            has_blank_line_between_args(
+                self.source,
+                self.line_breaks,
+                window[0].span().end,
+                window[1].span().start,
+            )
+        });
+
+        if has_blank_lines {
+            let mut arg_parts = Vec::new();
+            for (i, arg) in new_expr.arguments.iter().enumerate() {
+                // Check for blank line before this arg (no-comment case only).
+                // When comments exist, blank lines are handled in the separator
+                // logic of the previous iteration.
+                if i > 0 {
+                    let prev_end = new_expr.arguments[i - 1].span().end;
+                    let curr_start = arg.span().start;
+                    if !self.has_comments_between(prev_end, curr_start)
+                        && has_blank_line_between_args(
+                            self.source,
+                            self.line_breaks,
+                            prev_end,
+                            curr_start,
+                        )
+                    {
+                        arg_parts.push(d.literalline());
+                        arg_parts.push(d.hardline());
+                    }
+                }
+
+                arg_parts.push(self.build_expression_doc(arg));
+
+                if i < new_expr.arguments.len() - 1 {
+                    let arg_end = arg.span().end;
+                    let next_start = new_expr.arguments[i + 1].span().start;
+
+                    if self.has_comments_between(arg_end, next_start) {
+                        let pc = PartitionedComments::new(
+                            self.comments,
+                            self.line_breaks,
+                            arg_end,
+                            next_start,
+                        );
+
+                        arg_parts.push(d.text(","));
+                        pc.emit_trailing_comments(&mut arg_parts, self);
+
+                        let next_has_blank = pc.has_blank_line_in_gap(
+                            self.source,
+                            self.line_breaks,
+                            arg_end,
+                            next_start,
+                        );
+                        if next_has_blank {
+                            arg_parts.push(d.literalline());
+                        }
+                        arg_parts.push(d.hardline());
+                        pc.emit_leading_comments(&mut arg_parts, self);
+                    } else {
+                        arg_parts.push(d.text(","));
+                        // Skip hardline if next arg has blank line
+                        // (handled at top of next iteration)
+                        let next_has_blank = has_blank_line_between_args(
+                            self.source,
+                            self.line_breaks,
+                            arg_end,
+                            next_start,
+                        );
+                        if !next_has_blank {
+                            arg_parts.push(d.hardline());
+                        }
+                    }
+                }
+            }
+
+            let arg_doc = d.concat(&arg_parts);
+            return wrap_call_with_hard_breaks(d, callee_with_types, arg_doc);
         }
 
         // "Expand first arg" pattern: callback first, short/empty container last

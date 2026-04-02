@@ -27,6 +27,7 @@ use member_only::build_member_only_chain_doc;
 use super::analysis::should_merge_first_groups;
 use super::printing::{
     ChainPrinter, has_inside_bracket_comments, print_group, print_group_expanded,
+    print_group_standard_expanded,
 };
 use super::types::{ChainGroup, ChainNode};
 use crate::ast::internal::{ArrowFunctionBody, Expression};
@@ -370,25 +371,37 @@ fn build_multiarg_short_chain_doc<'a, P: ChainPrinter>(
     printer: &P,
 ) -> DocId {
     let d = printer.arena();
-    // State 1: First args inline, rest groups with expanded call args
+    // State: First args inline, rest groups with arrow-hugging expanded call args
+    // `(sig =>\n  body,\n)` — more compact (fewer lines) but longer first line
     let rest_expanded = build_rest_expanded_docs(rest_groups, printer);
-    let mut state_last_expanded_parts = vec![first_doc];
-    state_last_expanded_parts.extend(rest_expanded);
-    let state_last_expanded = d.concat(&state_last_expanded_parts);
+    let mut state_last_hugged_parts = vec![first_doc];
+    state_last_hugged_parts.extend(rest_expanded);
+    let state_last_hugged = d.concat(&state_last_hugged_parts);
 
-    // State 2: First call's args expanded, rest groups flexible
+    // State: First args inline, rest groups with standard expanded call args
+    // `(\n  args,\n)` — shorter first line, used when arrow-hugging doesn't fit
+    let rest_standard_expanded: Vec<DocId> = rest_groups
+        .iter()
+        .map(|g| print_group_standard_expanded(g, printer))
+        .collect();
+    let mut state_last_standard_parts = vec![first_doc];
+    state_last_standard_parts.extend(rest_standard_expanded);
+    let state_last_standard = d.concat(&state_last_standard_parts);
+
+    // State: First call's args expanded, rest groups flexible
     let first_expanded_doc = build_first_groups_expanded_doc(first_groups, printer);
     let mut state_first_expanded_parts = vec![first_expanded_doc];
     state_first_expanded_parts.extend(rest_docs.iter().copied());
     let state_first_expanded = d.concat(&state_first_expanded_parts);
 
-    // State 3: Everything expanded (first args broken, chain broken)
+    // State: Everything expanded (first args broken, chain broken)
     let rest_parts_hard = build_rest_parts_with_comments(rest_groups, printer, true, true);
     let state_all_expanded = d.concat(&[first_expanded_doc, d.indent(d.concat(&rest_parts_hard))]);
 
     d.conditional_group(&[
         on_line,
-        state_last_expanded,
+        state_last_hugged,
+        state_last_standard,
         state_first_expanded,
         state_all_expanded,
     ])

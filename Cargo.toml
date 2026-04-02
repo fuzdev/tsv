@@ -154,6 +154,10 @@ codegen-units = 1
 panic = "abort"
 strip = true
 
+[profile.corpus]
+inherits = "release"
+panic = "unwind"
+
 [profile.profiling]
 inherits = "release"
 debug = true

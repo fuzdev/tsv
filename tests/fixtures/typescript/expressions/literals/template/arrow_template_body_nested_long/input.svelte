@@ -1,5 +1,5 @@
 <script lang="ts">
-	// tsv breaks outer ${} to respect print width; prettier keeps outer ${} inline
+	// Nested template with arrow body — outer ${} hugs, inner breaks
 	const x = `${items.map(
 		(x) =>
 			`${

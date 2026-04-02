@@ -218,6 +218,13 @@ impl<'a> Printer<'a> {
                 let body_start = expr.span().start;
                 let has_post_arrow_comments = self.has_comments_between(arrow_end, body_start);
 
+                // Prettier's `hasLeadingOwnLineComment`: checks if any comment
+                // between `=>` and body has a newline after it. Inline block
+                // comments like `=> /* c */ expr` return false (body stays hugged),
+                // while own-line comments return true (body breaks).
+                let has_own_line_comment = has_post_arrow_comments
+                    && self.has_own_line_post_arrow_comment(arrow_end, body_start);
+
                 // Prettier's `shouldPutBodyOnSameLine`: certain expression types stay hugged to =>
                 // Object/array literals always hug.
                 // Nested arrows hug ONLY when outer has no return type annotation.
@@ -247,22 +254,28 @@ impl<'a> Printer<'a> {
                         false
                     };
 
-                let should_hug = !has_post_arrow_comments
+                // Inline block comments don't prevent hugging — only own-line comments do.
+                // `() => /* comment */ ({...})` hugs (inline block comment)
+                // `() =>\n  /* comment */\n  ({...})` breaks (own-line comment)
+                let should_hug = !has_own_line_comment
                     && (should_hug_arrow_body(expr) || is_template_on_same_line(self.source, expr))
                     && !chain_has_return_type
                     && !body_arrow_has_trailing_param_comments;
 
-                if has_post_arrow_comments {
-                    // Build body doc with leading comments - always breaks
+                if has_own_line_comment {
+                    // Own-line or line comments — always break
                     let body_with_comments =
                         self.build_arrow_body_with_comments_doc(expr, arrow_end, body_start);
                     parts.push(d.group(d.indent(d.concat(&[d.line(), body_with_comments]))));
                 } else if should_hug {
-                    // Hugged body: simple space, no line break option
-                    // `() => ({...})` stays on same line regardless of object's internal breaks
-                    let body_doc = self.build_arrow_body_doc(expr);
+                    // Hugged body (possibly with inline block comments):
+                    // `() => ({...})` or `() => /* c */ ({...})`
                     parts.push(d.text(" "));
-                    parts.push(body_doc);
+                    if has_post_arrow_comments {
+                        parts
+                            .push(self.build_inline_post_arrow_comments_doc(arrow_end, body_start));
+                    }
+                    parts.push(self.build_arrow_body_doc(expr));
                 } else if is_arrow_body
                     && (chain_has_return_type || self.in_curried_typed_arrow.get())
                 {
@@ -352,7 +365,19 @@ impl<'a> Printer<'a> {
                     // Template literal bodies with literalline nodes will propagate
                     // breaks naturally, enabling chain/call expansion decisions.
                     let body_doc = self.build_arrow_body_doc(expr);
-                    parts.push(d.group(d.indent(d.concat(&[d.line(), body_doc]))));
+                    if has_post_arrow_comments {
+                        // Inline block comments before non-huggable body:
+                        // `() => /* comment */ a + b`
+                        let comments_doc =
+                            self.build_inline_post_arrow_comments_doc(arrow_end, body_start);
+                        parts.push(d.group(d.indent(d.concat(&[
+                            d.line(),
+                            comments_doc,
+                            body_doc,
+                        ]))));
+                    } else {
+                        parts.push(d.group(d.indent(d.concat(&[d.line(), body_doc]))));
+                    }
                 }
             }
             internal::ArrowFunctionBody::BlockStatement(block) => {
@@ -583,14 +608,15 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build doc for arrow function body with leading comments.
+    /// Build doc for arrow function body with own-line leading comments.
     ///
-    /// Handles comments between `=>` and the body expression:
+    /// Called when at least one comment between `=>` and body is on its own line
+    /// (line comment or block comment with newline after). Inline block comments
+    /// use `build_inline_post_arrow_comments_doc` instead.
     /// ```typescript
-    /// () => /* comment */ expr
-    /// // becomes:
     /// () =>
-    ///     /* comment */ expr
+    ///     /* comment */
+    ///     expr
     /// ```
     fn build_arrow_body_with_comments_doc(
         &self,
@@ -609,16 +635,16 @@ impl<'a> Printer<'a> {
 
             // Determine separator after comment:
             // - Line comments (// ...) → MUST use hardline (comment extends to EOL)
-            // - Multi-line block comments (with newline before */) → hardline
-            // - Single-line block comments → space
+            // - Own-line block comments (newline after) → hardline
+            // - Inline block comments → space
             let is_line_comment = !comment.is_block;
-            let is_multi_line_block = comment.is_block && comment.content.ends_with('\n');
+            let next_start = comments.get(i + 1).map_or(body_start, |c| c.span.start);
+            let is_own_line = comment.is_block && !self.is_same_line(comment.span.end, next_start);
 
-            if is_line_comment || (is_multi_line_block && i == comments.len() - 1) {
-                // Line comment or multi-line block as last → put next content on new line
+            if is_line_comment || is_own_line {
                 parts.push(d.hardline());
             } else {
-                // Single-line block comment → space
+                // Inline block comment → space
                 parts.push(d.text(" "));
             }
         }
@@ -626,6 +652,40 @@ impl<'a> Printer<'a> {
         // Add the body expression
         parts.push(self.build_arrow_body_doc(expr));
 
+        d.concat(&parts)
+    }
+
+    /// Check if any comment between `=>` and body is on its own line.
+    ///
+    /// Matches Prettier's `hasLeadingOwnLineComment` which checks `hasNewline(text, locEnd(comment))`
+    /// — whether there's a newline after each comment. Inline block comments like
+    /// `=> /* c */ expr` have no newline after them (returns false). Own-line comments
+    /// and line comments have a newline after (returns true).
+    pub(crate) fn has_own_line_post_arrow_comment(&self, sig_end: u32, body_start: u32) -> bool {
+        for comment in tsv_lang::comments_in_range(self.comments, sig_end, body_start) {
+            if !comment.is_block {
+                // Line comments always have a newline after them
+                return true;
+            }
+            // Check if there's a newline after this block comment's end
+            if !self.is_same_line(comment.span.end, body_start) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Build doc for inline block comments between `=>` and body.
+    ///
+    /// Only called when all comments are inline (no own-line comments).
+    /// Emits each comment followed by a space: `/* c1 */ /* c2 */ `
+    fn build_inline_post_arrow_comments_doc(&self, sig_end: u32, body_start: u32) -> DocId {
+        let d = self.d();
+        let mut parts = Vec::new();
+        for comment in tsv_lang::comments_in_range(self.comments, sig_end, body_start) {
+            parts.push(self.build_comment_doc(comment));
+            parts.push(d.text(" "));
+        }
         d.concat(&parts)
     }
 

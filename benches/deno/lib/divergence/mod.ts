@@ -10,10 +10,10 @@
 export { checkSafety, type SafetyViolation } from './safety.ts';
 export {
 	detectDivergences,
-	enrichDetectionContext,
 	type DetectionContext,
 	type DivergenceMatch,
 	type DivergencePattern,
+	enrichDetectionContext,
 	type HunkCoverageResult,
 	PATTERNS,
 } from './patterns.ts';

@@ -30,8 +30,8 @@ mod test_patterns;
 
 // Re-export items needed by other printer modules
 pub(crate) use arg_comments::{
-    PartitionedComments, has_inter_argument_comments_slice, has_trailing_comments_slice,
-    has_trailing_line_comments_slice, skip_stripped_open_paren,
+    PartitionedComments, has_blank_line_between_args, has_inter_argument_comments_slice,
+    has_trailing_comments_slice, has_trailing_line_comments_slice, skip_stripped_open_paren,
 };
 pub(crate) use arg_wrapping::{
     arrow_has_type_reference_return, build_args_joined_with_comments, build_args_split_last,
@@ -45,9 +45,7 @@ use super::Printer;
 use super::chain;
 use super::utils::{is_block_function, preceding_args_allow_expand_last};
 use crate::ast::internal;
-use arg_comments::{
-    any_comment_forces_expansion, has_blank_line_between_args, last_arg_has_comments,
-};
+use arg_comments::{any_comment_forces_expansion, last_arg_has_comments};
 use tsv_lang::doc::arena::DocId;
 
 /// Check if a chain expression contains any call expressions
@@ -234,6 +232,17 @@ impl<'a> Printer<'a> {
         optional: bool,
     ) -> DocId {
         chain_args::build_call_args_doc_for_chain_expanded(self, call, optional)
+    }
+
+    /// Build a Doc for call arguments with standard forced expansion
+    ///
+    /// Always uses `(\n  args,\n)` form, never arrow-hugging `(sig =>\n  body,\n)`.
+    pub(super) fn build_call_args_doc_for_chain_standard_expanded(
+        &self,
+        call: &internal::CallExpression,
+        optional: bool,
+    ) -> DocId {
+        chain_args::build_call_args_doc_for_chain_standard_expanded(self, call, optional)
     }
 }
 

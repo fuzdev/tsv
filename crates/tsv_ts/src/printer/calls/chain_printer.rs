@@ -47,6 +47,14 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.build_call_args_doc_for_chain_expanded(call, optional)
     }
 
+    fn print_call_args_standard_expanded(
+        &self,
+        call: &internal::CallExpression,
+        optional: bool,
+    ) -> DocId {
+        self.build_call_args_doc_for_chain_standard_expanded(call, optional)
+    }
+
     fn build_block_comments_doc(
         &self,
         start: u32,

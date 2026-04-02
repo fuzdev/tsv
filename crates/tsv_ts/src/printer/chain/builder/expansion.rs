@@ -126,8 +126,16 @@ pub(super) fn call_callback_status<'a>(
                 has_callback = true;
                 if !will_break {
                     will_break = match &arrow.body {
-                        // Block body breaks only if it has statements (empty {} stays inline)
-                        ArrowFunctionBody::BlockStatement(block) => !block.body.is_empty(),
+                        // Block body breaks if it has statements or contains comments
+                        // (comment-only blocks emit hardlines via comment printing)
+                        ArrowFunctionBody::BlockStatement(block) => {
+                            !block.body.is_empty()
+                                || printing::has_newline_between_fast(
+                                    line_breaks,
+                                    block.span.start,
+                                    block.span.end,
+                                )
+                        }
                         // Expression body - check if it's multiline (O(log n))
                         ArrowFunctionBody::Expression(expr) => {
                             let span = expr.span();
@@ -137,10 +145,15 @@ pub(super) fn call_callback_status<'a>(
                 }
             }
             Expression::FunctionExpression(func) => {
-                // Function expressions break only if body is non-empty
+                // Function expressions break if body has statements or contains comments
                 has_callback = true;
                 if !will_break {
-                    will_break = !func.body.body.is_empty();
+                    will_break = !func.body.body.is_empty()
+                        || printing::has_newline_between_fast(
+                            line_breaks,
+                            func.body.span.start,
+                            func.body.span.end,
+                        );
                 }
             }
             _ => {}

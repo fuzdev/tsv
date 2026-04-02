@@ -9,11 +9,11 @@
  *   deno task corpus:compare ~/dev/some-project --safety-only
  *   deno task corpus:compare ~/dev/some-project --explain
  *   deno task corpus:compare ~/dev/some-project --summary   # Compact output (no diffs)
- *   deno task corpus:compare --all                          # All SvelteKit repos from ~/dev
+ *   deno task corpus:compare --all                          # All default corpus repos
  */
 
 import { parseArgs } from '@std/cli/parse-args';
-import { DevReposLoader, DirectoryLoader, groupByLanguage } from './lib/corpus.ts';
+import { DevReposLoader, DirectoryLoader } from './lib/corpus.ts';
 import { CanonicalImplementation } from './lib/canonical.ts';
 import {
 	type DiffHunk,
@@ -23,7 +23,7 @@ import {
 	formatDiffForTerminal,
 } from './lib/diff.ts';
 import { NativeImplementation } from './lib/ffi.ts';
-import { type Language, LANGUAGES, type SourceFile } from './lib/types.ts';
+import { type Language, LANGUAGES } from './lib/types.ts';
 import { loadAllVersions } from './lib/versions.ts';
 import {
 	checkExpectedError,
@@ -59,10 +59,11 @@ interface LanguageStats {
 	errors: number;
 }
 
+/** Lightweight result — stores path/bytes instead of full SourceFile for GC */
 interface CompareResult {
-	file: SourceFile;
+	path: string;
+	bytes: number;
 	status:
-		| 'match'
 		| 'known_divergence'
 		| 'partial_divergence'
 		| 'unknown_diff'
@@ -72,15 +73,17 @@ interface CompareResult {
 	error?: string;
 	/** Reason the error is expected (only for expected_error status) */
 	expectedReason?: string;
+	/** Only stored for unknown_diff (needed for full diff recomputation) */
 	ours?: string;
+	/** Only stored for unknown_diff (needed for full diff recomputation) */
 	prettier?: string;
 	coverage?: HunkCoverageResult;
 	safetyViolations?: SafetyViolation[];
 }
 
 /** Get relative path from base directory */
-function relPath(filePath: string, basePath: string): string {
-	return filePath.startsWith(basePath + '/') ? filePath.slice(basePath.length + 1) : filePath;
+function relPath(filePath: string, base: string): string {
+	return filePath.startsWith(base + '/') ? filePath.slice(base.length + 1) : filePath;
 }
 
 /** Format bytes as human-readable string */
@@ -143,7 +146,7 @@ Usage: deno task corpus:compare <path> [options]
 
 Arguments:
   path              Directory to scan for source files
-  --all             Compare all SvelteKit repos from ~/dev (from web.code-workspace)
+  --all             Compare all default corpus repos
 
 Options:
   --filter <lang>   Only compare files of this language (svelte, typescript, css)
@@ -201,9 +204,12 @@ async function main(): Promise<void> {
 	}
 
 	// Resolve path (handle ~)
-	const resolvedPath = path
-		? path.startsWith('~') ? path.replace('~', Deno.env.get('HOME') || '') : path
-		: '~/dev';
+	const homeDir = Deno.env.get('HOME') ?? '';
+	const basePath = useAllRepos
+		? `${homeDir}/dev`
+		: path!.startsWith('~')
+		? path!.replace('~', homeDir)
+		: path!;
 
 	// Validate filter
 	const filterLang = args.filter as Language | undefined;
@@ -222,9 +228,9 @@ async function main(): Promise<void> {
 	const summary = args.summary ?? false;
 
 	if (useAllRepos) {
-		console.log('Comparing: All SvelteKit repos from ~/dev');
+		console.log('Comparing: All default corpus repos');
 	} else {
-		console.log(`Comparing: ${resolvedPath}`);
+		console.log(`Comparing: ${basePath}`);
 	}
 	if (filterLang) console.log(`Filter: ${filterLang} only`);
 	if (limit) console.log(`Limit: ${limit} files per language`);
@@ -235,31 +241,10 @@ async function main(): Promise<void> {
 	if (summary) console.log(`Mode: summary (compact output, no diffs)`);
 	console.log();
 
-	// Load corpus
-	const loader = useAllRepos ? new DevReposLoader() : new DirectoryLoader({ path: resolvedPath });
-	const { files } = await loader.load(verbose ? console.log : () => {});
+	// Create loader
+	const loader = useAllRepos ? new DevReposLoader() : new DirectoryLoader(basePath);
 
-	if (files.length === 0) {
-		console.log('No files found.');
-		return;
-	}
-
-	// Group and optionally filter/limit
-	let grouped = groupByLanguage(files);
-	if (filterLang) {
-		grouped = { svelte: [], typescript: [], css: [], [filterLang]: grouped[filterLang] };
-	}
-	if (limit) {
-		for (const lang of LANGUAGES) {
-			grouped[lang] = grouped[lang].slice(0, limit);
-		}
-	}
-
-	const totalFiles = LANGUAGES.reduce((sum, lang) => sum + grouped[lang].length, 0);
-	const counts = LANGUAGES.map((lang) => `${grouped[lang].length} ${lang}`).join(', ');
-	console.log(`Found: ${totalFiles} files (${counts})\n`);
-
-	// Initialize implementations
+	// Initialize implementations (fail fast before streaming)
 	const versions = await loadAllVersions();
 	const canonical = new CanonicalImplementation(versions.canonical);
 	const native = new NativeImplementation();
@@ -279,7 +264,7 @@ async function main(): Promise<void> {
 		Deno.exit(1);
 	}
 
-	// Compare files
+	// Initialize per-language tracking
 	const results: Map<Language, CompareResult[]> = new Map();
 	const stats: Map<Language, LanguageStats> = new Map();
 
@@ -320,171 +305,197 @@ async function main(): Promise<void> {
 		const preview = (firstHunk?.addedLines[0] || firstHunk?.removedLines[0] || '')
 			.trim().slice(0, 60);
 		entries.push({
-			path: relPath(filePath, resolvedPath),
+			path: relPath(filePath, basePath),
 			hunkIndices,
 			hunkPreview: preview,
 		});
 		patternAuditMap.set(patternName, entries);
 	}
 
-	for (const lang of LANGUAGES) {
-		const langFiles = grouped[lang];
+	// Track per-language file counts for filtering/limiting
+	const langCounts: Record<Language, number> = { svelte: 0, typescript: 0, css: 0 };
+
+	// Stream and process files (file content is GC'd after each iteration)
+	for await (const file of loader.stream(verbose ? console.log : () => {})) {
+		const lang = file.language;
+		if (filterLang && lang !== filterLang) continue;
+		if (limit && langCounts[lang] >= limit) continue;
+		langCounts[lang]++;
+
 		const langStats = stats.get(lang)!;
 		const langResults = results.get(lang)!;
+		langStats.total++;
 
-		for (const file of langFiles) {
-			langStats.total++;
+		if (verbose) {
+			console.log(`  ${file.path}`);
+		}
 
-			if (verbose) {
-				console.log(`  ${file.path}`);
-			}
+		let shouldExit = false;
+		try {
+			// Format with both
+			const ours = native.format(file.content, lang);
+			const prettier = await canonical.formatAsync(file.content, lang);
 
-			let shouldExit = false;
-			try {
-				// Format with both
-				const ours = native.format(file.content, lang);
-				const prettier = await canonical.formatAsync(file.content, lang);
-
-				// Safety check FIRST (always) - compare source vs OUR output
-				const safetyViolations = checkSafety(file.content, ours);
-				if (safetyViolations.length > 0 && ours !== prettier) {
-					// Only report safety violations when our output differs from prettier.
-					// If ours === prettier, the transformation is shared (e.g., shorthand
-					// collapsing: foo={foo} → {foo}) and not a bug in our formatter.
-					langStats.safetyViolation++;
+			// Safety check FIRST (always) - compare source vs OUR output
+			const safetyViolations = checkSafety(file.content, ours);
+			if (safetyViolations.length > 0 && ours !== prettier) {
+				// Only report safety violations when our output differs from prettier.
+				// If ours === prettier, the transformation is shared (e.g., shorthand
+				// collapsing: foo={foo} → {foo}) and not a bug in our formatter.
+				langStats.safetyViolation++;
+				langResults.push({
+					path: file.path,
+					bytes: file.bytes,
+					status: 'safety_violation',
+					safetyViolations,
+				});
+				if (exitOnFirst) {
+					const rel = relPath(file.path, basePath);
+					console.log(`\nSafety violation: ${rel}`);
+					for (const v of safetyViolations) {
+						console.log(`  ${v.type}: ${v.summary}`);
+					}
+					shouldExit = true;
+				}
+			} else if (safetyOnly) {
+				// In safety-only mode, we're done after safety check passes
+				langStats.match++;
+			} else if (ours === prettier) {
+				// Exact match — only counted, not stored
+				langStats.match++;
+			} else {
+				// Difference detected
+				const rel = relPath(file.path, basePath);
+				if (strict) {
+					// Strict mode: any difference is a failure
+					langStats.unknownDiff++;
 					langResults.push({
-						file,
-						status: 'safety_violation',
+						path: file.path,
+						bytes: file.bytes,
+						status: 'unknown_diff',
 						ours,
 						prettier,
-						safetyViolations,
 					});
 					if (exitOnFirst) {
-						const rel = relPath(file.path, resolvedPath);
-						console.log(`\nSafety violation: ${rel}`);
-						for (const v of safetyViolations) {
-							console.log(`  ${v.type}: ${v.summary}`);
-						}
+						console.log(`\nDifference (strict mode): ${rel}`);
 						shouldExit = true;
 					}
-				} else if (safetyOnly) {
-					// In safety-only mode, we're done after safety check passes
-					langStats.match++;
-					langResults.push({ file, status: 'match' });
-				} else if (ours === prettier) {
-					// Exact match
-					langStats.match++;
-					langResults.push({ file, status: 'match' });
 				} else {
-					// Difference detected
-					const rel = relPath(file.path, resolvedPath);
-					if (strict) {
-						// Strict mode: any difference is a failure
-						langStats.unknownDiff++;
-						langResults.push({ file, status: 'unknown_diff', ours, prettier });
-						if (exitOnFirst) {
-							console.log(`\nDifference (strict mode): ${rel}`);
-							shouldExit = true;
+					// Detect known divergence patterns (hunk-aware)
+					const diff = diffLines(prettier, ours);
+					const hunks = extractHunks(diff);
+					const coverage = detectDivergences({
+						source: file.content,
+						ours,
+						prettier,
+						diff,
+						hunks,
+						language: lang,
+					});
+
+					if (coverage.classification === 'all_explained') {
+						// All hunks explained by known patterns
+						langStats.knownDivergence++;
+						langResults.push({
+							path: file.path,
+							bytes: file.bytes,
+							status: 'known_divergence',
+							coverage,
+						});
+						for (const d of coverage.matches) {
+							divergenceCounts.set(d.pattern, (divergenceCounts.get(d.pattern) || 0) + 1);
+							if (auditPatterns) {
+								recordAuditEntry(d.pattern, file.path, d.hunkIndices, hunks);
+							}
+						}
+					} else if (coverage.classification === 'partial') {
+						// Some hunks explained, some not
+						langStats.partialDivergence++;
+						langResults.push({
+							path: file.path,
+							bytes: file.bytes,
+							status: 'partial_divergence',
+							coverage,
+						});
+						for (const d of coverage.matches) {
+							divergenceCounts.set(d.pattern, (divergenceCounts.get(d.pattern) || 0) + 1);
+							if (auditPatterns) {
+								recordAuditEntry(d.pattern, file.path, d.hunkIndices, hunks);
+							}
 						}
 					} else {
-						// Detect known divergence patterns (hunk-aware)
-						const diff = diffLines(prettier, ours);
-						const hunks = extractHunks(diff);
-						const coverage = detectDivergences({
-							source: file.content,
+						// No hunks explained - unknown difference
+						langStats.unknownDiff++;
+						langResults.push({
+							path: file.path,
+							bytes: file.bytes,
+							status: 'unknown_diff',
 							ours,
 							prettier,
-							diff,
-							hunks,
-							language: lang,
+							coverage,
 						});
-
-						if (coverage.classification === 'all_explained') {
-							// All hunks explained by known patterns
-							langStats.knownDivergence++;
-							langResults.push({
-								file,
-								status: 'known_divergence',
-								ours,
-								prettier,
-								coverage,
-							});
-							for (const d of coverage.matches) {
-								divergenceCounts.set(d.pattern, (divergenceCounts.get(d.pattern) || 0) + 1);
-								if (auditPatterns) {
-									recordAuditEntry(d.pattern, file.path, d.hunkIndices, hunks);
-								}
+						if (exitOnFirst) {
+							console.log(`\nUnknown difference: ${rel}`);
+							console.log('─'.repeat(70));
+							const removals = diff.filter((d) => d.type === 'remove').length;
+							const additions = diff.filter((d) => d.type === 'add').length;
+							console.log(
+								`Diff: \x1b[31m- Prettier\x1b[0m → \x1b[32m+ Ours\x1b[0m  (${removals} prettier-only, ${additions} ours-only)`,
+							);
+							console.log('');
+							for (const line of formatDiffForTerminal(filterDiffContext(diff))) {
+								console.log(line);
 							}
-						} else if (coverage.classification === 'partial') {
-							// Some hunks explained, some not
-							langStats.partialDivergence++;
-							langResults.push({
-								file,
-								status: 'partial_divergence',
-								ours,
-								prettier,
-								coverage,
-							});
-							for (const d of coverage.matches) {
-								divergenceCounts.set(d.pattern, (divergenceCounts.get(d.pattern) || 0) + 1);
-								if (auditPatterns) {
-									recordAuditEntry(d.pattern, file.path, d.hunkIndices, hunks);
-								}
-							}
-						} else {
-							// No hunks explained - unknown difference
-							langStats.unknownDiff++;
-							langResults.push({ file, status: 'unknown_diff', ours, prettier, coverage });
-							if (exitOnFirst) {
-								console.log(`\nUnknown difference: ${rel}`);
-								console.log('─'.repeat(70));
-								const removals = diff.filter((d) => d.type === 'remove').length;
-								const additions = diff.filter((d) => d.type === 'add').length;
-								console.log(
-									`Diff: \x1b[31m- Prettier\x1b[0m → \x1b[32m+ Ours\x1b[0m  (${removals} prettier-only, ${additions} ours-only)`,
-								);
-								console.log('');
-								for (const line of formatDiffForTerminal(filterDiffContext(diff))) {
-									console.log(line);
-								}
-								shouldExit = true;
-							}
+							shouldExit = true;
 						}
 					}
 				}
-			} catch (e) {
-				const errorMsg = e instanceof Error ? e.message : String(e);
-				const expectedCheck = checkExpectedError(file.content);
-				if (expectedCheck.expected) {
-					langStats.expectedErrors++;
-					langResults.push({
-						file,
-						status: 'expected_error',
-						error: errorMsg,
-						expectedReason: expectedCheck.pattern!.reason,
-					});
-				} else {
-					langStats.errors++;
-					langResults.push({
-						file,
-						status: 'error',
-						error: errorMsg,
-					});
-					if (exitOnFirst) {
-						console.log(`\nError: ${relPath(file.path, resolvedPath)}`);
-						console.log(`  ${errorMsg}`);
-						shouldExit = true;
-					}
+			}
+		} catch (e) {
+			const errorMsg = e instanceof Error ? e.message : String(e);
+			const expectedCheck = checkExpectedError(file.content);
+			if (expectedCheck.expected) {
+				langStats.expectedErrors++;
+				langResults.push({
+					path: file.path,
+					bytes: file.bytes,
+					status: 'expected_error',
+					error: errorMsg,
+					expectedReason: expectedCheck.pattern!.reason,
+				});
+			} else {
+				langStats.errors++;
+				langResults.push({
+					path: file.path,
+					bytes: file.bytes,
+					status: 'error',
+					error: errorMsg,
+				});
+				if (exitOnFirst) {
+					console.log(`\nError: ${relPath(file.path, basePath)}`);
+					console.log(`  ${errorMsg}`);
+					shouldExit = true;
 				}
 			}
+		}
 
-			if (shouldExit) {
-				canonical.dispose();
-				native.dispose();
-				Deno.exit(1);
-			}
+		if (shouldExit) {
+			canonical.dispose();
+			native.dispose();
+			Deno.exit(1);
 		}
 	}
+
+	const totalProcessed = Object.values(langCounts).reduce((a, b) => a + b, 0);
+	if (totalProcessed === 0) {
+		console.log('No files found.');
+		canonical.dispose();
+		native.dispose();
+		return;
+	}
+
+	const counts = LANGUAGES.map((lang) => `${langCounts[lang]} ${lang}`).join(', ');
+	console.log(`\nProcessed: ${totalProcessed} files (${counts})\n`);
 
 	// Print results
 	console.log('Results:');
@@ -592,7 +603,7 @@ async function main(): Promise<void> {
 	if (allSafetyViolations.length > 0) {
 		console.log(`\n\x1b[31mSAFETY VIOLATIONS (${allSafetyViolations.length} files):\x1b[0m`);
 		for (const r of allSafetyViolations) {
-			console.log(`  ${relPath(r.file.path, resolvedPath)}`);
+			console.log(`  ${relPath(r.path, basePath)}`);
 			for (const v of r.safetyViolations!) {
 				console.log(`    - ${v.type}: ${v.summary}`);
 			}
@@ -602,12 +613,12 @@ async function main(): Promise<void> {
 	// Show partial divergences (some hunks unexplained)
 	const allPartial = LANGUAGES.flatMap((lang) =>
 		results.get(lang)!.filter((r) => r.status === 'partial_divergence')
-	).sort((a, b) => a.file.bytes - b.file.bytes);
+	).sort((a, b) => a.bytes - b.bytes);
 
 	// Show unknown differences (needs investigation)
 	const allUnknown = LANGUAGES.flatMap((lang) =>
 		results.get(lang)!.filter((r) => r.status === 'unknown_diff')
-	).sort((a, b) => a.file.bytes - b.file.bytes);
+	).sort((a, b) => a.bytes - b.bytes);
 
 	// Default: show unexplained diffs (partial hunks + unknown files)
 	// --summary: compact output without diffs
@@ -622,7 +633,7 @@ async function main(): Promise<void> {
 				const patterns = coverage.matches.map((d) => d.pattern).join(', ');
 				console.log(
 					`  ${
-						relPath(r.file.path, resolvedPath)
+						relPath(r.path, basePath)
 					}: ${patterns} (${coverage.unexplainedHunks.length} unexplained hunks)`,
 				);
 			}
@@ -637,9 +648,9 @@ async function main(): Promise<void> {
 				`\nUnknown Differences (${allUnknown.length} files, needs investigation):`,
 			);
 			for (const r of allUnknown.slice(0, 10)) {
-				const sizeStr = formatBytes(r.file.bytes);
+				const sizeStr = formatBytes(r.bytes);
 				const diffSummary = getDiffSummary(r.prettier!, r.ours!);
-				console.log(`  ${relPath(r.file.path, resolvedPath)} (${sizeStr})`);
+				console.log(`  ${relPath(r.path, basePath)} (${sizeStr})`);
 				console.log(`    ${diffSummary}`);
 			}
 			if (allUnknown.length > 10) {
@@ -664,7 +675,7 @@ async function main(): Promise<void> {
 				const patterns = coverage.matches.map((d) => d.pattern).join(', ');
 				const explainedCount = coverage.explainedHunks.size;
 				const totalHunks = coverage.hunks.length;
-				console.log(`\n  ${relPath(r.file.path, resolvedPath)}:`);
+				console.log(`\n  ${relPath(r.path, basePath)}:`);
 				console.log(
 					`    explained ${explainedCount}/${totalHunks} hunks: ${patterns}`,
 				);
@@ -690,7 +701,7 @@ async function main(): Promise<void> {
 				const diff = diffLines(r.prettier!, r.ours!);
 				const removals = diff.filter((d) => d.type === 'remove').length;
 				const additions = diff.filter((d) => d.type === 'add').length;
-				console.log(`\n  ${relPath(r.file.path, resolvedPath)} (${formatBytes(r.file.bytes)}):`);
+				console.log(`\n  ${relPath(r.path, basePath)} (${formatBytes(r.bytes)}):`);
 				console.log(
 					`    \x1b[31m-${removals} prettier-only\x1b[0m, \x1b[32m+${additions} ours-only\x1b[0m`,
 				);
@@ -711,7 +722,7 @@ async function main(): Promise<void> {
 			console.log(`\nKnown Divergences (${allKnown.length} files):`);
 			for (const r of allKnown) {
 				const patterns = r.coverage!.matches.map((d) => d.pattern).join(', ');
-				console.log(`  ${relPath(r.file.path, resolvedPath)}: ${patterns}`);
+				console.log(`  ${relPath(r.path, basePath)}: ${patterns}`);
 			}
 		}
 	}
@@ -719,13 +730,13 @@ async function main(): Promise<void> {
 	// Show errors (unexpected only)
 	const allErrors = LANGUAGES.flatMap((lang) =>
 		results.get(lang)!.filter((r) => r.status === 'error')
-	).sort((a, b) => a.file.bytes - b.file.bytes);
+	).sort((a, b) => a.bytes - b.bytes);
 
 	if (allErrors.length > 0) {
 		console.log(`\nErrors (${allErrors.length} files):`);
 		for (const r of allErrors.slice(0, 3)) {
-			const sizeStr = formatBytes(r.file.bytes);
-			console.log(`  ${relPath(r.file.path, resolvedPath)} (${sizeStr}): ${r.error?.slice(0, 80)}`);
+			const sizeStr = formatBytes(r.bytes);
+			console.log(`  ${relPath(r.path, basePath)} (${sizeStr}): ${r.error?.slice(0, 80)}`);
 		}
 		if (allErrors.length > 3) {
 			console.log(`  ... and ${allErrors.length - 3} more`);
@@ -735,12 +746,12 @@ async function main(): Promise<void> {
 	// Show expected errors (dimmed, verbose/explain only for details)
 	const allExpectedErrors = LANGUAGES.flatMap((lang) =>
 		results.get(lang)!.filter((r) => r.status === 'expected_error')
-	).sort((a, b) => a.file.bytes - b.file.bytes);
+	).sort((a, b) => a.bytes - b.bytes);
 
 	if (allExpectedErrors.length > 0 && (verbose || explain)) {
 		console.log(`\n\x1b[2mExpected Errors (${allExpectedErrors.length} files):\x1b[0m`);
 		for (const r of allExpectedErrors) {
-			console.log(`\x1b[2m  ${relPath(r.file.path, resolvedPath)}: ${r.expectedReason}\x1b[0m`);
+			console.log(`\x1b[2m  ${relPath(r.path, basePath)}: ${r.expectedReason}\x1b[0m`);
 		}
 	}
 

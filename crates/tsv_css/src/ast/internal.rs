@@ -408,7 +408,7 @@ impl CssValue {
 /// CSS color value
 ///
 /// Color channel value - supports numbers, percentages, and CSS Color 4 `none`
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ColorChannel {
     /// Numeric value: 255, 0.5, etc.
     Number(f64),

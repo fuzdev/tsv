@@ -29,7 +29,8 @@
 		"bench": "deno task build:ffi && deno task build:wasm:deno && deno task bench:run",
 		"bench:run": "deno run --v8-flags=--expose-gc --allow-ffi --allow-read --allow-write=benches/deno/results,benches/deno/baseline.json --allow-run=git --allow-env --allow-net --allow-sys benches/deno/bench.ts",
 
-		"corpus:compare": "deno task build:ffi && deno task corpus:compare:run",
+		"build:ffi:corpus": "cargo build -p tsv_ffi --profile corpus",
+		"corpus:compare": "deno task build:ffi:corpus && deno task corpus:compare:run",
 		"corpus:compare:run": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/corpus_compare.ts",
 
 		"metrics": "cargo run -p tsv_debug --quiet metrics",

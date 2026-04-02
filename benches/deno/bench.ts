@@ -154,7 +154,7 @@ const RESULTS_DIR = './benches/deno/results';
 
 log('Loading corpus...\n');
 const corpusLoader = new DevReposLoader();
-const { files } = await corpusLoader.load(log);
+const files = await corpusLoader.load(log);
 const byLanguage = groupByLanguage(files);
 
 // Preserve total counts before limiting

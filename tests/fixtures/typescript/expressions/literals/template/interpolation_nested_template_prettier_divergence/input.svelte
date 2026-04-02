@@ -1,11 +1,10 @@
 <script lang="ts">
 	const fn = () => {
 		return `
-									export const Items = [${
-										aaaaaaaa.bbbbbbb_cccccccc_sssss
-											.map((ssss) => {
-												const name = ssss.tttttt();
-												return `{
+									export const Items = [${aaaaaaaa.bbbbbbb_cccccccc_sssss
+										.map((ssss) => {
+											const name = ssss.tttttt();
+											return `{
 													a: '${
 														ssss.flagAAAAAAAAAAAAAAAAA
 															? aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -36,32 +35,19 @@
 														ssss.fallbackDDDDDDDDDDDDDDDDD ||
 														`${ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd}`
 													}',
-													e: '${
-														[
-															`${
-																eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
-															}`,
-														]
-													}',
-													f: '${
-														ssss.processFFFFFFFFFFFFFFFFF(
-															`${
-																fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-															}`,
-														)
-													}',
-													g: '${
-														ssss.itemsGGGGGGGGGGGGGGGGGG.map(
-															(x) =>
-																`${
-																	ggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg
-																}`,
-														)
-													}',
+													e: '${[
+														`${eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee}`,
+													]}',
+													f: '${ssss.processFFFFFFFFFFFFFFFFF(
+														`${fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff}`,
+													)}',
+													g: '${ssss.itemsGGGGGGGGGGGGGGGGGG.map(
+														(x) =>
+															`${ggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg}`,
+													)}',
 												}`;
-											})
-											.join(',\n')
-									}];
+										})
+										.join(',\n')}];
  `;
 	};
 </script>
