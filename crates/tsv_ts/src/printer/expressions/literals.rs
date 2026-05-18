@@ -10,6 +10,7 @@
 
 use super::Printer;
 use crate::ast::internal::{self, LiteralValue};
+use crate::printer::analysis;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::{StringFormatOptions, format_string_literal};
@@ -163,13 +164,60 @@ impl<'a> Printer<'a> {
         // Add identifier name
         parts.push(d.symbol(id.name.to_u32()));
 
+        // Compute name_end for comment extraction (used by optional and type annotation)
+        let search_end = id
+            .type_annotation
+            .as_ref()
+            .map_or(id.span.end, |ta| ta.span.start);
+        let raw_name_end = analysis::skip_identifier_at(
+            self.source.as_bytes(),
+            id.span.start as usize,
+            search_end as usize,
+        ) as u32;
+
+        // Find `?` position once (used for both optional handling and type annotation)
+        let q_pos = if id.optional && id.type_annotation.is_some() {
+            analysis::find_char_skipping_comments(
+                self.source.as_bytes(),
+                raw_name_end as usize,
+                search_end as usize,
+                b'?',
+            )
+            .map(|p| p as u32)
+        } else {
+            None
+        };
+
         // Handle optional marker (e.g., `a?` in `function fn(a?: number) {}`)
         if id.optional {
+            // Comments between name and `?` (e.g., `a /* c */?`) — only when type annotation
+            // exists. Without a type annotation, the identifier span covers only the name
+            // (the `?` is not in the span range).
+            if let Some(q) = q_pos
+                && self.has_comments_between(raw_name_end, q)
+            {
+                parts.push(self.build_inline_comments_between_doc(raw_name_end, q));
+            }
             parts.push(d.text("?"));
         }
 
         // Handle type annotations
         if let Some(type_annotation) = &id.type_annotation {
+            // Position after name and optional `?`
+            let after_modifier = q_pos.map_or(raw_name_end, |q| q + 1);
+            // Extract comments between name/modifier and `:` (e.g., `a /* c */: number`)
+            if self.has_comments_between(after_modifier, type_annotation.span.start) {
+                let comment_doc = self
+                    .build_inline_comments_between_doc(after_modifier, type_annotation.span.start);
+                if self.has_line_comments_between(after_modifier, type_annotation.span.start) {
+                    // Line comment forces break: `a // c\n: number` → keep on separate line
+                    parts.push(comment_doc);
+                    parts.push(d.hardline());
+                } else {
+                    // Trailing space separates comment from `:` in the type annotation
+                    parts.push(d.concat(&[comment_doc, d.text(" ")]));
+                }
+            }
             if wrap_type_args {
                 parts.push(self.build_type_annotation_doc_wrapping(type_annotation));
             } else {
@@ -209,16 +257,27 @@ impl<'a> Printer<'a> {
         // Use trailing_space variant: `.../* comment */ arg` (space after comment, not before)
         let comment_doc = self.build_rhs_comments_opt(dots_end, arg_start);
 
-        if needs_parens {
-            match comment_doc {
-                Some(c) => d.concat(&[d.text("...("), c, arg_doc, d.text(")")]),
-                None => d.concat(&[d.text("...("), arg_doc, d.text(")")]),
-            }
-        } else {
-            match comment_doc {
-                Some(c) => d.concat(&[d.text("..."), c, arg_doc]),
-                None => d.concat(&[d.text("..."), arg_doc]),
-            }
+        // Check for trailing comments from stripped grouping parens: `...(x /* c */)`
+        let argument_end = spread.argument.span().end;
+        let has_trailing_comments = self.has_comments_between(argument_end, spread.span.end);
+
+        let prefix = if needs_parens { "...(" } else { "..." };
+        let mut parts = vec![d.text(prefix)];
+        if let Some(c) = comment_doc {
+            parts.push(c);
         }
+        parts.push(arg_doc);
+        if has_trailing_comments {
+            // Handle same-line block comments and line comments here.
+            // Own-line block comments are skipped — they're handled by the parent
+            // (array/call) which places them as siblings after the spread's comma.
+            // Using line_suffix for own-line block comments in spread causes them to
+            // escape past the enclosing array/call brackets entirely.
+            self.append_spread_trailing_paren_comments(&mut parts, argument_end, spread.span.end);
+        }
+        if needs_parens {
+            parts.push(d.text(")"));
+        }
+        d.concat(&parts)
     }
 }

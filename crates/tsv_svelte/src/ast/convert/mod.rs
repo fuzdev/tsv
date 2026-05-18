@@ -431,6 +431,21 @@ fn acorn_child_key_order(node_type: &str) -> Option<&'static [&'static str]> {
         // acorn-typescript inserts returnType BEFORE params for arrow functions
         // (the TS plugin adds returnType to the node before acorn's base parser adds params)
         "ArrowFunctionExpression" => Some(&["returnType", "id", "params", "body"]),
+        // acorn inserts consequent before test in SwitchCase nodes
+        // (affects comment attachment: comments between test and colon become
+        // leadingComments on the first consequent, not trailingComments on test)
+        "SwitchCase" => Some(&["consequent", "test"]),
+        // acorn inserts body before label in LabeledStatement nodes
+        // (affects comment attachment: comments between label and colon become
+        // leadingComments on the body, not trailingComments on the label)
+        "LabeledStatement" => Some(&["body", "label"]),
+        // acorn inserts key before decorators in class members
+        // (affects comment attachment: comments between decorators and the member key
+        // become leadingComments on the key, not trailingComments on decorators)
+        // typeAnnotation is inserted by acorn-typescript before value, so comments
+        // between type annotation and `=` attach as typeAnnotation.trailingComments
+        "PropertyDefinition" => Some(&["key", "typeAnnotation", "value", "decorators"]),
+        "MethodDefinition" => Some(&["key", "value", "decorators"]),
         _ => None,
     }
 }
@@ -614,11 +629,13 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
             if let Some(ref script) = root.instance {
                 reparse_ranges.extend(tsv_ts::ast::convert::collect_acorn_type_reparse_ranges(
                     &script.content,
+                    source,
                 ));
             }
             if let Some(ref script) = root.module {
                 reparse_ranges.extend(tsv_ts::ast::convert::collect_acorn_type_reparse_ranges(
                     &script.content,
+                    source,
                 ));
             }
 
@@ -652,7 +669,7 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
                     "end".to_string(),
                     serde_json::Value::Number(comment.span.end.into()),
                 );
-                let loc_value = if comment.has_character_loc {
+                let loc_value = if comment.emit_character_field {
                     serde_json::json!({
                         "start": {
                             "line": location.start.line,

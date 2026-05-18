@@ -21,7 +21,7 @@
 							"start": 27,
 							"end": 115,
 							"name": "supports",
-							"prelude": "(display: grid) /* nested */ and (flex: 1)",
+							"prelude": "(display: grid)  and (flex: 1)",
 							"block": {
 								"type": "Block",
 								"start": 80,

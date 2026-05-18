@@ -1,0 +1,203 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 155,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " line comment with braces-like text",
+			"start": 10,
+			"end": 47,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " {} from",
+			"start": 56,
+			"end": 66,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 8
+				},
+				"end": {
+					"line": 3,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment with braces-like text",
+			"start": 77,
+			"end": 115,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " {} from ",
+			"start": 124,
+			"end": 137,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 8
+				},
+				"end": {
+					"line": 7,
+					"column": 21
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 154,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 145,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 49,
+					"end": 74,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 7
+						}
+					},
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 68,
+						"end": 73,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 4,
+								"column": 6
+							}
+						},
+						"value": "./a",
+						"raw": "'./a'",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " {} from",
+								"start": 56,
+								"end": 66
+							}
+						]
+					},
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment with braces-like text",
+							"start": 10,
+							"end": 47
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 117,
+					"end": 144,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 28
+						}
+					},
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 138,
+						"end": 143,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 22
+							},
+							"end": {
+								"line": 7,
+								"column": 27
+							}
+						},
+						"value": "./b",
+						"raw": "'./b'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " {} from ",
+								"start": 124,
+								"end": 137
+							}
+						]
+					},
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment with braces-like text",
+							"start": 77,
+							"end": 115
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

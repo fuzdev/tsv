@@ -54,43 +54,24 @@ struct FormatExecutable {
 impl Executable for FormatExecutable {
     fn execute(&self) {
         let source = self.input.content();
-        match self.parser_type {
-            ParserType::Svelte => match tsv_svelte::parse(source) {
-                Ok(ast) => {
-                    let formatted = tsv_svelte::format(&ast, source);
-                    print!("{formatted}");
-                }
-                Err(e) => {
-                    eprintln!("Parse error: {e}");
-                    process::exit(1);
-                }
-            },
-            ParserType::Css => match tsv_css::parse(source) {
-                Ok(ast) => {
-                    let formatted = tsv_css::format(&ast, source);
-                    print!("{formatted}");
-                }
-                Err(e) => {
-                    eprintln!("Parse error: {e}");
-                    process::exit(1);
-                }
-            },
-            ParserType::TypeScript => match tsv_ts::parse(source) {
-                Ok(ast) => {
-                    // For standalone TypeScript files, don't add trailing comma for arrow type params
-                    // (no Svelte template syntax disambiguation needed)
-                    let config = tsv_lang::PrintConfig {
-                        arrow_type_param_trailing_comma: false,
-                        ..Default::default()
-                    };
-                    let formatted = tsv_ts::format_with_config(&ast, source, config);
-                    print!("{formatted}");
-                }
-                Err(e) => {
-                    eprintln!("Parse error: {e}");
-                    process::exit(1);
-                }
-            },
+        let result: Result<String, String> = match self.parser_type {
+            ParserType::Svelte => tsv_svelte::parse(source)
+                .map(|ast| tsv_svelte::format(&ast, source))
+                .map_err(|e| e.to_string()),
+            ParserType::Css => tsv_css::parse(source)
+                .map(|ast| tsv_css::format(&ast, source))
+                .map_err(|e| e.to_string()),
+            ParserType::TypeScript => tsv_ts::parse(source)
+                .map(|ast| tsv_ts::format(&ast, source))
+                .map_err(|e| e.to_string()),
+        };
+
+        match result {
+            Ok(formatted) => print!("{formatted}"),
+            Err(e) => {
+                eprintln!("Parse error: {e}");
+                process::exit(1);
+            }
         }
     }
 }

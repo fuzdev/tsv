@@ -199,6 +199,17 @@ function extractCommentContent(line: string): string {
 	return line.trim();
 }
 
+/**
+ * Check if a comment with the given text content exists in the output.
+ * Searches for the text preceded by comment delimiters rather than matching
+ * the bare text anywhere — prevents "map" from matching `arr.map(...)`.
+ */
+function commentExistsInOutput(output: string, text: string): boolean {
+	return output.includes(`// ${text}`) ||
+		output.includes(`/* ${text}`) ||
+		output.includes(` * ${text}`);
+}
+
 // ─── Pattern Detectors ──────────────────────────────────────────────────────
 //
 // Ordered from most specific/narrow to most broad.
@@ -630,8 +641,17 @@ const cssCommentStableQuirk: DivergencePattern = {
 			// Comment content should be the same - only position differs
 			if (addedCommentTexts.length === 0 && removedCommentTexts.length === 0) return false;
 
-			// If one side has comment and other doesn't, it moved
-			if (addedHasComment !== removedHasComment) return true;
+			// If one side has comment and other doesn't, verify the comment text
+			// exists in the other side's full output (it was moved, not incidentally included).
+			// Require minimum text length to avoid short strings matching accidentally.
+			if (addedHasComment && !removedHasComment) {
+				const texts = addedCommentTexts.filter((t) => t.length >= 2);
+				return texts.length > 0 && texts.some((t) => commentExistsInOutput(ctx.prettier, t));
+			}
+			if (removedHasComment && !addedHasComment) {
+				const texts = removedCommentTexts.filter((t) => t.length >= 2);
+				return texts.length > 0 && texts.some((t) => commentExistsInOutput(ctx.ours, t));
+			}
 
 			// Both have comments - verify same content, different position
 			if (addedCommentTexts.length > 0 && removedCommentTexts.length > 0) {
@@ -691,6 +711,8 @@ const templateLiteralWidth: DivergencePattern = {
 		// These are expressions Prettier atomizes (pre-renders at infinite width).
 		const simpleExprLine = /^\t+(\w+(?:[.?]+\w+)*)\s*$/;
 
+		const prettierLines = ctx.prettierLines!;
+
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
 			const addedHasBreak = hunk.addedLines.some(
 				(l) => breakAfterDollarBrace.test(l) || closingBraceBacktick.test(l),
@@ -699,8 +721,14 @@ const templateLiteralWidth: DivergencePattern = {
 				(l) => breakAfterDollarBrace.test(l) || closingBraceBacktick.test(l),
 			);
 
-			// Case 1: Only our side has template breaks
-			if (addedHasBreak && !removedHasBreak) return true;
+			// Case 1: Only our side has template breaks — verify the break is
+			// plausibly width-motivated by checking that prettier's corresponding
+			// line is near print width (>80 chars). Without this, a bug that
+			// incorrectly breaks a short template literal would be claimed.
+			if (addedHasBreak && !removedHasBreak) {
+				const pLines = prettierLinesInHunk(prettierLines, hunk);
+				return pLines.some((l) => visualWidth(l) > 80);
+			}
 
 			// Case 2: Both sides break at ${} boundaries, but at different interpolations.
 			// Prettier atomizes simple expressions (Identifier, MemberExpression) so they
@@ -988,7 +1016,8 @@ const fillAfterInline: DivergencePattern = {
 		if (ctx.language !== 'svelte') return null;
 
 		const prettierLines = ctx.prettierLines!;
-		const inlineCloseTag = /<\/(?:span|a|strong|em|code|b|i|small|abbr|sub|sup)>/;
+		const inlineCloseTag =
+			/<\/(?:span|a|strong|em|code|b|i|small|abbr|sub|sup|mark|cite|q|time|data|kbd|samp|var|dfn|ins|del|u|s)>/;
 
 		// Check each hunk for prettier lines with long inline element lines
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
@@ -1101,10 +1130,16 @@ const cssValueWrap: DivergencePattern = {
 		const prettierLines = ctx.prettierLines!;
 
 		// Check each hunk for long CSS property values in prettier's range
+		// AND verify we actually wrapped (more lines than prettier)
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
 			if (!isInCssContext(hunk, ctx)) return false;
 			const pLines = prettierLinesInHunk(prettierLines, hunk);
-			return pLines.some((l) => /^\t+[\w-]+:\s*.+/.test(l) && visualWidth(l) > 100);
+			const hasLongProperty = pLines.some(
+				(l) => /^\t+[\w-]+:\s*.+/.test(l) && visualWidth(l) > 100,
+			);
+			if (!hasLongProperty) return false;
+			// We must have more lines (we wrapped the long value)
+			return hunk.addedLines.length > hunk.removedLines.length;
 		});
 
 		if (hunkIndices.length > 0) {
@@ -1123,7 +1158,7 @@ const fill101Boundary: DivergencePattern = {
 	id: 'fill_101_boundary',
 	description: 'Prettier allows lines to exceed print width, we break',
 	languages: ['svelte', 'typescript', 'css'],
-	conformanceSections: ['CSS: Layout', 'CSS: Values', 'Svelte/HTML'],
+	conformanceSections: ['CSS: Layout', 'CSS: Values', 'Svelte/HTML', 'TypeScript'],
 	fixtures: [
 		'css/comma_separated_greedy_fill_prettier_divergence',
 		'css/values/lists/comma_space_separated_long_prettier_divergence',
@@ -1187,13 +1222,18 @@ const commentPosition: DivergencePattern = {
 		'typescript/statements/for/of_line_comment_prettier_divergence',
 		'typescript/statements/do_while/open_paren_comment_prettier_divergence',
 		'typescript/statements/try/catch_between_comment_prettier_divergence',
+		'typescript/statements/try/line_comment_absorbed_prettier_divergence',
 		'typescript/statements/labeled/comment_prettier_divergence',
 		'typescript/statements/if/else_block_own_line_comment_prettier_divergence',
 		'typescript/statements/while/line_before_body_comment_prettier_divergence',
+		'typescript/statements/while/absorbed_body_comment_prettier_divergence',
 		'typescript/statements/do_while/line_before_while_comment_prettier_divergence',
 		// TypeScript chain comments
 		'typescript/expressions/calls/chained/trailing_member_comment_prettier_divergence',
 		'typescript/expressions/calls/chained/trailing_member_computed_comment_prettier_divergence',
+		// Import/export keyword-to-braces comments
+		'typescript/modules/imports/empty_keyword_comment_prettier_divergence',
+		'typescript/modules/exports/empty_keyword_comment_prettier_divergence',
 		// Svelte comments
 		'svelte/syntax/comments/expr_trailing_prettier_divergence',
 		'svelte/tags/debug/debug_comment_prettier_divergence',
@@ -1213,13 +1253,15 @@ const commentPosition: DivergencePattern = {
 			if (addedCommentLines.length > 0 && removedCommentLines.length === 0) {
 				return addedCommentLines.some((l) => {
 					const text = extractCommentContent(l);
-					return text.length > 0 && ctx.prettier.includes(text);
+					// Require minimum length and search with comment delimiters
+					// to avoid matching bare text in code (e.g., "map" in arr.map())
+					return text.length >= 3 && commentExistsInOutput(ctx.prettier, text);
 				});
 			}
 			if (removedCommentLines.length > 0 && addedCommentLines.length === 0) {
 				return removedCommentLines.some((l) => {
 					const text = extractCommentContent(l);
-					return text.length > 0 && ctx.ours.includes(text);
+					return text.length >= 3 && commentExistsInOutput(ctx.ours, text);
 				});
 			}
 
@@ -1253,6 +1295,24 @@ const commentPosition: DivergencePattern = {
 			if (
 				addedCode.length === removedCode.length &&
 				addedCode.every((l, i) => l === removedCode[i])
+			) {
+				return true;
+			}
+
+			// Fallback: when comment relocation also reformats the surrounding
+			// code structure (e.g., Prettier absorbs `while (a) /* c */ {}` into
+			// `while (a) {\n  /* c */\n}`, splitting one line into three), the
+			// line-by-line check fails. Join non-comment code in document order
+			// and compare whitespace-normalized to handle these cases.
+			// Cap at 100 chars to avoid masking real formatting bugs in longer code.
+			const addedCodeUnsorted = hunk.addedLines.map(stripComments).filter((l) => l.length > 0);
+			const removedCodeUnsorted = hunk.removedLines.map(stripComments).filter((l) => l.length > 0);
+			const normalize = (lines: string[]) => lines.join('').replace(/\s+/g, '');
+			const normalizedAdded = normalize(addedCodeUnsorted);
+			const normalizedRemoved = normalize(removedCodeUnsorted);
+			if (
+				normalizedAdded.length <= 100 &&
+				normalizedAdded === normalizedRemoved
 			) {
 				return true;
 			}
@@ -1321,16 +1381,17 @@ const blockCommentComputedMember: DivergencePattern = {
 	detect(ctx) {
 		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
 
-		// Prettier hoists JSDoc from inside brackets to before the chain:
-		//   removed: /** @type {T} */ obj.aaa.bbb?.[
+		// Prettier hoists block comments from inside brackets to before the chain:
+		//   removed: /* @type {T} */ obj.aaa.bbb?.[
 		//   added:   obj.aaa.bbb?.[
-		//            /** @type {T} */ d
-		const jsdocBeforeChain = /\/\*\*.*?\*\/\s+\w+\.\w+/;
-		const jsdocBeforeIdent = /\/\*\*.*?\*\/\s+\w+\s*$/;
+		//            /* @type {T} */ d
+		// Matches both /* */ and /** */ (JSDoc) comments.
+		const blockCommentBeforeChain = /\/\*.*?\*\/\s+\w+\.\w+/;
+		const blockCommentBeforeIdent = /\/\*.*?\*\/\s+\w+\s*$/;
 
 		const hunkIndices = findMatchingHunks(ctx.hunks, (hunk) => {
-			const prettierHoisted = hunk.removedLines.some((l) => jsdocBeforeChain.test(l));
-			const oursPreserved = hunk.addedLines.some((l) => jsdocBeforeIdent.test(l));
+			const prettierHoisted = hunk.removedLines.some((l) => blockCommentBeforeChain.test(l));
+			const oursPreserved = hunk.addedLines.some((l) => blockCommentBeforeIdent.test(l));
 			return prettierHoisted && oursPreserved;
 		});
 

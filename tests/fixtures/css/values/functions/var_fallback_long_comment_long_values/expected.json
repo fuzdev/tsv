@@ -45,14 +45,14 @@
 							"start": 70,
 							"end": 190,
 							"property": "prop",
-							"value": "var(\n\t\t\t--a,\n\t\t\t/* comment that is quite long and extends past the print width limit */ cccccccccccccccccccccc\n\t\t)"
+							"value": "var(\n\t\t\t--a,\n\t\t\t cccccccccccccccccccccc\n\t\t)"
 						},
 						{
 							"type": "Declaration",
 							"start": 244,
 							"end": 368,
 							"property": "prop",
-							"value": "var(\n\t\t\t--a,\n\t\t\t/* comment that is quite long and extends past the print width limit */\n\t\t\tccccccccccccccccccccccc\n\t\t)"
+							"value": "var(\n\t\t\t--a,\n\t\t\t\n\t\t\tccccccccccccccccccccccc\n\t\t)"
 						}
 					]
 				},

@@ -1,0 +1,807 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 790,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " block comment between export and braces (empty)",
+			"start": 20,
+			"end": 70,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 79,
+			"end": 86,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 8
+				},
+				"end": {
+					"line": 3,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment between export and braces (empty)",
+			"start": 93,
+			"end": 142,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 151,
+			"end": 155,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 8
+				},
+				"end": {
+					"line": 6,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " dangling comment inside empty braces (relocated before braces)",
+			"start": 164,
+			"end": 229,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 238,
+			"end": 245,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 8
+				},
+				"end": {
+					"line": 10,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment between from and source (re-export)",
+			"start": 252,
+			"end": 304,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 321,
+			"end": 328,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 16
+				},
+				"end": {
+					"line": 13,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment between from and source (re-export)",
+			"start": 336,
+			"end": 387,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 404,
+			"end": 408,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 16
+				},
+				"end": {
+					"line": 16,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " dangling comment inside empty braces with re-export (relocated after from)",
+			"start": 417,
+			"end": 494,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 511,
+			"end": 518,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 16
+				},
+				"end": {
+					"line": 20,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment between from and source (export all)",
+			"start": 526,
+			"end": 579,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 595,
+			"end": 602,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 15
+				},
+				"end": {
+					"line": 23,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment between from and source (export all)",
+			"start": 610,
+			"end": 662,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 678,
+			"end": 682,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 15
+				},
+				"end": {
+					"line": 26,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment between from and source (with specifiers)",
+			"start": 691,
+			"end": 749,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 767,
+			"end": 774,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 17
+				},
+				"end": {
+					"line": 30,
+					"column": 24
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 789,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 780,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 31,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 72,
+					"end": 90,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 19
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [],
+					"source": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment between export and braces (empty)",
+							"start": 20,
+							"end": 70
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 144,
+					"end": 161,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 5
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [],
+					"source": null,
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 79,
+							"end": 86
+						},
+						{
+							"type": "Line",
+							"value": " line comment between export and braces (empty)",
+							"start": 93,
+							"end": 142
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 231,
+					"end": 249,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 19
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [],
+					"source": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c",
+							"start": 151,
+							"end": 155
+						},
+						{
+							"type": "Line",
+							"value": " dangling comment inside empty braces (relocated before braces)",
+							"start": 164,
+							"end": 229
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 306,
+					"end": 333,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 28
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 329,
+						"end": 332,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 24
+							},
+							"end": {
+								"line": 13,
+								"column": 27
+							}
+						},
+						"value": "a",
+						"raw": "'a'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 321,
+								"end": 328
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 238,
+							"end": 245
+						},
+						{
+							"type": "Line",
+							"value": " block comment between from and source (re-export)",
+							"start": 252,
+							"end": 304
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 389,
+					"end": 414,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 5
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 410,
+						"end": 413,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 1
+							},
+							"end": {
+								"line": 17,
+								"column": 4
+							}
+						},
+						"value": "b",
+						"raw": "'b'",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 404,
+								"end": 408
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment between from and source (re-export)",
+							"start": 336,
+							"end": 387
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 496,
+					"end": 523,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 28
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 519,
+						"end": 522,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 24
+							},
+							"end": {
+								"line": 20,
+								"column": 27
+							}
+						},
+						"value": "c",
+						"raw": "'c'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 511,
+								"end": 518
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " dangling comment inside empty braces with re-export (relocated after from)",
+							"start": 417,
+							"end": 494
+						}
+					]
+				},
+				{
+					"type": "ExportAllDeclaration",
+					"start": 581,
+					"end": 607,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 27
+						}
+					},
+					"exportKind": "value",
+					"exported": null,
+					"source": {
+						"type": "Literal",
+						"start": 603,
+						"end": 606,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 23
+							},
+							"end": {
+								"line": 23,
+								"column": 26
+							}
+						},
+						"value": "d",
+						"raw": "'d'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 595,
+								"end": 602
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment between from and source (export all)",
+							"start": 526,
+							"end": 579
+						}
+					]
+				},
+				{
+					"type": "ExportAllDeclaration",
+					"start": 664,
+					"end": 688,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 5
+						}
+					},
+					"exportKind": "value",
+					"exported": null,
+					"source": {
+						"type": "Literal",
+						"start": 684,
+						"end": 687,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 1
+							},
+							"end": {
+								"line": 27,
+								"column": 4
+							}
+						},
+						"value": "e",
+						"raw": "'e'",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 678,
+								"end": 682
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment between from and source (export all)",
+							"start": 610,
+							"end": 662
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 751,
+					"end": 779,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 29
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 759,
+							"end": 760,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 9
+								},
+								"end": {
+									"line": 30,
+									"column": 10
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 759,
+								"end": 760,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 9
+									},
+									"end": {
+										"line": 30,
+										"column": 10
+									}
+								},
+								"name": "a"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 759,
+								"end": 760,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 9
+									},
+									"end": {
+										"line": 30,
+										"column": 10
+									}
+								},
+								"name": "a"
+							},
+							"exportKind": "value"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 775,
+						"end": 778,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 25
+							},
+							"end": {
+								"line": 30,
+								"column": 28
+							}
+						},
+						"value": "f",
+						"raw": "'f'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 767,
+								"end": 774
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment between from and source (with specifiers)",
+							"start": 691,
+							"end": 749
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

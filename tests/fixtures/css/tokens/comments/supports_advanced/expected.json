@@ -10,7 +10,7 @@
 				"start": 29,
 				"end": 113,
 				"name": "supports",
-				"prelude": "(display: grid) or /* comment */ (flex: 1)",
+				"prelude": "(display: grid) or  (flex: 1)",
 				"block": {
 					"type": "Block",
 					"start": 82,
@@ -71,7 +71,7 @@
 				"start": 135,
 				"end": 214,
 				"name": "supports",
-				"prelude": "/* before not */ not (display: grid)",
+				"prelude": "not (display: grid)",
 				"block": {
 					"type": "Block",
 					"start": 182,
@@ -132,7 +132,7 @@
 				"start": 245,
 				"end": 336,
 				"name": "supports",
-				"prelude": "(display: grid) /* c1 */ /* c2 */ and (flex: 1)",
+				"prelude": "(display: grid)   and (flex: 1)",
 				"block": {
 					"type": "Block",
 					"start": 303,

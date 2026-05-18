@@ -19,15 +19,45 @@
 //! ```
 
 pub mod ast;
-pub mod escapes;
-pub mod lexer;
-pub mod parser;
-pub mod printer;
+mod config;
+mod lexer;
+mod parser;
+mod printer;
 
-use std::cell::RefCell;
+pub use config::TsConfig;
+
 use std::rc::Rc;
 
-pub use tsv_lang::{ParseError, Result};
+use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::{EmbedContext, PrintConfig};
+pub use tsv_lang::{ParseError, Result, SharedInterner};
+
+/// Build a fully-configured printer borrowing the given arena/source/state.
+///
+/// All `format_*` and `build_*_doc` entry points funnel through this so the
+/// constructor argument list lives in exactly one place.
+#[allow(clippy::too_many_arguments)]
+fn make_printer<'a>(
+    arena: &'a DocArena,
+    source: &'a str,
+    interner: SharedInterner,
+    comments: &'a [ast::Comment],
+    line_breaks: &'a [u32],
+    config: PrintConfig,
+    embed: EmbedContext,
+    ts_config: TsConfig,
+) -> printer::Printer<'a> {
+    printer::Printer::with_config(
+        arena,
+        interner,
+        source,
+        comments,
+        line_breaks,
+        config,
+        embed,
+        ts_config,
+    )
+}
 
 /// Parse TypeScript source code into an internal AST
 ///
@@ -68,27 +98,25 @@ pub fn parse(source: &str) -> Result<Program> {
 /// assert_eq!(formatted, "const x = 42;\n");
 /// ```
 pub fn format(program: &Program, source: &str) -> String {
-    format_with_config(program, source, tsv_lang::PrintConfig::default())
+    format_with_config(program, source, TsConfig::default())
 }
 
-/// Format an internal AST back to source code with custom configuration
+/// Format an internal AST back to source code with custom TypeScript-specific
+/// configuration (e.g., trailing-comma behavior on arrow type params).
 ///
-/// This allows specifying print configuration like `base_indent_offset` for
-/// when TypeScript is embedded inside another format (e.g., Svelte `<script>` tags).
-pub fn format_with_config(
-    program: &Program,
-    source: &str,
-    config: tsv_lang::PrintConfig,
-) -> String {
-    let arena =
-        tsv_lang::doc::arena::DocArena::with_source_size_hint(source.len(), config.tab_width);
-    let mut printer = printer::Printer::with_config(
+/// Pure-TS callers (CLI/debug) pass `TsConfig { arrow_type_param_trailing_comma: false, .. }`
+/// to suppress the Svelte-template disambiguation.
+pub fn format_with_config(program: &Program, source: &str, ts_config: TsConfig) -> String {
+    let arena = DocArena::for_source(source);
+    let mut printer = make_printer(
         &arena,
-        Rc::clone(&program.interner),
         source,
+        Rc::clone(&program.interner),
         &program.comments,
         &program.line_breaks,
-        config,
+        PrintConfig::default(),
+        EmbedContext::default(),
+        ts_config,
     );
     printer.print_program(program);
     printer.into_string()
@@ -113,9 +141,10 @@ pub fn format_with_config(
 /// let public_ast = tsv_ts::convert_ast(&ast, source);
 /// let json = serde_json::to_string_pretty(&public_ast)?;
 /// ```
+#[cfg(feature = "convert")]
 pub fn convert_ast(program: &Program, source: &str) -> ast::public::Program {
     let tracker = tsv_lang::LocationTracker::new(source);
-    ast::convert::convert_program(program, source, &tracker)
+    ast::convert::convert_program(program, source, &tracker, ast::convert::Schema::Acorn)
 }
 
 /// Convert internal AST to JSON with character-based positions
@@ -125,10 +154,12 @@ pub fn convert_ast(program: &Program, source: &str) -> ast::public::Program {
 /// offsets to match acorn output.
 ///
 /// This is the preferred function for producing JSON AST output.
+#[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
 pub fn convert_ast_json(program: &Program, source: &str) -> serde_json::Value {
     let tracker = tsv_lang::LocationTracker::new(source);
-    let public_ast = ast::convert::convert_program(program, source, &tracker);
+    let public_ast =
+        ast::convert::convert_program(program, source, &tracker, ast::convert::Schema::Acorn);
     let mut json = serde_json::to_value(&public_ast).expect("AST types derive Serialize correctly");
     let map = tsv_lang::ByteToCharMap::new(source);
     ast::convert::translate_byte_to_char_offsets(&mut json, &map, &tracker);
@@ -152,35 +183,10 @@ pub fn convert_ast_json(program: &Program, source: &str) -> serde_json::Value {
 pub fn parse_with_interner(
     source: &str,
     base_offset: usize,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+    interner: SharedInterner,
 ) -> Result<Program> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
     parser.parse().map_err(|e| e.with_context(source))
-}
-
-/// Parse a single TypeScript expression
-///
-/// This is used when parsing embedded expressions in Svelte templates.
-///
-/// # Arguments
-///
-/// * `source` - The TypeScript expression source code
-/// * `base_offset` - Offset in the full source file
-/// * `interner` - Shared string interner
-///
-/// # Returns
-///
-/// * `Ok(Expression)` - The parsed expression
-/// * `Err(ParseError)` - If parsing fails
-pub fn parse_expression(
-    source: &str,
-    base_offset: usize,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
-) -> Result<Expression> {
-    let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
-    parser
-        .parse_expression_public()
-        .map_err(|e| e.with_context(source))
 }
 
 /// Parse a single TypeScript expression and return it with any comments.
@@ -190,7 +196,7 @@ pub fn parse_expression(
 pub fn parse_expression_with_comments(
     source: &str,
     base_offset: usize,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+    interner: SharedInterner,
 ) -> Result<(Expression, Vec<ast::Comment>)> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
     parser
@@ -198,116 +204,36 @@ pub fn parse_expression_with_comments(
         .map_err(|e| e.with_context(source))
 }
 
-/// Format a single TypeScript expression back to source code
+/// Format a single TypeScript expression to a string.
 ///
-/// This formats an expression AST node that was parsed as part of a larger document
-/// (e.g., a Svelte template). The source must be the full document source that the
-/// expression's spans refer to.
-///
-/// # Arguments
-///
-/// * `expression` - The expression AST to format
-/// * `source` - The original full source code (the expression's spans index into this)
-/// * `interner` - Shared string interner (same one used during parsing)
-///
-/// # Returns
-///
-/// The formatted expression as a String
+/// `expression` was parsed as part of a larger document (e.g., a Svelte
+/// template); `source` is the full document the expression's spans index into.
+/// `embed.base_indent_offset` seeds the printer's indent level so wrapped
+/// lines (method chains, multiline arrays) indent relative to the surrounding
+/// context.
+#[allow(clippy::too_many_arguments)]
 pub fn format_expression(
     expression: &Expression,
     source: &str,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
-    line_breaks: &[u32],
-) -> String {
-    format_expression_with_indent(expression, source, interner, 0, line_breaks)
-}
-
-/// Format a single TypeScript expression with a base indentation level
-///
-/// This is used when formatting expressions embedded in other content
-/// (e.g., Svelte templates) where the expression needs to respect the
-/// surrounding indentation context.
-pub fn format_expression_with_indent(
-    expression: &Expression,
-    source: &str,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
-    indent_level: usize,
-    line_breaks: &[u32],
-) -> String {
-    let comments = Vec::new();
-    let config = tsv_lang::PrintConfig::default();
-    let arena =
-        tsv_lang::doc::arena::DocArena::with_source_size_hint(source.len(), config.tab_width);
-    let mut printer =
-        printer::Printer::with_config(&arena, interner, source, &comments, line_breaks, config);
-    printer.set_indent_level(indent_level);
-    printer.print_expression(expression);
-    printer.into_string()
-}
-
-/// Format a single TypeScript expression with a base indentation level and comments
-///
-/// This is used when formatting expressions embedded in other content
-/// (e.g., Svelte templates) where the expression needs to respect the
-/// surrounding indentation context, and comments need to be preserved.
-pub fn format_expression_with_indent_and_comments(
-    expression: &Expression,
-    source: &str,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
-    indent_level: usize,
+    interner: SharedInterner,
     comments: &[ast::Comment],
     line_breaks: &[u32],
+    config: PrintConfig,
+    embed: EmbedContext,
+    ts_config: TsConfig,
 ) -> String {
-    let config = tsv_lang::PrintConfig::default();
-    let arena =
-        tsv_lang::doc::arena::DocArena::with_source_size_hint(source.len(), config.tab_width);
-    let mut printer =
-        printer::Printer::with_config(&arena, interner, source, comments, line_breaks, config);
-    printer.set_indent_level(indent_level);
-    printer.print_expression(expression);
-    printer.into_string()
-}
-
-/// Format a single TypeScript expression with comments.
-///
-/// Preserves comments that were collected during parsing.
-/// Used for Svelte expression tags that may contain comments.
-pub fn format_expression_with_comments(
-    expression: &Expression,
-    source: &str,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
-    comments: &[ast::Comment],
-    line_breaks: &[u32],
-) -> String {
-    let config = tsv_lang::PrintConfig::default();
-    let arena =
-        tsv_lang::doc::arena::DocArena::with_source_size_hint(source.len(), config.tab_width);
-    let mut printer =
-        printer::Printer::with_config(&arena, interner, source, comments, line_breaks, config);
-    printer.print_expression(expression);
-    printer.into_string()
-}
-
-/// Format a single TypeScript expression with custom print configuration.
-///
-/// Like `format_expression_with_comments`, but accepts a PrintConfig
-/// to control formatting behavior. Use `first_line_offset` to account for
-/// expressions that start mid-line (e.g., `{#each expr as item}`).
-pub fn format_expression_with_config(
-    expression: &Expression,
-    source: &str,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
-    comments: &[ast::Comment],
-    config: tsv_lang::PrintConfig,
-    line_breaks: &[u32],
-) -> String {
-    let arena =
-        tsv_lang::doc::arena::DocArena::with_source_size_hint(source.len(), config.tab_width);
-    let mut printer =
-        printer::Printer::with_config(&arena, interner, source, comments, line_breaks, config);
-    // Set indent level from base_indent_offset so wrapped lines (e.g., method chains)
-    // are indented relative to the outer context (e.g., Svelte block directives)
-    printer.set_indent_level(config.base_indent_offset);
+    let arena = DocArena::for_source(source);
+    let mut printer = make_printer(
+        &arena,
+        source,
+        interner,
+        comments,
+        line_breaks,
+        config,
+        embed,
+        ts_config,
+    );
+    printer.set_indent_level(embed.base_indent_offset);
     printer.print_expression(expression);
     printer.into_string()
 }
@@ -340,7 +266,7 @@ pub fn format_expression_with_config(
 pub fn parse_pattern_with_comments(
     source: &str,
     base_offset: usize,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+    interner: SharedInterner,
 ) -> Result<(Expression, Vec<ast::Comment>)> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
     let expr = parser
@@ -371,7 +297,7 @@ pub fn parse_pattern_with_comments(
 pub fn parse_type_annotation_partial(
     source: &str,
     base_offset: usize,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+    interner: SharedInterner,
 ) -> Result<(TSTypeAnnotation, usize)> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
     let ta = parser
@@ -381,45 +307,18 @@ pub fn parse_type_annotation_partial(
     Ok((ta, pos))
 }
 
-/// Parse a partial expression, stopping at top-level commas.
+/// Parse a partial expression, stopping at top-level commas, and return it
+/// with any collected comments.
 ///
-/// This is used when parsing patterns in contexts where commas have other meanings,
-/// such as `{#each items as pattern, index}` where the comma separates the pattern
-/// from the index variable.
-///
-/// Unlike `parse_expression`, this uses assignment expression parsing which stops
-/// at top-level commas (but handles commas inside objects/arrays/calls correctly).
-///
-/// # Arguments
-///
-/// * `source` - The source code starting at the expression
-/// * `base_offset` - Offset in the full source file
-/// * `interner` - Shared string interner
-///
-/// # Returns
-///
-/// * `Ok((Expression, usize))` - The parsed expression and the absolute position
-///   where parsing stopped (start of next token)
-/// * `Err(ParseError)` - If parsing fails
-pub fn parse_expression_partial(
-    source: &str,
-    base_offset: usize,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
-) -> Result<(Expression, usize)> {
-    let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
-    parser
-        .parse_assignment_expression_partial()
-        .map_err(|e| e.with_context(source))
-}
-
-/// Parse a partial expression and return it with any collected comments.
-///
-/// Like `parse_expression_partial`, but also returns comments for preservation
-/// in Svelte template contexts.
+/// Used when parsing patterns in contexts where commas have other meanings,
+/// such as `{#each items as pattern, index}` where the comma separates the
+/// pattern from the index variable. Uses assignment-expression parsing which
+/// stops at top-level commas (but handles commas inside objects/arrays/calls
+/// correctly).
 pub fn parse_expression_partial_with_comments(
     source: &str,
     base_offset: usize,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
+    interner: SharedInterner,
 ) -> Result<(Expression, usize, Vec<ast::Comment>)> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
     let (expr, end_pos) = parser
@@ -432,18 +331,29 @@ pub fn parse_expression_partial_with_comments(
 /// Build a DocId for a TypeScript expression with comments in the caller's arena.
 ///
 /// Pass `&[]` for comments when no comments need to be preserved.
+#[allow(clippy::too_many_arguments)]
 pub fn build_expression_doc_with_comments(
-    arena: &tsv_lang::doc::arena::DocArena,
+    arena: &DocArena,
     expression: &Expression,
     source: &str,
-    interner: Rc<RefCell<string_interner::DefaultStringInterner>>,
-    config: &tsv_lang::PrintConfig,
+    interner: SharedInterner,
+    config: &PrintConfig,
+    embed: &EmbedContext,
     comments: &[ast::Comment],
     line_breaks: &[u32],
-) -> tsv_lang::doc::arena::DocId {
-    let printer =
-        printer::Printer::with_config(arena, interner, source, comments, line_breaks, *config);
-    printer.build_expression_doc_public(expression)
+    ts_config: TsConfig,
+) -> DocId {
+    let printer = make_printer(
+        arena,
+        source,
+        interner,
+        comments,
+        line_breaks,
+        *config,
+        *embed,
+        ts_config,
+    );
+    printer.build_expression_doc(expression)
 }
 
 /// Build a DocId for a TypeScript program in the caller's arena.
@@ -451,27 +361,30 @@ pub fn build_expression_doc_with_comments(
 /// Returns a DocId that can be rendered with the arena.
 /// Used when embedding TypeScript in other formats like Svelte's `<script>`.
 pub fn build_program_doc(
-    arena: &tsv_lang::doc::arena::DocArena,
+    arena: &DocArena,
     program: &Program,
     source: &str,
-    config: tsv_lang::PrintConfig,
-) -> tsv_lang::doc::arena::DocId {
-    let printer = printer::Printer::with_config(
+    embed: EmbedContext,
+    ts_config: TsConfig,
+) -> DocId {
+    let printer = make_printer(
         arena,
-        Rc::clone(&program.interner),
         source,
+        Rc::clone(&program.interner),
         &program.comments,
         &program.line_breaks,
-        config,
+        PrintConfig::default(),
+        embed,
+        ts_config,
     );
     printer.build_program_doc(program)
 }
 
-// Re-export key types for convenience
+// Re-exports of types that appear in this crate's public function signatures
+// (`Program`, `Expression`, `TSTypeAnnotation`) or are named via the short
+// `tsv_ts::Foo` path by external consumers (`Statement`, `ObjectProperty`,
+// `ObjectPatternProperty` — currently only by tsv_svelte). All other AST
+// types remain accessible through the full `tsv_ts::ast::internal::Foo` path.
 pub use ast::internal::{
-    ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression, AssignmentExpression,
-    AssignmentOperator, AssignmentPattern, Expression, Identifier, Literal, LiteralValue,
-    ObjectPattern, ObjectPatternProperty, ObjectProperty, Program, Property, RestElement,
-    SpreadElement, Statement, TSKeywordKind, TSKeywordType, TSType, TSTypeAnnotation,
-    VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
+    Expression, ObjectPatternProperty, ObjectProperty, Program, Statement, TSTypeAnnotation,
 };

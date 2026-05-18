@@ -26,9 +26,12 @@ tsv_lang = { path = "crates/tsv_lang" }
 tsv_html = { path = "crates/tsv_html" }
 
 # Language implementations
-tsv_ts = { path = "crates/tsv_ts" }
-tsv_css = { path = "crates/tsv_css" }
-tsv_svelte = { path = "crates/tsv_svelte" }
+# Default-features off ships parse + format only; consumers opt into the
+# public AST + JSON layer with `features = ["convert"]`. Only the
+# @fuzdev/tsv_fmt WASM build leaves it off.
+tsv_ts = { path = "crates/tsv_ts", default-features = false }
+tsv_css = { path = "crates/tsv_css", default-features = false }
+tsv_svelte = { path = "crates/tsv_svelte", default-features = false }
 
 # External dependencies
 serde = { version = "1", features = ["derive"] }
@@ -121,8 +124,8 @@ clone_on_ref_ptr = "warn"
 dbg_macro = "warn"
 expect_used = "warn"
 panic = "warn"
+todo = "warn"
 unwrap_used = "warn"
-# Note: todo! macro allowed per project convention (see CLAUDE.md)
 
 # Root package for integration tests
 [package]
@@ -132,9 +135,9 @@ edition.workspace = true
 
 [dependencies]
 tsv_lang.workspace = true
-tsv_ts.workspace = true
-tsv_css.workspace = true
-tsv_svelte.workspace = true
+tsv_ts = { workspace = true, features = ["convert"] }
+tsv_css = { workspace = true, features = ["convert"] }
+tsv_svelte = { workspace = true, features = ["convert"] }
 serde.workspace = true
 serde_json.workspace = true
 
@@ -148,7 +151,6 @@ futures-util = "0.3"
 workspace = true
 
 [profile.release]
-# opt-level = "s" # smaller size
 lto = true
 codegen-units = 1
 panic = "abort"

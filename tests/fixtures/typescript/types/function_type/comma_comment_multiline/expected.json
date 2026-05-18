@@ -1,0 +1,813 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 461,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Inline block comment after comma with line comment forcing multiline",
+			"start": 20,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment",
+			"start": 119,
+			"end": 134,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 137,
+			"end": 144,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Trailing block comment before comma with line comment",
+			"start": 170,
+			"end": 226,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 251,
+			"end": 258,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 12
+				},
+				"end": {
+					"line": 11,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment",
+			"start": 262,
+			"end": 277,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Both trailing and leading around comma with line comment",
+			"start": 305,
+			"end": 364,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 389,
+			"end": 397,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 12
+				},
+				"end": {
+					"line": 18,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment",
+			"start": 401,
+			"end": 416,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 419,
+			"end": 427,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 2
+				},
+				"end": {
+					"line": 20,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 460,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 451,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 22,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 93,
+					"end": 167,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 11
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 98,
+						"end": 99,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 102,
+						"end": 166,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 7,
+								"column": 10
+							}
+						},
+						"parameters": [
+							{
+								"type": "Identifier",
+								"start": 106,
+								"end": 115,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 11
+									}
+								},
+								"name": "a",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 107,
+									"end": 115,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 3
+										},
+										"end": {
+											"line": 4,
+											"column": 11
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 109,
+										"end": 115,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 5
+											},
+											"end": {
+												"line": 4,
+												"column": 11
+											}
+										}
+									}
+								}
+							},
+							{
+								"type": "Identifier",
+								"start": 145,
+								"end": 154,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 10
+									},
+									"end": {
+										"line": 6,
+										"column": 19
+									}
+								},
+								"name": "b",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 146,
+									"end": 154,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 11
+										},
+										"end": {
+											"line": 6,
+											"column": 19
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 148,
+										"end": 154,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 13
+											},
+											"end": {
+												"line": 6,
+												"column": 19
+											}
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " line comment",
+										"start": 119,
+										"end": 134
+									},
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 137,
+										"end": 144
+									}
+								]
+							}
+						],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 159,
+							"end": 166,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 3
+								},
+								"end": {
+									"line": 7,
+									"column": 10
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSVoidKeyword",
+								"start": 162,
+								"end": 166,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 6
+									},
+									"end": {
+										"line": 7,
+										"column": 10
+									}
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Inline block comment after comma with line comment forcing multiline",
+							"start": 20,
+							"end": 91
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 228,
+					"end": 302,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 11
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 233,
+						"end": 234,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 6
+							},
+							"end": {
+								"line": 10,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 237,
+						"end": 301,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 10
+							},
+							"end": {
+								"line": 14,
+								"column": 10
+							}
+						},
+						"parameters": [
+							{
+								"type": "Identifier",
+								"start": 241,
+								"end": 250,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 11
+									}
+								},
+								"name": "a",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 242,
+									"end": 250,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 3
+										},
+										"end": {
+											"line": 11,
+											"column": 11
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 244,
+										"end": 250,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 5
+											},
+											"end": {
+												"line": 11,
+												"column": 11
+											}
+										}
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 251,
+										"end": 258
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 280,
+								"end": 289,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 11
+									}
+								},
+								"name": "b",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 281,
+									"end": 289,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 3
+										},
+										"end": {
+											"line": 13,
+											"column": 11
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 283,
+										"end": 289,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 5
+											},
+											"end": {
+												"line": 13,
+												"column": 11
+											}
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " line comment",
+										"start": 262,
+										"end": 277
+									}
+								]
+							}
+						],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 294,
+							"end": 301,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 3
+								},
+								"end": {
+									"line": 14,
+									"column": 10
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSVoidKeyword",
+								"start": 297,
+								"end": 301,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 6
+									},
+									"end": {
+										"line": 14,
+										"column": 10
+									}
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Trailing block comment before comma with line comment",
+							"start": 170,
+							"end": 226
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 366,
+					"end": 450,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 11
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 371,
+						"end": 372,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 6
+							},
+							"end": {
+								"line": 17,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 375,
+						"end": 449,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 10
+							},
+							"end": {
+								"line": 21,
+								"column": 10
+							}
+						},
+						"parameters": [
+							{
+								"type": "Identifier",
+								"start": 379,
+								"end": 388,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 11
+									}
+								},
+								"name": "a",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 380,
+									"end": 388,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 3
+										},
+										"end": {
+											"line": 18,
+											"column": 11
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 382,
+										"end": 388,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 5
+											},
+											"end": {
+												"line": 18,
+												"column": 11
+											}
+										}
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 389,
+										"end": 397
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 428,
+								"end": 437,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 11
+									},
+									"end": {
+										"line": 20,
+										"column": 20
+									}
+								},
+								"name": "b",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 429,
+									"end": 437,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 12
+										},
+										"end": {
+											"line": 20,
+											"column": 20
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 431,
+										"end": 437,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 14
+											},
+											"end": {
+												"line": 20,
+												"column": 20
+											}
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " line comment",
+										"start": 401,
+										"end": 416
+									},
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 419,
+										"end": 427
+									}
+								]
+							}
+						],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 442,
+							"end": 449,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 3
+								},
+								"end": {
+									"line": 21,
+									"column": 10
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSVoidKeyword",
+								"start": 445,
+								"end": 449,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 6
+									},
+									"end": {
+										"line": 21,
+										"column": 10
+									}
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Both trailing and leading around comma with line comment",
+							"start": 305,
+							"end": 364
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

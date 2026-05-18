@@ -28,7 +28,17 @@ pub(crate) fn build_arrow_inline_signature(
         sig_parts.push(d.text("async "));
     }
     if arrow.params.is_empty() {
-        sig_parts.push(d.text("()"));
+        if let Some(open) = arrow.params_start
+            && let Some(close_after) = printer.find_closing_paren(open, arrow.body.span().start)
+            && let Some(comment_doc) = printer
+                .build_inline_comments_between_doc_no_leading_space_opt(open + 1, close_after - 1)
+        {
+            sig_parts.push(d.text("("));
+            sig_parts.push(comment_doc);
+            sig_parts.push(d.text(")"));
+        } else {
+            sig_parts.push(d.text("()"));
+        }
     } else {
         sig_parts.push(d.text("("));
         sig_parts.push(

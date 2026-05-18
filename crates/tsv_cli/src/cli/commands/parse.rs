@@ -77,44 +77,25 @@ impl Executable for ParseExecutable {
 fn parse_to_json(input: &Input, pretty: bool, parser_type: ParserType) -> Result<String, String> {
     let source = input.content();
 
-    let json = match parser_type {
+    let json_value = match parser_type {
         ParserType::Svelte => {
-            // Parse as Svelte
             let ast = tsv_svelte::parse(source).map_err(|e| e.to_string())?;
-            let json_value = tsv_svelte::convert_ast_json(&ast, source);
-
-            // Serialize to JSON
-            if pretty {
-                to_json_with_tabs(&json_value)
-            } else {
-                serde_json::to_string(&json_value)
-            }
+            tsv_svelte::convert_ast_json(&ast, source)
         }
         ParserType::Css => {
-            // Parse as CSS
-            let nodes = tsv_css::parse(source).map_err(|e| e.to_string())?;
-            let json_value = tsv_css::convert_ast_json(&nodes, source);
-
-            // Serialize to JSON
-            if pretty {
-                to_json_with_tabs(&json_value)
-            } else {
-                serde_json::to_string(&json_value)
-            }
+            let ast = tsv_css::parse(source).map_err(|e| e.to_string())?;
+            tsv_css::convert_ast_json(&ast, source)
         }
         ParserType::TypeScript => {
-            // Parse as TypeScript
             let ast = tsv_ts::parse(source).map_err(|e| e.to_string())?;
-            let json_value = tsv_ts::convert_ast_json(&ast, source);
-
-            // Serialize to JSON
-            if pretty {
-                to_json_with_tabs(&json_value)
-            } else {
-                serde_json::to_string(&json_value)
-            }
+            tsv_ts::convert_ast_json(&ast, source)
         }
     };
 
+    let json = if pretty {
+        to_json_with_tabs(&json_value)
+    } else {
+        serde_json::to_string(&json_value)
+    };
     json.map_err(|e| format!("JSON serialization failed: {e}"))
 }

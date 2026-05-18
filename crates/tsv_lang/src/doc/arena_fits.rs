@@ -1,22 +1,29 @@
 //! Width fitting algorithms for arena-based doc trees.
 
-use crate::PrintConfig;
+use crate::EmbedContext;
 use crate::printing::visual_width;
 use smallvec::SmallVec;
 
 use super::arena::{ArenaCommand, DocArena, DocId, DocNode};
+use super::render_config::RenderConfig;
 use super::types::{LineKind, Mode, TEXT_WIDTH_HAS_NEWLINE, TextResolver, resolve_text};
 
 /// Check if a doc fits in the remaining width, looking ahead at remaining commands.
 ///
 /// Arena-based version of `fits_with_lookahead`.
+///
+/// `embed` is currently unused — fits decisions only need `tab_width`. The
+/// parameter is threaded so internal callers from `arena_render` can pass
+/// the same render/embed pair uniformly.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
     arena: &DocArena,
     doc: DocId,
     mode: Mode,
     rest_commands: &[ArenaCommand],
     remaining_width: isize,
-    config: &PrintConfig,
+    render: &RenderConfig,
+    _embed: &EmbedContext,
     resolver: Option<&R>,
 ) -> bool {
     if remaining_width == isize::MAX {
@@ -54,7 +61,7 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
                         if s.contains('\n') {
                             return true;
                         }
-                        remaining -= visual_width(s, config.tab_width) as isize;
+                        remaining -= visual_width(s, render.tab_width) as isize;
                     }
                 }
             }
@@ -149,24 +156,38 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
 }
 
 /// Check if a doc fits in the remaining width (public API without look-ahead).
+///
+/// Uses the production [`crate::TAB_WIDTH`] for visual width calculations.
+/// Internal callers that need to vary widths should use
+/// [`arena_fits_with_lookahead`] with a custom [`RenderConfig`].
 pub fn arena_fits<R: TextResolver + ?Sized>(
     arena: &DocArena,
     doc: DocId,
     width: usize,
     mode: Mode,
-    config: &PrintConfig,
     resolver: Option<&R>,
 ) -> bool {
-    arena_fits_with_lookahead(arena, doc, mode, &[], width as isize, config, resolver)
+    arena_fits_with_lookahead(
+        arena,
+        doc,
+        mode,
+        &[],
+        width as isize,
+        &RenderConfig::default(),
+        &EmbedContext::default(),
+        resolver,
+    )
 }
 
 /// Check if multiple docs fit sequentially in the remaining width.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn arena_fits_multi<R: TextResolver + ?Sized>(
     arena: &DocArena,
     doc_ids: &[DocId],
     width: usize,
     mode: Mode,
-    config: &PrintConfig,
+    render: &RenderConfig,
+    _embed: &EmbedContext,
     resolver: Option<&R>,
 ) -> bool {
     if width == usize::MAX {
@@ -199,7 +220,7 @@ pub(super) fn arena_fits_multi<R: TextResolver + ?Sized>(
                         if s.contains('\n') {
                             return true;
                         }
-                        remaining_width -= visual_width(s, config.tab_width) as isize;
+                        remaining_width -= visual_width(s, render.tab_width) as isize;
                         if remaining_width < 0 {
                             return false;
                         }

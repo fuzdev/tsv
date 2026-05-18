@@ -131,11 +131,17 @@ impl<'a> Parser<'a> {
                     return self.parse_using_declaration();
                 }
                 // Check for contextual keyword 'type' followed by identifier (type alias declaration)
-                if self.current_value() == "type" && self.peek_is_identifier() {
+                // Use peek_non_comment_kind to skip comments: `type /* c */ A = string`
+                if self.current_value() == "type"
+                    && matches!(self.peek_non_comment_kind(), TokenKind::Identifier)
+                {
                     return self.parse_type_alias_declaration();
                 }
                 // Check for contextual keyword 'interface' followed by identifier
-                if self.current_value() == "interface" && self.peek_is_identifier() {
+                // Use peek_non_comment_kind to skip comments: `interface /* c */ A {}`
+                if self.current_value() == "interface"
+                    && matches!(self.peek_non_comment_kind(), TokenKind::Identifier)
+                {
                     return self.parse_interface_declaration();
                 }
                 // Check for contextual keyword 'declare' followed by function/class
@@ -143,19 +149,22 @@ impl<'a> Parser<'a> {
                     return self.parse_declare_statement();
                 }
                 // Check for contextual keyword 'abstract' followed by class
+                // Use peek_non_comment_kind to skip comments: `abstract /* c */ class A {}`
                 if self.current_value() == "abstract"
-                    && self.peek_kind() == TokenKind::Keyword(KeywordKind::Class)
+                    && self.peek_non_comment_kind() == TokenKind::Keyword(KeywordKind::Class)
                 {
                     return self.parse_abstract_class();
                 }
                 // Check for contextual keyword 'namespace' or 'module' followed by identifier
+                // Use peek_non_comment_kind to skip comments: `namespace /* c */ A {}`
                 if (self.current_value() == "namespace" || self.current_value() == "module")
-                    && self.peek_is_identifier()
+                    && matches!(self.peek_non_comment_kind(), TokenKind::Identifier)
                 {
                     return self.parse_module_declaration(false, false);
                 }
                 // Check for labeled statement: `label: statement`
-                if self.peek_kind() == TokenKind::Colon {
+                // Use peek_non_comment_kind to skip comments: `label /* c */: statement`
+                if self.peek_non_comment_kind() == TokenKind::Colon {
                     return self.parse_labeled_statement();
                 }
                 // Regular expression statement

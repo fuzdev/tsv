@@ -45,14 +45,14 @@
 							"start": 45,
 							"end": 165,
 							"property": "prop",
-							"value": "var(\n\t\t\t--a,\n\t\t\t/* comment */ var(--b) ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\n\t\t)"
+							"value": "var(\n\t\t\t--a,\n\t\t\t var(--b) ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\n\t\t)"
 						},
 						{
 							"type": "Declaration",
 							"start": 195,
 							"end": 320,
 							"property": "prop",
-							"value": "var(\n\t\t\t--a,\n\t\t\t/* comment */ var(--b)\n\t\t\t\tcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\n\t\t)"
+							"value": "var(\n\t\t\t--a,\n\t\t\t var(--b)\n\t\t\t\tcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\n\t\t)"
 						}
 					]
 				},

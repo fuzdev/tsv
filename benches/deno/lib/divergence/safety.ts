@@ -9,10 +9,10 @@
  */
 
 export interface SafetyViolation {
-	type: 'content_lost';
-	/** Total characters lost */
+	type: 'content_lost' | 'content_added';
+	/** Total characters affected (lost or added) */
 	totalLost: number;
-	/** Lines from source that appear to be missing in formatted output */
+	/** Lines from source missing in formatted (content_lost), or extra in formatted (content_added) */
 	missingLines: string[];
 	/** Human-readable summary */
 	summary: string;
@@ -29,6 +29,12 @@ export interface SafetyViolation {
  * We intentionally TRACK (do not exclude):
  * - Brackets: [ ] { } < > - losing these changes semantics
  * - All letters, digits, operators - these are content
+ *
+ * Known blind spots (fundamental tradeoffs):
+ * - Parens excluded: a bug dropping parens around `(a + b) * c` → `a + b * c` is invisible
+ * - Commas/semicolons excluded: removing commas from objects or adding semicolons passes
+ * - Quote changes: `"x"` → `'x'` or `` `x` `` is invisible
+ * - Reordering: swapping statements preserves character frequencies
  */
 const FORMATTING_CHARS = new Set([
 	// Whitespace
@@ -72,41 +78,78 @@ export function checkSafety(source: string, formatted: string): SafetyViolation[
 		}
 	}
 
-	if (lostChars.size === 0) {
-		return [];
+	// Also check reverse: formatted has more semantic chars than source (content added).
+	// A formatter should not add new letters, digits, or operators.
+	const addedChars = new Map<string, number>();
+
+	for (const [char, formattedCount] of formattedCounts) {
+		const sourceCount = sourceCounts.get(char) ?? 0;
+		if (formattedCount > sourceCount) {
+			addedChars.set(char, formattedCount - sourceCount);
+		}
 	}
 
-	const totalLost = [...lostChars.values()].reduce((a, b) => a + b, 0);
+	const violations: SafetyViolation[] = [];
 
-	// Find lines that are likely missing (contain lost chars and not in formatted)
-	const missingLines = findMissingLines(source, formatted, lostChars);
+	if (lostChars.size > 0) {
+		const totalLost = [...lostChars.values()].reduce((a, b) => a + b, 0);
+		const missingLines = findMissingLines(source, formatted, lostChars);
 
-	// Build summary showing the actual missing content
-	let summary: string;
-	if (missingLines.length > 0) {
-		const preview = missingLines
-			.slice(0, 3)
-			.map((line) => line.trim().slice(0, 60))
-			.join(' | ');
-		summary = `${totalLost} chars lost. Missing: ${preview}${missingLines.length > 3 ? '...' : ''}`;
-	} else {
-		// Fallback to character list if we can't identify lines
-		const charList = [...lostChars.entries()]
-			.sort((a, b) => b[1] - a[1])
-			.slice(0, 5)
-			.map(([char, count]) => `'${char}'×${count}`)
-			.join(', ');
-		summary = `${totalLost} chars lost: ${charList}`;
-	}
+		let summary: string;
+		if (missingLines.length > 0) {
+			const preview = missingLines
+				.slice(0, 3)
+				.map((line) => line.trim().slice(0, 60))
+				.join(' | ');
+			summary = `${totalLost} chars lost. Missing: ${preview}${
+				missingLines.length > 3 ? '...' : ''
+			}`;
+		} else {
+			const charList = [...lostChars.entries()]
+				.sort((a, b) => b[1] - a[1])
+				.slice(0, 5)
+				.map(([char, count]) => `'${char}'×${count}`)
+				.join(', ');
+			summary = `${totalLost} chars lost: ${charList}`;
+		}
 
-	return [
-		{
+		violations.push({
 			type: 'content_lost',
 			totalLost,
 			missingLines,
 			summary,
-		},
-	];
+		});
+	}
+
+	if (addedChars.size > 0) {
+		const totalAdded = [...addedChars.values()].reduce((a, b) => a + b, 0);
+		const extraLines = findMissingLines(formatted, source, addedChars);
+
+		let summary: string;
+		if (extraLines.length > 0) {
+			const preview = extraLines
+				.slice(0, 3)
+				.map((line) => line.trim().slice(0, 60))
+				.join(' | ');
+			summary = `${totalAdded} chars added. Extra: ${preview}${extraLines.length > 3 ? '...' : ''}`;
+		} else {
+			const charList = [...addedChars.entries()]
+				.sort((a, b) => b[1] - a[1])
+				.slice(0, 5)
+				.map(([char, count]) => `'${char}'×${count}`)
+				.join(', ');
+			summary = `${totalAdded} chars added: ${charList}`;
+		}
+
+		violations.push({
+			type: 'content_added',
+			totalLost: totalAdded,
+			missingLines: extraLines,
+			summary,
+		});
+	}
+
+	return violations;
 }
 
 /**

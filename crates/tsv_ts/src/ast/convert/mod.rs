@@ -4,17 +4,28 @@ use super::internal;
 use super::public;
 use tsv_lang::{LocationTracker, Span};
 
-/// Controls context-dependent serialization behavior.
+/// Schema choice for public-AST serialization.
 ///
 /// Svelte's parser (for non-lang="ts" `<script>`) and acorn-typescript differ in
-/// which fields they emit on import/export nodes. This context is threaded through
-/// the conversion to produce the correct output for each parser.
-#[derive(Debug, Clone, Copy, Default)]
-pub(crate) struct ConversionContext {
-    /// When true: omit `importKind`/`exportKind` for "value" (Svelte non-lang="ts" behavior),
-    /// always include `attributes` on ImportDeclaration/ExportNamedDeclaration/ExportAllDeclaration.
-    /// When false: always include `importKind`/`exportKind`, omit `attributes` when empty (acorn behavior).
-    pub is_svelte_script: bool,
+/// which fields they emit on import/export nodes. This enum is threaded through
+/// conversion so each call site produces the correct JSON shape.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Schema {
+    /// acorn-typescript schema: always emit `importKind`/`exportKind`,
+    /// omit empty `attributes`.
+    #[default]
+    Acorn,
+    /// Svelte non-lang="ts" `<script>` schema: omit `importKind`/`exportKind`
+    /// when the value is `"value"`, always emit `attributes` on
+    /// `ImportDeclaration`/`ExportNamedDeclaration`/`ExportAllDeclaration`.
+    SvelteScript,
+}
+
+impl Schema {
+    #[inline]
+    pub(crate) fn is_svelte_script(self) -> bool {
+        matches!(self, Schema::SvelteScript)
+    }
 }
 
 // Submodules
@@ -247,51 +258,16 @@ pub(super) fn create_location(
     to_public_location(loc)
 }
 
+/// Convert an internal `Program` to the public AST under the given schema.
+///
+/// Use `Schema::Acorn` for standalone TypeScript and Svelte `lang="ts"` scripts;
+/// use `Schema::SvelteScript` for Svelte non-`lang="ts"` `<script>` blocks where
+/// the JSON shape must follow Svelte's parser quirks.
 pub fn convert_program(
     program: &internal::Program,
     source: &str,
     loc: &LocationTracker,
-) -> public::Program {
-    convert_program_with_context(program, source, loc, 0, ConversionContext::default())
-}
-
-/// Convert program from a Svelte non-lang="ts" `<script>` block.
-///
-/// Svelte's parser omits `importKind`/`exportKind` for "value" and always includes
-/// `attributes` on import/export declarations. This variant sets the context accordingly.
-pub fn convert_program_svelte(
-    program: &internal::Program,
-    source: &str,
-    loc: &LocationTracker,
-) -> public::Program {
-    convert_program_with_context(
-        program,
-        source,
-        loc,
-        0,
-        ConversionContext {
-            is_svelte_script: true,
-        },
-    )
-}
-
-// Convert Program with position offset for embedded content
-pub fn convert_program_with_offset(
-    program: &internal::Program,
-    source: &str,
-    loc: &LocationTracker,
-    offset: usize,
-) -> public::Program {
-    convert_program_with_context(program, source, loc, offset, ConversionContext::default())
-}
-
-// Convert Program with position offset and conversion context
-pub(crate) fn convert_program_with_context(
-    program: &internal::Program,
-    source: &str,
-    loc: &LocationTracker,
-    offset: usize,
-    ctx: ConversionContext,
+    schema: Schema,
 ) -> public::Program {
     let interner = program.interner.borrow();
 
@@ -299,11 +275,11 @@ pub(crate) fn convert_program_with_context(
         node_type: "Program".to_string(),
         start: program.span.start,
         end: program.span.end,
-        loc: create_location(program.span, loc, offset),
+        loc: create_location(program.span, loc, 0),
         body: program
             .body
             .iter()
-            .map(|s| convert_statement(s, source, loc, &interner, offset, ctx))
+            .map(|s| convert_statement(s, source, loc, &interner, 0, schema))
             .collect(),
         source_type: "module".to_string(),
     }

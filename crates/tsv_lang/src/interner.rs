@@ -5,6 +5,13 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol, Symbol};
 
+/// Shared, mutable interner reference threaded through parsers and printers.
+///
+/// Used for the embedded TS-in-Svelte path so the same string identity is
+/// reused across crates. This alias hides the upstream
+/// `string_interner::DefaultStringInterner` type from consumer signatures.
+pub type SharedInterner = Rc<RefCell<DefaultStringInterner>>;
+
 /// Extension trait for infallible symbol resolution.
 ///
 /// Symbols in tsv are always resolved by the same interner that created them.
@@ -75,15 +82,15 @@ impl TextResolver for DefaultStringInterner {
 /// # Example
 ///
 /// ```rust,ignore
-/// use tsv_lang::SymbolResolver;
+/// use tsv_lang::{SharedInterner, SymbolResolver};
 ///
 /// struct MyPrinter<'a> {
-///     interner: Rc<RefCell<DefaultStringInterner>>,
+///     interner: SharedInterner,
 ///     // ... other fields
 /// }
 ///
 /// impl<'a> SymbolResolver for MyPrinter<'a> {
-///     fn interner(&self) -> &Rc<RefCell<DefaultStringInterner>> {
+///     fn interner(&self) -> &SharedInterner {
 ///         &self.interner
 ///     }
 /// }
@@ -99,7 +106,7 @@ pub trait SymbolResolver {
     ///
     /// This is the only required method. All other methods have default
     /// implementations that use this interner reference.
-    fn interner(&self) -> &Rc<RefCell<DefaultStringInterner>>;
+    fn interner(&self) -> &SharedInterner;
 
     /// Resolve a symbol to a String (allocates)
     ///

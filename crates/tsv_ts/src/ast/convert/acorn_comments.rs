@@ -19,13 +19,75 @@ use tsv_lang::Comment;
 ///
 /// Each range is `(range_start, range_end)` — comments whose span falls entirely
 /// within this range should be duplicated in the root-level comments array.
-pub fn collect_acorn_type_reparse_ranges(program: &internal::Program) -> Vec<(u32, u32)> {
+pub fn collect_acorn_type_reparse_ranges(
+    program: &internal::Program,
+    source: &str,
+) -> Vec<(u32, u32)> {
     let mut ranges = Vec::new();
     for stmt in &program.body {
         collect_ranges_from_statement(stmt, &mut ranges);
     }
+    let bytes = source.as_bytes();
+    // Post-process: resolve mapped type ranges.
+    // These were encoded as pairs of MAPPED_TYPE_MARKER entries:
+    //   (mapped_start | MARKER, name_end), (constraint_start | MARKER, 0)
+    // Find the `in` keyword between name_end and constraint_start, then create
+    // a single (mapped_start, in_start) range covering `{` to `in`.
+    let mut resolved = Vec::new();
+    let mut i = 0;
+    let mut keep = vec![true; ranges.len()];
+    while i + 1 < ranges.len() {
+        if ranges[i].0 & MAPPED_TYPE_MARKER != 0 && ranges[i + 1].0 & MAPPED_TYPE_MARKER != 0 {
+            let mapped_start = (ranges[i].0 & !MAPPED_TYPE_MARKER) as usize;
+            let name_end = ranges[i].1 as usize;
+            let constraint_start = (ranges[i + 1].0 & !MAPPED_TYPE_MARKER) as usize;
+            // Find `i` of `in` keyword between name_end and constraint_start
+            if let Some(in_start) = tsv_lang::source_scan::find_char_skipping_comments(
+                bytes,
+                name_end,
+                constraint_start,
+                b'i',
+            ) {
+                resolved.push((mapped_start as u32, in_start as u32));
+            }
+            keep[i] = false;
+            keep[i + 1] = false;
+            i += 2;
+        } else {
+            i += 1;
+        }
+    }
+    if !keep.iter().all(|&k| k) {
+        let mut j = 0;
+        ranges.retain(|_| {
+            let k = keep[j];
+            j += 1;
+            k
+        });
+    }
+    ranges.extend(resolved);
+    // Narrow computed method signature ranges: the broad (span.start, span.end) range
+    // duplicates comments outside brackets. Find `]` and use it as the range end.
+    for range in &mut ranges {
+        // Detect method signature ranges by checking for `[` at range start
+        if (range.0 as usize) < bytes.len()
+            && bytes[range.0 as usize] == b'['
+            && let Some(bracket_pos) = tsv_lang::source_scan::find_char_skipping_comments(
+                bytes,
+                range.0 as usize + 1,
+                range.1 as usize,
+                b']',
+            )
+        {
+            range.1 = (bracket_pos + 1) as u32;
+        }
+    }
     ranges
 }
+
+/// Marker bit for mapped type name-to-in ranges (encoded in the start field).
+/// Uses bit 31 of u32 — valid source positions are well below 2^31.
+const MAPPED_TYPE_MARKER: u32 = 1 << 31;
 
 /// Build a comment list with acorn-typescript duplicates for type re-parse ranges.
 ///
@@ -94,8 +156,8 @@ fn collect_ranges_from_statement(stmt: &internal::Statement, ranges: &mut Vec<(u
             }
         }
         Statement::TSInterfaceDeclaration(decl) => {
-            // Interface bodies do NOT cause comment duplication in acorn-typescript
-            // (unlike type literals and mapped types)
+            // Interface bodies themselves do NOT cause comment duplication
+            // (unlike type literals and mapped types), but individual members may
             let body = &decl.body;
             for member in &body.body {
                 collect_ranges_from_type_element(member, ranges);
@@ -471,6 +533,12 @@ fn collect_ranges_from_expression(expr: &internal::Expression, ranges: &mut Vec<
             }
         }
         Expression::TSTypeAssertion(t) => {
+            // Angle bracket type assertion `<T>expr` causes acorn to backtrack:
+            // acorn first tries `<` as less-than operator, then recognizes type assertion.
+            // Comments between `<` and the type are duplicated during reparse.
+            let angle_start = t.span.start;
+            let type_start = t.type_annotation.span().start;
+            ranges.push((angle_start, type_start));
             collect_ranges_from_type(&t.type_annotation, ranges);
             collect_ranges_from_expression(&t.expression, ranges);
         }
@@ -609,8 +677,16 @@ fn collect_ranges_from_type(ty: &internal::TSType, ranges: &mut Vec<(u32, u32)>)
             }
         }
         TSType::Mapped(mapped) => {
-            // Mapped type body: comments between `{` and the type parameter are duplicated
-            ranges.push((mapped.span.start, mapped.type_parameter.span.start));
+            // Mapped type duplication: acorn duplicates all comments from `{` up to (but not
+            // including) the `in` keyword. This covers comments between `{[` and the param name
+            // AND comments between the param name and `in`. We encode this with
+            // MAPPED_TYPE_MARKER for post-processing where the source string is available.
+            let name_end =
+                mapped.type_parameter.span.start + mapped.type_parameter.name.len() as u32;
+            let constraint_start = mapped.type_parameter.constraint.span().start;
+            // Encode: (mapped_start | MARKER, name_end), constraint_start as next entry
+            ranges.push((mapped.span.start | MAPPED_TYPE_MARKER, name_end));
+            ranges.push((constraint_start | MAPPED_TYPE_MARKER, 0));
             // Recurse into the mapped type's parts
             collect_ranges_from_type(&mapped.type_parameter.constraint, ranges);
             if let Some(name_type) = &mapped.name_type {
@@ -622,11 +698,12 @@ fn collect_ranges_from_type(ty: &internal::TSType, ranges: &mut Vec<(u32, u32)>)
         }
         TSType::Function(func) => {
             // Function types with untyped params cause duplication when acorn backtracks
-            // from parenthesized expression to function type. Only duplicate when NO
-            // param has a type annotation (if any param is typed, acorn recognizes
-            // the function type immediately without backtracking).
+            // from parenthesized expression to function type. Only duplicate when there
+            // ARE params and NO param has a type annotation (if any param is typed, acorn
+            // recognizes the function type immediately without backtracking).
+            // Zero params `() =>` never cause backtracking — empty parens are unambiguous.
             let any_param_typed = func.params.iter().any(expr_has_type_annotation);
-            if !any_param_typed {
+            if !func.params.is_empty() && !any_param_typed {
                 ranges.push((func.span.start, func.span.end));
             }
             // Recurse into nested types
@@ -738,6 +815,14 @@ fn collect_ranges_from_type_element(elem: &internal::TSTypeElement, ranges: &mut
             }
         }
         TSTypeElement::MethodSignature(m) => {
+            // Computed plain method signatures cause re-parsing in acorn-typescript:
+            // acorn first tries to parse `[expr]` as a computed property, then backtracks
+            // when it sees `(` and reparses as a method. This duplicates comments within
+            // the computed key brackets. Getters/setters are identified by keyword early,
+            // so no backtrack occurs. Non-computed methods don't have bracket comments.
+            if m.computed && m.kind == internal::MethodKind::Method {
+                ranges.push((m.span.start, m.span.end));
+            }
             for param in &m.params {
                 collect_ranges_from_expression(param, ranges);
             }
@@ -771,8 +856,15 @@ fn collect_ranges_from_type_element(elem: &internal::TSTypeElement, ranges: &mut
             }
         }
         TSTypeElement::IndexSignature(sig) => {
+            // Index signature parameters cause partial reparse: acorn-typescript first tries
+            // [expr] as a computed property, then backtracks when it recognizes the index
+            // signature pattern. Comments between the param name and the colon are duplicated,
+            // but comments between the colon and the type are NOT (acorn recognizes the
+            // index signature at the colon and doesn't reparse the type region).
             for param in &sig.parameters {
                 if let Some(ta) = &param.type_annotation {
+                    // Range covers param name to colon only (not the full type annotation)
+                    ranges.push((param.span.start, ta.span.start));
                     collect_ranges_from_type(&ta.type_annotation, ranges);
                 }
             }

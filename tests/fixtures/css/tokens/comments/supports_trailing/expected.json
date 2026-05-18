@@ -10,7 +10,7 @@
 				"start": 33,
 				"end": 105,
 				"name": "supports",
-				"prelude": "(display: grid) /* trailing */",
+				"prelude": "(display: grid)",
 				"block": {
 					"type": "Block",
 					"start": 74,
@@ -71,7 +71,7 @@
 				"start": 131,
 				"end": 218,
 				"name": "supports",
-				"prelude": "(display: grid) and (flex: 1) /* trailing */",
+				"prelude": "(display: grid) and (flex: 1)",
 				"block": {
 					"type": "Block",
 					"start": 186,

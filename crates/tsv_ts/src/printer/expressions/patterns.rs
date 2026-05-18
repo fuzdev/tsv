@@ -11,6 +11,7 @@ use smallvec::SmallVec;
 
 use super::{PatternContext, Printer, object_pattern_should_expand};
 use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
+use crate::printer::CommentSpacing;
 use tsv_lang::Comment;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
@@ -110,12 +111,14 @@ impl<'a> Printer<'a> {
         let rhs_comment_start = assign.left.span().end;
         let rhs_comment_end = assign.right.span().start;
 
-        // When JSDoc cast parens are stripped, 2+ block comments may end up
-        // after the operator even though prettier places the first one before it.
-        // Detect and promote the first comment to the LHS.
-        let (left_doc, effective_rhs_start) = if let Some((promoted, new_start)) =
-            self.promote_block_comment_before_eq(rhs_comment_start, rhs_comment_end)
-        {
+        // Promote comments that appear before the operator to the LHS.
+        // e.g., `a /* comment */ = b` → comment stays before `=`, not after.
+        let (left_doc, effective_rhs_start) = if let Some((promoted, new_start)) = self
+            .promote_comments_before_operator(
+                rhs_comment_start,
+                rhs_comment_end,
+                assign.operator.as_str(),
+            ) {
             (d.concat(&[left_doc, promoted]), new_start)
         } else {
             (left_doc, rhs_comment_start)
@@ -143,6 +146,7 @@ impl<'a> Printer<'a> {
                     false,
                     rhs_comments,
                     rhs_has_line_comment,
+                    Some(assign.span.end),
                 );
             }
         }
@@ -160,6 +164,7 @@ impl<'a> Printer<'a> {
                 false,
                 rhs_comments,
                 rhs_has_line_comment,
+                Some(assign.span.end),
             );
         }
 
@@ -168,7 +173,7 @@ impl<'a> Printer<'a> {
         {
             self.build_assignment_doc_with_context(rhs_assign, AssignmentContext::Chain)
         } else {
-            self.build_expression_doc(&assign.right)
+            self.build_expression_doc_with_paren_comments(&assign.right, assign.span.end)
         };
 
         // Prepend inline comments to right doc if present
@@ -571,17 +576,24 @@ impl<'a> Printer<'a> {
                     };
 
                     if let Some(rhs) = default_rhs {
-                        // Shorthand with default: `{k = /* comment */ 1}`
-                        let comments = self.build_inline_comments_between_doc_trailing_space(
-                            p.key.span().end,
-                            rhs.span().start,
-                        );
-                        d.concat(&[
-                            self.build_expression_doc(&p.key),
-                            d.text(" = "),
-                            comments,
-                            self.build_expression_doc(rhs),
-                        ])
+                        // Shorthand with default: `{k /* c */ = 1}`
+                        let key_end = p.key.span().end;
+                        let rhs_start = rhs.span().start;
+                        let eq_pos = self.find_equals_position(key_end, rhs_start);
+                        let mut parts = vec![self.build_expression_doc(&p.key)];
+                        // Comments before `=` stay before `=`
+                        if self.has_comments_between(key_end, eq_pos) {
+                            parts.push(self.build_inline_comments_between_doc(key_end, eq_pos));
+                        }
+                        parts.push(d.text(" = "));
+                        // Comments after `=` stay after `=`
+                        if let Some(comment_doc) =
+                            self.build_rhs_comments_opt(eq_pos + 1, rhs_start)
+                        {
+                            parts.push(comment_doc);
+                        }
+                        parts.push(self.build_expression_doc(rhs));
+                        d.concat(&parts)
                     } else {
                         // Simple shorthand: `{k}`
                         self.build_expression_doc(&p.key)
@@ -589,23 +601,43 @@ impl<'a> Printer<'a> {
                 } else {
                     // Handle computed keys: {[key]: value}
                     // For regular keys, use property_key_doc to normalize string keys to identifiers
+                    let key_region_end;
                     let key_doc = if p.computed {
-                        d.brackets(self.build_expression_doc(&p.key))
+                        let inner = self.build_expression_doc(&p.key);
+                        let (doc, end) =
+                            self.build_computed_key_bracket_doc(p.span.start, &p.key, inner);
+                        key_region_end = end;
+                        doc
                     } else {
+                        key_region_end = p.key.span().end;
                         self.build_property_key_doc(&p.key)
                     };
-                    // Check for comments between `:` and the value
-                    // e.g., `{l: /* comment */ m}`
-                    let key_end = p.key.span().end;
+                    // Comments between key and value, split at `:`
+                    // e.g., `{[x] /* c1 */: /* c2 */ a}` → before `:` and after `:`
                     let value_start = p.value.span().start;
-                    let comments =
-                        self.build_inline_comments_between_doc_trailing_space(key_end, value_start);
-                    d.concat(&[
-                        key_doc,
-                        d.text(": "),
-                        comments,
-                        self.build_expression_doc(&p.value),
-                    ])
+                    #[allow(clippy::expect_used)]
+                    // Parser guarantees `:` exists in destructuring property
+                    let colon_pos = super::super::analysis::find_char_skipping_comments(
+                        self.source.as_bytes(),
+                        key_region_end as usize,
+                        value_start as usize,
+                        b':',
+                    )
+                    .expect(": not found in destructuring property")
+                        as u32;
+                    let pre_colon_comments =
+                        self.build_inline_comments_between_doc(key_region_end, colon_pos);
+                    let mut parts = vec![key_doc, pre_colon_comments];
+                    parts.push(d.text(": "));
+                    // Comments after `:`
+                    let after_colon_comments = self
+                        .build_inline_comments_between_doc_trailing_space(
+                            colon_pos + 1,
+                            value_start,
+                        );
+                    parts.push(after_colon_comments);
+                    parts.push(self.build_expression_doc(&p.value));
+                    d.concat(&parts)
                 }
             }
             ObjectPatternProperty::RestElement(r) => self.build_rest_element_doc(r),
@@ -618,10 +650,11 @@ impl<'a> Printer<'a> {
             return self.build_empty_array_pattern_doc(arr);
         }
 
-        // Check if we need to expand due to line comments
+        // Check if we need to expand due to line comments or own-line block comments
         let has_line_comments = self.array_pattern_has_line_comments(arr);
+        let has_own_line_block = self.array_pattern_has_own_line_block_comments(arr);
 
-        if has_line_comments {
+        if has_line_comments || has_own_line_block {
             self.build_expanded_array_pattern_doc(arr)
         } else {
             self.build_grouped_array_pattern_doc(arr)
@@ -660,6 +693,23 @@ impl<'a> Printer<'a> {
             elem.span()
         })
         .0 // Return just the has_line_comments flag
+    }
+
+    /// Check if array pattern has any own-line single-line block comments
+    fn array_pattern_has_own_line_block_comments(&self, arr: &internal::ArrayPattern) -> bool {
+        let boundary = arr
+            .type_annotation
+            .as_ref()
+            .map_or(arr.span.end, |t| t.span.start);
+
+        let span = tsv_lang::Span::new(arr.span.start, boundary);
+
+        // Collect non-hole element spans for boundary checking
+        let non_null_elements: Vec<_> = arr.elements.iter().flatten().collect();
+
+        self.has_own_line_block_comments_in_bracket_list(span, &non_null_elements, |elem| {
+            elem.span()
+        })
     }
 
     /// Build grouped array pattern doc (width-based expansion)
@@ -828,11 +878,18 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let left_doc = self.build_expression_doc(&pattern.left);
 
-        // Extract inline block comments between `=` and the default value expression
-        // (e.g., `a = /** @type {T} */ (expr)` — the JSDoc type cast comment)
         let left_end = pattern.left.span().end;
         let rhs_start = pattern.right.span().start;
-        let inline_comments = self.build_rhs_comments_opt(left_end, rhs_start);
+        let eq_pos = self.find_equals_position(left_end, rhs_start);
+
+        // Comments before `=` stay before `=` (e.g., `{a /* c */ = 1}`)
+        let mut parts = vec![left_doc];
+        if self.has_comments_between(left_end, eq_pos) {
+            parts.push(self.build_inline_comments_between_doc(left_end, eq_pos));
+        }
+
+        // Comments after `=` stay after `=`
+        let inline_comments = self.build_rhs_comments_opt(eq_pos + 1, rhs_start);
 
         let rhs_doc = self.build_expression_doc(&pattern.right);
         let value_doc = if let Some(comments_doc) = inline_comments {
@@ -841,13 +898,24 @@ impl<'a> Printer<'a> {
             rhs_doc
         };
 
-        d.concat(&[left_doc, d.text(" = "), value_doc])
+        parts.push(d.text(" = "));
+        parts.push(value_doc);
+        d.concat(&parts)
     }
 
     /// Build a Doc for a rest element
     pub(super) fn build_rest_element_doc(&self, rest: &internal::RestElement) -> DocId {
         let d = self.d();
-        let mut parts = vec![d.text("..."), self.build_expression_doc(&rest.argument)];
+        // Comments between `...` and the argument (e.g., `.../* c */ args`)
+        let dots_end = rest.span.start + 3; // "...".len()
+        let arg_start = rest.argument.span().start;
+        let comments_doc =
+            self.build_comments_between(dots_end, arg_start, CommentSpacing::Trailing);
+        let mut parts = vec![
+            d.text("..."),
+            comments_doc,
+            self.build_expression_doc(&rest.argument),
+        ];
         if let Some(ta) = &rest.type_annotation {
             parts.push(self.build_type_annotation_doc(ta));
         }

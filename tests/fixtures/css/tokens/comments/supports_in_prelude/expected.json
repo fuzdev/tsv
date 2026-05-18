@@ -10,7 +10,7 @@
 				"start": 9,
 				"end": 83,
 				"name": "supports",
-				"prelude": "(display: /* comment */ grid)",
+				"prelude": "(display:  grid)",
 				"block": {
 					"type": "Block",
 					"start": 49,

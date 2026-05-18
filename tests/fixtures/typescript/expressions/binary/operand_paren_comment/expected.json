@@ -1,0 +1,1091 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 498,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " LHS leading block comment in stripped parens",
+			"start": 10,
+			"end": 57,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 70,
+			"end": 77,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 12
+				},
+				"end": {
+					"line": 3,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 97,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 12
+				},
+				"end": {
+					"line": 4,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " LHS trailing block comment in stripped parens",
+			"start": 115,
+			"end": 163,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 49
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 178,
+			"end": 185,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 14
+				},
+				"end": {
+					"line": 7,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 205,
+			"end": 212,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 14
+				},
+				"end": {
+					"line": 8,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " RHS leading block comment in stripped parens",
+			"start": 221,
+			"end": 268,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 285,
+			"end": 292,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 16
+				},
+				"end": {
+					"line": 11,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 313,
+			"end": 320,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 17
+				},
+				"end": {
+					"line": 12,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " LHS leading line comment in stripped parens (multiline)",
+			"start": 326,
+			"end": 384,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 399,
+			"end": 403,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Statement-level: LHS leading block in stripped parens",
+			"start": 415,
+			"end": 471,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 473,
+			"end": 480,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 8
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 497,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 488,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 59,
+					"end": 84,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 26
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 65,
+							"end": 83,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 25
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 65,
+								"end": 67,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 9
+									}
+								},
+								"name": "a1"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 78,
+								"end": 83,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 20
+									},
+									"end": {
+										"line": 3,
+										"column": 25
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 78,
+									"end": 79,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 20
+										},
+										"end": {
+											"line": 3,
+											"column": 21
+										}
+									},
+									"name": "x"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 82,
+									"end": 83,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 24
+										},
+										"end": {
+											"line": 3,
+											"column": 25
+										}
+									},
+									"name": "y"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 70,
+										"end": 77
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " LHS leading block comment in stripped parens",
+							"start": 10,
+							"end": 57
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 86,
+					"end": 112,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 27
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 92,
+							"end": 111,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 26
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 92,
+								"end": 94,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 9
+									}
+								},
+								"name": "a2"
+							},
+							"init": {
+								"type": "LogicalExpression",
+								"start": 105,
+								"end": 111,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 20
+									},
+									"end": {
+										"line": 4,
+										"column": 26
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 105,
+									"end": 106,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 20
+										},
+										"end": {
+											"line": 4,
+											"column": 21
+										}
+									},
+									"name": "x"
+								},
+								"operator": "&&",
+								"right": {
+									"type": "Identifier",
+									"start": 110,
+									"end": 111,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 25
+										},
+										"end": {
+											"line": 4,
+											"column": 26
+										}
+									},
+									"name": "y"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 97,
+										"end": 104
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 165,
+					"end": 190,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 26
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 171,
+							"end": 189,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 25
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 171,
+								"end": 173,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 9
+									}
+								},
+								"name": "b1"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 176,
+								"end": 189,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 12
+									},
+									"end": {
+										"line": 7,
+										"column": 25
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 176,
+									"end": 177,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 12
+										},
+										"end": {
+											"line": 7,
+											"column": 13
+										}
+									},
+									"name": "x",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 178,
+											"end": 185
+										}
+									]
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 188,
+									"end": 189,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 24
+										},
+										"end": {
+											"line": 7,
+											"column": 25
+										}
+									},
+									"name": "y"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " LHS trailing block comment in stripped parens",
+							"start": 115,
+							"end": 163
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 192,
+					"end": 218,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 27
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 198,
+							"end": 217,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 26
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 198,
+								"end": 200,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 9
+									}
+								},
+								"name": "b2"
+							},
+							"init": {
+								"type": "LogicalExpression",
+								"start": 203,
+								"end": 217,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 12
+									},
+									"end": {
+										"line": 8,
+										"column": 26
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 203,
+									"end": 204,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 12
+										},
+										"end": {
+											"line": 8,
+											"column": 13
+										}
+									},
+									"name": "x",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 205,
+											"end": 212
+										}
+									]
+								},
+								"operator": "&&",
+								"right": {
+									"type": "Identifier",
+									"start": 216,
+									"end": 217,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 25
+										},
+										"end": {
+											"line": 8,
+											"column": 26
+										}
+									},
+									"name": "y"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 270,
+					"end": 295,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 26
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 276,
+							"end": 294,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 25
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 276,
+								"end": 278,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 9
+									}
+								},
+								"name": "c1"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 281,
+								"end": 294,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 12
+									},
+									"end": {
+										"line": 11,
+										"column": 25
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 281,
+									"end": 282,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 12
+										},
+										"end": {
+											"line": 11,
+											"column": 13
+										}
+									},
+									"name": "x"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 293,
+									"end": 294,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 24
+										},
+										"end": {
+											"line": 11,
+											"column": 25
+										}
+									},
+									"name": "y",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 285,
+											"end": 292
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " RHS leading block comment in stripped parens",
+							"start": 221,
+							"end": 268
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 297,
+					"end": 323,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 27
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 303,
+							"end": 322,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 26
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 303,
+								"end": 305,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 9
+									}
+								},
+								"name": "c2"
+							},
+							"init": {
+								"type": "LogicalExpression",
+								"start": 308,
+								"end": 322,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 12
+									},
+									"end": {
+										"line": 12,
+										"column": 26
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 308,
+									"end": 309,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 12
+										},
+										"end": {
+											"line": 12,
+											"column": 13
+										}
+									},
+									"name": "x"
+								},
+								"operator": "&&",
+								"right": {
+									"type": "Identifier",
+									"start": 321,
+									"end": 322,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 25
+										},
+										"end": {
+											"line": 12,
+											"column": 26
+										}
+									},
+									"name": "y",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 313,
+											"end": 320
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 386,
+					"end": 412,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 392,
+							"end": 411,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 17,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 392,
+								"end": 394,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 9
+									}
+								},
+								"name": "d1"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 406,
+								"end": 411,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 7
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 406,
+									"end": 407,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 2
+										},
+										"end": {
+											"line": 17,
+											"column": 3
+										}
+									},
+									"name": "x"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 410,
+									"end": 411,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 6
+										},
+										"end": {
+											"line": 17,
+											"column": 7
+										}
+									},
+									"name": "y"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 399,
+										"end": 403
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " LHS leading line comment in stripped parens (multiline)",
+							"start": 326,
+							"end": 384
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 481,
+					"end": 487,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 9
+						},
+						"end": {
+							"line": 20,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 481,
+						"end": 486,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 9
+							},
+							"end": {
+								"line": 20,
+								"column": 14
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 481,
+							"end": 482,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 9
+								},
+								"end": {
+									"line": 20,
+									"column": 10
+								}
+							},
+							"name": "x"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 485,
+							"end": 486,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 13
+								},
+								"end": {
+									"line": 20,
+									"column": 14
+								}
+							},
+							"name": "y"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Statement-level: LHS leading block in stripped parens",
+							"start": 415,
+							"end": 471
+						},
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 473,
+							"end": 480
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

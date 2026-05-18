@@ -11,6 +11,7 @@ use super::calls::{
     prepend_arrow_body_comments, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
     wrap_call_with_will_break_guard,
 };
+use super::comments::{CommentFilter, CommentSpacing};
 use super::utils::{
     arrow_has_trailing_param_comments, is_array_or_object_unwrapped, is_block_function,
     is_concise_numeric_array, is_function_composition_args, is_short_second_arg_for_expand_first,
@@ -67,21 +68,65 @@ impl<'a> Printer<'a> {
             .as_ref()
             .map(|ta| self.build_type_parameter_instantiation_doc(ta));
 
-        // Empty args: just `new Foo()` or `new Foo<K, V>()`
-        if new_expr.arguments.is_empty() {
-            let mut parts = vec![d.text("new "), callee];
-            if let Some(ta_doc) = type_args_doc {
-                parts.push(ta_doc);
+        // Combine callee with type arguments, preserving comments in the gap
+        // e.g., `new Foo/* c */ <string>()` — comment between callee and `<`
+        // Uses build_name_to_type_params_comments for safe line comment handling
+        let callee_with_types_base = match (&type_args_doc, &new_expr.type_arguments) {
+            (Some(ta_doc), Some(ta)) => {
+                match self.build_name_to_type_params_comments_opt(
+                    new_expr.callee.span().end,
+                    ta.span.start,
+                    CommentSpacing::Trailing,
+                ) {
+                    Some(comments_doc) => d.concat(&[callee, comments_doc, *ta_doc]),
+                    None => d.concat(&[callee, *ta_doc]),
+                }
             }
-            parts.push(d.text("()"));
+            (Some(ta_doc), _) => d.concat(&[callee, *ta_doc]),
+            _ => callee,
+        };
+
+        // Empty args: just `new Foo()` or `new Foo<K, V>()`, preserving dangling comments
+        if new_expr.arguments.is_empty() {
+            let after_type_args = new_expr
+                .type_arguments
+                .as_ref()
+                .map_or_else(|| new_expr.callee.span().end, |ta| ta.span.end);
+            let paren_close = new_expr.span.end;
+            // Find the actual `(` to separate pre-paren comments from inside-paren comments
+            let actual_paren = self.find_char_outside_comments(after_type_args, paren_close, b'(');
+            let mut parts = vec![d.text("new "), callee_with_types_base];
+            if let Some(paren_pos) = actual_paren {
+                let pre_paren_comments = self.build_comments_between_filtered_opt(
+                    after_type_args,
+                    paren_pos,
+                    CommentSpacing::Leading,
+                    CommentFilter::All,
+                );
+                let inside_paren_comments = self
+                    .build_inline_comments_between_doc_no_leading_space_opt(
+                        paren_pos + 1,
+                        paren_close,
+                    );
+                if let Some(pre) = pre_paren_comments {
+                    parts.push(pre);
+                }
+                match inside_paren_comments {
+                    Some(inner) => {
+                        parts.push(d.text("("));
+                        parts.push(inner);
+                        parts.push(d.text(")"));
+                    }
+                    None => parts.push(d.text("()")),
+                }
+            } else {
+                parts.push(d.text("()"));
+            }
             return d.concat(&parts);
         }
 
         // Build callee with type args: `new Foo<K, V>`
-        let callee_with_types = match type_args_doc {
-            Some(ta_doc) => d.concat(&[d.text("new "), callee, ta_doc]),
-            None => d.concat(&[d.text("new "), callee]),
-        };
+        let callee_with_types = d.concat(&[d.text("new "), callee_with_types_base]);
 
         // Single huggable argument: object literal or function
         // These stay on the same line as the opening paren: `new Cls({...})` not `new Cls(\n{...})`
@@ -553,12 +598,48 @@ impl<'a> Printer<'a> {
 
             // Add trailing block comment to last arg
             let last_arg = &new_expr.arguments[last_idx];
+            let mut effective_arg_end = last_arg.span().end;
+
+            // For spread elements, also check inside the spread span
+            if let internal::Expression::SpreadElement(spread) = last_arg
+                && self.has_comments_between(spread.argument.span().end, spread.span.end)
+            {
+                effective_arg_end = spread.argument.span().end;
+            }
+
             let pc = PartitionedComments::new(
                 self.comments,
                 self.line_breaks,
-                last_arg.span().end,
+                effective_arg_end,
                 new_expr.span.end,
             );
+
+            // Own-line block comments after the last arg (before closing paren).
+            // These appear as siblings after the trailing comma, forcing expansion.
+            let leading_block: Vec<_> = pc.leading.iter().filter(|c| c.is_block).collect();
+            if !leading_block.is_empty()
+                && let Some(last_doc) = arg_docs.pop()
+            {
+                let mut last_parts = vec![last_doc, d.text(",")];
+                for comment in &leading_block {
+                    last_parts.push(d.hardline());
+                    last_parts.push(self.build_comment_doc(comment));
+                }
+                arg_docs.push(d.concat(&last_parts));
+
+                let arg_parts = if new_expr.arguments.len() > 1 {
+                    d.join_doc(arg_docs, d.comma_hardline())
+                } else {
+                    d.concat(&arg_docs)
+                };
+                return d.concat(&[
+                    callee_with_types,
+                    d.text("("),
+                    d.indent(d.concat(&[d.hardline(), arg_parts])),
+                    d.hardline(),
+                    d.text(")"),
+                ]);
+            }
 
             if let Some(last_doc) = arg_docs.pop() {
                 let mut last_with_comment = vec![last_doc];

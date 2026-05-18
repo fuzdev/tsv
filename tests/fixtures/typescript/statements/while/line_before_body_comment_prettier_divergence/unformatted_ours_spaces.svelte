@@ -1,5 +1,5 @@
 <script>
-	// Trailing comment after ) - we preserve, prettier moves inside
+	// Trailing comment after ) - preserved, prettier absorbs into block
 	while  (  a  )   // trailing
 	{
 
@@ -7,7 +7,7 @@
 
 	}
 
-	// Own-line comment before { (no blank line)
+	// Own-line comment before { - preserved on own line
 	while  (
 		a
 	)
@@ -18,7 +18,7 @@
 
 	}
 
-	// Own-line comment before { (with blank line - preserved)
+	// Blank line before comment - blank line preserved
 	while  (  a  )
 
 

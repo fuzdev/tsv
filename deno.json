@@ -2,20 +2,25 @@
 	"tasks": {
 		"build": "cargo build --workspace",
 		"build:release": "cargo build --workspace --release",
-		"build:all": "deno task build:release && deno task build:ffi && deno task build:napi && deno task build:wasm",
+		"build:all": "deno task build:release && deno task build:ffi && deno task build:napi && deno task build:wasm && deno task build:wasm:parse",
 		"build:ffi": "cargo build -p tsv_ffi --release",
 		"build:napi": "cargo build -p tsv_napi --release",
 		"build:wasm": "deno task build:wasm:deno && deno task build:wasm:web && deno task build:wasm:node",
 		"build:wasm:deno": "wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/deno",
 		"build:wasm:web": "wasm-pack build crates/tsv_wasm --target web --release --out-dir pkg/web",
 		"build:wasm:node": "wasm-pack build crates/tsv_wasm --target nodejs --release --out-dir pkg/node",
+		"build:wasm:parse": "deno task build:wasm:parse:deno && deno task build:wasm:parse:web && deno task build:wasm:parse:node",
+		"build:wasm:parse:deno": "wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/deno-parse -- --features ast",
+		"build:wasm:parse:web": "wasm-pack build crates/tsv_wasm --target web --release --out-dir pkg/web-parse -- --features ast",
+		"build:wasm:parse:node": "wasm-pack build crates/tsv_wasm --target nodejs --release --out-dir pkg/node-parse -- --features ast",
 		"clean": "cargo clean",
 
 		"dev": "cargo watch -x 'check --workspace' -x 'test --workspace' || echo '⚠️  cargo-watch not installed. Run: cargo install cargo-watch'",
 		"typecheck": "cargo check --workspace",
 		"test": "cargo test --workspace",
 		"lint": "cargo clippy --workspace",
-		"check": "deno task typecheck && deno task test && deno task lint && deno fmt --check",
+		"check": "deno task typecheck && deno task test && deno task lint && deno fmt --check && deno task check:ast-types",
+		"check:ast-types": "deno run --allow-read --allow-write=scripts --allow-run=cargo,deno scripts/check_ast_types.ts",
 		"format": "cargo fmt && deno fmt",
 
 		"fixture:init": "cargo run -p tsv_debug --quiet fixture_init",
@@ -26,11 +31,12 @@
 		"fixtures:update:formatted": "cargo run -p tsv_debug --quiet fixtures_update_formatted",
 		"fixtures:audit": "cargo run -p tsv_debug --quiet fixtures_audit",
 
-		"bench": "deno task build:ffi && deno task build:wasm:deno && deno task bench:run",
+		"bench": "deno task build:ffi && deno task build:wasm:deno && deno task build:wasm:parse:deno && deno task bench:run",
 		"bench:run": "deno run --v8-flags=--expose-gc --allow-ffi --allow-read --allow-write=benches/deno/results,benches/deno/baseline.json --allow-run=git --allow-env --allow-net --allow-sys benches/deno/bench.ts",
+		"smoke": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/smoke.ts",
 
 		"build:ffi:corpus": "cargo build -p tsv_ffi --profile corpus",
-		"corpus:compare": "deno task build:ffi:corpus && deno task corpus:compare:run",
+		"corpus:compare": "deno task build:ffi:corpus && TSV_FFI_PROFILE=corpus deno task corpus:compare:run",
 		"corpus:compare:run": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/corpus_compare.ts",
 
 		"metrics": "cargo run -p tsv_debug --quiet metrics",
@@ -39,11 +45,12 @@
 
 		"test:divergence": "deno test --config benches/deno/deno.json benches/deno/lib/divergence/patterns_test.ts",
 
-		"publish:jsr:sync-version": "deno run --allow-read --allow-write=crates/tsv_wasm/jsr.json scripts/publish_sync_version.ts",
-		"publish:npm:build": "wasm-pack build crates/tsv_wasm --target bundler --release --scope fuzdev --out-dir pkg/npm && cp LICENSE crates/tsv_wasm/pkg/npm/LICENSE && deno run --allow-read --allow-write=crates/tsv_wasm/pkg/npm/package.json scripts/publish_patch_npm.ts",
-		"publish:npm": "deno task publish:npm:build && cd crates/tsv_wasm/pkg/npm && npm publish --access public",
-		"publish:jsr": "deno task publish:jsr:sync-version && deno task build:wasm:deno && cd crates/tsv_wasm && deno publish",
-		"publish": "deno task publish:npm && deno task publish:jsr"
+		"publish:npm:build:fmt": "wasm-pack build crates/tsv_wasm --target bundler --release --scope fuzdev --out-dir pkg/npm-fmt && deno run --allow-read --allow-write=crates/tsv_wasm/pkg/npm-fmt --allow-run=gzip scripts/publish_patch_npm.ts fmt",
+		"publish:npm:build:parse": "wasm-pack build crates/tsv_wasm --target bundler --release --scope fuzdev --out-dir pkg/npm-parse -- --features ast && deno run --allow-read --allow-write=crates/tsv_wasm/pkg/npm-parse --allow-run=gzip scripts/publish_patch_npm.ts parse",
+		"publish:npm:build": "deno task publish:npm:build:fmt && deno task publish:npm:build:parse",
+		"publish:npm:fmt": "deno task publish:npm:build:fmt && cd crates/tsv_wasm/pkg/npm-fmt && npm publish --access public",
+		"publish:npm:parse": "deno task publish:npm:build:parse && cd crates/tsv_wasm/pkg/npm-parse && npm publish --access public",
+		"publish:npm": "deno task publish:npm:fmt && deno task publish:npm:parse"
 	},
 	"fmt": {
 		"useTabs": true,

@@ -1,6 +1,9 @@
 //! Helpers for managing test fixtures
 
+pub mod audit_signature;
 pub mod validation;
+
+pub use audit_signature::{AUDIT_SIGNATURE_FILENAME, AuditSignature};
 
 use crate::deno::PrettierParser;
 use std::fs;
@@ -112,6 +115,14 @@ impl Fixture {
             .is_some_and(has_svelte_divergence_suffix)
     }
 
+    /// Check if this fixture is in a prettier divergence directory
+    pub fn is_prettier_divergence(&self) -> bool {
+        self.path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(has_prettier_divergence_suffix)
+    }
+
     /// Get the output_prettier filename (e.g., "output_prettier.svelte")
     pub fn output_prettier_filename(&self) -> &'static str {
         match self.input_type() {
@@ -125,6 +136,11 @@ impl Fixture {
     /// Get the full path to output_prettier file (with correct extension for input type)
     pub fn output_prettier_path(&self) -> PathBuf {
         self.path.join(self.output_prettier_filename())
+    }
+
+    /// Get the full path to audit_signature.txt (sibling of output_prettier.*)
+    pub fn audit_signature_path(&self) -> PathBuf {
+        self.path.join(AUDIT_SIGNATURE_FILENAME)
     }
 
     /// Check if this fixture matches any of the given filter terms
@@ -419,6 +435,40 @@ pub fn discover_prettier_intermediate_variants(fixture_dir: &Path, ext: &str) ->
         for entry in entries.flatten() {
             if let Some(filename) = entry.file_name().to_str()
                 && filename.starts_with("prettier_intermediate_")
+                && !filename.starts_with("prettier_intermediate_to_variant_")
+                && filename.ends_with(ext)
+            {
+                variants.push(filename.to_string());
+            }
+        }
+    }
+
+    variants.sort();
+    variants
+}
+
+/// Discover prettier_intermediate_to_variant_* files in a fixture directory
+///
+/// These files capture Prettier's unstable intermediate output from `unformatted_ours_*` files
+/// when the second pass converges to a documented `variant_*`/`prettier_variant_*` file
+/// rather than to `input`.
+///
+/// Validation rules (N7b):
+/// 1. `prettier(unformatted_ours_X) == prettier_intermediate_to_variant_X` (captures first-pass output)
+/// 2. `prettier(prettier_intermediate_to_variant_X) != prettier_intermediate_to_variant_X` (verifies it's unstable)
+/// 3. `prettier(prettier_intermediate_to_variant_X) ∈ {variant_*, prettier_variant_*}` content
+///
+/// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
+pub fn discover_prettier_intermediate_to_variant_variants(
+    fixture_dir: &Path,
+    ext: &str,
+) -> Vec<String> {
+    let mut variants = Vec::new();
+
+    if let Ok(entries) = fs::read_dir(fixture_dir) {
+        for entry in entries.flatten() {
+            if let Some(filename) = entry.file_name().to_str()
+                && filename.starts_with("prettier_intermediate_to_variant_")
                 && filename.ends_with(ext)
             {
                 variants.push(filename.to_string());
@@ -494,7 +544,7 @@ pub fn discover_unknown_files(fixture: &Fixture) -> Vec<String> {
 
 /// Check if a filename is a known fixture file pattern
 fn is_known_fixture_file(filename: &str, input_ext: &str) -> bool {
-    // Static files (input, expected, output_prettier, README)
+    // Static files (input, expected, output_prettier, README, audit_signature)
     if matches!(
         filename,
         "input.svelte"
@@ -509,6 +559,7 @@ fn is_known_fixture_file(filename: &str, input_ext: &str) -> bool {
             | "output_prettier.ts"
             | "output_prettier.css"
             | "README.md"
+            | AUDIT_SIGNATURE_FILENAME
     ) {
         return true;
     }
@@ -737,6 +788,19 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         // (see validate_formatter_prettier function)
     }
 
+    // audit_signature.txt is only meaningful alongside output_prettier.*
+    // (it captures prettier's chain from there). Reject orphans.
+    let audit_signature_path = fixture.audit_signature_path();
+    if audit_signature_path.exists() && !output_prettier_path.exists() {
+        return Err(format!(
+            "{AUDIT_SIGNATURE_FILENAME} exists without {output_prettier_filename}.\n\
+            The audit signature pins prettier's multi-pass chain anchored at output_prettier.*\n\
+            and only applies when that file exists. Either:\n\
+            - Generate {output_prettier_filename} (run: deno task fixtures:update:formatted), or\n\
+            - Delete {AUDIT_SIGNATURE_FILENAME} if no longer relevant."
+        ));
+    }
+
     // Check unformatted_* variants are not identical to input
     let unformatted_variants = discover_unformatted_variants(fixture_dir, input_ext);
     for variant_name in &unformatted_variants {
@@ -823,13 +887,20 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         discover_prettier_intermediate_variants(fixture_dir, input_ext);
     let has_prettier_intermediate_files = !prettier_intermediate_variants.is_empty();
 
+    // Discover prettier_intermediate_to_variant_* variants (needed for S8 validation)
+    let prettier_intermediate_to_variant_variants =
+        discover_prettier_intermediate_to_variant_variants(fixture_dir, input_ext);
+    let has_prettier_intermediate_to_variant_files =
+        !prettier_intermediate_to_variant_variants.is_empty();
+
     // Prettier divergence suffix is required when ANY prettier divergence files exist
     let needs_prettier_divergence_suffix = has_output_prettier
         || has_prettier_variant_files
         || has_variant_files
         || !unformatted_ours_variants.is_empty()
         || !unformatted_prettier_variants.is_empty()
-        || has_prettier_intermediate_files;
+        || has_prettier_intermediate_files
+        || has_prettier_intermediate_to_variant_files;
 
     if needs_prettier_divergence_suffix && !is_prettier_divergence_dir {
         let mut reasons = Vec::new();
@@ -861,6 +932,13 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
             reasons.push(format!(
                 "{} prettier_intermediate_*{} file(s)",
                 prettier_intermediate_variants.len(),
+                input_ext
+            ));
+        }
+        if has_prettier_intermediate_to_variant_files {
+            reasons.push(format!(
+                "{} prettier_intermediate_to_variant_*{} file(s)",
+                prettier_intermediate_to_variant_variants.len(),
                 input_ext
             ));
         }
@@ -1053,12 +1131,15 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
     let has_prettier_variants = !prettier_variant_variants.is_empty();
     let has_variants = !variant_variants.is_empty();
     let has_prettier_intermediate = !prettier_intermediate_variants.is_empty();
+    let has_prettier_intermediate_to_variant =
+        !prettier_intermediate_to_variant_variants.is_empty();
 
     let needs_readme = has_parser_divergence
         || has_formatter_divergence
         || has_prettier_variants
         || has_variants
-        || has_prettier_intermediate;
+        || has_prettier_intermediate
+        || has_prettier_intermediate_to_variant;
 
     if needs_readme && !has_readme {
         let mut reasons = Vec::new();
@@ -1083,6 +1164,11 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         if has_prettier_intermediate {
             reasons.push(format!(
                 "- Prettier intermediate (prettier_intermediate_*{input_ext})"
+            ));
+        }
+        if has_prettier_intermediate_to_variant {
+            reasons.push(format!(
+                "- Prettier intermediate to variant (prettier_intermediate_to_variant_*{input_ext})"
             ));
         }
 
@@ -1148,13 +1234,7 @@ pub fn format_with_our_formatter(content: &str, filepath: &str) -> Result<String
         Ok(tsv_svelte::format(&ast, content))
     } else if filepath.ends_with(".svelte.ts") || filepath.ends_with(".ts") {
         let ast = tsv_ts::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
-        // For standalone TypeScript files, don't add trailing comma for arrow type params
-        // (no Svelte template syntax disambiguation needed)
-        let config = tsv_lang::PrintConfig {
-            arrow_type_param_trailing_comma: false,
-            ..Default::default()
-        };
-        Ok(tsv_ts::format_with_config(&ast, content, config))
+        Ok(tsv_ts::format(&ast, content))
     } else if filepath.ends_with(".css") {
         let ast = tsv_css::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
         Ok(tsv_css::format(&ast, content))

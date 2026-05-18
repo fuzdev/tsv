@@ -42,7 +42,6 @@ import {
 	canonicalParserLabel,
 	getAlternativeVersions,
 	getBenchmarkTasks,
-	getFormattersForValidation,
 	initImplementations,
 } from './lib/implementations.ts';
 import {
@@ -60,7 +59,7 @@ import {
 	generateBinarySizeMarkdown,
 	generateBinarySizeReport,
 } from './lib/binary_sizes.ts';
-import type { Language, SourceFile } from './lib/types.ts';
+import { type Language, LANGUAGES, type SourceFile } from './lib/types.ts';
 
 //
 // CLI Arguments
@@ -72,6 +71,7 @@ const Args_schema = z.strictObject({
 	markdown: z.boolean().default(false),
 	'save-baseline': z.boolean().default(false),
 	'compare-baseline': z.boolean().default(false),
+	'save-report': z.boolean().default(false),
 });
 
 // Strip leading -- from deno task passthrough
@@ -101,6 +101,7 @@ const args = {
 	markdown: parsed.data.markdown,
 	saveBaseline: parsed.data['save-baseline'],
 	compareBaseline: parsed.data['compare-baseline'],
+	saveReport: parsed.data['save-report'],
 };
 
 // In JSON/markdown mode, progress goes to stderr so stdout is clean structured output
@@ -136,11 +137,17 @@ const BENCH_DURATION = envInt('BENCH_DURATION') ?? 5000;
 /** Number of warmup iterations (default: 3) */
 const BENCH_WARMUP = envInt('BENCH_WARMUP') ?? 3;
 
+/**
+ * Enable the per-iteration forced-GC hook (default: off — measures realistic
+ * throughput where GC happens opportunistically, matching real-world usage).
+ * Set `BENCH_GC=1` to force a major GC between every iteration; useful for
+ * stabilizing high-allocation workloads at the cost of penalizing efficient
+ * low-allocation paths. See `CLAUDE.md` → Fairness Caveats for the trade-off.
+ */
+const BENCH_GC = Deno.env.get('BENCH_GC') === '1';
+
 /** Maximum length of error message to display (longer messages are truncated) */
 const MAX_ERROR_MESSAGE_LENGTH = 200;
-
-/** Languages to benchmark */
-const LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
 
 /** Baseline file path */
 const BASELINE_PATH = './benches/deno/baseline.json';
@@ -206,88 +213,6 @@ log();
 const impls = await initImplementations({ logger: log });
 
 //
-// Formatter Validation
-//
-
-// Validate formatters before benchmarking
-{
-	log('Validating formatters...\n');
-
-	const formatters = getFormattersForValidation(impls);
-
-	// Helper to call formatter (sync or async) - returns Promise for uniform handling
-	const callFormatter = (
-		formatter: (typeof formatters)[0],
-		source: string,
-		lang: Language,
-	): Promise<string> => {
-		if (formatter.isAsync) {
-			return formatter.formatAsync!(source, lang);
-		}
-		return Promise.resolve(formatter.format!(source, lang));
-	};
-
-	// Unformatted test content - must be changed by a working formatter
-	const unformatted: Record<Language, string> = {
-		svelte: '<script>const x=1</script>\n<div class="a"   ></div>',
-		typescript: 'const x:number=1;function foo(a:string,b:number){return a+b}',
-		css: '.foo{color:red;display:flex}',
-	};
-
-	let hasErrors = false;
-
-	for (const lang of LANGUAGES) {
-		log(`  ${lang}:`);
-
-		for (const formatter of formatters) {
-			if (!formatter.supportsLanguage(lang)) {
-				log(`    ${formatter.name.padEnd(12)} skipped (unsupported)`);
-				continue;
-			}
-
-			const errors: string[] = [];
-
-			// Test 1: Does it actually format? (output differs from unformatted input)
-			try {
-				const input = unformatted[lang];
-				const output = await callFormatter(formatter, input, lang);
-				if (input === output) {
-					errors.push('no change on unformatted input');
-				}
-			} catch (e) {
-				const msg = e instanceof Error ? e.message : String(e);
-				errors.push(`format error: ${msg.slice(0, 50)}`);
-			}
-
-			// Test 2: Is it idempotent? (format(format(x)) == format(x))
-			try {
-				const input = unformatted[lang];
-				const first = await callFormatter(formatter, input, lang);
-				const second = await callFormatter(formatter, first, lang);
-				if (first !== second) {
-					errors.push('not idempotent');
-				}
-			} catch (e) {
-				const msg = e instanceof Error ? e.message : String(e);
-				errors.push(`idempotent error: ${msg.slice(0, 50)}`);
-			}
-
-			if (errors.length > 0) {
-				hasErrors = true;
-				log(`    ${formatter.name.padEnd(12)} ✗ ${errors.join(', ')}`);
-			} else {
-				log(`    ${formatter.name.padEnd(12)} ✓ formats + idempotent`);
-			}
-		}
-	}
-
-	log('');
-	if (hasErrors) {
-		log('⚠️  Some formatters failed validation. Results may be unreliable.\n');
-	}
-}
-
-//
 // Benchmark Helpers
 //
 
@@ -305,7 +230,12 @@ function recordSkip(benchName: string, filePath: string, error: unknown): void {
 }
 
 function recordCorpusSize(benchName: string, processed: number, total: number): void {
-	effectiveCorpusSize.set(benchName, { processed, total });
+	// Idempotent: every measured iteration re-counts the same files (same
+	// content, same fn), so only the first record matters. Avoids hundreds
+	// of redundant Map.set calls per task during the inner measurement loop.
+	if (!effectiveCorpusSize.has(benchName)) {
+		effectiveCorpusSize.set(benchName, { processed, total });
+	}
 }
 
 /** Process all files with the given function, tracking errors and effective corpus size */
@@ -371,7 +301,14 @@ async function runBenchmarkGroup(operation: 'parse' | 'format', language: Langua
 		duration_ms: BENCH_DURATION,
 		warmup_iterations: BENCH_WARMUP,
 		min_iterations: 3,
-		on_iteration: () => globalThis.gc?.(),
+		// oxfmt's async napi binding leaks state into Deno's timer wheel:
+		// after the first oxfmt.format call, exactly one further setTimeout
+		// fires and then all subsequent timers stall forever. The default
+		// 100ms inter-task cooldown is the only timer-dependent await in
+		// the loop, so dropping it sidesteps the hang.
+		// See benches/deno/CLAUDE.md → Known Issues.
+		cooldown_ms: 0,
+		on_iteration: BENCH_GC ? () => globalThis.gc?.() : undefined,
 		on_task_complete: (result, index, total) => {
 			const opsPerSec = result.stats.ops_per_second.toFixed(1);
 			const throughput = formatThroughput(result.stats.ops_per_second * corpusBytes);
@@ -597,11 +534,19 @@ function generateMarkdownReport(
 	return lines.join('\n');
 }
 
-/** Save results to the results directory (always called) */
+/**
+ * Save results to the results directory.
+ *
+ * Always writes a timestamped pair. Only overwrites the canonical
+ * `report.{json,md}` when `writeReport` is true — gated by the caller so
+ * that partial runs (BENCH_LIMIT, BENCH_FILTER) don't clobber the
+ * committed canonical report.
+ */
 async function saveResults(
 	data: Baseline,
 	groups: GroupResults[],
 	binarySizes: BinarySize[],
+	writeReport: boolean,
 ): Promise<string> {
 	await Deno.mkdir(RESULTS_DIR, { recursive: true });
 	const timestamp = data.timestamp.replace(/[:.]/g, '-').slice(0, 19);
@@ -618,12 +563,17 @@ async function saveResults(
 	);
 
 	const json = JSON.stringify(data, null, '\t');
-	await Promise.all([
+	const writes: Promise<void>[] = [
 		Deno.writeTextFile(`${basePath}.json`, json),
 		Deno.writeTextFile(`${basePath}.md`, markdown),
-		Deno.writeTextFile(`${RESULTS_DIR}/report.json`, json),
-		Deno.writeTextFile(`${RESULTS_DIR}/report.md`, markdown),
-	]);
+	];
+	if (writeReport) {
+		writes.push(
+			Deno.writeTextFile(`${RESULTS_DIR}/report.json`, json),
+			Deno.writeTextFile(`${RESULTS_DIR}/report.md`, markdown),
+		);
+	}
+	await Promise.all(writes);
 
 	return basePath;
 }
@@ -826,9 +776,16 @@ if (args.json) {
 	console.log('\n' + '='.repeat(80));
 }
 
-// Always save results (JSON + Markdown)
-const resultsPath = await saveResults(resultsData, allGroupResults, binarySizes);
+// Always save the timestamped pair; only overwrite the canonical
+// `report.{json,md}` on full-corpus runs or when --save-report is set.
+const writeReport = args.saveReport || !isLimited;
+const resultsPath = await saveResults(resultsData, allGroupResults, binarySizes, writeReport);
 log(`\nResults saved to ${resultsPath}.json and ${resultsPath}.md`);
+if (writeReport) {
+	log(`Canonical report updated: ${RESULTS_DIR}/report.{json,md}`);
+} else {
+	log(`Skipped canonical report (limited run — pass --save-report to override)`);
+}
 
 // Handle baseline operations
 if (args.saveBaseline) {

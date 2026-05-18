@@ -861,6 +861,7 @@ fn calculate_hunk_header(hunk_changes: &[similar::Change<&str>]) -> (usize, usiz
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

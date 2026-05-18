@@ -10,16 +10,30 @@ repository.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [package.metadata.wasm-pack.profile.release]
-# Disable wasm-opt until it supports bulk memory operations from Rust 2024
-wasm-opt = false
+# Rust 2024 emits `memory.copy` (bulk-memory) and `i64.trunc_sat_f64_s`
+# (nontrapping-float-to-int) — both shipped in every browser since 2021
+# and in Node 16+. Enabling them by name lets wasm-opt run on Rust 2024 output.
+wasm-opt = ['-O3', '--enable-bulk-memory', '--enable-nontrapping-float-to-int']
+
+[features]
+# Default build: format-only (@fuzdev/tsv_fmt).
+default = []
+# `--features ast`: adds parse_* + convert layer (@fuzdev/tsv_parse).
+ast = [
+    "tsv_ts/convert",
+    "tsv_css/convert",
+    "tsv_svelte/convert",
+    "dep:serde_json",
+    "dep:serde-wasm-bindgen",
+]
 
 [dependencies]
 tsv_svelte.workspace = true
 tsv_ts.workspace = true
 tsv_css.workspace = true
 wasm-bindgen = "0.2"
-serde-wasm-bindgen = "0.6"
-serde_json.workspace = true
+serde-wasm-bindgen = { version = "0.6", optional = true }
+serde_json = { workspace = true, optional = true }
 
 [lints]
 workspace = true

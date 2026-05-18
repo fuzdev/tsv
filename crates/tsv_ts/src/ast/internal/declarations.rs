@@ -17,6 +17,7 @@ pub struct TSInterfaceDeclaration {
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub extends: Vec<TSInterfaceHeritage>,
     pub body: TSInterfaceBody,
+    pub declare: bool,
     pub span: Span,
 }
 

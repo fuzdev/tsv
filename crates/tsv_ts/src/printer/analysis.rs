@@ -9,57 +9,25 @@ use string_interner::DefaultStringInterner;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
-/// Skip over a comment (line or block) starting at position `i`.
-///
-/// Returns `Some(new_i)` where `new_i` is the position AFTER the comment
-/// (ready for the next iteration), or `None` if not at a comment.
-///
-/// This is a simpler version of `skip_string_or_comment` for cases where
-/// we're searching between operator positions and don't need to skip strings.
-pub(crate) fn skip_comment(bytes: &[u8], i: usize, end: usize) -> Option<usize> {
-    if i + 1 >= end || bytes[i] != b'/' {
-        return None;
-    }
-    if bytes[i + 1] == b'/' {
-        // Line comment - skip to end of line
-        let mut j = i + 2;
-        while j < end && bytes[j] != b'\n' {
-            j += 1;
-        }
-        Some(j)
-    } else if bytes[i + 1] == b'*' {
-        // Block comment - skip to */
-        let mut j = i + 2;
-        while j + 1 < end && !(bytes[j] == b'*' && bytes[j + 1] == b'/') {
-            j += 1;
-        }
-        Some(j + 2) // Past the */
-    } else {
-        None
-    }
-}
+// Re-export from tsv_lang for use within tsv_ts printer and AST modules
+pub(crate) use tsv_lang::source_scan::find_char_skipping_comments;
+pub(crate) use tsv_lang::source_scan::skip_comment;
 
-/// Find the first occurrence of a character in source, skipping comments.
+/// Skip past identifier characters (alphanumeric, `_`, `$`, non-ASCII) starting at `pos`.
 ///
-/// Returns the position of the character, or `None` if not found.
-pub(crate) fn find_char_skipping_comments(
-    bytes: &[u8],
-    start: usize,
-    end: usize,
-    target: u8,
-) -> Option<usize> {
-    let mut i = start;
-    while i < end {
-        if let Some(new_i) = skip_comment(bytes, i, end) {
-            i = new_i;
-            continue;
-        }
-        if bytes[i] == target {
-            return Some(i);
-        }
+/// Returns the position after the last identifier character, or `pos` if none found.
+/// Handles multi-byte UTF-8 sequences for Unicode identifiers.
+pub(crate) fn skip_identifier_at(bytes: &[u8], pos: usize, end: usize) -> usize {
+    let mut i = pos;
+    while i < end
+        && (bytes[i].is_ascii_alphanumeric()
+            || bytes[i] == b'_'
+            || bytes[i] == b'$'
+            || bytes[i] > 127)
+    {
         i += 1;
     }
-    None
+    i
 }
 
 /// Skip over a string literal or comment starting at position `i`.

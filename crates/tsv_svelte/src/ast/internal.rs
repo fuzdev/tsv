@@ -3,11 +3,9 @@
 // Internal representation optimized for manipulation and formatting.
 // Uses string interning for efficient storage and comparison of identifiers.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-use string_interner::{DefaultStringInterner, DefaultSymbol};
+use string_interner::DefaultSymbol;
 use tsv_css::ast::internal::CssStyleSheet;
-pub use tsv_lang::{Comment, Span};
+pub use tsv_lang::{Comment, SharedInterner, Span};
 use tsv_ts::ast::internal::{Expression, Program};
 
 /// Svelte Root - top-level AST node
@@ -26,7 +24,7 @@ pub struct Root {
     /// Use `comments_in_range(span)` to find comments for a specific node.
     pub comments: Vec<Comment>,
     pub span: Span,
-    pub interner: Rc<RefCell<DefaultStringInterner>>,
+    pub interner: SharedInterner,
 }
 
 /// Svelte Fragment - container for template nodes
@@ -624,13 +622,14 @@ impl FragmentNode {
 }
 
 /// Svelte Element kind - distinguishes HTML elements from components
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "convert", derive(serde::Serialize, serde::Deserialize))]
 pub enum ElementKind {
     /// HTML element: `<div>`, `<span>`, `<input>`, etc. (lowercase first character)
-    #[serde(rename = "Html")]
+    #[cfg_attr(feature = "convert", serde(rename = "Html"))]
     Html,
     /// Svelte component: `<MyComponent>`, `<Button>`, etc. (uppercase first character)
-    #[serde(rename = "Component")]
+    #[cfg_attr(feature = "convert", serde(rename = "Component"))]
     Component,
 }
 

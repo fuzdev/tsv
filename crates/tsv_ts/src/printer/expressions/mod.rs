@@ -23,6 +23,7 @@ pub(super) use literals::{format_string_literal_from_ast, normalize_number_liter
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`
 use super::chain;
+use super::comments::CommentSpacing;
 pub(super) use super::{
     ParenContext, PatternContext, Printer, needs_parens, object_pattern_should_expand,
     unwrap_parenthesized,
@@ -33,13 +34,13 @@ use tsv_lang::printing::visual_width;
 
 impl<'a> Printer<'a> {
     /// Print an expression using doc-based formatting
-    pub fn print_expression(&mut self, expression: &Expression) {
+    pub(crate) fn print_expression(&mut self, expression: &Expression) {
         let doc = self.build_expression_doc(expression);
         self.write_arena_doc(doc);
     }
 
     /// Build a Doc for an expression (for use in object/array contexts and statements)
-    pub(super) fn build_expression_doc(&self, expr: &Expression) -> DocId {
+    pub(crate) fn build_expression_doc(&self, expr: &Expression) -> DocId {
         let d = self.d();
 
         // Take and clear is_expression_statement so it doesn't leak to sub-expressions.
@@ -192,8 +193,14 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let expr_needs_parens =
             needs_parens(&type_assert.expression, ParenContext::AngleBracketAssertion);
+        // Comments between `<` and the type
+        let angle_end = type_assert.span.start + 1; // after `<`
+        let type_start = type_assert.type_annotation.span().start;
+        let comments_doc =
+            self.build_comments_between(angle_end, type_start, CommentSpacing::Trailing);
         let mut parts = vec![
             d.text("<"),
+            comments_doc,
             self.build_type_doc_with_wrapping_type_args(&type_assert.type_annotation),
             d.text(">"),
         ];
@@ -234,12 +241,29 @@ impl<'a> Printer<'a> {
         }
 
         parts.push(d.text(" as "));
-        parts.push(self.build_type_doc_with_wrapping_type_args(&as_expr.type_annotation));
 
-        // Comments between `as` keyword and type → place after the type
+        // Comments between `as` keyword and type
+        // For `as const`, prettier moves these after `const`; for regular types, keeps in place
+        let is_as_const = &self.source
+            [type_start as usize..as_expr.type_annotation.span().end as usize]
+            == "const";
         if let Some(as_pos) = as_keyword_pos {
             let as_end = as_pos + 2; // "as" is 2 chars
-            parts.push(self.build_inline_comments_between_doc(as_end, type_start));
+            if is_as_const {
+                // `as const`: comments go after `const` (prettier normalization)
+                parts.push(self.build_type_doc_with_wrapping_type_args(&as_expr.type_annotation));
+                parts.push(self.build_inline_comments_between_doc(as_end, type_start));
+            } else {
+                // Regular type: comments stay before the type
+                parts.push(self.build_comments_between(
+                    as_end,
+                    type_start,
+                    CommentSpacing::Trailing,
+                ));
+                parts.push(self.build_type_doc_with_wrapping_type_args(&as_expr.type_annotation));
+            }
+        } else {
+            parts.push(self.build_type_doc_with_wrapping_type_args(&as_expr.type_annotation));
         }
 
         d.concat(&parts)
@@ -263,12 +287,24 @@ impl<'a> Printer<'a> {
             parts.push(d.text(")"));
         }
 
-        // Include comments between expression and `satisfies` keyword
+        // Comments around `satisfies` keyword: split before and after
         let expr_end = sat_expr.expression.span().end;
         let type_start = sat_expr.type_annotation.span().start;
-        parts.push(self.build_inline_comments_between_doc(expr_end, type_start));
+        let sat_keyword_pos = self.find_keyword_in_range(expr_end, type_start, "satisfies");
+
+        // Comments between expression and `satisfies` keyword → before keyword
+        if let Some(sat_pos) = sat_keyword_pos {
+            parts.push(self.build_inline_comments_between_doc(expr_end, sat_pos));
+        }
 
         parts.push(d.text(" satisfies "));
+
+        // Comments between `satisfies` keyword and type → before type
+        if let Some(sat_pos) = sat_keyword_pos {
+            let sat_end = sat_pos + 9; // "satisfies" is 9 chars
+            parts.push(self.build_comments_between(sat_end, type_start, CommentSpacing::Trailing));
+        }
+
         parts.push(self.build_type_doc_with_wrapping_type_args(&sat_expr.type_annotation));
         d.concat(&parts)
     }
@@ -288,6 +324,16 @@ impl<'a> Printer<'a> {
         parts.push(self.build_expression_doc(&inst_expr.expression));
         if needs_parens {
             parts.push(d.text(")"));
+        }
+        // Preserve comments between expression and type args: `fn/* c */ <string>`
+        let expr_end = inst_expr.expression.span().end;
+        let ta_start = inst_expr.type_arguments.span.start;
+        if let Some(doc) = self.build_name_to_type_params_comments_opt(
+            expr_end,
+            ta_start,
+            CommentSpacing::Trailing,
+        ) {
+            parts.push(doc);
         }
         parts.push(self.build_type_parameter_instantiation_doc(&inst_expr.type_arguments));
         d.concat(&parts)
@@ -323,7 +369,22 @@ impl<'a> Printer<'a> {
             chain::build_chain_doc(&groups, self)
         } else {
             let inner_doc = self.build_expression_doc(&non_null_expr.expression);
-            d.concat(&[inner_doc, d.text("!")])
+            // Check for trailing comments from stripped grouping parens: `(x /* c */)!`
+            let argument_end = non_null_expr.expression.span().end;
+            let has_trailing_comments =
+                self.has_comments_between(argument_end, non_null_expr.span.end);
+            if has_trailing_comments {
+                let mut parts = vec![inner_doc];
+                self.append_trailing_paren_comments(
+                    &mut parts,
+                    argument_end,
+                    non_null_expr.span.end,
+                );
+                parts.push(d.text("!"));
+                d.concat(&parts)
+            } else {
+                d.concat(&[inner_doc, d.text("!")])
+            }
         }
     }
 
@@ -691,7 +752,7 @@ impl<'a> Printer<'a> {
                 .chars()
                 .take_while(|c| *c == '\t' || *c == ' ')
                 .count();
-            visual_width(&after_nl[..ws_end], self.config.tab_width)
+            visual_width(&after_nl[..ws_end], tsv_lang::TAB_WIDTH)
         } else {
             0
         }
@@ -713,7 +774,7 @@ impl<'a> Printer<'a> {
             return doc;
         }
         let d = self.d();
-        let tab_width = self.config.tab_width;
+        let tab_width = tsv_lang::TAB_WIDTH;
         // In prettier's useTabs renderer, align(n%tw) creates a WIDTH command
         // that adds lastTabs=1 + lastSpaces=n%tw. When followed by INDENT,
         // flushTabs() emits the pending tab and resetLast() drops the fractional
@@ -891,8 +952,65 @@ impl<'a> Printer<'a> {
 
         let mut parts = vec![tag_doc];
         if let Some(type_args) = &tagged.type_arguments {
+            // Preserve comments between tag and type args: `fn/* c */ <string>`template``
+            let tag_end = tagged.tag.span().end;
+            let ta_start = type_args.span.start;
+            if let Some(doc) = self.build_name_to_type_params_comments_opt(
+                tag_end,
+                ta_start,
+                CommentSpacing::Trailing,
+            ) {
+                parts.push(doc);
+            }
             parts.push(self.build_type_parameter_instantiation_doc(type_args));
         }
+
+        // Emit comments between tag (or type_args) and template literal
+        // e.g., `foo /* c */ \`x\`` or `foo\n// c\n\`x\``
+        let comment_start = tagged
+            .type_arguments
+            .as_ref()
+            .map_or_else(|| tagged.tag.span().end, |ta| ta.span.end);
+        let comment_end = tagged.quasi.span.start;
+        let gap_comments: Vec<_> =
+            tsv_lang::comments_in_range(self.comments, comment_start, comment_end).collect();
+        if !gap_comments.is_empty() {
+            let mut prev_end = comment_start;
+            let mut ends_with_hardline = false;
+            for comment in &gap_comments {
+                if comment.is_block {
+                    let on_own_line = self.has_newline_between(prev_end, comment.span.start);
+                    if on_own_line || ends_with_hardline {
+                        parts.push(d.hardline());
+                        parts.push(self.build_comment_doc(comment));
+                        // Check if there's a newline after this block comment
+                        ends_with_hardline =
+                            self.has_newline_between(comment.span.end, comment_end);
+                    } else {
+                        parts.push(d.text(" "));
+                        parts.push(self.build_comment_doc(comment));
+                        ends_with_hardline = false;
+                    }
+                } else {
+                    // Line comment: hardline or space before, always hardline after
+                    let on_own_line = self.has_newline_between(prev_end, comment.span.start);
+                    if on_own_line || ends_with_hardline {
+                        parts.push(d.hardline());
+                    } else {
+                        parts.push(d.text(" "));
+                    }
+                    parts.push(self.build_comment_doc(comment));
+                    ends_with_hardline = true;
+                }
+                prev_end = comment.span.end;
+            }
+            if ends_with_hardline {
+                parts.push(d.hardline());
+            } else {
+                parts.push(d.text(" "));
+            }
+        }
+
         parts.push(self.build_template_literal_doc(&tagged.quasi));
         d.concat(&parts)
     }

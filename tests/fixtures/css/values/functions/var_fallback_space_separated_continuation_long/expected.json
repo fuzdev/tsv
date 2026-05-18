@@ -45,7 +45,7 @@
 							"start": 91,
 							"end": 294,
 							"property": "prop",
-							"value": "var(\n\t\t\t--a,\n\t\t\t/* Long comment that forces separate line aaaaaaaaaaaaaaaaaaaaaaaaaaa */\n\t\t\tvar(--aaaaaaaaaaaaaaaa)\n\t\t\t\tcolor-mix(in hsl, var(--aaaaaaaaaaaa) var(--aaaaaaaaaaaaaa), transparent)\n\t\t)"
+							"value": "var(\n\t\t\t--a,\n\t\t\t\n\t\t\tvar(--aaaaaaaaaaaaaaaa)\n\t\t\t\tcolor-mix(in hsl, var(--aaaaaaaaaaaa) var(--aaaaaaaaaaaaaa), transparent)\n\t\t)"
 						}
 					]
 				},

@@ -14,6 +14,9 @@ node_modules
 # WASM build output
 /crates/tsv_wasm/pkg
 
+# Drift-check generated file (left on failure for inspection)
+/scripts/.drift_check.gen.ts
+
 # Benchmark results (report.json and report.md are committed)
 /benches/deno/results/*.json
 /benches/deno/results/*.md

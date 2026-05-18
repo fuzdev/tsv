@@ -2,9 +2,7 @@
  * OXC implementation wrappers (oxc-parser + oxfmt)
  *
  * oxc-parser: Fast TypeScript/JS parser
- * oxfmt: Fast TypeScript/JS/CSS formatter
- *
- * Note: Neither supports Svelte files.
+ * oxfmt: Fast TypeScript/JS/CSS/Svelte formatter (Svelte is experimental as of 0.49)
  */
 
 import { type Language, LANGUAGE_EXTENSIONS, type TsvImplementation } from './types.ts';
@@ -16,11 +14,17 @@ interface OxcParserModule {
 }
 
 /** oxfmt module types */
+interface OxfmtFormatOptions {
+	useTabs?: boolean;
+	/** Enable experimental Svelte support — `{}` accepts defaults. */
+	svelte?: boolean | Record<string, unknown>;
+}
+
 interface OxfmtModule {
 	format: (
 		filename: string,
 		source: string,
-		options?: { useTabs?: boolean },
+		options?: OxfmtFormatOptions,
 	) => Promise<{ code: string; errors: unknown[] }>;
 }
 
@@ -29,7 +33,7 @@ interface OxfmtModule {
  *
  * Supports:
  * - Parse: TypeScript, JavaScript (NOT Svelte, NOT CSS)
- * - Format: TypeScript, JavaScript, CSS (NOT Svelte)
+ * - Format: TypeScript, JavaScript, CSS, Svelte (Svelte is experimental, expect partial coverage)
  */
 export class OxcImplementation implements TsvImplementation {
 	name = 'oxc' as const;
@@ -52,7 +56,7 @@ export class OxcImplementation implements TsvImplementation {
 	static readonly PARSE_LANGUAGES: Language[] = ['typescript'];
 
 	/** Languages supported for formatting */
-	static readonly FORMAT_LANGUAGES: Language[] = ['typescript', 'css'];
+	static readonly FORMAT_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
 
 	/** Check if parsing is supported for this language */
 	supportsParseLanguage(language: Language): boolean {
@@ -90,9 +94,15 @@ export class OxcImplementation implements TsvImplementation {
 			throw new Error(`OXC formatter does not support ${language}`);
 		}
 
-		const result = await this._formatter.format(`file${LANGUAGE_EXTENSIONS[language]}`, source, {
-			useTabs: true,
-		});
+		const options: OxfmtFormatOptions = { useTabs: true };
+		// oxfmt gates .svelte handling behind the `svelte` config key (experimental as of 0.49).
+		if (language === 'svelte') options.svelte = {};
+
+		const result = await this._formatter.format(
+			`file${LANGUAGE_EXTENSIONS[language]}`,
+			source,
+			options,
+		);
 
 		if (result.errors && result.errors.length > 0) {
 			throw new Error(`Format errors: ${JSON.stringify(result.errors)}`);

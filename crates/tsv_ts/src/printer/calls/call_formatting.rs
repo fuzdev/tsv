@@ -3,6 +3,7 @@
 // Contains the primary `build_call_doc_with_wrapping` function that handles
 // all the special cases for call expression formatting.
 
+use super::super::comments::{CommentFilter, CommentSpacing};
 use super::super::utils::{
     arrow_has_trailing_param_comments, is_array_or_object_unwrapped, is_block_function,
     is_concise_numeric_array, is_curried_arrow, is_function_composition_args,
@@ -126,14 +127,57 @@ pub(super) fn build_call_doc_with_wrapping(
         .as_ref()
         .map(|ta| printer.build_type_parameter_instantiation_doc(ta));
 
-    // Combine callee with type arguments
-    let callee = match type_args_doc {
-        Some(ta_doc) => d.concat(&[callee, ta_doc]),
-        None => callee,
+    // Combine callee with type arguments, preserving comments in the gap
+    // e.g., `fn/* c1 */ <string>()` — comment between callee and `<`
+    // Uses build_name_to_type_params_comments for safe line comment handling
+    let callee = match (&type_args_doc, &call.type_arguments) {
+        (Some(ta_doc), Some(ta)) => {
+            match printer.build_name_to_type_params_comments_opt(
+                call.callee.span().end,
+                ta.span.start,
+                CommentSpacing::Trailing,
+            ) {
+                Some(comments_doc) => d.concat(&[callee, comments_doc, *ta_doc]),
+                None => d.concat(&[callee, *ta_doc]),
+            }
+        }
+        _ => callee,
     };
 
-    // Empty args: just `fn()` or `fn<T>()`
+    // Empty args: just `fn()` or `fn<T>()`, preserving dangling comments
     if call.arguments.is_empty() {
+        let after_type_args = call
+            .type_arguments
+            .as_ref()
+            .map_or_else(|| call.callee.span().end, |ta| ta.span.end);
+        let paren_close = call.span.end;
+        // Find the actual `(` to separate pre-paren comments from inside-paren comments
+        // e.g., `fn<string> /* c2 */()` — comment should stay before `(`
+        let actual_paren = printer.find_char_outside_comments(after_type_args, paren_close, b'(');
+        if let Some(paren_pos) = actual_paren {
+            let pre_paren_comments = printer.build_comments_between_filtered_opt(
+                after_type_args,
+                paren_pos,
+                CommentSpacing::Leading,
+                CommentFilter::All,
+            );
+            let inside_paren_comments = printer
+                .build_inline_comments_between_doc_no_leading_space_opt(paren_pos + 1, paren_close);
+            let mut parts = vec![callee];
+            if let Some(pre) = pre_paren_comments {
+                parts.push(pre);
+            }
+            match inside_paren_comments {
+                Some(inner) => {
+                    parts.push(d.text("("));
+                    parts.push(inner);
+                    parts.push(d.text(")"));
+                }
+                None => parts.push(d.text("()")),
+            }
+            return d.concat(&parts);
+        }
+        // Fallback: no `(` found (shouldn't happen for valid code)
         return d.concat(&[callee, d.text("()")]);
     }
 
@@ -141,8 +185,11 @@ pub(super) fn build_call_doc_with_wrapping(
     // If there are line comments, expand to multi-line format
     if call.arguments.len() == 1 {
         let first_arg = &call.arguments[0];
-        // Find the opening paren position (just after callee ends)
-        let paren_open = call.callee.span().end;
+        // Find the opening paren position (after type args if present, otherwise after callee)
+        let paren_open = call
+            .type_arguments
+            .as_ref()
+            .map_or_else(|| call.callee.span().end, |ta| ta.span.end);
         let arg_start = first_arg.span().start;
         let arg_end = first_arg.span().end;
         let paren_close = call.span.end;
@@ -623,8 +670,11 @@ pub(super) fn build_call_doc_with_wrapping(
         // which produces the expanded form via wrap_call_with_hard_breaks
     }
 
-    // Position just after callee (before type args and open paren)
-    let paren_open = call.callee.span().end;
+    // Position after type args (or callee if no type args) — the `(` follows this
+    let paren_open = call
+        .type_arguments
+        .as_ref()
+        .map_or_else(|| call.callee.span().end, |ta| ta.span.end);
 
     // Check if any argument has multiline content (e.g., line continuation strings)
     // Prettier expands calls containing multiline strings (recursively)
@@ -973,7 +1023,31 @@ pub(super) fn build_call_doc_with_wrapping(
     // Also check for trailing block comments (has_trailing_comments_on_args only checks line comments)
     let has_any_trailing_comments = has_trailing_arg_comments || has_trailing_block_comment;
 
-    if has_leading_comments || has_inter_arg_comments || has_any_trailing_comments {
+    // Check for own-line block comments after the last arg (before closing paren).
+    // These need per-element handling to emit after the trailing comma.
+    // Also checks inside spread spans for comments from stripped parens.
+    let has_own_line_trailing_block = call.arguments.last().is_some_and(|last_arg| {
+        let mut search_start = last_arg.span().end;
+        if let internal::Expression::SpreadElement(spread) = last_arg
+            && printer.has_comments_between(spread.argument.span().end, spread.span.end)
+        {
+            search_start = spread.argument.span().end;
+        }
+        tsv_lang::comments_in_range(printer.comments, search_start, call.span.end).any(|c| {
+            c.is_block
+                && !tsv_lang::printing::is_same_line_fast(
+                    printer.line_breaks,
+                    search_start,
+                    c.span.start,
+                )
+        })
+    });
+
+    if has_leading_comments
+        || has_inter_arg_comments
+        || has_any_trailing_comments
+        || has_own_line_trailing_block
+    {
         // Build arguments with leading and/or inter-argument comments
         let mut arg_parts = Vec::new();
         let mut force_expansion = false;
@@ -1023,7 +1097,18 @@ pub(super) fn build_call_doc_with_wrapping(
                 let arg_end = arg.span().end;
                 let next_arg_start = call.arguments[i + 1].span().start;
 
-                if printer.has_comments_between(arg_end, next_arg_start) {
+                // Own-line block comments from spread with stripped parens:
+                // placed after the comma as siblings in the call.
+                let spread_comments = printer.spread_own_line_block_comments(arg);
+                if !spread_comments.is_empty() {
+                    arg_parts.push(d.text(","));
+                    for comment in &spread_comments {
+                        arg_parts.push(d.hardline());
+                        arg_parts.push(printer.build_comment_doc(comment));
+                    }
+                    force_expansion = true;
+                    arg_parts.push(d.hardline());
+                } else if printer.has_comments_between(arg_end, next_arg_start) {
                     if should_force_expansion_for_comments(printer, arg_end, next_arg_start) {
                         force_expansion = true;
                     }
@@ -1114,19 +1199,45 @@ pub(super) fn build_call_doc_with_wrapping(
                     }
                 }
             } else {
-                // Last argument - check for trailing line comments before closing paren
-                let arg_end = arg.span().end;
+                // Last argument - check for trailing comments before closing paren
+                let mut effective_arg_end = arg.span().end;
                 let paren_close = call.span.end;
+
+                // For spread elements, also check inside the spread span for
+                // comments from stripped parens (argument.end to spread.end)
+                if let internal::Expression::SpreadElement(spread) = arg
+                    && printer.has_comments_between(spread.argument.span().end, spread.span.end)
+                {
+                    effective_arg_end = spread.argument.span().end;
+                }
 
                 let pc = PartitionedComments::new(
                     printer.comments,
                     printer.line_breaks,
-                    arg_end,
+                    effective_arg_end,
                     paren_close,
                 );
 
+                // Own-line block comments after the last arg (before closing paren).
+                // These appear as siblings after the trailing comma, forcing expansion.
+                // Also handles spread with stripped parens via effective_arg_end.
+                if !pc.leading.is_empty() {
+                    let leading_block: Vec<_> = pc.leading.iter().filter(|c| c.is_block).collect();
+                    if !leading_block.is_empty() {
+                        arg_parts.push(d.text(","));
+                        for comment in &leading_block {
+                            arg_parts.push(d.hardline());
+                            arg_parts.push(printer.build_comment_doc(comment));
+                        }
+                        force_expansion = true;
+                        has_trailing_comma_on_last = true;
+                    }
+                }
+
                 if pc.has_trailing_line() {
-                    arg_parts.push(d.text(","));
+                    if !has_trailing_comma_on_last {
+                        arg_parts.push(d.text(","));
+                    }
 
                     // Build comment docs: " // comment" for each
                     let comment_docs: Vec<_> = pc

@@ -6,10 +6,11 @@
 use crate::deno::{PrettierParser, parse_css, parse_svelte, parse_typescript, run_prettier};
 use crate::diff;
 use crate::fixtures::{
-    self, Fixture, InputType, discover_invalid_variants, discover_prettier_intermediate_variants,
+    self, AuditSignature, Fixture, InputType, discover_invalid_variants,
+    discover_prettier_intermediate_to_variant_variants, discover_prettier_intermediate_variants,
     discover_prettier_variant_variants, discover_unformatted_ours_variants,
     discover_unformatted_prettier_variants, discover_unformatted_variants, discover_unknown_files,
-    discover_variant_variants, has_svelte_divergence_suffix, read_file,
+    discover_variant_variants, read_file,
 };
 use std::collections::HashMap;
 use std::fmt;
@@ -17,59 +18,36 @@ use std::hash::{Hash, Hasher};
 use thiserror::Error;
 use tsv_cli::json_utils::to_json_with_tabs;
 
-/// Validation error with self-describing names
+/// Why `audit_signature.txt` is stale.
 ///
-/// Note: Specific structure variants (StructureMissing*, StructurePrettier*, etc.) are defined
-/// but currently unused. Structure validation errors are wrapped in `StructureValidationFailed`
-/// which preserves detailed messages from `validate_fixture_structure()`. The specific variants
-/// document the intended type structure for future refactoring.
+/// Both cases are repaired by the same command (`fixtures:update:formatted`), but the user-facing
+/// remediation differs: drift is a routine regenerate, while a collapsed chain means prettier
+/// became idempotent on `output_prettier` since the signature was captured — the regenerate will
+/// delete the file, and the author should revisit whether the divergence still applies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuditSignatureStaleness {
+    /// Live chain differs from recorded chain — prettier's pass-K output drifted.
+    Drift,
+    /// Prettier is now idempotent on `output_prettier` — chain has collapsed to depth zero.
+    Collapsed,
+}
+
+impl fmt::Display for AuditSignatureStaleness {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Drift => write!(f, "prettier-chain drift from output_prettier"),
+            Self::Collapsed => write!(
+                f,
+                "prettier is now idempotent on output_prettier — chain collapsed"
+            ),
+        }
+    }
+}
+
+/// Validation error with self-describing names
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[allow(dead_code)]
 pub enum ValidationError {
-    // Structure - Missing/Invalid
-    #[error("Missing input file (input.svelte, input.ts, input.css, or input.svelte.ts)")]
-    StructureMissingInput,
-    #[error("Missing expected.json")]
-    StructureMissingExpected,
-    #[error("expected.json cannot coexist with expected_ours.json")]
-    StructureExpectedJsonWithDivergenceFiles,
-
-    // Structure - Svelte divergence
-    #[error("Directory needs _svelte_divergence suffix")]
-    StructureSvelteDivergenceMissingSuffix,
-    #[error("_svelte_divergence dir missing expected_ours/svelte.json")]
-    StructureSvelteDivergenceSuffixWithoutFiles,
-    #[error("Missing expected_ours.json in _svelte_divergence dir")]
-    StructureSvelteDivergenceMissingExpectedOurs,
-    #[error("Missing expected_svelte.json in _svelte_divergence dir")]
-    StructureSvelteDivergenceMissingExpectedSvelte,
-    #[error("expected_ours.json requires _svelte_divergence suffix")]
-    StructureExpectedOursWithoutSvelteDivergenceSuffix,
-    #[error("expected_svelte.json requires _svelte_divergence suffix")]
-    StructureExpectedSvelteWithoutSvelteDivergenceSuffix,
-    #[error("expected_ours.json and expected_svelte.json are identical")]
-    StructureSvelteDivergenceFilesIdentical,
-
-    // Structure - Prettier divergence
-    #[error("Directory needs _prettier_divergence suffix")]
-    StructurePrettierDivergenceMissingSuffix,
-    #[error("_prettier_divergence dir missing divergence files")]
-    StructurePrettierDivergenceSuffixWithoutFiles,
-    #[error("_prettier_divergence dir has unformatted_*.svelte: {}", .0.join(", "))]
-    StructurePrettierDivergenceHasUnformatted(Vec<String>),
-    #[error("{0} requires _prettier_divergence suffix")]
-    StructurePrettierVariantWithoutPrettierDivergenceSuffix(String),
-    #[error("{0} requires _prettier_divergence suffix")]
-    StructureUnformattedOursWithoutPrettierDivergenceSuffix(String),
-
-    // Structure - Content validation
-    #[error("{0} is identical to input file")]
-    StructureVariantIdenticalToInput(String),
-    #[error("README.md required for divergence")]
-    StructureMissingReadme,
-
-    /// Generic structure validation failure with detailed message
-    /// Used when validate_fixture_structure() returns an error string
+    /// Structure validation failure with detailed message from `validate_fixture_structure()`
     #[error("{0}")]
     StructureValidationFailed(String),
 
@@ -94,6 +72,12 @@ pub enum ValidationError {
     FormatterOutputPrettierOutdated,
     #[error("input file differs from prettier output")]
     FormatterInputDiffersFromPrettier(String),
+    #[error("audit_signature.txt is out of date ({0})")]
+    FormatterAuditSignatureOutdated(AuditSignatureStaleness),
+    #[error("audit_signature.txt is malformed: {0}")]
+    FormatterAuditSignatureMalformed(String),
+    #[error("audit_signature.txt walk failed: {0}")]
+    FormatterAuditSignatureWalkFailed(String),
     #[error("Formatter error: {0}")]
     FormatterError(String),
     #[error("Formatter error (svelte_divergence): {0}")]
@@ -145,6 +129,30 @@ pub enum ValidationError {
     #[error("{0} has no corresponding unformatted_ours_* file")]
     NormalizationPrettierIntermediateMissingSource(String),
 
+    // Prettier intermediate to variant (unstable first-pass output, converges to a variant)
+    #[error(
+        "{0} doesn't match prettier's first-pass output from corresponding unformatted_ours_* file"
+    )]
+    NormalizationPrettierIntermediateToVariantMismatch(String),
+    #[error(
+        "{0} is stable (prettier preserves it) - should be prettier_variant_* or variant_* instead"
+    )]
+    NormalizationPrettierIntermediateToVariantIsStable(String),
+    #[error(
+        "{0} doesn't converge to a documented variant_* / prettier_variant_* file after second pass (converges to input — rename to prettier_intermediate_* instead)"
+    )]
+    NormalizationPrettierIntermediateToVariantConvergesToInput(String),
+    #[error(
+        "{0} doesn't converge to any documented variant_* / prettier_variant_* file after second pass"
+    )]
+    NormalizationPrettierIntermediateToVariantNotConverging(String),
+    #[error("{0} has no corresponding unformatted_ours_* file")]
+    NormalizationPrettierIntermediateToVariantMissingSource(String),
+    #[error(
+        "{0} requires at least one variant_* or prettier_variant_* file in the fixture (the convergence target)"
+    )]
+    NormalizationPrettierIntermediateToVariantNoVariantTarget(String),
+
     // Duplicates (within fixture)
     #[error("Duplicate unformatted files: {}", .0.join(", "))]
     DuplicateUnformattedWithinFixture(Vec<String>),
@@ -176,33 +184,6 @@ impl ValidationError {
     /// Suggested fix for this error
     pub fn fix_hint(&self) -> &'static str {
         match self {
-            Self::StructureMissingInput => {
-                "Add input file (input.svelte, input.ts, input.css, or input.svelte.ts)"
-            }
-            Self::StructureMissingExpected => "Run: deno task fixtures:update:parsed <pattern>",
-            Self::StructureExpectedJsonWithDivergenceFiles
-            | Self::StructureSvelteDivergenceMissingSuffix
-            | Self::StructureSvelteDivergenceSuffixWithoutFiles
-            | Self::StructureSvelteDivergenceMissingExpectedOurs
-            | Self::StructureSvelteDivergenceMissingExpectedSvelte
-            | Self::StructureExpectedOursWithoutSvelteDivergenceSuffix
-            | Self::StructureExpectedSvelteWithoutSvelteDivergenceSuffix => {
-                "See docs/fixture_overview.md for _svelte_divergence naming rules"
-            }
-            Self::StructureSvelteDivergenceFilesIdentical => {
-                "Remove _svelte_divergence suffix if parsers match, or check fixture input"
-            }
-            Self::StructurePrettierDivergenceMissingSuffix
-            | Self::StructurePrettierDivergenceSuffixWithoutFiles
-            | Self::StructurePrettierDivergenceHasUnformatted(_)
-            | Self::StructurePrettierVariantWithoutPrettierDivergenceSuffix(_)
-            | Self::StructureUnformattedOursWithoutPrettierDivergenceSuffix(_) => {
-                "See docs/fixture_overview.md for _prettier_divergence naming rules"
-            }
-            Self::StructureVariantIdenticalToInput(_) => {
-                "Remove the variant file (it's identical to input file)"
-            }
-            Self::StructureMissingReadme => "Add README.md explaining the divergence",
             Self::StructureValidationFailed(_) => "See error message for details",
             Self::ParserOursDiffersFromExpected => "Fix the parser to match expected.json",
             Self::ParserExpectedJsonOutdated
@@ -239,6 +220,18 @@ impl ValidationError {
                 } else {
                     "Run: cargo run -p tsv_debug compare <fixture>/input.css to see difference"
                 }
+            }
+            Self::FormatterAuditSignatureOutdated(AuditSignatureStaleness::Drift) => {
+                "Run: deno task fixtures:update:formatted <pattern> (regenerates audit_signature.txt)"
+            }
+            Self::FormatterAuditSignatureOutdated(AuditSignatureStaleness::Collapsed) => {
+                "Run: deno task fixtures:update:formatted <pattern> (deletes audit_signature.txt), then re-evaluate whether the _prettier_divergence designation still applies"
+            }
+            Self::FormatterAuditSignatureMalformed(_) => {
+                "Delete and regenerate: deno task fixtures:update:formatted <pattern>"
+            }
+            Self::FormatterAuditSignatureWalkFailed(_) => {
+                "Investigate prettier error or non-converging chain; check input syntax. Then: deno task fixtures:update:formatted <pattern>"
             }
             Self::FormatterError(_) => "Fix the formatter implementation",
             Self::FormatterErrorInDivergence(_) => {
@@ -286,6 +279,24 @@ impl ValidationError {
             Self::NormalizationPrettierIntermediateMissingSource(_) => {
                 "Add corresponding unformatted_ours_* file or remove prettier_intermediate_* file"
             }
+            Self::NormalizationPrettierIntermediateToVariantMismatch(_) => {
+                "Update prettier_intermediate_to_variant_* to match prettier's actual first-pass output"
+            }
+            Self::NormalizationPrettierIntermediateToVariantIsStable(_) => {
+                "Rename to prettier_variant_* or variant_* (prettier preserves this idempotently)"
+            }
+            Self::NormalizationPrettierIntermediateToVariantConvergesToInput(_) => {
+                "Rename to prettier_intermediate_* (second pass converges to input, not a variant)"
+            }
+            Self::NormalizationPrettierIntermediateToVariantNotConverging(_) => {
+                "Check that the file's second prettier pass produces content matching some variant_* or prettier_variant_* sibling"
+            }
+            Self::NormalizationPrettierIntermediateToVariantMissingSource(_) => {
+                "Add corresponding unformatted_ours_* file or remove prettier_intermediate_to_variant_* file"
+            }
+            Self::NormalizationPrettierIntermediateToVariantNoVariantTarget(_) => {
+                "Add a variant_* or prettier_variant_* file documenting the convergence target"
+            }
             Self::DuplicateUnformattedWithinFixture(_)
             | Self::DuplicatePrettierVariantWithinFixture(_) => {
                 "Remove duplicate files (identical content)"
@@ -320,24 +331,7 @@ impl ValidationError {
     /// Get error category for grouping
     pub fn category(&self) -> &'static str {
         match self {
-            Self::StructureMissingInput
-            | Self::StructureMissingExpected
-            | Self::StructureExpectedJsonWithDivergenceFiles
-            | Self::StructureSvelteDivergenceMissingSuffix
-            | Self::StructureSvelteDivergenceSuffixWithoutFiles
-            | Self::StructureSvelteDivergenceMissingExpectedOurs
-            | Self::StructureSvelteDivergenceMissingExpectedSvelte
-            | Self::StructureExpectedOursWithoutSvelteDivergenceSuffix
-            | Self::StructureExpectedSvelteWithoutSvelteDivergenceSuffix
-            | Self::StructureSvelteDivergenceFilesIdentical
-            | Self::StructurePrettierDivergenceMissingSuffix
-            | Self::StructurePrettierDivergenceSuffixWithoutFiles
-            | Self::StructurePrettierDivergenceHasUnformatted(_)
-            | Self::StructurePrettierVariantWithoutPrettierDivergenceSuffix(_)
-            | Self::StructureUnformattedOursWithoutPrettierDivergenceSuffix(_)
-            | Self::StructureVariantIdenticalToInput(_)
-            | Self::StructureMissingReadme
-            | Self::StructureValidationFailed(_) => "Structure",
+            Self::StructureValidationFailed(_) => "Structure",
 
             Self::ParserOursDiffersFromExpected
             | Self::ParserExpectedJsonOutdated
@@ -349,6 +343,9 @@ impl ValidationError {
             Self::FormatterInputNotIdempotent(_)
             | Self::FormatterOutputPrettierOutdated
             | Self::FormatterInputDiffersFromPrettier(_)
+            | Self::FormatterAuditSignatureOutdated(_)
+            | Self::FormatterAuditSignatureMalformed(_)
+            | Self::FormatterAuditSignatureWalkFailed(_)
             | Self::FormatterError(_)
             | Self::FormatterErrorInDivergence(_) => "Formatter",
 
@@ -366,7 +363,13 @@ impl ValidationError {
             | Self::NormalizationVariantNormalizesToInput(_)
             | Self::NormalizationPrettierIntermediateIsStable(_)
             | Self::NormalizationPrettierIntermediateNotConverging(_)
-            | Self::NormalizationPrettierIntermediateMissingSource(_) => "Normalization",
+            | Self::NormalizationPrettierIntermediateMissingSource(_)
+            | Self::NormalizationPrettierIntermediateToVariantMismatch(_)
+            | Self::NormalizationPrettierIntermediateToVariantIsStable(_)
+            | Self::NormalizationPrettierIntermediateToVariantConvergesToInput(_)
+            | Self::NormalizationPrettierIntermediateToVariantNotConverging(_)
+            | Self::NormalizationPrettierIntermediateToVariantMissingSource(_)
+            | Self::NormalizationPrettierIntermediateToVariantNoVariantTarget(_) => "Normalization",
 
             Self::DuplicateUnformattedWithinFixture(_)
             | Self::DuplicatePrettierVariantWithinFixture(_)
@@ -440,6 +443,7 @@ pub struct FixtureValidation {
     pub prettier_variant_count: usize,
     pub variant_count: usize,
     pub prettier_intermediate_count: usize,
+    pub prettier_intermediate_to_variant_count: usize,
     pub invalid_syntax_count: usize,
     /// Input content for cross-fixture duplicate detection (populated during validation)
     pub input_content: Option<String>,
@@ -471,6 +475,7 @@ impl FixtureValidation {
             prettier_variant_count: 0,
             variant_count: 0,
             prettier_intermediate_count: 0,
+            prettier_intermediate_to_variant_count: 0,
             invalid_syntax_count: 0,
             input_content: None,
             input_file_name: None,
@@ -562,13 +567,6 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
     result.input_content = Some(input.clone());
     result.input_file_name = Some(fixture.input_file.clone());
 
-    // Get directory info and input type
-    let fixture_dir = &fixture.path;
-    let dir_name = fixture_dir
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("");
-    let is_svelte_divergence_dir = has_svelte_divergence_suffix(dir_name);
     let input_type = fixture.input_type();
     let input_ext = input_type.extension();
 
@@ -593,14 +591,7 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
 
     // Phase 5: Deno sidecar validations (prettier + Svelte/TypeScript parser)
     // P1, P3: Parser freshness
-    validate_parser_external(
-        &mut result,
-        fixture,
-        &input,
-        is_svelte_divergence_dir,
-        input_type,
-    )
-    .await;
+    validate_parser_external(&mut result, fixture, &input, input_type).await;
 
     // F2, F3: Prettier freshness and baseline (Svelte and SvelteTs)
     // TypeScript/CSS fixtures don't use prettier-svelte plugin
@@ -1025,7 +1016,6 @@ async fn validate_parser_external(
     result: &mut FixtureValidation,
     fixture: &Fixture,
     input: &str,
-    _is_svelte_divergence_dir: bool,
     input_type: InputType,
 ) {
     // CSS fixtures use Svelte's parseCss as the external canonical source
@@ -1201,6 +1191,11 @@ async fn validate_formatter_prettier(
             } else {
                 result.add_success(ValidationSuccess::FormatterMatchesPrettier);
             }
+
+            // F4: When audit_signature.txt exists, byte-equality-check the entire
+            // prettier-chain from output_prettier to its fixed point. Catches drift
+            // in pass-2+ outputs that F2's pass-1 check would miss.
+            validate_audit_signature(result, fixture, &expected_prettier).await;
         }
     } else {
         // F3: No output_prettier file - prettier(input) must equal input
@@ -1221,6 +1216,87 @@ async fn validate_formatter_prettier(
         } else {
             result.add_success(ValidationSuccess::FormatterMatchesPrettier);
         }
+    }
+}
+
+/// F4: Validate audit_signature.txt against the live prettier chain.
+///
+/// When the signature file exists, it pins prettier's multi-pass chain from
+/// `output_prettier.*` to its fixed point. This catches drift that F2 (pass-1 only)
+/// would miss — if prettier's pass-2+ output changes byte-for-byte, F4 fails.
+///
+/// When the signature file is absent, this check is skipped: most fixtures have
+/// prettier idempotent on `output_prettier`, so no signature is needed.
+async fn validate_audit_signature(
+    result: &mut FixtureValidation,
+    fixture: &Fixture,
+    output_prettier_content: &str,
+) {
+    let signature_path = fixture.audit_signature_path();
+    if !signature_path.exists() {
+        return;
+    }
+
+    let recorded_raw = match read_file(&signature_path) {
+        Ok(s) => s,
+        Err(e) => {
+            result.add_error(ValidationError::FormatterAuditSignatureMalformed(e));
+            return;
+        }
+    };
+    let recorded = match AuditSignature::parse(&recorded_raw) {
+        Ok(s) => s,
+        Err(e) => {
+            result.add_error(ValidationError::FormatterAuditSignatureMalformed(e));
+            return;
+        }
+    };
+
+    let parser = fixture.input_type().prettier_parser();
+    let live = match AuditSignature::walk(output_prettier_content, parser).await {
+        Ok(Some(s)) => s,
+        Ok(None) => {
+            // Prettier idempotent on output_prettier but signature file exists →
+            // chain collapsed since capture; the regenerate will delete the file.
+            result.add_error(ValidationError::FormatterAuditSignatureOutdated(
+                AuditSignatureStaleness::Collapsed,
+            ));
+            return;
+        }
+        Err(e) => {
+            // Distinct from `Malformed`: the signature parsed fine, but walking the
+            // live chain failed (prettier error or non-converging chain). The remediation
+            // differs — investigate the prettier failure or the input, don't blindly regenerate.
+            result.add_error(ValidationError::FormatterAuditSignatureWalkFailed(e));
+            return;
+        }
+    };
+
+    if live.passes != recorded.passes {
+        result.add_error(ValidationError::FormatterAuditSignatureOutdated(
+            AuditSignatureStaleness::Drift,
+        ));
+        // Diff the first differing pass for actionable output
+        let max_len = recorded.passes.len().max(live.passes.len());
+        for i in 0..max_len {
+            let recorded_step = recorded.passes.get(i).map_or("", String::as_str);
+            let live_step = live.passes.get(i).map_or("", String::as_str);
+            if recorded_step != live_step {
+                let pass_num = i + 2;
+                diff::print_diff_with_options(
+                    &format!(
+                        "audit_signature drift (pass={pass_num}): {}/audit_signature.txt",
+                        fixture.relative_path
+                    ),
+                    recorded_step,
+                    live_step,
+                    &diff::DiffOptions::freshness(),
+                );
+                break;
+            }
+        }
+    } else {
+        result.add_success(ValidationSuccess::FormatterMatchesPrettier);
     }
 }
 
@@ -1455,6 +1531,124 @@ async fn validate_normalization_prettier(
         }
     }
 
+    // N7b: prettier_intermediate_to_variant_* validation
+    // Like N7, but the second pass must converge to a documented variant_*/prettier_variant_*
+    // file (not input).
+    let prettier_intermediate_to_variant_variants =
+        discover_prettier_intermediate_to_variant_variants(fixture_dir, input_ext);
+    result.prettier_intermediate_to_variant_count = prettier_intermediate_to_variant_variants.len();
+
+    // Pre-read variant_*/prettier_variant_* contents — these are the allowed convergence targets.
+    let mut variant_target_contents: Vec<String> = Vec::new();
+    for pv_name in &prettier_variant_variants {
+        if let Ok(content) = read_file(&fixture_dir.join(pv_name)) {
+            variant_target_contents.push(content);
+        }
+    }
+    for v_name in &variant_variants {
+        if let Ok(content) = read_file(&fixture_dir.join(v_name)) {
+            variant_target_contents.push(content);
+        }
+    }
+
+    for intermediate_name in &prettier_intermediate_to_variant_variants {
+        let intermediate_path = fixture_dir.join(intermediate_name);
+        let Ok(intermediate_content) = read_file(&intermediate_path) else {
+            continue;
+        };
+
+        // Extract suffix: prettier_intermediate_to_variant_X.svelte -> X
+        let suffix = intermediate_name
+            .strip_prefix("prettier_intermediate_to_variant_")
+            .and_then(|s| s.strip_suffix(input_ext))
+            .unwrap_or("");
+
+        // Check 1: Must have corresponding unformatted_ours_* file
+        let Some(expected_content) = unformatted_ours_prettier_outputs.get(suffix) else {
+            result.add_error(
+                ValidationError::NormalizationPrettierIntermediateToVariantMissingSource(
+                    intermediate_name.clone(),
+                ),
+            );
+            continue;
+        };
+
+        // Check 2: must have at least one variant_*/prettier_variant_* file as convergence target
+        if variant_target_contents.is_empty() {
+            result.add_error(
+                ValidationError::NormalizationPrettierIntermediateToVariantNoVariantTarget(
+                    intermediate_name.clone(),
+                ),
+            );
+            continue;
+        }
+
+        // Check 3: prettier(unformatted_ours_X) == prettier_intermediate_to_variant_X
+        if *expected_content != intermediate_content {
+            result.add_error(
+                ValidationError::NormalizationPrettierIntermediateToVariantMismatch(
+                    intermediate_name.clone(),
+                ),
+            );
+            diff::print_diff_with_options(
+                &format!(
+                    "prettier_intermediate_to_variant mismatch: {}/{}",
+                    fixture.relative_path, intermediate_name
+                ),
+                &intermediate_content,
+                expected_content,
+                &diff::DiffOptions::freshness(),
+            );
+            continue;
+        }
+
+        // Check 4: prettier(prettier_intermediate_to_variant_X) != prettier_intermediate_to_variant_X (unstable)
+        match run_prettier(&intermediate_content, prettier_parser).await {
+            Ok(second_pass) => {
+                if second_pass == intermediate_content {
+                    result.add_error(
+                        ValidationError::NormalizationPrettierIntermediateToVariantIsStable(
+                            intermediate_name.clone(),
+                        ),
+                    );
+                    continue;
+                }
+
+                // Check 5: second pass must NOT equal input (else use prettier_intermediate_* instead)
+                if second_pass == *input {
+                    result.add_error(
+                        ValidationError::NormalizationPrettierIntermediateToVariantConvergesToInput(
+                            intermediate_name.clone(),
+                        ),
+                    );
+                    continue;
+                }
+
+                // Check 6: second pass must match some variant_* / prettier_variant_* content
+                let hits_variant = variant_target_contents.contains(&second_pass);
+                if !hits_variant {
+                    result.add_error(
+                        ValidationError::NormalizationPrettierIntermediateToVariantNotConverging(
+                            intermediate_name.clone(),
+                        ),
+                    );
+                    if let Some(first_target) = variant_target_contents.first() {
+                        diff::print_diff_with_options(
+                            &format!(
+                                "prettier_intermediate_to_variant not converging: {}/{}",
+                                fixture.relative_path, intermediate_name
+                            ),
+                            &second_pass,
+                            first_target,
+                            &diff::DiffOptions::prettier_behavior(),
+                        );
+                    }
+                }
+            }
+            Err(_) => continue,
+        }
+    }
+
     // N8: unformatted_prettier_* validation
     // These files test that prettier normalizes certain inputs to output_prettier.*
     let unformatted_prettier_variants =
@@ -1520,12 +1714,20 @@ async fn validate_normalization_prettier(
     // After N7, check which unformatted_ours_* prettier outputs weren't consumed by prettier_intermediate_*
     // Then check if those outputs match any known file content (output_prettier, prettier_variant_*, variant_*)
     {
-        // Build set of suffixes claimed by prettier_intermediate_*
+        // Build set of suffixes claimed by prettier_intermediate_* and prettier_intermediate_to_variant_*
         let mut claimed_suffixes: std::collections::HashSet<String> =
             std::collections::HashSet::new();
         for intermediate_name in &prettier_intermediate_variants {
             let suffix = intermediate_name
                 .strip_prefix("prettier_intermediate_")
+                .and_then(|s| s.strip_suffix(input_ext))
+                .unwrap_or("")
+                .to_string();
+            claimed_suffixes.insert(suffix);
+        }
+        for intermediate_name in &prettier_intermediate_to_variant_variants {
+            let suffix = intermediate_name
+                .strip_prefix("prettier_intermediate_to_variant_")
                 .and_then(|s| s.strip_suffix(input_ext))
                 .unwrap_or("")
                 .to_string();
@@ -1697,6 +1899,7 @@ pub struct ValidationSummary {
     pub total_prettier_variant: usize,
     pub total_variant: usize,
     pub total_prettier_intermediate: usize,
+    pub total_prettier_intermediate_to_variant: usize,
     pub total_invalid_syntax: usize,
     pub results: Vec<FixtureValidation>,
     pub cross_fixture_duplicates: Vec<Vec<String>>,
@@ -1716,6 +1919,8 @@ impl ValidationSummary {
         self.total_prettier_variant += result.prettier_variant_count;
         self.total_variant += result.variant_count;
         self.total_prettier_intermediate += result.prettier_intermediate_count;
+        self.total_prettier_intermediate_to_variant +=
+            result.prettier_intermediate_to_variant_count;
         self.total_invalid_syntax += result.invalid_syntax_count;
         self.total_undocumented_prettier += result.undocumented_prettier_outputs.len();
 
@@ -1752,6 +1957,10 @@ impl ValidationSummary {
     ///
     /// A high count indicates the sidecar crashed during the test run,
     /// causing cascading failures that aren't real fixture issues.
+    ///
+    /// Called from `tests/fixtures_tests.rs` (root-crate integration test).
+    /// The `tsv_debug` binary doesn't use this, so the `#[allow]` silences a
+    /// dead_code warning that only fires in the binary build.
     #[allow(dead_code)]
     pub fn count_sidecar_failures(&self) -> usize {
         self.results
@@ -1769,6 +1978,8 @@ impl ValidationSummary {
     ///
     /// A high count indicates the sidecar is hanging on certain inputs,
     /// possibly due to a bug in prettier/acorn or resource exhaustion.
+    ///
+    /// Called from `tests/fixtures_tests.rs` — see note on `count_sidecar_failures`.
     #[allow(dead_code)]
     pub fn count_timeout_failures(&self) -> usize {
         self.results
@@ -1892,6 +2103,12 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
             variant_parts.push(format!(
                 "{} prettier_intermediate_*",
                 summary.total_prettier_intermediate
+            ));
+        }
+        if summary.total_prettier_intermediate_to_variant > 0 {
+            variant_parts.push(format!(
+                "{} prettier_intermediate_to_variant_*",
+                summary.total_prettier_intermediate_to_variant
             ));
         }
         if summary.total_invalid_syntax > 0 {

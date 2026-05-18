@@ -10,7 +10,7 @@
 				"start": 60,
 				"end": 169,
 				"name": "container",
-				"prelude": "/* a */ (min-width: 100px) /* b */ and /* c */ (max-width: 200px)",
+				"prelude": "(min-width: 100px)  and  (max-width: 200px)",
 				"block": {
 					"type": "Block",
 					"start": 137,

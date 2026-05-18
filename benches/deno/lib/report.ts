@@ -509,16 +509,15 @@ export function generateComparisonSummary(
 
 	lines.push('');
 	lines.push('  (parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts)');
-	if (hasNativeOxc) {
+	if (hasNativeOxc || hasWasmOxc) {
 		lines.push(
-			'  (parse native: oxc-parser uses raw transfer, tsv-json includes JSON serialization)',
+			'  (oxc-parser returns a lazy proxy backed by raw buffer; tsv-json eagerly',
+		);
+		lines.push(
+			'   materializes the full JS AST tree — comparison is not apples-to-apples)',
 		);
 	}
-	if (hasWasmOxc) {
-		lines.push(
-			'  (parse WASM: oxc-parser-wasm and tsv_wasm-json both serialize to JSON — fair comparison)',
-		);
-	}
+	lines.push('  (format groups include parse time — each formatter parses internally)');
 
 	return lines.join('\n');
 }
@@ -564,16 +563,12 @@ export function generateComparisonMarkdown(
 	const notes: string[] = [
 		'Parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts',
 	];
-	if (hasNativeOxc) {
+	if (hasNativeOxc || hasWasmOxc) {
 		notes.push(
-			'Parse native: oxc-parser uses raw transfer, tsv-json includes JSON serialization',
+			'oxc-parser returns a lazy proxy backed by raw buffer; tsv-json eagerly materializes the full JS AST tree — comparison is not apples-to-apples',
 		);
 	}
-	if (hasWasmOxc) {
-		notes.push(
-			'Parse WASM: oxc-parser-wasm and tsv_wasm-json both serialize to JSON — fair comparison',
-		);
-	}
+	notes.push('Format groups include parse time — each formatter parses internally');
 
 	lines.push('_' + notes.join('. ') + '_');
 

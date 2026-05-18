@@ -10,7 +10,7 @@
 				"start": 9,
 				"end": 69,
 				"name": "media",
-				"prelude": "screen /* c */, print",
+				"prelude": "screen , print",
 				"block": {
 					"type": "Block",
 					"start": 38,

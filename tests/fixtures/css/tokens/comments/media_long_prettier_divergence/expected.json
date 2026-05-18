@@ -10,7 +10,7 @@
 				"start": 90,
 				"end": 220,
 				"name": "media",
-				"prelude": "(min-width: 1000px) /* c */ and (max-width: 2000px) and (height > 300px) and\n\t\t(a: 100aaaaa)",
+				"prelude": "(min-width: 1000px)  and (max-width: 2000px) and (height > 300px) and\n\t\t(a: 100aaaaa)",
 				"block": {
 					"type": "Block",
 					"start": 190,

@@ -12,7 +12,7 @@ impl<'a> Printer<'a> {
     /// - style/script: handled by build_raw_content_element_doc()
     /// - pre/textarea: handled by build_whitespace_sensitive_element_doc()
     /// - all others: handled by build_element_doc()
-    pub fn print_element(&mut self, element: &internal::Element) {
+    pub(crate) fn print_element(&mut self, element: &internal::Element) {
         let doc = self.build_element_doc(element);
         self.render_doc_immediate(doc);
     }
@@ -20,7 +20,7 @@ impl<'a> Printer<'a> {
     /// Format a Svelte special element
     ///
     /// Doc-based path for all special elements (svelte:*, slot, title).
-    pub fn print_special_element(&mut self, element: &internal::SpecialElement) {
+    pub(crate) fn print_special_element(&mut self, element: &internal::SpecialElement) {
         let doc = self.build_special_element_doc(element);
         self.render_doc_immediate(doc);
     }

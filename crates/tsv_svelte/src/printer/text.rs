@@ -8,7 +8,7 @@
 use crate::printer::Printer;
 
 // Helper trait for text analysis
-pub trait TextAnalysis {
+pub(crate) trait TextAnalysis {
     fn is_whitespace_only(&self) -> bool;
     fn count_newlines(&self) -> usize;
     fn has_blank_line(&self) -> bool;

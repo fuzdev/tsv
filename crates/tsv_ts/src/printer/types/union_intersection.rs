@@ -12,7 +12,7 @@ use super::helpers::{
     type_needs_parens_in_union,
 };
 use super::{CommentFilter, CommentSpacing, Printer};
-use crate::ast::internal::{TSIntersectionType, TSType, TSUnionType};
+use crate::ast::internal::{self, TSIntersectionType, TSParenthesizedType, TSType, TSUnionType};
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -58,6 +58,16 @@ impl<'a> Printer<'a> {
         // Example: `{ name: string; value: number } | null` stays hugged.
         if !has_comments_on_or_between_members && should_hug_union_type(union) {
             let mut parts = Vec::new();
+            // Extract leading block comments before the first type
+            // (e.g., `| /* c */ A` — comment between leading `|` and first member)
+            if let Some(first) = union.types.first() {
+                parts.push(self.build_comments_between_filtered(
+                    union.span.start,
+                    first.span().start,
+                    CommentSpacing::Trailing,
+                    CommentFilter::BlockOnly,
+                ));
+            }
             for (i, t) in union.types.iter().enumerate() {
                 if i > 0 {
                     parts.push(d.text(" | "));
@@ -67,8 +77,21 @@ impl<'a> Printer<'a> {
             return d.concat(&parts);
         }
 
-        // Check for line comments between union members (force multiline)
-        if self.union_has_line_comments_between_members(union) {
+        // Check for line comments that force the multiline layout:
+        // - Between union members (`A | B // c\n  | C`)
+        // - Before the first member (`| // c\n  A | B`)
+        // - Inside a member's stripped paren (`A | (// c\n  B)`) — these are
+        //   relocated to trail the previous member in the multiline path.
+        let first_type_start = union.types.first().map(|t| t.span().start);
+        let has_leading_line_comments = first_type_start
+            .is_some_and(|start| self.has_line_comments_between(union.span.start, start));
+        let has_paren_inner_leading_line_comments = union.types.iter().any(
+            |t| matches!(t, TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p)),
+        );
+        if has_leading_line_comments
+            || self.union_has_line_comments_between_members(union)
+            || has_paren_inner_leading_line_comments
+        {
             return self.build_union_type_doc_with_line_comments(union);
         }
 
@@ -103,6 +126,15 @@ impl<'a> Printer<'a> {
             } else {
                 // First type: "| " when broken, nothing when flat
                 parts.push(d.if_break(d.text("| "), d.empty()));
+
+                // Extract leading block comments before the first type
+                // (e.g., `| /* c */ A | B` — comment between leading `|` and first member)
+                parts.push(self.build_comments_between_filtered(
+                    union.span.start,
+                    type_start,
+                    CommentSpacing::Trailing,
+                    CommentFilter::BlockOnly,
+                ));
             }
 
             // Special handling for object type literals: use aligned indentation
@@ -164,6 +196,19 @@ impl<'a> Printer<'a> {
             let type_start = t.span().start;
             let type_end = t.span().end;
 
+            // For non-first members, detect leading line comments inside the
+            // parens of a TSParenthesizedType wrapper. Prettier relocates these
+            // to trail the previous member (e.g., `a | (// c\n b)` becomes
+            // `| a // c\n | b`). We extract them so they can be emitted before
+            // the `| ` separator and skipped when building the member's type doc.
+            let relocated_paren_leading: Vec<&internal::Comment> = if i > 0
+                && let TSType::Parenthesized(p) = t
+            {
+                self.paren_leading_line_comments(p)
+            } else {
+                Vec::new()
+            };
+
             if i > 0 {
                 // Get previous type end and find the pipe position
                 let prev_type_end = union.types[i - 1].span().end;
@@ -174,6 +219,11 @@ impl<'a> Printer<'a> {
                 {
                     // Comments before the pipe (trailing on previous type's line or on own lines)
                     parts.extend(self.build_trailing_comments_multiline(prev_type_end, pipe_pos));
+
+                    // Relocated paren leading line comments: trail prev member
+                    for comment in &relocated_paren_leading {
+                        parts.push(self.build_trailing_line_comment_doc(comment));
+                    }
 
                     // Newline before `| `
                     parts.push(d.hardline());
@@ -189,10 +239,28 @@ impl<'a> Printer<'a> {
             } else {
                 // First type: always has `| ` prefix when multiline
                 parts.push(d.text("| "));
+
+                // Extract leading comments before the first type. Both block and
+                // line comments are emitted here — line comments require multiline
+                // and place the type on the next line (e.g., `| // c\n   A`).
+                parts.extend(self.build_leading_comments_multiline(union.span.start, type_start));
             }
 
-            // Add the type
-            if let TSType::TypeLiteral(obj) = t {
+            // Add the type. When we relocated leading line comments from inside
+            // a TSParenthesizedType wrapper, build the inner type directly so
+            // the relocated comments aren't emitted again. Re-wrap in parens
+            // when precedence demands it.
+            if !relocated_paren_leading.is_empty()
+                && let TSType::Parenthesized(p) = t
+            {
+                if type_needs_parens_in_union(&p.type_annotation) {
+                    parts.push(d.text("("));
+                    parts.push(self.build_type_doc(&p.type_annotation));
+                    parts.push(d.text(")"));
+                } else {
+                    parts.push(self.build_type_doc(&p.type_annotation));
+                }
+            } else if let TSType::TypeLiteral(obj) = t {
                 parts.push(self.build_union_member_object_literal_doc(obj));
             } else {
                 parts.push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_union));
@@ -258,6 +326,27 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
+        // Hoist leading line comments inside the first member's stripped parens
+        // OUT of the intersection (e.g., `(// c\n a) & b` → `// c\n a & b`).
+        // The comment goes on its own line BEFORE the intersection so the
+        // intersection content itself can still fit inline.
+        if let Some(TSType::Parenthesized(first_paren)) = intersection.types.first() {
+            let first_paren_leading = self.paren_leading_line_comments(first_paren);
+            if !first_paren_leading.is_empty() {
+                let inner = self.build_intersection_type_doc_with_first_paren_leading_stripped(
+                    intersection,
+                    first_paren,
+                );
+                let mut parts = Vec::new();
+                for comment in &first_paren_leading {
+                    parts.push(self.build_comment_doc(comment));
+                    parts.push(d.hardline());
+                }
+                parts.push(inner);
+                return d.concat(&parts);
+            }
+        }
+
         // Check for line comments between intersection members (force multiline)
         // Only check the gaps between member types, not inside member types
         let has_line_comments_between_members = intersection
@@ -287,7 +376,17 @@ impl<'a> Printer<'a> {
         // Build first type separately (not indented)
         let mut first_parts = Vec::new();
         let first_type = &intersection.types[0];
+        let first_type_start = first_type.span().start;
         let first_type_end = first_type.span().end;
+
+        // Extract leading block comments before the first type
+        // (e.g., `& /* c */ A & B` — comment between leading `&` and first member)
+        first_parts.push(self.build_comments_between_filtered(
+            intersection.span.start,
+            first_type_start,
+            CommentSpacing::Trailing,
+            CommentFilter::BlockOnly,
+        ));
 
         first_parts
             .push(self.build_type_doc_maybe_parens(first_type, type_needs_parens_in_intersection));
@@ -469,6 +568,17 @@ impl<'a> Printer<'a> {
                 }
             }
 
+            // For the first type, extract leading block comments
+            // (e.g., `& /* c */ A & B` — comment between leading `&` and first member)
+            if i == 0 {
+                parts.push(self.build_comments_between_filtered(
+                    intersection.span.start,
+                    type_start,
+                    CommentSpacing::Trailing,
+                    CommentFilter::BlockOnly,
+                ));
+            }
+
             // Add the type
             parts.push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_intersection));
 
@@ -484,6 +594,44 @@ impl<'a> Printer<'a> {
             }
         }
 
+        d.concat(&parts)
+    }
+
+    /// Build an intersection type's doc with the first member's stripped-paren
+    /// leading line comments excluded from the output. Used by the hoisting
+    /// path in `build_intersection_type_doc` — the caller emits the hoisted
+    /// comment before this doc, and passes the first member's `TSParenthesizedType`
+    /// directly so we can strip its parens without re-matching.
+    fn build_intersection_type_doc_with_first_paren_leading_stripped(
+        &self,
+        intersection: &TSIntersectionType,
+        first_paren: &TSParenthesizedType,
+    ) -> DocId {
+        let d = self.d();
+        let inner = first_paren.type_annotation.as_ref();
+        let first_doc = if type_needs_parens_in_intersection(inner) {
+            // Re-wrap inner in parens (e.g., union in intersection: `(A | B) & C`).
+            if let TSType::Union(union) = inner {
+                self.build_parenthesized_union_doc(union)
+            } else {
+                d.concat(&[
+                    d.text("("),
+                    d.align_spaces(2, d.indent(self.build_type_doc(inner))),
+                    d.text(")"),
+                ])
+            }
+        } else {
+            self.build_type_doc(inner)
+        };
+
+        // Build the rest as `first & second & third...` inline (the hoisted
+        // comment forces a hardline before; we want the intersection itself
+        // to remain compact when possible).
+        let mut parts = vec![first_doc];
+        for t in intersection.types.iter().skip(1) {
+            parts.push(d.text(" & "));
+            parts.push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_intersection));
+        }
         d.concat(&parts)
     }
 

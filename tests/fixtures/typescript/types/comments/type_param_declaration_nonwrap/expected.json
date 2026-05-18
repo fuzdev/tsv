@@ -1,0 +1,614 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 326,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Line comment in call signature type params (non-wrapping path)",
+			"start": 20,
+			"end": 85,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 108,
+			"end": 112,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 6
+				},
+				"end": {
+					"line": 5,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Block comment in call signature type params",
+			"start": 132,
+			"end": 178,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 196,
+			"end": 203,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 5
+				},
+				"end": {
+					"line": 11,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Line comment in construct signature type params",
+			"start": 220,
+			"end": 270,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 297,
+			"end": 301,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 6
+				},
+				"end": {
+					"line": 17,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 325,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 316,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 20,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 87,
+					"end": 129,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 92,
+						"end": 93,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 96,
+						"end": 128,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"members": [
+							{
+								"type": "TSCallSignatureDeclaration",
+								"start": 100,
+								"end": 125,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 12
+									}
+								},
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 100,
+									"end": 116,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 3
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 105,
+											"end": 106,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 3
+												},
+												"end": {
+													"line": 5,
+													"column": 4
+												}
+											},
+											"name": "T",
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " c",
+													"start": 108,
+													"end": 112
+												}
+											]
+										}
+									],
+									"extra": {
+										"trailingComma": 106
+									}
+								},
+								"parameters": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 118,
+									"end": 124,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 5
+										},
+										"end": {
+											"line": 6,
+											"column": 11
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSVoidKeyword",
+										"start": 120,
+										"end": 124,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 7
+											},
+											"end": {
+												"line": 6,
+												"column": 11
+											}
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment in call signature type params (non-wrapping path)",
+							"start": 20,
+							"end": 85
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 180,
+					"end": 217,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 185,
+						"end": 186,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 6
+							},
+							"end": {
+								"line": 10,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 189,
+						"end": 216,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 10
+							},
+							"end": {
+								"line": 12,
+								"column": 2
+							}
+						},
+						"members": [
+							{
+								"type": "TSCallSignatureDeclaration",
+								"start": 193,
+								"end": 213,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 22
+									}
+								},
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 193,
+									"end": 204,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 13
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 194,
+											"end": 195,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 3
+												},
+												"end": {
+													"line": 11,
+													"column": 4
+												}
+											},
+											"name": "T",
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 196,
+													"end": 203
+												}
+											]
+										}
+									]
+								},
+								"parameters": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 206,
+									"end": 212,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 15
+										},
+										"end": {
+											"line": 11,
+											"column": 21
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSVoidKeyword",
+										"start": 208,
+										"end": 212,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 17
+											},
+											"end": {
+												"line": 11,
+												"column": 21
+											}
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block comment in call signature type params",
+							"start": 132,
+							"end": 178
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 272,
+					"end": 315,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 277,
+						"end": 278,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 6
+							},
+							"end": {
+								"line": 15,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 281,
+						"end": 314,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 10
+							},
+							"end": {
+								"line": 19,
+								"column": 2
+							}
+						},
+						"members": [
+							{
+								"type": "TSConstructSignatureDeclaration",
+								"start": 285,
+								"end": 311,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 9
+									}
+								},
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 289,
+									"end": 305,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 6
+										},
+										"end": {
+											"line": 18,
+											"column": 3
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 294,
+											"end": 295,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 3
+												},
+												"end": {
+													"line": 17,
+													"column": 4
+												}
+											},
+											"name": "T",
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " c",
+													"start": 297,
+													"end": 301
+												}
+											]
+										}
+									],
+									"extra": {
+										"trailingComma": 295
+									}
+								},
+								"parameters": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 307,
+									"end": 310,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 5
+										},
+										"end": {
+											"line": 18,
+											"column": 8
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 309,
+										"end": 310,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 7
+											},
+											"end": {
+												"line": 18,
+												"column": 8
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 309,
+											"end": 310,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 7
+												},
+												"end": {
+													"line": 18,
+													"column": 8
+												}
+											},
+											"name": "C"
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment in construct signature type params",
+							"start": 220,
+							"end": 270
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -1,58 +1,92 @@
 // Shared print configuration across all formatters
 
-/// Print configuration
-#[derive(Debug, Clone, Copy)]
-pub struct PrintConfig {
-    /// Indent string (default: tabs)
-    pub indent: &'static str,
-    /// Maximum line width (default: 100, matching prettier default)
-    pub print_width: usize,
-    /// Tab width for visual width calculations (default: 2)
-    pub tab_width: usize,
-    /// Base indent offset for width calculations (default: 0)
-    /// Used when formatting nested content (e.g., CSS inside Svelte)
-    /// where the output will be wrapped with additional indentation
-    pub base_indent_offset: usize,
-    /// First line column offset for width calculations (default: 0)
-    /// Used when formatting expressions that start mid-line (e.g., `{#each expr as item}`)
-    /// The expression starts at column first_line_offset, not column 0.
-    pub first_line_offset: usize,
-    /// Expected suffix width after the expression (default: 0)
-    /// Used when formatting expressions followed by known suffix text (e.g., ` as item}...`)
-    /// This reduces the effective line width for wrapping decisions.
-    pub suffix_width: usize,
-    /// Whether to add trailing comma for arrow type params disambiguation (default: true)
-    /// When true, single type params in arrow functions get a trailing comma: `<T,>` instead of `<T>`
-    /// This matches prettier's behavior in Svelte files where `<T>` could be confused with template syntax.
-    /// Set to false for pure TypeScript (.ts) files.
-    pub arrow_type_param_trailing_comma: bool,
-    /// Whether to force binary expressions to allow line breaks even with 2 operands (default: false)
-    /// When true, simple binary expressions like `a || b` can break when they exceed print width.
-    /// Used in attribute string contexts where Prettier allows internal expression breaks.
-    pub force_binary_breaks: bool,
-    /// Whether this expression is embedded in a template language (default: false)
-    /// When true, binary expressions use ContinuationIndent style (group([head, indent(rest)]))
-    /// instead of Grouped style (group(parts)). This matches Prettier's behavior where
-    /// JsExpressionRoot parent triggers `shouldNotIndent = true` (no indent) at the top level,
-    /// but nested binaries within the expression still get normal indentation.
-    pub is_embedded_expression: bool,
+/// Maximum line width used by the formatter (matches Prettier default).
+///
+/// Hardcoded — see [`crate::config`] module docs and the project README.
+/// The renderer reads this constant directly; tests override widths via
+/// the `*_with_widths` rendering helpers.
+pub const PRINT_WIDTH: usize = 100;
+
+/// Visual width of a single tab character, used for column calculations.
+pub const TAB_WIDTH: usize = 2;
+
+/// Indent string emitted at each indentation level.
+///
+/// `"\t"` matches the project's tabs-only indentation policy.
+pub const INDENT: &str = "\t";
+
+/// Workspace-wide doc-builder configuration.
+///
+/// Currently empty: the renderer reads compile-time globals ([`PRINT_WIDTH`] /
+/// [`TAB_WIDTH`] / [`INDENT`]) directly, embedding state lives on
+/// [`EmbedContext`], and language-specific knobs live on the language's own
+/// config (e.g., `tsv_ts::TsConfig`). This type is the reserved slot for
+/// cross-language doc-builder toggles that will appear when the hardcoded
+/// pre-v0.1 posture relaxes — future Prettier-style options that apply to
+/// every language go here.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PrintConfig {}
+
+/// How the renderer should treat the doc tree at its outer boundary.
+///
+/// Replaces the old `PrintConfig::is_embedded_expression: bool`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LayoutMode {
+    /// The doc tree is the entire document (e.g., a standalone TS/CSS file,
+    /// or a Svelte `<script>` block).
+    #[default]
+    Standalone,
+    /// The doc tree is a fragment embedded inside another language's output
+    /// (e.g., a TS expression inside a Svelte `{...}` template tag). Binary
+    /// expressions use ContinuationIndent style here, matching Prettier's
+    /// `JsExpressionRoot` parent → `shouldNotIndent = true` semantics.
+    Embedded,
 }
 
-impl Default for PrintConfig {
+/// Embedding state for a render. Threaded into the renderer alongside the
+/// doc tree; replaces the `base_indent_offset` / `first_line_offset` /
+/// `suffix_width` / `is_embedded_expression` fields previously on
+/// [`PrintConfig`].
+///
+/// Constructed by the host language (e.g., tsv_svelte) when invoking an
+/// embedded language's printer; defaults to a standalone, column-0,
+/// no-suffix, no-base-offset layout.
+#[derive(Debug, Clone, Copy)]
+pub struct EmbedContext {
+    /// Base indent offset for width calculations.
+    /// Used when formatting nested content (e.g., CSS inside Svelte) where
+    /// the output will be wrapped with additional indentation.
+    pub base_indent_offset: usize,
+    /// First line column offset for width calculations.
+    /// Used when formatting expressions that start mid-line (e.g.,
+    /// `{#each expr as item}`). The expression starts at column
+    /// `first_line_offset`, not column 0.
+    pub first_line_offset: usize,
+    /// Expected suffix width after the expression (default: 0).
+    /// Used when formatting expressions followed by known suffix text
+    /// (e.g., ` as item}...`). Reduces the effective line width for wrapping
+    /// decisions.
+    // TODO: delete once the doc-tree embedding migration makes lookahead native.
+    pub suffix_width: usize,
+    /// How the renderer should treat the outer doc — see [`LayoutMode`].
+    pub mode: LayoutMode,
+}
+
+impl Default for EmbedContext {
     fn default() -> Self {
         Self {
-            // TODO: Replace with `use_tabs: bool` to match Prettier's config model.
-            // Would require deriving indent string (Cow<str> or pre-computed) since
-            // spaces need `" ".repeat(tab_width)`. See CLAUDE.md § Configuration.
-            indent: "\t",
-            print_width: 100,
-            tab_width: 2,
             base_indent_offset: 0,
             first_line_offset: 0,
             suffix_width: 0,
-            arrow_type_param_trailing_comma: true, // Default to true for Svelte compatibility
-            force_binary_breaks: false,
-            is_embedded_expression: false,
+            mode: LayoutMode::Standalone,
         }
+    }
+}
+
+impl EmbedContext {
+    /// Convenience: is this an embedded fragment?
+    #[inline]
+    pub fn is_embedded(&self) -> bool {
+        matches!(self.mode, LayoutMode::Embedded)
     }
 }

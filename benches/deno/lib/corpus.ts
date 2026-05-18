@@ -9,7 +9,7 @@
 
 import { exists } from '@std/fs/exists';
 import { walk } from '@std/fs/walk';
-import { basename, dirname, extname, join, resolve } from '@std/path';
+import { basename, dirname, extname, join, resolve } from 'node:path';
 
 import type { Language, Logger, SourceFile } from './types.ts';
 

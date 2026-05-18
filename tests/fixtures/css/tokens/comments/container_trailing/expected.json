@@ -10,7 +10,7 @@
 				"start": 33,
 				"end": 109,
 				"name": "container",
-				"prelude": "(min-width: 100px) /* trailing */",
+				"prelude": "(min-width: 100px)",
 				"block": {
 					"type": "Block",
 					"start": 78,
@@ -71,7 +71,7 @@
 				"start": 135,
 				"end": 235,
 				"name": "container",
-				"prelude": "(min-width: 100px) and (max-width: 200px) /* trailing */",
+				"prelude": "(min-width: 100px) and (max-width: 200px)",
 				"block": {
 					"type": "Block",
 					"start": 203,

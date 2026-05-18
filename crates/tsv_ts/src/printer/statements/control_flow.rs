@@ -4,6 +4,7 @@ use smallvec::SmallVec;
 
 use super::Printer;
 use crate::ast::internal::{self, Expression, Statement};
+use crate::printer::analysis::find_char_skipping_comments;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::DocId;
 
@@ -83,6 +84,18 @@ impl<'a> Printer<'a> {
         (inline_prev, own_line, inline_next)
     }
 
+    /// Build comments between a keyword and its `(`, preserving position.
+    ///
+    /// Returns a doc for comments between `keyword_end` and `open_paren` if any exist.
+    /// Example: `if/* c */(a)` → `if /* c */ (a)` (comment stays between keyword and paren)
+    fn build_keyword_paren_comments(
+        &self,
+        keyword_end: u32,
+        open_paren: Option<u32>,
+    ) -> Option<DocId> {
+        open_paren.and_then(|op| self.build_inline_comments_between_doc_opt(keyword_end, op))
+    }
+
     /// Build docs for comments between statement parts (e.g., between `}` and `else`).
     ///
     /// Handles:
@@ -118,6 +131,369 @@ impl<'a> Printer<'a> {
             end = comment.span.end;
         }
         end
+    }
+
+    /// Append `) ` to parts, extracting any comments between the close paren and body.
+    ///
+    /// Used for block bodies: if, while, for-in/for-of `{ }`. For non-block bodies in
+    /// for-in/for-of, use `append_close_paren_with_non_block_body` which also indents.
+    /// Append `)` + comments + `;` for empty statement bodies.
+    ///
+    /// Handles comments between `)` and `;`:
+    /// - Block comments: `if (a) /* comment */ ;`
+    /// - Line comments: `if (a) // comment\n;`
+    /// - No comments: `if (a);`
+    fn append_close_paren_empty_stmt_with_comments(
+        &self,
+        parts: &mut Vec<DocId>,
+        paren_end: u32,
+        empty_start: u32,
+    ) {
+        let d = self.d();
+        parts.push(d.text(")"));
+        if self.has_comments_between(paren_end, empty_start) {
+            let has_line = self.has_line_comments_between(paren_end, empty_start);
+            let comment_doc =
+                self.build_inline_comments_between_doc_no_leading_space(paren_end, empty_start);
+            if has_line {
+                parts.push(d.text(" "));
+                parts.push(comment_doc);
+                parts.push(d.hardline());
+                parts.push(d.text(";"));
+            } else {
+                parts.push(d.text(" "));
+                parts.push(comment_doc);
+                parts.push(d.text(" ;"));
+            }
+        } else {
+            parts.push(d.text(";"));
+        }
+    }
+
+    /// Block comments are always inlined (trailing after `)`). Line comments preserve
+    /// their position: trailing stays trailing, own-line stays on its own line (with
+    /// blank line preservation). Line comments force a hardline before the body.
+    fn append_close_paren_with_comments(
+        &self,
+        parts: &mut Vec<DocId>,
+        paren_end: u32,
+        body_start: u32,
+    ) {
+        let d = self.d();
+        if self.has_comments_between(paren_end, body_start) {
+            let (mut inline_prev, own_line, inline_next) =
+                self.partition_comments_by_line(paren_end, body_start);
+
+            // Own-line block comments become inline — block comments are flexible
+            // and should normalize to trailing position (matches prettier).
+            // Only line comments preserve own-line position.
+            // inline_next (comments on same line as body `{`) are treated same as own_line.
+            let mut own_line_lines: CommentVec = SmallVec::new();
+            for comment in own_line.into_iter().chain(inline_next) {
+                if comment.is_block {
+                    inline_prev.push(comment);
+                } else {
+                    own_line_lines.push(comment);
+                }
+            }
+
+            parts.push(d.text(")"));
+            // Use the end of the last inline comment for blank-line detection in the
+            // own-line loop — reclassified block comments shift the reference point.
+            let effective_prev_end = inline_prev.last().map_or(paren_end, |c| c.span.end);
+            self.build_comments_between_parts(
+                parts,
+                &inline_prev,
+                &own_line_lines,
+                effective_prev_end,
+            );
+
+            // Line comments force a hardline before body; block-only gets a space.
+            if !own_line_lines.is_empty() || inline_prev.iter().any(|c| !c.is_block) {
+                parts.push(d.hardline());
+            } else {
+                parts.push(d.text(" "));
+            }
+        } else {
+            parts.push(d.text(") "));
+        }
+    }
+
+    /// Append `)` + comments + non-block body for for-in/for-of statements.
+    ///
+    /// Unlike `append_close_paren_with_comments` (which handles block bodies where
+    /// indentation isn't needed), this properly indents non-block bodies when line
+    /// comments force a break. Also avoids placing block comments after line comments
+    /// on the same line (which would absorb them into the line comment text).
+    fn append_close_paren_with_non_block_body(
+        &self,
+        parts: &mut Vec<DocId>,
+        paren_end: u32,
+        body: &Statement,
+    ) {
+        let d = self.d();
+        let body_start = body.span().start;
+        let body_doc = self.build_statement_doc(body);
+
+        if !self.has_comments_between(paren_end, body_start) {
+            parts.push(d.text(") "));
+            parts.push(body_doc);
+            return;
+        }
+
+        let (inline_prev, own_line, inline_next) =
+            self.partition_comments_by_line(paren_end, body_start);
+
+        // Check if any line comment forces a break
+        let has_line =
+            inline_prev.iter().any(|c| !c.is_block) || own_line.iter().any(|c| !c.is_block);
+
+        parts.push(d.text(")"));
+
+        if has_line {
+            // Emit trailing comments on the `)` line
+            for comment in &inline_prev {
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
+            }
+
+            // Remaining comments (own_line + inline_next) go indented before body
+            let mut inner = vec![d.hardline()];
+            for comment in own_line.into_iter().chain(inline_next) {
+                inner.push(self.build_comment_doc(comment));
+                if comment.is_block {
+                    inner.push(d.text(" "));
+                } else {
+                    inner.push(d.hardline());
+                }
+            }
+            inner.push(body_doc);
+            parts.push(d.indent(d.concat(&inner)));
+        } else {
+            // Block comments only — all inline: `) /* a */ body`
+            for comment in inline_prev
+                .iter()
+                .chain(own_line.iter())
+                .chain(inline_next.iter())
+            {
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
+            }
+            parts.push(d.text(" "));
+            parts.push(body_doc);
+        }
+    }
+
+    /// Append an else body to parts, dispatching on statement type.
+    ///
+    /// When `comment_forced` is true, the layout was already determined by a preceding comment,
+    /// so non-block bodies are emitted directly. When false, non-block/non-inline bodies get
+    /// indented (Prettier's adjustClause behavior).
+    fn append_else_body_doc(
+        &self,
+        parts: &mut Vec<DocId>,
+        alternate: &Statement,
+        comment_forced: bool,
+    ) {
+        if let Statement::BlockStatement(block) = alternate {
+            parts.push(self.build_block_statement_expand_empty_doc(block));
+        } else if comment_forced || is_inline_alternate(alternate) {
+            parts.push(self.build_statement_doc(alternate));
+        } else {
+            let d = self.d();
+            parts.push(d.indent(d.concat(&[d.hardline(), self.build_statement_doc(alternate)])));
+        }
+    }
+
+    /// Append `else` clause on a new line for non-block/empty-statement consequent paths.
+    ///
+    /// Handles EmptyStatement alternate (`else;`), inline alternate (`else expr;`),
+    /// block alternate (`else { ... }`), and non-inline alternate (indented).
+    fn append_newline_else_clause(&self, parts: &mut Vec<DocId>, alternate: &Statement) {
+        let d = self.d();
+        parts.push(d.hardline());
+        if matches!(alternate, Statement::EmptyStatement(_)) {
+            parts.push(d.text("else;"));
+        } else {
+            parts.push(d.text("else "));
+            if is_inline_alternate(alternate) {
+                if let Statement::BlockStatement(block) = alternate {
+                    parts.push(self.build_block_statement_expand_empty_doc(block));
+                } else {
+                    parts.push(self.build_statement_doc(alternate));
+                }
+            } else {
+                parts.push(d.hardline());
+                parts.push(d.indent(self.build_statement_doc(alternate)));
+            }
+        }
+    }
+
+    /// Build an adjust-clause doc with head-body comment handling for non-block bodies.
+    ///
+    /// Used by if/while for `stmt (cond) /* c */ fn();` and `stmt (cond) // c\n fn();`.
+    /// Returns the full `keyword (condition) body` doc including comments when present.
+    ///
+    /// `head_parts` are the docs before the `)` (e.g., `["if (", condition_group]`).
+    fn build_adjust_clause_with_comments(
+        &self,
+        head_parts: &[DocId],
+        paren_end: u32,
+        body_start: u32,
+        body_doc: DocId,
+    ) -> DocId {
+        let d = self.d();
+        if self.has_comments_between(paren_end, body_start) {
+            let has_line = self.has_line_comments_between(paren_end, body_start);
+            let comment_doc =
+                self.build_inline_comments_between_doc_no_leading_space(paren_end, body_start);
+            let mut parts = head_parts.to_vec();
+            parts.push(d.text(")"));
+            if has_line {
+                // Line comment forces break: stmt (cond)\n\t// comment\n\tfn();
+                parts.push(d.indent(d.concat(&[
+                    d.hardline(),
+                    comment_doc,
+                    d.hardline(),
+                    body_doc,
+                ])));
+                d.concat(&parts)
+            } else {
+                // Block comment stays with statement: stmt (cond) /* c */ fn();
+                // When broken: stmt (cond)\n\t/* c */ fn();
+                parts.push(d.indent(d.concat(&[d.line(), comment_doc, d.text(" "), body_doc])));
+                d.group(d.concat(&parts))
+            }
+        } else {
+            let mut parts = head_parts.to_vec();
+            parts.push(d.text(")"));
+            parts.push(d.indent_line(body_doc));
+            d.group(d.concat(&parts))
+        }
+    }
+
+    /// Append a space (or comments + space/hardline) between a keyword/token end and body start.
+    ///
+    /// Used for `try /* c */ {`, `catch (e) /* c */ {`, `catch /* c */ {`, `finally /* c */ {`.
+    fn append_keyword_to_body_comments(
+        &self,
+        parts: &mut Vec<DocId>,
+        token_end: u32,
+        body_start: u32,
+    ) {
+        let d = self.d();
+        if self.has_comments_between(token_end, body_start) {
+            let has_line = self.has_line_comments_between(token_end, body_start);
+            parts.push(self.build_inline_comments_between_doc(token_end, body_start));
+            if has_line {
+                parts.push(d.hardline());
+            } else {
+                parts.push(d.text(" "));
+            }
+        } else {
+            parts.push(d.text(" "));
+        }
+    }
+
+    /// Build else clause with comment extraction between `else` keyword and body.
+    ///
+    /// Handles block comments staying inline: `} else /* c */ {`
+    /// and line comments forcing a break before the body.
+    fn build_head_body_else_clause(
+        &self,
+        parts: &mut Vec<DocId>,
+        alternate: &Statement,
+        consequent_end: u32,
+    ) {
+        let d = self.d();
+        let alt_start = alternate.span().start;
+
+        // Find "else" keyword by scanning forward from consequent end, skipping comments
+        let else_end = self.find_else_keyword_end_between(consequent_end, alt_start);
+
+        if matches!(alternate, Statement::EmptyStatement(_)) {
+            // Empty alternate: `} else;`, `} else /* c */ ;`, or `} else // c\n;`
+            if let Some(else_end) = else_end
+                && self.has_comments_between(else_end, alt_start)
+            {
+                let has_line = self.has_line_comments_between(else_end, alt_start);
+                parts.push(d.text(" else"));
+                parts.push(self.build_inline_comments_between_doc(else_end, alt_start));
+                if has_line {
+                    // Line comment: `} else // c\n;`
+                    parts.push(d.hardline());
+                    parts.push(d.text(";"));
+                } else {
+                    // Block comment: `} else /* c */ ;`
+                    parts.push(d.text(" ;"));
+                }
+            } else {
+                parts.push(d.text(" else;"));
+            }
+        } else if let Some(else_end) = else_end
+            && self.has_comments_between(else_end, alt_start)
+        {
+            // Comments between `else` and body
+            let has_line = self.has_line_comments_between(else_end, alt_start);
+            let is_non_block_non_if = !matches!(
+                alternate,
+                Statement::BlockStatement(_) | Statement::IfStatement(_)
+            );
+            parts.push(d.text(" else"));
+            parts.push(self.build_inline_comments_between_doc(else_end, alt_start));
+            if has_line && is_non_block_non_if {
+                // Line comment + non-block body: comment stays on else line, body indented
+                // } else // c\n\texpr;
+                let body_doc = self.build_statement_doc(alternate);
+                parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
+            } else if has_line {
+                parts.push(d.hardline());
+                self.append_else_body_doc(parts, alternate, true);
+            } else {
+                parts.push(d.text(" "));
+                self.append_else_body_doc(parts, alternate, true);
+            }
+        } else {
+            parts.push(d.text(" else "));
+            self.append_else_body_doc(parts, alternate, false);
+        }
+    }
+
+    /// Find the end position of the "else" keyword between two positions.
+    ///
+    /// Scans forward from `from` to `to`, skipping comment content so that
+    /// "else" inside comments (e.g., `} else /* or else */ {`) is not matched.
+    fn find_else_keyword_end_between(&self, from: u32, to: u32) -> Option<u32> {
+        let bytes = self.source.as_bytes();
+        let mut i = from as usize;
+        let end = to as usize;
+        while i + 4 <= end {
+            match bytes[i] {
+                b'/' if i + 1 < end => match bytes[i + 1] {
+                    b'*' => {
+                        i += 2;
+                        while i + 1 < end && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
+                            i += 1;
+                        }
+                        i += 2;
+                        // Clamp in case block comment was unterminated
+                        i = i.min(end);
+                    }
+                    b'/' => {
+                        while i < end && bytes[i] != b'\n' {
+                            i += 1;
+                        }
+                        i = (i + 1).min(end);
+                    }
+                    _ => i += 1,
+                },
+                b'e' if i + 4 <= end && &self.source[i..i + 4] == "else" => {
+                    return Some((i + 4) as u32);
+                }
+                _ => i += 1,
+            }
+        }
+        None
     }
 
     /// Build a condition group for if/while/for/switch statements
@@ -366,6 +742,11 @@ impl<'a> Printer<'a> {
         let open_paren = self.find_open_paren_after(stmt.span.start);
         let close_paren = self.find_close_paren_after(stmt.test.span().end);
 
+        // Preserve comments between `if` keyword and `(` in place:
+        //   if/* c */(a){} → if /* c */ (a) {}
+        let if_keyword_end = stmt.span.start + 2; // "if" is 2 chars
+        let keyword_comments = self.build_keyword_paren_comments(if_keyword_end, open_paren);
+
         // Build condition group (handles breaking within condition and comments)
         let condition_group = if let (Some(open), Some(close)) = (open_paren, close_paren) {
             self.build_condition_group_with_comments(&stmt.test, open, close)
@@ -376,57 +757,76 @@ impl<'a> Printer<'a> {
         if let Statement::BlockStatement(block) = stmt.consequent.as_ref() {
             // Block consequent: group(["if (" + condition + ") " + block])
             // Outer group controls whether the whole if statement breaks
-            let mut parts = vec![d.text("if ("), condition_group, d.text(") ")];
+            let mut parts = vec![d.text("if")];
+            if let Some(kc) = keyword_comments {
+                parts.push(kc);
+            }
+            parts.push(d.text(" ("));
+            parts.push(condition_group);
+
+            // Check for comments between ) and block body
+            let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
+            self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
 
             parts.push(self.build_block_statement_expand_empty_doc(block));
 
             // Handle else clause
             if let Some(alternate) = &stmt.alternate {
-                parts.push(d.text(" else "));
-                if let Statement::BlockStatement(block) = alternate.as_ref() {
-                    parts.push(self.build_block_statement_expand_empty_doc(block));
-                } else if is_inline_alternate(alternate) {
-                    parts.push(self.build_statement_doc(alternate));
-                } else {
-                    parts.push(d.hardline());
-                    parts.push(d.indent(self.build_statement_doc(alternate)));
-                }
+                self.build_head_body_else_clause(&mut parts, alternate, block.span.end);
             }
 
             // Outer group for the whole if statement
             d.group(d.concat(&parts))
         } else if matches!(stmt.consequent.as_ref(), Statement::EmptyStatement(_)) {
-            // Empty statement: `if (cond);`
-            d.group(d.concat(&[d.text("if ("), condition_group, d.text(");")]))
+            // Empty statement: `if (cond);` or `if (cond) /* comment */ ;`
+            let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
+            let empty_start = stmt.consequent.span().start;
+
+            let mut empty_parts = vec![d.text("if")];
+            if let Some(kc) = keyword_comments {
+                empty_parts.push(kc);
+            }
+            empty_parts.push(d.text(" ("));
+            empty_parts.push(condition_group);
+            self.append_close_paren_empty_stmt_with_comments(
+                &mut empty_parts,
+                paren_end,
+                empty_start,
+            );
+
+            // Handle else clause for empty-statement consequent
+            if let Some(alternate) = &stmt.alternate {
+                self.append_newline_else_clause(&mut empty_parts, alternate);
+            }
+
+            d.group(d.concat(&empty_parts))
         } else {
             // Non-block consequent: use adjustClause equivalent
             // Prettier's adjustClause returns: indent([line, clause])
             // - When flat: line becomes space -> `if (cond) a;`
             // - When broken: line becomes newline + indent -> `if (cond)\n\ta;`
+            let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
+            let body_start = stmt.consequent.span().start;
             let consequent_doc = self.build_statement_doc(&stmt.consequent);
-            let adjust_clause = d.indent_line(consequent_doc);
 
-            let mut parts = vec![d.group(d.concat(&[
-                d.text("if ("),
-                condition_group,
-                d.text(")"),
-                adjust_clause,
-            ]))];
+            let mut head_parts = vec![d.text("if")];
+            if let Some(kc) = keyword_comments {
+                head_parts.push(kc);
+            }
+            head_parts.push(d.text(" ("));
+            head_parts.push(condition_group);
+            let head_and_body = self.build_adjust_clause_with_comments(
+                &head_parts,
+                paren_end,
+                body_start,
+                consequent_doc,
+            );
+
+            let mut parts = vec![head_and_body];
 
             // Handle else clause for non-block consequent
             if let Some(alternate) = &stmt.alternate {
-                parts.push(d.hardline());
-                parts.push(d.text("else "));
-                if is_inline_alternate(alternate) {
-                    if let Statement::BlockStatement(block) = alternate.as_ref() {
-                        parts.push(self.build_block_statement_expand_empty_doc(block));
-                    } else {
-                        parts.push(self.build_statement_doc(alternate));
-                    }
-                } else {
-                    parts.push(d.hardline());
-                    parts.push(d.indent(self.build_statement_doc(alternate)));
-                }
+                self.append_newline_else_clause(&mut parts, alternate);
             }
 
             d.concat(&parts)
@@ -512,7 +912,7 @@ impl<'a> Printer<'a> {
     /// ) {
     /// ```
     fn build_for_header_doc(&self, stmt: &internal::ForStatement) -> DocId {
-        self.build_for_header_doc_impl(stmt, false)
+        self.build_for_header_doc_impl(stmt, false, None)
     }
 
     /// Build doc for empty for (;;) with comments inside
@@ -581,16 +981,24 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    fn build_for_header_doc_breaking(&self, stmt: &internal::ForStatement) -> DocId {
-        self.build_for_header_doc_impl(stmt, true)
-    }
-
-    fn build_for_header_doc_impl(&self, stmt: &internal::ForStatement, force_break: bool) -> DocId {
+    fn build_for_header_doc_impl(
+        &self,
+        stmt: &internal::ForStatement,
+        force_break: bool,
+        keyword_comments: Option<DocId>,
+    ) -> DocId {
         let d = self.d();
         let has_init = stmt.init.is_some();
         let has_test = stmt.test.is_some();
         let has_update = stmt.update.is_some();
         let has_any = has_init || has_test || has_update;
+
+        // Build "for" + optional keyword comments + " (" prefix
+        let for_open = if let Some(kc) = keyword_comments {
+            d.concat(&[d.text("for"), kc, d.text(" (")])
+        } else {
+            d.text("for (")
+        };
 
         // Check if there are any comments inside the for parens
         let open_paren = self.find_open_paren_after(stmt.span.start);
@@ -604,7 +1012,7 @@ impl<'a> Printer<'a> {
 
         if !has_any && !has_comments_inside {
             // Empty for (;;) with no comments - no wrapping needed
-            return d.text("for (;;)");
+            return d.concat(&[for_open, d.text(";;)")]);
         }
 
         if !has_any && has_comments_inside {
@@ -821,7 +1229,7 @@ impl<'a> Printer<'a> {
         };
 
         d.group(d.concat(&[
-            d.text("for ("),
+            for_open,
             d.indent(d.concat(&inner_parts)),
             closing,
             d.text(")"),
@@ -924,8 +1332,12 @@ impl<'a> Printer<'a> {
             .find_keyword_position(left_end, right_start, "in")
             .unwrap_or(left_end);
 
-        // Check for line comments in the header - if present, use breaking layout
+        // Preserve comments between `for` keyword and `(`
+        let for_keyword_end = stmt.span.start + 3; // "for" is 3 chars
         let open_paren = self.find_open_paren_after(stmt.span.start);
+        let keyword_comments = self.build_keyword_paren_comments(for_keyword_end, open_paren);
+
+        // Check for line comments in the header - if present, use breaking layout
         let close = close_paren.unwrap_or(right_end + 1);
         let has_line_comments = if let Some(open) = open_paren {
             self.has_line_comments_in_range(open + 1, close)
@@ -945,12 +1357,26 @@ impl<'a> Printer<'a> {
             );
         }
 
-        let mut parts = vec![d.text("for (")];
+        let mut parts = if let Some(kc) = keyword_comments {
+            vec![d.text("for"), kc, d.text(" (")]
+        } else {
+            vec![d.text("for (")]
+        };
+
+        // Comments between ( and left
+        if let Some(open) = open_paren {
+            for comment in tsv_lang::comments_in_range(self.comments, open + 1, left_start) {
+                if comment.is_block {
+                    parts.push(self.build_comment_doc(comment));
+                    parts.push(d.text(" "));
+                }
+            }
+        }
+
         parts.push(self.build_for_in_of_left_doc(&stmt.left));
 
         // Comments after left, before 'in'
-        let has_left_comment =
-            self.append_for_in_of_before_keyword_comments(&mut parts, left_end, in_pos);
+        let has_left_comment = self.append_for_in_of_block_comments(&mut parts, left_end, in_pos);
 
         if has_left_comment {
             parts.push(d.text("in"));
@@ -961,7 +1387,7 @@ impl<'a> Printer<'a> {
         // Comments after 'in', before right
         let in_keyword_end = in_pos + 2; // "in" is 2 chars
         let has_comment =
-            self.append_for_in_of_inline_comments(&mut parts, in_keyword_end, right_start);
+            self.append_for_in_of_block_comments(&mut parts, in_keyword_end, right_start);
         if !has_comment {
             parts.push(d.text(" "));
         }
@@ -973,13 +1399,15 @@ impl<'a> Printer<'a> {
             self.append_for_in_of_trailing_comments(&mut parts, right_end, close);
         }
 
-        parts.push(d.text(") "));
+        // Check for comments between ) and body
+        let paren_end = close_paren.map_or(right_end + 1, |p| p + 1);
 
         // Prettier expands empty blocks for for-in
         if let Statement::BlockStatement(block) = stmt.body.as_ref() {
+            self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
             parts.push(self.build_block_statement_expand_empty_doc(block));
         } else {
-            parts.push(self.build_statement_doc(&stmt.body));
+            self.append_close_paren_with_non_block_body(&mut parts, paren_end, &stmt.body);
         }
 
         d.concat(&parts)
@@ -1039,9 +1467,30 @@ impl<'a> Printer<'a> {
             .find_keyword_position(left_end, right_start, "of")
             .unwrap_or(left_end);
 
+        // Preserve comments between keywords and `(`
+        // for await: two gaps — for-to-await and await-to-paren
+        // for (non-await): one gap — for-to-paren
+        let for_keyword_end = stmt.span.start + 3; // "for" is 3 chars
+        let open_paren = self.find_open_paren_after(stmt.span.start);
+        let (for_await_comments, await_paren_comments) = if stmt.r#await {
+            let await_pos = self.find_keyword_in_source(for_keyword_end, left_start, "await");
+            let for_await_c = await_pos
+                .and_then(|ap| self.build_inline_comments_between_doc_opt(for_keyword_end, ap));
+            let await_paren_c = await_pos
+                .map(|ap| ap + 5)
+                .and_then(|ae| self.build_keyword_paren_comments(ae, open_paren));
+            (for_await_c, await_paren_c)
+        } else {
+            (None, None)
+        };
+        let keyword_comments = if !stmt.r#await {
+            self.build_keyword_paren_comments(for_keyword_end, open_paren)
+        } else {
+            None
+        };
+
         // Check for line comments in the header - if present, use breaking layout
         // We check from open paren to close paren
-        let open_paren = self.find_open_paren_after(stmt.span.start);
         let close = close_paren.unwrap_or(right_end + 1);
         let has_line_comments = if let Some(open) = open_paren {
             self.has_line_comments_in_range(open + 1, close)
@@ -1061,16 +1510,37 @@ impl<'a> Printer<'a> {
             );
         }
 
-        let mut parts = vec![d.text("for ")];
+        let mut parts = vec![d.text("for")];
+        if let Some(kc) = keyword_comments {
+            parts.push(kc);
+        }
+        if let Some(fac) = for_await_comments {
+            parts.push(fac);
+        }
+        parts.push(d.text(" "));
         if stmt.r#await {
-            parts.push(d.text("await "));
+            parts.push(d.text("await"));
+            if let Some(apc) = await_paren_comments {
+                parts.push(apc);
+            }
+            parts.push(d.text(" "));
         }
         parts.push(d.text("("));
+
+        // Comments between ( and left
+        if let Some(open) = open_paren {
+            for comment in tsv_lang::comments_in_range(self.comments, open + 1, left_start) {
+                if comment.is_block {
+                    parts.push(self.build_comment_doc(comment));
+                    parts.push(d.text(" "));
+                }
+            }
+        }
+
         parts.push(self.build_for_in_of_left_doc(&stmt.left));
 
         // Comments after left, before 'of'
-        let has_left_comment =
-            self.append_for_in_of_before_keyword_comments(&mut parts, left_end, of_pos);
+        let has_left_comment = self.append_for_in_of_block_comments(&mut parts, left_end, of_pos);
 
         if has_left_comment {
             parts.push(d.text("of"));
@@ -1081,7 +1551,7 @@ impl<'a> Printer<'a> {
         // Comments after 'of', before right
         let of_keyword_end = of_pos + 2; // "of" is 2 chars
         let has_comment =
-            self.append_for_in_of_inline_comments(&mut parts, of_keyword_end, right_start);
+            self.append_for_in_of_block_comments(&mut parts, of_keyword_end, right_start);
         if !has_comment {
             parts.push(d.text(" "));
         }
@@ -1093,13 +1563,15 @@ impl<'a> Printer<'a> {
             self.append_for_in_of_trailing_comments(&mut parts, right_end, close);
         }
 
-        parts.push(d.text(") "));
+        // Check for comments between ) and body
+        let paren_end = close_paren.map_or(right_end + 1, |p| p + 1);
 
         // Prettier expands empty blocks for for-of
         if let Statement::BlockStatement(block) = stmt.body.as_ref() {
+            self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
             parts.push(self.build_block_statement_expand_empty_doc(block));
         } else {
-            parts.push(self.build_statement_doc(&stmt.body));
+            self.append_close_paren_with_non_block_body(&mut parts, paren_end, &stmt.body);
         }
 
         d.concat(&parts)
@@ -1157,12 +1629,10 @@ impl<'a> Printer<'a> {
         inner.push(d.hardline());
         inner.push(self.build_for_in_of_left_doc(left));
 
-        // Inline comment after left
+        // Comments after left, before keyword — emit all (own-line comments normalize to inline)
         for comment in tsv_lang::comments_in_range(self.comments, left_end, keyword_pos) {
-            if self.is_same_line(left_end, comment.span.start) {
-                inner.push(d.text(" "));
-                inner.push(self.build_comment_doc(comment));
-            }
+            inner.push(d.text(" "));
+            inner.push(self.build_comment_doc(comment));
         }
 
         // Keyword with extra indent (hardline is INSIDE the indent so keyword gets extra indent)
@@ -1173,25 +1643,21 @@ impl<'a> Printer<'a> {
         };
         let mut keyword_parts = vec![d.hardline(), keyword_doc];
 
-        // Inline comment after keyword
+        // Comments after keyword, before right — emit all (own-line comments normalize to inline)
         for comment in tsv_lang::comments_in_range(self.comments, keyword_end, right_start) {
-            if self.is_same_line(keyword_end, comment.span.start) {
-                keyword_parts.push(d.text(" "));
-                keyword_parts.push(self.build_comment_doc(comment));
-            }
+            keyword_parts.push(d.text(" "));
+            keyword_parts.push(self.build_comment_doc(comment));
         }
 
         // Right side (items)
         keyword_parts.push(d.hardline());
         keyword_parts.push(self.build_expression_doc(right));
 
-        // Inline comment after right
+        // Comments after right, before close paren
         if let Some(close) = close_paren {
             for comment in tsv_lang::comments_in_range(self.comments, right_end, close) {
-                if self.is_same_line(right_end, comment.span.start) {
-                    keyword_parts.push(d.text(" "));
-                    keyword_parts.push(self.build_comment_doc(comment));
-                }
+                keyword_parts.push(d.text(" "));
+                keyword_parts.push(self.build_comment_doc(comment));
             }
         }
 
@@ -1199,13 +1665,16 @@ impl<'a> Printer<'a> {
 
         parts.push(d.indent(d.concat(&inner)));
         parts.push(d.hardline());
-        parts.push(d.text(") "));
+
+        // Comments between ) and body (matching inline path)
+        let paren_end = close_paren.map_or(right_end + 1, |p| p + 1);
 
         // Body
         if let Statement::BlockStatement(block) = body {
+            self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
             parts.push(self.build_block_statement_expand_empty_doc(block));
         } else {
-            parts.push(self.build_statement_doc(body));
+            self.append_close_paren_with_non_block_body(&mut parts, paren_end, body);
         }
 
         d.concat(&parts)
@@ -1232,34 +1701,12 @@ impl<'a> Printer<'a> {
         tsv_lang::comments_in_range(self.comments, start, end).any(|c| !c.is_block)
     }
 
-    /// Append block comments before a keyword (like 'in' or 'of')
-    /// Returns true if any comments were added
-    /// Adds space-comment-space pattern so keyword doesn't need leading space
-    fn append_for_in_of_before_keyword_comments(
-        &self,
-        parts: &mut Vec<DocId>,
-        start: u32,
-        end: u32,
-    ) -> bool {
-        let d = self.d();
-        let mut added = false;
-        for comment in tsv_lang::comments_in_range(self.comments, start, end) {
-            // Only include block comments that are on the same line
-            if comment.is_block && self.is_same_line(start, comment.span.start) {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-                parts.push(d.text(" "));
-                added = true;
-            }
-        }
-        added
-    }
-
-    /// Append inline block comments for for-in/for-of statements
-    ///
+    /// Append inline block comments for for-in/for-of statements.
+    /// Emits ` comment` for each block comment, plus trailing ` ` if any were added.
+    /// Own-line comments normalize to inline. Line comments are skipped (handled by
+    /// the breaking layout path).
     /// Returns true if any comments were added.
-    /// Adds leading space before each comment and trailing space after all comments.
-    fn append_for_in_of_inline_comments(
+    fn append_for_in_of_block_comments(
         &self,
         parts: &mut Vec<DocId>,
         start: u32,
@@ -1268,27 +1715,24 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut added = false;
         for comment in tsv_lang::comments_in_range(self.comments, start, end) {
-            // Only include block comments (line comments would break the statement)
             if comment.is_block {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
                 added = true;
             }
         }
-        // Add trailing space after comments if we added any
         if added {
             parts.push(d.text(" "));
         }
         added
     }
 
-    /// Append trailing block comments (same line) for for-in/for-of statements
-    /// No trailing space (use for comments before close paren)
+    /// Append trailing block comments for for-in/for-of statements.
+    /// Own-line comments normalize to inline. No trailing space.
     fn append_for_in_of_trailing_comments(&self, parts: &mut Vec<DocId>, start: u32, end: u32) {
         let d = self.d();
         for comment in tsv_lang::comments_in_range(self.comments, start, end) {
-            // Only include block comments that are on the same line
-            if comment.is_block && self.is_same_line(start, comment.span.start) {
+            if comment.is_block {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
             }
@@ -1305,6 +1749,11 @@ impl<'a> Printer<'a> {
         let open_paren = self.find_open_paren_after(stmt.span.start);
         let close_paren = self.find_close_paren_after(stmt.test.span().end);
 
+        // Preserve comments between `while` keyword and `(` in place:
+        //   while/* c */(a){} → while /* c */ (a) {}
+        let while_keyword_end = stmt.span.start + 5; // "while" is 5 chars
+        let keyword_comments = self.build_keyword_paren_comments(while_keyword_end, open_paren);
+
         // Build condition group (handles breaking within condition and comments)
         let condition_group = if let (Some(open), Some(close)) = (open_paren, close_paren) {
             self.build_condition_group_with_comments(&stmt.test, open, close)
@@ -1314,43 +1763,51 @@ impl<'a> Printer<'a> {
 
         if let Statement::BlockStatement(block) = stmt.body.as_ref() {
             // Block body: while (cond) { ... }
-            let mut parts = vec![d.text("while ("), condition_group, d.text(")")];
-
-            // Check for comments between ) and {
-            let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end);
-            let block_start = block.span.start;
-
-            if self.has_comments_between(paren_end, block_start) {
-                let (inline_prev, own_line, _) =
-                    self.partition_comments_by_line(paren_end, block_start);
-
-                // Add comments preserving their position
-                self.build_comments_between_parts(&mut parts, &inline_prev, &own_line, paren_end);
-
-                parts.push(d.hardline());
-                parts.push(self.build_block_statement_doc(block));
-            } else {
-                parts.push(d.text(" "));
-                parts.push(self.build_block_statement_doc(block));
+            // Uses append_close_paren_with_comments for consistency with if/for-in/for-of:
+            // block comments stay inline, line comments become trailing.
+            let mut parts = vec![d.text("while")];
+            if let Some(kc) = &keyword_comments {
+                parts.push(*kc);
             }
-
+            parts.push(d.text(" ("));
+            parts.push(condition_group);
+            let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
+            self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
+            parts.push(self.build_block_statement_doc(block));
             d.group(d.concat(&parts))
         } else if matches!(stmt.body.as_ref(), Statement::EmptyStatement(_)) {
-            // Empty statement: while (cond);
-            d.group(d.concat(&[d.text("while ("), condition_group, d.text(");")]))
+            // Empty statement: `while (cond);` or `while (cond) /* comment */ ;`
+            let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
+            let empty_start = stmt.body.span().start;
+
+            let mut empty_parts = vec![d.text("while")];
+            if let Some(kc) = &keyword_comments {
+                empty_parts.push(*kc);
+            }
+            empty_parts.push(d.text(" ("));
+            empty_parts.push(condition_group);
+            self.append_close_paren_empty_stmt_with_comments(
+                &mut empty_parts,
+                paren_end,
+                empty_start,
+            );
+
+            d.group(d.concat(&empty_parts))
         } else {
             // Non-block body: use adjustClause equivalent
             // - When flat: line becomes space -> `while (cond) a;`
             // - When broken: line becomes newline + indent -> `while (cond)\n\ta;`
+            let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
+            let body_start = stmt.body.span().start;
             let body_doc = self.build_statement_doc(&stmt.body);
-            let adjust_clause = d.indent_line(body_doc);
 
-            d.group(d.concat(&[
-                d.text("while ("),
-                condition_group,
-                d.text(")"),
-                adjust_clause,
-            ]))
+            let mut head_parts = vec![d.text("while")];
+            if let Some(kc) = &keyword_comments {
+                head_parts.push(*kc);
+            }
+            head_parts.push(d.text(" ("));
+            head_parts.push(condition_group);
+            self.build_adjust_clause_with_comments(&head_parts, paren_end, body_start, body_doc)
         }
     }
 
@@ -1364,6 +1821,25 @@ impl<'a> Printer<'a> {
         let open_paren = self.find_open_paren_after(stmt.span.start);
         let close_paren = self.find_close_paren_after(stmt.discriminant.span().end);
 
+        // Preserve comments between `switch` keyword and `(` in place:
+        //   switch/* c */(a){} → switch /* c */ (a) {}
+        let switch_keyword_end = stmt.span.start + 6; // "switch" is 6 chars
+        let keyword_comments = self.build_keyword_paren_comments(switch_keyword_end, open_paren);
+
+        // Preserve comments between ) and { in place:
+        //   switch(x)/* c */{} → switch (x) /* c */ {}
+        let body_open_brace = close_paren.and_then(|close| {
+            self.source[close as usize + 1..stmt.span.end as usize]
+                .find('{')
+                .map(|p| close + 1 + p as u32)
+        });
+        let paren_brace_comments = match (close_paren, body_open_brace) {
+            (Some(close), Some(brace)) if self.has_comments_between(close + 1, brace) => {
+                self.build_inline_comments_between_doc_opt(close + 1, brace)
+            }
+            _ => None,
+        };
+
         // Build condition group (handles breaking within discriminant and comments)
         let condition_group = if let (Some(open), Some(close)) = (open_paren, close_paren) {
             self.build_condition_group_with_comments(&stmt.discriminant, open, close)
@@ -1374,9 +1850,10 @@ impl<'a> Printer<'a> {
         // Build cases - they handle their own internal indentation
         // Join cases with hardlines, handling comments between cases
         let mut case_parts = Vec::new();
-        // Start after closing paren to avoid picking up comments inside parens
-        // (those are handled by build_condition_group_with_comments)
-        let mut prev_end = close_paren.map_or_else(|| stmt.discriminant.span().end, |p| p + 1);
+        // Start after the open brace to find comments between { and first case
+        let brace_start = body_open_brace
+            .unwrap_or_else(|| close_paren.map_or_else(|| stmt.discriminant.span().end, |p| p + 1));
+        let mut prev_end = brace_start + 1;
         let mut prev_case_label_end: Option<u32> = None;
         let mut is_first_item = true;
         for (i, case) in stmt.cases.iter().enumerate() {
@@ -1457,13 +1934,20 @@ impl<'a> Printer<'a> {
             ])
         };
 
-        d.group(d.concat(&[
-            d.text("switch ("),
-            condition_group,
-            d.text(") {"),
-            body_doc,
-            d.text("}"),
-        ]))
+        let mut switch_parts = vec![d.text("switch")];
+        if let Some(kc) = keyword_comments {
+            switch_parts.push(kc);
+        }
+        switch_parts.push(d.text(" ("));
+        switch_parts.push(condition_group);
+        switch_parts.push(d.text(")"));
+        if let Some(pbc) = paren_brace_comments {
+            switch_parts.push(pbc);
+        }
+        switch_parts.push(d.text(" {"));
+        switch_parts.push(body_doc);
+        switch_parts.push(d.text("}"));
+        d.group(d.concat(&switch_parts))
     }
 
     /// Get the end position of a case label (position after the colon)
@@ -1500,9 +1984,32 @@ impl<'a> Printer<'a> {
         if let Some(test) = &case.test {
             parts.push(d.text("case "));
             parts.push(self.build_expression_doc(test));
+            // Comments between expression and colon: `case 1 /* c */:`
+            let test_end = test.span().end;
+            let colon_pos = find_char_skipping_comments(
+                self.source.as_bytes(),
+                test_end as usize,
+                case_label_end as usize,
+                b':',
+            )
+            .unwrap_or(case_label_end as usize - 1);
+            parts.push(self.build_inline_comments_between_doc(test_end, colon_pos as u32));
             parts.push(d.text(":"));
         } else {
-            parts.push(d.text("default:"));
+            // Comments between `default` keyword and colon: `default /* c */:`
+            let default_keyword_end = case.span.start + 7; // "default".len()
+            let colon_pos = find_char_skipping_comments(
+                self.source.as_bytes(),
+                default_keyword_end as usize,
+                case_label_end as usize,
+                b':',
+            )
+            .unwrap_or(case_label_end as usize - 1);
+            parts.push(d.text("default"));
+            parts.push(
+                self.build_inline_comments_between_doc(default_keyword_end, colon_pos as u32),
+            );
+            parts.push(d.text(":"));
         }
 
         // Handle inline comments after case label (e.g., `case 1: // comment`)
@@ -1657,28 +2164,61 @@ impl<'a> Printer<'a> {
         // Build condition group (same as build_if_statement_with_wrapping_doc)
         let open_paren = self.find_open_paren_after(stmt.span.start);
         let close_paren = self.find_close_paren_after(stmt.test.span().end);
+        let if_keyword_end = stmt.span.start + 2;
+        let keyword_comments = self.build_keyword_paren_comments(if_keyword_end, open_paren);
         let condition_group = if let (Some(open), Some(close)) = (open_paren, close_paren) {
             self.build_condition_group_with_comments(&stmt.test, open, close)
         } else {
             self.build_condition_group(&stmt.test)
         };
 
-        let mut parts = vec![d.text("if ("), condition_group];
+        let mut parts = vec![d.text("if")];
+        if let Some(kc) = keyword_comments {
+            parts.push(kc);
+        }
+        parts.push(d.text(" ("));
+        parts.push(condition_group);
 
-        // Build consequent
+        // Build consequent (with head-body comment extraction)
+        let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
         if let Statement::BlockStatement(block) = stmt.consequent.as_ref() {
-            parts.push(d.text(") "));
+            self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
             parts.push(self.build_block_statement_expand_empty_doc(block));
         } else if matches!(stmt.consequent.as_ref(), Statement::EmptyStatement(_)) {
-            parts.push(d.text(");"));
-        } else if is_inline_consequent(&stmt.consequent) {
-            parts.push(d.text(") "));
-            parts.push(self.build_statement_doc(&stmt.consequent));
+            let empty_start = stmt.consequent.span().start;
+            self.append_close_paren_empty_stmt_with_comments(&mut parts, paren_end, empty_start);
         } else {
-            parts.push(d.text(")"));
-            parts.push(
-                d.indent(d.concat(&[d.hardline(), self.build_statement_doc(&stmt.consequent)])),
-            );
+            // Non-block consequent: handle head-body comments between ) and body
+            let body_start = stmt.consequent.span().start;
+            let consequent_doc = self.build_statement_doc(&stmt.consequent);
+
+            if self.has_comments_between(paren_end, body_start) {
+                let has_line = self.has_line_comments_between(paren_end, body_start);
+                let comment_doc =
+                    self.build_inline_comments_between_doc_no_leading_space(paren_end, body_start);
+                parts.push(d.text(")"));
+                if has_line {
+                    // Line comment forces break: if (cond)\n\t// comment\n\tbody;
+                    parts.push(d.indent(d.concat(&[
+                        d.hardline(),
+                        comment_doc,
+                        d.hardline(),
+                        consequent_doc,
+                    ])));
+                } else {
+                    // Block comment stays inline: if (cond) /* c */ body;
+                    parts.push(d.text(" "));
+                    parts.push(comment_doc);
+                    parts.push(d.text(" "));
+                    parts.push(consequent_doc);
+                }
+            } else if is_inline_consequent(&stmt.consequent) {
+                parts.push(d.text(") "));
+                parts.push(consequent_doc);
+            } else {
+                parts.push(d.text(")"));
+                parts.push(d.indent(d.concat(&[d.hardline(), consequent_doc])));
+            }
         }
 
         // Handle else with comments
@@ -1686,31 +2226,90 @@ impl<'a> Printer<'a> {
             let consequent_end = stmt.consequent.span().end;
             let alternate_start = alternate.span().start;
 
-            let (inline_prev, own_line, _) =
-                self.partition_comments_by_line(consequent_end, alternate_start);
+            // Find "else" keyword to split comments into before-else and after-else
+            let else_end = self.find_else_keyword_end_between(consequent_end, alternate_start);
+            let else_start = else_end.map(|e| e - 4); // "else" is 4 chars
 
-            // Add comments between consequent and else
-            self.build_comments_between_parts(&mut parts, &inline_prev, &own_line, consequent_end);
+            // Comments between } and "else"
+            let before_else_end = else_start.unwrap_or(alternate_start);
+            if self.has_comments_between(consequent_end, before_else_end) {
+                let (inline_prev, own_line, inline_next) =
+                    self.partition_comments_by_line(consequent_end, before_else_end);
 
-            // Determine if else can stay on same line (block consequent only):
-            // - No own-line comments AND all inline comments are block comments
-            let has_inline_line_comment = inline_prev.iter().any(|c| !c.is_block);
-            let is_block_consequent =
-                matches!(stmt.consequent.as_ref(), Statement::BlockStatement(_));
-            if is_block_consequent && own_line.is_empty() && !has_inline_line_comment {
-                parts.push(d.text(" else "));
+                // Merge inline_next (comments on same line as `else`) into own_line
+                // so they're emitted before the `else` keyword rather than dropped.
+                // e.g. `} \n /* b */ else {` → `}\n/* b */\nelse {`
+                let mut all_own_line = own_line;
+                all_own_line.extend(inline_next);
+
+                self.build_comments_between_parts(
+                    &mut parts,
+                    &inline_prev,
+                    &all_own_line,
+                    consequent_end,
+                );
+
+                let has_inline_line_comment = inline_prev.iter().any(|c| !c.is_block);
+                let is_block_consequent =
+                    matches!(stmt.consequent.as_ref(), Statement::BlockStatement(_));
+                if is_block_consequent && all_own_line.is_empty() && !has_inline_line_comment {
+                    parts.push(d.text(" "));
+                } else {
+                    parts.push(d.hardline());
+                }
+            } else if matches!(stmt.consequent.as_ref(), Statement::BlockStatement(_)) {
+                // Block body: `} else` on same line
+                parts.push(d.text(" "));
             } else {
+                // Empty statement or non-block body: `else` on new line
                 parts.push(d.hardline());
-                parts.push(d.text("else "));
             }
 
-            if let Statement::BlockStatement(block) = alternate.as_ref() {
-                parts.push(self.build_block_statement_expand_empty_doc(block));
-            } else if is_inline_alternate(alternate) {
-                parts.push(self.build_statement_doc(alternate));
+            // Comments between "else" and alternate body
+            if matches!(alternate.as_ref(), Statement::EmptyStatement(_)) {
+                // Empty alternate: `else;`, `else /* c */ ;`, or `else // c\n;`
+                if let Some(else_e) = else_end
+                    && self.has_comments_between(else_e, alternate_start)
+                {
+                    let has_line = self.has_line_comments_between(else_e, alternate_start);
+                    parts.push(d.text("else"));
+                    parts.push(self.build_inline_comments_between_doc(else_e, alternate_start));
+                    if has_line {
+                        // Line comment: `else // c\n;`
+                        parts.push(d.hardline());
+                        parts.push(d.text(";"));
+                    } else {
+                        // Block comment: `else /* c */ ;`
+                        parts.push(d.text(" ;"));
+                    }
+                } else {
+                    parts.push(d.text("else;"));
+                }
+            } else if let Some(else_e) = else_end
+                && self.has_comments_between(else_e, alternate_start)
+            {
+                let has_line = self.has_line_comments_between(else_e, alternate_start);
+                let is_non_block_non_if = !matches!(
+                    alternate.as_ref(),
+                    Statement::BlockStatement(_) | Statement::IfStatement(_)
+                );
+                parts.push(d.text("else"));
+                parts.push(self.build_inline_comments_between_doc(else_e, alternate_start));
+                if has_line && is_non_block_non_if {
+                    // Line comment + non-block body: comment stays on else line, body indented
+                    // else // c\n\texpr;
+                    let body_doc = self.build_statement_doc(alternate);
+                    parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
+                } else if has_line {
+                    parts.push(d.hardline());
+                    self.append_else_body_doc(&mut parts, alternate, true);
+                } else {
+                    parts.push(d.text(" "));
+                    self.append_else_body_doc(&mut parts, alternate, true);
+                }
             } else {
-                parts
-                    .push(d.indent(d.concat(&[d.hardline(), self.build_statement_doc(alternate)])));
+                parts.push(d.text("else "));
+                self.append_else_body_doc(&mut parts, alternate, false);
             }
         }
 
@@ -1719,11 +2318,19 @@ impl<'a> Printer<'a> {
 
     pub(super) fn build_for_statement_doc(&self, stmt: &internal::ForStatement) -> DocId {
         let d = self.d();
+
+        // Preserve comments between `for` keyword and `(` in place:
+        //   for/* c */(;;){} → for /* c */ (;;) {}
+        let for_keyword_end = stmt.span.start + 3; // "for" is 3 chars
+        let open_paren = self.find_open_paren_after(stmt.span.start);
+        let keyword_comments = self.build_keyword_paren_comments(for_keyword_end, open_paren);
+        let has_pre_paren_comments = keyword_comments.is_some();
+
         // Check for comments between ) and body (Prettier 3.7 #18108)
         let header_end = self.get_for_header_end(stmt);
         let body_start = stmt.body.span().start;
 
-        if self.has_comments_between(header_end, body_start) {
+        if has_pre_paren_comments || self.has_comments_between(header_end, body_start) {
             // Check if we have line comments (need special handling)
             let has_line_comment = self.has_line_comments_between(header_end, body_start);
 
@@ -1733,20 +2340,48 @@ impl<'a> Printer<'a> {
             // Force header to break only for line comments
             // Block comments can stay inline with for loop
             if has_line_comment {
-                parts.push(self.build_for_header_doc_breaking(stmt));
+                parts.push(self.build_for_header_doc_impl(stmt, true, keyword_comments));
             } else {
-                parts.push(self.build_for_header_doc(stmt));
+                parts.push(self.build_for_header_doc_impl(stmt, false, keyword_comments));
             }
-            parts.push(self.build_inline_comments_between_doc(header_end, body_start));
 
-            if has_line_comment {
-                // Line comment: need hardline before body
-                parts.push(d.hardline());
+            // Post-header comments
+            let is_block_body = matches!(stmt.body.as_ref(), Statement::BlockStatement(_));
+            if self.has_comments_between(header_end, body_start) {
+                let comment_doc =
+                    self.build_inline_comments_between_doc_no_leading_space(header_end, body_start);
+                let body_doc = self.build_statement_doc(&stmt.body);
+
+                if has_line_comment && !is_block_body {
+                    // Line comment with non-block body: indent comment + body
+                    // for (;;)\n\t// c\n\texpr;
+                    parts.push(d.indent(d.concat(&[
+                        d.hardline(),
+                        comment_doc,
+                        d.hardline(),
+                        body_doc,
+                    ])));
+                } else if has_line_comment {
+                    // Line comment with block body: keep flat
+                    parts.push(d.text(" "));
+                    parts.push(comment_doc);
+                    parts.push(d.hardline());
+                    parts.push(body_doc);
+                } else {
+                    // Block comment: space before body
+                    parts.push(d.text(" "));
+                    parts.push(comment_doc);
+                    parts.push(d.text(" "));
+                    parts.push(body_doc);
+                }
             } else {
-                // Block comment: space before body
-                parts.push(d.text(" "));
+                if has_line_comment {
+                    parts.push(d.hardline());
+                } else {
+                    parts.push(d.text(" "));
+                }
+                parts.push(self.build_statement_doc(&stmt.body));
             }
-            parts.push(self.build_statement_doc(&stmt.body));
 
             d.concat(&parts)
         } else {
@@ -1766,7 +2401,14 @@ impl<'a> Printer<'a> {
                     }
                     parts.push(self.build_expression_doc(&declarator.id));
                     if let Some(init) = &declarator.init {
+                        let id_end = declarator.id.span().end;
+                        let init_start = init.span().start;
+                        let eq_pos = self.find_equals_position(id_end, init_start);
                         parts.push(d.text(" = "));
+                        if let Some(comments) = self.build_rhs_comments_opt(eq_pos + 1, init_start)
+                        {
+                            parts.push(comments);
+                        }
                         parts.push(self.build_expression_doc(init));
                     }
                 }
@@ -1820,42 +2462,110 @@ impl<'a> Printer<'a> {
     pub(super) fn build_do_while_statement_doc(&self, stmt: &internal::DoWhileStatement) -> DocId {
         let d = self.d();
         let is_block = matches!(stmt.body.as_ref(), Statement::BlockStatement(_));
-        let mut parts = vec![d.text("do "), self.build_statement_doc(&stmt.body)];
+
+        // Check for comments between `do` keyword and body
+        let do_end = stmt.span.start + 2; // "do" is 2 chars
+        let body_start = stmt.body.span().start;
+        let mut parts = if self.has_comments_between(do_end, body_start) {
+            let has_line = self.has_line_comments_between(do_end, body_start);
+            let comment_doc =
+                self.build_inline_comments_between_doc_no_leading_space(do_end, body_start);
+            let body_doc = self.build_statement_doc(&stmt.body);
+            let mut p = vec![d.text("do")];
+            if has_line && !is_block {
+                // Line comment with non-block body: indent comment + body
+                // do\n\t// c\n\texpr;
+                p.push(d.indent(d.concat(&[d.hardline(), comment_doc, d.hardline(), body_doc])));
+            } else if has_line {
+                // Line comment with block body: keep flat
+                p.push(d.text(" "));
+                p.push(comment_doc);
+                p.push(d.hardline());
+                p.push(body_doc);
+            } else {
+                p.push(d.text(" "));
+                p.push(comment_doc);
+                p.push(d.text(" "));
+                p.push(body_doc);
+            }
+            p
+        } else {
+            vec![d.text("do "), self.build_statement_doc(&stmt.body)]
+        };
 
         // Find the while keyword position for comment handling
-        // Use test expression start and search backwards for "while" to avoid matching "while" in comments
+        // Search forward from body end, skipping over comments to find the actual keyword
         let body_end = stmt.body.span().end;
         let test_start = stmt.test.span().start;
-        let while_pos = self.source[body_end as usize..test_start as usize]
-            .rfind("while")
-            .map(|p| body_end + p as u32);
+        let while_pos = {
+            let search = &self.source[body_end as usize..test_start as usize];
+            let mut pos = 0;
+            let mut found = None;
+            while pos < search.len() {
+                if search[pos..].starts_with("//") {
+                    // Skip line comment
+                    pos += search[pos..].find('\n').unwrap_or(search.len() - pos);
+                } else if search[pos..].starts_with("/*") {
+                    // Skip block comment
+                    pos += search[pos + 2..]
+                        .find("*/")
+                        .map_or(search.len() - pos, |p| p + 4);
+                } else if search[pos..].starts_with("while") {
+                    found = Some(body_end + pos as u32);
+                    break;
+                } else {
+                    pos += 1;
+                }
+            }
+            found
+        };
 
         // Check for comments between } and while, determine if while stays on same line
         let while_on_same_line = if let Some(while_start) = while_pos
             && self.has_comments_between(body_end, while_start)
         {
-            let (inline_prev, own_line, _) = self.partition_comments_by_line(body_end, while_start);
+            let (inline_prev, own_line, inline_next) =
+                self.partition_comments_by_line(body_end, while_start);
+
+            // Merge inline_next (comments on same line as `while`) into own_line
+            // so they're emitted before the `while` keyword rather than dropped.
+            // e.g. `} \n /* c */ while (cond);` → `}\n/* c */\nwhile (cond);`
+            let mut all_own_line = own_line;
+            all_own_line.extend(inline_next);
 
             // Add comments preserving their position
-            self.build_comments_between_parts(&mut parts, &inline_prev, &own_line, body_end);
+            self.build_comments_between_parts(&mut parts, &inline_prev, &all_own_line, body_end);
 
             // While stays on same line only if: block body, no own-line comments, all inline are block comments
             let has_inline_line_comment = inline_prev.iter().any(|c| !c.is_block);
-            is_block && own_line.is_empty() && !has_inline_line_comment
+            is_block && all_own_line.is_empty() && !has_inline_line_comment
         } else {
             is_block
         };
 
-        if while_on_same_line {
-            parts.push(d.text(" while ("));
-        } else {
-            parts.push(d.hardline());
-            parts.push(d.text("while ("));
-        }
-
         // Find paren positions for comment handling
         let open_paren = while_pos.and_then(|p| self.find_open_paren_after(p));
         let close_paren = self.find_close_paren_after(stmt.test.span().end);
+
+        // Preserve comments between `while` keyword and `(` in place:
+        //   do{}while/* c */(a); → do {} while /* c */ (a);
+        let keyword_comments = if let Some(wp) = while_pos {
+            let while_keyword_end = wp + 5; // "while" is 5 chars
+            self.build_keyword_paren_comments(while_keyword_end, open_paren)
+        } else {
+            None
+        };
+
+        if while_on_same_line {
+            parts.push(d.text(" while"));
+        } else {
+            parts.push(d.hardline());
+            parts.push(d.text("while"));
+        }
+        if let Some(kc) = keyword_comments {
+            parts.push(kc);
+        }
+        parts.push(d.text(" ("));
 
         // Check for comments in the condition and use preserve_inline if present
         // Use preserve_inline for do-while to intentionally differ from Prettier
@@ -1880,11 +2590,15 @@ impl<'a> Printer<'a> {
 
     pub(super) fn build_try_statement_doc(&self, stmt: &internal::TryStatement) -> DocId {
         let d = self.d();
-        let mut parts = vec![
-            d.text("try "),
-            // Try block expands empty: `try {\n}` not `try {}`
-            self.build_block_statement_expand_empty_doc(&stmt.block),
-        ];
+
+        // try keyword to block: `try /* comment */ {`
+        let try_keyword_end = stmt.span.start + 3; // "try" is 3 chars
+        let block_start = stmt.block.span.start;
+        let mut parts = vec![d.text("try")];
+        self.append_keyword_to_body_comments(&mut parts, try_keyword_end, block_start);
+        // Try block expands empty: `try {\n}` not `try {}`
+        parts.push(self.build_block_statement_expand_empty_doc(&stmt.block));
+
         if let Some(handler) = &stmt.handler {
             // Check for comments between try block and catch keyword
             let try_end = stmt.block.span.end;
@@ -1904,11 +2618,20 @@ impl<'a> Printer<'a> {
             }
             if let Some(param) = &handler.param {
                 // Find paren positions for comment handling
+                let catch_keyword_end = handler.span.start + 5; // "catch" is 5 chars
                 let catch_start = handler.body.span.start;
                 let open_paren = self.source[stmt.block.span.end as usize..catch_start as usize]
                     .find('(')
                     .map(|p| stmt.block.span.end + p as u32);
                 let close_paren = self.find_close_paren_after(param.span().end);
+
+                // Preserve comments between catch keyword and ( in place:
+                //   catch/* comment */(e) → catch /* comment */ (e)
+                let keyword_comments =
+                    self.build_keyword_paren_comments(catch_keyword_end, open_paren);
+                if let Some(kc) = keyword_comments {
+                    parts.push(kc);
+                }
 
                 // Check for comments in catch parameter
                 parts.push(d.text(" ("));
@@ -1921,8 +2644,23 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_expression_doc(param));
                 }
                 parts.push(d.text(")"));
+
+                // Comments between ) and body: `catch (e) /* comment */ {`
+                let paren_end = close_paren.unwrap_or_else(|| param.span().end) + 1;
+                self.append_keyword_to_body_comments(
+                    &mut parts,
+                    paren_end,
+                    handler.body.span.start,
+                );
+            } else {
+                // No param: comments between catch keyword and body: `catch /* comment */ {`
+                let catch_keyword_end = handler.span.start + 5; // "catch" is 5 chars
+                self.append_keyword_to_body_comments(
+                    &mut parts,
+                    catch_keyword_end,
+                    handler.body.span.start,
+                );
             }
-            parts.push(d.text(" "));
             // Catch block stays inline: `catch (e) {}`
             parts.push(self.build_block_statement_doc(&handler.body));
         }
@@ -1949,10 +2687,17 @@ impl<'a> Printer<'a> {
                 } else {
                     parts.push(d.text(" "));
                 }
-                parts.push(d.text("finally "));
+                parts.push(d.text("finally"));
             } else {
-                parts.push(d.text(" finally "));
+                parts.push(d.text(" finally"));
             }
+            // Comments between finally keyword and body: `finally /* comment */ {`
+            let finally_keyword_end = finally_keyword_pos + 7; // "finally" is 7 chars
+            self.append_keyword_to_body_comments(
+                &mut parts,
+                finally_keyword_end,
+                finalizer.span.start,
+            );
             // Finally block expands empty: `finally {\n}` not `finally {}`
             parts.push(self.build_block_statement_expand_empty_doc(finalizer));
         }
@@ -1960,45 +2705,83 @@ impl<'a> Printer<'a> {
     }
 
     pub(super) fn build_throw_statement_doc(&self, stmt: &internal::ThrowStatement) -> DocId {
-        self.build_keyword_argument_doc("throw", stmt.span.start, &stmt.argument)
+        self.build_keyword_argument_doc("throw", stmt.span.start, stmt.span.end, &stmt.argument)
     }
 
     pub(super) fn build_break_statement_doc(&self, stmt: &internal::BreakStatement) -> DocId {
-        let d = self.d();
-        if let Some(label) = &stmt.label {
-            d.concat(&[d.text("break "), d.symbol(label.name.to_u32()), d.text(";")])
-        } else {
-            d.text("break;")
-        }
+        self.build_jump_statement_doc("break", stmt.span, stmt.label.as_ref())
     }
 
     pub(super) fn build_continue_statement_doc(&self, stmt: &internal::ContinueStatement) -> DocId {
+        self.build_jump_statement_doc("continue", stmt.span, stmt.label.as_ref())
+    }
+
+    /// Shared builder for break/continue statements with optional label and trailing comments.
+    fn build_jump_statement_doc(
+        &self,
+        keyword: &'static str,
+        span: tsv_lang::Span,
+        label: Option<&internal::Identifier>,
+    ) -> DocId {
         let d = self.d();
-        if let Some(label) = &stmt.label {
-            d.concat(&[
-                d.text("continue "),
-                d.symbol(label.name.to_u32()),
-                d.text(";"),
-            ])
+        if let Some(label) = label {
+            let keyword_end = span.start + keyword.len() as u32;
+            // Comments between keyword and label (e.g., `break /* c */ loop;`)
+            let pre_label_comment =
+                self.build_inline_comments_between_doc_opt(keyword_end, label.span.start);
+            // Comments between label and semicolon (e.g., `break loop /* c */;`)
+            let post_label_comment =
+                self.build_inline_comments_between_doc_opt(label.span.end, span.end);
+
+            let mut parts = Vec::new();
+            parts.push(d.text(keyword));
+            if let Some(comment_doc) = pre_label_comment {
+                parts.push(comment_doc);
+            }
+            parts.push(d.text(" "));
+            parts.push(d.symbol(label.name.to_u32()));
+            if let Some(comment_doc) = post_label_comment {
+                parts.push(comment_doc);
+            }
+            parts.push(d.text(";"));
+            d.concat(&parts)
         } else {
-            d.text("continue;")
+            let keyword_end = span.start + keyword.len() as u32;
+            if let Some(comment_doc) =
+                self.build_inline_comments_between_doc_opt(keyword_end, span.end)
+            {
+                d.concat(&[d.text(keyword), d.text(";"), comment_doc])
+            } else {
+                d.concat(&[d.text(keyword), d.text(";")])
+            }
         }
     }
 
     pub(super) fn build_labeled_statement_doc(&self, stmt: &internal::LabeledStatement) -> DocId {
         let d = self.d();
-        // Check for comments between label and body
-        // The colon is after the label identifier
-        let colon_end = stmt.label.span.end + 1; // Position after ":"
+        let label_end = stmt.label.span.end;
         let body_start = stmt.body.span().start;
 
+        // Find actual colon position (skip comments between label and colon)
+        let colon_pos = find_char_skipping_comments(
+            self.source.as_bytes(),
+            label_end as usize,
+            body_start as usize,
+            b':',
+        )
+        .unwrap_or(label_end as usize);
+        let colon_end = colon_pos as u32 + 1;
+
+        let mut parts = vec![d.symbol(stmt.label.name.to_u32())];
+
+        // Comments between label name and colon: `label /* c */:`
+        parts.push(self.build_inline_comments_between_doc(label_end, colon_pos as u32));
+
+        // Check for comments between colon and body
         if self.has_comments_between(colon_end, body_start) {
             let has_line_comment = self.has_line_comments_between(colon_end, body_start);
-            let mut parts = vec![
-                d.symbol(stmt.label.name.to_u32()),
-                d.text(":"),
-                self.build_inline_comments_between_doc(colon_end, body_start),
-            ];
+            parts.push(d.text(":"));
+            parts.push(self.build_inline_comments_between_doc(colon_end, body_start));
             if has_line_comment {
                 parts.push(d.hardline());
             } else {
@@ -2013,11 +2796,9 @@ impl<'a> Printer<'a> {
             } else {
                 ": "
             };
-            d.concat(&[
-                d.symbol(stmt.label.name.to_u32()),
-                d.text(separator),
-                self.build_statement_doc(&stmt.body),
-            ])
+            parts.push(d.text(separator));
+            parts.push(self.build_statement_doc(&stmt.body));
+            d.concat(&parts)
         }
     }
 

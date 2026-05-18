@@ -1,47 +1,12 @@
-// Source fidelity utilities - extracting raw source text while preserving quirks
+// Source fidelity utilities: semantic value formatting for the CSS printer.
 //
-// This module centralizes logic for deciding when to extract raw source text vs
-// using semantic AST formatting. This is part of Sprint 1 cleanup to remove
-// source text duplication from the AST (see TODO_CSS_AST_CLEANUP.md).
-//
-// ## Architecture
-//
-// Internal AST stores semantic data + spans. When formatting, we decide:
-// - Extract raw source: preserve escapes, comments, quirks (source fidelity)
-// - Format from AST: normalize spacing, apply prettier rules (semantic formatting)
-//
-// ## Usage
-//
-// ```rust
-// use crate::printer::source_fidelity::extract_raw_value;
-//
-// let raw = extract_raw_value(source, value.span());
-// output.write(raw);
-// ```
+// Internal AST stores semantic data + spans. When formatting we usually format
+// semantically (normalize spacing, apply prettier rules); raw-source extraction
+// uses `span.extract(source)` directly at the callsite when needed.
 
 use crate::ast::internal::{Color, ColorChannel};
 use tsv_lang::Span;
 use tsv_lang::printing::{StringFormatOptions, format_string_literal};
-
-/// Extract raw source text for a value (preserves escapes, comments, quirks)
-///
-/// Use this when you need source fidelity (e.g., complex escape sequences, value comments).
-///
-/// # Arguments
-/// * `source` - Original CSS source text
-/// * `span` - Span of the value to extract
-///
-/// # Returns
-/// * Raw source text slice
-///
-/// # Example
-/// ```ignore
-/// let raw = extract_raw_value(source, value.span());
-/// printer.write(raw);  // Preserves "01px" not "1px", "\0041" not "A"
-/// ```
-pub fn extract_raw_value(source: &str, span: Span) -> &str {
-    span.extract(source)
-}
 
 /// Format an identifier value semantically
 ///
@@ -50,7 +15,7 @@ pub fn extract_raw_value(source: &str, span: Span) -> &str {
 /// assert_eq!(format_identifier_value("red"), "red");
 /// assert_eq!(format_identifier_value("auto"), "auto");
 /// ```
-pub fn format_identifier_value(name: &str) -> String {
+pub(crate) fn format_identifier_value(name: &str) -> String {
     name.to_string()
 }
 
@@ -68,7 +33,8 @@ pub fn format_identifier_value(name: &str) -> String {
 /// assert_eq!(format_dimension_value(1.5, "em"), "1.5em");
 /// assert_eq!(format_dimension_value(100.0, "px"), "100px");
 /// ```
-pub fn format_dimension_value(value: f64, unit: &str) -> String {
+#[cfg(feature = "convert")]
+pub(crate) fn format_dimension_value(value: f64, unit: &str) -> String {
     let normalized = normalize_number(value);
     if unit.is_empty() {
         normalized
@@ -86,6 +52,7 @@ pub fn format_dimension_value(value: f64, unit: &str) -> String {
 ///
 /// The key insight: f64 representation loses leading zeros like `01`,
 /// so we can safely use f64::to_string() and only normalize trailing zeros.
+#[cfg(feature = "convert")]
 fn normalize_number(value: f64) -> String {
     // Handle special cases first
     if value == 0.0 {
@@ -128,7 +95,7 @@ fn normalize_number(value: f64) -> String {
 ///
 /// # Returns
 /// Normalized dimension string matching prettier's output
-pub fn normalize_dimension_from_source(raw: &str) -> String {
+pub(crate) fn normalize_dimension_from_source(raw: &str) -> String {
     // If no decimal point, return as-is (preserves leading zeros, signs)
     if !raw.contains('.') {
         return raw.to_string();
@@ -213,7 +180,7 @@ fn normalize_decimal_preserving_prefix(num: &str) -> String {
 /// let color = Color::Hex("#FF0000".to_string());
 /// assert_eq!(format_color_value(&color), "#ff0000");
 /// ```
-pub fn format_color_value(color: &Color) -> String {
+pub(crate) fn format_color_value(color: &Color) -> String {
     match color {
         Color::Named(name) => name.clone(),
         Color::Hex(hex) => hex.to_lowercase(),
@@ -287,7 +254,7 @@ fn format_color_channel(channel: &ColorChannel) -> String {
 /// * `color` - The parsed color
 /// * `source` - The original source code
 /// * `span` - The span of the color in source
-pub fn format_color_from_source(color: &Color, source: &str, span: Span) -> String {
+pub(crate) fn format_color_from_source(color: &Color, source: &str, span: Span) -> String {
     // Named and hex colors don't need syntax detection
     match color {
         Color::Named(name) => return name.clone(),
@@ -374,7 +341,7 @@ pub fn format_color_from_source(color: &Color, source: &str, span: Span) -> Stri
 /// assert_eq!(format_string_value("hello", '\''), "'hello'");
 /// assert_eq!(format_string_value("world", '"'), "\"world\"");
 /// ```
-pub fn format_string_value(content: &str, quote: char) -> String {
+pub(crate) fn format_string_value(content: &str, quote: char) -> String {
     format_string_literal(content, quote, StringFormatOptions::default())
 }
 
@@ -407,7 +374,7 @@ pub fn format_string_value(content: &str, quote: char) -> String {
 /// - Input: `color/* comment */:red;`
 /// - Output: `color /* comment */` (normalized spacing)
 /// - Prettier: `color/* comment */` (no space before comment)
-pub fn extract_property_name(decl_source: &str) -> String {
+pub(crate) fn extract_property_name(decl_source: &str) -> String {
     if let Some(colon_pos) = decl_source.find(':') {
         let property_part = &decl_source[..colon_pos];
 
@@ -452,7 +419,7 @@ pub fn extract_property_name(decl_source: &str) -> String {
 /// let source = "content: 'hello\\nworld';";
 /// assert_eq!(extract_string_value(source, '\''), Some("'hello\\nworld'".to_string()));
 /// ```
-pub fn extract_string_value(decl_source: &str, quote: char) -> Option<String> {
+pub(crate) fn extract_string_value(decl_source: &str, quote: char) -> Option<String> {
     if let Some(colon_pos) = decl_source.find(':') {
         let value_part = decl_source[colon_pos + 1..].trim();
         // String should be quoted
@@ -483,7 +450,7 @@ pub fn extract_string_value(decl_source: &str, quote: char) -> Option<String> {
 /// let source = "margin: 10px  /* test */  20px;";
 /// assert_eq!(extract_value_with_comments(source), Some("10px /* test */ 20px".to_string()));
 /// ```
-pub fn extract_value_with_comments(decl_source: &str) -> Option<String> {
+pub(crate) fn extract_value_with_comments(decl_source: &str) -> Option<String> {
     if let Some(colon_pos) = decl_source.find(':') {
         let value_with_ws = &decl_source[colon_pos + 1..];
         let normalized = normalize_value_spacing(value_with_ws);
@@ -519,7 +486,7 @@ pub fn extract_value_with_comments(decl_source: &str) -> Option<String> {
 ///     "url('path with spaces')"
 /// );
 /// ```
-pub fn normalize_css_whitespace(s: &str) -> String {
+pub(crate) fn normalize_css_whitespace(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
     let mut in_string = false;
@@ -629,7 +596,7 @@ pub fn normalize_css_whitespace(s: &str) -> String {
 
 /// Normalize spacing in a value containing comments (alias for backward compatibility)
 #[inline]
-pub fn normalize_value_spacing(value: &str) -> String {
+pub(crate) fn normalize_value_spacing(value: &str) -> String {
     normalize_css_whitespace(value)
 }
 
@@ -637,7 +604,7 @@ pub fn normalize_value_spacing(value: &str) -> String {
 ///
 /// Given source like `property: func_name(arg1, arg2)` and func_name `func_name`,
 /// returns `Some("arg1, arg2")`. Returns `None` if the function can't be found.
-pub fn extract_function_args<'a>(source: &'a str, func_name: &str) -> Option<&'a str> {
+pub(crate) fn extract_function_args<'a>(source: &'a str, func_name: &str) -> Option<&'a str> {
     let func_start = source.find(func_name)?;
     let after_name = &source[func_start + func_name.len()..];
     let open_paren = after_name.find('(')?;
@@ -667,7 +634,7 @@ pub fn extract_function_args<'a>(source: &'a str, func_name: &str) -> Option<&'a
 ///
 /// Used for space-separated values like `var(--b) color-mix(...)`.
 /// Returns individual values that can be wrapped independently.
-pub fn split_by_space_preserving_parens(content: &str) -> Vec<&str> {
+pub(crate) fn split_by_space_preserving_parens(content: &str) -> Vec<&str> {
     let mut parts = Vec::new();
     let mut depth: u32 = 0;
     let mut start = 0;
@@ -749,7 +716,7 @@ pub fn split_by_space_preserving_parens(content: &str) -> Vec<&str> {
 /// Handles nested parentheses correctly so `func(a, b)` inside an arg isn't split.
 /// Skips over block comments so commas inside `/* a, b */` aren't treated as separators.
 /// Skips over quoted strings so commas inside `"a, b"` aren't treated as separators.
-pub fn split_args_by_comma(content: &str) -> Vec<&str> {
+pub(crate) fn split_args_by_comma(content: &str) -> Vec<&str> {
     let mut args = Vec::new();
     let mut depth: u32 = 0;
     let mut start = 0;
@@ -825,13 +792,6 @@ pub fn split_args_by_comma(content: &str) -> Vec<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_extract_raw_value() {
-        let source = "color: #ff0000;";
-        let span = Span { start: 7, end: 14 };
-        assert_eq!(extract_raw_value(source, span), "#ff0000");
-    }
 
     #[test]
     fn test_extract_function_args() {

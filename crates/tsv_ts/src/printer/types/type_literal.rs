@@ -246,7 +246,7 @@ impl<'a> Printer<'a> {
                     m.span().start,
                     is_first,
                 ));
-                member_parts.push(self.build_type_member_doc_inner(m, false));
+                member_parts.push(self.build_type_member_doc_inner(m));
 
                 // Handle trailing comments - preserve position relative to semicolon
                 let upper_bound = t
@@ -265,7 +265,7 @@ impl<'a> Printer<'a> {
             } else {
                 // Width-aware: softlines, conditional semicolons
                 member_parts.push(d.softline());
-                member_parts.push(self.build_type_member_doc_inner(m, false));
+                member_parts.push(self.build_type_member_doc_inner(m));
 
                 // Handle trailing comments - preserve position relative to semicolon
                 let upper_bound = t
@@ -429,7 +429,7 @@ impl<'a> Printer<'a> {
                     m.span().start,
                     is_first,
                 ));
-                member_parts.push(self.build_type_member_doc_inner(m, false));
+                member_parts.push(self.build_type_member_doc_inner(m));
 
                 // Handle trailing comments - preserve position relative to semicolon
                 let upper_bound = t
@@ -462,7 +462,7 @@ impl<'a> Printer<'a> {
                 // Use content_end for comment detection (before trailing separator)
                 let member_content_end = m.content_end(self.source);
 
-                parts.push(self.build_type_member_doc_inner(m, false));
+                parts.push(self.build_type_member_doc_inner(m));
 
                 let upper_bound = t
                     .members
@@ -496,7 +496,7 @@ impl<'a> Printer<'a> {
                 let member_content_end = m.content_end(self.source);
 
                 member_parts.push(d.softline());
-                member_parts.push(self.build_type_member_doc_inner(m, false));
+                member_parts.push(self.build_type_member_doc_inner(m));
 
                 let upper_bound = t
                     .members

@@ -2,20 +2,18 @@
 
 use super::super::{internal, public};
 use super::{
-    ConversionContext, convert_block_statement, convert_expression, convert_statement,
+    Schema, convert_block_statement, convert_expression, convert_statement,
     convert_variable_declaration, create_location,
 };
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
 
-/// Default conversion context for control flow statement bodies.
+/// Schema for control flow statement bodies.
 ///
 /// Control flow bodies (if/for/while/etc.) never contain import/export
-/// declarations, so the context doesn't matter. We use the default (non-Svelte)
-/// context for simplicity.
-const CTX: ConversionContext = ConversionContext {
-    is_svelte_script: false,
-};
+/// declarations, so the schema doesn't matter. We use `Acorn` (the default)
+/// for simplicity.
+const SCHEMA: Schema = Schema::Acorn;
 
 pub(in crate::ast) fn convert_if_statement(
     if_stmt: &internal::IfStatement,
@@ -42,12 +40,13 @@ pub(in crate::ast) fn convert_if_statement(
             loc,
             interner,
             offset,
-            CTX,
+            SCHEMA,
         )),
-        alternate: if_stmt
-            .alternate
-            .as_ref()
-            .map(|alt| Box::new(convert_statement(alt, source, loc, interner, offset, CTX))),
+        alternate: if_stmt.alternate.as_ref().map(|alt| {
+            Box::new(convert_statement(
+                alt, source, loc, interner, offset, SCHEMA,
+            ))
+        }),
     }
 }
 
@@ -81,7 +80,7 @@ pub(in crate::ast) fn convert_for_statement(
             loc,
             interner,
             offset,
-            CTX,
+            SCHEMA,
         )),
     }
 }
@@ -112,7 +111,7 @@ pub(in crate::ast) fn convert_for_in_statement(
             loc,
             interner,
             offset,
-            CTX,
+            SCHEMA,
         )),
     }
 }
@@ -144,7 +143,7 @@ pub(in crate::ast) fn convert_for_of_statement(
             loc,
             interner,
             offset,
-            CTX,
+            SCHEMA,
         )),
     }
 }
@@ -174,7 +173,7 @@ pub(in crate::ast) fn convert_while_statement(
             loc,
             interner,
             offset,
-            CTX,
+            SCHEMA,
         )),
     }
 }
@@ -197,7 +196,7 @@ pub(in crate::ast) fn convert_do_while_statement(
             loc,
             interner,
             offset,
-            CTX,
+            SCHEMA,
         )),
         test: Box::new(convert_expression(
             &do_while.test,
@@ -358,7 +357,7 @@ pub(in crate::ast) fn convert_labeled_statement(
             loc,
             interner,
             offset,
-            CTX,
+            SCHEMA,
         )),
     }
 }
@@ -468,7 +467,7 @@ fn convert_switch_case(
         consequent: case
             .consequent
             .iter()
-            .map(|s| convert_statement(s, source, loc, interner, offset, CTX))
+            .map(|s| convert_statement(s, source, loc, interner, offset, SCHEMA))
             .collect(),
     }
 }

@@ -115,12 +115,19 @@ export async function collectBinarySizes(
 		}
 	}
 
-	// tsv WASM
+	// tsv WASM — two builds from one crate via the `ast` feature:
+	// pkg/deno (format-only, @fuzdev/tsv_fmt) and pkg/deno-parse
+	// (parse + format, @fuzdev/tsv_parse).
 	if (options?.hasWasm !== false) {
-		const path = `${projectRoot}/crates/tsv_wasm/pkg/deno/tsv_wasm_bg.wasm`;
-		const bytes = await fileSize(path);
-		if (bytes !== null) {
-			sizes.push({ label: 'tsv_wasm', bytes, kind: 'wasm' });
+		const fmtPath = `${projectRoot}/crates/tsv_wasm/pkg/deno/tsv_wasm_bg.wasm`;
+		const fmtBytes = await fileSize(fmtPath);
+		if (fmtBytes !== null) {
+			sizes.push({ label: 'tsv_fmt (wasm)', bytes: fmtBytes, kind: 'wasm' });
+		}
+		const parsePath = `${projectRoot}/crates/tsv_wasm/pkg/deno-parse/tsv_wasm_bg.wasm`;
+		const parseBytes = await fileSize(parsePath);
+		if (parseBytes !== null) {
+			sizes.push({ label: 'tsv_parse (wasm)', bytes: parseBytes, kind: 'wasm' });
 		}
 	}
 

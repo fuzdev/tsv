@@ -10,7 +10,7 @@
 				"start": 9,
 				"end": 84,
 				"name": "keyframes",
-				"prelude": "anim1 /* comment */",
+				"prelude": "anim1",
 				"block": {
 					"type": "Block",
 					"start": 40,

@@ -181,16 +181,19 @@ impl<'a> Printer<'a> {
             let stmt_end = stmt.span().end;
             body_parts.extend(self.build_trailing_same_line_comment_docs(stmt_end, block_end));
 
-            prev_end = stmt_end;
+            // Update prev_end past trailing comments (including comments on the
+            // closing */ line of multi-line block comments)
+            prev_end = self.find_end_with_trailing_comments(stmt_end);
             prev_stmt_end = Some(stmt_end);
         }
 
         // Handle trailing comments after the last statement (on their own line)
         // Preserve blank lines between last statement and trailing comments, and between comments
         if let Some(last_stmt_end) = prev_stmt_end {
-            let mut trailing_prev_end = last_stmt_end;
-            for comment in tsv_lang::comments_in_range(self.comments, last_stmt_end, block_end) {
-                if self.is_same_line(last_stmt_end, comment.span.start) {
+            let trailing_start = self.find_end_with_trailing_comments(last_stmt_end);
+            let mut trailing_prev_end = trailing_start;
+            for comment in tsv_lang::comments_in_range(self.comments, trailing_start, block_end) {
+                if self.is_same_line(trailing_start, comment.span.start) {
                     continue; // Skip same-line comments (already handled above)
                 }
                 // Check for blank line before this comment
@@ -212,7 +215,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Collect leading comments for a statement, filtering out trailing same-line from previous
-    fn collect_leading_comments(
+    pub(in crate::printer) fn collect_leading_comments(
         &self,
         prev_end: u32,
         stmt_start: u32,
@@ -228,25 +231,6 @@ impl<'a> Printer<'a> {
         } else {
             comments
         }
-    }
-
-    /// Collect outer comments to be moved inside a block
-    ///
-    /// Used to collect "dangling" comments between a signature and its body:
-    /// ```text
-    /// fn() // comment
-    /// {
-    ///     return 1;
-    /// }
-    /// ```
-    pub(in crate::printer) fn build_outer_comments_for_block(
-        &self,
-        sig_end: u32,
-        block: &internal::BlockStatement,
-    ) -> Vec<DocId> {
-        tsv_lang::comments_in_range(self.comments, sig_end, block.span.start)
-            .map(|c| self.build_comment_doc(c))
-            .collect()
     }
 
     /// Build a Doc for a block statement with outer comments moved inside

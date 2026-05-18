@@ -23,6 +23,7 @@
 pub mod arena;
 mod arena_fits;
 mod arena_render;
+mod render_config;
 mod types;
 
 // Types
@@ -31,14 +32,14 @@ pub use types::{DocContext, DocText, GroupId, LineKind, Mode, TextResolver};
 // Arena render
 pub use arena_render::{
     arena_print_doc, arena_print_doc_at_column, arena_print_doc_at_column_resolved,
-    arena_print_doc_resolved, arena_print_doc_with_indent, arena_print_doc_with_indent_resolved,
-    arena_print_doc_with_indent_resolved_preserve_whitespace,
+    arena_print_doc_flat_resolved, arena_print_doc_resolved, arena_print_doc_with_indent,
+    arena_print_doc_with_indent_resolved, arena_print_doc_with_indent_resolved_preserve_whitespace,
 };
 
 // Arena fits
 pub use arena_fits::arena_fits;
 
-use crate::PrintConfig;
+use crate::{PRINT_WIDTH, TAB_WIDTH};
 
 /// Calculate available width for fitting check
 ///
@@ -46,94 +47,117 @@ use crate::PrintConfig;
 /// formatters. It accounts for indentation and any trailing characters that will follow
 /// the content being checked.
 ///
+/// Uses the hardcoded [`PRINT_WIDTH`] and [`TAB_WIDTH`].
+///
 /// # Arguments
-/// * `config` - Print configuration (contains print_width and tab_width)
 /// * `indent_level` - Current indentation level
 /// * `current_column` - Position on current line (0 if start of line)
 /// * `trailing_chars` - Space to reserve for trailing punctuation (e.g., 1 for ";")
-pub fn available_width(
-    config: &PrintConfig,
-    indent_level: usize,
-    current_column: usize,
-    trailing_chars: usize,
-) -> usize {
-    let indent_width = indent_level * config.tab_width;
+pub fn available_width(indent_level: usize, current_column: usize, trailing_chars: usize) -> usize {
+    let indent_width = indent_level * TAB_WIDTH;
     let used = indent_width.max(current_column) + trailing_chars;
-    config.print_width.saturating_sub(used)
+    PRINT_WIDTH.saturating_sub(used)
 }
 
 #[cfg(test)]
 mod arena_tests {
     use super::arena::{DocArena, DocId};
+    use super::arena_render::arena_print_doc_with_indent_and_render;
+    use super::render_config::RenderConfig;
     use super::*;
-    use crate::PrintConfig;
+    use crate::EmbedContext;
+
+    /// Test helper: render with explicit width/tab/indent overrides and
+    /// optional `base_indent_offset`. Wraps the internal
+    /// [`arena_print_doc_with_indent_and_render`] for compactness.
+    fn render_test(
+        arena: &DocArena,
+        doc: DocId,
+        render: &RenderConfig,
+        base_indent_offset: usize,
+    ) -> String {
+        let embed = EmbedContext {
+            base_indent_offset,
+            ..EmbedContext::default()
+        };
+        arena_print_doc_with_indent_and_render(arena, doc, &embed, 0, 0, render)
+    }
+
+    /// Test helper: render with default widths and the default embed context.
+    fn render_default(arena: &DocArena, doc: DocId) -> String {
+        arena_print_doc(arena, doc, &EmbedContext::default())
+    }
+
+    /// Test helper: render with explicit `print_width`, default tab/indent.
+    fn render_pw(arena: &DocArena, doc: DocId, print_width: usize) -> String {
+        let render = RenderConfig {
+            print_width,
+            ..RenderConfig::default()
+        };
+        render_test(arena, doc, &render, 0)
+    }
+
+    /// Test helper: render with explicit `print_width` and 2-space indent
+    /// (matches the old `indent: "  ", tab_width: 2` test setup).
+    fn render_pw_spaces(arena: &DocArena, doc: DocId, print_width: usize) -> String {
+        let render = RenderConfig {
+            print_width,
+            tab_width: 2,
+            indent: "  ",
+        };
+        render_test(arena, doc, &render, 0)
+    }
+
+    /// Test helper: render with explicit `print_width` and tab indent.
+    fn render_pw_tab(arena: &DocArena, doc: DocId, print_width: usize) -> String {
+        let render = RenderConfig {
+            print_width,
+            tab_width: 2,
+            indent: "\t",
+        };
+        render_test(arena, doc, &render, 0)
+    }
 
     #[test]
     fn test_arena_simple_text() {
         let a = DocArena::new(2);
         let doc = a.text("hello");
-        let config = PrintConfig::default();
-        assert_eq!(arena_print_doc(&a, doc, &config), "hello");
+        assert_eq!(render_default(&a, doc), "hello");
     }
 
     #[test]
     fn test_arena_concat() {
         let a = DocArena::new(2);
         let doc = a.concat(&[a.text("hello"), a.text(" "), a.text("world")]);
-        let config = PrintConfig::default();
-        assert_eq!(arena_print_doc(&a, doc, &config), "hello world");
+        assert_eq!(render_default(&a, doc), "hello world");
     }
 
     #[test]
     fn test_arena_line_in_flat_mode_fits() {
         let a = DocArena::new(2);
         let doc = a.group(a.concat(&[a.text("a"), a.line(), a.text("b")]));
-        let config = PrintConfig {
-            indent: "\t",
-            print_width: 10,
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "a b");
+        assert_eq!(render_pw_tab(&a, doc, 10), "a b");
     }
 
     #[test]
     fn test_arena_line_in_break_mode() {
         let a = DocArena::new(2);
         let doc = a.group(a.concat(&[a.text("hello"), a.line(), a.text("world")]));
-        let config = PrintConfig {
-            indent: "\t",
-            print_width: 8,
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "hello\nworld");
+        assert_eq!(render_pw_tab(&a, doc, 8), "hello\nworld");
     }
 
     #[test]
     fn test_arena_hardline() {
         let a = DocArena::new(2);
         let doc = a.concat(&[a.text("a"), a.hardline(), a.text("b")]);
-        let config = PrintConfig {
-            indent: "\t",
-            print_width: 100,
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "a\nb");
+        assert_eq!(render_pw_tab(&a, doc, 100), "a\nb");
     }
 
     #[test]
     fn test_arena_softline() {
         let a = DocArena::new(2);
         let doc = a.group(a.concat(&[a.text("a"), a.softline(), a.text("b")]));
-        let config = PrintConfig {
-            indent: "\t",
-            print_width: 10,
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "ab");
+        assert_eq!(render_pw_tab(&a, doc, 10), "ab");
     }
 
     #[test]
@@ -141,13 +165,7 @@ mod arena_tests {
         let a = DocArena::new(2);
         let inner = a.concat(&[a.hardline(), a.text("child")]);
         let doc = a.concat(&[a.text("parent"), a.indent(inner)]);
-        let config = PrintConfig {
-            indent: "\t",
-            print_width: 80,
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "parent\n\tchild");
+        assert_eq!(render_pw_tab(&a, doc, 80), "parent\n\tchild");
     }
 
     #[test]
@@ -157,29 +175,14 @@ mod arena_tests {
         let indented = a.indent(inner);
         let doc = a.group(a.concat(&[a.text("("), indented, a.line(), a.text(")")]));
 
-        let config_wide = PrintConfig {
-            indent: "  ",
-            print_width: 20,
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config_wide), "( content )");
+        assert_eq!(render_pw_spaces(&a, doc, 20), "( content )");
 
         let a2 = DocArena::new(2);
         let inner2 = a2.concat(&[a2.line(), a2.text("content")]);
         let indented2 = a2.indent(inner2);
         let doc2 = a2.group(a2.concat(&[a2.text("("), indented2, a2.line(), a2.text(")")]));
 
-        let config_narrow = PrintConfig {
-            indent: "  ",
-            print_width: 8,
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(
-            arena_print_doc(&a2, doc2, &config_narrow),
-            "(\n  content\n)"
-        );
+        assert_eq!(render_pw_spaces(&a2, doc2, 8), "(\n  content\n)");
     }
 
     #[test]
@@ -191,13 +194,7 @@ mod arena_tests {
             a.text(")"),
         ]));
 
-        let config_wide = PrintConfig {
-            indent: "\t",
-            print_width: 20,
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config_wide), "(, )");
+        assert_eq!(render_pw_tab(&a, doc, 20), "(, )");
     }
 
     #[test]
@@ -211,14 +208,8 @@ mod arena_tests {
             a.text("still-level1"),
             dedented,
         ]));
-        let config = PrintConfig {
-            indent: "\t",
-            print_width: 80,
-            tab_width: 2,
-            ..Default::default()
-        };
         assert_eq!(
-            arena_print_doc(&a, doc, &config),
+            render_pw_tab(&a, doc, 80),
             "level1\n\tstill-level1\nback-to-level0"
         );
     }
@@ -227,26 +218,14 @@ mod arena_tests {
     fn test_arena_fill_all_fit() {
         let a = DocArena::new(2);
         let doc = a.fill(&[a.text("a"), a.line(), a.text("b"), a.line(), a.text("c")]);
-        let config = PrintConfig {
-            indent: "\t",
-            print_width: 20,
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "a b c");
+        assert_eq!(render_pw_tab(&a, doc, 20), "a b c");
     }
 
     #[test]
     fn test_arena_fill_greedy_packing() {
         let a = DocArena::new(2);
         let doc = a.fill(&[a.text("aa"), a.line(), a.text("bb"), a.line(), a.text("cc")]);
-        let config = PrintConfig {
-            indent: "\t",
-            print_width: 6,
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "aa bb\ncc");
+        assert_eq!(render_pw_tab(&a, doc, 6), "aa bb\ncc");
     }
 
     #[test]
@@ -261,13 +240,7 @@ mod arena_tests {
             a.concat(&[a.text(","), a.line()]),
             a.text("dddd"),
         ]);
-        let config = PrintConfig {
-            indent: "\t",
-            print_width: 15,
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "aaaa, bbbb,\ncccc, dddd");
+        assert_eq!(render_pw_tab(&a, doc, 15), "aaaa, bbbb,\ncccc, dddd");
     }
 
     #[test]
@@ -291,15 +264,13 @@ mod arena_tests {
             a.text("8"),
         ]));
 
-        let config_no_offset = PrintConfig {
-            indent: "\t",
+        let render = RenderConfig {
             print_width: 12,
             tab_width: 2,
-            base_indent_offset: 0,
-            ..Default::default()
+            indent: "\t",
         };
         assert_eq!(
-            arena_print_doc(&a, doc, &config_no_offset),
+            render_test(&a, doc, &render, 0),
             "1, 2, 3, 4,\n\t5, 6, 7, 8"
         );
 
@@ -322,15 +293,8 @@ mod arena_tests {
             a2.text("8"),
         ]));
 
-        let config_with_offset = PrintConfig {
-            indent: "\t",
-            print_width: 12,
-            tab_width: 2,
-            base_indent_offset: 1,
-            ..Default::default()
-        };
         assert_eq!(
-            arena_print_doc(&a2, doc2, &config_with_offset),
+            render_test(&a2, doc2, &render, 1),
             "1, 2, 3, 4,\n\t5, 6, 7,\n\t8"
         );
     }
@@ -340,8 +304,7 @@ mod arena_tests {
         let a = DocArena::new(2);
         let docs = vec![a.text("a"), a.text("b"), a.text("c")];
         let doc = a.join(docs, ", ");
-        let config = PrintConfig::default();
-        assert_eq!(arena_print_doc(&a, doc, &config), "a, b, c");
+        assert_eq!(render_default(&a, doc), "a, b, c");
     }
 
     #[test]
@@ -349,8 +312,7 @@ mod arena_tests {
         let a = DocArena::new(2);
         let docs: Vec<_> = vec![];
         let doc = a.join(docs, ", ");
-        let config = PrintConfig::default();
-        assert_eq!(arena_print_doc(&a, doc, &config), "");
+        assert_eq!(render_default(&a, doc), "");
     }
 
     #[test]
@@ -361,11 +323,7 @@ mod arena_tests {
         let joined = a.join_doc(docs, sep);
         let doc = a.group(joined);
 
-        let config_wide = PrintConfig {
-            print_width: 20,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config_wide), "a b c");
+        assert_eq!(render_pw(&a, doc, 20), "a b c");
 
         let a2 = DocArena::new(2);
         let sep2 = a2.line();
@@ -373,43 +331,35 @@ mod arena_tests {
         let joined2 = a2.join_doc(docs2, sep2);
         let doc2 = a2.group(joined2);
 
-        let config_narrow = PrintConfig {
-            print_width: 3,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a2, doc2, &config_narrow), "a\nb\nc");
+        assert_eq!(render_pw(&a2, doc2, 3), "a\nb\nc");
     }
 
     #[test]
     fn test_arena_wrap() {
         let a = DocArena::new(2);
         let doc = a.wrap("(", a.text("content"), ")");
-        let config = PrintConfig::default();
-        assert_eq!(arena_print_doc(&a, doc, &config), "(content)");
+        assert_eq!(render_default(&a, doc), "(content)");
     }
 
     #[test]
     fn test_arena_parens() {
         let a = DocArena::new(2);
         let doc = a.parens(a.text("x"));
-        let config = PrintConfig::default();
-        assert_eq!(arena_print_doc(&a, doc, &config), "(x)");
+        assert_eq!(render_default(&a, doc), "(x)");
     }
 
     #[test]
     fn test_arena_brackets() {
         let a = DocArena::new(2);
         let doc = a.brackets(a.text("0"));
-        let config = PrintConfig::default();
-        assert_eq!(arena_print_doc(&a, doc, &config), "[0]");
+        assert_eq!(render_default(&a, doc), "[0]");
     }
 
     #[test]
     fn test_arena_braces() {
         let a = DocArena::new(2);
         let doc = a.braces(a.text("a: 1"));
-        let config = PrintConfig::default();
-        assert_eq!(arena_print_doc(&a, doc, &config), "{a: 1}");
+        assert_eq!(render_default(&a, doc), "{a: 1}");
     }
 
     #[test]
@@ -419,13 +369,7 @@ mod arena_tests {
         let docs = vec![a.text("a"), a.text("b"), a.text("c")];
         let trailing = a.join_trailing(docs, sep);
         let doc = a.group(trailing);
-        let config = PrintConfig {
-            print_width: 20,
-            indent: "  ",
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "a, b, c");
+        assert_eq!(render_pw_spaces(&a, doc, 20), "a, b, c");
     }
 
     #[test]
@@ -435,39 +379,21 @@ mod arena_tests {
         let docs = vec![a.text("a"), a.text("b"), a.text("c")];
         let trailing = a.join_trailing(docs, sep);
         let doc = a.group(trailing);
-        let config = PrintConfig {
-            print_width: 3,
-            indent: "  ",
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "a,\nb,\nc,");
+        assert_eq!(render_pw_spaces(&a, doc, 3), "a,\nb,\nc,");
     }
 
     #[test]
     fn test_arena_indent_line() {
         let a = DocArena::new(2);
         let doc = a.group(a.concat(&[a.text("prefix"), a.indent_line(a.text("indented"))]));
-        let config = PrintConfig {
-            print_width: 10,
-            indent: "  ",
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "prefix\n  indented");
+        assert_eq!(render_pw_spaces(&a, doc, 10), "prefix\n  indented");
     }
 
     #[test]
     fn test_arena_indent_softline_flat() {
         let a = DocArena::new(2);
         let doc = a.group(a.concat(&[a.text("a"), a.indent_softline(a.text("b"))]));
-        let config = PrintConfig {
-            print_width: 20,
-            indent: "  ",
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "ab");
+        assert_eq!(render_pw_spaces(&a, doc, 20), "ab");
     }
 
     #[test]
@@ -476,11 +402,7 @@ mod arena_tests {
         let inner = a.concat(&[a.text("a"), a.hardline(), a.text("b")]);
         let iso = a.isolated_group(inner);
         let doc = a.group(a.concat(&[a.text("fn("), iso, a.text(")")]));
-        let config = PrintConfig {
-            print_width: 100,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "fn(a\nb)");
+        assert_eq!(render_pw(&a, doc, 100), "fn(a\nb)");
     }
 
     #[test]
@@ -496,11 +418,7 @@ mod arena_tests {
         let inner_iso = a.isolated_group(a.concat(&[a.text("x"), a.hardline(), a.text("y")]));
         let outer_iso = a.isolated_group(a.concat(&[a.text("b("), inner_iso, a.text(")")]));
         let doc = a.group(a.concat(&[a.text("a("), outer_iso, a.text(")")]));
-        let config = PrintConfig {
-            print_width: 100,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "a(b(x\ny))");
+        assert_eq!(render_pw(&a, doc, 100), "a(b(x\ny))");
     }
 
     #[test]
@@ -525,17 +443,26 @@ mod arena_tests {
         }
 
         let doc = a.fill(&parts);
-        let config = PrintConfig {
-            indent: "\t",
+        let render = RenderConfig {
             print_width: 100,
             tab_width: 2,
+            indent: "\t",
+        };
+        let embed = EmbedContext {
             base_indent_offset: 1,
-            ..Default::default()
+            ..EmbedContext::default()
         };
 
         let start_column = 6;
         let indent_level = 3;
-        let output = arena_print_doc_with_indent(&a, doc, &config, start_column, indent_level);
+        let output = arena_print_doc_with_indent_and_render(
+            &a,
+            doc,
+            &embed,
+            start_column,
+            indent_level,
+            &render,
+        );
 
         assert!(
             !output.contains("a5555555555, a6666666666666666"),
@@ -553,8 +480,7 @@ mod arena_tests {
         let a = DocArena::new(2);
         let docs = vec![a.text("a")];
         let doc = a.join(docs, ", ");
-        let config = PrintConfig::default();
-        assert_eq!(arena_print_doc(&a, doc, &config), "a");
+        assert_eq!(render_default(&a, doc), "a");
     }
 
     #[test]
@@ -565,14 +491,7 @@ mod arena_tests {
         let joined = a.join_doc(docs, sep);
         let doc = a.group(joined);
 
-        let config_wide = PrintConfig {
-            print_width: 30,
-            ..Default::default()
-        };
-        assert_eq!(
-            arena_print_doc(&a, doc, &config_wide),
-            "item1, item2, item3"
-        );
+        assert_eq!(render_pw(&a, doc, 30), "item1, item2, item3");
 
         let a2 = DocArena::new(2);
         let sep2 = a2.concat(&[a2.text(","), a2.line()]);
@@ -580,14 +499,7 @@ mod arena_tests {
         let joined2 = a2.join_doc(docs2, sep2);
         let doc2 = a2.group(joined2);
 
-        let config_narrow = PrintConfig {
-            print_width: 10,
-            ..Default::default()
-        };
-        assert_eq!(
-            arena_print_doc(&a2, doc2, &config_narrow),
-            "item1,\nitem2,\nitem3"
-        );
+        assert_eq!(render_pw(&a2, doc2, 10), "item1,\nitem2,\nitem3");
     }
 
     #[test]
@@ -596,8 +508,7 @@ mod arena_tests {
         let sep = a.concat(&[a.text(","), a.line()]);
         let docs: Vec<DocId> = vec![];
         let doc = a.join_trailing(docs, sep);
-        let config = PrintConfig::default();
-        assert_eq!(arena_print_doc(&a, doc, &config), "");
+        assert_eq!(render_default(&a, doc), "");
     }
 
     #[test]
@@ -607,11 +518,7 @@ mod arena_tests {
         let docs = vec![a.text("a")];
         let trailing = a.join_trailing(docs, sep);
         let doc = a.group(trailing);
-        let config = PrintConfig {
-            print_width: 20,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "a");
+        assert_eq!(render_pw(&a, doc, 20), "a");
     }
 
     #[test]
@@ -626,13 +533,7 @@ mod arena_tests {
         let sl2 = a.softline();
         let doc = a.group(a.concat(&[a.text("["), indented, sl2, a.text("]")]));
 
-        let wide = PrintConfig {
-            print_width: 30,
-            indent: "  ",
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &wide), "[item1, item2, item3]");
+        assert_eq!(render_pw_spaces(&a, doc, 30), "[item1, item2, item3]");
 
         let a2 = DocArena::new(2);
         let sep2 = a2.concat(&[a2.text(","), a2.line()]);
@@ -644,14 +545,8 @@ mod arena_tests {
         let sl2_2 = a2.softline();
         let doc2 = a2.group(a2.concat(&[a2.text("["), indented2, sl2_2, a2.text("]")]));
 
-        let narrow = PrintConfig {
-            print_width: 15,
-            indent: "  ",
-            tab_width: 2,
-            ..Default::default()
-        };
         assert_eq!(
-            arena_print_doc(&a2, doc2, &narrow),
+            render_pw_spaces(&a2, doc2, 15),
             "[\n  item1,\n  item2,\n  item3,\n]"
         );
     }
@@ -660,21 +555,14 @@ mod arena_tests {
     fn test_arena_fill_single_item() {
         let a = DocArena::new(2);
         let doc = a.fill(&[a.text("hello")]);
-        let config = PrintConfig::default();
-        assert_eq!(arena_print_doc(&a, doc, &config), "hello");
+        assert_eq!(render_default(&a, doc), "hello");
     }
 
     #[test]
     fn test_arena_fill_two_items() {
         let a = DocArena::new(2);
         let doc = a.fill(&[a.text("a"), a.line(), a.text("b")]);
-        let config = PrintConfig {
-            indent: "\t",
-            print_width: 10,
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "a b");
+        assert_eq!(render_pw_tab(&a, doc, 10), "a b");
     }
 
     #[test]
@@ -687,14 +575,8 @@ mod arena_tests {
             a.line(),
             a.text("verylongitem3"),
         ]);
-        let config = PrintConfig {
-            indent: "\t",
-            print_width: 15,
-            tab_width: 2,
-            ..Default::default()
-        };
         assert_eq!(
-            arena_print_doc(&a, doc, &config),
+            render_pw_tab(&a, doc, 15),
             "verylongitem1\nverylongitem2\nverylongitem3"
         );
     }
@@ -709,26 +591,14 @@ mod arena_tests {
             a.line(),
             a.text("ccc"),
         ]));
-        let config = PrintConfig {
-            indent: "\t",
-            print_width: 10,
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "aaa bbb\n\tccc");
+        assert_eq!(render_pw_tab(&a, doc, 10), "aaa bbb\n\tccc");
     }
 
     #[test]
     fn test_arena_indent_softline_break() {
         let a = DocArena::new(2);
         let doc = a.group(a.concat(&[a.text("a"), a.indent_softline(a.text("b"))]));
-        let config = PrintConfig {
-            print_width: 1,
-            indent: "  ",
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "a\n  b");
+        assert_eq!(render_pw_spaces(&a, doc, 1), "a\n  b");
     }
 
     #[test]
@@ -742,13 +612,7 @@ mod arena_tests {
             a.text(")"),
         ]));
 
-        let wide = PrintConfig {
-            print_width: 30,
-            indent: "  ",
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &wide), "fn(arg1, arg2)");
+        assert_eq!(render_pw_spaces(&a, doc, 30), "fn(arg1, arg2)");
 
         let a2 = DocArena::new(2);
         let sl2 = a2.softline();
@@ -759,26 +623,14 @@ mod arena_tests {
             a2.text(")"),
         ]));
 
-        let narrow = PrintConfig {
-            print_width: 10,
-            indent: "  ",
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a2, doc2, &narrow), "fn(\n  arg1, arg2\n)");
+        assert_eq!(render_pw_spaces(&a2, doc2, 10), "fn(\n  arg1, arg2\n)");
     }
 
     #[test]
     fn test_arena_indent_line_fits() {
         let a = DocArena::new(2);
         let doc = a.group(a.concat(&[a.text("a"), a.indent_line(a.text("b"))]));
-        let config = PrintConfig {
-            print_width: 20,
-            indent: "  ",
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "a b");
+        assert_eq!(render_pw_spaces(&a, doc, 20), "a b");
     }
 
     #[test]
@@ -791,13 +643,7 @@ mod arena_tests {
             a.softline(),
             a.text(")"),
         ]));
-        let config = PrintConfig {
-            print_width: 10,
-            indent: "  ",
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert!(arena_print_doc(&a, doc, &config).contains('\n'));
+        assert!(render_pw_spaces(&a, doc, 10).contains('\n'));
     }
 
     #[test]
@@ -812,11 +658,7 @@ mod arena_tests {
         ]));
         let iso = a.isolated_group(inner_group);
         let doc = a.group(a.concat(&[a.text("outer("), iso, a.text(")")]));
-        let config = PrintConfig {
-            print_width: 100,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "outer(inner(content))");
+        assert_eq!(render_pw(&a, doc, 100), "outer(inner(content))");
     }
 
     #[test]
@@ -824,8 +666,7 @@ mod arena_tests {
         let a = DocArena::new(2);
         let inner = a.concat(&[a.text("a"), a.text(", "), a.text("b")]);
         let doc = a.brackets(inner);
-        let config = PrintConfig::default();
-        assert_eq!(arena_print_doc(&a, doc, &config), "[a, b]");
+        assert_eq!(render_default(&a, doc), "[a, b]");
     }
 
     #[test]
@@ -833,21 +674,14 @@ mod arena_tests {
         let a = DocArena::new(2);
         let inner = a.brackets(a.text("x"));
         let doc = a.braces(a.concat(&[a.text(" "), inner, a.text(" ")]));
-        let config = PrintConfig::default();
-        assert_eq!(arena_print_doc(&a, doc, &config), "{ [x] }");
+        assert_eq!(render_default(&a, doc), "{ [x] }");
     }
 
     #[test]
     fn test_arena_line_in_break_mode_doesnt_fit() {
         let a = DocArena::new(2);
         let doc = a.group(a.concat(&[a.text("hello"), a.line(), a.text("world")]));
-        let config = PrintConfig {
-            indent: "\t",
-            print_width: 8,
-            tab_width: 2,
-            ..Default::default()
-        };
-        assert_eq!(arena_print_doc(&a, doc, &config), "hello\nworld");
+        assert_eq!(render_pw_tab(&a, doc, 8), "hello\nworld");
     }
 
     #[test]

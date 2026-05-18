@@ -58,33 +58,23 @@ type FfiFn = (
 type LibSymbols = Deno.DynamicLibrary<typeof symbols>['symbols'];
 
 /** Get the native library path based on platform.
- * Checks `target/corpus/` first (built with panic=unwind for catch_unwind),
- * then falls back to `target/release/`.
+ * Uses TSV_FFI_PROFILE env var to select cargo profile (default: "release").
+ * The corpus comparison task sets this to "corpus" for panic recovery.
  */
 function getLibraryPath(): string {
-	const libName =
-		Deno.build.os === 'linux'
-			? 'libtsv_ffi.so'
-			: Deno.build.os === 'darwin'
-				? 'libtsv_ffi.dylib'
-				: Deno.build.os === 'windows'
-					? 'tsv_ffi.dll'
-					: (() => {
-							throw new Error(`Unsupported platform: ${Deno.build.os}`);
-						})();
+	const libName = Deno.build.os === 'linux'
+		? 'libtsv_ffi.so'
+		: Deno.build.os === 'darwin'
+		? 'libtsv_ffi.dylib'
+		: Deno.build.os === 'windows'
+		? 'tsv_ffi.dll'
+		: (() => {
+			throw new Error(`Unsupported platform: ${Deno.build.os}`);
+		})();
 
+	const profile = Deno.env.get('TSV_FFI_PROFILE') ?? 'release';
 	const targetDir = new URL('../../../target', import.meta.url).pathname;
-
-	// Prefer corpus profile (panic=unwind, catches panics gracefully)
-	const corpusPath = `${targetDir}/corpus/${libName}`;
-	try {
-		Deno.statSync(corpusPath);
-		return corpusPath;
-	} catch {
-		// Fall back to release
-	}
-
-	return `${targetDir}/release/${libName}`;
+	return `${targetDir}/${profile}/${libName}`;
 }
 
 export class NativeImplementation implements TsvImplementation {
@@ -113,12 +103,15 @@ export class NativeImplementation implements TsvImplementation {
 	async init(): Promise<void> {
 		const libPath = getLibraryPath();
 
+		const profile = Deno.env.get('TSV_FFI_PROFILE') ?? 'release';
 		try {
 			await Deno.stat(libPath);
 		} catch {
 			throw new Error(
 				`Native library not found at ${libPath}. ` +
-					`Run 'cargo build -p tsv_ffi --release' first.`,
+					`Run 'cargo build -p tsv_ffi --${
+						profile === 'release' ? 'release' : `profile ${profile}`
+					}' first.`,
 			);
 		}
 

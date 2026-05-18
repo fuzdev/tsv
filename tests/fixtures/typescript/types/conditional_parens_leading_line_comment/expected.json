@@ -1,0 +1,503 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 219,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " case T: leading line comment in true branch",
+			"start": 20,
+			"end": 66,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " leading",
+			"start": 89,
+			"end": 99,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 22
+				},
+				"end": {
+					"line": 3,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " case F: leading line comment in false branch",
+			"start": 115,
+			"end": 162,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " leading",
+			"start": 191,
+			"end": 201,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 6
+				},
+				"end": {
+					"line": 9,
+					"column": 16
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 218,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 209,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 68,
+					"end": 112,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 73,
+						"end": 74,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "T"
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 77,
+						"end": 111,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 5,
+								"column": 5
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 77,
+							"end": 78,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 10
+								},
+								"end": {
+									"line": 3,
+									"column": 11
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 77,
+								"end": 78,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 10
+									},
+									"end": {
+										"line": 3,
+										"column": 11
+									}
+								},
+								"name": "a"
+							}
+						},
+						"extendsType": {
+							"type": "TSTypeReference",
+							"start": 87,
+							"end": 88,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 20
+								},
+								"end": {
+									"line": 3,
+									"column": 21
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 87,
+								"end": 88,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 20
+									},
+									"end": {
+										"line": 3,
+										"column": 21
+									}
+								},
+								"name": "b"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " leading",
+									"start": 89,
+									"end": 99
+								}
+							]
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 104,
+							"end": 105,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 4
+								},
+								"end": {
+									"line": 4,
+									"column": 5
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 104,
+								"end": 105,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 4
+									},
+									"end": {
+										"line": 4,
+										"column": 5
+									}
+								},
+								"name": "c"
+							}
+						},
+						"falseType": {
+							"type": "TSTypeReference",
+							"start": 110,
+							"end": 111,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 4
+								},
+								"end": {
+									"line": 5,
+									"column": 5
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 110,
+								"end": 111,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 4
+									},
+									"end": {
+										"line": 5,
+										"column": 5
+									}
+								},
+								"name": "d"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " case T: leading line comment in true branch",
+							"start": 20,
+							"end": 66
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 164,
+					"end": 208,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 169,
+						"end": 170,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"name": "F"
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 173,
+						"end": 207,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 10
+							},
+							"end": {
+								"line": 10,
+								"column": 5
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 173,
+							"end": 174,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 10
+								},
+								"end": {
+									"line": 8,
+									"column": 11
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 173,
+								"end": 174,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 10
+									},
+									"end": {
+										"line": 8,
+										"column": 11
+									}
+								},
+								"name": "a"
+							}
+						},
+						"extendsType": {
+							"type": "TSTypeReference",
+							"start": 183,
+							"end": 184,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 20
+								},
+								"end": {
+									"line": 8,
+									"column": 21
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 183,
+								"end": 184,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 20
+									},
+									"end": {
+										"line": 8,
+										"column": 21
+									}
+								},
+								"name": "b"
+							}
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 189,
+							"end": 190,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 4
+								},
+								"end": {
+									"line": 9,
+									"column": 5
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 189,
+								"end": 190,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 4
+									},
+									"end": {
+										"line": 9,
+										"column": 5
+									}
+								},
+								"name": "c"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " leading",
+									"start": 191,
+									"end": 201
+								}
+							]
+						},
+						"falseType": {
+							"type": "TSTypeReference",
+							"start": 206,
+							"end": 207,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 4
+								},
+								"end": {
+									"line": 10,
+									"column": 5
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 206,
+								"end": 207,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 4
+									},
+									"end": {
+										"line": 10,
+										"column": 5
+									}
+								},
+								"name": "d"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " case F: leading line comment in false branch",
+							"start": 115,
+							"end": 162
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

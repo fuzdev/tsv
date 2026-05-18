@@ -16,87 +16,50 @@
 
 use napi_derive::napi;
 
-//
-// Svelte
-//
+fn err(e: impl ToString) -> napi::Error {
+    napi::Error::from_reason(e.to_string())
+}
 
-/// Parse Svelte source code and return JSON AST.
-#[napi]
-pub fn parse_svelte(source: String) -> napi::Result<String> {
-    let ast = tsv_svelte::parse(&source).map_err(|e| napi::Error::from_reason(e.to_string()))?;
-    let json_value = tsv_svelte::convert_ast_json(&ast, &source);
-    serde_json::to_string(&json_value)
+fn to_json(value: &serde_json::Value) -> napi::Result<String> {
+    serde_json::to_string(value)
         .map_err(|e| napi::Error::from_reason(format!("JSON serialization error: {e}")))
 }
 
-/// Parse Svelte source code to internal AST only (no conversion, for benchmarking).
-#[napi]
-pub fn parse_internal_svelte(source: String) -> napi::Result<()> {
-    let ast = tsv_svelte::parse(&source).map_err(|e| napi::Error::from_reason(e.to_string()))?;
-    // Prevent compiler from optimizing away the parse
-    std::hint::black_box(ast);
-    Ok(())
+/// Generate `parse_<lang>` / `parse_internal_<lang>` / `format_<lang>` N-API
+/// functions for one language module.
+macro_rules! lang_bindings {
+    ($parse_fn:ident, $parse_internal_fn:ident, $format_fn:ident, $lang:ident) => {
+        #[napi]
+        pub fn $parse_fn(source: String) -> napi::Result<String> {
+            let ast = $lang::parse(&source).map_err(err)?;
+            to_json(&$lang::convert_ast_json(&ast, &source))
+        }
+
+        #[napi]
+        pub fn $parse_internal_fn(source: String) -> napi::Result<()> {
+            let ast = $lang::parse(&source).map_err(err)?;
+            std::hint::black_box(ast);
+            Ok(())
+        }
+
+        #[napi]
+        pub fn $format_fn(source: String) -> napi::Result<String> {
+            let ast = $lang::parse(&source).map_err(err)?;
+            Ok($lang::format(&ast, &source))
+        }
+    };
 }
 
-/// Format Svelte source code.
-#[napi]
-pub fn format_svelte(source: String) -> napi::Result<String> {
-    let ast = tsv_svelte::parse(&source).map_err(|e| napi::Error::from_reason(e.to_string()))?;
-    Ok(tsv_svelte::format(&ast, &source))
-}
-
-//
-// TypeScript
-//
-
-/// Parse TypeScript source code and return JSON AST.
-#[napi]
-pub fn parse_typescript(source: String) -> napi::Result<String> {
-    let ast = tsv_ts::parse(&source).map_err(|e| napi::Error::from_reason(e.to_string()))?;
-    let json_value = tsv_ts::convert_ast_json(&ast, &source);
-    serde_json::to_string(&json_value)
-        .map_err(|e| napi::Error::from_reason(format!("JSON serialization error: {e}")))
-}
-
-/// Parse TypeScript source code to internal AST only (no conversion, for benchmarking).
-#[napi]
-pub fn parse_internal_typescript(source: String) -> napi::Result<()> {
-    let ast = tsv_ts::parse(&source).map_err(|e| napi::Error::from_reason(e.to_string()))?;
-    std::hint::black_box(ast);
-    Ok(())
-}
-
-/// Format TypeScript source code.
-#[napi]
-pub fn format_typescript(source: String) -> napi::Result<String> {
-    let ast = tsv_ts::parse(&source).map_err(|e| napi::Error::from_reason(e.to_string()))?;
-    Ok(tsv_ts::format(&ast, &source))
-}
-
-//
-// CSS
-//
-
-/// Parse CSS source code and return JSON AST.
-#[napi]
-pub fn parse_css(source: String) -> napi::Result<String> {
-    let ast = tsv_css::parse(&source).map_err(|e| napi::Error::from_reason(e.to_string()))?;
-    let json_value = tsv_css::convert_ast_json(&ast, &source);
-    serde_json::to_string(&json_value)
-        .map_err(|e| napi::Error::from_reason(format!("JSON serialization error: {e}")))
-}
-
-/// Parse CSS source code to internal AST only (no conversion, for benchmarking).
-#[napi]
-pub fn parse_internal_css(source: String) -> napi::Result<()> {
-    let ast = tsv_css::parse(&source).map_err(|e| napi::Error::from_reason(e.to_string()))?;
-    std::hint::black_box(ast);
-    Ok(())
-}
-
-/// Format CSS source code.
-#[napi]
-pub fn format_css(source: String) -> napi::Result<String> {
-    let ast = tsv_css::parse(&source).map_err(|e| napi::Error::from_reason(e.to_string()))?;
-    Ok(tsv_css::format(&ast, &source))
-}
+lang_bindings!(
+    parse_svelte,
+    parse_internal_svelte,
+    format_svelte,
+    tsv_svelte
+);
+lang_bindings!(
+    parse_typescript,
+    parse_internal_typescript,
+    format_typescript,
+    tsv_ts
+);
+lang_bindings!(parse_css, parse_internal_css, format_css, tsv_css);

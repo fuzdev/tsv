@@ -22,6 +22,8 @@ pub struct TSInterfaceDeclaration {
     #[serde(rename = "extends", skip_serializing_if = "Vec::is_empty")]
     pub extends: Vec<TSInterfaceHeritage>,
     pub body: TSInterfaceBody,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub declare: bool,
 }
 
 /// Interface heritage: `extends Foo, Bar`

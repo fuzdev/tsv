@@ -67,22 +67,91 @@ impl<'a> Printer<'a> {
         // Re-add parens to preserve the comment: `!(/** @type {T} */ expr.prop)`
         let operator_end = unary.span.start + unary.operator.as_str().len() as u32;
         let argument_start = unary.argument.span().start;
-        let comments_opt = self.build_rhs_comments_opt(operator_end, argument_start);
+        let argument_end = unary.argument.span().end;
+        let leading_comments_opt = self.build_rhs_comments_opt(operator_end, argument_start);
 
-        let has_line_comment = self.has_line_comments_between(operator_end, argument_start);
-        let argument_doc = if let Some(comments) = comments_opt {
+        // Check for trailing comments after the argument but inside the original parens.
+        // When the parser strips grouping parens from `!(x /* c */)`, the comment
+        // between argument end and unary span end is lost if we don't re-add parens.
+        let has_trailing_comments = self.has_comments_between(argument_end, unary.span.end);
+
+        // Determine if multiline layout is needed: line comments force newlines,
+        // and block comments on their own line (newline in source) preserve structure.
+        // For trailing comments, check if the comment itself is on a different line
+        // from the argument (not just whether there's a newline in the whole range,
+        // which could be between the comment and the closing paren).
+        let has_own_line_trailing_comment =
+            tsv_lang::comments_in_range(self.comments, argument_end, unary.span.end)
+                .any(|c| !c.is_block || self.has_newline_between(argument_end, c.span.start));
+        let needs_multiline = self.has_line_comments_between(operator_end, argument_start)
+            || has_own_line_trailing_comment
+            || (leading_comments_opt.is_some()
+                && self.has_newline_between(operator_end, argument_start));
+
+        let argument_doc = if leading_comments_opt.is_some() || has_trailing_comments {
+            // Comments inside grouping parens — must wrap in parens to preserve them.
             let inner = self.build_expression_doc(&unary.argument);
-            if has_line_comment {
-                // Line comments need indent + hardline structure:
-                // !(\n  // comment\n  expr\n)
+            let needs_paren_wrap = needs_parens(&unary.argument, ParenContext::UnaryArgument);
+            let inner = if needs_paren_wrap {
+                d.concat(&[d.text("("), inner, d.text(")")])
+            } else {
+                inner
+            };
+            if needs_multiline {
+                // Multiline layout: !(\n  /* c */\n  expr\n) or !(\n  expr // c\n)
+                let mut indent_parts = vec![d.hardline()];
+                // Add leading comments — use hardline if the comment and argument
+                // are on different lines, space if they're on the same line.
+                for comment in
+                    tsv_lang::comments_in_range(self.comments, operator_end, argument_start)
+                {
+                    indent_parts.push(self.build_comment_doc(comment));
+                    if self.has_newline_between(comment.span.end, argument_start) {
+                        indent_parts.push(d.hardline());
+                    } else {
+                        indent_parts.push(d.text(" "));
+                    }
+                }
+                indent_parts.push(inner);
+                // Add trailing comments with appropriate spacing
+                for comment in
+                    tsv_lang::comments_in_range(self.comments, argument_end, unary.span.end)
+                {
+                    if !comment.is_block
+                        || !self.has_newline_between(argument_end, comment.span.start)
+                    {
+                        // Line comment or block comment on same line as argument
+                        indent_parts.push(d.text(" "));
+                        indent_parts.push(self.build_comment_doc(comment));
+                    } else {
+                        // Block comment on its own line
+                        indent_parts.push(d.hardline());
+                        indent_parts.push(self.build_comment_doc(comment));
+                    }
+                }
                 d.concat(&[
                     d.text("("),
-                    d.indent(d.concat(&[d.hardline(), comments, inner])),
+                    d.indent(d.concat(&indent_parts)),
                     d.hardline(),
                     d.text(")"),
                 ])
             } else {
-                d.concat(&[d.text("("), comments, inner, d.text(")")])
+                // Inline layout: !(/* c */ expr) or !(expr /* c */)
+                let mut parts = Vec::new();
+                parts.push(d.text("("));
+                if let Some(leading) = leading_comments_opt {
+                    parts.push(leading);
+                }
+                parts.push(inner);
+                // Trailing block comments inline: `expr /* c */`
+                for comment in
+                    tsv_lang::comments_in_range(self.comments, argument_end, unary.span.end)
+                {
+                    parts.push(d.text(" "));
+                    parts.push(self.build_comment_doc(comment));
+                }
+                parts.push(d.text(")"));
+                d.concat(&parts)
             }
         } else if needs_parens(&unary.argument, ParenContext::UnaryArgument) {
             // Binary expressions need parens - use grouping for logical ops to allow line breaking
@@ -152,7 +221,7 @@ impl<'a> Printer<'a> {
         // Use continuation indent in embedded expression contexts (Svelte template expressions).
         // This matches Prettier where JsExpressionRoot parent triggers the normal indent path
         // (group([head, indent(rest)])) vs the shouldNotIndent path (group(parts)).
-        if self.config.is_embedded_expression {
+        if self.embed.is_embedded() {
             self.build_binary_chain_doc_with_continuation_indent(binary)
         } else {
             self.build_binary_chain_doc(binary)
@@ -245,12 +314,13 @@ impl<'a> Printer<'a> {
 
         let should_inline_last = super::assignment::should_inline_logical_expression(binary);
         let should_group = Self::should_group_binary_continuation(binary);
-        self.build_binary_chain_continuation_indent_parts(
+        let chain = self.build_binary_chain_continuation_indent_parts(
             &operands,
             &operators,
             should_inline_last,
             should_group,
-        )
+        );
+        self.wrap_chain_with_paren_comments(binary, &operands, chain)
     }
 
     /// Core implementation for binary chain doc building
@@ -305,7 +375,7 @@ impl<'a> Printer<'a> {
 
         // For ContinuationIndent, we separate first operand from the rest
         // For other styles, we build a flat parts list
-        match style {
+        let chain = match style {
             BinaryChainStyle::ContinuationIndent => self.build_binary_chain_continuation_indent(
                 &operands,
                 &operators,
@@ -319,6 +389,47 @@ impl<'a> Printer<'a> {
                 should_group,
                 should_inline_last,
             ),
+        };
+        self.wrap_chain_with_paren_comments(binary, &operands, chain)
+    }
+
+    /// Wrap a binary chain doc with comments from stripped grouping parens.
+    ///
+    /// When the parser strips parens like `(/* l */ a + b /* t */)`, the
+    /// comments are orphaned in the gaps between `binary.span` and the outer
+    /// operand spans. Without this, those comments are silently dropped — a
+    /// SAFETY violation.
+    ///
+    /// Leading comments (between `binary.span.start` and the leftmost operand)
+    /// are prepended via `prepend_removed_paren_comments`. Trailing comments
+    /// (between the rightmost operand and `binary.span.end`) emit inline for
+    /// same-line blocks (` /* t */`) and via `line_suffix` for line/own-line
+    /// comments (so they defer past any enclosing semicolon).
+    fn wrap_chain_with_paren_comments(
+        &self,
+        binary: &internal::BinaryExpression,
+        operands: &[ChainOperand],
+        chain: DocId,
+    ) -> DocId {
+        let Some(leftmost_start) = operands.first().map(|o| o.span.start) else {
+            return chain;
+        };
+        let Some(rightmost_end) = operands.last().map(|o| o.span.end) else {
+            return chain;
+        };
+
+        let with_leading =
+            self.prepend_removed_paren_comments(binary.span.start, leftmost_start, chain);
+
+        if rightmost_end >= binary.span.end {
+            return with_leading;
+        }
+        let mut parts = vec![with_leading];
+        self.append_trailing_paren_comments(&mut parts, rightmost_end, binary.span.end);
+        if parts.len() == 1 {
+            with_leading
+        } else {
+            self.d().concat(&parts)
         }
     }
 
@@ -735,7 +846,7 @@ impl<'a> Printer<'a> {
         //   short 2-operand binaries flat (Prettier's behavior for template expressions).
         if needs_parens(operand, ctx) {
             if let Expression::BinaryExpression(inner_binary) = operand {
-                if self.config.is_embedded_expression {
+                if self.embed.is_embedded() {
                     // Embedded expression context: use grouped approach that keeps short binaries flat
                     let inner_doc =
                         self.build_binary_chain_doc_with_continuation_indent(inner_binary);
@@ -767,11 +878,21 @@ impl<'a> Printer<'a> {
         // Preserve comments from stripped grouping parens: `await (/** @type {T} */ expr)`
         let keyword_end = await_expr.span.start + "await".len() as u32;
         let argument_start = await_expr.argument.span().start;
+        let argument_end = await_expr.argument.span().end;
         let comments_opt = self.build_rhs_comments_opt(keyword_end, argument_start);
 
-        let argument_doc = if let Some(comments) = comments_opt {
+        // Trailing comments from stripped grouping parens: `await (x /* c */)` → `await x /* c */`
+        let has_trailing_comments = self.has_comments_between(argument_end, await_expr.span.end);
+
+        let argument_doc = if comments_opt.is_some() || has_trailing_comments {
             let inner = self.build_expression_doc(&await_expr.argument);
-            d.concat(&[comments, inner])
+            let mut parts = Vec::new();
+            if let Some(comments) = comments_opt {
+                parts.push(comments);
+            }
+            parts.push(inner);
+            self.append_trailing_paren_comments(&mut parts, argument_end, await_expr.span.end);
+            d.concat(&parts)
         } else if needs_parens(&await_expr.argument, ParenContext::AwaitArgument) {
             d.concat(&[
                 d.text("("),
@@ -807,9 +928,19 @@ impl<'a> Printer<'a> {
                 }
                 .len() as u32;
             let argument_start = arg.span().start;
-            if let Some(comments) = self.build_rhs_comments_opt(keyword_end, argument_start) {
-                parts.push(comments);
+            let argument_end = arg.span().end;
+            let leading_comments_opt = self.build_rhs_comments_opt(keyword_end, argument_start);
+
+            // Trailing comments from stripped grouping parens: `yield (x /* c */)` → `yield x /* c */`
+            let has_trailing_comments =
+                self.has_comments_between(argument_end, yield_expr.span.end);
+
+            if leading_comments_opt.is_some() || has_trailing_comments {
+                if let Some(comments) = leading_comments_opt {
+                    parts.push(comments);
+                }
                 parts.push(self.build_expression_doc(arg));
+                self.append_trailing_paren_comments(&mut parts, argument_end, yield_expr.span.end);
             } else if needs_parens(arg, ParenContext::YieldArgument) {
                 // Assignment needs parens: `yield (x ??= y)`
                 parts.push(d.text("("));
@@ -832,8 +963,13 @@ impl<'a> Printer<'a> {
             if i > 0 {
                 parts.push(d.text(", "));
             }
+            // Boundary for paren comment detection: next expression start or sequence end
+            let boundary = seq
+                .expressions
+                .get(i + 1)
+                .map_or(seq.span.end, |next| next.span().start);
             // Assignment expressions in sequences need individual parens
-            let expr_doc = self.build_expression_doc(expr);
+            let expr_doc = self.build_expression_doc_with_paren_comments(expr, boundary);
             let expr_doc = if matches!(expr, Expression::AssignmentExpression(_)) {
                 d.parens(expr_doc)
             } else {

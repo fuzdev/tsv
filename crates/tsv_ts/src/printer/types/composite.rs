@@ -9,11 +9,12 @@
 // - Entity names: `A.B.C`
 
 use super::super::comments_in_range;
-use super::Printer;
 use super::helpers::{type_needs_parens_for_array_element, unwrap_parenthesized};
+use super::{CommentSpacing, Printer};
 use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
+use crate::printer::analysis::find_char_skipping_comments;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -27,6 +28,63 @@ impl<'a> Printer<'a> {
     /// Structure: `check extends extends_type [indent: line, "? ", true_type, line, ": ", false_type]`
     pub(super) fn build_conditional_type_doc_inner(&self, c: &TSConditionalType) -> DocId {
         let d = self.d();
+
+        let extends_type_end = c.extends_type.span().end;
+        let true_type_start = c.true_type.span().start;
+        let true_type_end = c.true_type.span().end;
+        let false_type_start = c.false_type.span().start;
+
+        // Find ? and : token positions for comment categorization
+        let question_pos = self.find_char_outside_comments(extends_type_end, true_type_start, b'?');
+        let colon_pos = self.find_char_outside_comments(true_type_end, false_type_start, b':');
+
+        // Check for comments that force breaking layout.
+        // Line comments anywhere in the conditional force breaking (they end the line).
+        // Multiline block comments after ?/: force breaking.
+        // Comments before ? (between extends_type and ?) that are on own line force breaking.
+        // Block comments between true_type and : are trailing (don't force breaking).
+        // Also: leading line comments inside stripped parens around extends_type
+        // (e.g., `a extends (// c\n  b)`) — these are relocated to trail
+        // extends_type and force breaking.
+        let extends_paren_has_leading_line_comment = matches!(
+            c.extends_type.as_ref(),
+            TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p),
+        );
+        // Same for true_type / false_type: leading line comments inside their
+        // parens get relocated to trail extends_type / true_type respectively.
+        let true_paren_has_leading_line_comment = matches!(
+            c.true_type.as_ref(),
+            TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p),
+        );
+        let false_paren_has_leading_line_comment = matches!(
+            c.false_type.as_ref(),
+            TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p),
+        );
+        let has_breaking_comments_around_question = self
+            .has_line_comments_between(extends_type_end, true_type_start)
+            || self.has_multiline_block_comments_between(extends_type_end, true_type_start)
+            || question_pos.is_some_and(|q| {
+                tsv_lang::has_comments_in_range(self.comments, extends_type_end, q)
+            })
+            || extends_paren_has_leading_line_comment
+            || true_paren_has_leading_line_comment;
+        let colon_end = colon_pos.map_or(true_type_end, |c| c + 1);
+        let has_breaking_comments_after_colon = self
+            .has_line_comments_between(colon_end, false_type_start)
+            || self.has_multiline_block_comments_between(colon_end, false_type_start)
+            || false_paren_has_leading_line_comment;
+        // Trailing line comments on true_type also force breaking (they end the line)
+        let has_trailing_line_comment_on_true =
+            colon_pos.is_some_and(|c| self.has_line_comments_between(true_type_end, c));
+
+        let needs_breaking = has_breaking_comments_around_question
+            || has_breaking_comments_after_colon
+            || has_trailing_line_comment_on_true;
+
+        if needs_breaking {
+            return self.build_conditional_type_doc_with_line_comments(c);
+        }
+
         // Build true_type doc: if it's a conditional (possibly wrapped in parens), don't wrap in group
         // Add parens for readability only when flat (single-line), not when broken (multi-line)
         let true_type_doc =
@@ -54,9 +112,99 @@ impl<'a> Printer<'a> {
                 self.build_type_doc(&c.false_type)
             };
 
+        // Comments after ? (block only — line/multiline handled in breaking path)
+        let comments_after_question = if let Some(q) = question_pos {
+            self.build_inline_comments_between_doc_trailing_space(q + 1, true_type_start)
+        } else {
+            d.empty()
+        };
+
+        // Comments trailing on true_type (between true_type and :)
+        // These stay with the true branch, preserving user intent.
+        let trailing_on_true = if let Some(c) = colon_pos {
+            self.build_inline_comments_between_doc(true_type_end, c)
+        } else {
+            d.empty()
+        };
+
+        // Comments after : (block only — line/multiline handled in breaking path)
+        let comments_after_colon = if let Some(c) = colon_pos {
+            self.build_inline_comments_between_doc_trailing_space(c + 1, false_type_start)
+        } else {
+            d.empty()
+        };
+
         // Build extends_type doc - unions need special handling to avoid trailing space
         // after "extends" when the union breaks (e.g., `T extends\n\t| A\n\t| B`)
-        let extends_type_doc = if let TSType::Union(union) = c.extends_type.as_ref() {
+        // Comments around `extends`: `check /* c1 */ extends /* c2 */ extends_type`
+        let check_type_end = c.check_type.span().end;
+        let extends_type_start = c.extends_type.span().start;
+        let extends_kw_start = find_char_skipping_comments(
+            self.source.as_bytes(),
+            check_type_end as usize,
+            extends_type_start as usize,
+            b'e',
+        );
+        let extends_kw_start = extends_kw_start.map_or(check_type_end, |p| p as u32);
+        let extends_kw_end = extends_kw_start + 7; // "extends".len()
+        let comments_before_extends =
+            self.build_comments_between(check_type_end, extends_kw_start, CommentSpacing::Leading);
+        let extends_type_doc = self.build_conditional_type_extends_doc(c, extends_kw_end);
+
+        d.concat(&[
+            self.build_type_doc(&c.check_type),
+            comments_before_extends,
+            d.text(" extends"),
+            extends_type_doc,
+            d.indent(d.concat(&[
+                d.line(),
+                d.text("? "),
+                comments_after_question,
+                true_type_doc,
+                trailing_on_true,
+                d.line(),
+                d.text(": "),
+                comments_after_colon,
+                false_type_doc,
+            ])),
+        ])
+    }
+
+    /// Build the extends clause doc for a conditional type, including comments
+    /// between the `extends` keyword and the extends_type.
+    /// Comments before `extends` are handled by the caller.
+    /// `extends_kw_end` is the position after the `extends` keyword (caller already found it).
+    fn build_conditional_type_extends_doc(
+        &self,
+        c: &TSConditionalType,
+        extends_kw_end: u32,
+    ) -> DocId {
+        let d = self.d();
+        let extends_type_start = c.extends_type.span().start;
+
+        // Comments between `extends` keyword and extends_type
+        let comments_after_extends = self.build_comments_between(
+            extends_kw_end,
+            extends_type_start,
+            CommentSpacing::Trailing,
+        );
+
+        // Special case: TSParenthesizedType extends_type with a leading line
+        // comment inside the parens (e.g., `extends (// c\n  b)`). Strip the
+        // parens, build the inner type, and append the line comment as trailing
+        // on the inner type — matching prettier's relocation.
+        if let TSType::Parenthesized(p) = c.extends_type.as_ref()
+            && self.paren_has_leading_line_comment(p)
+        {
+            let mut parts = vec![d.text(" "), comments_after_extends];
+            parts.push(self.build_type_doc(&p.type_annotation));
+            for comment in self.paren_leading_line_comments(p) {
+                parts.push(self.build_trailing_line_comment_doc(comment));
+            }
+            return d.concat(&parts);
+        }
+
+        if let TSType::Union(union) = c.extends_type.as_ref() {
             if union.types.is_empty() {
                 d.text(" ")
             } else {
@@ -70,24 +218,206 @@ impl<'a> Printer<'a> {
                     }
                     parts.push(self.build_type_doc(t));
                 }
-                d.group(d.indent(d.concat(&parts)))
+                d.concat(&[
+                    d.text(" "),
+                    comments_after_extends,
+                    d.group(d.indent(d.concat(&parts))),
+                ])
             }
         } else {
-            d.concat(&[d.text(" "), self.build_type_doc(&c.extends_type)])
+            d.concat(&[
+                d.text(" "),
+                comments_after_extends,
+                self.build_type_doc(&c.extends_type),
+            ])
+        }
+    }
+
+    /// Build conditional type doc when comments force a breaking layout.
+    /// This handles: line comments, multiline block comments, and comments
+    /// before `?` or `:` operators.
+    fn build_conditional_type_doc_with_line_comments(&self, c: &TSConditionalType) -> DocId {
+        let d = self.d();
+
+        let extends_type_end = c.extends_type.span().end;
+        let true_type_start = c.true_type.span().start;
+        let true_type_end = c.true_type.span().end;
+        let false_type_start = c.false_type.span().start;
+
+        // Detect leading line comments inside parens around true_type / false_type
+        // for relocation: prettier moves them to trail extends_type / true_type
+        // (e.g., `extends b ? (// c\n  C) : D` → `extends b // c\n  ? C\n  : D`).
+        let true_paren = match c.true_type.as_ref() {
+            TSType::Parenthesized(p) => Some(p),
+            _ => None,
+        };
+        let false_paren = match c.false_type.as_ref() {
+            TSType::Parenthesized(p) => Some(p),
+            _ => None,
+        };
+        let true_paren_leading_line_comments: Vec<&internal::Comment> = true_paren
+            .map(|p| self.paren_leading_line_comments(p))
+            .unwrap_or_default();
+        let false_paren_leading_line_comments: Vec<&internal::Comment> = false_paren
+            .map(|p| self.paren_leading_line_comments(p))
+            .unwrap_or_default();
+
+        // Build branch type docs (same nested-conditional logic as non-breaking path).
+        // When we relocated leading line comments from a TSParenthesizedType wrapper,
+        // build the inner type directly so the relocated comments aren't emitted twice.
+        let true_type_doc =
+            if let Some(p) = true_paren.filter(|_| !true_paren_leading_line_comments.is_empty()) {
+                self.build_type_doc(&p.type_annotation)
+            } else if let TSType::Conditional(inner) = unwrap_parenthesized(c.true_type.as_ref()) {
+                self.build_conditional_type_doc_inner(inner)
+            } else {
+                self.build_type_doc(&c.true_type)
+            };
+
+        let false_type_doc = if let Some(p) =
+            false_paren.filter(|_| !false_paren_leading_line_comments.is_empty())
+        {
+            self.build_type_doc(&p.type_annotation)
+        } else if let TSType::Conditional(inner) = unwrap_parenthesized(c.false_type.as_ref()) {
+            self.build_conditional_type_doc_inner(inner)
+        } else {
+            self.build_type_doc(&c.false_type)
+        };
+
+        // Find `extends` keyword position (reused for both extends_type_doc and comments_before_extends)
+        let check_type_end = c.check_type.span().end;
+        let extends_type_start = c.extends_type.span().start;
+        let extends_kw_start = find_char_skipping_comments(
+            self.source.as_bytes(),
+            check_type_end as usize,
+            extends_type_start as usize,
+            b'e',
+        )
+        .map_or(check_type_end, |p| p as u32);
+        let extends_kw_end = extends_kw_start + 7; // "extends".len()
+
+        let extends_type_doc = self.build_conditional_type_extends_doc(c, extends_kw_end);
+
+        // Split comments around the `?` token by position so trailing line
+        // comments on extends_type (e.g., `b // comment\n? c`) stay on
+        // extends_type's line rather than being relocated past `?`.
+        let q_pos = self.find_char_outside_comments(extends_type_end, true_type_start, b'?');
+        let (before_q_end, after_q_start) = match q_pos {
+            Some(q) => (q, q + 1),
+            None => (true_type_start, extends_type_end),
+        };
+
+        // Comments BEFORE the `?` token — emit as trailing on extends_type
+        // (before the hardline that ends extends_type's line). Also includes
+        // relocated leading line comments from inside true_type's parens.
+        let mut trailing_on_extends_parts: Vec<DocId> = Vec::new();
+        for comment in comments_in_range(self.comments, extends_type_end, before_q_end) {
+            if comment.is_block {
+                trailing_on_extends_parts.push(d.text(" "));
+                trailing_on_extends_parts.push(self.build_comment_doc(comment));
+            } else {
+                trailing_on_extends_parts.push(self.build_trailing_line_comment_doc(comment));
+            }
+        }
+        for comment in &true_paren_leading_line_comments {
+            trailing_on_extends_parts.push(self.build_trailing_line_comment_doc(comment));
+        }
+
+        let mut q_parts = Vec::new();
+
+        // ? on new line
+        q_parts.push(d.hardline());
+        q_parts.push(d.text("?"));
+
+        // Comments AFTER the `?` token — emit between `?` and the true branch.
+        let mut needs_indent_before_true = false;
+        for comment in comments_in_range(self.comments, after_q_start, true_type_start) {
+            q_parts.push(d.text(" "));
+            q_parts.push(self.build_comment_doc(comment));
+            if !comment.is_block || comment.content.contains('\n') {
+                needs_indent_before_true = true;
+            }
+        }
+        if needs_indent_before_true {
+            // Line or multiline block comment — branch on new indented line.
+            // Uses literal tab text (not d.indent) to shift only the first line
+            // without increasing the structural indent level for nested content.
+            q_parts.push(d.hardline());
+            q_parts.push(d.text(tsv_lang::INDENT));
+            q_parts.push(true_type_doc);
+        } else {
+            q_parts.push(d.text(" "));
+            q_parts.push(true_type_doc);
+        }
+
+        // Comments trailing on true_type (between true_type and :) — preserve position.
+        // Also includes relocated leading line comments from inside false_type's parens.
+        let colon = self.find_char_outside_comments(true_type_end, false_type_start, b':');
+        if let Some(c_pos) = colon {
+            for comment in comments_in_range(self.comments, true_type_end, c_pos) {
+                if comment.is_block {
+                    q_parts.push(d.text(" "));
+                    q_parts.push(self.build_comment_doc(comment));
+                } else {
+                    q_parts.push(self.build_trailing_line_comment_doc(comment));
+                }
+            }
+        }
+        for comment in &false_paren_leading_line_comments {
+            q_parts.push(self.build_trailing_line_comment_doc(comment));
+        }
+
+        // : on new line
+        q_parts.push(d.hardline());
+        q_parts.push(d.text(":"));
+
+        // Comments after : only (between : and false_type)
+        let colon_end = colon.map_or(true_type_end, |c| c + 1);
+        let mut needs_indent_before_false = false;
+        let mut prev_was_line_comment = false;
+        for comment in comments_in_range(self.comments, colon_end, false_type_start) {
+            if prev_was_line_comment {
+                // Line comments end the line, so subsequent comments need a new line
+                q_parts.push(d.hardline());
+                q_parts.push(d.text(tsv_lang::INDENT));
+            } else {
+                q_parts.push(d.text(" "));
+            }
+            q_parts.push(self.build_comment_doc(comment));
+            if !comment.is_block || comment.content.contains('\n') {
+                needs_indent_before_false = true;
+            }
+            prev_was_line_comment = !comment.is_block;
+        }
+        if needs_indent_before_false {
+            // Line or multiline block comment — branch on new indented line.
+            // Uses literal tab text (not d.indent) to shift only the first line
+            // without increasing the structural indent level for nested content.
+            q_parts.push(d.hardline());
+            q_parts.push(d.text(tsv_lang::INDENT));
+            q_parts.push(false_type_doc);
+        } else {
+            q_parts.push(d.text(" "));
+            q_parts.push(false_type_doc);
+        }
+
+        // Comments between check_type and `extends` keyword (reuses extends_kw_start from above)
+        let comments_before_extends =
+            self.build_comments_between(check_type_end, extends_kw_start, CommentSpacing::Leading);
+
+        let trailing_on_extends_doc = if trailing_on_extends_parts.is_empty() {
+            d.empty()
+        } else {
+            d.concat(&trailing_on_extends_parts)
         };
 
         d.concat(&[
             self.build_type_doc(&c.check_type),
+            comments_before_extends,
             d.text(" extends"),
             extends_type_doc,
-            d.indent(d.concat(&[
-                d.line(),
-                d.text("? "),
-                true_type_doc,
-                d.line(),
-                d.text(": "),
-                false_type_doc,
-            ])),
+            trailing_on_extends_doc,
+            d.indent(d.concat(&q_parts)),
         ])
     }
 
@@ -140,15 +470,71 @@ impl<'a> Printer<'a> {
         }
 
         body_parts.push(d.text_owned(m.type_parameter.name.clone()));
+        // Comments around `in` keyword: `key /* c1 */ in /* c2 */ Constraint`
+        let name_end = m.type_parameter.span.start + m.type_parameter.name.len() as u32;
+        let constraint_start = m.type_parameter.constraint.span().start;
+        // Find `i` of `in` keyword, skipping comments before it
+        let in_start = find_char_skipping_comments(
+            self.source.as_bytes(),
+            name_end as usize,
+            constraint_start as usize,
+            b'i',
+        );
+        let in_end = in_start.map_or(name_end, |p| (p + 2) as u32);
+        let in_start = in_start.map_or(name_end, |p| p as u32);
+        // Comments between key name and `in` keyword
+        body_parts.push(self.build_comments_between(name_end, in_start, CommentSpacing::Leading));
         body_parts.push(d.text(" in "));
+        // Comments between `in` keyword and constraint type
+        body_parts.push(self.build_comments_between(
+            in_end,
+            constraint_start,
+            CommentSpacing::Trailing,
+        ));
         body_parts.push(self.build_type_doc(&m.type_parameter.constraint));
 
         // as clause: `as NewKeyType`
+        // Track the end of the last element inside brackets (for bracket-close comments)
+        let mut last_inner_end = m.type_parameter.constraint.span().end;
         if let Some(name_type) = &m.name_type {
+            // Comments around `as` keyword: `Constraint /* c1 */ as /* c2 */ NewKey`
+            let constraint_end = m.type_parameter.constraint.span().end;
+            let name_type_start = name_type.span().start;
+            // Find `a` of `as` keyword, skipping comments before it
+            let as_start = find_char_skipping_comments(
+                self.source.as_bytes(),
+                constraint_end as usize,
+                name_type_start as usize,
+                b'a',
+            );
+            let as_end = as_start.map_or(constraint_end, |p| (p + 2) as u32);
+            let as_start = as_start.map_or(constraint_end, |p| p as u32);
+            // Comments between constraint and `as` keyword
+            body_parts.push(self.build_comments_between(
+                constraint_end,
+                as_start,
+                CommentSpacing::Leading,
+            ));
             body_parts.push(d.text(" as "));
+            // Comments between `as` keyword and name type
+            body_parts.push(self.build_comments_between(
+                as_end,
+                name_type_start,
+                CommentSpacing::Trailing,
+            ));
             body_parts.push(self.build_type_doc(name_type));
+            last_inner_end = name_type.span().end;
         }
 
+        // Comments between last inner element and `]`
+        let bracket_close = self
+            .find_char_outside_comments(last_inner_end, m.span.end, b']')
+            .unwrap_or(last_inner_end);
+        body_parts.push(self.build_comments_between(
+            last_inner_end,
+            bracket_close,
+            CommentSpacing::Leading,
+        ));
         body_parts.push(d.text("]"));
 
         // optional modifier: `?`, `+?`, or `-?`
@@ -165,16 +551,10 @@ impl<'a> Printer<'a> {
             let type_start = type_ann.span().start;
             let type_end = type_ann.span().end;
 
-            // Find the end of the last syntax element before value type
-            // This is either: name_type, or type_parameter constraint
-            let after_bracket_area = m
-                .name_type
-                .as_ref()
-                .map_or_else(|| m.type_parameter.constraint.span().end, |n| n.span().end);
-
-            // Comments between `]:` area and value type
+            // Comments between `]` (or `?`/`+?`/`-?`) and value type
+            // Start from bracket_close to avoid double-counting pre-bracket comments
             let comments_before_value: Vec<_> =
-                comments_in_range(self.comments, after_bracket_area, type_start).collect();
+                comments_in_range(self.comments, bracket_close, type_start).collect();
 
             body_parts.push(d.text(":"));
             for comment in &comments_before_value {
@@ -254,20 +634,54 @@ impl<'a> Printer<'a> {
             return self.build_empty_brackets_with_comments_doc(t.span);
         }
 
-        // Check for line comments between elements or after last element (force multiline)
-        if self.has_line_comments_in_delimited_list(&t.element_types, TSType::span, t.span.end - 1)
+        // Check for comments that force expansion: line comments, multiline block comments,
+        // or own-line single-line block comments. Also check for line comments BEFORE the
+        // first element (between `[` and first element), e.g., `[// leading\n a, b]`.
+        let has_leading_line_comment = t.element_types.first().is_some_and(|first| {
+            self.has_line_comments_between(t.span.start + 1, first.span().start)
+        });
+        if has_leading_line_comment
+            || self.has_line_comments_in_delimited_list(
+                &t.element_types,
+                TSType::span,
+                t.span.end - 1,
+            )
+            || self.has_own_line_block_comments_in_bracket_list(
+                t.span,
+                &t.element_types,
+                TSType::span,
+            )
         {
             return self.build_tuple_type_doc_with_line_comments(t);
         }
 
-        // Build element docs with commas and line breaks
+        // Build element docs with commas, inline block comments, and line breaks
         let mut parts = Vec::new();
+        let mut prev_end = t.span.start + 1; // After opening `[`
         for (i, elem) in t.element_types.iter().enumerate() {
             if i > 0 {
                 parts.push(d.text(","));
                 parts.push(d.line());
             }
+
+            // Add inline leading block comments (after previous comma or `[`)
+            let leading =
+                self.build_inline_comments_between_doc_trailing_space(prev_end, elem.span().start);
+            parts.push(leading);
+
             parts.push(self.build_type_doc(elem));
+
+            let elem_end = elem.span().end;
+            prev_end = if i + 1 < t.element_types.len() {
+                let next_start = t.element_types[i + 1].span().start;
+                let comma_pos = self.find_list_comma(elem_end, next_start);
+                self.append_trailing_inline_block_comments(&mut parts, elem_end, comma_pos);
+                comma_pos + 1 // After comma
+            } else {
+                let before_close = t.span.end - 1;
+                self.append_trailing_inline_block_comments(&mut parts, elem_end, before_close);
+                before_close
+            };
         }
 
         // Width-aware breaking: inline if fits, one-per-line if not
@@ -276,7 +690,7 @@ impl<'a> Printer<'a> {
         d.group(d.concat(&[d.text("["), d.indent(inner), d.softline(), d.text("]")]))
     }
 
-    /// Build tuple type with line comments between elements
+    /// Build tuple type with expanding comments (line comments or own-line block comments)
     fn build_tuple_type_doc_with_line_comments(&self, t: &TSTupleType) -> DocId {
         let d = self.d();
         let mut inner_parts = Vec::new();
@@ -287,29 +701,22 @@ impl<'a> Printer<'a> {
             let elem_end = elem.span().end;
             let is_last = i == t.element_types.len() - 1;
 
-            // Leading comments
+            // Leading comments (after previous comma or `[`)
             inner_parts.extend(self.build_leading_comments_multiline(prev_end, elem_start));
 
             inner_parts.push(self.build_type_doc(elem));
 
-            let next_boundary = if i + 1 < t.element_types.len() {
-                t.element_types[i + 1].span().start
-            } else {
-                t.span.end - 1 // Before the closing `]`
-            };
-
-            // Trailing comma for all elements
-            inner_parts.push(d.text(","));
-
-            // Trailing comments
-            inner_parts.extend(self.build_trailing_comments_multiline(elem_end, next_boundary));
-
-            // Hardline to separate from next element
             if !is_last {
-                inner_parts.push(d.hardline());
+                let next_start = t.element_types[i + 1].span().start;
+                prev_end =
+                    self.emit_multiline_comma_with_comments(&mut inner_parts, elem_end, next_start);
+            } else {
+                // Last element: trailing comma + comments before `]`
+                let before_close = t.span.end - 1;
+                inner_parts.push(d.text(","));
+                inner_parts.extend(self.build_trailing_comments_multiline(elem_end, before_close));
+                prev_end = before_close;
             }
-
-            prev_end = next_boundary;
         }
 
         d.concat(&[
@@ -359,6 +766,19 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_type_entity_name_doc(qualifier));
                 }
                 if let Some(type_args) = &i.type_arguments {
+                    // Preserve comments before type args: `import("a").Foo/* c */ <string>`
+                    let gap_start = i
+                        .qualifier
+                        .as_ref()
+                        .map_or(i.argument.span.end + 1, |q| q.span().end);
+                    let gap_end = type_args.span.start;
+                    if let Some(doc) = self.build_name_to_type_params_comments_opt(
+                        gap_start,
+                        gap_end,
+                        CommentSpacing::Trailing,
+                    ) {
+                        parts.push(doc);
+                    }
                     parts.push(self.build_type_parameter_instantiation_doc(type_args));
                 }
                 d.concat(&parts)

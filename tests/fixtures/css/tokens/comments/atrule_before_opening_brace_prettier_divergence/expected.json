@@ -10,7 +10,7 @@
 				"start": 9,
 				"end": 68,
 				"name": "media",
-				"prelude": "screen /* comment */",
+				"prelude": "screen",
 				"block": {
 					"type": "Block",
 					"start": 37,

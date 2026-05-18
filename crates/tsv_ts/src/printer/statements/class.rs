@@ -2,16 +2,20 @@
 
 use super::Printer;
 use crate::ast::internal;
+use crate::printer::CommentSpacing;
+use crate::printer::analysis;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::{SymbolToU32, comments_in_range};
 
 impl<'a> Printer<'a> {
-    /// Check if class should use "group mode" for heritage clauses
+    /// Check if class should use "group mode" for heritage clauses (non-comment reasons).
     ///
-    /// In group mode, heritage clauses break when the class header group breaks.
     /// Returns true when:
     /// 1. Multiple heritage items (extends + implements count > 1)
     /// 2. Member expression superclass without type arguments
+    ///
+    /// Comment-based group mode is determined separately in `build_class_declaration_doc_inner`
+    /// using the already-computed position data (avoids duplicate binary searches).
     fn should_class_group_mode(&self, decl: &internal::ClassDeclaration) -> bool {
         // Count heritage items
         let mut count = if decl.super_class.is_some() { 1 } else { 0 };
@@ -81,7 +85,7 @@ impl<'a> Printer<'a> {
                     .sum();
                 // +4 for (): and opening of return type
                 let estimated_params = current_col + params_width + 4;
-                estimated_params > self.config.print_width
+                estimated_params > tsv_lang::PRINT_WIDTH
             } else {
                 // Estimate total signature width (current column + remaining content)
                 let current_col = self.current_column();
@@ -96,7 +100,7 @@ impl<'a> Printer<'a> {
                     .map_or(0, |rt| (rt.span.end - rt.span.start) as usize);
                 // +4 accounts for parens and spaces: "()" around params, " {}" body
                 let estimated_total = current_col + params_width + return_type_width + 4;
-                estimated_total > self.config.print_width
+                estimated_total > tsv_lang::PRINT_WIDTH
             }
         } else if return_type_will_break {
             // Return type is multiline - it breaks on its own, so only check if params fit
@@ -108,7 +112,7 @@ impl<'a> Printer<'a> {
                 .sum();
             // +4 for (): and opening of return type
             let estimated_params = current_col + params_width + 4;
-            estimated_params > self.config.print_width
+            estimated_params > tsv_lang::PRINT_WIDTH
         } else {
             // No type params - still need to check if signature fits
             let current_col = self.current_column();
@@ -122,7 +126,7 @@ impl<'a> Printer<'a> {
                 .as_ref()
                 .map_or(0, |rt| (rt.span.end - rt.span.start) as usize);
             let estimated_total = current_col + params_width + return_type_width + 4;
-            estimated_total > self.config.print_width
+            estimated_total > tsv_lang::PRINT_WIDTH
         };
 
         let mut parts = Vec::new();
@@ -198,37 +202,161 @@ impl<'a> Printer<'a> {
         include_decorators: bool,
     ) -> DocId {
         let d = self.d();
-        let group_mode = self.should_class_group_mode(decl);
+
+        // Compute heritage positions once (used for group mode, comment extraction, header_end)
+        let pre_heritage_end = decl.type_parameters.as_ref().map_or_else(
+            || {
+                decl.id
+                    .as_ref()
+                    .map_or(decl.span.start + 5, |id| id.span.end)
+            },
+            |tp| tp.span.end,
+        );
+        // Find `extends`/`implements` keyword positions (not expression starts) so that
+        // heritage leading comments only cover name-to-keyword, not keyword-to-item.
+        let extends_keyword_start = decl.super_class.as_ref().and_then(|sc| {
+            self.find_keyword_in_range(pre_heritage_end, sc.span().start, "extends")
+        });
+        let implements_keyword_start = if !decl.implements.is_empty() {
+            let search_start = extends_keyword_start.map_or(pre_heritage_end, |ek| {
+                // After extends clause
+                decl.super_class.as_ref().map_or(ek + 7, |sc| {
+                    decl.super_type_parameters
+                        .as_ref()
+                        .map_or_else(|| sc.span().end, |tp| tp.span.end)
+                })
+            });
+            self.find_keyword_in_range(search_start, decl.implements[0].span.start, "implements")
+        } else {
+            None
+        };
+        let first_heritage_start = extends_keyword_start.or(implements_keyword_start);
+        let extends_clause_end = decl.super_class.as_ref().map(|sc| {
+            decl.super_type_parameters
+                .as_ref()
+                .map_or_else(|| sc.span().end, |tp| tp.span.end)
+        });
+
+        // Determine group mode: structural reasons OR heritage comments
+        let has_heritage_comments = first_heritage_start
+            .is_some_and(|hs| self.has_comments_between(pre_heritage_end, hs))
+            || extends_clause_end.is_some_and(|ext_end| {
+                !decl.implements.is_empty()
+                    && self.has_comments_between(ext_end, decl.implements[0].span.start)
+            });
+        let group_mode = self.should_class_group_mode(decl) || has_heritage_comments;
+
+        // Check if heritage line comments force group break.
+        // Line comments consume the rest of the line, so heritage must break to new lines.
+        // We use group_break() instead of break_parent to avoid polluting fits() lookahead
+        // for nested groups (e.g., type params `<T>` would break unnecessarily).
+        let has_heritage_line_comments = first_heritage_start.is_some_and(|heritage_start| {
+            self.has_line_comments_between(pre_heritage_end, heritage_start)
+        }) || extends_clause_end.is_some_and(|ext_end| {
+            !decl.implements.is_empty()
+                && self.has_line_comments_between(ext_end, decl.implements[0].span.start)
+        });
+
         let mut parts = vec![];
 
         // Decorators, each on its own line
+        // Find the first keyword after decorators (declare/abstract/class)
+        let first_keyword = if decl.declare {
+            "declare"
+        } else if decl.r#abstract {
+            "abstract"
+        } else {
+            "class"
+        };
+        let keyword_start = self.find_keyword_after_decorators(
+            decl.decorators.as_deref(),
+            first_keyword,
+            decl.span.start,
+        );
+
         if include_decorators
-            && let Some(dec_doc) = self.build_decorators_doc(decl.decorators.as_deref())
+            && let Some(dec_doc) =
+                self.build_decorators_doc(decl.decorators.as_deref(), keyword_start)
         {
             parts.push(dec_doc);
         }
 
-        // declare modifier
+        // Emit modifiers with comments preserved between each keyword pair
+        // e.g., `abstract/* b */class B` → `abstract /* b */ class B`
+        let search_end = decl.id.as_ref().map_or(decl.span.end, |id| id.span.start);
+        let mut cursor = keyword_start;
+
         if decl.declare {
-            parts.push(d.text("declare "));
+            parts.push(d.text("declare"));
+            cursor = keyword_start + 7;
         }
-
-        // abstract modifier
         if decl.r#abstract {
-            parts.push(d.text("abstract "));
+            // Find "abstract" in source after cursor, skipping comments
+            let abstract_pos = self.find_keyword_in_source(cursor, search_end, "abstract");
+            if let Some(ap) = abstract_pos {
+                if let Some(c) = self.build_inline_comments_between_doc_opt(cursor, ap) {
+                    parts.push(c);
+                }
+                if cursor > keyword_start {
+                    parts.push(d.text(" "));
+                }
+                parts.push(d.text("abstract"));
+                cursor = ap + 8;
+            }
+        }
+        // Find "class" in source after cursor, skipping comments
+        let class_pos = self.find_keyword_in_source(cursor, search_end, "class");
+        if let Some(cp) = class_pos {
+            if let Some(c) = self.build_inline_comments_between_doc_opt(cursor, cp) {
+                parts.push(c);
+            }
+            if cursor > keyword_start {
+                parts.push(d.text(" "));
+            }
+            parts.push(d.text("class"));
+            cursor = cp + 5;
         }
 
-        parts.push(d.text("class"));
         if let Some(id) = &decl.id {
-            parts.push(d.text(" "));
+            // Comments between class keyword and name
+            parts.push(self.build_keyword_to_name_comments(cursor, id.span.start));
             parts.push(d.symbol(id.name.to_u32()));
+
+            // Comments between name and type params: `class A/* c */ <T> {}`
+            // Line comments get a hardline to prevent absorbing type params as comment text
+            if let Some(type_params) = &decl.type_parameters {
+                parts.push(self.build_name_to_type_params_comments(
+                    id.span.end,
+                    type_params.span.start,
+                    CommentSpacing::Trailing,
+                ));
+            }
         }
 
         // Build heritage docs
         let extends_doc = if let Some(super_class) = &decl.super_class {
             let mut ext_parts = vec![d.text("extends ")];
+            // Comments between `extends` keyword and base class: `extends /* c */ Base`
+            if let Some(kw_start) = extends_keyword_start {
+                let kw_end = kw_start + 7; // "extends".len()
+                ext_parts.push(self.build_comments_between(
+                    kw_end,
+                    super_class.span().start,
+                    CommentSpacing::Trailing,
+                ));
+            }
             ext_parts.push(d.text_owned(self.expression_to_string(super_class)));
             if let Some(type_args) = &decl.super_type_parameters {
+                // Preserve comments between super class and type args: `extends Base/* c */ <T>`
+                let gap_start = super_class.span().end;
+                let gap_end = type_args.span.start;
+                if let Some(doc) = self.build_name_to_type_params_comments_opt(
+                    gap_start,
+                    gap_end,
+                    CommentSpacing::Trailing,
+                ) {
+                    ext_parts.push(doc);
+                }
                 ext_parts.push(self.build_type_arguments_doc_wrapping(type_args));
             }
             Some(d.concat(&ext_parts))
@@ -237,32 +365,25 @@ impl<'a> Printer<'a> {
         };
 
         let implements_doc = if !decl.implements.is_empty() {
-            let impl_type_docs: Vec<_> = decl
-                .implements
-                .iter()
-                .map(|heritage| {
-                    let mut h_parts = vec![self.build_entity_name_doc(&heritage.expression)];
-                    if let Some(type_args) = &heritage.type_arguments {
-                        h_parts.push(self.build_type_arguments_doc_wrapping(type_args));
-                    }
-                    d.concat(&h_parts)
-                })
-                .collect();
-            if group_mode {
-                // Multiple implements: types break individually via inner group
-                // Matches Prettier's printHeritageClauses for hasMultipleHeritage
-                let comma_line = d.concat(&[d.text(","), d.line()]);
-                let types_joined = d.join_doc(impl_type_docs, comma_line);
-                Some(d.concat(&[
-                    d.text("implements"),
-                    d.group(d.indent(d.concat(&[d.line(), types_joined]))),
-                ]))
-            } else {
-                Some(d.concat(&[d.text("implements "), d.join(impl_type_docs, ", ")]))
-            }
+            Some(self.build_heritage_clause_doc(
+                "implements",
+                &decl.implements,
+                group_mode,
+                implements_keyword_start,
+            ))
         } else {
             None
         };
+
+        // Compute header_end once (last heritage or identifier position before body)
+        let header_end = decl
+            .implements
+            .last()
+            .map(|i| i.span.end)
+            .or(extends_clause_end)
+            .or_else(|| decl.type_parameters.as_ref().map(|tp| tp.span.end))
+            .or_else(|| decl.id.as_ref().map(|id| id.span.end))
+            .unwrap_or(decl.span.start + 5);
 
         // Build the header group
         // The pre-brace line break is inside the group so it's affected by group break
@@ -274,11 +395,34 @@ impl<'a> Printer<'a> {
                 parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
             }
 
+            // Comments between name/type-params and first heritage clause
+            // (e.g., `class A // comment\n  extends B {}`)
+            let mut extra_heritage_comments = Vec::new();
+            if let Some(heritage_start) = first_heritage_start {
+                let (inline, indent) =
+                    self.build_heritage_leading_comment_parts(pre_heritage_end, heritage_start);
+                parts.extend(inline);
+                extra_heritage_comments = indent;
+            }
+
             // Heritage clauses with line breaks
-            let mut heritage_parts = Vec::new();
+            let mut heritage_parts = extra_heritage_comments;
             if let Some(ext) = extends_doc {
                 heritage_parts.push(d.line());
                 heritage_parts.push(ext);
+                // Comments between extends clause and implements keyword
+                // (e.g., `class F extends B // comment\n  implements D {}`)
+                // Use implements_keyword_start to avoid double-counting keyword comments
+                if let Some(ext_end) = extends_clause_end
+                    && !decl.implements.is_empty()
+                {
+                    let mid_end = implements_keyword_start.unwrap_or(decl.implements[0].span.start);
+                    if let Some(mid_comments) =
+                        self.build_inline_comments_between_doc_opt(ext_end, mid_end)
+                    {
+                        heritage_parts.push(mid_comments);
+                    }
+                }
             }
             if let Some(impl_doc) = implements_doc {
                 heritage_parts.push(d.line());
@@ -288,19 +432,37 @@ impl<'a> Printer<'a> {
                 parts.push(d.indent(d.concat(&heritage_parts)));
             }
 
-            // Pre-brace behavior depends on body content:
-            // - Empty body: always space (` {}` stays inline)
-            // - Non-empty body: line() becomes space if fits, newline if breaks
-            if decl.body.body.is_empty() {
+            // Comments between header and body: class A extends B /* c */ {}
+            // Line comments get a hardline to prevent absorbing the brace
+            let has_header_body_line_comment =
+                self.has_line_comments_between(header_end, decl.body.span.start);
+            if self.has_comments_between(header_end, decl.body.span.start) {
+                parts
+                    .push(self.build_inline_comments_between_doc(header_end, decl.body.span.start));
+            }
+
+            if has_header_body_line_comment {
+                // Line comment forces break: `class A // c\n{}`
+                parts.push(d.hardline());
+            } else if decl.body.body.is_empty() {
+                // Pre-brace behavior depends on body content:
+                // - Empty body: always space (` {}` stays inline)
                 parts.push(d.text(" "));
             } else {
+                // - Non-empty body: line() becomes space if fits, newline if breaks
                 // line() at base indent (heritage is indented, brace is at class level)
                 parts.push(d.line());
             }
 
-            d.group(d.concat(&parts))
+            let parts_doc = d.concat(&parts);
+            if has_heritage_line_comments {
+                d.group_break(parts_doc)
+            } else {
+                d.group(parts_doc)
+            }
         } else {
             // Non-group mode: type params break independently, heritage stays inline
+            // (No heritage comments in this path - comments force group mode)
             if let Some(type_params) = &decl.type_parameters {
                 parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
             }
@@ -315,8 +477,20 @@ impl<'a> Printer<'a> {
                 parts.push(impl_doc);
             }
 
-            // Always space before brace in non-group mode
-            parts.push(d.text(" "));
+            // Comments between header and body: class A /* comment */ {}
+            // Line comments get a hardline to prevent absorbing the brace
+            if self.has_comments_between(header_end, decl.body.span.start) {
+                parts
+                    .push(self.build_inline_comments_between_doc(header_end, decl.body.span.start));
+                if self.has_line_comments_between(header_end, decl.body.span.start) {
+                    parts.push(d.hardline());
+                } else {
+                    parts.push(d.text(" "));
+                }
+            } else {
+                // Always space before brace in non-group mode
+                parts.push(d.text(" "));
+            }
 
             d.concat(&parts)
         };
@@ -392,7 +566,9 @@ impl<'a> Printer<'a> {
             member_parts
                 .extend(self.build_trailing_same_line_comment_docs(member.span().end, upper_bound));
 
-            prev_end = member.span().end;
+            // Update prev_end past trailing comments (including comments on the
+            // closing */ line of multi-line block comments)
+            prev_end = self.find_end_with_trailing_comments(member.span().end);
         }
 
         // Handle trailing comments after the last member (before closing `}`)
@@ -427,6 +603,9 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = Vec::new();
 
+        if sig.is_static {
+            parts.push(d.text("static "));
+        }
         if sig.readonly {
             parts.push(d.text("readonly "));
         }
@@ -463,7 +642,16 @@ impl<'a> Printer<'a> {
         let mut parts = vec![];
 
         // Decorators (inline or own-line depending on original source)
-        if let Some(dec_doc) = self.build_class_member_decorators_doc(prop.decorators.as_deref()) {
+        let next_token_start = prop
+            .decorators
+            .as_ref()
+            .and_then(|decs| decs.last())
+            .map_or(prop.span.start, |dec| {
+                self.find_first_token_after(dec.span.end)
+            });
+        if let Some(dec_doc) =
+            self.build_class_member_decorators_doc(prop.decorators.as_deref(), next_token_start)
+        {
             parts.push(dec_doc);
         }
 
@@ -503,43 +691,87 @@ impl<'a> Printer<'a> {
             parts.push(d.text("accessor "));
         }
 
-        // Key
+        // Key (track key_region_end to avoid double-counting comments inside brackets)
+        let key_region_end;
         if prop.computed {
-            parts.push(d.text("["));
-            parts.push(self.build_expression_doc(&prop.key));
-            parts.push(d.text("]"));
+            let key_doc = self.build_expression_doc(&prop.key);
+            let (doc, end) =
+                self.build_computed_key_bracket_doc(prop.span.start, &prop.key, key_doc);
+            key_region_end = end;
+            parts.push(doc);
         } else {
+            key_region_end = prop.key.span().end;
             parts.push(self.build_expression_doc(&prop.key));
         }
 
-        // Optional/definite modifier after key
-        match prop.modifier {
-            internal::PropertyModifier::Optional => parts.push(d.text("?")),
-            internal::PropertyModifier::Definite => parts.push(d.text("!")),
-            internal::PropertyModifier::None => {}
-        }
+        // Optional/definite modifier after key, with comment extraction
+        let after_modifier = if prop.modifier != internal::PropertyModifier::None {
+            let modifier_char = match prop.modifier {
+                internal::PropertyModifier::Optional => b'?',
+                internal::PropertyModifier::Definite => b'!',
+                internal::PropertyModifier::None => unreachable!(),
+            };
+            let search_end = prop.type_annotation.as_ref().map_or_else(
+                || {
+                    prop.value
+                        .as_ref()
+                        .map_or(prop.span.end, |v| v.span().start)
+                },
+                |ta| ta.span.start,
+            );
+            #[allow(clippy::expect_used)] // Parser guarantees modifier char exists
+            let modifier_pos = analysis::find_char_skipping_comments(
+                self.source.as_bytes(),
+                key_region_end as usize,
+                search_end as usize,
+                modifier_char,
+            )
+            .expect("modifier char not found") as u32;
+
+            // Comments between key and modifier (e.g., `a /* c */? = 1;`)
+            if self.has_comments_between(key_region_end, modifier_pos) {
+                parts.push(self.build_inline_comments_between_doc(key_region_end, modifier_pos));
+            }
+
+            parts.push(d.text(if modifier_char == b'?' { "?" } else { "!" }));
+            modifier_pos + 1
+        } else {
+            key_region_end
+        };
 
         // Type annotation - use width-aware wrapping for generics and union types
         if let Some(type_ann) = &prop.type_annotation {
+            // Comments between modifier (or key) and `:` (e.g., `c! /* c */ : number`)
+            if self.has_comments_between(after_modifier, type_ann.span.start) {
+                let comment_doc =
+                    self.build_inline_comments_between_doc(after_modifier, type_ann.span.start);
+                // Trailing space separates comment from `:` in the type annotation
+                parts.push(d.concat(&[comment_doc, d.text(" ")]));
+            }
             parts.push(self.build_type_annotation_doc_wrapping(type_ann));
         }
 
         // Value if present - use assignment layout (matches prettier's printAssignment)
         if let Some(value) = &prop.value {
-            // Check for comments between = and value (e.g., /* @__PURE__ */ annotations)
-            let before_value = prop
+            let before_eq = prop
                 .type_annotation
                 .as_ref()
-                .map_or_else(|| prop.key.span().end, |ta| ta.span.end);
-            let has_line_comment = self.has_line_comments_between(before_value, value.span().start);
+                .map_or(after_modifier, |ta| ta.span.end);
+            let value_start = value.span().start;
+            let eq_pos = self.find_equals_position(before_eq, value_start);
+
+            // Comments before `=` stay before `=` (e.g., `b /* c */ = 1;`)
+            if self.has_comments_between(before_eq, eq_pos) {
+                parts.push(self.build_inline_comments_between_doc(before_eq, eq_pos));
+            }
+
+            // Comments after `=` pass through assignment layout
+            let has_line_comment = self.has_line_comments_between(eq_pos + 1, value_start);
             let rhs_comments = if has_line_comment {
                 // Line comments: build without trailing hardline — we add indent([hardline, ...])
-                self.build_inline_comments_between_doc_no_leading_space_opt(
-                    before_value,
-                    value.span().start,
-                )
+                self.build_inline_comments_between_doc_no_leading_space_opt(eq_pos + 1, value_start)
             } else {
-                self.build_rhs_comments_opt(before_value, value.span().start)
+                self.build_rhs_comments_opt(eq_pos + 1, value_start)
             };
 
             if has_line_comment {
@@ -564,6 +796,18 @@ impl<'a> Printer<'a> {
             }
         }
 
+        // Comments between last content and `;`
+        let content_end = prop
+            .value
+            .as_ref()
+            .map(|v| v.span().end)
+            .or_else(|| prop.type_annotation.as_ref().map(|ta| ta.span.end))
+            .unwrap_or(after_modifier);
+        for comment in comments_in_range(self.comments, content_end, prop.span.end) {
+            parts.push(d.text(" "));
+            parts.push(self.build_comment_doc(comment));
+        }
+
         parts.push(d.text(";"));
 
         d.concat(&parts)
@@ -575,7 +819,16 @@ impl<'a> Printer<'a> {
         let mut parts = vec![];
 
         // Decorators (inline or own-line depending on original source)
-        if let Some(dec_doc) = self.build_class_member_decorators_doc(method.decorators.as_deref()) {
+        let next_token_start = method
+            .decorators
+            .as_ref()
+            .and_then(|decs| decs.last())
+            .map_or(method.span.start, |dec| {
+                self.find_first_token_after(dec.span.end)
+            });
+        if let Some(dec_doc) =
+            self.build_class_member_decorators_doc(method.decorators.as_deref(), next_token_start)
+        {
             parts.push(dec_doc);
         }
 
@@ -608,6 +861,11 @@ impl<'a> Printer<'a> {
         // Generator marker
         if method.value.generator {
             parts.push(d.text("*"));
+            self.append_generator_star_comments(
+                &mut parts,
+                method.span.start,
+                method.key.span().start,
+            );
         }
 
         // Get/set for accessors
@@ -618,17 +876,48 @@ impl<'a> Printer<'a> {
         }
 
         // Key
+        let key_region_end;
         if method.computed {
-            parts.push(d.text("["));
-            parts.push(self.build_expression_doc(&method.key));
-            parts.push(d.text("]"));
+            let key_doc = self.build_expression_doc(&method.key);
+            let (doc, end) =
+                self.build_computed_key_bracket_doc(method.span.start, &method.key, key_doc);
+            key_region_end = end;
+            parts.push(doc);
         } else {
+            key_region_end = method.key.span().end;
             parts.push(self.build_expression_doc(&method.key));
         }
+
+        // Comments between key and next token: [x] /* c */() or method /* c */ <T>()
+        // Line comments get a hardline to prevent absorbing type params as comment text
+        let next_after_key = method
+            .value
+            .type_parameters
+            .as_ref()
+            .map_or(method.value.params_start, |tp| tp.span.start);
+        parts.push(self.build_name_to_type_params_comments(
+            key_region_end,
+            next_after_key,
+            CommentSpacing::for_type_params(method.value.type_parameters.is_some()),
+        ));
 
         // Type parameters if present: method<T>()
         if let Some(type_params) = &method.value.type_parameters {
             parts.push(self.build_type_parameter_declaration_doc(type_params));
+
+            // Comments between type_params `>` and `(` go after type_params
+            if let Some(pp) = analysis::find_char_skipping_comments(
+                self.source.as_bytes(),
+                type_params.span.end as usize,
+                self.source.len(),
+                b'(',
+            ) {
+                self.append_type_params_to_paren_comments(
+                    &mut parts,
+                    type_params.span.end,
+                    pp as u32,
+                );
+            }
         }
 
         // Parameters and return type - use the signature builder
@@ -639,11 +928,19 @@ impl<'a> Printer<'a> {
 
         // For abstract methods or overload signatures, use semicolon instead of body
         if method.r#abstract || is_overload_signature {
+            // Comments between return type (or params) and `;`
+            let content_end = if let Some(rt) = &method.value.return_type {
+                rt.span.end
+            } else {
+                self.find_closing_paren(method.value.params_start, method.span.end)
+                    .unwrap_or(method.span.end)
+            };
+            for comment in comments_in_range(self.comments, content_end, method.span.end) {
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
+            }
             parts.push(d.text(";"));
         } else {
-            parts.push(d.text(" "));
-            // Check for comments between signature and body (outer comments)
-            // These need to be moved inside the block body
             let sig_end = if let Some(rt) = &method.value.return_type {
                 rt.span.end
             } else if let Some(paren) =
@@ -653,13 +950,7 @@ impl<'a> Printer<'a> {
             } else {
                 method.value.body.span.start
             };
-            let outer_comments = self.build_outer_comments_for_block(sig_end, &method.value.body);
-            parts.push(
-                self.build_block_statement_with_outer_comments_doc(
-                    &method.value.body,
-                    outer_comments,
-                ),
-            );
+            self.append_body_with_sig_comments(&mut parts, sig_end, &method.value.body);
         }
 
         d.concat(&parts)

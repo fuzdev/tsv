@@ -8,9 +8,17 @@ pub struct Comment {
     pub content: String,
     pub is_block: bool, // true for /* */ or <!-- -->, false for //
     pub span: Span,
-    /// Whether this comment's loc should include a `character` field (byte offset).
-    /// True for JS comments in Svelte template open tags; false for script/expression comments.
-    pub has_character_loc: bool,
+    /// Public-AST serializer hint: when true, the JSON `loc` for this comment
+    /// includes a `character` (byte-offset) field alongside `line`/`column`.
+    /// Set by parsers that emit comments matching Svelte's template open-tag
+    /// shape; cleared for comments inside `<script>`/expressions/CSS that
+    /// follow the standard Svelte/acorn shape.
+    //
+    // TODO: this serializer flag is a stopgap for the v0.1 detached-comment
+    // model. Once an LSP/linter consumer arrives, promote to a structural
+    // attachment (parallel collection on `tsv_svelte::Root` per Phase 5
+    // Option A, or per-element attachment if a richer model is needed).
+    pub emit_character_field: bool,
 }
 
 //

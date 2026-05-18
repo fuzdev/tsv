@@ -2202,10 +2202,10 @@ impl<'a> Printer<'a> {
                 .map(|c| self.build_leading_js_comment_doc(c))
                 .collect();
 
-        // is_embedded_expression defaults to false: binary chains use Grouped style, not ContinuationIndent
-        let config = tsv_lang::PrintConfig {
+        // mode defaults to Standalone: binary chains use Grouped style, not ContinuationIndent
+        let embed = tsv_lang::EmbedContext {
             first_line_offset: 0,
-            ..self.config
+            ..self.embed
         };
 
         let expr_doc = tsv_ts::build_expression_doc_with_comments(
@@ -2213,9 +2213,11 @@ impl<'a> Printer<'a> {
             expr,
             self.source,
             Rc::clone(&self.interner),
-            &config,
+            &self.config,
+            &embed,
             self.comments,
             &self.line_breaks,
+            tsv_ts::TsConfig::svelte(),
         );
 
         let trailing_docs: Vec<DocId> =
@@ -2425,15 +2427,15 @@ impl<'a> Printer<'a> {
                 .map(|c| self.build_leading_js_comment_doc(c))
                 .collect();
 
-        // Config for embedded expression context: binary chains use ContinuationIndent style.
+        // Embed for embedded expression context: binary chains use ContinuationIndent style.
         // first_line_offset estimates the column position for width calculations.
-        let context_indent = self.config.tab_width;
+        let context_indent = tsv_lang::TAB_WIDTH;
         let opening_offset = 5; // typical tag prefix, e.g. `{#if `
         let first_line_offset = context_indent + opening_offset;
-        let config = tsv_lang::PrintConfig {
+        let embed = tsv_lang::EmbedContext {
             first_line_offset,
-            is_embedded_expression: true,
-            ..self.config
+            mode: tsv_lang::LayoutMode::Embedded,
+            ..self.embed
         };
 
         // Build expression doc directly in the shared arena.
@@ -2444,9 +2446,11 @@ impl<'a> Printer<'a> {
             expr,
             self.source,
             Rc::clone(&self.interner),
-            &config,
+            &self.config,
+            &embed,
             self.comments,
             &self.line_breaks,
+            tsv_ts::TsConfig::svelte(),
         );
 
         // Build docs for trailing comments (between expression end and span_end)
@@ -2501,18 +2505,18 @@ impl<'a> Printer<'a> {
                 .map(|c| self.build_leading_js_comment_doc(c))
                 .collect();
 
-        // In multiline contexts, set up embedded expression config so binary chains
+        // In multiline contexts, set up embedded expression context so binary chains
         // use ContinuationIndent style. first_line_offset estimates the column position.
-        let config = if in_multiline_context {
-            let context_indent = self.config.tab_width;
+        let embed = if in_multiline_context {
+            let context_indent = tsv_lang::TAB_WIDTH;
             let first_line_offset = context_indent + opening_offset;
-            tsv_lang::PrintConfig {
+            tsv_lang::EmbedContext {
                 first_line_offset,
-                is_embedded_expression: true,
-                ..self.config
+                mode: tsv_lang::LayoutMode::Embedded,
+                ..self.embed
             }
         } else {
-            self.config
+            self.embed
         };
 
         // Build expression doc tree
@@ -2523,9 +2527,11 @@ impl<'a> Printer<'a> {
                 expr,
                 self.source,
                 Rc::clone(&self.interner),
-                &config,
+                &self.config,
+                &embed,
                 self.comments,
                 &self.line_breaks,
+                tsv_ts::TsConfig::svelte(),
             );
             d.parens(inner)
         } else {
@@ -2534,9 +2540,11 @@ impl<'a> Printer<'a> {
                 expr,
                 self.source,
                 Rc::clone(&self.interner),
-                &config,
+                &self.config,
+                &embed,
                 self.comments,
                 &self.line_breaks,
+                tsv_ts::TsConfig::svelte(),
             )
         };
 

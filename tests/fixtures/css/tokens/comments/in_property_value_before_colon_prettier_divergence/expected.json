@@ -45,7 +45,7 @@
 							"start": 20,
 							"end": 45,
 							"property": "color",
-							"value": "/* comment */ : red"
+							"value": ": red"
 						}
 					]
 				},

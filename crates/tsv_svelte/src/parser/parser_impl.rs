@@ -5,7 +5,7 @@ use crate::lexer::{Lexer, TokenKind};
 use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
-use tsv_lang::{Comment, ParseError, Span};
+use tsv_lang::{Comment, ParseError, SharedInterner, Span};
 
 use super::PeekData;
 
@@ -16,7 +16,7 @@ pub(crate) struct SvelteParser<'a> {
     pub(crate) current_start: usize, // Global position in full source
     pub(crate) current_end: usize,   // Global position in full source
     pub(crate) peek_cache: Option<PeekData<TokenKind>>,
-    pub(crate) interner: Rc<RefCell<DefaultStringInterner>>,
+    pub(crate) interner: SharedInterner,
     pub(crate) base_offset: usize, // Offset of lexer's source in full source
     /// TS comments collected from template expressions (e.g., {@debug /* comment */ a})
     pub(crate) expression_comments: Vec<Comment>,
@@ -210,7 +210,7 @@ impl<'a> SvelteParser<'a> {
                         start: (base_offset + start) as u32,
                         end: (base_offset + end) as u32,
                     },
-                    has_character_loc: false,
+                    emit_character_field: false,
                 });
 
                 // Replace comment with spaces in result
@@ -233,7 +233,7 @@ impl<'a> SvelteParser<'a> {
                         start: (base_offset + start) as u32,
                         end: (base_offset + end) as u32,
                     },
-                    has_character_loc: false,
+                    emit_character_field: false,
                 });
 
                 // Replace comment with spaces in result
@@ -292,7 +292,7 @@ impl<'a> SvelteParser<'a> {
                         start: pos as u32,
                         end: end as u32,
                     },
-                    has_character_loc: true,
+                    emit_character_field: true,
                 });
 
                 self.advance_to_position(end)?;
@@ -322,7 +322,7 @@ impl<'a> SvelteParser<'a> {
                         start: pos as u32,
                         end: comment_end as u32,
                     },
-                    has_character_loc: true,
+                    emit_character_field: true,
                 });
 
                 self.advance_to_position(comment_end)?;
@@ -413,7 +413,6 @@ impl<'a> SvelteParser<'a> {
     /// Parse a TypeScript expression and collect any comments.
     ///
     /// Comments are added to `self.expression_comments` for later inclusion in `Root.comments`.
-    /// Use this instead of calling `tsv_ts::parse_expression` directly.
     pub(crate) fn parse_ts_expression(
         &mut self,
         source: &str,
@@ -427,7 +426,7 @@ impl<'a> SvelteParser<'a> {
 
     /// Parse a partial TypeScript expression (stops at top-level identifiers like `as`).
     ///
-    /// Comments are collected. Use this instead of `tsv_ts::parse_expression_partial` directly.
+    /// Comments are collected.
     pub(crate) fn parse_ts_expression_partial(
         &mut self,
         source: &str,

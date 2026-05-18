@@ -2,14 +2,13 @@
 
 use super::super::{internal, public};
 use super::{
-    ConversionContext, convert_break_statement, convert_class_declaration,
-    convert_continue_statement, convert_do_while_statement, convert_export_default_value,
-    convert_export_specifier, convert_expression, convert_for_in_statement,
-    convert_for_of_statement, convert_for_statement, convert_function_declaration,
-    convert_if_statement, convert_import_attribute, convert_import_specifier,
-    convert_labeled_statement, convert_literal, convert_switch_statement, convert_throw_statement,
-    convert_try_statement, convert_type_alias_declaration, convert_while_statement,
-    create_location, types::convert_entity_name,
+    Schema, convert_break_statement, convert_class_declaration, convert_continue_statement,
+    convert_do_while_statement, convert_export_default_value, convert_export_specifier,
+    convert_expression, convert_for_in_statement, convert_for_of_statement, convert_for_statement,
+    convert_function_declaration, convert_if_statement, convert_import_attribute,
+    convert_import_specifier, convert_labeled_statement, convert_literal, convert_switch_statement,
+    convert_throw_statement, convert_try_statement, convert_type_alias_declaration,
+    convert_while_statement, create_location, types::convert_entity_name,
 };
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker, Span};
@@ -31,7 +30,7 @@ pub(in crate::ast) fn convert_statement(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-    ctx: ConversionContext,
+    schema: Schema,
 ) -> public::Statement {
     match stmt {
         internal::Statement::ExpressionStatement(expr_stmt) => {
@@ -85,7 +84,7 @@ pub(in crate::ast) fn convert_statement(
         internal::Statement::ExportNamedDeclaration(export_decl) => {
             let export_kind = match export_decl.export_kind {
                 internal::ExportKind::Value => {
-                    if ctx.is_svelte_script {
+                    if schema.is_svelte_script() {
                         None
                     } else {
                         Some("value".to_string())
@@ -95,7 +94,7 @@ pub(in crate::ast) fn convert_statement(
             };
             // Svelte parser always includes `attributes: []` on ExportNamedDeclaration;
             // acorn-typescript omits it entirely. Internal struct doesn't have this field.
-            let attributes = if ctx.is_svelte_script {
+            let attributes = if schema.is_svelte_script() {
                 Some(Vec::new())
             } else {
                 None
@@ -121,11 +120,11 @@ pub(in crate::ast) fn convert_statement(
                 declaration: export_decl
                     .declaration
                     .as_ref()
-                    .map(|d| Box::new(convert_statement(d, source, loc, interner, offset, ctx))),
+                    .map(|d| Box::new(convert_statement(d, source, loc, interner, offset, schema))),
                 specifiers: export_decl
                     .specifiers
                     .iter()
-                    .map(|s| convert_export_specifier(s, loc, interner, offset, ctx))
+                    .map(|s| convert_export_specifier(s, loc, interner, offset, schema))
                     .collect(),
                 // TODO: Consider whether source should be stored differently
                 // (e.g., just the module name string vs full Literal node)
@@ -137,7 +136,7 @@ pub(in crate::ast) fn convert_statement(
             })
         }
         internal::Statement::ExportDefaultDeclaration(export_decl) => {
-            let export_kind = if ctx.is_svelte_script {
+            let export_kind = if schema.is_svelte_script() {
                 None
             } else {
                 Some("value".to_string())
@@ -172,7 +171,7 @@ pub(in crate::ast) fn convert_statement(
         internal::Statement::ExportAllDeclaration(export_decl) => {
             let export_kind = match export_decl.export_kind {
                 internal::ExportKind::Value => {
-                    if ctx.is_svelte_script {
+                    if schema.is_svelte_script() {
                         None
                     } else {
                         Some("value".to_string())
@@ -182,7 +181,7 @@ pub(in crate::ast) fn convert_statement(
             };
             // Svelte parser always includes `attributes: []` on ExportAllDeclaration;
             // acorn-typescript omits it entirely. Internal struct doesn't have this field.
-            let attributes = if ctx.is_svelte_script {
+            let attributes = if schema.is_svelte_script() {
                 Some(Vec::new())
             } else {
                 None
@@ -219,7 +218,7 @@ pub(in crate::ast) fn convert_statement(
         internal::Statement::ImportDeclaration(import_decl) => {
             let import_kind = match import_decl.import_kind {
                 internal::ImportKind::Value => {
-                    if ctx.is_svelte_script {
+                    if schema.is_svelte_script() {
                         None
                     } else {
                         Some("value".to_string())
@@ -232,7 +231,7 @@ pub(in crate::ast) fn convert_statement(
                 .iter()
                 .map(|a| convert_import_attribute(a, source, loc, interner, offset))
                 .collect();
-            let attributes = if ctx.is_svelte_script {
+            let attributes = if schema.is_svelte_script() {
                 Some(attrs)
             } else if attrs.is_empty() {
                 None
@@ -248,7 +247,7 @@ pub(in crate::ast) fn convert_statement(
                 specifiers: import_decl
                     .specifiers
                     .iter()
-                    .map(|s| convert_import_specifier(s, loc, interner, offset, ctx))
+                    .map(|s| convert_import_specifier(s, loc, interner, offset, schema))
                     .collect(),
                 source: convert_literal(&import_decl.source, source, loc, offset),
                 attributes,
@@ -412,7 +411,6 @@ fn convert_module_block(
     offset: usize,
 ) -> public::TSModuleBlock {
     // TSModuleBlock is always in TypeScript context (declare namespace/module)
-    let ctx = ConversionContext::default();
     public::TSModuleBlock {
         node_type: "TSModuleBlock".to_string(),
         start: block.span.start,
@@ -421,7 +419,7 @@ fn convert_module_block(
         body: block
             .body
             .iter()
-            .map(|s| convert_statement(s, source, loc, interner, offset, ctx))
+            .map(|s| convert_statement(s, source, loc, interner, offset, Schema::Acorn))
             .collect(),
     }
 }
@@ -434,7 +432,6 @@ pub(in crate::ast) fn convert_block_statement(
     offset: usize,
 ) -> public::BlockStatement {
     // BlockStatement is always in TypeScript context (function bodies, etc.)
-    let ctx = ConversionContext::default();
     public::BlockStatement {
         node_type: "BlockStatement".to_string(),
         start: block.span.start,
@@ -443,7 +440,7 @@ pub(in crate::ast) fn convert_block_statement(
         body: block
             .body
             .iter()
-            .map(|s| convert_statement(s, source, loc, interner, offset, ctx))
+            .map(|s| convert_statement(s, source, loc, interner, offset, Schema::Acorn))
             .collect(),
     }
 }

@@ -522,7 +522,7 @@ impl<'a> Parser<'a> {
         // Check for index signature: [key: Type]: ValueType
         // Index signatures look like `[ident: Type]` followed by `: ValueType`
         if self.is_index_signature_start() {
-            return self.parse_class_index_signature(start, readonly);
+            return self.parse_class_index_signature(start, is_static, readonly);
         }
 
         // Parse member name (key)
@@ -830,9 +830,10 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse an index signature: `[key: KeyType]: ValueType` or `readonly [key: KeyType]: ValueType`
-    fn parse_class_index_signature(
+    pub(in crate::parser) fn parse_class_index_signature(
         &mut self,
         start: usize,
+        is_static: bool,
         readonly: bool,
     ) -> Result<ClassMember, ParseError> {
         // Consume `[`
@@ -881,6 +882,7 @@ impl<'a> Parser<'a> {
         Ok(ClassMember::IndexSignature(TSIndexSignature {
             parameters: vec![parameter],
             type_annotation: value_type,
+            is_static,
             readonly,
             span: Span::new(start as u32, end),
         }))

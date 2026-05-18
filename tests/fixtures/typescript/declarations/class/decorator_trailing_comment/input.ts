@@ -1,0 +1,2 @@
+@expr /* c */
+class A {}

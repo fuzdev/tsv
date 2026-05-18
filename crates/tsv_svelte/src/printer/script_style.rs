@@ -32,12 +32,17 @@ impl<'a> Printer<'a> {
         // Width calculations are handled by:
         // - start_column for the first line
         // - start_indent_level for subsequent lines after hardline
-        // Note: We use default config (base_indent_offset=0) for accurate width calculations.
+        // Note: We use default embed (base_indent_offset=0) for accurate width calculations.
         // Template indent fallback (when source has no whitespace) is handled separately
         // in the TypeScript printer with a hardcoded default of 1 for Svelte context.
-        let config = tsv_lang::PrintConfig::default();
-        let script_doc_id =
-            tsv_ts::build_program_doc(self.d(), &script.content, self.source(), config);
+        let embed = tsv_lang::EmbedContext::default();
+        let script_doc_id = tsv_ts::build_program_doc(
+            self.d(),
+            &script.content,
+            self.source(),
+            embed,
+            tsv_ts::TsConfig::svelte(),
+        );
 
         // Render with indent
         // The Doc system naturally handles template literals: text() newlines are NOT indented
@@ -50,9 +55,9 @@ impl<'a> Printer<'a> {
         let output = doc::arena_print_doc_with_indent_resolved(
             self.d(),
             script_doc_id,
-            &config,
-            config.tab_width, // start column = 1 tab's visual width
-            1,                // start indent level = 1 (accounts for Svelte wrapper)
+            &embed,
+            tsv_lang::TAB_WIDTH, // start column = 1 tab's visual width
+            1,                   // start indent level = 1 (accounts for Svelte wrapper)
             &*interner,
         );
 
@@ -181,12 +186,13 @@ impl<'a> Printer<'a> {
             // Pass the entire source to CSS printer (CSS node spans are absolute)
             // The CSS printer will use the spans to detect blank lines correctly
             // Use base_indent_offset=1 to account for the Svelte wrapper indent
-            let config = tsv_lang::PrintConfig {
+            let config = tsv_lang::PrintConfig::default();
+            let embed = tsv_lang::EmbedContext {
                 base_indent_offset: 1,
-                ..Default::default()
+                ..tsv_lang::EmbedContext::default()
             };
             let formatted_css =
-                tsv_css::format_with_config(&style.css_stylesheet, self.source(), config);
+                tsv_css::format_with_config(&style.css_stylesheet, self.source(), config, embed);
 
             // Indent each line - trim trailing newlines first to avoid extra blank lines
             // Note: CSS formatter adds trailing newline, we need to remove it before line processing
@@ -290,17 +296,17 @@ impl<'a> Printer<'a> {
         } else {
             0
         };
-        let col = self.buffer.current_column(self.config.tab_width);
-        let config = tsv_lang::PrintConfig {
+        let col = self.buffer.current_column(tsv_lang::TAB_WIDTH);
+        let embed = tsv_lang::EmbedContext {
             suffix_width: closing_tag_width,
-            ..self.config
+            ..self.embed
         };
         let output = {
             let interner = self.interner.borrow();
             doc::arena_print_doc_with_indent_resolved_preserve_whitespace(
                 &self.arena,
                 group,
-                &config,
+                &embed,
                 col,
                 self.indent_level,
                 &*interner,

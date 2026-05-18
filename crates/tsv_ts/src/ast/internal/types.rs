@@ -283,6 +283,7 @@ pub struct TSTypeAliasDeclaration {
     pub id: Identifier,
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub type_annotation: TSType,
+    pub declare: bool,
     pub span: Span,
 }
 
@@ -513,6 +514,7 @@ pub struct TSConstructSignatureDeclaration {
 pub struct TSIndexSignature {
     pub parameters: Vec<Identifier>,
     pub type_annotation: TSTypeAnnotation,
+    pub is_static: bool,
     pub readonly: bool,
     pub span: Span,
 }

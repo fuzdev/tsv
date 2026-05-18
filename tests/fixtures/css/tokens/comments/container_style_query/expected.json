@@ -10,7 +10,7 @@
 				"start": 51,
 				"end": 129,
 				"name": "container",
-				"prelude": "style(--theme: dark) /* trailing */",
+				"prelude": "style(--theme: dark)",
 				"block": {
 					"type": "Block",
 					"start": 98,
@@ -71,7 +71,7 @@
 				"start": 172,
 				"end": 263,
 				"name": "container",
-				"prelude": "sidebar style(--highlight: true) /* trailing */",
+				"prelude": "sidebar style(--highlight: true)",
 				"block": {
 					"type": "Block",
 					"start": 231,

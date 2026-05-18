@@ -28,7 +28,7 @@ mod values;
 
 use crate::ast::internal::{Comment, CssBlockChild, CssNode, CssStyleSheet, CssValue};
 use tsv_lang::{
-    CommentPosition, OutputBuffer, PrintConfig, classify_comment_fast,
+    CommentPosition, EmbedContext, OutputBuffer, PrintConfig, classify_comment_fast,
     doc::{
         self,
         arena::{DocArena, DocId},
@@ -48,13 +48,17 @@ pub(crate) fn has_wrappable_args(args: &[CssValue]) -> bool {
 }
 
 /// Printer state for building output
-pub struct Printer<'a> {
+pub(crate) struct Printer<'a> {
     /// Output buffer
     buffer: OutputBuffer,
     /// Current indentation level
     pub(crate) indent_level: usize,
-    /// Print configuration
-    config: PrintConfig,
+    /// Workspace-wide doc-builder configuration (reserved slot for future
+    /// cross-language toggles — empty today).
+    #[allow(dead_code)]
+    pub(crate) config: PrintConfig,
+    /// Embedding context (base indent offset, first-line offset, layout mode, etc.).
+    pub(crate) embed: EmbedContext,
     /// Arena allocator for doc nodes
     pub(crate) arena: DocArena,
     /// Original source (for blank line detection and raw value extraction)
@@ -67,22 +71,30 @@ pub struct Printer<'a> {
 
 impl<'a> Printer<'a> {
     /// Create a new printer with source, comments, and line_breaks
-    pub fn new(source: &'a str, comments: &'a [Comment], line_breaks: &'a [u32]) -> Self {
-        Self::with_config(source, comments, line_breaks, PrintConfig::default())
+    pub(crate) fn new(source: &'a str, comments: &'a [Comment], line_breaks: &'a [u32]) -> Self {
+        Self::with_config(
+            source,
+            comments,
+            line_breaks,
+            PrintConfig::default(),
+            EmbedContext::default(),
+        )
     }
 
-    /// Create a new printer with the given config
-    pub fn with_config(
+    /// Create a new printer with the given doc-builder config and embed context.
+    pub(crate) fn with_config(
         source: &'a str,
         comments: &'a [Comment],
         line_breaks: &'a [u32],
         config: PrintConfig,
+        embed: EmbedContext,
     ) -> Self {
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
             config,
-            arena: DocArena::with_source_size_hint(source.len(), config.tab_width),
+            embed,
+            arena: DocArena::for_source(source),
             source,
             comments,
             line_breaks,
@@ -133,7 +145,7 @@ impl<'a> Printer<'a> {
     ///
     /// Used for printing nested structures like CSS rules.
     pub(crate) fn write_indent(&mut self) {
-        tsv_lang::write_indent(&mut self.buffer, self.indent_level, self.config.indent);
+        tsv_lang::write_indent(&mut self.buffer, self.indent_level, tsv_lang::INDENT);
     }
 
     /// Remove trailing newline from buffer (for inline comment handling)
@@ -151,9 +163,9 @@ impl<'a> Printer<'a> {
     /// Includes base_indent_offset to account for Svelte wrapper indentation
     /// that will be added to each line during final formatting.
     pub(crate) fn current_column(&self) -> usize {
-        let col = self.buffer.current_column(self.config.tab_width);
+        let col = self.buffer.current_column(tsv_lang::TAB_WIDTH);
         // Add wrapper indent width so fill calculations account for final indentation
-        col + (self.config.base_indent_offset * self.config.tab_width)
+        col + (self.embed.base_indent_offset * tsv_lang::TAB_WIDTH)
     }
 
     /// Get the effective indent level for width calculations
@@ -161,14 +173,14 @@ impl<'a> Printer<'a> {
     /// Includes base_indent_offset to account for external context (e.g., Svelte wrapper)
     /// that adds indentation to the final output.
     pub(crate) fn effective_indent(&self) -> usize {
-        self.indent_level + self.config.base_indent_offset
+        self.indent_level + self.embed.base_indent_offset
     }
 
     /// Get the visual width of current indentation in characters
     ///
     /// Converts indent level to actual character width based on tab_width.
     pub(crate) fn indent_width(&self) -> usize {
-        self.effective_indent() * self.config.tab_width
+        self.effective_indent() * tsv_lang::TAB_WIDTH
     }
 
     /// Write a DocId to the buffer, accounting for current column and indent level
@@ -185,7 +197,7 @@ impl<'a> Printer<'a> {
         let output = doc::arena_print_doc_with_indent(
             &self.arena,
             d,
-            &self.config,
+            &self.embed,
             current_col,
             self.indent_level,
         );
@@ -193,12 +205,12 @@ impl<'a> Printer<'a> {
     }
 
     /// Get the formatted output
-    pub fn into_string(self) -> String {
+    pub(crate) fn into_string(self) -> String {
         self.buffer.into_string()
     }
 
     /// Print a list of CSS nodes (rules) with comments interspersed by position
-    pub fn print_css_nodes(&mut self, nodes: &[CssNode]) {
+    pub(crate) fn print_css_nodes(&mut self, nodes: &[CssNode]) {
         // Use comment index for efficient traversal (comments are sorted)
         let mut comment_idx = 0;
         let mut prev_end: u32 = 0;
@@ -586,7 +598,7 @@ impl<'a> Printer<'a> {
 
 /// Format CSS stylesheet to a string
 /// Requires source for blank line preservation and raw value extraction
-pub fn format_css(stylesheet: &CssStyleSheet, source: &str) -> String {
+pub(crate) fn format_css(stylesheet: &CssStyleSheet, source: &str) -> String {
     let mut printer = Printer::new(source, &stylesheet.comments, &stylesheet.line_breaks);
     printer.print_css_nodes(&stylesheet.nodes);
     printer.into_string()
@@ -594,17 +606,19 @@ pub fn format_css(stylesheet: &CssStyleSheet, source: &str) -> String {
 
 /// Format CSS stylesheet with custom configuration
 /// Use this when CSS is nested inside another language (e.g., Svelte)
-/// with base_indent_offset to account for wrapper indentation
-pub fn format_css_with_config(
+/// with `embed.base_indent_offset` to account for wrapper indentation.
+pub(crate) fn format_css_with_config(
     stylesheet: &CssStyleSheet,
     source: &str,
     config: PrintConfig,
+    embed: EmbedContext,
 ) -> String {
     let mut printer = Printer::with_config(
         source,
         &stylesheet.comments,
         &stylesheet.line_breaks,
         config,
+        embed,
     );
     printer.print_css_nodes(&stylesheet.nodes);
     printer.into_string()

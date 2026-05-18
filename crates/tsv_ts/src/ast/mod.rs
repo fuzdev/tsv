@@ -1,8 +1,10 @@
 // AST module - re-exports
 
+#[cfg(feature = "convert")]
 pub mod convert;
 pub mod internal;
 pub mod precedence;
+#[cfg(feature = "convert")]
 pub mod public;
 
 pub use internal::{

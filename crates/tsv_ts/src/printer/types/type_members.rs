@@ -8,19 +8,18 @@
 // - IndexSignature: `[key: Type]: Value`
 
 use super::super::comments_in_range;
+use super::CommentSpacing;
 use super::Printer;
 use super::helpers::intersection_has_huggable_last_type;
 use crate::ast::internal::{self, TSType, TSTypeElement};
+use crate::printer::analysis::{find_char_skipping_comments, skip_identifier_at};
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
-    /// Build doc for type member with optional trailing semicolon
-    pub(super) fn build_type_member_doc_inner(
-        &self,
-        member: &TSTypeElement,
-        with_semicolon: bool,
-    ) -> DocId {
+    /// Build doc for a type member without its trailing `;` — the type-literal
+    /// printer is responsible for the separator and any surrounding comments.
+    pub(super) fn build_type_member_doc_inner(&self, member: &TSTypeElement) -> DocId {
         let d = self.d();
         match member {
             TSTypeElement::PropertySignature(prop) => {
@@ -28,19 +27,24 @@ impl<'a> Printer<'a> {
                 if prop.readonly {
                     parts.push(d.text("readonly "));
                 }
+                let key_region_end;
                 if prop.computed {
-                    parts.push(d.text("["));
-                    parts.push(self.build_expression_doc(&prop.key));
-                    parts.push(d.text("]"));
+                    let key_doc = self.build_expression_doc(&prop.key);
+                    let (doc, end) =
+                        self.build_computed_key_bracket_doc(prop.span.start, &prop.key, key_doc);
+                    key_region_end = end;
+                    parts.push(doc);
                 } else {
+                    key_region_end = prop.key.span().end;
                     parts.push(self.build_expression_doc(&prop.key));
                 }
 
                 // Handle comments between key and colon (e.g., `b /* comment */: B`)
-                let key_end = prop.key.span().end;
+                // key_region_end is after `]` for computed, avoiding re-finding bracket comments
                 if let Some(type_ann) = &prop.type_annotation {
                     let type_ann_start = type_ann.span.start;
-                    for comment in comments_in_range(self.comments, key_end, type_ann_start) {
+                    for comment in comments_in_range(self.comments, key_region_end, type_ann_start)
+                    {
                         parts.push(d.text(" "));
                         parts.push(self.build_comment_doc(comment));
                     }
@@ -60,15 +64,6 @@ impl<'a> Printer<'a> {
                         parts.push(d.text(" "));
                         parts.push(self.build_comment_doc(comment));
                     }
-
-                    // For simple types with trailing comments, the doc already includes semicolon
-                    let has_trailing_comment =
-                        self.type_annotation_has_trailing_comment_doc(type_ann);
-                    if with_semicolon && !has_trailing_comment {
-                        parts.push(d.text(";"));
-                    }
-                } else if with_semicolon {
-                    parts.push(d.text(";"));
                 }
                 d.concat(&parts)
             }
@@ -80,32 +75,46 @@ impl<'a> Printer<'a> {
                     internal::MethodKind::Set => parts.push(d.text("set ")),
                     _ => {}
                 }
+                let key_region_end;
                 if method.computed {
-                    parts.push(d.text("["));
-                    parts.push(self.build_expression_doc(&method.key));
-                    parts.push(d.text("]"));
+                    let key_doc = self.build_expression_doc(&method.key);
+                    let (doc, end) = self.build_computed_key_bracket_doc(
+                        method.span.start,
+                        &method.key,
+                        key_doc,
+                    );
+                    key_region_end = end;
+                    parts.push(doc);
                 } else {
+                    key_region_end = method.key.span().end;
                     parts.push(self.build_expression_doc(&method.key));
                 }
 
                 // Handle comments around method signature parts
                 // Comments between key and type_params/`(` go before `?`
                 // Comments between type_params and `(` go after type_params
-                let key_end = method.key.span().end;
+                // key_region_end is after `]` for computed, avoiding re-finding bracket comments
                 let type_params_end = method.type_parameters.as_ref().map(|tp| tp.span.end);
 
-                // Find the position of `(` in source (search after type_params if present)
-                let paren_search_start = type_params_end.unwrap_or(key_end);
-                let paren_pos = self.source[paren_search_start as usize..]
-                    .find('(')
-                    .map(|p| paren_search_start + p as u32);
+                // Find the position of `(` in source (skip comments to avoid matching `(` inside them)
+                let paren_search_start = type_params_end.unwrap_or(key_region_end);
+                let paren_pos = find_char_skipping_comments(
+                    self.source.as_bytes(),
+                    paren_search_start as usize,
+                    self.source.len(),
+                    b'(',
+                )
+                .map(|p| p as u32);
 
                 // Comments between key and type_params (or `(` if no type_params) go before `?`
-                let comments_before_boundary = type_params_end.or(paren_pos).unwrap_or(key_end);
-                for comment in comments_in_range(self.comments, key_end, comments_before_boundary) {
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                }
+                // Line comments get a hardline to prevent absorbing type params as comment text
+                let comments_before_boundary =
+                    type_params_end.or(paren_pos).unwrap_or(key_region_end);
+                parts.push(self.build_name_to_type_params_comments(
+                    key_region_end,
+                    comments_before_boundary,
+                    CommentSpacing::for_type_params(method.type_parameters.is_some()),
+                ));
 
                 if method.optional {
                     parts.push(d.text("?"));
@@ -117,18 +126,25 @@ impl<'a> Printer<'a> {
 
                 // Comments between type_params and `(` go after type_params
                 if let (Some(tp_end), Some(paren_pos)) = (type_params_end, paren_pos) {
-                    for comment in comments_in_range(self.comments, tp_end, paren_pos) {
-                        parts.push(d.text(" "));
-                        parts.push(self.build_comment_doc(comment));
-                    }
+                    self.append_type_params_to_paren_comments(&mut parts, tp_end, paren_pos);
                 }
 
                 parts.push(self.build_signature_params_doc(&method.params, paren_pos));
                 if let Some(return_type) = &method.return_type {
                     parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
                 }
-                if with_semicolon {
-                    parts.push(d.text(";"));
+                // Comments between return type (or params) and `;`
+                let content_end = method.return_type.as_ref().map_or_else(
+                    || {
+                        paren_pos
+                            .and_then(|p| self.find_close_paren(p))
+                            .unwrap_or(method.span.end)
+                    },
+                    |rt| rt.span.end,
+                );
+                for comment in comments_in_range(self.comments, content_end, method.span.end) {
+                    parts.push(d.text(" "));
+                    parts.push(self.build_comment_doc(comment));
                 }
                 d.group(d.concat(&parts))
             }
@@ -139,21 +155,42 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_type_parameter_declaration_doc(type_params));
                 }
 
-                // Find paren position for comment handling
+                // Find paren position for comment handling (skip comments to avoid matching `(` inside them)
                 let paren_search_start = call
                     .type_parameters
                     .as_ref()
                     .map_or(call.span.start, |tp| tp.span.end);
-                let paren_pos = self.source[paren_search_start as usize..]
-                    .find('(')
-                    .map(|p| paren_search_start + p as u32);
+                let paren_pos = find_char_skipping_comments(
+                    self.source.as_bytes(),
+                    paren_search_start as usize,
+                    self.source.len(),
+                    b'(',
+                )
+                .map(|p| p as u32);
+
+                // Comments between type_params and `(` go after type_params
+                if let (Some(tp), Some(pp)) =
+                    (call.type_parameters.as_ref().map(|t| t.span.end), paren_pos)
+                {
+                    self.append_type_params_to_paren_comments(&mut parts, tp, pp);
+                }
 
                 parts.push(self.build_signature_params_doc(&call.params, paren_pos));
                 if let Some(return_type) = &call.return_type {
                     parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
                 }
-                if with_semicolon {
-                    parts.push(d.text(";"));
+                // Comments between return type (or params) and `;`
+                let content_end = call.return_type.as_ref().map_or_else(
+                    || {
+                        paren_pos
+                            .and_then(|p| self.find_close_paren(p))
+                            .unwrap_or(call.span.end)
+                    },
+                    |rt| rt.span.end,
+                );
+                for comment in comments_in_range(self.comments, content_end, call.span.end) {
+                    parts.push(d.text(" "));
+                    parts.push(self.build_comment_doc(comment));
                 }
                 d.group(d.concat(&parts))
             }
@@ -164,36 +201,51 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_type_parameter_declaration_doc(type_params));
                 }
 
-                // Find paren position for comment handling
+                // Find paren position for comment handling (skip comments to avoid matching `(` inside them)
                 let paren_search_start = ctor
                     .type_parameters
                     .as_ref()
                     .map_or(ctor.span.start, |tp| tp.span.end);
-                let paren_pos = self.source[paren_search_start as usize..]
-                    .find('(')
-                    .map(|p| paren_search_start + p as u32);
+                let paren_pos = find_char_skipping_comments(
+                    self.source.as_bytes(),
+                    paren_search_start as usize,
+                    self.source.len(),
+                    b'(',
+                )
+                .map(|p| p as u32);
+
+                // Comments between type_params and `(` go after type_params
+                if let (Some(tp), Some(pp)) =
+                    (ctor.type_parameters.as_ref().map(|t| t.span.end), paren_pos)
+                {
+                    self.append_type_params_to_paren_comments(&mut parts, tp, pp);
+                }
 
                 parts.push(self.build_signature_params_doc(&ctor.params, paren_pos));
                 if let Some(return_type) = &ctor.return_type {
                     parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
                 }
-                if with_semicolon {
-                    parts.push(d.text(";"));
+                // Comments between return type (or params) and `;`
+                let content_end = ctor.return_type.as_ref().map_or_else(
+                    || {
+                        paren_pos
+                            .and_then(|p| self.find_close_paren(p))
+                            .unwrap_or(ctor.span.end)
+                    },
+                    |rt| rt.span.end,
+                );
+                for comment in comments_in_range(self.comments, content_end, ctor.span.end) {
+                    parts.push(d.text(" "));
+                    parts.push(self.build_comment_doc(comment));
                 }
                 d.group(d.concat(&parts))
             }
-            TSTypeElement::IndexSignature(idx) => {
-                self.build_type_element_index_signature_doc(idx, with_semicolon)
-            }
+            TSTypeElement::IndexSignature(idx) => self.build_type_element_index_signature_doc(idx),
         }
     }
 
     /// Build doc for index signature in type elements: `[key: Type]: Value`
-    fn build_type_element_index_signature_doc(
-        &self,
-        idx: &internal::TSIndexSignature,
-        with_semicolon: bool,
-    ) -> DocId {
+    fn build_type_element_index_signature_doc(&self, idx: &internal::TSIndexSignature) -> DocId {
         let d = self.d();
         let mut parts = vec![];
         if idx.readonly {
@@ -209,21 +261,56 @@ impl<'a> Printer<'a> {
             .map(|param| {
                 let mut param_parts = vec![d.symbol(param.name.to_u32())];
                 if let Some(type_ann) = &param.type_annotation {
-                    match type_ann.type_annotation.as_ref() {
-                        TSType::Union(u) => {
-                            // Union key type: break after `:` with leading `|`
-                            let type_doc = self.build_union_type_doc(u, false);
-                            param_parts.push(d.text(":"));
-                            param_parts.push(d.group(d.indent(d.concat(&[d.line(), type_doc]))));
-                        }
-                        TSType::Intersection(i) => {
-                            // Intersection key type: break after `:` with trailing `&`
-                            let type_doc = self.build_intersection_type_doc(i, false);
-                            param_parts.push(d.text(":"));
-                            param_parts.push(d.group(d.indent(d.concat(&[d.line(), type_doc]))));
-                        }
-                        _ => {
-                            // Regular key type: use standard annotation
+                    // Extract comments between param name and colon: `[key /* c */ : string]`
+                    // Prettier adds space before `:` when comments present
+                    let colon_pos = type_ann.span.start;
+                    let name_end = skip_identifier_at(
+                        self.source.as_bytes(),
+                        param.span.start as usize,
+                        colon_pos as usize,
+                    ) as u32;
+                    let has_pre_colon_comment = if let Some(comment_doc) =
+                        self.build_inline_comments_between_doc_opt(name_end, colon_pos)
+                    {
+                        param_parts.push(comment_doc);
+                        true
+                    } else {
+                        false
+                    };
+                    let key_colon_end = colon_pos + 1;
+                    let key_type_start = type_ann.type_annotation.span().start;
+                    // Union/Intersection key types: break after `:` with leading `|` or trailing `&`
+                    let breaking_type_doc = match type_ann.type_annotation.as_ref() {
+                        TSType::Union(u) => Some(self.build_union_type_doc(u, false)),
+                        TSType::Intersection(i) => Some(self.build_intersection_type_doc(i, false)),
+                        _ => None,
+                    };
+                    if let Some(type_doc) = breaking_type_doc {
+                        let comments_doc = self.build_comments_between(
+                            key_colon_end,
+                            key_type_start,
+                            CommentSpacing::Trailing,
+                        );
+                        param_parts.push(d.text(if has_pre_colon_comment { " :" } else { ":" }));
+                        param_parts.push(d.group(d.indent(d.concat(&[
+                            d.line(),
+                            comments_doc,
+                            type_doc,
+                        ]))));
+                    } else {
+                        // Regular key type: use standard annotation
+                        // build_type_annotation_doc emits `: type`, need space before `:` with comments
+                        if has_pre_colon_comment {
+                            let type_start = type_ann.type_annotation.span().start;
+                            let colon_end = colon_pos + 1;
+                            param_parts.push(d.text(" :"));
+                            // Handle comments between `:` and type (delegate to existing logic)
+                            let between_doc =
+                                self.build_inline_comments_between_doc(colon_end, type_start);
+                            param_parts.push(d.text(" "));
+                            param_parts.push(between_doc);
+                            param_parts.push(self.build_type_doc(&type_ann.type_annotation));
+                        } else {
                             param_parts.push(self.build_type_annotation_doc(type_ann));
                         }
                     }
@@ -244,50 +331,70 @@ impl<'a> Printer<'a> {
         ]));
         parts.push(bracket_group);
 
-        // Handle comments between `]` and type annotation
-        // Search for `]` from the last parameter's end position
+        // Handle comments between `]` and `:` of value type annotation
+        // Only search up to the colon position, not the type start
         let search_start = idx.parameters.last().map_or(idx.span.start, |p| p.span.end);
         let bracket_close_pos = self.source[search_start as usize..]
             .find(']')
             .map(|p| search_start + p as u32);
-        let type_start = idx.type_annotation.type_annotation.span().start;
-        let mut has_comment = false;
+        let val_colon_pos = idx.type_annotation.span.start;
+        let val_colon_end = val_colon_pos + 1;
+        let val_type_start = idx.type_annotation.type_annotation.span().start;
+        let mut has_bracket_colon_comment = false;
         if let Some(close_pos) = bracket_close_pos {
-            // Search up to the type's span start, not the annotation's
-            for comment in comments_in_range(self.comments, close_pos + 1, type_start) {
+            for comment in comments_in_range(self.comments, close_pos + 1, val_colon_pos) {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
-                has_comment = true;
+                has_bracket_colon_comment = true;
             }
         }
 
         // Build value type annotation with proper breaking for long unions/intersections
-        // When we have a comment before `:`, we handle `:` ourselves to avoid
-        // build_type_annotation_doc outputting the comment again.
-        if has_comment {
-            // We already output the comment, now just add ` : Type`
+        if has_bracket_colon_comment {
+            // Bracket-colon comment present: emit ` : ` then handle colon-to-type comments
             parts.push(d.text(" : "));
+            parts.push(self.build_comments_between(
+                val_colon_end,
+                val_type_start,
+                CommentSpacing::Trailing,
+            ));
             parts.push(self.build_type_doc(&idx.type_annotation.type_annotation));
         } else {
-            // No comment before `:`, use normal type annotation handling
+            // No bracket-colon comment: use normal type annotation handling
             match idx.type_annotation.type_annotation.as_ref() {
                 TSType::Union(u) => {
                     let type_doc = self.build_union_type_doc(u, false);
+                    let comments_doc = self.build_comments_between(
+                        val_colon_end,
+                        val_type_start,
+                        CommentSpacing::Trailing,
+                    );
                     parts.push(d.text(":"));
                     parts.push(d.group(d.indent(d.concat(&[
                         d.line(), // space when flat, newline when broken
+                        comments_doc,
                         type_doc,
                     ]))));
                 }
                 TSType::Intersection(i) => {
                     let type_doc = self.build_intersection_type_doc(i, false);
+                    let comments_doc = self.build_comments_between(
+                        val_colon_end,
+                        val_type_start,
+                        CommentSpacing::Trailing,
+                    );
                     if intersection_has_huggable_last_type(i) {
                         // No indent/line - keep `: Type & {` hugged
                         parts.push(d.text(": "));
+                        parts.push(comments_doc);
                         parts.push(type_doc);
                     } else {
                         parts.push(d.text(":"));
-                        parts.push(d.group(d.indent(d.concat(&[d.line(), type_doc]))));
+                        parts.push(d.group(d.indent(d.concat(&[
+                            d.line(),
+                            comments_doc,
+                            type_doc,
+                        ]))));
                     }
                 }
                 _ => {
@@ -296,9 +403,6 @@ impl<'a> Printer<'a> {
             }
         }
 
-        if with_semicolon {
-            parts.push(d.text(";"));
-        }
         d.concat(&parts)
     }
 }

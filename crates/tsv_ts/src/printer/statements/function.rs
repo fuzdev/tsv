@@ -2,6 +2,8 @@
 
 use super::Printer;
 use crate::ast::internal;
+use crate::printer::CommentSpacing;
+use crate::printer::analysis::find_char_skipping_comments;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
@@ -83,39 +85,97 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let mut parts = Vec::new();
+        let search_end = decl
+            .id
+            .as_ref()
+            .map_or(decl.params_start, |id| id.span.start);
+        let mut cursor = decl.span.start;
+
         if decl.r#async {
-            parts.push(d.text("async "));
+            parts.push(d.text("async"));
+            cursor = decl.span.start + 5; // "async" length
         }
-        parts.push(d.text("function"));
+
+        // Find "function" in source after cursor, skipping comments
+        let function_pos = self.find_keyword_in_source(cursor, search_end, "function");
+        if let Some(fp) = function_pos {
+            if let Some(c) = self.build_inline_comments_between_doc_opt(cursor, fp) {
+                parts.push(c);
+            }
+            if cursor > decl.span.start {
+                parts.push(d.text(" "));
+            }
+            parts.push(d.text("function"));
+            cursor = fp + 8; // "function" length
+        } else {
+            if cursor > decl.span.start {
+                parts.push(d.text(" "));
+            }
+            parts.push(d.text("function"));
+        }
+
         if decl.generator {
             parts.push(d.text("*"));
+            cursor += 1;
         }
         if let Some(id) = &decl.id {
-            parts.push(d.text(" "));
-            // Comments between keywords and the name: `async /* a */ function* /* b */ F()`
-            // Search from span start to find all comments before the name
-            // (prettier normalizes them to after `function*`)
-            parts.push(
-                self.build_inline_comments_between_doc_trailing_space(
-                    decl.span.start,
-                    id.span.start,
-                ),
-            );
+            // Comments between function/function* and the name
+            parts.push(self.build_keyword_to_name_comments(cursor, id.span.start));
             parts.push(d.symbol(id.name.to_u32()));
+
+            // Comments between name and type params/parens: `function fn1/* c */ <T>()` or `fn1 /* c */()`
+            // Line comments get a hardline to prevent absorbing type params as comment text
+            let comment_end = decl
+                .type_parameters
+                .as_ref()
+                .map_or(decl.params_start, |tp| tp.span.start);
+            parts.push(self.build_name_to_type_params_comments(
+                id.span.end,
+                comment_end,
+                CommentSpacing::for_type_params(decl.type_parameters.is_some()),
+            ));
         } else {
-            // Prettier adds a space before () for anonymous functions
-            parts.push(d.text(" "));
+            // Anonymous function (export default): extract comments between keyword and params
+            // `export default function /* c */ () {}`
+            // Line comments get hardline to prevent absorbing parens: `function // c\n()`
+            let next_start = decl
+                .type_parameters
+                .as_ref()
+                .map_or(decl.params_start, |tp| tp.span.start);
+            parts.push(self.build_keyword_to_name_comments(cursor, next_start));
         }
         // Type parameters (TypeScript generics): function foo<T>()
         if let Some(type_params) = &decl.type_parameters {
             parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
+
+            // Comments between type_params `>` and `(` go after type_params
+            if let Some(pp) = find_char_skipping_comments(
+                self.source.as_bytes(),
+                type_params.span.end as usize,
+                self.source.len(),
+                b'(',
+            ) {
+                self.append_type_params_to_paren_comments(
+                    &mut parts,
+                    type_params.span.end,
+                    pp as u32,
+                );
+            }
         }
 
         // Signature (params + return type) in a single group
         parts.push(self.build_function_signature_doc(decl));
 
-        parts.push(d.text(" "));
-        parts.push(self.build_block_statement_doc(&decl.body));
+        // Handle comments between signature and body: function a() /* comment */ {}
+        let sig_end = if let Some(rt) = &decl.return_type {
+            rt.span.end
+        } else if let Some(paren) = self.find_closing_paren(decl.params_start, decl.body.span.start)
+        {
+            paren
+        } else {
+            decl.body.span.start
+        };
+        self.append_body_with_sig_comments(&mut parts, sig_end, &decl.body);
 
         d.concat(&parts)
     }

@@ -1,8 +1,8 @@
 use crate::deno::run_prettier;
 use crate::fixtures::{
-    self, Fixture, InputType, discover_prettier_intermediate_variants,
-    discover_prettier_variant_variants, discover_unformatted_ours_variants,
-    discover_unformatted_variants, discover_variant_variants, has_prettier_divergence_suffix,
+    self, AuditSignature, Fixture, InputType, discover_prettier_intermediate_to_variant_variants,
+    discover_prettier_intermediate_variants, discover_prettier_variant_variants,
+    discover_unformatted_ours_variants, discover_unformatted_variants, discover_variant_variants,
     read_file,
 };
 use futures_util::stream::{self, StreamExt};
@@ -92,8 +92,59 @@ enum Suggestion {
     Variant(String),
     /// Suggest creating a prettier_intermediate_* file
     PrettierIntermediate(String),
+    /// Suggest creating a prettier_intermediate_to_variant_* file
+    PrettierIntermediateToVariant(String),
+    /// Prettier-chain from output_prettier is documented in audit_signature.txt (chain depth K)
+    DocumentedMultiPass(usize),
     /// Needs investigation
     Investigate(String),
+}
+
+/// Result of checking audit_signature.txt against the live prettier chain
+enum AuditSignatureCheck {
+    /// Signature file exists and matches the live chain. Carries chain depth.
+    MatchesRecorded(usize),
+    /// Signature file exists but the live chain differs from what's recorded —
+    /// genuine prettier drift since signature was captured.
+    Drift,
+    /// Check could not be performed: I/O failure, malformed signature, or prettier
+    /// failed during the live walk. Distinct from `Drift` because the remediation is
+    /// "investigate" rather than "regenerate" — regenerating would hit the same error.
+    Error(String),
+    /// No signature file present
+    NoSignature,
+}
+
+/// Check whether `output_prettier.*`'s prettier chain matches a recorded `audit_signature.txt`.
+///
+/// Reads the signature file (if present), walks prettier from `output_prettier.*` to its fixed
+/// point live, and byte-compares. This mirrors F4 validation but runs in audit context.
+async fn check_audit_signature(fixture: &Fixture) -> AuditSignatureCheck {
+    let signature_path = fixture.audit_signature_path();
+    if !signature_path.exists() {
+        return AuditSignatureCheck::NoSignature;
+    }
+    let raw = match read_file(&signature_path) {
+        Ok(s) => s,
+        Err(e) => return AuditSignatureCheck::Error(format!("read audit_signature.txt: {e}")),
+    };
+    let recorded = match AuditSignature::parse(&raw) {
+        Ok(s) => s,
+        Err(e) => return AuditSignatureCheck::Error(format!("parse audit_signature.txt: {e}")),
+    };
+    let output_prettier_path = fixture.output_prettier_path();
+    let output_prettier_content = match read_file(&output_prettier_path) {
+        Ok(s) => s,
+        Err(e) => return AuditSignatureCheck::Error(format!("read output_prettier: {e}")),
+    };
+    let parser = fixture.input_type().prettier_parser();
+    match AuditSignature::walk(&output_prettier_content, parser).await {
+        Ok(Some(live)) if live.passes == recorded.passes => {
+            AuditSignatureCheck::MatchesRecorded(live.passes.len())
+        }
+        Ok(_) => AuditSignatureCheck::Drift,
+        Err(e) => AuditSignatureCheck::Error(format!("prettier chain walk: {e}")),
+    }
 }
 
 /// Result of auditing one file within a fixture
@@ -141,8 +192,7 @@ impl FixturesAuditExecutable {
                     return true;
                 }
                 // Default: only _prettier_divergence fixtures
-                let dir_name = f.path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                has_prettier_divergence_suffix(dir_name)
+                f.is_prettier_divergence()
             })
             .collect();
 
@@ -222,7 +272,9 @@ impl FixturesAuditExecutable {
                 if let Some(ref suggestion) = file_audit.novel_suggestion {
                     let msg = format_suggestion(suggestion);
                     println!("    >> {msg}");
-                    novel_count += 1;
+                    if !matches!(suggestion, Suggestion::DocumentedMultiPass(_)) {
+                        novel_count += 1;
+                    }
                 }
             }
 
@@ -270,6 +322,16 @@ fn format_suggestion(suggestion: &Suggestion) -> String {
         Suggestion::PrettierIntermediate(suffix) => {
             format!(
                 "suggest prettier_intermediate_{suffix} (prettier unstable, converges to input)"
+            )
+        }
+        Suggestion::PrettierIntermediateToVariant(suffix) => {
+            format!(
+                "suggest prettier_intermediate_to_variant_{suffix} (prettier unstable, converges to a variant_* / prettier_variant_*)"
+            )
+        }
+        Suggestion::DocumentedMultiPass(depth) => {
+            format!(
+                "documented: prettier non-idempotent on output_prettier (chain depth={depth}, pinned by audit_signature.txt)"
             )
         }
         Suggestion::Investigate(reason) => format!("investigate: {reason}"),
@@ -324,6 +386,14 @@ async fn audit_fixture(fixture: &Fixture) -> FixtureAudit {
         }
     }
 
+    let prettier_intermediate_to_variant_variants =
+        discover_prettier_intermediate_to_variant_variants(fixture_dir, input_ext);
+    for name in &prettier_intermediate_to_variant_variants {
+        if let Ok(content) = read_file(&fixture_dir.join(name)) {
+            known_files.insert(name.clone(), content);
+        }
+    }
+
     // Collect all files to audit
     let mut files_to_audit: Vec<String> = vec![fixture.input_file.clone()];
 
@@ -340,6 +410,7 @@ async fn audit_fixture(fixture: &Fixture) -> FixtureAudit {
     files_to_audit.extend(prettier_variant_variants);
     files_to_audit.extend(variant_variants);
     files_to_audit.extend(prettier_intermediate_variants);
+    files_to_audit.extend(prettier_intermediate_to_variant_variants);
 
     let mut file_audits = Vec::new();
     let mut has_novel = false;
@@ -379,11 +450,17 @@ async fn audit_fixture(fixture: &Fixture) -> FixtureAudit {
             &input_content,
             fixture,
             use_prettier,
+            &known_files,
         )
         .await;
 
         if let Some(ref s) = novel_suggestion {
-            has_novel = true;
+            // DocumentedMultiPass is informational — covered by audit_signature.txt and
+            // checked byte-for-byte by F4. Don't mark the fixture as novel; it would
+            // surface noise on every audit run even though nothing is wrong.
+            if !matches!(s, Suggestion::DocumentedMultiPass(_)) {
+                has_novel = true;
+            }
             suggestions.push(s.clone());
         }
 
@@ -444,6 +521,7 @@ async fn classify_novel(
     input_content: &str,
     fixture: &Fixture,
     use_prettier: bool,
+    known_files: &HashMap<String, String>,
 ) -> Option<Suggestion> {
     // Only interested in novel prettier results
     let FormatResult::Novel = prettier_result? else {
@@ -457,7 +535,28 @@ async fn classify_novel(
         rest.strip_suffix(input_ext).unwrap_or(rest)
     } else {
         // Non-variant source files (input.*, output_prettier.*, prettier_variant_*, etc.)
-        // can't generate meaningful variant names — flag for investigation
+        // can't generate meaningful variant names. Before flagging, check whether this is
+        // a documented prettier non-idempotent case captured in audit_signature.txt.
+        if filename.starts_with("output_prettier.") && use_prettier {
+            match check_audit_signature(fixture).await {
+                AuditSignatureCheck::MatchesRecorded(depth) => {
+                    return Some(Suggestion::DocumentedMultiPass(depth));
+                }
+                AuditSignatureCheck::Drift => {
+                    return Some(Suggestion::Investigate(
+                        "audit_signature.txt drift — prettier chain from output_prettier no longer matches recorded chain. Run: deno task fixtures:update:formatted".to_string()
+                    ));
+                }
+                AuditSignatureCheck::Error(reason) => {
+                    return Some(Suggestion::Investigate(format!(
+                        "audit_signature.txt check failed: {reason}"
+                    )));
+                }
+                AuditSignatureCheck::NoSignature => {
+                    // Fall through to original "investigate manually" message
+                }
+            }
+        }
         return Some(Suggestion::Investigate(format!(
             "prettier({filename}) produces novel output — investigate manually"
         )));
@@ -521,15 +620,28 @@ async fn classify_novel(
         if second_pass == *input_content {
             Some(Suggestion::PrettierIntermediate(suffix.to_string()))
         } else {
-            let ours_normalizes = matches!(ours_result, Some(FormatResult::MatchesInput));
-            if ours_normalizes {
-                Some(Suggestion::Investigate(
-                    "prettier unstable, does not converge to input".to_string(),
+            // Does the second pass converge to a documented variant_* / prettier_variant_*?
+            let converges_to_variant = known_files.iter().any(|(name, content)| {
+                (name.starts_with("variant_") || name.starts_with("prettier_variant_"))
+                    && name.ends_with(input_ext)
+                    && *content == second_pass
+            });
+            if converges_to_variant {
+                Some(Suggestion::PrettierIntermediateToVariant(
+                    suffix.to_string(),
                 ))
             } else {
-                Some(Suggestion::Investigate(
-                    "prettier unstable, non-converging".to_string(),
-                ))
+                let ours_normalizes = matches!(ours_result, Some(FormatResult::MatchesInput));
+                if ours_normalizes {
+                    Some(Suggestion::Investigate(
+                        "prettier unstable, does not converge to input or any documented variant"
+                            .to_string(),
+                    ))
+                } else {
+                    Some(Suggestion::Investigate(
+                        "prettier unstable, non-converging".to_string(),
+                    ))
+                }
             }
         }
     }

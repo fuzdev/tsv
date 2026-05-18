@@ -75,7 +75,6 @@ impl<'a> Printer<'a> {
             CssValue::CommaSeparated { values, .. } => {
                 let doc = self.build_list_doc(values, ", ");
                 let available = doc::available_width(
-                    &self.config,
                     self.effective_indent(),
                     0,
                     property.len() + 3, // property + ": " + ";"
@@ -85,7 +84,6 @@ impl<'a> Printer<'a> {
                     doc,
                     available,
                     Mode::Flat,
-                    &self.config,
                     None,
                 );
                 (exceeds_width, true)
@@ -93,7 +91,6 @@ impl<'a> Printer<'a> {
             CssValue::List { values, .. } => {
                 let doc = self.build_list_doc(values, " ");
                 let available = doc::available_width(
-                    &self.config,
                     self.effective_indent(),
                     0,
                     property.len() + 3, // property + ": " + ";"
@@ -103,7 +100,6 @@ impl<'a> Printer<'a> {
                     doc,
                     available,
                     Mode::Flat,
-                    &self.config,
                     None,
                 );
                 (exceeds_width, false)
@@ -153,14 +149,12 @@ impl<'a> Printer<'a> {
         let name_doc = d.text_owned(name.to_string());
         let func_doc = d.concat(&[name_doc, d.parens(args_doc)]);
 
-        let available =
-            doc::available_width(&self.config, self.effective_indent(), 0, context_offset);
+        let available = doc::available_width(self.effective_indent(), 0, context_offset);
         !doc::arena_fits::<dyn doc::TextResolver>(
             &self.arena,
             func_doc,
             available,
             Mode::Flat,
-            &self.config,
             None,
         )
     }
@@ -255,7 +249,7 @@ impl<'a> Printer<'a> {
             let func_source = span.extract(self.source);
             let normalized = source_fidelity::normalize_value_spacing(func_source);
             let inline_len = decl.property.len() + 2 + normalized.len() + 1;
-            self.indent_width() + inline_len > self.config.print_width
+            self.indent_width() + inline_len > tsv_lang::PRINT_WIDTH
         } else {
             let context_offset = decl.property.len() + 3;
             self.should_wrap_function_with_offset(name, args, context_offset)
@@ -583,14 +577,12 @@ impl<'a> Printer<'a> {
     /// `trailing_reserve` accounts for characters after the list (comma, paren, semicolon).
     fn space_list_exceeds_width(&self, values: &[CssValue], trailing_reserve: usize) -> bool {
         let list_doc = self.build_list_doc(values, " ");
-        let available =
-            doc::available_width(&self.config, self.effective_indent(), 0, trailing_reserve);
+        let available = doc::available_width(self.effective_indent(), 0, trailing_reserve);
         !doc::arena_fits::<dyn doc::TextResolver>(
             &self.arena,
             list_doc,
             available,
             Mode::Flat,
-            &self.config,
             None,
         )
     }
@@ -638,7 +630,7 @@ impl<'a> Printer<'a> {
 
     /// Check if an arg string would exceed width when printed at current position
     fn arg_string_exceeds_width(&self, arg: &str) -> bool {
-        self.indent_width() + arg.len() > self.config.print_width
+        self.indent_width() + arg.len() > tsv_lang::PRINT_WIDTH
     }
 
     /// Print space-separated values with fill wrapping
@@ -659,7 +651,7 @@ impl<'a> Printer<'a> {
         let first_len = parts[0].len();
         let second_len = parts[1].len();
         let first_fills_line =
-            self.indent_width() + first_len + 1 + second_len > self.config.print_width;
+            self.indent_width() + first_len + 1 + second_len > tsv_lang::PRINT_WIDTH;
 
         // When comment fills line: print it separately, then handle values with continuation
         let (value_parts, use_continuation) =
@@ -672,12 +664,12 @@ impl<'a> Printer<'a> {
                 let val1_len = parts[1].len();
                 let val2_len = parts[2].len();
                 let needs_wrap =
-                    self.indent_width() + val1_len + 1 + val2_len > self.config.print_width;
+                    self.indent_width() + val1_len + 1 + val2_len > tsv_lang::PRINT_WIDTH;
                 (&parts[1..], needs_wrap)
             } else {
                 // Normal case: check if first two items fit together
                 let both_fit =
-                    self.indent_width() + first_len + 1 + second_len <= self.config.print_width;
+                    self.indent_width() + first_len + 1 + second_len <= tsv_lang::PRINT_WIDTH;
                 (parts, both_fit)
             };
 

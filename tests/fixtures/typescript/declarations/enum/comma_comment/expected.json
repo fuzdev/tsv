@@ -1,0 +1,520 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 315,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Inline block comment after comma (leading on next member)",
+			"start": 20,
+			"end": 80,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 98,
+			"end": 105,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Inline block comment before comma (trailing on current member)",
+			"start": 114,
+			"end": 179,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 194,
+			"end": 201,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 4
+				},
+				"end": {
+					"line": 10,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Both trailing and leading comments around comma",
+			"start": 213,
+			"end": 263,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 278,
+			"end": 286,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 4
+				},
+				"end": {
+					"line": 16,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 290,
+			"end": 298,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 314,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 305,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 19,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSEnumDeclaration",
+					"start": 82,
+					"end": 111,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 87,
+						"end": 88,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 93,
+							"end": 94,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 2
+								},
+								"end": {
+									"line": 4,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 93,
+								"end": 94,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 3
+									}
+								},
+								"name": "X"
+							}
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 106,
+							"end": 107,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 10
+								},
+								"end": {
+									"line": 5,
+									"column": 11
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 106,
+								"end": 107,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 10
+									},
+									"end": {
+										"line": 5,
+										"column": 11
+									}
+								},
+								"name": "Y"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 98,
+									"end": 105
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Inline block comment after comma (leading on next member)",
+							"start": 20,
+							"end": 80
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 181,
+					"end": 210,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 186,
+						"end": 187,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 6
+							},
+							"end": {
+								"line": 9,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 192,
+							"end": 193,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 2
+								},
+								"end": {
+									"line": 10,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 192,
+								"end": 193,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 3
+									}
+								},
+								"name": "X"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 194,
+									"end": 201
+								}
+							]
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 205,
+							"end": 206,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 2
+								},
+								"end": {
+									"line": 11,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 205,
+								"end": 206,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 3
+									}
+								},
+								"name": "Y"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Inline block comment before comma (trailing on current member)",
+							"start": 114,
+							"end": 179
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 265,
+					"end": 304,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 270,
+						"end": 271,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 6
+							},
+							"end": {
+								"line": 15,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 276,
+							"end": 277,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 2
+								},
+								"end": {
+									"line": 16,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 276,
+								"end": 277,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 3
+									}
+								},
+								"name": "X"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 278,
+									"end": 286
+								}
+							]
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 299,
+							"end": 300,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 11
+								},
+								"end": {
+									"line": 17,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 299,
+								"end": 300,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 11
+									},
+									"end": {
+										"line": 17,
+										"column": 12
+									}
+								},
+								"name": "Y"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c2 ",
+									"start": 290,
+									"end": 298
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Both trailing and leading comments around comma",
+							"start": 213,
+							"end": 263
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

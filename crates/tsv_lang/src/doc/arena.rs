@@ -237,6 +237,13 @@ impl DocArena {
         }
     }
 
+    /// Create an arena sized for `source`, using the default `TAB_WIDTH`.
+    ///
+    /// Equivalent to `with_source_size_hint(source.len(), TAB_WIDTH)`.
+    pub fn for_source(source: &str) -> Self {
+        Self::with_source_size_hint(source.len(), crate::config::TAB_WIDTH)
+    }
+
     //
     // Internal helpers
     //
@@ -1000,10 +1007,26 @@ impl DocArena {
     pub fn borrow_children(&self) -> std::cell::Ref<'_, Vec<DocId>> {
         self.children.borrow()
     }
+
+    /// Estimate output buffer capacity (bytes) for the rendered string.
+    ///
+    /// Doc trees average ~4 nodes per source byte (see [`with_source_size_hint`]),
+    /// and Prettier-conforming output is within ±10% of source. So output bytes
+    /// ≈ `nodes.len() / 4`. Used to pre-size the render `String` buffer and avoid
+    /// the geometric `realloc` chain that starts from a small default capacity.
+    ///
+    /// Floor: 256 bytes (matches the old hardcoded default for tiny inputs).
+    /// Ceiling: 1 MB (guards against accidental huge initial allocations).
+    ///
+    /// [`with_source_size_hint`]: Self::with_source_size_hint
+    #[inline]
+    pub fn estimated_output_capacity(&self) -> usize {
+        (self.nodes.borrow().len() / 4).clamp(256, 1 << 20)
+    }
 }
 
 impl Default for DocArena {
     fn default() -> Self {
-        Self::new(crate::PrintConfig::default().tab_width)
+        Self::new(crate::TAB_WIDTH)
     }
 }

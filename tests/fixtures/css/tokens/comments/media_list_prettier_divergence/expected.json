@@ -10,7 +10,7 @@
 				"start": 92,
 				"end": 184,
 				"name": "media",
-				"prelude": "/* a */ screen /* b */ and /* c */ (min-width: 500px)",
+				"prelude": "screen  and  (min-width: 500px)",
 				"block": {
 					"type": "Block",
 					"start": 153,
@@ -71,7 +71,7 @@
 				"start": 218,
 				"end": 309,
 				"name": "media",
-				"prelude": "(width > 100px) /* d */ or /* e */ (height > 200px)",
+				"prelude": "(width > 100px)  or  (height > 200px)",
 				"block": {
 					"type": "Block",
 					"start": 277,
@@ -132,7 +132,7 @@
 				"start": 350,
 				"end": 420,
 				"name": "media",
-				"prelude": "(min-width: /* size */ 500px)",
+				"prelude": "(min-width:  500px)",
 				"block": {
 					"type": "Block",
 					"start": 387,
@@ -193,7 +193,7 @@
 				"start": 455,
 				"end": 515,
 				"name": "media",
-				"prelude": "not /* f */ screen",
+				"prelude": "not  screen",
 				"block": {
 					"type": "Block",
 					"start": 481,
@@ -254,7 +254,7 @@
 				"start": 551,
 				"end": 612,
 				"name": "media",
-				"prelude": "only /* g */ screen",
+				"prelude": "only  screen",
 				"block": {
 					"type": "Block",
 					"start": 578,
@@ -315,7 +315,7 @@
 				"start": 651,
 				"end": 714,
 				"name": "media",
-				"prelude": "screen /* h */, print",
+				"prelude": "screen , print",
 				"block": {
 					"type": "Block",
 					"start": 680,

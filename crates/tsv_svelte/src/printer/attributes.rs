@@ -195,9 +195,6 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an attribute value part
-    ///
-    /// Uses `force_binary_breaks: true` for expression tags inside attribute strings,
-    /// allowing binary expressions to break when the attribute value exceeds print width.
     fn build_attribute_value_doc(&self, value: &internal::AttributeValue) -> DocId {
         match value {
             internal::AttributeValue::Text(text) => self.build_attribute_text_doc(&text.raw),
@@ -229,15 +226,8 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an expression tag inside an attribute value.
-    ///
-    /// Uses `force_binary_breaks: true` so binary expressions can break when
-    /// the attribute value exceeds print width.
     fn build_attribute_expression_doc(&self, expr_tag: &internal::ExpressionTag) -> DocId {
-        let config = tsv_lang::PrintConfig {
-            force_binary_breaks: true,
-            ..self.config
-        };
-        self.build_expression_tag_doc_with_config(expr_tag, &config)
+        self.build_expression_tag_doc_with_config(expr_tag, tsv_lang::PrintConfig::default())
     }
 
     /// Build a Doc for attribute text content, handling newlines as literallines.
@@ -443,12 +433,12 @@ impl<'a> Printer<'a> {
     fn build_expression_doc_for_attribute(
         &self,
         expr: &tsv_ts::ast::internal::Expression,
-        config: &tsv_lang::PrintConfig,
+        config: tsv_lang::PrintConfig,
     ) -> DocId {
         let d = self.d();
-        let embedded_config = tsv_lang::PrintConfig {
-            is_embedded_expression: true,
-            ..*config
+        let embedded = tsv_lang::EmbedContext {
+            mode: tsv_lang::LayoutMode::Embedded,
+            ..tsv_lang::EmbedContext::default()
         };
 
         // Assignment expressions need parens in attribute values: prop={(a = b)}
@@ -458,9 +448,11 @@ impl<'a> Printer<'a> {
                 expr,
                 self.source,
                 Rc::clone(&self.interner),
-                &embedded_config,
+                &config,
+                &embedded,
                 self.comments,
                 &self.line_breaks,
+                tsv_ts::TsConfig::svelte(),
             );
             return d.parens(inner);
         }
@@ -470,9 +462,11 @@ impl<'a> Printer<'a> {
             expr,
             self.source,
             Rc::clone(&self.interner),
-            &embedded_config,
+            &config,
+            &embedded,
             self.comments,
             &self.line_breaks,
+            tsv_ts::TsConfig::svelte(),
         )
     }
 
@@ -557,7 +551,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        let expr_doc = self.build_expression_doc_for_attribute(expr, &self.config);
+        let expr_doc = self.build_expression_doc_for_attribute(expr, self.config);
 
         // Collect trailing comments
         let mut trailing_comments = Vec::new();
@@ -673,7 +667,7 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for an expression tag: `{expr}`
     pub(super) fn build_expression_tag_doc(&self, tag: &internal::ExpressionTag) -> DocId {
-        self.build_expression_tag_doc_with_config(tag, &self.config)
+        self.build_expression_tag_doc_with_config(tag, self.config)
     }
 
     /// Build a Doc for an expression tag with a specific config
@@ -688,7 +682,7 @@ impl<'a> Printer<'a> {
     fn build_expression_tag_doc_with_config(
         &self,
         tag: &internal::ExpressionTag,
-        config: &tsv_lang::PrintConfig,
+        config: tsv_lang::PrintConfig,
     ) -> DocId {
         let d = self.d();
         let mut parts = vec![d.text("{")];

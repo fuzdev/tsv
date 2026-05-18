@@ -231,6 +231,8 @@ pub struct TSTypeAliasDeclaration {
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     #[serde(rename = "typeAnnotation")]
     pub type_annotation: TSType,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub declare: bool,
 }
 
 /// TypeScript literal type: `type X = 'hello'` or `type X = \`template\``
@@ -398,14 +400,14 @@ pub struct TSMethodSignature {
     /// Whether this is an optional method: `method?(): T`
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub optional: bool,
+    /// Method kind: "get" or "set" for accessor signatures (omitted for regular methods)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
     #[serde(rename = "typeParameters", skip_serializing_if = "Option::is_none")]
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub parameters: Vec<Expression>,
     #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
     pub return_type: Option<TSTypeAnnotation>,
-    /// Method kind: "get" or "set" for accessor signatures (omitted for regular methods)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub kind: Option<String>,
 }
 
 /// Call signature: `(): T` or `<T>(): T`
@@ -448,6 +450,9 @@ pub struct TSIndexSignature {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
+    #[serde(rename = "static")]
+    #[serde(skip_serializing_if = "is_false")]
+    pub is_static: bool,
     #[serde(skip_serializing_if = "is_false")]
     pub readonly: bool,
     pub parameters: Vec<Identifier>,

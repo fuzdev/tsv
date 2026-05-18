@@ -1,0 +1,1061 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 609,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Function declaration - block comment before body",
+			"start": 20,
+			"end": 71,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 86,
+			"end": 99,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 14
+				},
+				"end": {
+					"line": 3,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Function expression - block comment before body",
+			"start": 105,
+			"end": 155,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 177,
+			"end": 190,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 21
+				},
+				"end": {
+					"line": 6,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Method - block comment before body",
+			"start": 197,
+			"end": 234,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 252,
+			"end": 265,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 6
+				},
+				"end": {
+					"line": 10,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Class - block comment before body",
+			"start": 276,
+			"end": 312,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 322,
+			"end": 335,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 9
+				},
+				"end": {
+					"line": 14,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Interface - block comment before body",
+			"start": 341,
+			"end": 381,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 395,
+			"end": 408,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 13
+				},
+				"end": {
+					"line": 17,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Enum - block comment before body",
+			"start": 429,
+			"end": 464,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 473,
+			"end": 486,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 8
+				},
+				"end": {
+					"line": 22,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Namespace - block comment before body",
+			"start": 504,
+			"end": 544,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 558,
+			"end": 571,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 13
+				},
+				"end": {
+					"line": 28,
+					"column": 26
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 608,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 599,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 31,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 73,
+					"end": 102,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 30
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 82,
+						"end": 83,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 11
+							}
+						},
+						"name": "a"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 100,
+						"end": 102,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 28
+							},
+							"end": {
+								"line": 3,
+								"column": 30
+							}
+						},
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " comment ",
+								"start": 86,
+								"end": 99
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Function declaration - block comment before body",
+							"start": 20,
+							"end": 71
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 157,
+					"end": 194,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 38
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 161,
+							"end": 193,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 5
+								},
+								"end": {
+									"line": 6,
+									"column": 37
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 161,
+								"end": 162,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 5
+									},
+									"end": {
+										"line": 6,
+										"column": 6
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "FunctionExpression",
+								"start": 165,
+								"end": 193,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 9
+									},
+									"end": {
+										"line": 6,
+										"column": 37
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 191,
+									"end": 193,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 35
+										},
+										"end": {
+											"line": 6,
+											"column": 37
+										}
+									},
+									"body": [],
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " comment ",
+											"start": 177,
+											"end": 190
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Function expression - block comment before body",
+							"start": 105,
+							"end": 155
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 236,
+					"end": 273,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 240,
+							"end": 272,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 5
+								},
+								"end": {
+									"line": 11,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 240,
+								"end": 241,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 5
+									},
+									"end": {
+										"line": 9,
+										"column": 6
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 244,
+								"end": 272,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 9
+									},
+									"end": {
+										"line": 11,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 248,
+										"end": 268,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 2
+											},
+											"end": {
+												"line": 10,
+												"column": 22
+											}
+										},
+										"method": true,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 248,
+											"end": 249,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 2
+												},
+												"end": {
+													"line": 10,
+													"column": 3
+												}
+											},
+											"name": "d"
+										},
+										"value": {
+											"type": "FunctionExpression",
+											"start": 249,
+											"end": 268,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 3
+												},
+												"end": {
+													"line": 10,
+													"column": 22
+												}
+											},
+											"id": null,
+											"expression": false,
+											"generator": false,
+											"async": false,
+											"params": [],
+											"body": {
+												"type": "BlockStatement",
+												"start": 266,
+												"end": 268,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 20
+													},
+													"end": {
+														"line": 10,
+														"column": 22
+													}
+												},
+												"body": [],
+												"leadingComments": [
+													{
+														"type": "Block",
+														"value": " comment ",
+														"start": 252,
+														"end": 265
+													}
+												]
+											}
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Method - block comment before body",
+							"start": 197,
+							"end": 234
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 314,
+					"end": 338,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 25
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 320,
+						"end": 321,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 7
+							},
+							"end": {
+								"line": 14,
+								"column": 8
+							}
+						},
+						"name": "A",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " comment ",
+								"start": 322,
+								"end": 335
+							}
+						]
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 336,
+						"end": 338,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 23
+							},
+							"end": {
+								"line": 14,
+								"column": 25
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Class - block comment before body",
+							"start": 276,
+							"end": 312
+						}
+					]
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 383,
+					"end": 426,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 393,
+						"end": 394,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 11
+							},
+							"end": {
+								"line": 17,
+								"column": 12
+							}
+						},
+						"name": "B",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " comment ",
+								"start": 395,
+								"end": 408
+							}
+						]
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 409,
+						"end": 426,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 27
+							},
+							"end": {
+								"line": 19,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSPropertySignature",
+								"start": 413,
+								"end": 423,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 12
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 413,
+									"end": 414,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 3
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 414,
+									"end": 422,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 3
+										},
+										"end": {
+											"line": 18,
+											"column": 11
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 416,
+										"end": 422,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 5
+											},
+											"end": {
+												"line": 18,
+												"column": 11
+											}
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Interface - block comment before body",
+							"start": 341,
+							"end": 381
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 466,
+					"end": 501,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 471,
+						"end": 472,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 6
+							},
+							"end": {
+								"line": 22,
+								"column": 7
+							}
+						},
+						"name": "C",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " comment ",
+								"start": 473,
+								"end": 486
+							}
+						]
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 491,
+							"end": 492,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 2
+								},
+								"end": {
+									"line": 23,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 491,
+								"end": 492,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 3
+									}
+								},
+								"name": "A"
+							}
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 496,
+							"end": 497,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 2
+								},
+								"end": {
+									"line": 24,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 496,
+								"end": 497,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 2
+									},
+									"end": {
+										"line": 24,
+										"column": 3
+									}
+								},
+								"name": "B"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Enum - block comment before body",
+							"start": 429,
+							"end": 464
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 546,
+					"end": 598,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 556,
+						"end": 557,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 11
+							},
+							"end": {
+								"line": 28,
+								"column": 12
+							}
+						},
+						"name": "D",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " comment ",
+								"start": 558,
+								"end": 571
+							}
+						]
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 572,
+						"end": 598,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 27
+							},
+							"end": {
+								"line": 30,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExportNamedDeclaration",
+								"start": 576,
+								"end": 595,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 21
+									}
+								},
+								"exportKind": "value",
+								"declaration": {
+									"type": "VariableDeclaration",
+									"start": 583,
+									"end": 595,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 9
+										},
+										"end": {
+											"line": 29,
+											"column": 21
+										}
+									},
+									"declarations": [
+										{
+											"type": "VariableDeclarator",
+											"start": 589,
+											"end": 594,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 15
+												},
+												"end": {
+													"line": 29,
+													"column": 20
+												}
+											},
+											"id": {
+												"type": "Identifier",
+												"start": 589,
+												"end": 590,
+												"loc": {
+													"start": {
+														"line": 29,
+														"column": 15
+													},
+													"end": {
+														"line": 29,
+														"column": 16
+													}
+												},
+												"name": "x"
+											},
+											"init": {
+												"type": "Literal",
+												"start": 593,
+												"end": 594,
+												"loc": {
+													"start": {
+														"line": 29,
+														"column": 19
+													},
+													"end": {
+														"line": 29,
+														"column": 20
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									],
+									"kind": "const"
+								},
+								"specifiers": [],
+								"source": null
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Namespace - block comment before body",
+							"start": 504,
+							"end": 544
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -135,10 +135,17 @@ impl<'a> Printer<'a> {
     fn build_return_statement_doc(&self, ret: &internal::ReturnStatement) -> DocId {
         let d = self.d();
         let Some(arg) = &ret.argument else {
+            // Check for comments between `return` and `;`: return /* comment */;
+            let keyword_end = ret.span.start + 6; // "return" is 6 chars
+            let semi = ret.span.end; // span end is after `;`
+            if let Some(comment_doc) = self.build_inline_comments_between_doc_opt(keyword_end, semi)
+            {
+                return d.concat(&[d.text("return"), comment_doc, d.text(";")]);
+            }
             return d.text("return;");
         };
 
-        self.build_keyword_argument_doc("return", ret.span.start, arg)
+        self.build_keyword_argument_doc("return", ret.span.start, ret.span.end, arg)
     }
 
     /// Shared dispatch for return/throw argument formatting.
@@ -152,6 +159,7 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         keyword_start: u32,
+        span_end: u32,
         arg: &Expression,
     ) -> DocId {
         let d = self.d();
@@ -160,6 +168,10 @@ impl<'a> Printer<'a> {
         // Uses line-comment-safe spacing to prevent `return // comment expr`
         let keyword_end = keyword_start + keyword.len() as u32;
         let inline_comments = self.build_rhs_comments_opt(keyword_end, arg.span().start);
+
+        // Trailing comments from stripped grouping parens: `return (x /* c */)` → `return x /* c */;`
+        let argument_end = arg.span().end;
+        let has_trailing_comments = self.has_comments_between(argument_end, span_end);
 
         if self.argument_has_own_line_comment(keyword_start, arg) {
             return self.build_comment_paren_doc(keyword, arg, inline_comments);
@@ -205,7 +217,12 @@ impl<'a> Printer<'a> {
             expr_doc
         };
 
-        d.concat(&[d.text(keyword), d.text(" "), rhs_doc, d.text(";")])
+        let mut result_parts = vec![d.text(keyword), d.text(" "), rhs_doc];
+        if has_trailing_comments {
+            self.append_trailing_paren_comments(&mut result_parts, argument_end, span_end);
+        }
+        result_parts.push(d.text(";"));
+        d.concat(&result_parts)
     }
 
     /// Check if a return/throw argument has own-line comments that require

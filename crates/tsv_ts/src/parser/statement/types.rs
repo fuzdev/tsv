@@ -1035,6 +1035,7 @@ impl<'a> Parser<'a> {
                 type_annotation: Box::new(value_type),
                 span: Span::new(value_colon_start as u32, member_end),
             },
+            is_static: false,
             readonly,
             span: Span::new(sig_start as u32, member_end),
         }))
@@ -1486,7 +1487,20 @@ impl<'a> Parser<'a> {
         debug_assert!(self.current_value() == "type");
         self.advance()?;
 
-        let decl = self.parse_type_alias_declaration_body(start)?;
+        let decl = self.parse_type_alias_declaration_body(start, false)?;
+        Ok(Statement::TSTypeAliasDeclaration(decl))
+    }
+
+    /// Parse type alias declaration with an external start position (for `declare type`)
+    fn parse_type_alias_declaration_with_start(
+        &mut self,
+        start: usize,
+    ) -> Result<Statement, ParseError> {
+        // Consume 'type' contextual keyword
+        debug_assert!(self.current_value() == "type");
+        self.advance()?;
+
+        let decl = self.parse_type_alias_declaration_body(start, true)?;
         Ok(Statement::TSTypeAliasDeclaration(decl))
     }
 
@@ -1497,7 +1511,7 @@ impl<'a> Parser<'a> {
         &mut self,
         type_start: usize,
     ) -> Result<Statement, ParseError> {
-        let decl = self.parse_type_alias_declaration_body(type_start)?;
+        let decl = self.parse_type_alias_declaration_body(type_start, false)?;
         Ok(Statement::TSTypeAliasDeclaration(decl))
     }
 
@@ -1505,6 +1519,7 @@ impl<'a> Parser<'a> {
     fn parse_type_alias_declaration_body(
         &mut self,
         start: usize,
+        declare: bool,
     ) -> Result<TSTypeAliasDeclaration, ParseError> {
         // Parse type name (identifier)
         if !matches!(self.current_kind(), TokenKind::Identifier) {
@@ -1535,6 +1550,7 @@ impl<'a> Parser<'a> {
             id,
             type_parameters,
             type_annotation,
+            declare,
             span: Span::new(start as u32, end),
         })
     }
@@ -1546,7 +1562,23 @@ impl<'a> Parser<'a> {
     /// Parse interface declaration: `interface Foo { ... }` or `interface Foo extends Bar { ... }`
     pub(super) fn parse_interface_declaration(&mut self) -> Result<Statement, ParseError> {
         let start = self.current_pos().0;
+        self.parse_interface_declaration_body(start, false)
+    }
 
+    /// Parse interface declaration with an external start position (for `declare interface`)
+    fn parse_interface_declaration_with_start(
+        &mut self,
+        start: usize,
+    ) -> Result<Statement, ParseError> {
+        self.parse_interface_declaration_body(start, true)
+    }
+
+    /// Parse interface declaration body - assumes start position is set, consumes from `interface` keyword
+    fn parse_interface_declaration_body(
+        &mut self,
+        start: usize,
+        declare: bool,
+    ) -> Result<Statement, ParseError> {
         // Consume 'interface' contextual keyword
         debug_assert!(self.current_value() == "interface");
         self.advance()?;
@@ -1586,6 +1618,7 @@ impl<'a> Parser<'a> {
             type_parameters,
             extends,
             body,
+            declare,
             span: Span::new(start as u32, end),
         }))
     }
@@ -1901,7 +1934,15 @@ impl<'a> Parser<'a> {
 
         match self.current_kind() {
             TokenKind::Keyword(KeywordKind::Function) => self.parse_declare_function(start),
-            TokenKind::Keyword(KeywordKind::Class) => self.parse_declare_class(start),
+            TokenKind::Keyword(KeywordKind::Class) => self.parse_declare_class(start, false),
+            TokenKind::Identifier if self.current_value() == "abstract" => {
+                // declare abstract class
+                self.advance()?;
+                if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Class)) {
+                    return Err(self.error_expected_after("'class'", "declare abstract"));
+                }
+                self.parse_declare_class(start, true)
+            }
             TokenKind::Keyword(KeywordKind::Enum) => {
                 // declare enum
                 self.parse_enum_declaration_with_start(false, true, start)
@@ -1925,12 +1966,20 @@ impl<'a> Parser<'a> {
                 // declare namespace/module
                 self.parse_module_declaration_with_start(true, false, start)
             }
+            TokenKind::Identifier if self.current_value() == "interface" => {
+                // declare interface
+                self.parse_interface_declaration_with_start(start)
+            }
+            TokenKind::Identifier if self.current_value() == "type" => {
+                // declare type
+                self.parse_type_alias_declaration_with_start(start)
+            }
             TokenKind::Identifier if self.current_value() == "global" => {
                 // declare global { }
                 self.parse_declare_global(start)
             }
             _ => Err(self.error_expected_after(
-                "'function', 'class', 'enum', 'const', 'let', 'var', 'namespace', 'module', or 'global'",
+                "'function', 'class', 'enum', 'const', 'let', 'var', 'namespace', 'module', 'interface', 'type', or 'global'",
                 "declare",
             )),
         }
@@ -2116,8 +2165,12 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse declare class: `declare class Foo { ... }`
-    fn parse_declare_class(&mut self, start: usize) -> Result<Statement, ParseError> {
+    /// Parse declare class: `declare class Foo { ... }` or `declare abstract class Foo { ... }`
+    fn parse_declare_class(
+        &mut self,
+        start: usize,
+        is_abstract: bool,
+    ) -> Result<Statement, ParseError> {
         // Consume 'class' keyword
         self.advance()?;
 
@@ -2189,7 +2242,7 @@ impl<'a> Parser<'a> {
             implements,
             body,
             declare: true,
-            r#abstract: false,
+            r#abstract: is_abstract,
             type_parameters,
             span: Span::new(start as u32, end),
         }))
@@ -2229,9 +2282,33 @@ impl<'a> Parser<'a> {
             None
         };
 
-        // Handle modifiers: static, readonly
+        // Handle modifiers: static, abstract, override, readonly
         let is_static = self.eat_contextual_keyword("static");
+        let is_abstract = self.eat_contextual_keyword("abstract");
+        let is_override = self.eat_contextual_keyword("override");
         let readonly = self.eat_contextual_keyword("readonly");
+
+        // Handle 'get' and 'set' contextual keywords for getters/setters
+        let accessor_kind = if matches!(self.current_kind(), TokenKind::Identifier) {
+            let kind = match self.current_value() {
+                "get" => Some(MethodKind::Get),
+                "set" => Some(MethodKind::Set),
+                _ => None,
+            };
+            if kind.is_some() && self.peek_is_class_member_name() {
+                self.advance().ok();
+                kind
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // Check for index signature: [key: Type]: ValueType
+        if self.is_index_signature_start() {
+            return self.parse_class_index_signature(start, is_static, readonly);
+        }
 
         // Parse member name or constructor
         let (computed, key, is_constructor) = if self.check(&TokenKind::BracketOpen) {
@@ -2280,6 +2357,8 @@ impl<'a> Parser<'a> {
 
             let kind = if is_constructor {
                 MethodKind::Constructor
+            } else if let Some(ak) = accessor_kind {
+                ak
             } else {
                 MethodKind::Method
             };
@@ -2307,8 +2386,8 @@ impl<'a> Parser<'a> {
                 kind,
                 accessibility,
                 is_static,
-                r#override: false,
-                r#abstract: false,
+                r#override: is_override,
+                r#abstract: is_abstract,
                 computed,
                 span: Span::new(start as u32, end),
             }))
@@ -2347,8 +2426,8 @@ impl<'a> Parser<'a> {
                 accessibility,
                 is_static,
                 declare: false,
-                r#abstract: false,
-                r#override: false,
+                r#abstract: is_abstract,
+                r#override: is_override,
                 readonly,
                 computed,
                 accessor: false,

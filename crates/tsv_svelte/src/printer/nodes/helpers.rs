@@ -11,7 +11,7 @@ impl<'a> Printer<'a> {
     ///
     /// Expression tags are Svelte-specific syntax for embedding TypeScript/JS
     /// expressions in the template: `{expression}`
-    pub fn print_expression_tag(&mut self, tag: &crate::ast::internal::ExpressionTag) {
+    pub(crate) fn print_expression_tag(&mut self, tag: &crate::ast::internal::ExpressionTag) {
         self.write("{");
         // Assignment expressions need parens in expression tags: {(a = b)}
         let needs_parens = matches!(tag.expression, tsv_ts::Expression::AssignmentExpression(_));
@@ -34,7 +34,7 @@ impl<'a> Printer<'a> {
     /// - Nested ternary wrapping
     /// - IIFE parenthesization
     /// - Mixed logical operator grouping (&&, ||, ??)
-    pub fn print_ts_expression(&mut self, expr: &tsv_ts::Expression) {
+    pub(crate) fn print_ts_expression(&mut self, expr: &tsv_ts::Expression) {
         let formatted = self.format_ts_expression(expr);
         self.write(&formatted);
     }
@@ -43,7 +43,7 @@ impl<'a> Printer<'a> {
     ///
     /// Block comments: `/*content*/ ` (with trailing space)
     /// Line comments: `// content\n` (with newline)
-    pub fn write_leading_js_comment(&mut self, comment: &tsv_lang::Comment) {
+    pub(crate) fn write_leading_js_comment(&mut self, comment: &tsv_lang::Comment) {
         if comment.is_block {
             self.write("/*");
             self.write(&comment.content);
@@ -60,7 +60,7 @@ impl<'a> Printer<'a> {
     ///
     /// Block comments: ` /*content*/` (with leading space)
     /// Line comments: ` // content` (with leading space, no newline)
-    pub fn write_trailing_js_comment(&mut self, comment: &tsv_lang::Comment) {
+    pub(crate) fn write_trailing_js_comment(&mut self, comment: &tsv_lang::Comment) {
         if comment.is_block {
             self.write(" /*");
             self.write(&comment.content);
@@ -80,7 +80,7 @@ impl<'a> Printer<'a> {
     /// For simple expression contexts (tags, simple blocks), suffix_width defaults to 1
     /// for the closing `}`. For blocks with pattern/body suffixes, use
     /// `print_ts_expression_with_suffix_width` instead.
-    pub fn print_ts_expression_with_comments(
+    pub(crate) fn print_ts_expression_with_comments(
         &mut self,
         expr: &tsv_ts::Expression,
         span_start: u32,
@@ -94,7 +94,7 @@ impl<'a> Printer<'a> {
     ///
     /// Use this for block expressions where the suffix (pattern, body, closing tag)
     /// should be accounted for in line width calculations.
-    pub fn print_ts_expression_with_suffix_width(
+    pub(crate) fn print_ts_expression_with_suffix_width(
         &mut self,
         expr: &tsv_ts::Expression,
         span_start: u32,
@@ -109,25 +109,27 @@ impl<'a> Printer<'a> {
 
         // Calculate first_line_offset for width-aware wrapping
         // This tells the TypeScript formatter where the expression starts on the line
-        let first_line_offset = self.buffer.current_column(self.config.tab_width);
+        let first_line_offset = self.buffer.current_column(tsv_lang::TAB_WIDTH);
         // Pass current indent level so wrapped lines get proper indentation
         let base_indent_offset = self.indent_level;
-        let config = tsv_lang::PrintConfig {
+        let config = tsv_lang::PrintConfig::default();
+        let embed = tsv_lang::EmbedContext {
             first_line_offset,
             suffix_width,
             base_indent_offset,
-            is_embedded_expression: true,
-            ..Default::default()
+            mode: tsv_lang::LayoutMode::Embedded,
         };
 
         // Format the expression with context-aware width calculations
-        let formatted = tsv_ts::format_expression_with_config(
+        let formatted = tsv_ts::format_expression(
             expr,
             self.source(),
             std::rc::Rc::clone(&self.interner),
             self.comments,
-            config,
             &self.line_breaks,
+            config,
+            embed,
+            tsv_ts::TsConfig::svelte(),
         );
         self.write(&formatted);
 
@@ -137,33 +139,13 @@ impl<'a> Printer<'a> {
             self.write_trailing_js_comment(comment);
         }
     }
-
-    /// Get the content span for a node, skipping layout whitespace for text nodes
-    ///
-    /// Used for inline run grouping to determine if nodes are on the same source line.
-    /// For text nodes, we skip both leading and trailing whitespace (which is often
-    /// indentation and layout separation) to get the actual content position.
-    pub fn get_content_span(&self, node: &FragmentNode) -> tsv_lang::Span {
-        match node {
-            FragmentNode::Text(text) => {
-                // Skip leading and trailing whitespace to get the actual content position
-                let leading_ws_len = text.raw.len() - text.raw.trim_start().len();
-                let trailing_ws_len = text.raw.len() - text.raw.trim_end().len();
-                tsv_lang::Span::new(
-                    text.span.start + leading_ws_len as u32,
-                    text.span.end - trailing_ws_len as u32,
-                )
-            }
-            _ => node.span(),
-        }
-    }
 }
 
 /// Check if a fragment node is a control flow block (if/each/await/key/snippet).
 ///
 /// Control flow blocks can hug adjacent inline content when directly adjacent,
 /// unlike HTML block elements (`<div>`, `<p>`) which get their own lines.
-pub fn is_control_flow_block(node: &FragmentNode) -> bool {
+pub(crate) fn is_control_flow_block(node: &FragmentNode) -> bool {
     matches!(
         node,
         FragmentNode::IfBlock(_)
@@ -178,7 +160,7 @@ pub fn is_control_flow_block(node: &FragmentNode) -> bool {
 ///
 /// Only if/each/key blocks force expansion. Await blocks do NOT - they stay inline
 /// in block elements (e.g., `<div>{#await promise}loading{/await}</div>` stays inline).
-pub fn is_expanding_control_flow_block(node: &FragmentNode) -> bool {
+pub(crate) fn is_expanding_control_flow_block(node: &FragmentNode) -> bool {
     matches!(
         node,
         FragmentNode::IfBlock(_) | FragmentNode::EachBlock(_) | FragmentNode::KeyBlock(_)
@@ -189,7 +171,7 @@ pub fn is_expanding_control_flow_block(node: &FragmentNode) -> bool {
 ///
 /// This is a convenience function combining `is_expanding_control_flow_block` and
 /// `has_expanding_block_in_await` checks that are commonly used together.
-pub fn has_any_expanding_blocks(nodes: &[FragmentNode]) -> bool {
+pub(crate) fn has_any_expanding_blocks(nodes: &[FragmentNode]) -> bool {
     nodes.iter().any(is_expanding_control_flow_block) || has_expanding_block_in_await(nodes)
 }
 
@@ -226,7 +208,7 @@ fn has_expanding_block_in_await(nodes: &[FragmentNode]) -> bool {
 ///
 /// Used to detect when a parent element will go multiline due to
 /// nested content forcing line breaks.
-pub fn has_nested_block_flow(nodes: &[FragmentNode]) -> bool {
+pub(crate) fn has_nested_block_flow(nodes: &[FragmentNode]) -> bool {
     nodes.iter().any(|n| {
         if let FragmentNode::Element(child) = n {
             child.fragment.nodes.iter().any(is_control_flow_block)

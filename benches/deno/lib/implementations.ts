@@ -335,7 +335,7 @@ export function canonicalParserLabel(lang: Language): string {
 	}
 }
 
-/** Formatter info for pre-benchmark validation */
+/** Uniform formatter handle (sync or async, with per-language support gate) */
 export interface FormatterInfo {
 	name: string;
 	isAsync: boolean;
@@ -345,10 +345,11 @@ export interface FormatterInfo {
 }
 
 /**
- * Get all available formatters for validation.
- * Preserves sync/async distinction - caller should check isAsync.
+ * Collect every available formatter wrapped in a uniform handle.
+ * Used by the smoke test (`deno task smoke`). Preserves the sync/async
+ * distinction — callers should branch on `isAsync`.
  */
-export function getFormattersForValidation(impls: InitializedImplementations): FormatterInfo[] {
+export function getFormatters(impls: InitializedImplementations): FormatterInfo[] {
 	const formatters: FormatterInfo[] = [];
 
 	// Canonical (prettier) - async

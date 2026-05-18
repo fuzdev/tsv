@@ -3,8 +3,8 @@
 use super::super::{internal, public};
 use super::types::convert_type_annotation as convert_type_annotation_from_types;
 use super::{
-    ConversionContext, convert_block_statement, convert_expression, convert_statement,
-    convert_type, convert_type_annotation, create_location,
+    Schema, convert_block_statement, convert_expression, convert_statement, convert_type,
+    convert_type_annotation, create_location,
 };
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker, Span};
@@ -60,6 +60,7 @@ pub(in crate::ast) fn convert_type_alias_declaration(
             .as_ref()
             .map(|tp| convert_type_parameter_declaration(tp, source, loc, interner, offset)),
         type_annotation: convert_type(&type_alias.type_annotation, source, loc, interner, offset),
+        declare: type_alias.declare,
     }
 }
 
@@ -371,6 +372,7 @@ fn convert_index_signature(
             interner,
             offset,
         ),
+        is_static: sig.is_static,
         readonly: sig.readonly,
     }
 }
@@ -391,16 +393,7 @@ fn convert_static_block(
             .body
             .iter()
             // StaticBlock is always in TypeScript class context
-            .map(|s| {
-                convert_statement(
-                    s,
-                    source,
-                    loc,
-                    interner,
-                    offset,
-                    ConversionContext::default(),
-                )
-            })
+            .map(|s| convert_statement(s, source, loc, interner, offset, Schema::Acorn))
             .collect(),
     }
 }

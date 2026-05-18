@@ -45,14 +45,14 @@
 							"start": 45,
 							"end": 140,
 							"property": "prop",
-							"value": "var(--a, /* comment */ var(--b) cccccccccccccccccccccccccccccccccccccccccccccccccccccccc)"
+							"value": "var(--a,  var(--b) cccccccccccccccccccccccccccccccccccccccccccccccccccccccc)"
 						},
 						{
 							"type": "Declaration",
 							"start": 170,
 							"end": 276,
 							"property": "prop",
-							"value": "var(\n\t\t\t--a,\n\t\t\t/* comment */ var(--b) ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\n\t\t)"
+							"value": "var(\n\t\t\t--a,\n\t\t\t var(--b) ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\n\t\t)"
 						}
 					]
 				},

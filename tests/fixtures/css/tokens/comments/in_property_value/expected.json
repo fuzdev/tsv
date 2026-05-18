@@ -45,21 +45,21 @@
 							"start": 20,
 							"end": 49,
 							"property": "font-size",
-							"value": "/* comment */ 12px"
+							"value": "12px"
 						},
 						{
 							"type": "Declaration",
 							"start": 53,
 							"end": 83,
 							"property": "background",
-							"value": "blue /* comment */"
+							"value": "blue"
 						},
 						{
 							"type": "Declaration",
 							"start": 87,
 							"end": 115,
 							"property": "color",
-							"value": "/* with, comma */ red"
+							"value": "red"
 						}
 					]
 				},

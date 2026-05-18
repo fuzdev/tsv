@@ -45,21 +45,21 @@
 							"start": 17,
 							"end": 51,
 							"property": "color",
-							"value": "var(--a, /* comment */ red)"
+							"value": "var(--a,  red)"
 						},
 						{
 							"type": "Declaration",
 							"start": 55,
 							"end": 86,
 							"property": "width",
-							"value": "var(--b, /* c2 */ 100px)"
+							"value": "var(--b,  100px)"
 						},
 						{
 							"type": "Declaration",
 							"start": 90,
 							"end": 121,
 							"property": "height",
-							"value": "var(--c, /* c3 */ 50px)"
+							"value": "var(--c,  50px)"
 						}
 					]
 				},

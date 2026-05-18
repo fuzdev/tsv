@@ -378,16 +378,12 @@ impl<'a> Printer<'a> {
         let suffix_len = if has_block { " {".len() } else { 0 };
 
         let current_col = self.current_column();
-        let available = self
-            .config
-            .print_width
-            .saturating_sub(current_col + suffix_len);
+        let available = tsv_lang::PRINT_WIDTH.saturating_sub(current_col + suffix_len);
         let fits = doc::arena_fits::<dyn doc::TextResolver>(
             &self.arena,
             prelude_doc,
             available,
             Mode::Flat,
-            &self.config,
             None,
         );
 
@@ -616,7 +612,7 @@ impl<'a> Printer<'a> {
         suffix_len: usize,
     ) -> usize {
         let mut line_width = current_col;
-        let print_width = self.config.print_width;
+        let print_width = tsv_lang::PRINT_WIDTH;
 
         for (i, part) in parts.iter().enumerate() {
             // Width of connector before this part (if any)
@@ -678,7 +674,7 @@ impl<'a> Printer<'a> {
         let current_col = self.current_column();
         let total_width = current_col + content.len() + suffix_len;
 
-        if total_width <= self.config.print_width {
+        if total_width <= tsv_lang::PRINT_WIDTH {
             self.write(content);
             return;
         }
@@ -688,14 +684,14 @@ impl<'a> Printer<'a> {
 
         for (idx, _) in content.match_indices(" and ") {
             let break_pos = idx + " and".len();
-            if current_col + break_pos <= self.config.print_width {
+            if current_col + break_pos <= tsv_lang::PRINT_WIDTH {
                 best_break = Some(break_pos);
             }
         }
 
         for (idx, _) in content.match_indices(" or ") {
             let break_pos = idx + " or".len();
-            if current_col + break_pos <= self.config.print_width
+            if current_col + break_pos <= tsv_lang::PRINT_WIDTH
                 && best_break.is_none_or(|b| break_pos > b)
             {
                 best_break = Some(break_pos);

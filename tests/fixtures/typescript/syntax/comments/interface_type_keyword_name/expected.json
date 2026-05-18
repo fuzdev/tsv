@@ -1,0 +1,576 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 266,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Interface declarations",
+			"start": 20,
+			"end": 45,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a ",
+			"start": 57,
+			"end": 64,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 11
+				},
+				"end": {
+					"line": 3,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b ",
+			"start": 88,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 18
+				},
+				"end": {
+					"line": 4,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 120,
+			"end": 127,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 19
+				},
+				"end": {
+					"line": 5,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Type alias declarations",
+			"start": 135,
+			"end": 161,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 168,
+			"end": 175,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 6
+				},
+				"end": {
+					"line": 8,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " e ",
+			"start": 201,
+			"end": 208,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 13
+				},
+				"end": {
+					"line": 9,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " f ",
+			"start": 235,
+			"end": 242,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 14
+				},
+				"end": {
+					"line": 10,
+					"column": 21
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 265,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 256,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 47,
+					"end": 69,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 23
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 65,
+						"end": 66,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 19
+							},
+							"end": {
+								"line": 3,
+								"column": 20
+							}
+						},
+						"name": "A",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " a ",
+								"start": 57,
+								"end": 64
+							}
+						]
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 67,
+						"end": 69,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 21
+							},
+							"end": {
+								"line": 3,
+								"column": 23
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Interface declarations",
+							"start": 20,
+							"end": 45
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 71,
+					"end": 100,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 30
+						}
+					},
+					"exportKind": "type",
+					"declaration": {
+						"type": "TSInterfaceDeclaration",
+						"start": 78,
+						"end": 100,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 8
+							},
+							"end": {
+								"line": 4,
+								"column": 30
+							}
+						},
+						"id": {
+							"type": "Identifier",
+							"start": 96,
+							"end": 97,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 26
+								},
+								"end": {
+									"line": 4,
+									"column": 27
+								}
+							},
+							"name": "B",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " b ",
+									"start": 88,
+									"end": 95
+								}
+							]
+						},
+						"body": {
+							"type": "TSInterfaceBody",
+							"start": 98,
+							"end": 100,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 28
+								},
+								"end": {
+									"line": 4,
+									"column": 30
+								}
+							},
+							"body": []
+						}
+					},
+					"specifiers": [],
+					"source": null
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 102,
+					"end": 132,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 31
+						}
+					},
+					"declare": true,
+					"id": {
+						"type": "Identifier",
+						"start": 128,
+						"end": 129,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 27
+							},
+							"end": {
+								"line": 5,
+								"column": 28
+							}
+						},
+						"name": "C",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 120,
+								"end": 127
+							}
+						]
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 130,
+						"end": 132,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 29
+							},
+							"end": {
+								"line": 5,
+								"column": 31
+							}
+						},
+						"body": []
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 163,
+					"end": 187,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 25
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 176,
+						"end": 177,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 14
+							},
+							"end": {
+								"line": 8,
+								"column": 15
+							}
+						},
+						"name": "D",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " d ",
+								"start": 168,
+								"end": 175
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSStringKeyword",
+						"start": 180,
+						"end": 186,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 18
+							},
+							"end": {
+								"line": 8,
+								"column": 24
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Type alias declarations",
+							"start": 135,
+							"end": 161
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 189,
+					"end": 220,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 32
+						}
+					},
+					"exportKind": "type",
+					"declaration": {
+						"type": "TSTypeAliasDeclaration",
+						"start": 196,
+						"end": 220,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 8
+							},
+							"end": {
+								"line": 9,
+								"column": 32
+							}
+						},
+						"id": {
+							"type": "Identifier",
+							"start": 209,
+							"end": 210,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 21
+								},
+								"end": {
+									"line": 9,
+									"column": 22
+								}
+							},
+							"name": "E",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " e ",
+									"start": 201,
+									"end": 208
+								}
+							]
+						},
+						"typeAnnotation": {
+							"type": "TSNumberKeyword",
+							"start": 213,
+							"end": 219,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 25
+								},
+								"end": {
+									"line": 9,
+									"column": 31
+								}
+							}
+						}
+					},
+					"specifiers": [],
+					"source": null
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 222,
+					"end": 255,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 34
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 243,
+						"end": 244,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 22
+							},
+							"end": {
+								"line": 10,
+								"column": 23
+							}
+						},
+						"name": "F",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " f ",
+								"start": 235,
+								"end": 242
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSBooleanKeyword",
+						"start": 247,
+						"end": 254,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 26
+							},
+							"end": {
+								"line": 10,
+								"column": 33
+							}
+						}
+					},
+					"declare": true
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

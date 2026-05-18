@@ -2,10 +2,8 @@
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
-use std::cell::RefCell;
 use std::rc::Rc;
-use string_interner::DefaultStringInterner;
-use tsv_lang::{InfallibleResolve, ParseError, Span};
+use tsv_lang::{InfallibleResolve, ParseError, SharedInterner, Span};
 
 use super::parser_impl::SvelteParser;
 
@@ -127,7 +125,7 @@ impl<'a> SvelteParser<'a> {
     fn detect_script_context(
         attributes: &[AttributeNode],
         _source: &str,
-        interner: &Rc<RefCell<DefaultStringInterner>>,
+        interner: &SharedInterner,
     ) -> ScriptContext {
         for attr_node in attributes {
             // Only process Attribute nodes (not AttachTag or directives)

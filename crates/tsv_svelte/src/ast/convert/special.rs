@@ -54,12 +54,13 @@ pub(super) fn convert_script(
     // always include `attributes` on import/export declarations).
     let is_lang_ts = script_has_lang_ts(script, interner);
 
-    // Delegate to tsv_ts for program conversion, using the appropriate context
-    let mut program = if is_lang_ts {
-        tsv_ts::ast::convert::convert_program(&script.content, source, &loc)
+    // Delegate to tsv_ts for program conversion, using the appropriate schema
+    let schema = if is_lang_ts {
+        tsv_ts::ast::convert::Schema::Acorn
     } else {
-        tsv_ts::ast::convert::convert_program_svelte(&script.content, source, &loc)
+        tsv_ts::ast::convert::Schema::SvelteScript
     };
+    let mut program = tsv_ts::ast::convert::convert_program(&script.content, source, &loc, schema);
 
     // Svelte uses the line of the <script> tag itself, not the content start
     // (matters when the opening tag spans multiple lines, e.g., multiline attr values)
@@ -91,7 +92,8 @@ pub(super) fn convert_script(
     // Comments within acorn type re-parse ranges get duplicated (see collect_acorn_type_reparse_ranges).
     // The duplicate appears just before the first original from each range, matching acorn's
     // behavior where type re-parsing causes onComment to fire twice for the same comment.
-    let reparse_ranges = tsv_ts::ast::convert::collect_acorn_type_reparse_ranges(&script.content);
+    let reparse_ranges =
+        tsv_ts::ast::convert::collect_acorn_type_reparse_ranges(&script.content, source);
 
     let comment_queue: std::collections::VecDeque<serde_json::Value> =
         tsv_ts::ast::convert::build_comments_with_duplicates(

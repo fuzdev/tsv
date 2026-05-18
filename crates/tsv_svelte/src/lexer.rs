@@ -41,13 +41,11 @@ impl fmt::Display for TokenKind {
     }
 }
 
-/// Zero-allocation token design: value borrows from source string
 #[derive(Debug, Clone)]
-pub struct Token<'a> {
+pub struct Token {
     pub kind: TokenKind,
     pub start: usize,
     pub end: usize,
-    pub value: &'a str,
 }
 
 pub struct Lexer<'a> {
@@ -106,14 +104,13 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Create a token with the current position as end and value extracted from source
+    /// Create a token with the current position as end.
     #[inline]
-    fn make_token(&self, kind: TokenKind, start: usize) -> Token<'a> {
+    fn make_token(&self, kind: TokenKind, start: usize) -> Token {
         Token {
             kind,
             start,
             end: self.position,
-            value: &self.source[start..self.position],
         }
     }
 
@@ -149,7 +146,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn next_token(&mut self) -> Result<Token<'_>, ParseError> {
+    pub fn next_token(&mut self) -> Result<Token, ParseError> {
         // Template mode (outside tags): skip text content, only tokenize special chars
         // Tag mode (inside <...>): tokenize everything including identifiers
         if self.inside_tag {
@@ -165,7 +162,6 @@ impl<'a> Lexer<'a> {
                 kind: TokenKind::Eof,
                 start,
                 end: start,
-                value: "",
             }),
             Some('<') => {
                 // Check for HTML comment: <!--

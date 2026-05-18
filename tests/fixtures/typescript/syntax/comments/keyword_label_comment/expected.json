@@ -1,0 +1,837 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 436,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Block comment between keyword and label",
+			"start": 10,
+			"end": 52,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 80,
+			"end": 87,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 8
+				},
+				"end": {
+					"line": 4,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 129,
+			"end": 136,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 11
+				},
+				"end": {
+					"line": 8,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Block comment between label and semicolon",
+			"start": 149,
+			"end": 193,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 227,
+			"end": 234,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 14
+				},
+				"end": {
+					"line": 13,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 276,
+			"end": 283,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 17
+				},
+				"end": {
+					"line": 17,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Line comment after label (forces line break)",
+			"start": 290,
+			"end": 337,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 372,
+			"end": 376,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 15
+				},
+				"end": {
+					"line": 22,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 418,
+			"end": 422,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 18
+				},
+				"end": {
+					"line": 26,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 435,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 426,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 28,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "LabeledStatement",
+					"start": 54,
+					"end": 97,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 2
+						}
+					},
+					"body": {
+						"type": "ForStatement",
+						"start": 61,
+						"end": 97,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 8
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"init": null,
+						"test": null,
+						"update": null,
+						"body": {
+							"type": "BlockStatement",
+							"start": 70,
+							"end": 97,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 17
+								},
+								"end": {
+									"line": 5,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "BreakStatement",
+									"start": 74,
+									"end": 94,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 22
+										}
+									},
+									"label": {
+										"type": "Identifier",
+										"start": 88,
+										"end": 93,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 16
+											},
+											"end": {
+												"line": 4,
+												"column": 21
+											}
+										},
+										"name": "loop1",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 80,
+												"end": 87
+											}
+										]
+									}
+								}
+							]
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 54,
+						"end": 59,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 3,
+								"column": 6
+							}
+						},
+						"name": "loop1"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block comment between keyword and label",
+							"start": 10,
+							"end": 52
+						}
+					]
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 100,
+					"end": 146,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 2
+						}
+					},
+					"body": {
+						"type": "ForStatement",
+						"start": 107,
+						"end": 146,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 8
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"init": null,
+						"test": null,
+						"update": null,
+						"body": {
+							"type": "BlockStatement",
+							"start": 116,
+							"end": 146,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 17
+								},
+								"end": {
+									"line": 9,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "ContinueStatement",
+									"start": 120,
+									"end": 143,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 25
+										}
+									},
+									"label": {
+										"type": "Identifier",
+										"start": 137,
+										"end": 142,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 19
+											},
+											"end": {
+												"line": 8,
+												"column": 24
+											}
+										},
+										"name": "loop2",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 129,
+												"end": 136
+											}
+										]
+									}
+								}
+							]
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 100,
+						"end": 105,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 6
+							}
+						},
+						"name": "loop2"
+					}
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 195,
+					"end": 238,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 2
+						}
+					},
+					"body": {
+						"type": "ForStatement",
+						"start": 202,
+						"end": 238,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 8
+							},
+							"end": {
+								"line": 14,
+								"column": 2
+							}
+						},
+						"init": null,
+						"test": null,
+						"update": null,
+						"body": {
+							"type": "BlockStatement",
+							"start": 211,
+							"end": 238,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 17
+								},
+								"end": {
+									"line": 14,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "BreakStatement",
+									"start": 215,
+									"end": 235,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 2
+										},
+										"end": {
+											"line": 13,
+											"column": 22
+										}
+									},
+									"label": {
+										"type": "Identifier",
+										"start": 221,
+										"end": 226,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 8
+											},
+											"end": {
+												"line": 13,
+												"column": 13
+											}
+										},
+										"name": "loop3",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 227,
+												"end": 234
+											}
+										]
+									}
+								}
+							]
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 195,
+						"end": 200,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 12,
+								"column": 6
+							}
+						},
+						"name": "loop3"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block comment between label and semicolon",
+							"start": 149,
+							"end": 193
+						}
+					]
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 241,
+					"end": 287,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 2
+						}
+					},
+					"body": {
+						"type": "ForStatement",
+						"start": 248,
+						"end": 287,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 8
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"init": null,
+						"test": null,
+						"update": null,
+						"body": {
+							"type": "BlockStatement",
+							"start": 257,
+							"end": 287,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 17
+								},
+								"end": {
+									"line": 18,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "ContinueStatement",
+									"start": 261,
+									"end": 284,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 2
+										},
+										"end": {
+											"line": 17,
+											"column": 25
+										}
+									},
+									"label": {
+										"type": "Identifier",
+										"start": 270,
+										"end": 275,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 11
+											},
+											"end": {
+												"line": 17,
+												"column": 16
+											}
+										},
+										"name": "loop4",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 276,
+												"end": 283
+											}
+										]
+									}
+								}
+							]
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 241,
+						"end": 246,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 1
+							},
+							"end": {
+								"line": 16,
+								"column": 6
+							}
+						},
+						"name": "loop4"
+					}
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 339,
+					"end": 379,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 2
+						}
+					},
+					"body": {
+						"type": "ForStatement",
+						"start": 346,
+						"end": 379,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 8
+							},
+							"end": {
+								"line": 23,
+								"column": 2
+							}
+						},
+						"init": null,
+						"test": null,
+						"update": null,
+						"body": {
+							"type": "BlockStatement",
+							"start": 355,
+							"end": 379,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 17
+								},
+								"end": {
+									"line": 23,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "BreakStatement",
+									"start": 359,
+									"end": 371,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 2
+										},
+										"end": {
+											"line": 22,
+											"column": 14
+										}
+									},
+									"label": {
+										"type": "Identifier",
+										"start": 365,
+										"end": 370,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 8
+											},
+											"end": {
+												"line": 22,
+												"column": 13
+											}
+										},
+										"name": "loop5"
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 372,
+											"end": 376
+										}
+									]
+								}
+							]
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 339,
+						"end": 344,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 1
+							},
+							"end": {
+								"line": 21,
+								"column": 6
+							}
+						},
+						"name": "loop5"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment after label (forces line break)",
+							"start": 290,
+							"end": 337
+						}
+					]
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 382,
+					"end": 425,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 2
+						}
+					},
+					"body": {
+						"type": "ForStatement",
+						"start": 389,
+						"end": 425,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 8
+							},
+							"end": {
+								"line": 27,
+								"column": 2
+							}
+						},
+						"init": null,
+						"test": null,
+						"update": null,
+						"body": {
+							"type": "BlockStatement",
+							"start": 398,
+							"end": 425,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 17
+								},
+								"end": {
+									"line": 27,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "ContinueStatement",
+									"start": 402,
+									"end": 417,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 2
+										},
+										"end": {
+											"line": 26,
+											"column": 17
+										}
+									},
+									"label": {
+										"type": "Identifier",
+										"start": 411,
+										"end": 416,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 11
+											},
+											"end": {
+												"line": 26,
+												"column": 16
+											}
+										},
+										"name": "loop6"
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 418,
+											"end": 422
+										}
+									]
+								}
+							]
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 382,
+						"end": 387,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 1
+							},
+							"end": {
+								"line": 25,
+								"column": 6
+							}
+						},
+						"name": "loop6"
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

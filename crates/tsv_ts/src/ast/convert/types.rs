@@ -962,6 +962,7 @@ fn convert_type_element(
                     interner,
                     offset,
                 ),
+                is_static: i.is_static,
                 readonly: i.readonly,
             })
         }
@@ -1001,6 +1002,7 @@ pub(in crate::ast) fn convert_interface_declaration(
             .map(|h| convert_interface_heritage(h, source, loc, interner, offset))
             .collect(),
         body: convert_interface_body(&iface.body, source, loc, interner, offset),
+        declare: iface.declare,
     }
 }
 

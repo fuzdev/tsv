@@ -23,7 +23,7 @@
 /// String with quote escaping adjusted for the new quote style
 ///
 /// # Examples
-/// ```
+/// ```ignore
 /// use tsv_lang::escapes::swap_quote_escaping;
 ///
 /// // Single-quoted string with escaped single quote → double quotes

@@ -1,0 +1,297 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 220,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Switch - comment after condition absorbed into parens",
+			"start": 10,
+			"end": 66,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 78,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 11
+				},
+				"end": {
+					"line": 3,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Catch - comment before param absorbed into parens",
+			"start": 120,
+			"end": 172,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 190,
+			"end": 203,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 10
+				},
+				"end": {
+					"line": 10,
+					"column": 23
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 219,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 210,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "SwitchStatement",
+					"start": 68,
+					"end": 117,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 76,
+						"end": 77,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 9
+							},
+							"end": {
+								"line": 3,
+								"column": 10
+							}
+						},
+						"name": "x",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " comment ",
+								"start": 78,
+								"end": 91
+							}
+						]
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 97,
+							"end": 114,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 2
+								},
+								"end": {
+									"line": 5,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 108,
+									"end": 114,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 3
+										},
+										"end": {
+											"line": 5,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 102,
+								"end": 103,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Switch - comment after condition absorbed into parens",
+							"start": 10,
+							"end": 66
+						}
+					]
+				},
+				{
+					"type": "TryStatement",
+					"start": 174,
+					"end": 209,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 29
+						}
+					},
+					"block": {
+						"type": "BlockStatement",
+						"start": 178,
+						"end": 182,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 5
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": []
+					},
+					"handler": {
+						"type": "CatchClause",
+						"start": 183,
+						"end": 209,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 3
+							},
+							"end": {
+								"line": 10,
+								"column": 29
+							}
+						},
+						"param": {
+							"type": "Identifier",
+							"start": 204,
+							"end": 205,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 24
+								},
+								"end": {
+									"line": 10,
+									"column": 25
+								}
+							},
+							"name": "e",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " comment ",
+									"start": 190,
+									"end": 203
+								}
+							]
+						},
+						"body": {
+							"type": "BlockStatement",
+							"start": 207,
+							"end": 209,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 27
+								},
+								"end": {
+									"line": 10,
+									"column": 29
+								}
+							},
+							"body": []
+						}
+					},
+					"finalizer": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Catch - comment before param absorbed into parens",
+							"start": 120,
+							"end": 172
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

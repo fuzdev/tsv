@@ -181,7 +181,7 @@ impl<'a> ChainPrinter for Printer<'a> {
     }
 
     fn get_tab_width(&self) -> usize {
-        self.config.tab_width
+        tsv_lang::TAB_WIDTH
     }
 
     fn should_force_expand(&self) -> bool {

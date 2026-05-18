@@ -10,7 +10,10 @@ use super::super::utils::arrow_has_trailing_param_comments;
 use super::super::{has_newline_before_position, is_multiline_template_expression};
 use super::{ParenContext, Printer, needs_parens, unwrap_parenthesized};
 use crate::ast::internal;
+use crate::printer::analysis::find_char_skipping_comments;
 use crate::printer::types::helpers::is_huggable_type;
+use crate::printer::{CommentFilter, CommentSpacing};
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
 
 /// Check if an expression is directly an object literal (needs parentheses in arrow body)
@@ -159,6 +162,16 @@ impl<'a> Printer<'a> {
         // Type parameters: group them independently only when function params exist
         if let Some(tp) = &arrow.type_parameters {
             sig_parts.push(self.build_type_params_doc_for_arrow(tp, has_params));
+
+            // Comments between type_params `>` and `(` go after type_params
+            if let Some(pp) = find_char_skipping_comments(
+                self.source.as_bytes(),
+                tp.span.end as usize,
+                self.source.len(),
+                b'(',
+            ) {
+                self.append_type_params_to_paren_comments(&mut sig_parts, tp.span.end, pp as u32);
+            }
         }
 
         // Function parameters - NOT in their own group, just softlines
@@ -196,7 +209,7 @@ impl<'a> Printer<'a> {
 
         // Check for comments between signature and `=>` (e.g., `(x) /* c */ =>`)
         // Single binary search via comments_in_range
-        for comment in tsv_lang::comments_in_range(self.comments, sig_end, arrow_pos) {
+        for comment in comments_in_range(self.comments, sig_end, arrow_pos) {
             sig_parts.push(d.text(" "));
             sig_parts.push(self.build_comment_doc(comment));
         }
@@ -213,172 +226,201 @@ impl<'a> Printer<'a> {
         // Body - expression bodies can break to new line with indent
         match &arrow.body {
             internal::ArrowFunctionBody::Expression(expr) => {
-                // Check for comments between `=>` and body start
-                // These are comments like: `() => /* comment */ expr`
-                let body_start = expr.span().start;
-                let has_post_arrow_comments = self.has_comments_between(arrow_end, body_start);
+                // Check for trailing comments from stripped grouping parens.
+                // When the parser strips parens from `() => (x /* c */)`, comments
+                // between body expr end and arrow span end are lost. Re-add parens
+                // to preserve them, matching the unary expression approach.
+                let body_end = expr.span().end;
+                let has_trailing_paren_comments =
+                    self.has_trailing_paren_comments(body_end, arrow.span.end);
 
-                // Prettier's `hasLeadingOwnLineComment`: checks if any comment
-                // between `=>` and body has a newline after it. Inline block
-                // comments like `=> /* c */ expr` return false (body stays hugged),
-                // while own-line comments return true (body breaks).
-                let has_own_line_comment = has_post_arrow_comments
-                    && self.has_own_line_post_arrow_comment(arrow_end, body_start);
-
-                // Prettier's `shouldPutBodyOnSameLine`: certain expression types stay hugged to =>
-                // Object/array literals always hug.
-                // Nested arrows hug ONLY when outer has no return type annotation.
-                // With return type: const f = (x: T): H => (y) => expr; // breaks
-                // Without:          const f = (x: T) => (y) => expr;    // hugs
-                let is_arrow_body =
-                    matches!(&**expr, internal::Expression::ArrowFunctionExpression(_));
-
-                // Check if this is a curried arrow where ANY arrow triggers chain breaking.
-                // Triggers: return type with params, type parameters, non-identifier params.
-                // Skip when skip_arrow_chain is set (call arg expand-last context) — prettier's
-                // shouldPrintAsChain is false when expandLastArg is true, so chain detection
-                // is disabled and the body is hugged.
-                let chain_has_return_type = is_arrow_body
-                    && !self.skip_arrow_chain.get()
-                    && crate::printer::arrow_chain_has_return_type(arrow);
-
-                // Check if body arrow has trailing param comments (forces break)
-                let body_arrow_has_trailing_param_comments =
-                    if let internal::Expression::ArrowFunctionExpression(body_arrow) = expr.as_ref()
-                    {
-                        let arrow_token = self.find_arrow_token_for(body_arrow);
-                        arrow_has_trailing_param_comments(body_arrow, arrow_token, |start, end| {
-                            self.has_comments_between(start, end)
-                        })
-                    } else {
-                        false
-                    };
-
-                // Inline block comments don't prevent hugging — only own-line comments do.
-                // `() => /* comment */ ({...})` hugs (inline block comment)
-                // `() =>\n  /* comment */\n  ({...})` breaks (own-line comment)
-                let should_hug = !has_own_line_comment
-                    && (should_hug_arrow_body(expr) || is_template_on_same_line(self.source, expr))
-                    && !chain_has_return_type
-                    && !body_arrow_has_trailing_param_comments;
-
-                if has_own_line_comment {
-                    // Own-line or line comments — always break
-                    let body_with_comments =
-                        self.build_arrow_body_with_comments_doc(expr, arrow_end, body_start);
-                    parts.push(d.group(d.indent(d.concat(&[d.line(), body_with_comments]))));
-                } else if should_hug {
-                    // Hugged body (possibly with inline block comments):
-                    // `() => ({...})` or `() => /* c */ ({...})`
+                if has_trailing_paren_comments {
                     parts.push(d.text(" "));
-                    if has_post_arrow_comments {
-                        parts
-                            .push(self.build_inline_post_arrow_comments_doc(arrow_end, body_start));
+                    // Leading comments between `=>` and body (if any):
+                    // `() => /* lead */ (x /* trail */)` — emit inline leading,
+                    // then paren-wrapped body with trailing.
+                    let body_start = expr.span().start;
+                    if self.has_comments_between(arrow_end, body_start) {
+                        for comment in comments_in_range(self.comments, arrow_end, body_start) {
+                            parts.push(self.build_comment_doc(comment));
+                            parts.push(d.text(" "));
+                        }
                     }
-                    parts.push(self.build_arrow_body_doc(expr));
-                } else if is_arrow_body
-                    && (chain_has_return_type || self.in_curried_typed_arrow.get())
-                {
-                    // Curried arrow chain - all arrows break without indent so they align:
-                    // const f = (x: T): H => (y) => expr   // outer has return type
-                    // const f = (x: T) => (y): H => expr   // inner has return type
-                    // becomes:
-                    // const f =
-                    //     (x: T): H =>      or      (x: T) =>
-                    //     (y) =>                    (y): H =>
-                    //         expr                      expr
-                    //
-                    // Set context flag when entering chain, restore when done.
-                    let was_in_curried = self.in_curried_typed_arrow.get();
-                    if chain_has_return_type {
-                        self.in_curried_typed_arrow.set(true);
-                    }
-                    let body_doc = self.build_arrow_body_doc(expr);
-                    self.in_curried_typed_arrow.set(was_in_curried);
-                    parts.push(d.concat(&[d.hardline(), body_doc]));
-                } else if is_arrow_body && body_arrow_has_trailing_param_comments {
-                    // Nested arrow with trailing param comments - first level gets indent,
-                    // subsequent levels align (use curried pattern)
-                    // (a, // c) => (b, // c) => {}
-                    // becomes:
-                    // (a, // c) =>
-                    //     (b, // c) =>
-                    //     (c, // c) => {}
-                    let was_in_curried = self.in_curried_typed_arrow.get();
-                    self.in_curried_typed_arrow.set(true);
-                    let body_doc = self.build_arrow_body_doc(expr);
-                    self.in_curried_typed_arrow.set(was_in_curried);
-                    parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
-                } else if self.in_curried_typed_arrow.get() {
-                    // Innermost arrow in curried chain - body is NOT another arrow.
-                    // This needs indent since it's the final expression.
-                    // Reset flag so arrows inside the body (e.g. callback args) aren't
-                    // treated as part of the curried chain.
-                    self.in_curried_typed_arrow.set(false);
-                    let body_doc = self.build_arrow_body_doc(expr);
-                    self.in_curried_typed_arrow.set(true);
-                    parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
-                } else if matches!(&**expr, internal::Expression::ConditionalExpression(_))
-                    && !has_leftmost_object_expression(expr)
-                {
-                    // Prettier's shouldAddParensIfNotBreak: ternary body gets conditional
-                    // parens when inline, no parens when on its own line.
-                    // Excludes ternaries whose test starts with ObjectExpression (matches
-                    // Prettier's startsWithNoLookaheadToken check) — those fall through
-                    // to the normal path which calls build_arrow_body_doc for object parens.
-                    //
-                    // Structure: [" ", group([ifBreak("","("), indent([softline, body]),
-                    //                         ifBreak("",")")])]
-                    //
-                    // The " " TEXT element before the group is critical for fits() boundary:
-                    // when sig + " =>" = exactly print_width, remaining=0. The " " consumes
-                    // 1 char (→ -1), making the sig group fail fits() and break params.
-                    // With the old group(indent(line, body)), line() in Break mode would
-                    // short-circuit fits() to return true, keeping the sig flat.
-                    //
-                    // Flat:  ` => (cond ? a : b)` — parens, same line
-                    // Break: ` =>\n\tcond ? a : b` — no parens, next line
-                    let body_doc = self.build_expression_doc(expr);
-                    if d.will_break(body_doc) {
-                        // Body has hardlines (multiline template in ternary, etc.)
-                        // Use normal break layout — no parens needed
-                        parts.push(d.group(d.indent(d.concat(&[d.line(), body_doc]))));
-                    } else {
-                        parts.push(d.text(" "));
-                        parts.push(d.group(d.concat(&[
-                            d.if_break(d.empty(), d.text("(")),
-                            d.indent(d.concat(&[d.softline(), body_doc])),
-                            d.if_break(d.empty(), d.text(")")),
-                        ])));
-                    }
+                    parts.push(self.build_expression_doc_with_paren_comments(expr, arrow.span.end));
+                    // Skip normal body handling — paren wrapping covers all cases
                 } else {
-                    // Normal expression: can break after => with indentation
-                    // Short: (x) => x + 1
-                    // Long:  (veryLongParams) =>
-                    //            veryLongExpr
-                    //
-                    // The body is wrapped in a group so it can make its own fits() decision.
-                    // This allows the arrow body to stay inline even when the parent element
-                    // is in break mode, as long as the body content fits from its position.
-                    //
-                    // Normal expression body: can break after => with indentation.
-                    // Template literal bodies with literalline nodes will propagate
-                    // breaks naturally, enabling chain/call expansion decisions.
-                    let body_doc = self.build_arrow_body_doc(expr);
-                    if has_post_arrow_comments {
-                        // Inline block comments before non-huggable body:
-                        // `() => /* comment */ a + b`
-                        let comments_doc =
-                            self.build_inline_post_arrow_comments_doc(arrow_end, body_start);
-                        parts.push(d.group(d.indent(d.concat(&[
-                            d.line(),
-                            comments_doc,
-                            body_doc,
-                        ]))));
+                    // Check for comments between `=>` and body start
+                    // These are comments like: `() => /* comment */ expr`
+                    let body_start = expr.span().start;
+                    let has_post_arrow_comments = self.has_comments_between(arrow_end, body_start);
+
+                    // Prettier's `hasLeadingOwnLineComment`: checks if any comment
+                    // between `=>` and body has a newline after it. Inline block
+                    // comments like `=> /* c */ expr` return false (body stays hugged),
+                    // while own-line comments return true (body breaks).
+                    let has_own_line_comment = has_post_arrow_comments
+                        && self.has_own_line_post_arrow_comment(arrow_end, body_start);
+
+                    // Prettier's `shouldPutBodyOnSameLine`: certain expression types stay hugged to =>
+                    // Object/array literals always hug.
+                    // Nested arrows hug ONLY when outer has no return type annotation.
+                    // With return type: const f = (x: T): H => (y) => expr; // breaks
+                    // Without:          const f = (x: T) => (y) => expr;    // hugs
+                    let is_arrow_body =
+                        matches!(&**expr, internal::Expression::ArrowFunctionExpression(_));
+
+                    // Check if this is a curried arrow where ANY arrow triggers chain breaking.
+                    // Triggers: return type with params, type parameters, non-identifier params.
+                    // Skip when skip_arrow_chain is set (call arg expand-last context) — prettier's
+                    // shouldPrintAsChain is false when expandLastArg is true, so chain detection
+                    // is disabled and the body is hugged.
+                    let chain_has_return_type = is_arrow_body
+                        && !self.skip_arrow_chain.get()
+                        && crate::printer::arrow_chain_has_return_type(arrow);
+
+                    // Check if body arrow has trailing param comments (forces break)
+                    let body_arrow_has_trailing_param_comments =
+                        if let internal::Expression::ArrowFunctionExpression(body_arrow) =
+                            expr.as_ref()
+                        {
+                            let arrow_token = self.find_arrow_token_for(body_arrow);
+                            arrow_has_trailing_param_comments(
+                                body_arrow,
+                                arrow_token,
+                                |start, end| self.has_comments_between(start, end),
+                            )
+                        } else {
+                            false
+                        };
+
+                    // Inline block comments don't prevent hugging — only own-line comments do.
+                    // `() => /* comment */ ({...})` hugs (inline block comment)
+                    // `() =>\n  /* comment */\n  ({...})` breaks (own-line comment)
+                    let should_hug = !has_own_line_comment
+                        && (should_hug_arrow_body(expr)
+                            || is_template_on_same_line(self.source, expr))
+                        && !chain_has_return_type
+                        && !body_arrow_has_trailing_param_comments;
+
+                    if has_own_line_comment {
+                        // Own-line or line comments — always break
+                        let body_with_comments =
+                            self.build_arrow_body_with_comments_doc(expr, arrow_end, body_start);
+                        parts.push(d.group(d.indent(d.concat(&[d.line(), body_with_comments]))));
+                    } else if should_hug {
+                        // Hugged body (possibly with inline block comments):
+                        // `() => ({...})` or `() => /* c */ ({...})`
+                        parts.push(d.text(" "));
+                        if has_post_arrow_comments {
+                            parts.push(
+                                self.build_inline_post_arrow_comments_doc(arrow_end, body_start),
+                            );
+                        }
+                        parts.push(self.build_arrow_body_doc(expr));
+                    } else if is_arrow_body
+                        && (chain_has_return_type || self.in_curried_typed_arrow.get())
+                    {
+                        // Curried arrow chain - all arrows break without indent so they align:
+                        // const f = (x: T): H => (y) => expr   // outer has return type
+                        // const f = (x: T) => (y): H => expr   // inner has return type
+                        // becomes:
+                        // const f =
+                        //     (x: T): H =>      or      (x: T) =>
+                        //     (y) =>                    (y): H =>
+                        //         expr                      expr
+                        //
+                        // Set context flag when entering chain, restore when done.
+                        let was_in_curried = self.in_curried_typed_arrow.get();
+                        if chain_has_return_type {
+                            self.in_curried_typed_arrow.set(true);
+                        }
+                        let body_doc = self.build_arrow_body_doc(expr);
+                        self.in_curried_typed_arrow.set(was_in_curried);
+                        parts.push(d.concat(&[d.hardline(), body_doc]));
+                    } else if is_arrow_body && body_arrow_has_trailing_param_comments {
+                        // Nested arrow with trailing param comments - first level gets indent,
+                        // subsequent levels align (use curried pattern)
+                        // (a, // c) => (b, // c) => {}
+                        // becomes:
+                        // (a, // c) =>
+                        //     (b, // c) =>
+                        //     (c, // c) => {}
+                        let was_in_curried = self.in_curried_typed_arrow.get();
+                        self.in_curried_typed_arrow.set(true);
+                        let body_doc = self.build_arrow_body_doc(expr);
+                        self.in_curried_typed_arrow.set(was_in_curried);
+                        parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
+                    } else if self.in_curried_typed_arrow.get() {
+                        // Innermost arrow in curried chain - body is NOT another arrow.
+                        // This needs indent since it's the final expression.
+                        // Reset flag so arrows inside the body (e.g. callback args) aren't
+                        // treated as part of the curried chain.
+                        self.in_curried_typed_arrow.set(false);
+                        let body_doc = self.build_arrow_body_doc(expr);
+                        self.in_curried_typed_arrow.set(true);
+                        parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
+                    } else if matches!(&**expr, internal::Expression::ConditionalExpression(_))
+                        && !has_leftmost_object_expression(expr)
+                    {
+                        // Prettier's shouldAddParensIfNotBreak: ternary body gets conditional
+                        // parens when inline, no parens when on its own line.
+                        // Excludes ternaries whose test starts with ObjectExpression (matches
+                        // Prettier's startsWithNoLookaheadToken check) — those fall through
+                        // to the normal path which calls build_arrow_body_doc for object parens.
+                        //
+                        // Structure: [" ", group([ifBreak("","("), indent([softline, body]),
+                        //                         ifBreak("",")")])]
+                        //
+                        // The " " TEXT element before the group is critical for fits() boundary:
+                        // when sig + " =>" = exactly print_width, remaining=0. The " " consumes
+                        // 1 char (→ -1), making the sig group fail fits() and break params.
+                        // With the old group(indent(line, body)), line() in Break mode would
+                        // short-circuit fits() to return true, keeping the sig flat.
+                        //
+                        // Flat:  ` => (cond ? a : b)` — parens, same line
+                        // Break: ` =>\n\tcond ? a : b` — no parens, next line
+                        let body_doc = self.build_expression_doc(expr);
+                        if d.will_break(body_doc) {
+                            // Body has hardlines (multiline template in ternary, etc.)
+                            // Use normal break layout — no parens needed
+                            parts.push(d.group(d.indent(d.concat(&[d.line(), body_doc]))));
+                        } else {
+                            parts.push(d.text(" "));
+                            parts.push(d.group(d.concat(&[
+                                d.if_break(d.empty(), d.text("(")),
+                                d.indent(d.concat(&[d.softline(), body_doc])),
+                                d.if_break(d.empty(), d.text(")")),
+                            ])));
+                        }
                     } else {
-                        parts.push(d.group(d.indent(d.concat(&[d.line(), body_doc]))));
+                        // Normal expression: can break after => with indentation
+                        // Short: (x) => x + 1
+                        // Long:  (veryLongParams) =>
+                        //            veryLongExpr
+                        //
+                        // The body is wrapped in a group so it can make its own fits() decision.
+                        // This allows the arrow body to stay inline even when the parent element
+                        // is in break mode, as long as the body content fits from its position.
+                        //
+                        // Normal expression body: can break after => with indentation.
+                        // Template literal bodies with literalline nodes will propagate
+                        // breaks naturally, enabling chain/call expansion decisions.
+                        let body_doc = self.build_arrow_body_doc(expr);
+                        if has_post_arrow_comments {
+                            // Inline block comments before non-huggable body:
+                            // `() => /* comment */ a + b`
+                            let comments_doc =
+                                self.build_inline_post_arrow_comments_doc(arrow_end, body_start);
+                            parts.push(d.group(d.indent(d.concat(&[
+                                d.line(),
+                                comments_doc,
+                                body_doc,
+                            ]))));
+                        } else {
+                            parts.push(d.group(d.indent(d.concat(&[d.line(), body_doc]))));
+                        }
                     }
-                }
+                } // end of `else` (no trailing paren comments)
             }
             internal::ArrowFunctionBody::BlockStatement(block) => {
                 // Block body: always stays hugged to => (no break)
@@ -392,8 +434,7 @@ impl<'a> Printer<'a> {
                 if has_post_arrow_comments {
                     // Build comments doc
                     let mut comment_parts = Vec::new();
-                    for comment in tsv_lang::comments_in_range(self.comments, arrow_end, body_start)
-                    {
+                    for comment in comments_in_range(self.comments, arrow_end, body_start) {
                         comment_parts.push(d.text(" "));
                         comment_parts.push(self.build_comment_doc(comment));
                     }
@@ -458,7 +499,7 @@ impl<'a> Printer<'a> {
         // Svelte disambiguation: single param without constraint needs trailing comma
         // in Svelte files to avoid confusion with template syntax like `<Component>`.
         // In pure .ts files (arrow_type_param_trailing_comma=false), no trailing comma needed.
-        let needs_trailing_comma = self.config.arrow_type_param_trailing_comma
+        let needs_trailing_comma = self.ts_config.arrow_type_param_trailing_comma
             && decl.params.len() == 1
             && decl.params[0].constraint.is_none();
         let inner_parts = if needs_trailing_comma {
@@ -532,6 +573,16 @@ impl<'a> Printer<'a> {
         // Type parameters: group them independently only when function params exist
         if let Some(tp) = &arrow.type_parameters {
             parts.push(self.build_type_params_doc_for_arrow(tp, has_params));
+
+            // Comments between type_params `>` and `(` go after type_params
+            if let Some(pp) = find_char_skipping_comments(
+                self.source.as_bytes(),
+                tp.span.end as usize,
+                self.source.len(),
+                b'(',
+            ) {
+                self.append_type_params_to_paren_comments(&mut parts, tp.span.end, pp as u32);
+            }
         }
 
         // Function parameters
@@ -545,7 +596,7 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Check if any param has a trailing line comment
+    /// Check if any param has a trailing line comment or own-line block comment
     fn has_trailing_line_comment_in_params(
         &self,
         params: &[internal::Expression],
@@ -553,7 +604,16 @@ impl<'a> Printer<'a> {
     ) -> bool {
         params.iter().enumerate().any(|(i, param)| {
             let trailing_end = self.param_trailing_end(params, i, trailing_comments_end);
-            self.has_line_comments_between(param.span().end, trailing_end)
+            if self.has_line_comments_between(param.span().end, trailing_end) {
+                return true;
+            }
+            // For the last param, also check for own-line block comments before `)`
+            if i == params.len() - 1 {
+                comments_in_range(self.comments, param.span().end, trailing_end)
+                    .any(|c| c.is_block && !self.is_same_line(param.span().end, c.span.start))
+            } else {
+                false
+            }
         })
     }
 
@@ -628,8 +688,7 @@ impl<'a> Printer<'a> {
         let mut parts = Vec::new();
 
         // Print leading comments
-        let comments: Vec<_> =
-            tsv_lang::comments_in_range(self.comments, sig_end, body_start).collect();
+        let comments: Vec<_> = comments_in_range(self.comments, sig_end, body_start).collect();
         for (i, comment) in comments.iter().enumerate() {
             parts.push(self.build_comment_doc(comment));
 
@@ -662,7 +721,7 @@ impl<'a> Printer<'a> {
     /// `=> /* c */ expr` have no newline after them (returns false). Own-line comments
     /// and line comments have a newline after (returns true).
     pub(crate) fn has_own_line_post_arrow_comment(&self, sig_end: u32, body_start: u32) -> bool {
-        for comment in tsv_lang::comments_in_range(self.comments, sig_end, body_start) {
+        for comment in comments_in_range(self.comments, sig_end, body_start) {
             if !comment.is_block {
                 // Line comments always have a newline after them
                 return true;
@@ -682,7 +741,7 @@ impl<'a> Printer<'a> {
     fn build_inline_post_arrow_comments_doc(&self, sig_end: u32, body_start: u32) -> DocId {
         let d = self.d();
         let mut parts = Vec::new();
-        for comment in tsv_lang::comments_in_range(self.comments, sig_end, body_start) {
+        for comment in comments_in_range(self.comments, sig_end, body_start) {
             parts.push(self.build_comment_doc(comment));
             parts.push(d.text(" "));
         }
@@ -709,6 +768,20 @@ impl<'a> Printer<'a> {
         // Use _wrapping version for width-based line breaking
         if let Some(type_params) = &func.type_parameters {
             sig_parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
+
+            // Comments between type_params `>` and `(` go after type_params
+            if let Some(pp) = find_char_skipping_comments(
+                self.source.as_bytes(),
+                type_params.span.end as usize,
+                self.source.len(),
+                b'(',
+            ) {
+                self.append_type_params_to_paren_comments(
+                    &mut sig_parts,
+                    type_params.span.end,
+                    pp as u32,
+                );
+            }
         }
 
         // Function parameters - NOT in their own group, just softlines
@@ -745,15 +818,9 @@ impl<'a> Printer<'a> {
             func.body.span.start
         };
 
-        // Check for comments between signature and body (outer comments)
-        let outer_comments = self.build_outer_comments_for_block(sig_end, &func.body);
-
-        // Body - always on same line as signature close
-        d.concat(&[
-            sig_doc,
-            d.text(" "),
-            self.build_block_statement_with_outer_comments_doc(&func.body, outer_comments),
-        ])
+        let mut parts = vec![sig_doc];
+        self.append_body_with_sig_comments(&mut parts, sig_end, &func.body);
+        d.concat(&parts)
     }
 
     /// Build a Doc for a standalone function expression with width-aware wrapping.
@@ -788,20 +855,32 @@ impl<'a> Printer<'a> {
 
         // Optional function name
         if let Some(id) = &func.id {
-            parts.push(d.text(" "));
             // Comments between keywords and the name (same as FunctionDeclaration)
-            parts.push(
-                self.build_inline_comments_between_doc_trailing_space(
-                    func.span.start,
-                    id.span.start,
-                ),
-            );
+            parts.push(self.build_keyword_to_name_comments(func.span.start, id.span.start));
             parts.push(self.build_identifier_doc(id));
+
+            // Comments between name and type params/parens: `function fn1/* c */ <T>()` or `fn1 /* c */()`
+            // Line comments get a hardline to prevent absorbing type params as comment text
+            let comment_end = func
+                .type_parameters
+                .as_ref()
+                .map_or(func.params_start, |tp| tp.span.start);
+            parts.push(self.build_name_to_type_params_comments(
+                id.span.end,
+                comment_end,
+                CommentSpacing::for_type_params(func.type_parameters.is_some()),
+            ));
         }
 
         // Space before type params or params if no name: `function <T>` or `function ()`
+        // Also extract comments between keyword and next element: `function /* c */ ()`
+        // Line comments get hardline to prevent absorbing parens: `function // c\n()`
         if func.id.is_none() {
-            parts.push(d.text(" "));
+            let next_start = func
+                .type_parameters
+                .as_ref()
+                .map_or(func.params_start, |tp| tp.span.start);
+            parts.push(self.build_keyword_to_name_comments(func.span.start, next_start));
         }
 
         // Type params, params, return type, and body (signature_doc handles type params)
@@ -857,6 +936,20 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         if params.is_empty() {
+            // Check for dangling comments in empty parens: fn(/* comment */)
+            // Use find_closing_paren which skips comment/string content,
+            // so comments containing ')' don't cause false matches.
+            if let Some(open) = params_start {
+                let end_bound = trailing_comments_end.unwrap_or(self.source.len() as u32);
+                if let Some(close_after) = self.find_closing_paren(open, end_bound) {
+                    let close = close_after - 1;
+                    if let Some(comment_doc) =
+                        self.build_inline_comments_between_doc_no_leading_space_opt(open + 1, close)
+                    {
+                        return d.concat(&[d.text("("), comment_doc, d.text(")")]);
+                    }
+                }
+            }
             return d.text("()");
         }
 
@@ -884,9 +977,12 @@ impl<'a> Printer<'a> {
             params_start.unwrap_or_else(|| params[0].span().start),
             params[0].span().start,
         );
+        let no_trailing_comments = trailing_comments_end
+            .is_none_or(|end| !self.has_comments_between(params[0].span().end, end));
         let should_hug_single_pattern = params.len() == 1
             && (is_huggable_pattern(&params[0]) || has_huggable_type_annotation(&params[0]))
-            && no_leading_comments;
+            && no_leading_comments
+            && no_trailing_comments;
 
         if should_hug_single_pattern {
             // Hug mode: just ( + pattern + optional trailing comma + )
@@ -979,7 +1075,7 @@ impl<'a> Printer<'a> {
 
             // Collect same-line comments
             let same_line_comments: Vec<_> =
-                tsv_lang::comments_in_range(self.comments, param.span().end, search_end)
+                comments_in_range(self.comments, param.span().end, search_end)
                     .filter(|c| self.is_same_line(param.span().end, c.span.start))
                     .collect();
 
@@ -1006,13 +1102,11 @@ impl<'a> Printer<'a> {
                 inner_parts.push(self.build_trailing_line_comment_doc(comment));
             }
 
-            // Own-line line comments (on their own line after last param, before `)`)
+            // Own-line comments (on their own line after last param, before `)`)
             // Only for the last param - non-last param comments are handled as leading for next param
             if is_last {
-                for comment in
-                    tsv_lang::comments_in_range(self.comments, param.span().end, search_end).filter(
-                        |c| !c.is_block && !self.is_same_line(param.span().end, c.span.start),
-                    )
+                for comment in comments_in_range(self.comments, param.span().end, search_end)
+                    .filter(|c| !self.is_same_line(param.span().end, c.span.start))
                 {
                     inner_parts.push(d.hardline());
                     inner_parts.push(self.build_comment_doc(comment));
@@ -1064,7 +1158,7 @@ impl<'a> Printer<'a> {
 
     /// Check if there's a line comment on its own line between two positions
     fn has_own_line_comment_between(&self, start: u32, end: u32) -> bool {
-        for comment in tsv_lang::comments_in_range(self.comments, start, end) {
+        for comment in comments_in_range(self.comments, start, end) {
             // Line comments are always on their own line (they extend to EOL)
             // Block comments on their own line have a newline before them
             if !comment.is_block {
@@ -1088,7 +1182,7 @@ impl<'a> Printer<'a> {
         prev_comma_pos: Option<u32>,
     ) -> DocId {
         let d = self.d();
-        let comments: Vec<_> = tsv_lang::comments_in_range(self.comments, start, end)
+        let comments: Vec<_> = comments_in_range(self.comments, start, end)
             .filter(|c| {
                 let Some(comma) = prev_comma_pos else {
                     return true; // First param - keep all comments
@@ -1144,6 +1238,48 @@ impl<'a> Printer<'a> {
         class_expr: &internal::ClassExpression,
     ) -> DocId {
         let d = self.d();
+
+        // Compute positions for heritage comment extraction
+        let pre_heritage_end = class_expr.type_parameters.as_ref().map_or_else(
+            || {
+                class_expr
+                    .id
+                    .as_ref()
+                    .map_or(class_expr.span.start + 5, |id| id.span.end)
+            },
+            |tp| tp.span.end,
+        );
+        // Use `extends` keyword position (not super class expression start) so
+        // heritage leading comments only cover name-to-extends, not extends-to-base
+        let extends_keyword_start = class_expr.super_class.as_ref().and_then(|sc| {
+            self.find_keyword_in_range(pre_heritage_end, sc.span().start, "extends")
+        });
+        let first_heritage_start =
+            extends_keyword_start.or_else(|| class_expr.implements.first().map(|i| i.span.start));
+        let extends_clause_end = class_expr.super_class.as_ref().map(|sc| {
+            class_expr
+                .super_type_parameters
+                .as_ref()
+                .map_or_else(|| sc.span().end, |tp| tp.span.end)
+        });
+
+        // Check for heritage comments to determine if group mode is needed
+        let has_heritage_comments = first_heritage_start
+            .is_some_and(|hs| self.has_comments_between(pre_heritage_end, hs))
+            || extends_clause_end.is_some_and(|ext_end| {
+                !class_expr.implements.is_empty()
+                    && self.has_comments_between(ext_end, class_expr.implements[0].span.start)
+            });
+        let has_heritage_line_comments = first_heritage_start
+            .is_some_and(|hs| self.has_line_comments_between(pre_heritage_end, hs))
+            || extends_clause_end.is_some_and(|ext_end| {
+                !class_expr.implements.is_empty()
+                    && self.has_line_comments_between(ext_end, class_expr.implements[0].span.start)
+            });
+
+        // Group mode only when heritage comments need line breaks
+        let group_mode = has_heritage_comments;
+
         let mut parts = Vec::new();
 
         // 'class' keyword
@@ -1151,8 +1287,52 @@ impl<'a> Printer<'a> {
 
         // Optional class name
         if let Some(id) = &class_expr.id {
-            parts.push(d.text(" "));
+            // Comments between `class` keyword and name
+            parts.push(self.build_keyword_to_name_comments(class_expr.span.start, id.span.start));
             parts.push(self.build_identifier_doc(id));
+
+            // Comments between name and type params: `class A/* c */ <T> {}`
+            // Line comments get a hardline to prevent absorbing type params as comment text
+            if let Some(type_params) = &class_expr.type_parameters {
+                parts.push(self.build_name_to_type_params_comments(
+                    id.span.end,
+                    type_params.span.start,
+                    CommentSpacing::Trailing,
+                ));
+            } else if first_heritage_start.is_none() {
+                // No type params, no heritage: comments between name and body `class A /* c */ {}`
+                // Heritage path handles name→heritage comments when heritage exists
+                parts.push(self.build_name_to_type_params_comments(
+                    id.span.end,
+                    class_expr.body.span.start,
+                    CommentSpacing::Leading,
+                ));
+            }
+        } else if class_expr.type_parameters.is_none()
+            && class_expr.super_class.is_none()
+            && class_expr.implements.is_empty()
+        {
+            // Anonymous class without heritage: extract comments between `class` and body
+            // `class /* c */ {}` — heritage comment handling covers the heritage case
+            if self.has_line_comments_between(class_expr.span.start, class_expr.body.span.start) {
+                // Line comment: hardline after, body on new line without extra space
+                // `class // c\n{}` — no heritage/type params, so return early
+                parts.push(self.build_name_to_type_params_comments(
+                    class_expr.span.start,
+                    class_expr.body.span.start,
+                    CommentSpacing::Leading,
+                ));
+                parts.push(self.build_class_body_doc(&class_expr.body, false));
+                return d.concat(&parts);
+            }
+            if let Some(comment_doc) = self.build_comments_between_filtered_opt(
+                class_expr.span.start,
+                class_expr.body.span.start,
+                CommentSpacing::Leading,
+                CommentFilter::All,
+            ) {
+                parts.push(comment_doc);
+            }
         }
 
         // Type parameters (TypeScript generics): class<T>
@@ -1161,33 +1341,107 @@ impl<'a> Printer<'a> {
             parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
         }
 
-        // Optional extends clause
-        if let Some(super_class) = &class_expr.super_class {
-            parts.push(d.text(" extends "));
-            parts.push(self.build_expression_doc(super_class));
-            // Type arguments: extends Base<T>
-            if let Some(super_type_params) = &class_expr.super_type_parameters {
-                parts.push(self.build_type_parameter_instantiation_doc(super_type_params));
+        // Build extends doc
+        let extends_doc = if let Some(super_class) = &class_expr.super_class {
+            let mut ext_parts = vec![d.text("extends ")];
+            // Comments between `extends` keyword and base class: `extends /* c */ Base`
+            if let Some(kw_start) = extends_keyword_start {
+                let kw_end = kw_start + 7; // "extends".len()
+                ext_parts.push(self.build_comments_between(
+                    kw_end,
+                    super_class.span().start,
+                    CommentSpacing::Trailing,
+                ));
             }
-        }
+            ext_parts.push(self.build_expression_doc(super_class));
+            if let Some(super_type_params) = &class_expr.super_type_parameters {
+                // Preserve comments between super class and type args
+                let gap_start = super_class.span().end;
+                let gap_end = super_type_params.span.start;
+                if let Some(doc) = self.build_name_to_type_params_comments_opt(
+                    gap_start,
+                    gap_end,
+                    CommentSpacing::Trailing,
+                ) {
+                    ext_parts.push(doc);
+                }
+                ext_parts.push(self.build_type_parameter_instantiation_doc(super_type_params));
+            }
+            Some(d.concat(&ext_parts))
+        } else {
+            None
+        };
 
-        // Implements clause (extract from source for simplicity)
-        if !class_expr.implements.is_empty() {
-            parts.push(d.text(" implements "));
+        // Build implements doc (extract from source — class expressions rarely have implements)
+        let implements_doc = if !class_expr.implements.is_empty() {
             let first_impl = &class_expr.implements[0];
             let last_impl = &class_expr.implements[class_expr.implements.len() - 1];
-            let impl_start = first_impl.span.start_usize();
-            let impl_end = last_impl.span.end_usize();
-            let impl_str = &self.source[impl_start..impl_end];
-            parts.push(d.text_owned(impl_str.to_string()));
+            let impl_str = &self.source[first_impl.span.start_usize()..last_impl.span.end_usize()];
+            Some(d.concat(&[d.text("implements "), d.text_owned(impl_str.to_string())]))
+        } else {
+            None
+        };
+
+        if group_mode {
+            // Comments between name/type-params and first heritage
+            let mut extra_heritage_comments = Vec::new();
+            if let Some(heritage_start) = first_heritage_start {
+                let (inline, indent) =
+                    self.build_heritage_leading_comment_parts(pre_heritage_end, heritage_start);
+                parts.extend(inline);
+                extra_heritage_comments = indent;
+            }
+
+            // Heritage clauses with line breaks
+            let mut heritage_parts = extra_heritage_comments;
+            if let Some(ext) = extends_doc {
+                heritage_parts.push(d.line());
+                heritage_parts.push(ext);
+                // Comments between extends and implements
+                if let Some(ext_end) = extends_clause_end
+                    && !class_expr.implements.is_empty()
+                    && let Some(mid_comments) = self.build_inline_comments_between_doc_opt(
+                        ext_end,
+                        class_expr.implements[0].span.start,
+                    )
+                {
+                    heritage_parts.push(mid_comments);
+                }
+            }
+            if let Some(impl_doc) = implements_doc {
+                heritage_parts.push(d.line());
+                heritage_parts.push(impl_doc);
+            }
+            if !heritage_parts.is_empty() {
+                parts.push(d.indent(d.concat(&heritage_parts)));
+            }
+
+            // Space before body
+            parts.push(d.text(" "));
+            parts.push(self.build_class_body_doc(&class_expr.body, false));
+
+            let parts_doc = d.concat(&parts);
+            if has_heritage_line_comments {
+                d.group_break(parts_doc)
+            } else {
+                d.group(parts_doc)
+            }
+        } else {
+            // Non-group mode: heritage stays inline
+            if let Some(ext) = extends_doc {
+                parts.push(d.text(" "));
+                parts.push(ext);
+            }
+            if let Some(impl_doc) = implements_doc {
+                parts.push(d.text(" "));
+                parts.push(impl_doc);
+            }
+
+            // Space before body
+            parts.push(d.text(" "));
+            parts.push(self.build_class_body_doc(&class_expr.body, false));
+
+            d.concat(&parts)
         }
-
-        // Space before body
-        parts.push(d.text(" "));
-
-        // Class body
-        parts.push(self.build_class_body_doc(&class_expr.body, false));
-
-        d.concat(&parts)
     }
 }

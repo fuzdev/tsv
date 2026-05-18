@@ -29,11 +29,9 @@ mod text;
 
 use self::text::TextAnalysis;
 use crate::ast::internal::{self, FragmentNode};
-use std::cell::RefCell;
 use std::rc::Rc;
-use string_interner::DefaultStringInterner;
 use tsv_lang::doc::arena::{DocArena, DocId};
-use tsv_lang::{Comment, OutputBuffer, PrintConfig, SymbolResolver};
+use tsv_lang::{Comment, EmbedContext, OutputBuffer, PrintConfig, SharedInterner, SymbolResolver};
 
 /// Pending whitespace state - buffers whitespace decisions until next node is known
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -141,19 +139,21 @@ impl RootPrintState {
 }
 
 /// Printer state for building output
-pub struct Printer<'a> {
+pub(crate) struct Printer<'a> {
     /// Output buffer
     buffer: OutputBuffer,
     /// Current indentation level
     pub(crate) indent_level: usize,
     /// Print configuration
     config: PrintConfig,
+    /// Embedding context (layout mode, offsets)
+    embed: EmbedContext,
     /// Arena allocator for doc nodes
     pub(crate) arena: DocArena,
     /// Source code (needed for preserving whitespace semantics)
     pub(crate) source: &'a str,
     /// Shared string interner for resolving symbols
-    interner: Rc<RefCell<DefaultStringInterner>>,
+    interner: SharedInterner,
     /// Comments from scripts and template expressions
     comments: &'a [Comment],
     /// Precomputed line break positions (byte offsets of '\n' in source)
@@ -162,27 +162,31 @@ pub struct Printer<'a> {
 
 impl<'a> Printer<'a> {
     /// Create a new printer with the given source, interner, comments, and default config
-    pub fn new(
-        source: &'a str,
-        interner: Rc<RefCell<DefaultStringInterner>>,
-        comments: &'a [Comment],
-    ) -> Self {
-        Self::with_config(source, interner, comments, PrintConfig::default())
+    pub(crate) fn new(source: &'a str, interner: SharedInterner, comments: &'a [Comment]) -> Self {
+        Self::with_config(
+            source,
+            interner,
+            comments,
+            PrintConfig::default(),
+            EmbedContext::default(),
+        )
     }
 
-    /// Create a new printer with the given source, interner, comments, and config
-    pub fn with_config(
+    /// Create a new printer with the given source, interner, comments, config, and embed context
+    pub(crate) fn with_config(
         source: &'a str,
-        interner: Rc<RefCell<DefaultStringInterner>>,
+        interner: SharedInterner,
         comments: &'a [Comment],
         config: PrintConfig,
+        embed: EmbedContext,
     ) -> Self {
         let line_breaks = tsv_lang::printing::build_line_breaks(source);
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
             config,
-            arena: DocArena::with_source_size_hint(source.len(), config.tab_width),
+            embed,
+            arena: DocArena::for_source(source),
             source,
             interner,
             comments,
@@ -208,7 +212,7 @@ impl<'a> Printer<'a> {
 
     /// Write indentation based on current indent level
     pub(crate) fn write_indent(&mut self) {
-        tsv_lang::write_indent(&mut self.buffer, self.indent_level, self.config.indent);
+        tsv_lang::write_indent(&mut self.buffer, self.indent_level, tsv_lang::INDENT);
     }
 
     /// Get the formatted output
@@ -216,7 +220,7 @@ impl<'a> Printer<'a> {
     /// Simply extracts the buffer. Whitespace stripping is handled by the doc rendering layer:
     /// - Normal elements: rendered with `print_doc_with_indent_resolved()` which strips
     /// - Whitespace-sensitive elements: rendered with `print_doc_with_indent_resolved_preserve_whitespace()` which preserves
-    pub fn into_string(self) -> String {
+    pub(crate) fn into_string(self) -> String {
         self.buffer.into_string()
     }
 
@@ -234,13 +238,13 @@ impl<'a> Printer<'a> {
     /// must be preserved. Normal elements have trailing whitespace stripped during
     /// doc building, not rendering.
     pub(crate) fn render_doc_immediate(&mut self, d: DocId) {
-        let col = self.buffer.current_column(self.config.tab_width);
+        let col = self.buffer.current_column(tsv_lang::TAB_WIDTH);
         let output = {
             let interner = self.interner.borrow();
             tsv_lang::doc::arena_print_doc_with_indent_resolved_preserve_whitespace(
                 &self.arena,
                 d,
-                &self.config,
+                &self.embed,
                 col,
                 self.indent_level,
                 &*interner,
@@ -262,8 +266,10 @@ impl<'a> Printer<'a> {
             self.source,
             Rc::clone(&self.interner),
             &self.config,
+            &self.embed,
             self.comments,
             &self.line_breaks,
+            tsv_ts::TsConfig::svelte(),
         )
     }
 
@@ -278,8 +284,10 @@ impl<'a> Printer<'a> {
             self.source,
             Rc::clone(&self.interner),
             &self.config,
+            &self.embed,
             &[],
             &self.line_breaks,
+            tsv_ts::TsConfig::svelte(),
         )
     }
 
@@ -291,13 +299,17 @@ impl<'a> Printer<'a> {
             expr,
             self.source,
             Rc::clone(&self.interner),
+            &[],
             &self.line_breaks,
+            PrintConfig::default(),
+            EmbedContext::default(),
+            tsv_ts::TsConfig::svelte(),
         )
     }
 }
 
 /// Format a Svelte AST back to source code
-pub fn format_svelte(root: &internal::Root, source: &str) -> String {
+pub(crate) fn format_svelte(root: &internal::Root, source: &str) -> String {
     let mut printer = Printer::new(source, Rc::clone(&root.interner), &root.comments);
     printer.print_root(root);
     printer.into_string()
@@ -445,7 +457,7 @@ impl<'a> Printer<'a> {
     ///
     /// Sections are ordered canonically and separated by blank lines.
     /// Comments travel with the section they immediately precede in source order.
-    pub fn print_root(&mut self, root: &internal::Root) {
+    pub(crate) fn print_root(&mut self, root: &internal::Root) {
         // Classify fragment comments by the section they should travel with.
         let mut options_comments: Vec<usize> = Vec::new();
         let mut module_comments: Vec<usize> = Vec::new();
@@ -1009,7 +1021,7 @@ impl<'a> Printer<'a> {
 
 // Implement SymbolResolver trait for shared symbol resolution utilities
 impl<'a> SymbolResolver for Printer<'a> {
-    fn interner(&self) -> &Rc<RefCell<DefaultStringInterner>> {
+    fn interner(&self) -> &SharedInterner {
         &self.interner
     }
 }

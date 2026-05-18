@@ -10,13 +10,17 @@
  *   deno task divergence:audit --json
  */
 
-import { parseArgs } from '@std/cli/parse-args';
+import process from 'node:process';
+
+import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.js';
+import { z } from 'zod';
+
 import { formatAuditReport, generateAuditReport } from './lib/divergence/mod.ts';
 
-interface Args {
-	json?: boolean;
-	help?: boolean;
-}
+const AuditArgs = z.object({
+	json: z.boolean().default(false),
+	help: z.boolean().default(false).meta({ aliases: ['h'] }),
+});
 
 function printUsage(): void {
 	console.log(`
@@ -33,10 +37,13 @@ Examples:
 }
 
 async function main(): Promise<void> {
-	const args = parseArgs(Deno.args, {
-		boolean: ['json', 'help'],
-		alias: { h: 'help' },
-	}) as Args;
+	const parsed = args_parse(argv_parse(process.argv.slice(2)), AuditArgs);
+	if (!parsed.success) {
+		console.error(z.prettifyError(parsed.error));
+		printUsage();
+		Deno.exit(1);
+	}
+	const args = parsed.data;
 
 	if (args.help) {
 		printUsage();

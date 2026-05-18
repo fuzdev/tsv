@@ -10,7 +10,7 @@
 				"start": 9,
 				"end": 94,
 				"name": "media",
-				"prelude": "screen /* in prelude */ and (min-width: 500px)",
+				"prelude": "screen  and (min-width: 500px)",
 				"block": {
 					"type": "Block",
 					"start": 63,

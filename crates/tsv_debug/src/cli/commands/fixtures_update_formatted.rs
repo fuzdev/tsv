@@ -1,8 +1,12 @@
-use crate::fixtures::{self, discover_unformatted_ours_variants, has_prettier_divergence_suffix};
+use crate::fixtures::{
+    self, AUDIT_SIGNATURE_FILENAME, AuditSignature, discover_prettier_variant_variants,
+    discover_unformatted_ours_variants, discover_variant_variants,
+};
 use tsv_cli::cli::args::Args;
 use tsv_cli::cli::commands::{Command, Executable};
 
-/// fixtures-update-formatted command - regenerate output_prettier.* and prettier_intermediate_* files
+/// fixtures-update-formatted command - regenerate output_prettier.*, prettier_intermediate_*,
+/// and prettier_intermediate_to_variant_* files
 pub struct FixturesUpdateFormattedCommand;
 
 impl Command for FixturesUpdateFormattedCommand {
@@ -22,7 +26,7 @@ impl Command for FixturesUpdateFormattedCommand {
 
     fn usage(&self) -> Vec<String> {
         vec![
-            "fixtures_update_formatted                   Regenerate output_prettier.* and prettier_intermediate_* files"
+            "fixtures_update_formatted                   Regenerate output_prettier.*, prettier_intermediate_*, and prettier_intermediate_to_variant_* files"
                 .to_string(),
             "fixtures_update_formatted <filter>...       Regenerate matching fixtures".to_string(),
         ]
@@ -85,6 +89,12 @@ async fn run(filters: &[String]) {
     let mut intermediate_removed = 0;
     let mut intermediate_unchanged = 0;
 
+    // Separate counters for audit_signature.txt
+    let mut signature_created = 0;
+    let mut signature_updated = 0;
+    let mut signature_removed = 0;
+    let mut signature_unchanged = 0;
+
     for fixture in &fixture_list {
         // Update output_prettier.*
         let output_filename = fixture.output_prettier_filename();
@@ -124,13 +134,49 @@ async fn run(filters: &[String]) {
             }
         }
 
-        // Update prettier_intermediate_* files (only in _prettier_divergence directories)
-        let dir_name = fixture
-            .path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("");
-        if has_prettier_divergence_suffix(dir_name) {
+        // Update audit_signature.txt (pins prettier's multi-pass chain from output_prettier.*).
+        // Only meaningful in _prettier_divergence dirs with output_prettier.* present.
+        let is_prettier_divergence = fixture.is_prettier_divergence();
+        if is_prettier_divergence {
+            match update_audit_signature(fixture).await {
+                FormattedResult::Created => {
+                    println!(
+                        "✓ Created {}/{}",
+                        fixture.relative_path, AUDIT_SIGNATURE_FILENAME
+                    );
+                    signature_created += 1;
+                }
+                FormattedResult::Updated => {
+                    println!(
+                        "✓ Updated {}/{}",
+                        fixture.relative_path, AUDIT_SIGNATURE_FILENAME
+                    );
+                    signature_updated += 1;
+                }
+                FormattedResult::Removed => {
+                    println!(
+                        "✓ Removed {}/{} (prettier is idempotent on output_prettier)",
+                        fixture.relative_path, AUDIT_SIGNATURE_FILENAME
+                    );
+                    signature_removed += 1;
+                }
+                FormattedResult::Unchanged => {
+                    signature_unchanged += 1;
+                }
+                FormattedResult::NotNeeded => {
+                    signature_unchanged += 1;
+                }
+                FormattedResult::Failed(err) => {
+                    eprintln!(
+                        "✗ Failed to update {}/{}: {}",
+                        fixture.relative_path, AUDIT_SIGNATURE_FILENAME, err
+                    );
+                    failed += 1;
+                }
+            }
+        }
+
+        if is_prettier_divergence {
             let input_ext = fixture.input_type().extension();
             let results = update_intermediate_files(fixture, input_ext).await;
             for (filename, result) in results {
@@ -145,7 +191,7 @@ async fn run(filters: &[String]) {
                     }
                     FormattedResult::Removed => {
                         println!(
-                            "✓ Removed {}/{} (prettier normalizes directly)",
+                            "✓ Removed {}/{} (no intermediate needed)",
                             fixture.relative_path, filename
                         );
                         intermediate_removed += 1;
@@ -169,10 +215,10 @@ async fn run(filters: &[String]) {
         }
     }
 
-    let total_created = created + intermediate_created;
-    let total_updated = updated + intermediate_updated;
-    let total_removed = removed + intermediate_removed;
-    let total_unchanged = unchanged + intermediate_unchanged;
+    let total_created = created + intermediate_created + signature_created;
+    let total_updated = updated + intermediate_updated + signature_updated;
+    let total_removed = removed + intermediate_removed + signature_removed;
+    let total_unchanged = unchanged + intermediate_unchanged + signature_unchanged;
 
     if filters.is_empty() {
         println!(
@@ -201,7 +247,10 @@ async fn run(filters: &[String]) {
         println!("⚠️  Updated source of truth files (output_prettier.*)");
     }
     if intermediate_created > 0 || intermediate_updated > 0 || intermediate_removed > 0 {
-        println!("⚠️  Updated prettier_intermediate_* files");
+        println!("⚠️  Updated prettier_intermediate_* / prettier_intermediate_to_variant_* files");
+    }
+    if signature_created > 0 || signature_updated > 0 || signature_removed > 0 {
+        println!("⚠️  Updated audit_signature.txt files");
     }
 
     if failed > 0 {
@@ -216,6 +265,71 @@ enum FormattedResult {
     Unchanged,
     NotNeeded,
     Failed(String),
+}
+
+/// Update `audit_signature.txt` for a fixture.
+///
+/// The signature pins prettier's multi-pass chain starting from `output_prettier.*`. It's
+/// created/updated when `prettier(output_prettier) != output_prettier` (prettier non-idempotent),
+/// and removed when prettier is idempotent on output_prettier (chain depth zero — nothing to pin).
+///
+/// Skips silently if output_prettier doesn't exist (idempotent case — no chain to record).
+async fn update_audit_signature(fixture: &fixtures::Fixture) -> FormattedResult {
+    let signature_path = fixture.audit_signature_path();
+    let output_prettier_path = fixture.output_prettier_path();
+
+    // No output_prettier → no chain anchor → remove any stale signature
+    if !output_prettier_path.exists() {
+        if signature_path.exists() {
+            return match fixtures::delete_file_if_exists(&signature_path) {
+                Ok(()) => FormattedResult::Removed,
+                Err(e) => FormattedResult::Failed(e),
+            };
+        }
+        return FormattedResult::NotNeeded;
+    }
+
+    let output_prettier_content = match fixtures::read_file(&output_prettier_path) {
+        Ok(s) => s,
+        Err(e) => return FormattedResult::Failed(e),
+    };
+
+    let parser = fixture.input_type().prettier_parser();
+    let chain = match AuditSignature::walk(&output_prettier_content, parser).await {
+        Ok(c) => c,
+        Err(e) => return FormattedResult::Failed(e),
+    };
+
+    match chain {
+        None => {
+            // Prettier idempotent — no signature needed. Remove stale file if any.
+            if signature_path.exists() {
+                match fixtures::delete_file_if_exists(&signature_path) {
+                    Ok(()) => FormattedResult::Removed,
+                    Err(e) => FormattedResult::Failed(e),
+                }
+            } else {
+                FormattedResult::NotNeeded
+            }
+        }
+        Some(sig) => {
+            let serialized = sig.serialize();
+            let existing = fixtures::read_file(&signature_path).ok();
+            if existing.as_deref() == Some(serialized.as_str()) {
+                FormattedResult::Unchanged
+            } else if existing.is_none() {
+                match fixtures::write_file(&signature_path, &serialized) {
+                    Ok(()) => FormattedResult::Created,
+                    Err(e) => FormattedResult::Failed(e),
+                }
+            } else {
+                match fixtures::write_file(&signature_path, &serialized) {
+                    Ok(()) => FormattedResult::Updated,
+                    Err(e) => FormattedResult::Failed(e),
+                }
+            }
+        }
+    }
 }
 
 async fn update_formatted_file(fixture: &fixtures::Fixture) -> FormattedResult {
@@ -264,18 +378,43 @@ async fn update_formatted_file(fixture: &fixtures::Fixture) -> FormattedResult {
     }
 }
 
-/// Update prettier_intermediate_* files for a fixture
+/// Shape of prettier's chain from an `unformatted_ours_*` variant.
 ///
-/// For each unformatted_ours_* file, runs prettier to get first-pass output.
-/// If output differs from input (unstable intermediate), writes/updates prettier_intermediate_*.
-/// If output equals input (prettier normalizes directly), removes any existing prettier_intermediate_*.
+/// Distinguishes the three "no intermediate file" cases (which all clean up any stale files)
+/// from the two "write an intermediate file" cases (which differ only in target filename).
+enum ChainShape {
+    /// `prettier(variant) == input` — first pass normalizes directly; no intermediate needed.
+    NormalizesToInput,
+    /// `prettier(variant) != input` but `prettier(prettier(variant)) == prettier(variant)` —
+    /// first pass is already a fixed point; no intermediate needed.
+    StableFirstPass,
+    /// First pass unstable, second pass equals `input` — write `prettier_intermediate_*`.
+    UnstableConvergesToInput,
+    /// First pass unstable, second pass equals a sibling `variant_*` / `prettier_variant_*` —
+    /// write `prettier_intermediate_to_variant_*`.
+    UnstableConvergesToVariant,
+    /// First pass unstable, second pass is neither `input` nor any documented variant —
+    /// the chain is anchored further downstream and captured by `audit_signature.txt`
+    /// alongside `output_prettier.*`; no intermediate file is appropriate.
+    UnstableNotConverging,
+    /// First-pass output is syntactically invalid (prettier bug) — second pass fails to parse.
+    /// No chain classification is possible. Treat like `UnstableNotConverging` for file
+    /// management (clean up stale intermediates) but surface the prettier bug in the message.
+    FirstPassUnparseable(String),
+}
+
+/// Update prettier_intermediate_*{,_to_variant_*} files for a fixture.
+///
+/// For each `unformatted_ours_*` file, classifies what prettier does over one or two passes
+/// (see `ChainShape`), then either removes any stale intermediate files or writes the
+/// correct one. The `UnstableNotConverging` case is the interaction point with
+/// `audit_signature.txt` — those fixtures pin their chain there instead.
 async fn update_intermediate_files(
     fixture: &fixtures::Fixture,
     input_ext: &str,
 ) -> Vec<(String, FormattedResult)> {
     let mut results = Vec::new();
 
-    // Read input file for comparison
     let input = match fixtures::read_file(&fixture.input_path()) {
         Ok(s) => s,
         Err(e) => {
@@ -289,6 +428,22 @@ async fn update_intermediate_files(
 
     let unformatted_ours_variants = discover_unformatted_ours_variants(&fixture.path, input_ext);
 
+    // Pre-load convergence-target contents to distinguish "converges to input" from
+    // "converges to a documented variant" on the second pass.
+    let prettier_variant_variants = discover_prettier_variant_variants(&fixture.path, input_ext);
+    let variant_variants = discover_variant_variants(&fixture.path, input_ext);
+    let mut variant_target_contents: Vec<String> = Vec::new();
+    for pv_name in &prettier_variant_variants {
+        if let Ok(content) = fixtures::read_file(&fixture.path.join(pv_name)) {
+            variant_target_contents.push(content);
+        }
+    }
+    for v_name in &variant_variants {
+        if let Ok(content) = fixtures::read_file(&fixture.path.join(v_name)) {
+            variant_target_contents.push(content);
+        }
+    }
+
     for variant_name in unformatted_ours_variants {
         // Extract suffix: unformatted_ours_X.svelte -> X
         let suffix = variant_name
@@ -296,67 +451,179 @@ async fn update_intermediate_files(
             .and_then(|s| s.strip_suffix(input_ext))
             .unwrap_or("");
 
-        let intermediate_filename = format!("prettier_intermediate_{suffix}{input_ext}");
-        let intermediate_path = fixture.path.join(&intermediate_filename);
+        let plain_filename = format!("prettier_intermediate_{suffix}{input_ext}");
+        let to_variant_filename = format!("prettier_intermediate_to_variant_{suffix}{input_ext}");
+        let plain_path = fixture.path.join(&plain_filename);
+        let to_variant_path = fixture.path.join(&to_variant_filename);
 
-        // Read variant file
-        let variant_path = fixture.path.join(&variant_name);
-        let variant_content = match fixtures::read_file(&variant_path) {
-            Ok(s) => s,
-            Err(e) => {
-                results.push((intermediate_filename, FormattedResult::Failed(e)));
-                continue;
-            }
-        };
-
-        // Run prettier on variant
-        let formatted = match crate::deno::run_prettier(
-            &variant_content,
-            fixture.input_type().prettier_parser(),
-        )
-        .await
-        {
-            Ok(f) => f,
-            Err(e) => {
-                results.push((
-                    intermediate_filename,
-                    FormattedResult::Failed(format!("Prettier error: {e}")),
-                ));
-                continue;
-            }
-        };
-
-        // If prettier normalizes directly to input, remove any existing intermediate file
-        if formatted == input {
-            if intermediate_path.exists() {
-                match fixtures::delete_file_if_exists(&intermediate_path) {
-                    Ok(()) => results.push((intermediate_filename, FormattedResult::Removed)),
-                    Err(e) => results.push((intermediate_filename, FormattedResult::Failed(e))),
+        let (shape, formatted) =
+            match classify_variant_chain(fixture, &variant_name, &input, &variant_target_contents)
+                .await
+            {
+                Ok(pair) => pair,
+                Err(e) => {
+                    results.push((plain_filename, FormattedResult::Failed(e)));
+                    continue;
                 }
+            };
+
+        match shape {
+            ChainShape::NormalizesToInput | ChainShape::StableFirstPass => {
+                remove_stale_intermediates(
+                    &[
+                        (&plain_path, &plain_filename),
+                        (&to_variant_path, &to_variant_filename),
+                    ],
+                    &mut results,
+                );
             }
-            // No intermediate needed - prettier goes directly to input
-            continue;
+            ChainShape::UnstableNotConverging => {
+                // Make the skip visible — silently doing nothing here masks the (intentional)
+                // interaction between prettier_intermediate_* and audit_signature.txt.
+                println!(
+                    "- {}/{}: chain doesn't converge to input or any variant — captured by audit_signature.txt instead",
+                    fixture.relative_path, variant_name
+                );
+                remove_stale_intermediates(
+                    &[
+                        (&plain_path, &plain_filename),
+                        (&to_variant_path, &to_variant_filename),
+                    ],
+                    &mut results,
+                );
+            }
+            ChainShape::FirstPassUnparseable(prettier_err) => {
+                // Prettier produced syntactically invalid output on the first pass — a known
+                // prettier bug (e.g., `{@const x = expr) /* c */}`). Document the bug in the
+                // fixture's README and clean up any stale intermediate files. Not a failure:
+                // there's no chain to record, and `fixtures:validate` is the authoritative
+                // green-light for the fixture as a whole.
+                println!(
+                    "- {}/{}: prettier produced invalid syntax on first pass (prettier bug, see README): {prettier_err}",
+                    fixture.relative_path, variant_name
+                );
+                remove_stale_intermediates(
+                    &[
+                        (&plain_path, &plain_filename),
+                        (&to_variant_path, &to_variant_filename),
+                    ],
+                    &mut results,
+                );
+            }
+            ChainShape::UnstableConvergesToInput => {
+                write_intermediate_target(
+                    &plain_path,
+                    plain_filename,
+                    &to_variant_path,
+                    to_variant_filename,
+                    &formatted,
+                    &mut results,
+                );
+            }
+            ChainShape::UnstableConvergesToVariant => {
+                write_intermediate_target(
+                    &to_variant_path,
+                    to_variant_filename,
+                    &plain_path,
+                    plain_filename,
+                    &formatted,
+                    &mut results,
+                );
+            }
         }
-
-        // Prettier produces unstable intermediate output, write/update the file
-        let existing = fixtures::read_file(&intermediate_path).ok();
-
-        let result = if Some(&formatted) == existing.as_ref() {
-            FormattedResult::Unchanged
-        } else if existing.is_none() {
-            match fixtures::write_file(&intermediate_path, &formatted) {
-                Ok(()) => FormattedResult::Created,
-                Err(e) => FormattedResult::Failed(e),
-            }
-        } else {
-            match fixtures::write_file(&intermediate_path, &formatted) {
-                Ok(()) => FormattedResult::Updated,
-                Err(e) => FormattedResult::Failed(e),
-            }
-        };
-
-        results.push((intermediate_filename, result));
     }
 
     results
+}
+
+/// Classify prettier's chain from a single `unformatted_ours_*` variant.
+///
+/// Returns the chain shape and prettier's first-pass output (the bytes that go into a
+/// `prettier_intermediate_*` file when the shape calls for one). Errors are surfaced as
+/// `FormattedResult::Failed` by the caller, keyed to the `prettier_intermediate_*` filename.
+async fn classify_variant_chain(
+    fixture: &fixtures::Fixture,
+    variant_name: &str,
+    input: &str,
+    variant_target_contents: &[String],
+) -> Result<(ChainShape, String), String> {
+    let variant_content = fixtures::read_file(&fixture.path.join(variant_name))?;
+    let parser = fixture.input_type().prettier_parser();
+
+    let formatted = crate::deno::run_prettier(&variant_content, parser)
+        .await
+        .map_err(|e| format!("Prettier error: {e}"))?;
+
+    if formatted == *input {
+        return Ok((ChainShape::NormalizesToInput, formatted));
+    }
+
+    // Second pass can fail when prettier's first-pass output is syntactically invalid
+    // (a known prettier bug — e.g., `{@const x = expr) /* c */}` has an unmatched paren).
+    // Don't propagate as a hard error; classify it so the caller can clean up and report
+    // the prettier bug specifically.
+    let second_pass = match crate::deno::run_prettier(&formatted, parser).await {
+        Ok(s) => s,
+        Err(e) => return Ok((ChainShape::FirstPassUnparseable(e.to_string()), formatted)),
+    };
+
+    let shape = if second_pass == formatted {
+        ChainShape::StableFirstPass
+    } else if second_pass == *input {
+        ChainShape::UnstableConvergesToInput
+    } else if variant_target_contents.contains(&second_pass) {
+        ChainShape::UnstableConvergesToVariant
+    } else {
+        ChainShape::UnstableNotConverging
+    };
+    Ok((shape, formatted))
+}
+
+/// Remove any intermediate files that exist; append a `Removed`/`Failed` result for each.
+fn remove_stale_intermediates(
+    paths: &[(&std::path::Path, &String)],
+    results: &mut Vec<(String, FormattedResult)>,
+) {
+    for (path, name) in paths {
+        if path.exists() {
+            match fixtures::delete_file_if_exists(path) {
+                Ok(()) => results.push(((*name).clone(), FormattedResult::Removed)),
+                Err(e) => results.push(((*name).clone(), FormattedResult::Failed(e))),
+            }
+        }
+    }
+}
+
+/// Write `formatted` into `target_path` (Created/Updated/Unchanged) and clean up any stale
+/// `opposite_path` from a previous run with a different chain shape.
+fn write_intermediate_target(
+    target_path: &std::path::Path,
+    target_filename: String,
+    opposite_path: &std::path::Path,
+    opposite_filename: String,
+    formatted: &str,
+    results: &mut Vec<(String, FormattedResult)>,
+) {
+    if opposite_path.exists()
+        && let Err(e) = fixtures::delete_file_if_exists(opposite_path)
+    {
+        results.push((opposite_filename, FormattedResult::Failed(e)));
+        // Continue to write the correct target even on cleanup failure.
+    }
+
+    let existing = fixtures::read_file(target_path).ok();
+    let result = if existing.as_deref() == Some(formatted) {
+        FormattedResult::Unchanged
+    } else if existing.is_none() {
+        match fixtures::write_file(target_path, formatted) {
+            Ok(()) => FormattedResult::Created,
+            Err(e) => FormattedResult::Failed(e),
+        }
+    } else {
+        match fixtures::write_file(target_path, formatted) {
+            Ok(()) => FormattedResult::Updated,
+            Err(e) => FormattedResult::Failed(e),
+        }
+    };
+    results.push((target_filename, result));
 }

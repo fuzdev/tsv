@@ -1,0 +1,38 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2 (fixed point)%%
+<script>
+	// Anonymous function - no params
+	const a = function () {
+		// c1
+	};
+
+	// Anonymous function - with params
+	const b = function (
+		// c2
+		x,
+	) {
+		return x;
+	};
+
+	// Anonymous generator
+	const c = function* () {
+		// c3
+	};
+
+	// Async anonymous function
+	const d = async function () {
+		// c4
+	};
+
+	// Export default anonymous function
+	export default function () {
+		// c5
+	}
+</script>

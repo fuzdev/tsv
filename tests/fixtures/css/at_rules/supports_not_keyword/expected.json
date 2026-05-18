@@ -10,7 +10,7 @@
 				"start": 9,
 				"end": 84,
 				"name": "supports",
-				"prelude": "not /* comment */ (display: grid)",
+				"prelude": "not  (display: grid)",
 				"block": {
 					"type": "Block",
 					"start": 53,
@@ -71,7 +71,7 @@
 				"start": 87,
 				"end": 161,
 				"name": "supports",
-				"prelude": "not /* a */ selector(:has(div))",
+				"prelude": "not  selector(:has(div))",
 				"block": {
 					"type": "Block",
 					"start": 129,

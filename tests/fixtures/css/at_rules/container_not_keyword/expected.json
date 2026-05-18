@@ -10,7 +10,7 @@
 				"start": 9,
 				"end": 85,
 				"name": "container",
-				"prelude": "not /* comment */ (width > 100px)",
+				"prelude": "not  (width > 100px)",
 				"block": {
 					"type": "Block",
 					"start": 54,
@@ -71,7 +71,7 @@
 				"start": 88,
 				"end": 172,
 				"name": "container",
-				"prelude": "sidebar not /* a */ style(--theme: dark)",
+				"prelude": "sidebar not  style(--theme: dark)",
 				"block": {
 					"type": "Block",
 					"start": 140,

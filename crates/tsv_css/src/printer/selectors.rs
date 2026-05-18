@@ -94,13 +94,12 @@ impl<'a> Printer<'a> {
         // Use current column position (what's already printed: indent + pseudo-class prefix)
         // and leave room for closing `) {` (3 chars)
         let current_col = self.current_column();
-        let available_width = self.config.print_width.saturating_sub(current_col + 3);
+        let available_width = tsv_lang::PRINT_WIDTH.saturating_sub(current_col + 3);
         let fits = doc::arena_fits::<dyn doc::TextResolver>(
             &self.arena,
             list_doc,
             available_width,
             Mode::Flat,
-            &self.config,
             None,
         );
 
@@ -186,13 +185,12 @@ impl<'a> Printer<'a> {
         // Check if it fits on one line
         // Account for: indent + trailing " {" (2 chars)
         let overhead = self.indent_width() + 2; // " {" or ", "
-        let available_width = self.config.print_width.saturating_sub(overhead);
+        let available_width = tsv_lang::PRINT_WIDTH.saturating_sub(overhead);
         let fits = doc::arena_fits::<dyn doc::TextResolver>(
             &self.arena,
             selector_doc,
             available_width,
             Mode::Flat,
-            &self.config,
             None,
         );
 
@@ -566,13 +564,12 @@ impl<'a> Printer<'a> {
         // Calculate available width: account for `(` and `)` plus trailing content
         // We need to leave room for `) {` (3 chars) at end of selector
         let current_col = self.current_column();
-        let available_width = self.config.print_width.saturating_sub(current_col + 4);
+        let available_width = tsv_lang::PRINT_WIDTH.saturating_sub(current_col + 4);
         let fits = doc::arena_fits::<dyn doc::TextResolver>(
             &self.arena,
             args_doc,
             available_width,
             Mode::Flat,
-            &self.config,
             None,
         );
 
@@ -643,7 +640,6 @@ impl<'a> Printer<'a> {
                             args_doc,
                             60,
                             Mode::Flat,
-                            &self.config,
                             None,
                         );
                         if !fits {

@@ -787,6 +787,7 @@ impl<'a> Printer<'a> {
             is_short_key,
             rhs_comments,
             false,
+            None,
         )
     }
 
@@ -794,6 +795,10 @@ impl<'a> Printer<'a> {
     ///
     /// When `rhs_has_line_comment` is true, forces `BreakAfterOperator` layout so the
     /// line comment and expression get proper indentation instead of being placed inline.
+    ///
+    /// When `right_boundary` is `Some`, checks for trailing comments from stripped grouping
+    /// parens between `right_expr.span().end` and the boundary. If found, wraps in parens.
+    #[allow(clippy::too_many_arguments)]
     pub fn build_assignment_layout_with_line_comment(
         &self,
         left_doc: DocId,
@@ -802,13 +807,14 @@ impl<'a> Printer<'a> {
         is_short_key: bool,
         rhs_comments: Option<DocId>,
         rhs_has_line_comment: bool,
+        right_boundary: Option<u32>,
     ) -> DocId {
         let d = self.d();
         let mut layout = choose_layout(
             right_expr,
             is_short_key,
             self.source,
-            self.config.print_width,
+            tsv_lang::PRINT_WIDTH,
             self.comments,
         );
 
@@ -847,7 +853,11 @@ impl<'a> Printer<'a> {
             layout = AssignmentLayout::NeverBreakAfterOperator;
         }
 
-        let right_doc = self.build_expression_doc(right_expr);
+        let right_doc = if let Some(boundary) = right_boundary {
+            self.build_expression_doc_with_paren_comments(right_expr, boundary)
+        } else {
+            self.build_expression_doc(right_expr)
+        };
 
         // Validate static heuristic: if is_poorly_breakable_chain classified this
         // expression as poorly breakable (no good internal break points), the printed
@@ -860,7 +870,7 @@ impl<'a> Printer<'a> {
                 !is_poorly_breakable_chain(
                     core_expr,
                     self.source,
-                    self.config.print_width,
+                    tsv_lang::PRINT_WIDTH,
                     self.comments,
                 ) || !d.will_break(right_doc)
             },

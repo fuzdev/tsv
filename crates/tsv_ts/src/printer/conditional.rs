@@ -95,7 +95,7 @@ impl<'a> Printer<'a> {
         // In embedded contexts (Svelte attributes), the grandparent is a template
         // node (none of the above), so shouldNotIndent = true → no indent.
         let test = if let internal::Expression::BinaryExpression(binary) = &*cond.test {
-            if self.config.is_embedded_expression {
+            if self.embed.is_embedded() {
                 // Embedded: shouldNotIndent = true (grandparent is Svelte template node)
                 self.build_binary_chain_doc(binary)
             } else if indent_binary_test {
@@ -125,13 +125,17 @@ impl<'a> Printer<'a> {
         // grandparent is ReturnStatement/ThrowStatement/CallExpression/NewExpression,
         // shouldNotIndent = false → binary gets indent(rest) for continuation lines.
         // In assignment/variable contexts, shouldNotIndent = true → flat (no indent).
-        let consequent = self.build_ternary_branch_expr_doc(&cond.consequent, indent_binary_test);
+        let consequent = self.build_ternary_branch_expr_doc(
+            &cond.consequent,
+            indent_binary_test,
+            alternate_start,
+        );
 
         // Split comments around ? and : operators.
         // Comments before ? go after test, comments after ? go before consequent,
         // comments after : go before alternate.
-        let question_pos = self.find_char_position(test_end, consequent_start, '?');
-        let colon_pos = self.find_char_position(consequent_end, alternate_start, ':');
+        let question_pos = self.find_char_outside_comments(test_end, consequent_start, b'?');
+        let colon_pos = self.find_char_outside_comments(consequent_end, alternate_start, b':');
 
         // Comments between test and ?
         let comments_before_question = if let Some(q) = question_pos {
@@ -144,6 +148,13 @@ impl<'a> Printer<'a> {
         // Trailing space so the comment doesn't touch the consequent
         let comments_after_question = if let Some(q) = question_pos {
             self.build_inline_comments_between_doc_trailing_space(q + 1, consequent_start)
+        } else {
+            d.empty()
+        };
+
+        // Comments between consequent and : (e.g., `b ? c /* comment */ : d`)
+        let comments_before_colon = if let Some(c) = colon_pos {
+            self.build_inline_comments_between_doc(consequent_end, c)
         } else {
             d.empty()
         };
@@ -196,27 +207,30 @@ impl<'a> Printer<'a> {
         //   (right-associative, so naturally parsed as `a ? b : (c ? d : e)`)
         // - `as`/`satisfies` need parens to avoid `:` ambiguity: `a ? b : (c as T)`
         // - `??` needs parens for clarity: `a ? b : (c ?? d)`
-        let alternate_doc = if let internal::Expression::ConditionalExpression(nested) =
-            &*cond.alternate
-        {
-            // Recursively build as chained (no group wrapper, no parens)
-            // No indent wrapper - nested conditional has its own structure
-            self.build_conditional_doc_impl(nested, true, indent_binary_test)
-        } else {
-            let alternate = self.build_ternary_branch_expr_doc(&cond.alternate, indent_binary_test);
-            let alternate = if matches!(
-                &*cond.alternate,
-                internal::Expression::TSAsExpression(_)
-                    | internal::Expression::TSSatisfiesExpression(_)
-                    | internal::Expression::AssignmentExpression(_)
-            ) || is_nullish_coalescing(&cond.alternate)
-            {
-                d.parens(alternate)
+        let alternate_doc =
+            if let internal::Expression::ConditionalExpression(nested) = &*cond.alternate {
+                // Recursively build as chained (no group wrapper, no parens)
+                // No indent wrapper - nested conditional has its own structure
+                self.build_conditional_doc_impl(nested, true, indent_binary_test)
             } else {
-                alternate
+                let alternate = self.build_ternary_branch_expr_doc(
+                    &cond.alternate,
+                    indent_binary_test,
+                    cond.span.end,
+                );
+                let alternate = if matches!(
+                    &*cond.alternate,
+                    internal::Expression::TSAsExpression(_)
+                        | internal::Expression::TSSatisfiesExpression(_)
+                        | internal::Expression::AssignmentExpression(_)
+                ) || is_nullish_coalescing(&cond.alternate)
+                {
+                    d.parens(alternate)
+                } else {
+                    alternate
+                };
+                d.indent(alternate)
             };
-            d.indent(alternate)
-        };
 
         let inner = d.concat(&[
             test,
@@ -226,6 +240,7 @@ impl<'a> Printer<'a> {
                 d.text("? "),
                 comments_after_question,
                 consequent_doc,
+                comments_before_colon,
                 d.line(),
                 d.text(": "),
                 comments_after_colon,
@@ -274,8 +289,8 @@ impl<'a> Printer<'a> {
         };
 
         // Find the ? and : positions for proper comment categorization
-        let question_pos = self.find_char_position(test_end, consequent_start, '?');
-        let colon_pos = self.find_char_position(consequent_end, alternate_start, ':');
+        let question_pos = self.find_char_outside_comments(test_end, consequent_start, b'?');
+        let colon_pos = self.find_char_outside_comments(consequent_end, alternate_start, b':');
 
         let mut parts = vec![test];
 
@@ -298,7 +313,7 @@ impl<'a> Printer<'a> {
                 if has_prev_comment_after_q {
                     // Subsequent comments go on their own line
                     q_parts.push(d.hardline());
-                    q_parts.push(d.text(self.config.indent));
+                    q_parts.push(d.text(tsv_lang::INDENT));
                 } else {
                     q_parts.push(d.text(" "));
                 }
@@ -325,7 +340,7 @@ impl<'a> Printer<'a> {
         if has_line_comment_before_consequent {
             // Line comment — consequent on new line
             q_parts.push(d.hardline());
-            q_parts.push(d.text(self.config.indent));
+            q_parts.push(d.text(tsv_lang::INDENT));
             q_parts.push(consequent);
         } else {
             // Single block comment or no comment - space then consequent
@@ -366,7 +381,7 @@ impl<'a> Printer<'a> {
                 if has_prev_comment_after_colon {
                     // Subsequent comments go on their own line
                     q_parts.push(d.hardline());
-                    q_parts.push(d.text(self.config.indent));
+                    q_parts.push(d.text(tsv_lang::INDENT));
                 } else {
                     q_parts.push(d.text(" "));
                 }
@@ -390,7 +405,7 @@ impl<'a> Printer<'a> {
 
         if has_line_comment_before_alternate {
             q_parts.push(d.hardline());
-            q_parts.push(d.text(self.config.indent));
+            q_parts.push(d.text(tsv_lang::INDENT));
         } else {
             q_parts.push(d.text(" "));
         }
@@ -410,21 +425,11 @@ impl<'a> Printer<'a> {
         &self,
         expr: &internal::Expression,
         indent_binary: bool,
+        boundary_end: u32,
     ) -> DocId {
         if indent_binary && let internal::Expression::BinaryExpression(binary) = expr {
             return self.build_binary_chain_doc_with_continuation_indent(binary);
         }
-        self.build_expression_doc(expr)
-    }
-
-    /// Find the position of a character in source, skipping over comments
-    fn find_char_position(&self, start: u32, end: u32, target: char) -> Option<u32> {
-        super::analysis::find_char_skipping_comments(
-            self.source.as_bytes(),
-            start as usize,
-            end as usize,
-            target as u8,
-        )
-        .map(|pos| pos as u32)
+        self.build_expression_doc_with_paren_comments(expr, boundary_end)
     }
 }

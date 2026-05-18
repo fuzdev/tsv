@@ -8,10 +8,10 @@
 // - Blank line preservation between properties
 
 use super::Printer;
-use super::calls::skip_stripped_open_paren;
 use super::expression_stringifier::is_valid_js_identifier;
 use super::expressions::literals::format_string_literal_from_ast;
 use crate::ast::internal::{self, Expression, Literal, LiteralValue};
+use crate::printer::CommentSpacing;
 use tsv_lang::SymbolResolver;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
@@ -265,16 +265,12 @@ impl<'a> Printer<'a> {
             let mut parts = Vec::new();
 
             for (i, prop) in obj.properties.iter().enumerate() {
-                // Check for blank line before this property (preserved in multiline)
-                // Use find_comma_after + skip_stripped_open_paren to avoid span gaps
-                // from stripped grouping parens being falsely detected as blank lines.
+                // Check for blank line before this property (preserved in multiline).
                 let has_blank_before = if i > 0 {
                     let prev_prop = &obj.properties[i - 1];
                     let prev_end = prev_prop.value_end();
                     let prop_start = prop.span().start;
-                    let check_start = self.find_comma_after(prev_end).map_or(prev_end, |c| c + 1);
-                    let check_end = skip_stripped_open_paren(self.source, check_start, prop_start);
-                    self.has_blank_line_between(check_start, check_end)
+                    self.has_blank_line_after_comma(prev_end, prop_start)
                 } else {
                     false
                 };
@@ -296,9 +292,7 @@ impl<'a> Printer<'a> {
                     let next_prop = &obj.properties[i + 1];
                     let curr_end = prop.value_end();
                     let next_start = next_prop.span().start;
-                    let check_start = self.find_comma_after(curr_end).map_or(curr_end, |c| c + 1);
-                    let check_end = skip_stripped_open_paren(self.source, check_start, next_start);
-                    let next_has_blank = self.has_blank_line_between(check_start, check_end);
+                    let next_has_blank = self.has_blank_line_after_comma(curr_end, next_start);
 
                     if !next_has_blank {
                         parts.push(d.line());
@@ -382,23 +376,9 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // For computed keys, use expression doc (preserves string quotes)
         // For regular keys, use property key doc (converts strings to bare identifiers when valid)
+        // Track where comments after the key region end (after `]` for computed, after key for normal)
+        let key_region_end;
         let key_doc = if prop.computed {
-            // Handle comments inside computed property brackets: [/* comment */ key]
-            let key_start = prop.key.span().start;
-            let key_end = prop.key.span().end;
-
-            // Find bracket positions (search from property start, not file start)
-            let bracket_start = self.find_opening_bracket_after(prop.span.start, key_start);
-            let bracket_end = self.find_closing_bracket_after(key_end);
-
-            let mut parts = vec![d.text("[")];
-
-            // Add comments between [ and key
-            for comment in comments_in_range(self.comments, bracket_start + 1, key_start) {
-                parts.push(self.build_comment_doc(comment));
-                parts.push(d.text(" "));
-            }
-
             // Assignment expressions need parens in computed keys: {[(a = b)]: c}
             let key_expr_doc =
                 if super::needs_parens(&prop.key, super::ParenContext::ComputedPropertyKey) {
@@ -406,17 +386,12 @@ impl<'a> Printer<'a> {
                 } else {
                     self.build_expression_doc(&prop.key)
                 };
-            parts.push(key_expr_doc);
-
-            // Add comments between key and ]
-            for comment in comments_in_range(self.comments, key_end, bracket_end) {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-            }
-
-            parts.push(d.text("]"));
-            d.concat(&parts)
+            let (doc, end) =
+                self.build_computed_key_bracket_doc(prop.span.start, &prop.key, key_expr_doc);
+            key_region_end = end;
+            doc
         } else {
+            key_region_end = prop.key.span().end;
             self.build_property_key_doc(&prop.key)
         };
 
@@ -435,7 +410,15 @@ impl<'a> Printer<'a> {
             // Getter/setter: `get x() {}` or `set x(v) {}`
             if let Expression::FunctionExpression(func) = &prop.value {
                 let func_doc = self.build_function_doc_body(func);
-                d.concat(&[key_doc, func_doc])
+                // Comments between key and params: get [x] /* c */() {}
+                // Line comments get a hardline to prevent absorbing parens as comment text
+                let params_start = func.params_start;
+                let comments = self.build_name_to_type_params_comments(
+                    key_region_end,
+                    params_start,
+                    CommentSpacing::Leading,
+                );
+                d.concat(&[key_doc, comments, func_doc])
             } else {
                 key_doc
             }
@@ -450,16 +433,33 @@ impl<'a> Printer<'a> {
                 }
                 if func.generator {
                     parts.push(d.text("*"));
+                    let star_search_start = if func.r#async {
+                        prop.span.start + 6 // after "async "
+                    } else {
+                        prop.span.start
+                    };
+                    self.append_generator_star_comments(
+                        &mut parts,
+                        star_search_start,
+                        prop.key.span().start,
+                    );
                 }
                 parts.push(key_doc);
 
-                // Handle comments between method name and parameters: foo /* comment */ ()
-                let key_end = prop.key.span().end;
-                let params_start = func.params_start;
-                for comment in comments_in_range(self.comments, key_end, params_start) {
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                }
+                // Handle comments between method name and type params/parameters: foo /* comment */ ()
+                // Use key_region_end (after `]` for computed) to avoid re-finding bracket comments
+                // Stop at type_params start when present — comments between `>` and `(`
+                // are handled by build_function_expression_signature_doc
+                // Line comments get a hardline to prevent absorbing type params as comment text
+                let comment_search_end = func
+                    .type_parameters
+                    .as_ref()
+                    .map_or(func.params_start, |tp| tp.span.start);
+                parts.push(self.build_name_to_type_params_comments(
+                    key_region_end,
+                    comment_search_end,
+                    CommentSpacing::for_type_params(func.type_parameters.is_some()),
+                ));
 
                 parts.push(func_doc);
                 d.concat(&parts)
@@ -483,13 +483,14 @@ impl<'a> Printer<'a> {
         } else {
             // Regular property: check for comments between key and value
             // Find colon position and check for comments
-            let key_end = prop.key.span().end;
-            let colon_pos = self.find_colon_after(key_end);
+            // Use key_region_end (after `]` for computed, after key for normal)
+            // to avoid double-counting comments already inside brackets
+            let colon_pos = self.find_colon_after(key_region_end);
             let value_start = prop.value.span().start;
 
-            // Comments between key and colon (e.g., {key /* comment */: value})
+            // Comments between key region and colon (e.g., {key /* comment */: value})
             let pre_colon_comments: Vec<_> =
-                comments_in_range(self.comments, key_end, colon_pos).collect();
+                comments_in_range(self.comments, key_region_end, colon_pos).collect();
             // Comments between colon and value (e.g., {key: /* comment */ value})
             let post_colon_comments: Vec<_> =
                 comments_in_range(self.comments, colon_pos + 1, value_start).collect();
@@ -617,21 +618,21 @@ impl<'a> Printer<'a> {
     /// Uses `getStringWidth(cleanDoc(keyDoc)) < tabWidth + MIN_OVERLAP_FOR_BREAK`
     fn is_short_property_key(&self, key: &Expression, computed: bool) -> bool {
         // Prettier: MIN_OVERLAP_FOR_BREAK = 3 (assignment.js:409)
-        let threshold = self.config.tab_width + super::assignment::MIN_OVERLAP_FOR_BREAK;
+        let threshold = tsv_lang::TAB_WIDTH + super::assignment::MIN_OVERLAP_FOR_BREAK;
 
         let base_width = match key {
             // Prettier: cleanDoc reduces identifier keys to their name string
             Expression::Identifier(id) => {
-                visual_width(&self.resolve_symbol(id.name), self.config.tab_width)
+                visual_width(&self.resolve_symbol(id.name), tsv_lang::TAB_WIDTH)
             }
             Expression::Literal(lit) => match &lit.value {
                 LiteralValue::String { content, .. } => {
                     // For computed keys, quotes are always preserved: ["x"] prints as ['x']
                     // For non-computed keys, valid identifiers are unquoted: {"x":1} → {x:1}
                     if computed || !is_valid_js_identifier(content) {
-                        visual_width(content, self.config.tab_width) + 2 // Include quotes
+                        visual_width(content, tsv_lang::TAB_WIDTH) + 2 // Include quotes
                     } else {
-                        visual_width(content, self.config.tab_width)
+                        visual_width(content, tsv_lang::TAB_WIDTH)
                     }
                 }
                 LiteralValue::Number(_) => {
@@ -690,6 +691,39 @@ impl<'a> Printer<'a> {
             b':',
         )
         .map_or(start, |pos| pos as u32)
+    }
+
+    /// Build a `[key]` doc with comments preserved inside brackets.
+    /// Returns `(doc, key_region_end)` where key_region_end is the position after `]`.
+    /// Used by object properties, class methods, and class properties.
+    pub(super) fn build_computed_key_bracket_doc(
+        &self,
+        search_start: u32,
+        key: &Expression,
+        key_doc: DocId,
+    ) -> (DocId, u32) {
+        let d = self.d();
+        let key_start = key.span().start;
+        let key_end = key.span().end;
+        let bracket_start = self.find_opening_bracket_after(search_start, key_start);
+        let bracket_end = self.find_closing_bracket_after(key_end);
+
+        let mut parts = vec![d.text("[")];
+
+        for comment in comments_in_range(self.comments, bracket_start + 1, key_start) {
+            parts.push(self.build_comment_doc(comment));
+            parts.push(d.text(" "));
+        }
+
+        parts.push(key_doc);
+
+        for comment in comments_in_range(self.comments, key_end, bracket_end) {
+            parts.push(d.text(" "));
+            parts.push(self.build_comment_doc(comment));
+        }
+
+        parts.push(d.text("]"));
+        (d.concat(&parts), bracket_end + 1)
     }
 
     /// Find the opening `[` bracket between two positions (for computed properties).

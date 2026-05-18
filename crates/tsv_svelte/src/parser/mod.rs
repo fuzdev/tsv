@@ -211,7 +211,7 @@ impl<'a> SvelteParser<'a> {
                     content: ts_comment.content.clone(),
                     is_block: ts_comment.is_block,
                     span: ts_comment.span,
-                    has_character_loc: ts_comment.has_character_loc,
+                    emit_character_field: ts_comment.emit_character_field,
                 });
             }
         }
@@ -221,7 +221,7 @@ impl<'a> SvelteParser<'a> {
                     content: ts_comment.content.clone(),
                     is_block: ts_comment.is_block,
                     span: ts_comment.span,
-                    has_character_loc: ts_comment.has_character_loc,
+                    emit_character_field: ts_comment.emit_character_field,
                 });
             }
         }

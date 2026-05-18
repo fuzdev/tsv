@@ -31,6 +31,8 @@ pub(crate) fn find_comma_pos(source: &str, start: u32, end: u32) -> Option<usize
 /// may contain `(\n\t\texpr` — two newlines that look like a blank line.
 /// This scans from `from` toward `to` and skips past any opening `(` that's the
 /// first non-whitespace character, returning the position after it.
+///
+/// Callers must pass `from <= to`.
 #[inline]
 pub(crate) fn skip_stripped_open_paren(source: &str, from: u32, to: u32) -> u32 {
     let slice = &source[from as usize..to as usize];
@@ -477,8 +479,8 @@ impl<'a> PartitionedComments<'a> {
         arg_end: u32,
         next_arg_start: u32,
     ) -> bool {
-        let check_start = if self.has_trailing_line() {
-            self.trailing_line.last().unwrap().span.end
+        let check_start = if let Some(last) = self.trailing_line.last() {
+            last.span.end
         } else {
             find_comma_pos(source, arg_end, next_arg_start).map_or(arg_end, |c| c as u32 + 1)
         };

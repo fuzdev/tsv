@@ -3,6 +3,7 @@
 // Handles building call arguments in chain contexts where the callee
 // is handled separately by the chain printer.
 
+use super::super::comments::{CommentFilter, CommentSpacing};
 use super::super::utils::{
     arrow_has_trailing_param_comments, is_block_function, is_concise_numeric_array,
     is_curried_arrow, is_function_composition_args, is_short_second_arg_for_expand_first,
@@ -307,26 +308,47 @@ fn build_call_args_doc_for_chain_impl(
     let prefix = if optional { "?.(" } else { "(" };
 
     let mut parts = Vec::new();
+    // Emit comments between callee and type args: `obj.fn/* c */ <string>()`
+    // Uses build_name_to_type_params_comments for safe line comment handling
+    if let Some(ta) = type_args {
+        let gap_start = call.callee.span().end;
+        let gap_end = ta.span.start;
+        if let Some(doc) = printer.build_name_to_type_params_comments_opt(
+            gap_start,
+            gap_end,
+            CommentSpacing::Trailing,
+        ) {
+            parts.push(doc);
+        }
+    }
     if let Some(ta_doc) = type_args_doc {
         parts.push(ta_doc);
     }
 
     if call.arguments.is_empty() {
-        // Check for comments inside empty parens
-        let has_empty_paren_comments = printer.has_comments_between(paren_open, call.span.end);
-        if has_empty_paren_comments {
-            // Emit comments between parens
-            let mut inner_parts = Vec::new();
-            for comment in tsv_lang::comments_in_range(printer.comments, paren_open, call.span.end)
-            {
-                if !inner_parts.is_empty() {
-                    inner_parts.push(d.text(" "));
-                }
-                inner_parts.push(printer.build_comment_doc(comment));
+        // Separate pre-paren comments (between > and () from inside-paren comments
+        let paren_close = call.span.end;
+        let actual_paren = printer.find_char_outside_comments(paren_open, paren_close, b'(');
+        if let Some(paren_pos) = actual_paren {
+            let pre_paren_comments = printer.build_comments_between_filtered_opt(
+                paren_open,
+                paren_pos,
+                CommentSpacing::Leading,
+                CommentFilter::All,
+            );
+            let inside_paren_comments = printer
+                .build_inline_comments_between_doc_no_leading_space_opt(paren_pos + 1, paren_close);
+            if let Some(pre) = pre_paren_comments {
+                parts.push(pre);
             }
-            parts.push(d.text(prefix));
-            parts.push(d.concat(&inner_parts));
-            parts.push(d.text(")"));
+            match inside_paren_comments {
+                Some(inner) => {
+                    parts.push(d.text(prefix));
+                    parts.push(inner);
+                    parts.push(d.text(")"));
+                }
+                None => parts.push(d.text_owned(format!("{prefix})"))),
+            }
         } else {
             parts.push(d.text_owned(format!("{prefix})")));
         }

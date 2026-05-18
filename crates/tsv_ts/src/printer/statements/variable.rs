@@ -3,7 +3,7 @@
 use super::Printer;
 use crate::ast::internal::{self, Expression};
 use crate::printer::{
-    CommentFilter, CommentSpacing, ParenContext, conditional_should_break_after_op,
+    CommentFilter, CommentSpacing, ParenContext, analysis, conditional_should_break_after_op,
     is_call_on_member_chain, is_curried_arrow_with_return_type, is_literal_member_chain,
     is_module_path_fluid_call, is_multiline_string_literal, is_poorly_breakable_chain,
     is_pure_property_chain, is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding,
@@ -11,6 +11,7 @@ use crate::printer::{
     needs_parens, should_inline_logical_expression,
 };
 use tsv_lang::SymbolToU32;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
@@ -71,13 +72,64 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let mut parts = vec![d.symbol(ident.name.to_u32())];
+
+        // Compute name_end for comment extraction
+        let search_end = ident
+            .type_annotation
+            .as_ref()
+            .map_or(ident.span.end, |ta| ta.span.start);
+        let raw_name_end = analysis::skip_identifier_at(
+            self.source.as_bytes(),
+            ident.span.start as usize,
+            search_end as usize,
+        ) as u32;
+        let mut after_modifier = raw_name_end;
+
         if definite {
+            #[allow(clippy::expect_used)] // Parser guarantees `!` exists for definite identifier
+            let bang_pos = analysis::find_char_skipping_comments(
+                self.source.as_bytes(),
+                after_modifier as usize,
+                search_end as usize,
+                b'!',
+            )
+            .expect("! not found for definite identifier") as u32;
+            // Comments between name and `!` (e.g., `a /* c */ !`)
+            if self.has_comments_between(after_modifier, bang_pos) {
+                parts.push(self.build_inline_comments_between_doc(after_modifier, bang_pos));
+            }
             parts.push(d.text("!"));
+            after_modifier = bang_pos + 1;
         }
         if ident.optional {
+            #[allow(clippy::expect_used)] // Parser guarantees `?` exists for optional identifier
+            let q_pos = analysis::find_char_skipping_comments(
+                self.source.as_bytes(),
+                after_modifier as usize,
+                search_end as usize,
+                b'?',
+            )
+            .expect("? not found for optional identifier") as u32;
+            // Comments between name/! and `?` (e.g., `a /* c */ ?`)
+            if self.has_comments_between(after_modifier, q_pos) {
+                parts.push(self.build_inline_comments_between_doc(after_modifier, q_pos));
+            }
             parts.push(d.text("?"));
+            after_modifier = q_pos + 1;
         }
         if let Some(type_ann) = &ident.type_annotation {
+            // Extract comments between modifiers and `:` (e.g., `a! /* c */: number`)
+            if self.has_comments_between(after_modifier, type_ann.span.start) {
+                let comment_doc =
+                    self.build_inline_comments_between_doc(after_modifier, type_ann.span.start);
+                if self.has_line_comments_between(after_modifier, type_ann.span.start) {
+                    // Line comment forces break: `a! // c\n: number`
+                    parts.push(comment_doc);
+                    parts.push(d.hardline());
+                } else {
+                    parts.push(d.concat(&[comment_doc, d.text(" ")]));
+                }
+            }
             if wrap_type {
                 parts.push(self.build_type_annotation_doc_wrapping(type_ann));
             } else {
@@ -152,14 +204,43 @@ impl<'a> Printer<'a> {
                 let has_block_comment = self.has_comments_between(prev_end, curr_start);
 
                 if should_break {
-                    parts.push(d.text(","));
                     if has_line_comment {
-                        // Line comment: print on same line as comma, then break
-                        parts.push(self.build_inline_comments_between_doc(prev_end, curr_start));
+                        // Line comment(s) between declarators: comma must go before
+                        // the first line comment, block comments go before the comma.
+                        // e.g. `a = 1 /* c1 */,\n// c2\nb = 2` or `a = 1, // c1\n// c2\nb = 2`
+                        let comments: Vec<_> =
+                            comments_in_range(self.comments, prev_end, curr_start).collect();
+                        let first_line_idx = comments.iter().position(|c| !c.is_block).unwrap_or(0);
+
+                        // Block comments before the first line comment
+                        for comment in &comments[..first_line_idx] {
+                            parts.push(d.text(" "));
+                            parts.push(self.build_comment_doc(comment));
+                        }
+
+                        // Comma before the first line comment
+                        parts.push(d.text(","));
+
+                        // Remaining comments (starting with the first line comment)
+                        // `needs_hardline` starts true when block comments precede
+                        // (comma sits between block and line, needs newline after)
+                        let mut needs_hardline = first_line_idx > 0;
+                        for comment in &comments[first_line_idx..] {
+                            if needs_hardline {
+                                parts.push(d.hardline());
+                                parts.push(d.text(tsv_lang::INDENT));
+                            } else {
+                                parts.push(d.text(" "));
+                            }
+                            parts.push(self.build_comment_doc(comment));
+                            needs_hardline = !comment.is_block;
+                        }
+                    } else {
+                        parts.push(d.text(","));
                     }
-                    // Break to new line with indentation for initializers
+                    // Break to new line with indentation for next declarator
                     parts.push(d.hardline());
-                    parts.push(d.text(self.config.indent));
+                    parts.push(d.text(tsv_lang::INDENT));
                     if has_block_comment && !has_line_comment {
                         // Block comment: print on new line before declarator
                         parts.push(self.build_inline_comments_between_doc_no_leading_space(
@@ -353,7 +434,7 @@ impl<'a> Printer<'a> {
                     || is_poorly_breakable_chain(
                         init,
                         self.source,
-                        self.config.print_width,
+                        tsv_lang::PRINT_WIDTH,
                         self.comments,
                     )
                     || is_string_literal(init)
@@ -412,7 +493,7 @@ impl<'a> Printer<'a> {
                     let call_head_width = indent_visual
                         + (call.callee.span().end as usize - decl.span.start as usize)
                         + 1; // +1 for "(" after callee
-                    call_head_width < self.config.print_width
+                    call_head_width < tsv_lang::PRINT_WIDTH
                 } else {
                     false
                 };
@@ -442,7 +523,7 @@ impl<'a> Printer<'a> {
                 let is_type_assertion_with_lhs_type = is_type_assertion_call(
                     init,
                     self.source,
-                    self.config.print_width,
+                    tsv_lang::PRINT_WIDTH,
                 ) && matches!(&declarator.id, Expression::Identifier(id) if id.type_annotation.is_some());
 
                 let is_simple_rhs_with_breakable_lhs =
@@ -476,8 +557,7 @@ impl<'a> Printer<'a> {
                         // Single pass: partition comments into same-line (inline) and
                         // different-line (leading) relative to the `=` sign.
                         let mut leading_comments = Vec::new();
-                        for comment in
-                            tsv_lang::comments_in_range(self.comments, equals_pos + 1, init_start)
+                        for comment in comments_in_range(self.comments, equals_pos + 1, init_start)
                         {
                             if self.is_same_line(equals_pos, comment.span.start) {
                                 // Inline comment on same line as =
@@ -491,12 +571,26 @@ impl<'a> Printer<'a> {
                         parts.push(d.indent(d.concat(&[
                             d.hardline(),
                             d.concat(&leading_comments),
-                            wrap_init_doc(d, self.build_expression_doc(init), init),
+                            wrap_init_doc(
+                                d,
+                                self.build_expression_doc_with_paren_comments(
+                                    init,
+                                    declarator.span.end,
+                                ),
+                                init,
+                            ),
                         ])));
                     } else {
                         parts.push(d.indent(d.concat(&[
                             d.hardline(),
-                            wrap_init_doc(d, self.build_expression_doc(init), init),
+                            wrap_init_doc(
+                                d,
+                                self.build_expression_doc_with_paren_comments(
+                                    init,
+                                    declarator.span.end,
+                                ),
+                                init,
+                            ),
                         ])));
                     }
                 } else if has_multiline_block_comment_after_eq {
@@ -507,7 +601,11 @@ impl<'a> Printer<'a> {
                     let comments_doc = self
                         .build_rhs_comments_opt(rhs_comments_start, init_start)
                         .unwrap_or_else(|| d.empty());
-                    let init_doc = wrap_init_doc(d, self.build_expression_doc(init), init);
+                    let init_doc = wrap_init_doc(
+                        d,
+                        self.build_expression_doc_with_paren_comments(init, declarator.span.end),
+                        init,
+                    );
                     let rhs_doc = d.concat(&[comments_doc, init_doc]);
                     parts.push(d.group(d.indent(d.concat(&[d.line(), rhs_doc]))));
                 } else if is_curried_arrow {
@@ -517,7 +615,14 @@ impl<'a> Printer<'a> {
                     parts.push(d.text(" ="));
                     parts.push(d.indent(d.concat(&[
                         d.hardline(),
-                        wrap_init_doc(d, self.build_expression_doc(init), init),
+                        wrap_init_doc(
+                            d,
+                            self.build_expression_doc_with_paren_comments(
+                                init,
+                                declarator.span.end,
+                            ),
+                            init,
+                        ),
                     ])));
                 } else if (has_complex_type_annotation
                     || has_complex_destructuring
@@ -553,8 +658,11 @@ impl<'a> Printer<'a> {
 
                     // Add ` = rightDoc` (right side grouped)
                     parts.push(d.text(" = "));
-                    let init_doc =
-                        make_init_doc(wrap_init_doc(d, self.build_expression_doc(init), init));
+                    let init_doc = make_init_doc(wrap_init_doc(
+                        d,
+                        self.build_expression_doc_with_paren_comments(init, declarator.span.end),
+                        init,
+                    ));
                     parts.push(d.group(init_doc));
                 } else if is_type_assertion_with_lhs_type
                     || is_single_call_member_chain
@@ -576,8 +684,11 @@ impl<'a> Printer<'a> {
                     } else {
                         id_doc
                     };
-                    let init_doc =
-                        make_init_doc(wrap_init_doc(d, self.build_expression_doc(init), init));
+                    let init_doc = make_init_doc(wrap_init_doc(
+                        d,
+                        self.build_expression_doc_with_paren_comments(init, declarator.span.end),
+                        init,
+                    ));
                     parts.push(build_fluid_assignment_doc(
                         d,
                         make_fluid_lhs(fluid_id_doc),
@@ -592,8 +703,11 @@ impl<'a> Printer<'a> {
                     // indented together after the `=` break.
                     push_lhs(&mut parts, id_doc);
                     parts.push(d.text(" ="));
-                    let init_doc =
-                        make_init_doc(wrap_init_doc(d, self.build_expression_doc(init), init));
+                    let init_doc = make_init_doc(wrap_init_doc(
+                        d,
+                        self.build_expression_doc_with_paren_comments(init, declarator.span.end),
+                        init,
+                    ));
                     parts.push(d.group(d.indent(d.concat(&[d.line(), init_doc]))));
                 } else if is_layout_eligible && !is_simple_value(init) {
                     // Fluid layout (default for layout-eligible values)
@@ -601,8 +715,11 @@ impl<'a> Printer<'a> {
                     // Matches prettier's chooseLayout default: when no special layout
                     // applies, use fluid so the marker can break at `=` only if needed,
                     // while allowing the RHS to break internally first.
-                    let init_doc =
-                        make_init_doc(wrap_init_doc(d, self.build_expression_doc(init), init));
+                    let init_doc = make_init_doc(wrap_init_doc(
+                        d,
+                        self.build_expression_doc_with_paren_comments(init, declarator.span.end),
+                        init,
+                    ));
                     parts.push(build_fluid_assignment_doc(
                         d,
                         make_fluid_lhs(id_doc),
@@ -611,8 +728,11 @@ impl<'a> Printer<'a> {
                 } else {
                     push_lhs(&mut parts, id_doc);
                     parts.push(d.text(" = "));
-                    let init_doc =
-                        make_init_doc(wrap_init_doc(d, self.build_expression_doc(init), init));
+                    let init_doc = make_init_doc(wrap_init_doc(
+                        d,
+                        self.build_expression_doc_with_paren_comments(init, declarator.span.end),
+                        init,
+                    ));
                     parts.push(init_doc);
                 }
             } else if should_break || i == 0 {
@@ -626,10 +746,9 @@ impl<'a> Printer<'a> {
             parts.push(d.indent(d.concat(&rest_parts)));
         }
 
-        parts.push(d.text(";"));
-
-        // Handle comments between last declarator and semicolon
-        // Prettier prints these AFTER the semicolon: `const x = 1; /* comment */`
+        // Preserve comments between last declarator and semicolon in place:
+        // `const x = 1 /* comment */;` stays before `;`
+        // Prettier moves these after: `const x = 1; /* comment */`
         if let Some(last) = decl.declarations.last() {
             let semicolon_pos = decl.span.end.saturating_sub(1);
             if let Some(comments_doc) =
@@ -638,6 +757,8 @@ impl<'a> Printer<'a> {
                 parts.push(comments_doc);
             }
         }
+
+        parts.push(d.text(";"));
 
         // Restore context flags
         self.declaration_indent_depth.set(old_indent_depth);

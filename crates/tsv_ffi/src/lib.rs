@@ -37,7 +37,7 @@ unsafe fn extract_source<'a>(
 }
 
 /// Format a panic payload into a string for error reporting.
-fn format_panic(payload: Box<dyn std::any::Any + Send>) -> String {
+fn format_panic(payload: &(dyn std::any::Any + Send)) -> String {
     if let Some(s) = payload.downcast_ref::<&str>() {
         format!("panic: {s}")
     } else if let Some(s) = payload.downcast_ref::<String>() {
@@ -78,7 +78,7 @@ where
             string_to_ptr(json, out_len)
         }
         Ok(Err(e)) => error_result(&e, out_len),
-        Err(payload) => error_result(&format_panic(payload), out_len),
+        Err(payload) => error_result(&format_panic(&*payload), out_len),
     }
 }
 
@@ -104,7 +104,7 @@ where
     match panic::catch_unwind(|| f(source)) {
         Ok(Ok(result)) => string_to_ptr(result, out_len),
         Ok(Err(e)) => error_result(&e, out_len),
-        Err(payload) => error_result(&format_panic(payload), out_len),
+        Err(payload) => error_result(&format_panic(&*payload), out_len),
     }
 }
 
@@ -138,7 +138,7 @@ where
             string_to_ptr(String::new(), out_len) // Success: empty string
         }
         Ok(Err(e)) => error_result(&e, out_len),
-        Err(payload) => error_result(&format_panic(payload), out_len),
+        Err(payload) => error_result(&format_panic(&*payload), out_len),
     }
 }
 
@@ -158,197 +158,89 @@ fn error_result(message: &str, out_len: *mut usize) -> *mut u8 {
     string_to_ptr(json, out_len)
 }
 
-//
-// Svelte
-//
-
-/// Parse Svelte source code and return JSON AST.
+/// Generate `tsv_parse_<lang>` / `tsv_parse_internal_<lang>` / `tsv_format_<lang>`
+/// C FFI functions for one language module.
 ///
-/// # Safety
+/// # Safety (applies to every generated function)
 /// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
 /// - `out_len` must point to a valid `usize` for writing output length
 /// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn tsv_parse_svelte(
-    source_ptr: *const u8,
-    source_len: usize,
-    out_len: *mut usize,
-) -> *mut u8 {
-    unsafe {
-        with_source(source_ptr, source_len, out_len, |source| {
-            let ast = tsv_svelte::parse(source).map_err(|e| e.to_string())?;
-            Ok(tsv_svelte::convert_ast_json(&ast, source))
-        })
-    }
+macro_rules! lang_bindings {
+    ($parse_fn:ident, $parse_internal_fn:ident, $format_fn:ident, $lang:ident) => {
+        /// Parse source code and return JSON AST.
+        ///
+        /// # Safety
+        /// See the module-level safety contract.
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $parse_fn(
+            source_ptr: *const u8,
+            source_len: usize,
+            out_len: *mut usize,
+        ) -> *mut u8 {
+            unsafe {
+                with_source(source_ptr, source_len, out_len, |source| {
+                    let ast = $lang::parse(source).map_err(|e| e.to_string())?;
+                    Ok($lang::convert_ast_json(&ast, source))
+                })
+            }
+        }
+
+        /// Parse source to internal AST only (no conversion, no serialization).
+        /// Returns empty string on success for minimal overhead benchmarking.
+        ///
+        /// # Safety
+        /// See the module-level safety contract.
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $parse_internal_fn(
+            source_ptr: *const u8,
+            source_len: usize,
+            out_len: *mut usize,
+        ) -> *mut u8 {
+            unsafe {
+                with_source_parse_internal(source_ptr, source_len, out_len, |source| {
+                    $lang::parse(source).map_err(|e| e.to_string())
+                })
+            }
+        }
+
+        /// Format source code.
+        ///
+        /// # Safety
+        /// See the module-level safety contract.
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $format_fn(
+            source_ptr: *const u8,
+            source_len: usize,
+            out_len: *mut usize,
+        ) -> *mut u8 {
+            unsafe {
+                with_source_format(source_ptr, source_len, out_len, |source| {
+                    let ast = $lang::parse(source).map_err(|e| e.to_string())?;
+                    Ok($lang::format(&ast, source))
+                })
+            }
+        }
+    };
 }
 
-/// Parse Svelte source to internal AST only (no conversion, no serialization).
-/// Returns empty string on success for minimal overhead benchmarking.
-///
-/// # Safety
-/// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
-/// - `out_len` must point to a valid `usize` for writing output length
-/// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn tsv_parse_internal_svelte(
-    source_ptr: *const u8,
-    source_len: usize,
-    out_len: *mut usize,
-) -> *mut u8 {
-    unsafe {
-        with_source_parse_internal(source_ptr, source_len, out_len, |source| {
-            tsv_svelte::parse(source).map_err(|e| e.to_string())
-        })
-    }
-}
-
-/// Format Svelte source code.
-///
-/// # Safety
-/// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
-/// - `out_len` must point to a valid `usize` for writing output length
-/// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn tsv_format_svelte(
-    source_ptr: *const u8,
-    source_len: usize,
-    out_len: *mut usize,
-) -> *mut u8 {
-    unsafe {
-        with_source_format(source_ptr, source_len, out_len, |source| {
-            let ast = tsv_svelte::parse(source).map_err(|e| e.to_string())?;
-            Ok(tsv_svelte::format(&ast, source))
-        })
-    }
-}
-
-//
-// TypeScript
-//
-
-/// Parse TypeScript source code and return JSON AST.
-///
-/// # Safety
-/// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
-/// - `out_len` must point to a valid `usize` for writing output length
-/// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn tsv_parse_typescript(
-    source_ptr: *const u8,
-    source_len: usize,
-    out_len: *mut usize,
-) -> *mut u8 {
-    unsafe {
-        with_source(source_ptr, source_len, out_len, |source| {
-            let ast = tsv_ts::parse(source).map_err(|e| e.to_string())?;
-            Ok(tsv_ts::convert_ast_json(&ast, source))
-        })
-    }
-}
-
-/// Parse TypeScript source to internal AST only (no conversion, no serialization).
-/// Returns empty string on success for minimal overhead benchmarking.
-///
-/// # Safety
-/// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
-/// - `out_len` must point to a valid `usize` for writing output length
-/// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn tsv_parse_internal_typescript(
-    source_ptr: *const u8,
-    source_len: usize,
-    out_len: *mut usize,
-) -> *mut u8 {
-    unsafe {
-        with_source_parse_internal(source_ptr, source_len, out_len, |source| {
-            tsv_ts::parse(source).map_err(|e| e.to_string())
-        })
-    }
-}
-
-/// Format TypeScript source code.
-///
-/// # Safety
-/// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
-/// - `out_len` must point to a valid `usize` for writing output length
-/// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn tsv_format_typescript(
-    source_ptr: *const u8,
-    source_len: usize,
-    out_len: *mut usize,
-) -> *mut u8 {
-    unsafe {
-        with_source_format(source_ptr, source_len, out_len, |source| {
-            let ast = tsv_ts::parse(source).map_err(|e| e.to_string())?;
-            Ok(tsv_ts::format(&ast, source))
-        })
-    }
-}
-
-//
-// CSS
-//
-
-/// Parse CSS source code and return JSON AST.
-///
-/// # Safety
-/// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
-/// - `out_len` must point to a valid `usize` for writing output length
-/// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn tsv_parse_css(
-    source_ptr: *const u8,
-    source_len: usize,
-    out_len: *mut usize,
-) -> *mut u8 {
-    unsafe {
-        with_source(source_ptr, source_len, out_len, |source| {
-            let ast = tsv_css::parse(source).map_err(|e| e.to_string())?;
-            Ok(tsv_css::convert_ast_json(&ast, source))
-        })
-    }
-}
-
-/// Parse CSS source to internal AST only (no conversion, no serialization).
-/// Returns empty string on success for minimal overhead benchmarking.
-///
-/// # Safety
-/// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
-/// - `out_len` must point to a valid `usize` for writing output length
-/// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn tsv_parse_internal_css(
-    source_ptr: *const u8,
-    source_len: usize,
-    out_len: *mut usize,
-) -> *mut u8 {
-    unsafe {
-        with_source_parse_internal(source_ptr, source_len, out_len, |source| {
-            tsv_css::parse(source).map_err(|e| e.to_string())
-        })
-    }
-}
-
-/// Format CSS source code.
-///
-/// # Safety
-/// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
-/// - `out_len` must point to a valid `usize` for writing output length
-/// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn tsv_format_css(
-    source_ptr: *const u8,
-    source_len: usize,
-    out_len: *mut usize,
-) -> *mut u8 {
-    unsafe {
-        with_source_format(source_ptr, source_len, out_len, |source| {
-            let ast = tsv_css::parse(source).map_err(|e| e.to_string())?;
-            Ok(tsv_css::format(&ast, source))
-        })
-    }
-}
+lang_bindings!(
+    tsv_parse_svelte,
+    tsv_parse_internal_svelte,
+    tsv_format_svelte,
+    tsv_svelte
+);
+lang_bindings!(
+    tsv_parse_typescript,
+    tsv_parse_internal_typescript,
+    tsv_format_typescript,
+    tsv_ts
+);
+lang_bindings!(
+    tsv_parse_css,
+    tsv_parse_internal_css,
+    tsv_format_css,
+    tsv_css
+);
 
 //
 // Memory Management

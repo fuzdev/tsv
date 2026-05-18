@@ -4,13 +4,15 @@
 //! Part of the tsv (formatter and parser for TypeScript, Svelte, and CSS) project.
 
 pub mod ast;
-pub mod escapes;
-pub mod lexer;
-pub mod parser;
-pub mod printer;
+mod escapes;
+mod lexer;
+mod parser;
+mod printer;
 
 // Re-export commonly used types
-pub use ast::{CssDeclaration, CssNode, CssRule, CssStyleSheet, StyleContent, StyleSheet};
+pub use ast::{CssDeclaration, CssNode, CssRule, CssStyleSheet};
+#[cfg(feature = "convert")]
+pub use ast::{StyleContent, StyleSheet};
 pub use tsv_lang::{ParseError, Result};
 
 /// Parse CSS source into internal AST
@@ -84,19 +86,20 @@ pub fn format(stylesheet: &CssStyleSheet, source: &str) -> String {
 /// # Example
 /// ```
 /// use tsv_css::{parse, format_with_config};
-/// use tsv_lang::PrintConfig;
+/// use tsv_lang::{EmbedContext, PrintConfig};
 ///
 /// let css = "div{color:red;}";
 /// let stylesheet = parse(css).expect("Failed to parse CSS");
-/// let config = PrintConfig { base_indent_offset: 1, ..Default::default() };
-/// let formatted = format_with_config(&stylesheet, css, config);
+/// let embed = EmbedContext { base_indent_offset: 1, ..EmbedContext::default() };
+/// let formatted = format_with_config(&stylesheet, css, PrintConfig::default(), embed);
 /// ```
 pub fn format_with_config(
     stylesheet: &CssStyleSheet,
     source: &str,
     config: tsv_lang::PrintConfig,
+    embed: tsv_lang::EmbedContext,
 ) -> String {
-    printer::format_css_with_config(stylesheet, source, config)
+    printer::format_css_with_config(stylesheet, source, config, embed)
 }
 
 /// Convert CSS AST to public JSON-compatible AST
@@ -117,6 +120,7 @@ pub fn format_with_config(
 /// let public_ast = convert_ast(&stylesheet, css);
 /// let json = serde_json::to_string_pretty(&public_ast).unwrap();
 /// ```
+#[cfg(feature = "convert")]
 pub fn convert_ast(stylesheet: &CssStyleSheet, source: &str) -> StyleSheet {
     ast::convert::convert_css_nodes(&stylesheet.nodes, source)
 }
@@ -130,6 +134,7 @@ pub fn convert_ast(stylesheet: &CssStyleSheet, source: &str) -> StyleSheet {
 /// (no `attributes` or `content` fields, `end` set to full source length).
 ///
 /// This is the preferred function for producing JSON AST output.
+#[cfg(feature = "convert")]
 pub fn convert_ast_json(stylesheet: &CssStyleSheet, source: &str) -> serde_json::Value {
     let mut json = ast::convert::convert_css_nodes_standalone(&stylesheet.nodes, source);
     let map = tsv_lang::ByteToCharMap::new(source);

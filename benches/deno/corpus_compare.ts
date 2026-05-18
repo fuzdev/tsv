@@ -12,7 +12,11 @@
  *   deno task corpus:compare --all                          # All default corpus repos
  */
 
-import { parseArgs } from '@std/cli/parse-args';
+import process from 'node:process';
+
+import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.js';
+import { z } from 'zod';
+
 import { DevReposLoader, DirectoryLoader } from './lib/corpus.ts';
 import { CanonicalImplementation } from './lib/canonical.ts';
 import {
@@ -33,20 +37,20 @@ import {
 	type SafetyViolation,
 } from './lib/divergence/mod.ts';
 
-interface Args {
-	_: string[];
-	all?: boolean;
-	filter?: string;
-	limit?: number;
-	verbose?: boolean;
-	'exit-on-first'?: boolean;
-	'safety-only'?: boolean;
-	explain?: boolean;
-	strict?: boolean;
-	'audit-patterns'?: boolean;
-	summary?: boolean;
-	help?: boolean;
-}
+const CorpusCompareArgs = z.object({
+	_: z.array(z.string()).default(() => []),
+	all: z.boolean().default(false).meta({ aliases: ['a'] }),
+	filter: z.string().optional().meta({ aliases: ['f'] }),
+	limit: z.number().optional().meta({ aliases: ['l'] }),
+	verbose: z.boolean().default(false).meta({ aliases: ['v'] }),
+	'exit-on-first': z.boolean().default(false),
+	'safety-only': z.boolean().default(false),
+	explain: z.boolean().default(false),
+	strict: z.boolean().default(false),
+	'audit-patterns': z.boolean().default(false),
+	summary: z.boolean().default(false),
+	help: z.boolean().default(false).meta({ aliases: ['h'] }),
+});
 
 interface LanguageStats {
 	total: number;
@@ -173,28 +177,20 @@ Examples:
 }
 
 async function main(): Promise<void> {
-	const args = parseArgs(Deno.args, {
-		string: ['filter'],
-		boolean: [
-			'all',
-			'verbose',
-			'help',
-			'exit-on-first',
-			'safety-only',
-			'explain',
-			'strict',
-			'audit-patterns',
-			'summary',
-		],
-		alias: { h: 'help', v: 'verbose', f: 'filter', l: 'limit', a: 'all' },
-	}) as Args;
+	const parsed = args_parse(argv_parse(process.argv.slice(2)), CorpusCompareArgs);
+	if (!parsed.success) {
+		console.error(z.prettifyError(parsed.error));
+		printUsage();
+		Deno.exit(1);
+	}
+	const args = parsed.data;
 
 	if (args.help) {
 		printUsage();
 		return;
 	}
 
-	const useAllRepos = args.all ?? false;
+	const useAllRepos = args.all;
 	const path = args._[0]?.toString();
 
 	if (!path && !useAllRepos) {
@@ -218,14 +214,14 @@ async function main(): Promise<void> {
 		Deno.exit(1);
 	}
 
-	const limit = args.limit ? Number(args.limit) : undefined;
-	const verbose = args.verbose ?? false;
-	const exitOnFirst = args['exit-on-first'] ?? false;
-	const safetyOnly = args['safety-only'] ?? false;
-	const explain = args.explain ?? false;
-	const strict = args.strict ?? false;
-	const auditPatterns = args['audit-patterns'] ?? false;
-	const summary = args.summary ?? false;
+	const limit = args.limit;
+	const verbose = args.verbose;
+	const exitOnFirst = args['exit-on-first'];
+	const safetyOnly = args['safety-only'];
+	const explain = args.explain;
+	const strict = args.strict;
+	const auditPatterns = args['audit-patterns'];
+	const summary = args.summary;
 
 	if (useAllRepos) {
 		console.log('Comparing: All default corpus repos');
@@ -342,20 +338,61 @@ async function main(): Promise<void> {
 				// Only report safety violations when our output differs from prettier.
 				// If ours === prettier, the transformation is shared (e.g., shorthand
 				// collapsing: foo={foo} → {foo}) and not a bug in our formatter.
-				langStats.safetyViolation++;
-				langResults.push({
-					path: file.path,
-					bytes: file.bytes,
-					status: 'safety_violation',
-					safetyViolations,
+				//
+				// Check if all ours-vs-prettier differences are explained by known
+				// divergence patterns. Intentional divergences (BOM stripping,
+				// self-closing normalization) trigger safety checks but aren't bugs.
+				//
+				// Safety guarantee: if we lose content that prettier preserves, it
+				// creates an unexplained diff hunk → classification stays SAFETY.
+				// Content lost by both formatters has no diff hunk and is a shared
+				// transformation (not our bug). Overmatching risk is low because
+				// patterns like comment_position require the comment text to exist
+				// in both outputs — a dropped comment won't match.
+				const diff = diffLines(prettier, ours);
+				const hunks = extractHunks(diff);
+				const coverage = detectDivergences({
+					source: file.content,
+					ours,
+					prettier,
+					diff,
+					hunks,
+					language: lang,
 				});
-				if (exitOnFirst) {
-					const rel = relPath(file.path, basePath);
-					console.log(`\nSafety violation: ${rel}`);
-					for (const v of safetyViolations) {
-						console.log(`  ${v.type}: ${v.summary}`);
+
+				if (coverage.classification === 'all_explained') {
+					// Safety violations are fully explained by known divergence patterns
+					langStats.knownDivergence++;
+					langResults.push({
+						path: file.path,
+						bytes: file.bytes,
+						status: 'known_divergence',
+						coverage,
+					});
+					for (const d of coverage.matches) {
+						divergenceCounts.set(d.pattern, (divergenceCounts.get(d.pattern) || 0) + 1);
+						if (auditPatterns) {
+							recordAuditEntry(d.pattern, file.path, d.hunkIndices, hunks);
+						}
 					}
-					shouldExit = true;
+				} else {
+					// Unexplained safety violations — real data loss
+					langStats.safetyViolation++;
+					langResults.push({
+						path: file.path,
+						bytes: file.bytes,
+						status: 'safety_violation',
+						safetyViolations,
+						coverage: coverage.classification !== 'none_explained' ? coverage : undefined,
+					});
+					if (exitOnFirst) {
+						const rel = relPath(file.path, basePath);
+						console.log(`\nSafety violation: ${rel}`);
+						for (const v of safetyViolations) {
+							console.log(`  ${v.type}: ${v.summary}`);
+						}
+						shouldExit = true;
+					}
 				}
 			} else if (safetyOnly) {
 				// In safety-only mode, we're done after safety check passes

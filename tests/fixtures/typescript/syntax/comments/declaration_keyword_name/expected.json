@@ -1,0 +1,945 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 402,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Class declarations",
+			"start": 20,
+			"end": 41,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a ",
+			"start": 49,
+			"end": 56,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 7
+				},
+				"end": {
+					"line": 3,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b ",
+			"start": 78,
+			"end": 85,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 16
+				},
+				"end": {
+					"line": 4,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 106,
+			"end": 113,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 15
+				},
+				"end": {
+					"line": 5,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 133,
+			"end": 140,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 14
+				},
+				"end": {
+					"line": 6,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " e ",
+			"start": 168,
+			"end": 175,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 22
+				},
+				"end": {
+					"line": 7,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Enum declarations",
+			"start": 183,
+			"end": 203,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " f ",
+			"start": 210,
+			"end": 217,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 6
+				},
+				"end": {
+					"line": 10,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " g ",
+			"start": 242,
+			"end": 249,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 12
+				},
+				"end": {
+					"line": 13,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " h ",
+			"start": 276,
+			"end": 283,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 14
+				},
+				"end": {
+					"line": 16,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Namespace/module declarations",
+			"start": 298,
+			"end": 330,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 350,
+			"end": 357,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 19
+				},
+				"end": {
+					"line": 21,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " j ",
+			"start": 379,
+			"end": 386,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 16
+				},
+				"end": {
+					"line": 22,
+					"column": 23
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 401,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 392,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 43,
+					"end": 61,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 19
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 57,
+						"end": 58,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 15
+							},
+							"end": {
+								"line": 3,
+								"column": 16
+							}
+						},
+						"name": "A",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " a ",
+								"start": 49,
+								"end": 56
+							}
+						]
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 59,
+						"end": 61,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 17
+							},
+							"end": {
+								"line": 3,
+								"column": 19
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Class declarations",
+							"start": 20,
+							"end": 41
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 63,
+					"end": 90,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 28
+						}
+					},
+					"abstract": true,
+					"id": {
+						"type": "Identifier",
+						"start": 86,
+						"end": 87,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 24
+							},
+							"end": {
+								"line": 4,
+								"column": 25
+							}
+						},
+						"name": "B",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " b ",
+								"start": 78,
+								"end": 85
+							}
+						]
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 88,
+						"end": 90,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 26
+							},
+							"end": {
+								"line": 4,
+								"column": 28
+							}
+						},
+						"body": []
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 92,
+					"end": 118,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 27
+						}
+					},
+					"declare": true,
+					"id": {
+						"type": "Identifier",
+						"start": 114,
+						"end": 115,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 23
+							},
+							"end": {
+								"line": 5,
+								"column": 24
+							}
+						},
+						"name": "C",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 106,
+								"end": 113
+							}
+						]
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 116,
+						"end": 118,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 25
+							},
+							"end": {
+								"line": 5,
+								"column": 27
+							}
+						},
+						"body": []
+					}
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 120,
+					"end": 145,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 26
+						}
+					},
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassDeclaration",
+						"start": 127,
+						"end": 145,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 8
+							},
+							"end": {
+								"line": 6,
+								"column": 26
+							}
+						},
+						"id": {
+							"type": "Identifier",
+							"start": 141,
+							"end": 142,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 22
+								},
+								"end": {
+									"line": 6,
+									"column": 23
+								}
+							},
+							"name": "D",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " d ",
+									"start": 133,
+									"end": 140
+								}
+							]
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 143,
+							"end": 145,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 24
+								},
+								"end": {
+									"line": 6,
+									"column": 26
+								}
+							},
+							"body": []
+						}
+					},
+					"specifiers": [],
+					"source": null
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 147,
+					"end": 180,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 34
+						}
+					},
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassDeclaration",
+						"start": 162,
+						"end": 180,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 16
+							},
+							"end": {
+								"line": 7,
+								"column": 34
+							}
+						},
+						"id": {
+							"type": "Identifier",
+							"start": 176,
+							"end": 177,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 30
+								},
+								"end": {
+									"line": 7,
+									"column": 31
+								}
+							},
+							"name": "E",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " e ",
+									"start": 168,
+									"end": 175
+								}
+							]
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 178,
+							"end": 180,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 32
+								},
+								"end": {
+									"line": 7,
+									"column": 34
+								}
+							},
+							"body": []
+						}
+					}
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 205,
+					"end": 229,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 218,
+						"end": 219,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 14
+							},
+							"end": {
+								"line": 10,
+								"column": 15
+							}
+						},
+						"name": "F",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " f ",
+								"start": 210,
+								"end": 217
+							}
+						]
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 224,
+							"end": 225,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 2
+								},
+								"end": {
+									"line": 11,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 224,
+								"end": 225,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 3
+									}
+								},
+								"name": "X"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Enum declarations",
+							"start": 183,
+							"end": 203
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 231,
+					"end": 261,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 2
+						}
+					},
+					"const": true,
+					"id": {
+						"type": "Identifier",
+						"start": 250,
+						"end": 251,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 20
+							},
+							"end": {
+								"line": 13,
+								"column": 21
+							}
+						},
+						"name": "G",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " g ",
+								"start": 242,
+								"end": 249
+							}
+						]
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 256,
+							"end": 257,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 2
+								},
+								"end": {
+									"line": 14,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 256,
+								"end": 257,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 3
+									}
+								},
+								"name": "X"
+							}
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 263,
+					"end": 295,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 2
+						}
+					},
+					"declare": true,
+					"id": {
+						"type": "Identifier",
+						"start": 284,
+						"end": 285,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 22
+							},
+							"end": {
+								"line": 16,
+								"column": 23
+							}
+						},
+						"name": "H",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " h ",
+								"start": 276,
+								"end": 283
+							}
+						]
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 290,
+							"end": 291,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 2
+								},
+								"end": {
+									"line": 17,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 290,
+								"end": 291,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 3
+									}
+								},
+								"name": "X"
+							}
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 332,
+					"end": 362,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 31
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 358,
+						"end": 359,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 27
+							},
+							"end": {
+								"line": 21,
+								"column": 28
+							}
+						},
+						"name": "I",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " i ",
+								"start": 350,
+								"end": 357
+							}
+						]
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 360,
+						"end": 362,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 29
+							},
+							"end": {
+								"line": 21,
+								"column": 31
+							}
+						},
+						"body": []
+					},
+					"declare": true,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Namespace/module declarations",
+							"start": 298,
+							"end": 330
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 364,
+					"end": 391,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 28
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 387,
+						"end": 388,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 24
+							},
+							"end": {
+								"line": 22,
+								"column": 25
+							}
+						},
+						"name": "J",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " j ",
+								"start": 379,
+								"end": 386
+							}
+						]
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 389,
+						"end": 391,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 26
+							},
+							"end": {
+								"line": 22,
+								"column": 28
+							}
+						},
+						"body": []
+					},
+					"declare": true
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

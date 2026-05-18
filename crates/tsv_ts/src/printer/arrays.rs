@@ -63,6 +63,61 @@ impl<'a> Printer<'a> {
             .unwrap_or(arr.span.end - 1)
     }
 
+    /// Check for a blank line at an array boundary, walking back across any
+    /// intervening hole commas (elision-aware version of
+    /// `has_blank_line_after_comma`).
+    ///
+    /// `i` is the destination iter index; `upper` is the position of the next
+    /// real token (typically the next element's start, or its first own-line
+    /// leading comment).
+    fn has_blank_line_at_array_boundary(
+        &self,
+        arr: &internal::ArrayExpression,
+        i: usize,
+        upper: u32,
+    ) -> bool {
+        let check_start = self.blank_scan_start_before(arr, i, upper);
+        let check_end = skip_stripped_open_paren(self.source, check_start, upper);
+        self.has_blank_line_between(check_start, check_end)
+    }
+
+    /// Compute the scan start for a blank-line check between array element
+    /// boundaries — the position immediately before `upper` after stepping past
+    /// every comma and every comment in (`scan_from`, `upper`).
+    ///
+    /// `scan_from` is the end of the last real element before index `i` (or
+    /// just inside `[`). `i` may be `arr.elements.len()` for end-of-iter checks
+    /// where the "next" boundary is the closing bracket.
+    ///
+    /// Why both: elision commas live between consecutive holes; line and
+    /// multi-line block comments contribute newlines that `has_blank_line_between`
+    /// would otherwise count as a blank line. Returning the position past all of
+    /// them leaves a pure-whitespace gap to `upper` that the binary-search
+    /// blank-line check can interpret correctly.
+    ///
+    /// Result is clamped to `<= upper`.
+    fn blank_scan_start_before(
+        &self,
+        arr: &internal::ArrayExpression,
+        i: usize,
+        upper: u32,
+    ) -> u32 {
+        let scan_from = arr.elements[..i]
+            .iter()
+            .rev()
+            .find_map(|e| e.as_ref().map(|e| e.span().end))
+            .unwrap_or(arr.span.start + 1);
+        let mut pos = self
+            .find_last_comma_before(scan_from, upper)
+            .map_or(scan_from, |c| c + 1);
+        for c in comments_in_range(self.comments, pos, upper) {
+            if c.span.end > pos {
+                pos = c.span.end;
+            }
+        }
+        pos.min(upper)
+    }
+
     /// Format a block comment for inline use (with appropriate spacing)
     ///
     /// - `leading: true` for comments before elements → space after: `/*c*/ elem`
@@ -84,21 +139,6 @@ impl<'a> Printer<'a> {
         self.build_huggable_expression_doc(expr)
     }
 
-    /// Add leading comments after opening bracket for the first array element
-    fn add_first_element_comments(
-        &self,
-        arr: &internal::ArrayExpression,
-        first_elem: Option<&Expression>,
-        parts: &mut Vec<DocId>,
-    ) {
-        let first_elem_start = first_elem.map_or(arr.span.end - 1, |e| e.span().start);
-        for comment in comments_in_range(self.comments, arr.span.start + 1, first_elem_start) {
-            if comment.is_block {
-                parts.push(self.format_inline_block_comment(comment, true));
-            }
-        }
-    }
-
     /// Calculate the end position of an element (or fallback for elisions)
     fn element_end_position(
         &self,
@@ -108,26 +148,31 @@ impl<'a> Printer<'a> {
         elem.map_or(arr.span.start + 1, |e| e.span().end)
     }
 
-    /// Add leading block comments for a non-first array element
-    ///
-    /// Adds block comments that appear after the previous element's comma and before this element.
-    /// These are leading comments on the current element (not trailing on the previous).
-    fn add_leading_array_comments(
+    /// Emit block comments in `[search_start, elem_start)` as inline-leading
+    /// (`/*c*/ elem`). Used by both the first-element and subsequent-element
+    /// paths in the non-expanding array printers.
+    fn add_inline_leading_block_comments(
         &self,
-        arr: &internal::ArrayExpression,
+        search_start: u32,
         elem_start: u32,
-        current_index: usize,
         parts: &mut Vec<DocId>,
     ) {
-        let prev_end = self.element_end_position(arr.elements[current_index - 1].as_ref(), arr);
-
-        // Start search after the comma (comments after comma are leading on this element)
-        let search_start = self.leading_comment_search_start(prev_end, false);
-
         for comment in comments_in_range(self.comments, search_start, elem_start) {
             if comment.is_block {
                 parts.push(self.format_inline_block_comment(comment, true));
             }
+        }
+    }
+
+    /// Compute the search start for leading comments on the array element at
+    /// `i`. For the first element, that's just inside `[`; for later elements,
+    /// just past the comma after the previous element.
+    fn leading_comment_search_start_for(&self, arr: &internal::ArrayExpression, i: usize) -> u32 {
+        if i == 0 {
+            arr.span.start + 1
+        } else {
+            let prev_end = self.element_end_position(arr.elements[i - 1].as_ref(), arr);
+            self.leading_comment_search_start(prev_end, false)
         }
     }
 
@@ -163,10 +208,12 @@ impl<'a> Printer<'a> {
             return self.build_empty_brackets_with_comments_doc(arr.span);
         }
 
-        // Check for comments that force expansion: line comments (can't be inline)
-        // or multi-line block comments (contain hardlines that must propagate)
+        // Check for comments that force expansion: line comments (can't be inline),
+        // multi-line block comments (contain hardlines that must propagate),
+        // or own-line single-line block comments (on a separate line from adjacent tokens)
         let has_expanding_comments = self.has_line_comments_between(arr.span.start, arr.span.end)
-            || has_multiline_block_comments_in_range(self.comments, arr.span.start, arr.span.end);
+            || has_multiline_block_comments_in_range(self.comments, arr.span.start, arr.span.end)
+            || self.has_own_line_block_comments_in_array(arr);
 
         if has_expanding_comments {
             return self.build_array_doc_with_expanding_comments(arr);
@@ -193,6 +240,15 @@ impl<'a> Printer<'a> {
             // Use group with one-per-line for other content
             self.build_array_group_doc(arr)
         }
+    }
+
+    /// Check if array contains own-line single-line block comments that force expansion.
+    ///
+    /// Delegates to the generic `has_own_line_block_comments_in_bracket_list` helper,
+    /// filtering out holes (elisions) from the element list.
+    fn has_own_line_block_comments_in_array(&self, arr: &internal::ArrayExpression) -> bool {
+        let non_null: Vec<_> = arr.elements.iter().flatten().collect();
+        self.has_own_line_block_comments_in_bracket_list(arr.span, &non_null, |e| e.span())
     }
 
     /// Check if array contains only numeric literals (for fill behavior)
@@ -229,19 +285,12 @@ impl<'a> Printer<'a> {
                 let elem_start = expr.span().start;
                 let elem_end = expr.span().end;
 
-                // Add leading comments
-                if i == 0 {
-                    // First element: comments between `[` and element
-                    self.add_first_element_comments(arr, elem.as_ref(), &mut parts);
-                } else {
-                    // Other elements: comments between previous element's comma and this element
-                    self.add_leading_array_comments(arr, elem_start, i, &mut parts);
-                }
+                let search_start = self.leading_comment_search_start_for(arr, i);
+                self.add_inline_leading_block_comments(search_start, elem_start, &mut parts);
 
-                // Add element
                 parts.push(self.build_expression_doc(expr));
 
-                // Add trailing block comments (before comma only)
+                // Trailing block comments (before comma only)
                 self.add_trailing_array_comments(arr, elem_end, i, &mut parts);
             }
 
@@ -270,7 +319,7 @@ impl<'a> Printer<'a> {
         let has_trailing_elision = arr.elements.last().is_some_and(Option::is_none);
 
         // Check Prettier's shouldBreak heuristic for nested arrays/objects
-        let should_break = self.should_break_nested_array(arr);
+        let mut should_break = self.should_break_nested_array(arr);
 
         for (i, elem) in arr.elements.iter().enumerate() {
             // Calculate elem_end for blank line checking (even for elisions)
@@ -280,34 +329,38 @@ impl<'a> Printer<'a> {
             if let Some(expr) = elem {
                 let elem_start = expr.span().start;
 
-                // Add leading comments
-                if i == 0 {
-                    // First element: comments between `[` and element
-                    self.add_first_element_comments(arr, elem.as_ref(), &mut parts);
-                } else {
-                    // Other elements: comments between previous element's comma and this element
-                    self.add_leading_array_comments(arr, elem_start, i, &mut parts);
-                }
+                let search_start = self.leading_comment_search_start_for(arr, i);
+                self.add_inline_leading_block_comments(search_start, elem_start, &mut parts);
 
                 // Add element (templates wrapped in isolated_group)
                 parts.push(self.build_array_element_doc(expr));
 
-                // Add trailing block comments (before comma only)
+                // Trailing block comments (before comma only)
                 self.add_trailing_array_comments(arr, elem_end, i, &mut parts);
             }
 
             let is_last = i == arr.elements.len() - 1;
             if !is_last {
-                // Check for blank line after this element (using same boundary logic as comments)
-                // Use find_comma_after + skip_stripped_open_paren to avoid span gaps
-                // from stripped grouping parens being falsely detected as blank lines.
+                // Check for blank line after this element (using same boundary logic as comments).
                 let next_start = self.next_element_boundary(arr, i);
-                let check_start = self.find_comma_after(elem_end).map_or(elem_end, |c| c + 1);
-                let check_end = skip_stripped_open_paren(self.source, check_start, next_start);
-                let has_blank_after = self.has_blank_line_between(check_start, check_end);
+                let has_blank_after = self.has_blank_line_after_comma(elem_end, next_start);
 
                 // Separator comma between elements
                 parts.push(d.text(","));
+
+                // Own-line block comments from spread with stripped parens:
+                // placed after the comma as siblings in the array.
+                if let Some(expr) = elem {
+                    let spread_comments = self.spread_own_line_block_comments(expr);
+                    if !spread_comments.is_empty() {
+                        for comment in &spread_comments {
+                            parts.push(d.line());
+                            parts.push(self.build_comment_doc(comment));
+                        }
+                        should_break = true;
+                    }
+                }
+
                 if has_blank_after {
                     // Blank line preservation: empty line (no indent) then content line (with indent)
                     // Flat mode: just a space (blank line collapses)
@@ -319,6 +372,24 @@ impl<'a> Printer<'a> {
             } else if has_trailing_elision {
                 // Trailing comma for elision - MUST be preserved (semantically significant)
                 parts.push(d.text(","));
+
+                // Block comments past the trailing-elision comma (e.g., `[, , ,/* c */]`)
+                // aren't picked up by add_leading/add_trailing, which only run for real
+                // elements. Anchor on the last comma in the array, then emit any block
+                // comments after it inline.
+                let scan_start = arr
+                    .elements
+                    .iter()
+                    .flatten()
+                    .next_back()
+                    .map_or(arr.span.start + 1, |e| e.span().end);
+                if let Some(lc) = self.find_last_comma_before(scan_start, arr.span.end - 1) {
+                    for comment in comments_in_range(self.comments, lc + 1, arr.span.end - 1) {
+                        if comment.is_block {
+                            parts.push(self.build_comment_doc(comment));
+                        }
+                    }
+                }
             }
         }
 
@@ -330,13 +401,47 @@ impl<'a> Printer<'a> {
             d.trailing_comma()
         };
 
-        let inner = d.concat(&[d.softline(), d.concat(&parts), trailing]);
+        // Own-line block comments after the last element (before closing bracket).
+        // These appear as siblings after the trailing comma, forcing the array to break.
+        // Also picks up comments from spread with stripped parens that
+        // build_spread_doc intentionally skips.
+        let last_elem_end = arr.elements.last().and_then(|e| e.as_ref()).map(|e| {
+            // For spread elements, also check inside the spread span for
+            // comments from stripped parens (argument.end to spread.end)
+            if let Expression::SpreadElement(spread) = e {
+                let has_inner =
+                    self.has_comments_between(spread.argument.span().end, spread.span.end);
+                if has_inner {
+                    return spread.argument.span().end;
+                }
+            }
+            e.span().end
+        });
+        let mut trailing_own_line_comments = Vec::new();
+        if let Some(search_start) = last_elem_end {
+            for comment in comments_in_range(self.comments, search_start, arr.span.end - 1) {
+                if comment.is_block && !self.is_same_line(search_start, comment.span.start) {
+                    trailing_own_line_comments.push(comment);
+                }
+            }
+        }
+
+        let mut inner_parts = vec![d.softline(), d.concat(&parts), trailing];
+        if !trailing_own_line_comments.is_empty() {
+            for comment in &trailing_own_line_comments {
+                inner_parts.push(d.line());
+                inner_parts.push(self.build_comment_doc(comment));
+            }
+            should_break = true;
+        }
+
+        let inner = d.concat(&inner_parts);
         let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.softline());
 
         // Build group contents
         let group_contents = d.concat(&[d.text("["), indented_content, closing_line, d.text("]")]);
 
-        // Use group_break() when shouldBreak heuristic matched.
+        // Use group_break() when shouldBreak heuristic matched or spread comments force it.
         // This sets shouldBreak on the GROUP ITSELF rather than using break_parent().
         // The difference: shouldBreak is local to this group, while break_parent()
         // propagates up and forces enclosing groups to break.
@@ -357,17 +462,14 @@ impl<'a> Printer<'a> {
             if i > 0 {
                 parts.push(d.text(","));
 
-                // Check for blank line before this element (preserved when wrapped)
+                // Check for blank line before this element (preserved when wrapped).
                 // Use literalline() for the blank line (no trailing whitespace) then
                 // hardline() for the indented content line — matches the non-forced path.
-                // Use find_comma_after + skip_stripped_open_paren to avoid span gaps.
                 let prev_end = arr.elements[i - 1]
                     .as_ref()
                     .map_or(arr.span.start + 1, |e| e.span().end);
                 let curr_start = elem.as_ref().map_or(arr.span.end - 1, |e| e.span().start);
-                let check_start = self.find_comma_after(prev_end).map_or(prev_end, |c| c + 1);
-                let check_end = skip_stripped_open_paren(self.source, check_start, curr_start);
-                if self.has_blank_line_between(check_start, check_end) {
+                if self.has_blank_line_after_comma(prev_end, curr_start) {
                     parts.push(d.literalline());
                 }
 
@@ -379,10 +481,33 @@ impl<'a> Printer<'a> {
             }
         }
 
-        let inner = d.concat(&[d.hardline(), d.concat(&parts), d.text(",")]);
-        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.hardline());
+        // Own-line block comments after the last element (before closing bracket).
+        // These appear after the trailing comma, so we add comma + comment separately.
+        let mut trailing_comments = Vec::new();
+        if let Some(last) = arr.elements.last().and_then(|e| e.as_ref()) {
+            let search_start = last.span().end;
+            for comment in comments_in_range(self.comments, search_start, arr.span.end - 1) {
+                if comment.is_block && !self.is_same_line(search_start, comment.span.start) {
+                    trailing_comments.push(comment);
+                }
+            }
+        }
 
-        d.concat(&[d.text("["), indented_content, closing_line, d.text("]")])
+        if trailing_comments.is_empty() {
+            let inner = d.concat(&[d.hardline(), d.concat(&parts), d.text(",")]);
+            let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.hardline());
+            d.concat(&[d.text("["), indented_content, closing_line, d.text("]")])
+        } else {
+            // Trailing comma after last element, then comments on own lines
+            parts.push(d.text(","));
+            for comment in &trailing_comments {
+                parts.push(d.hardline());
+                parts.push(self.build_comment_doc(comment));
+            }
+            let inner = d.concat(&[d.hardline(), d.concat(&parts)]);
+            let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.hardline());
+            d.concat(&[d.text("["), indented_content, closing_line, d.text("]")])
+        }
     }
 
     /// Build a Doc for an array with comments that force expansion.
@@ -392,126 +517,180 @@ impl<'a> Printer<'a> {
     fn build_array_doc_with_expanding_comments(&self, arr: &internal::ArrayExpression) -> DocId {
         let d = self.d();
         let mut parts = Vec::new();
-        let mut prev_end = arr.span.start + 1; // After opening bracket
+
+        // End of the most recently emitted REAL element. Holes don't advance it;
+        // this lets the next real element's leading-comment range walk back across
+        // any intervening hole commas to claim the comments between them and the
+        // previous real element. Also drives the post-loop trailing-comments scan.
+        let mut last_real_emit_end = arr.span.start + 1;
+
+        // End position of the last trailing-on-array comment emitted by the
+        // trailing-hole iteration (when present). The post-loop scan starts here
+        // to avoid re-emitting those comments.
+        let mut trailing_hole_comments_end: Option<u32> = None;
 
         for (i, elem) in arr.elements.iter().enumerate() {
+            // O(remaining elements) — compute once and reuse below.
+            let next_boundary = self.next_element_boundary(arr, i);
             let (elem_start, elem_end) = match elem {
                 Some(e) => (e.span().start, e.span().end),
-                // Elision: use next element's start or closing bracket
-                None => {
-                    let pos = self.next_element_boundary(arr, i);
-                    (pos, pos)
-                }
+                None => (next_boundary, next_boundary),
             };
 
-            // Collect leading comments before this element
-            // Block comments after the comma are leading on this element, even if on
-            // the same line as the previous element. Line comments on the same line
-            // as the previous element are always trailing (handled in prior iteration).
-            let prev_comma_pos = if i > 0 {
-                self.find_comma_after(prev_end)
+            // Hole at the LAST element index: its leading comments are trailing
+            // on the array as a whole (no future real element to attach to).
+            // Collect them and emit inline after the hole's comma below.
+            let is_trailing_hole = elem.is_none() && i + 1 == arr.elements.len();
+
+            // For real elements: comments in (last_real_emit_end, elem_start).
+            // For a trailing hole: same range, but extended to the closing `]`.
+            // Other holes contribute nothing — their comments belong to the next
+            // real element's leading-comment range.
+            //
+            // Filter rule: comments same-line with the previous real element are
+            // trailing on it, EXCEPT block comments past its comma, which are
+            // leading on this element.
+            let leading_upper = if elem.is_some() {
+                Some(elem_start)
+            } else if is_trailing_hole {
+                Some(arr.span.end - 1)
             } else {
                 None
             };
-            let leading_comments: Vec<_> = comments_in_range(self.comments, prev_end, elem_start)
-                .filter(|c| {
-                    // Skip comments that are trailing on the previous element
-                    if i > 0 && self.is_same_line(prev_end, c.span.start) {
-                        // Block comments after the comma are leading on this element
-                        c.is_block && prev_comma_pos.is_some_and(|pos| c.span.start > pos)
-                    } else {
-                        true
-                    }
-                })
-                .collect();
+            let leading_comments: Vec<_> = if let Some(upper) = leading_upper {
+                let prev_comma_pos = (i > 0)
+                    .then(|| self.find_comma_after(last_real_emit_end))
+                    .flatten();
+                comments_in_range(self.comments, last_real_emit_end, upper)
+                    .filter(|c| {
+                        if i > 0 && self.is_same_line(last_real_emit_end, c.span.start) {
+                            c.is_block && prev_comma_pos.is_some_and(|pos| c.span.start > pos)
+                        } else {
+                            true
+                        }
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
 
-            // Check for blank line before this element or before leading comments
-            // Use find_comma_after + skip_stripped_open_paren to avoid span gaps.
+            // Blank-line check before this element / its leading comments
+            // (walks back across intervening hole commas).
             if i > 0 {
-                // Check blank line to the first leading comment, or to the element if no comments
                 let blank_check_end = leading_comments
                     .first()
                     .map_or(elem_start, |c| c.span.start);
-                let check_start = self.find_comma_after(prev_end).map_or(prev_end, |c| c + 1);
-                let check_end = skip_stripped_open_paren(self.source, check_start, blank_check_end);
-                if self.has_blank_line_between(check_start, check_end) {
+                if self.has_blank_line_at_array_boundary(arr, i, blank_check_end) {
                     parts.push(d.literalline());
                     parts.push(d.hardline());
                 }
             }
 
-            // Add leading comments (preserve blank lines between consecutive comments)
-            for (ci, comment) in leading_comments.iter().enumerate() {
-                // Preserve blank line between consecutive comments
-                if ci > 0 {
-                    let prev_comment_end = leading_comments[ci - 1].span.end;
-                    if self.has_blank_line_between(prev_comment_end, comment.span.start) {
-                        parts.push(d.literalline());
-                        parts.push(d.hardline());
+            // Emit leading comments BEFORE real element.
+            if elem.is_some() {
+                for (ci, comment) in leading_comments.iter().enumerate() {
+                    if ci > 0 {
+                        let prev_comment_end = leading_comments[ci - 1].span.end;
+                        if self.has_blank_line_between(prev_comment_end, comment.span.start) {
+                            parts.push(d.literalline());
+                            parts.push(d.hardline());
+                        }
                     }
-                }
-                parts.push(self.build_comment_doc(comment));
-                // Line comments always need hardline after
-                // Block comments: hardline if NOT on same line as element, space otherwise
-                let is_last_comment = ci == leading_comments.len() - 1;
-                let has_blank_after = if is_last_comment {
-                    false
-                } else {
-                    self.has_blank_line_between(
-                        comment.span.end,
-                        leading_comments[ci + 1].span.start,
-                    )
-                };
-                if has_blank_after {
-                    // Skip hardline — the blank line separator at the next comment handles it
-                } else if !comment.is_block || !self.is_same_line(comment.span.end, elem_start) {
-                    parts.push(d.hardline());
-                } else {
-                    parts.push(d.text(" "));
+                    parts.push(self.build_comment_doc(comment));
+                    // If a blank line follows, the next iter's literalline+hardline
+                    // handles the separator — emit nothing here.
+                    let next_is_separated_by_blank =
+                        leading_comments.get(ci + 1).is_some_and(|next| {
+                            self.has_blank_line_between(comment.span.end, next.span.start)
+                        });
+                    if !next_is_separated_by_blank {
+                        let inline_block =
+                            comment.is_block && self.is_same_line(comment.span.end, elem_start);
+                        parts.push(if inline_block {
+                            d.text(" ")
+                        } else {
+                            d.hardline()
+                        });
+                    }
                 }
             }
 
-            // Add element (or nothing for elision)
             if let Some(e) = elem {
                 parts.push(self.build_array_element_doc(e));
             }
 
-            // Boundary for trailing comments: next element or closing bracket
-            let next_boundary = self.next_element_boundary(arr, i);
+            // Same-line trailing comments (real elements only).
+            let trailing: Vec<_> = if elem.is_some() {
+                let comma_pos = self.find_comma_after(elem_end);
+                comments_in_range(self.comments, elem_end, next_boundary)
+                    .filter(|c| self.is_same_line(elem_end, c.span.start))
+                    .filter(|c| {
+                        if c.is_block {
+                            comma_pos.is_none_or(|pos| c.span.start < pos)
+                        } else {
+                            true
+                        }
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
 
-            // Collect same-line trailing comments (block before comma, line after)
-            let comma_pos = self.find_comma_after(elem_end);
-            let trailing: Vec<_> = comments_in_range(self.comments, elem_end, next_boundary)
-                .filter(|c| self.is_same_line(elem_end, c.span.start))
-                .collect();
-
-            // Block comments go before comma (only if actually before the comma)
             for comment in trailing.iter().filter(|c| c.is_block) {
-                if comma_pos.is_none_or(|pos| comment.span.start < pos) {
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                }
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
             }
 
             parts.push(d.text(","));
 
-            // Line comments go after comma (excluded from width calculations)
             for comment in trailing.iter().filter(|c| !c.is_block) {
                 parts.push(self.build_trailing_line_comment_doc(comment));
             }
 
-            // Check if next element has blank line before it or before its leading comments
-            // If so, don't add hardline here (blank line will be added at start of next iteration)
+            // Trailing-hole iter: emit collected trailing-on-array comments inline
+            // after this hole's comma. First same-line block comment hugs the comma
+            // (no separator); subsequent or own-line comments use hardline.
+            if is_trailing_hole && !leading_comments.is_empty() {
+                // Source position of the LAST comma before `]` (the comma we just
+                // emitted for this hole). Used as the same-line anchor for the
+                // first comment.
+                let last_comma = self.find_last_comma_before(last_real_emit_end, arr.span.end - 1);
+
+                for (ci, comment) in leading_comments.iter().enumerate() {
+                    let same_line_inline = if ci == 0 {
+                        comment.is_block
+                            && last_comma.is_some_and(|c| self.is_same_line(c, comment.span.start))
+                    } else {
+                        let prev_comment_end = leading_comments[ci - 1].span.end;
+                        comment.is_block
+                            && self.is_same_line(prev_comment_end, comment.span.start)
+                            && !self.has_blank_line_between(prev_comment_end, comment.span.start)
+                    };
+                    if same_line_inline {
+                        parts.push(self.build_comment_doc(comment));
+                    } else {
+                        if ci > 0 {
+                            let prev_comment_end = leading_comments[ci - 1].span.end;
+                            if self.has_blank_line_between(prev_comment_end, comment.span.start) {
+                                parts.push(d.literalline());
+                            }
+                        }
+                        parts.push(d.hardline());
+                        parts.push(self.build_comment_doc(comment));
+                    }
+                }
+                trailing_hole_comments_end = leading_comments.last().map(|c| c.span.end);
+            }
+
+            // Suppress trailing hardline if the next iter has a blank line before it
+            // (the blank check at start of that iter will emit it).
             let next_has_blank_before = if i + 1 < arr.elements.len() {
-                let next_start = self.next_element_boundary(arr, i);
-                let first_leading_comment = comments_in_range(self.comments, elem_end, next_start)
-                    .find(|c| !self.is_same_line(elem_end, c.span.start));
+                let first_leading_comment =
+                    comments_in_range(self.comments, elem_end, next_boundary)
+                        .find(|c| !self.is_same_line(elem_end, c.span.start));
                 let blank_check_boundary =
-                    first_leading_comment.map_or(next_start, |c| c.span.start);
-                let check_start = self.find_comma_after(elem_end).map_or(elem_end, |c| c + 1);
-                let check_end =
-                    skip_stripped_open_paren(self.source, check_start, blank_check_boundary);
-                self.has_blank_line_between(check_start, check_end)
+                    first_leading_comment.map_or(next_boundary, |c| c.span.start);
+                self.has_blank_line_at_array_boundary(arr, i + 1, blank_check_boundary)
             } else {
                 false
             };
@@ -520,12 +699,27 @@ impl<'a> Printer<'a> {
                 parts.push(d.hardline());
             }
 
-            prev_end = elem_end;
+            if elem.is_some() {
+                last_real_emit_end = elem_end;
+
+                // Spread elements with own-line trailing comments from stripped parens:
+                // expose them to subsequent leading-comment searches and the final scan.
+                if let Some(Expression::SpreadElement(spread)) = elem {
+                    let arg_end = spread.argument.span().end;
+                    let has_own_line = comments_in_range(self.comments, arg_end, spread.span.end)
+                        .any(|c| c.is_block && self.has_newline_between(arg_end, c.span.start));
+                    if has_own_line {
+                        last_real_emit_end = arg_end;
+                    }
+                }
+            }
         }
 
-        // Add any final comments before closing bracket
-        for comment in comments_in_range(self.comments, prev_end, arr.span.end - 1) {
-            if !self.is_same_line(prev_end, comment.span.start) {
+        // Final comments before closing bracket. Skip what trailing-hole emission
+        // already handled.
+        let final_scan_start = trailing_hole_comments_end.unwrap_or(last_real_emit_end);
+        for comment in comments_in_range(self.comments, final_scan_start, arr.span.end - 1) {
+            if !self.is_same_line(final_scan_start, comment.span.start) {
                 parts.push(d.hardline());
                 parts.push(self.build_comment_doc(comment));
             }

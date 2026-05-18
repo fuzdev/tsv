@@ -45,14 +45,21 @@ impl<'a> Printer<'a> {
     pub(super) fn print_const_tag(&mut self, tag: &internal::ConstTag) {
         self.write("{@const ");
 
+        let embed = tsv_lang::EmbedContext {
+            base_indent_offset: self.indent_level,
+            ..tsv_lang::EmbedContext::default()
+        };
+
         // Format the id (pattern) with current indent level for multiline patterns
-        let formatted_id = tsv_ts::format_expression_with_indent_and_comments(
+        let formatted_id = tsv_ts::format_expression(
             &tag.id,
             self.source,
             Rc::clone(&self.interner),
-            self.indent_level,
             self.comments,
             &self.line_breaks,
+            tsv_lang::PrintConfig::default(),
+            embed,
+            tsv_ts::TsConfig::svelte(),
         );
         self.write(&formatted_id);
         self.write(" = ");
@@ -63,13 +70,15 @@ impl<'a> Printer<'a> {
         }
 
         // Format the init expression
-        let formatted_init = tsv_ts::format_expression_with_indent_and_comments(
+        let formatted_init = tsv_ts::format_expression(
             &tag.init,
             self.source,
             Rc::clone(&self.interner),
-            self.indent_level,
             self.comments,
             &self.line_breaks,
+            tsv_lang::PrintConfig::default(),
+            embed,
+            tsv_ts::TsConfig::svelte(),
         );
         self.write(&formatted_init);
 

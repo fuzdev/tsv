@@ -11,7 +11,7 @@ use crate::lexer::{KeywordKind, Lexer, TokenKind};
 use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
-use tsv_lang::{ParseError, PeekData, Span};
+use tsv_lang::{ParseError, PeekData, SharedInterner, Span};
 
 // Import parsing implementations
 mod expression;
@@ -28,7 +28,7 @@ pub struct Parser<'a> {
     current_end: usize,
     current_decoded: Option<String>, // Decoded string value (for strings with escapes)
     peek_cache: Option<PeekData<TokenKind>>,
-    interner: Rc<RefCell<DefaultStringInterner>>,
+    interner: SharedInterner,
     base_offset: usize,     // Offset in full source (for embedded expressions)
     comments: Vec<Comment>, // Collected comments during parsing
     /// True if a line terminator occurred between the previous token and current token.
@@ -75,7 +75,7 @@ impl<'a> Parser<'a> {
     pub fn with_interner(
         source: &'a str,
         base_offset: usize,
-        interner: Rc<RefCell<DefaultStringInterner>>,
+        interner: SharedInterner,
     ) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
         // Extract token data immediately to avoid keeping token alive
@@ -91,7 +91,7 @@ impl<'a> Parser<'a> {
                 content: content.clone(),
                 is_block: *is_block,
                 span: Span::new((start + base_offset) as u32, (end + base_offset) as u32),
-                has_character_loc: false,
+                emit_character_field: false,
             });
             let token = lexer.next_token()?;
             kind = token.kind;
@@ -168,7 +168,7 @@ impl<'a> Parser<'a> {
                     (self.current_start + self.base_offset) as u32,
                     (self.current_end + self.base_offset) as u32,
                 ),
-                has_character_loc: false,
+                emit_character_field: false,
             });
             let token = self.lexer.next_token()?;
             self.current_kind = token.kind;
@@ -559,7 +559,7 @@ impl<'a> Parser<'a> {
                         (peek.start + self.base_offset) as u32,
                         (peek.end + self.base_offset) as u32,
                     ),
-                    has_character_loc: false,
+                    emit_character_field: false,
                 });
             }
 

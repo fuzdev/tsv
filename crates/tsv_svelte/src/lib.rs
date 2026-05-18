@@ -3,9 +3,9 @@
 //! This crate provides Svelte component parsing and code formatting.
 
 pub mod ast;
-pub mod lexer;
-pub mod parser;
-pub mod printer;
+mod lexer;
+mod parser;
+mod printer;
 
 pub use tsv_lang::{ParseError, Result};
 
@@ -70,6 +70,7 @@ pub fn format(root: &Root, source: &str) -> String {
 /// let public_ast = tsv_svelte::convert_ast(&ast, source);
 /// let json = serde_json::to_string_pretty(&public_ast)?;
 /// ```
+#[cfg(feature = "convert")]
 pub fn convert_ast(root: &Root, source: &str) -> ast::public::Root {
     ast::convert::convert_root(root, source)
 }
@@ -89,6 +90,7 @@ pub fn convert_ast(root: &Root, source: &str) -> ast::public::Root {
 /// let ast = tsv_svelte::parse(source)?;
 /// let json = tsv_svelte::convert_ast_json(&ast, source);
 /// ```
+#[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
 pub fn convert_ast_json(root: &Root, source: &str) -> serde_json::Value {
     let public_ast = ast::convert::convert_root(root, source);
@@ -116,8 +118,4 @@ pub fn convert_ast_json(root: &Root, source: &str) -> serde_json::Value {
     json
 }
 
-// Re-export commonly used types
-pub use ast::{
-    Attribute, AttributeValue, Element, ExpressionTag, Fragment, FragmentNode, Root, Script,
-    ScriptContext, Style, Text,
-};
+pub use ast::Root;

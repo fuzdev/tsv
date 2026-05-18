@@ -30,6 +30,10 @@ use crate::printer::source_fidelity;
 ///
 /// This is a tokenization bug in Svelte's CSS parser, but we replicate it for compatibility.
 /// Our internal AST remains semantically correct; this quirk is only applied in conversion.
+///
+/// Note: `convert_declaration` runs `strip_css_comments` on the returned value, so the
+/// public AST for `color /* c */ : red` ends up as property=`color`, value=`": red"`
+/// (Svelte 5.55.x strips block comments from value strings post-split).
 fn split_declaration_svelte_compat(decl_source: &str) -> (&str, &str) {
     let Some(colon_pos) = decl_source.find(':') else {
         return (decl_source, "");
@@ -57,6 +61,94 @@ fn split_declaration_svelte_compat(decl_source: &str) -> (&str, &str) {
     (property, value)
 }
 
+/// Remove all `/* ... */` block comments from a CSS string, then trim outer whitespace.
+///
+/// Matches Svelte 5.55.x behavior for Declaration `value` and Atrule `prelude` strings:
+/// comments are stripped in place (surrounding whitespace preserved), then the result
+/// is trimmed.
+///
+/// String- and url()-aware: `/*` sequences inside `"..."`, `'...'`, or `url(...)` are
+/// treated as content, not comments. Unterminated comments are left intact (parse
+/// error caught elsewhere).
+fn strip_css_comments(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut rest = input;
+    while let Some(ch) = rest.chars().next() {
+        // Block comment — strip
+        if ch == '/' && rest.as_bytes().get(1) == Some(&b'*') {
+            if let Some(end_rel) = rest[2..].find("*/") {
+                rest = &rest[2 + end_rel + 2..];
+                continue;
+            }
+            // Unterminated — keep verbatim
+            out.push_str(rest);
+            break;
+        }
+        // String literal — copy through unchanged (escape-aware)
+        if ch == '"' || ch == '\'' {
+            emit(&mut out, &mut rest, ch);
+            copy_quoted(&mut out, &mut rest, ch);
+            continue;
+        }
+        // url(...) — copy through to matching ')'
+        if starts_with_url_open(rest) {
+            out.push_str(&rest[..4]);
+            rest = &rest[4..];
+            copy_balanced_parens(&mut out, &mut rest);
+            continue;
+        }
+        emit(&mut out, &mut rest, ch);
+    }
+    out.trim().to_string()
+}
+
+/// Push `ch` to `out` and advance `rest` past it.
+fn emit(out: &mut String, rest: &mut &str, ch: char) {
+    out.push(ch);
+    *rest = &rest[ch.len_utf8()..];
+}
+
+/// Copy a CSS string body (opening quote already emitted) through `out`,
+/// advancing `rest` past the closing quote. Handles backslash escapes.
+fn copy_quoted(out: &mut String, rest: &mut &str, quote: char) {
+    while let Some(ch) = rest.chars().next() {
+        emit(out, rest, ch);
+        if ch == '\\' {
+            if let Some(esc) = rest.chars().next() {
+                emit(out, rest, esc);
+            }
+        } else if ch == quote {
+            break;
+        }
+    }
+}
+
+/// Copy through `out` until the depth-1 close paren that ends `url(...)` (or eof).
+/// Skips over quoted strings so embedded `)` characters are not treated as terminators.
+fn copy_balanced_parens(out: &mut String, rest: &mut &str) {
+    let mut depth: u32 = 1;
+    while depth > 0 {
+        let Some(ch) = rest.chars().next() else { break };
+        emit(out, rest, ch);
+        match ch {
+            '(' => depth += 1,
+            ')' => depth -= 1,
+            '"' | '\'' => copy_quoted(out, rest, ch),
+            _ => {}
+        }
+    }
+}
+
+/// Whether `s` begins with `url(` (case-insensitive for `url`).
+fn starts_with_url_open(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    bytes.len() >= 4
+        && bytes[0].eq_ignore_ascii_case(&b'u')
+        && bytes[1].eq_ignore_ascii_case(&b'r')
+        && bytes[2].eq_ignore_ascii_case(&b'l')
+        && bytes[3] == b'('
+}
+
 /// Convert a CSS declaration to JSON, including !important in value and end position
 fn convert_declaration(decl: &internal::CssDeclaration, source: &str) -> serde_json::Value {
     let decl_source = decl.span.extract(source);
@@ -67,6 +159,8 @@ fn convert_declaration(decl: &internal::CssDeclaration, source: &str) -> serde_j
     } else {
         (decl.span.end, value_source.to_string())
     };
+    // Svelte 5.55.x strips block comments from declaration values.
+    let value = strip_css_comments(&value);
 
     serde_json::json!({
         "type": "Declaration",
@@ -301,6 +395,10 @@ fn convert_css_atrule(atrule: &internal::CssAtrule, source: &str) -> serde_json:
 }
 
 /// Convert PreludeValue to string representation for public AST
+///
+/// Svelte 5.55.x strips `/* ... */` block comments from at-rule preludes (surrounding
+/// whitespace preserved, then trimmed). Applied to all source-extracted variants;
+/// `Values` is built from parsed tokens that never contained comments.
 fn convert_prelude_to_string(prelude: &internal::PreludeValue, source: &str) -> String {
     match prelude {
         internal::PreludeValue::Values { values, .. } => {
@@ -311,7 +409,7 @@ fn convert_prelude_to_string(prelude: &internal::PreludeValue, source: &str) -> 
                 .collect::<Vec<_>>()
                 .join(" ")
         }
-        internal::PreludeValue::Raw { content, .. } => content.clone(),
+        internal::PreludeValue::Raw { content, .. } => strip_css_comments(content),
         internal::PreludeValue::Selectors {
             root: _,
             limit: _,
@@ -319,11 +417,11 @@ fn convert_prelude_to_string(prelude: &internal::PreludeValue, source: &str) -> 
         } => {
             // Format selector lists for @scope: (root) [to (limit)]
             // Extract from source for maximum fidelity
-            span.extract(source).to_string()
+            strip_css_comments(span.extract(source))
         }
-        internal::PreludeValue::Supports { span, .. } => span.extract(source).trim().to_string(),
-        internal::PreludeValue::Container { span, .. } => span.extract(source).trim().to_string(),
-        internal::PreludeValue::Media { span, .. } => span.extract(source).trim().to_string(),
+        internal::PreludeValue::Supports { span, .. } => strip_css_comments(span.extract(source)),
+        internal::PreludeValue::Container { span, .. } => strip_css_comments(span.extract(source)),
+        internal::PreludeValue::Media { span, .. } => strip_css_comments(span.extract(source)),
     }
 }
 
@@ -786,5 +884,70 @@ fn add_parsecss_metadata(value: &mut serde_json::Value) {
             }
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strip_css_comments_basic_removal_and_trim() {
+        assert_eq!(strip_css_comments("/* c */ 12px"), "12px");
+        assert_eq!(strip_css_comments("blue /* c */"), "blue");
+        assert_eq!(strip_css_comments("/* a */ red"), "red");
+    }
+
+    #[test]
+    fn strip_css_comments_interior_whitespace_preserved() {
+        assert_eq!(
+            strip_css_comments("var(--a, /* c */ red)"),
+            "var(--a,  red)",
+        );
+        assert_eq!(
+            strip_css_comments("sidebar /* x */ (min-width: 100px)"),
+            "sidebar  (min-width: 100px)",
+        );
+    }
+
+    #[test]
+    fn strip_css_comments_inside_strings_are_preserved() {
+        assert_eq!(
+            strip_css_comments("\"/* not a comment */\""),
+            "\"/* not a comment */\"",
+        );
+        assert_eq!(strip_css_comments("'/* keep */'"), "'/* keep */'");
+    }
+
+    #[test]
+    fn strip_css_comments_inside_url_are_preserved() {
+        assert_eq!(
+            strip_css_comments("url(\"data:image/svg+xml,/* x */\")"),
+            "url(\"data:image/svg+xml,/* x */\")",
+        );
+    }
+
+    #[test]
+    fn strip_css_comments_inside_other_functions_are_stripped() {
+        // Only url() is special — calc/var/etc. follow normal CSS tokenization,
+        // so block comments inside them are stripped just like at top level.
+        assert_eq!(
+            strip_css_comments("calc(/* x */ 1px + 2px)"),
+            "calc( 1px + 2px)",
+        );
+        assert_eq!(strip_css_comments("URL(/* keep */)"), "URL(/* keep */)");
+    }
+
+    #[test]
+    fn strip_css_comments_unterminated_kept_verbatim() {
+        assert_eq!(strip_css_comments("red /* oops"), "red /* oops");
+    }
+
+    #[test]
+    fn strip_css_comments_escaped_quote_does_not_close_string() {
+        assert_eq!(
+            strip_css_comments("\"a\\\" /* in str */ b\" /* real */ c"),
+            "\"a\\\" /* in str */ b\"  c",
+        );
     }
 }

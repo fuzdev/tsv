@@ -3,7 +3,7 @@
 use super::super::{internal, public};
 use super::types::convert_declare_function;
 use super::{
-    ConversionContext, bigint_to_decimal, convert_block_statement, convert_class_declaration,
+    Schema, bigint_to_decimal, convert_block_statement, convert_class_declaration,
     convert_expression, convert_identifier, convert_type_annotation,
     convert_type_parameter_declaration, create_location,
 };
@@ -15,7 +15,7 @@ pub(in crate::ast) fn convert_import_specifier(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-    ctx: ConversionContext,
+    schema: Schema,
 ) -> public::ImportSpecifier {
     match spec {
         internal::ImportSpecifier::Default(default_spec) => {
@@ -41,7 +41,7 @@ pub(in crate::ast) fn convert_import_specifier(
         internal::ImportSpecifier::Named(named_spec) => {
             let import_kind = match named_spec.import_kind {
                 internal::ImportKind::Value => {
-                    if ctx.is_svelte_script {
+                    if schema.is_svelte_script() {
                         None
                     } else {
                         Some("value".to_string())
@@ -133,11 +133,11 @@ pub(in crate::ast) fn convert_export_specifier(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-    ctx: ConversionContext,
+    schema: Schema,
 ) -> public::ExportSpecifier {
     let export_kind = match spec.export_kind {
         internal::ExportKind::Value => {
-            if ctx.is_svelte_script {
+            if schema.is_svelte_script() {
                 None
             } else {
                 Some("value".to_string())

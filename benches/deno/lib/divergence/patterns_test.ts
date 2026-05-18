@@ -60,25 +60,28 @@ function runPattern(patternId: string, ctx: DetectionContext): DivergenceMatch |
 // ─── template_literal_width ─────────────────────────────────────────────────
 
 Deno.test('template_literal_width: positive - }` closing on own line', () => {
-	// In real diffs, the template spans multiple lines. Prettier keeps ${expr} on one line,
-	// we break ${...} to separate lines. The diff has added lines with ${ break
-	// that don't appear in removed lines.
-	// Simulate: ours adds a `}` backtick line that prettier doesn't have
-	const prettier = 'line1\nline2 end';
-	const ours = 'line1\n\t}`\nline2 end';
+	// Prettier keeps ${expr} on one line (> 80 chars), we break to separate lines.
+	// The diff has a proper removed/added hunk with prettier's long line visible.
+	const padding = 'x'.repeat(70);
+	const prettier = `\tconst msg = \`${padding} \${expr}\`;`;
+	const ours = `\tconst msg = \`${padding} \${\n\t\texpr\n\t}\`;`;
 	const ctx = makeContext(ours, prettier, 'typescript');
-	ctx.source = 'const x = `${expr}`;'; // source has ${
+	ctx.source = `const msg = \`${padding} \${expr}\`;`;
 	const match = runPattern('template_literal_width', ctx);
 	assertNotEquals(match, null);
 	assertEquals(match!.pattern, 'template_literal_width');
 });
 
 Deno.test('template_literal_width: positive - ${ at end of line in ours', () => {
-	// We break after ${ (end of line), prettier keeps ${expr} inline
-	const prettier = '\t\tconsole.error(\n\t\t\t`msg "${VALUE}", got "${fixture.prop}"`,\n\t\t);';
-	const ours = '\t\tconsole.error(`msg "${VALUE}", got "${\n\t\t\t\tfixture.prop\n\t\t\t}"`);\n';
+	// We break after ${ (end of line), prettier keeps ${expr} inline.
+	// Prettier line must be > 80 chars to confirm width-motivated break.
+	const prettier =
+		'\t\tconsole.error(\n\t\t\t`message content is "${VALUE}" and the result value got "${fixture.prop}" with extra text`,\n\t\t);';
+	const ours =
+		'\t\tconsole.error(`message content is "${VALUE}" and the result value got "${\n\t\t\t\tfixture.prop\n\t\t\t}" with extra text`);\n';
 	const ctx = makeContext(ours, prettier, 'typescript');
-	ctx.source = 'console.error(`msg "${VALUE}", got "${fixture.prop}"`);';
+	ctx.source =
+		'console.error(`message content is "${VALUE}" and the result value got "${fixture.prop}" with extra text`);';
 	const match = runPattern('template_literal_width', ctx);
 	assertNotEquals(match, null);
 	assertEquals(match!.pattern, 'template_literal_width');
@@ -522,6 +525,33 @@ Deno.test('comment_position: positive - Case 1 comment moved out of hunk region'
 	assertNotEquals(match, null);
 });
 
+Deno.test('comment_position: positive - comment absorbed into block body', () => {
+	// Prettier absorbs comment between ) and {} into the block body, reformatting the block
+	const prettier = 'while (a) {\n\t/* comment */\n}';
+	const ours = 'while (a) /* comment */ {}';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('comment_position', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('comment_position: positive - line comment absorbed into try block', () => {
+	// Prettier absorbs line comment between try and { into block body
+	const prettier = 'try {\n\t// comment\n} catch (e) {}';
+	const ours = 'try // comment\n{\n} catch (e) {}';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('comment_position', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('comment_position: positive - comment absorbed into catch parens', () => {
+	// Prettier absorbs line comment after catch (e) into parens, reformatting to multiline
+	const prettier = '} catch (\n\te // comment\n) {}';
+	const ours = '} catch (e) // comment\n{}';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('comment_position', ctx);
+	assertNotEquals(match, null);
+});
+
 // ─── block_multiline_attrs_hug ──────────────────────────────────────────────
 
 Deno.test('block_multiline_attrs_hug: positive - > on own line with pre context', () => {
@@ -875,6 +905,129 @@ Deno.test('block_comment_chain: negative - CSS (not applicable)', () => {
 	const ours = '\t/* comment */.class { color: red; }';
 	const ctx = makeContext(ours, prettier, 'css');
 	const match = runPattern('block_comment_chain', ctx);
+	assertEquals(match, null);
+});
+
+// ─── block_comment_computed_member (additional) ──────────────────────────
+
+Deno.test('block_comment_computed_member: positive - regular block comment (not JSDoc)', () => {
+	// Same hoisting behavior with /* */ instead of /** */
+	const prettier = '\t/* cast */ obj.aaaa.bbbb.cccc?.[\n\t\td\n\t];';
+	const ours = '\tobj.aaaa.bbbb.cccc?.[\n\t\t/* cast */ d\n\t];';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('block_comment_computed_member', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'block_comment_computed_member');
+});
+
+// ─── fill_after_inline (additional) ───────────────────────────────────────
+
+Deno.test('fill_after_inline: positive - <mark> element (expanded inline list)', () => {
+	const longContent = 'x'.repeat(90);
+	const prettier = `\t<p>Text <mark>${longContent}</mark> trailing text after inline element</p>`;
+	const ours = `\t<p>Text <mark>${longContent}</mark>\n\ttrailing text after inline element</p>`;
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('fill_after_inline', ctx);
+	assertNotEquals(match, null);
+});
+
+// ─── template_literal_width (additional) ──────────────────────────────────
+
+Deno.test('template_literal_width: negative - short prettier line (not width-motivated)', () => {
+	// Our side breaks at ${ but prettier's line is only ~40 chars.
+	// Not width-motivated — likely a bug in our formatter.
+	const prettier = '\tconst x = `hello ${name}`;';
+	const ours = '\tconst x = `hello ${\n\t\tname\n\t}`;';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	ctx.source = 'const x = `hello ${name}`;';
+	const match = runPattern('template_literal_width', ctx);
+	assertEquals(match, null);
+});
+
+// ─── jsdoc_type_cast_parens ────────────────────────────────────────────────
+
+Deno.test('jsdoc_type_cast_parens: negative - not svelte language', () => {
+	// Pattern only applies to svelte files (prettier-plugin-svelte context)
+	const prettier = '\tconst a = b.map((x) => /** @type {A} */ (fn(x)));';
+	const ours = '\tconst a = b.map((x) => /** @type {A} */ fn(x));';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('jsdoc_type_cast_parens', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('jsdoc_type_cast_parens: negative - @satisfies without paren difference', () => {
+	// Both sides have the same parens — no divergence
+	const prettier = '\tconst a = /** @satisfies {A} */ (fn(x));';
+	const ours = '\tconst a = /** @satisfies {A} */ (fn(x));';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('jsdoc_type_cast_parens', ctx);
+	assertEquals(match, null);
+});
+
+// ─── member_expression_call (additional) ──────────────────────────────────
+
+Deno.test('member_expression_call: positive - import.meta.resolve in diff', () => {
+	const prettier = 'const p = import.meta.resolve("some/very/long/module/path/that/exceeds");';
+	const ours = 'const p = import.meta.resolve(\n\t"some/very/long/module/path/that/exceeds",\n);';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('member_expression_call', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'member_expression_call');
+});
+
+// ─── block_expression_logical (additional) ────────────────────────────────
+
+Deno.test('block_expression_logical: positive - || at start of line in ours', () => {
+	const prettier = '{#if someCondition || anotherCondition || thirdCondition}content{/if}';
+	const ours = '{#if someCondition\n\t|| anotherCondition\n\t|| thirdCondition}content{/if}';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('block_expression_logical', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'block_expression_logical');
+});
+
+// ─── css_atrule_spec_spacing (additional) ─────────────────────────────────
+
+Deno.test('css_atrule_spec_spacing: positive - not( missing space', () => {
+	const prettier = '<style>\n@media not(print) {\n\tdiv { color: red; }\n}\n</style>';
+	const ours = '<style>\n@media not (print) {\n\tdiv { color: red; }\n}\n</style>';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('css_atrule_spec_spacing', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.confidence, 'certain');
+});
+
+// ─── comment_position (additional) ────────────────────────────────────────
+
+Deno.test('comment_position: negative - short comment text matches incidentally', () => {
+	// Comment text "x" is very short (< 3 chars) and would match incidentally
+	// in prettier's output (e.g., inside variable names). Should NOT claim.
+	const prettier = 'const max = 1;\nconst y = 2;';
+	const ours = 'const max = 1;\n// x\nconst y = 2;';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('comment_position', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('comment_position: negative - comment text in code but not as comment', () => {
+	// Comment "map" (3+ chars) exists in prettier output but only as a method
+	// name (arr.map), NOT as a comment. Should NOT claim as moved comment.
+	const prettier = 'const result = arr.map(x => x * 2);\nconst y = 2;';
+	const ours = '// map\nconst result = arr.map(x => x * 2);\nconst y = 2;';
+	const ctx = makeContext(ours, prettier, 'typescript');
+	const match = runPattern('comment_position', ctx);
+	assertEquals(match, null);
+});
+
+// ─── css_comment_stable_quirk (additional) ────────────────────────────────
+
+Deno.test('css_comment_stable_quirk: negative - one-sided comment not in other output', () => {
+	// Comment on our side only, but text doesn't exist in prettier's output.
+	// Should NOT claim as a comment position divergence.
+	const prettier = '<style>\n.a { color: red; }\n</style>';
+	const ours = '<style>\n.a { /* new-unique-text */ color: red; }\n</style>';
+	const ctx = makeContext(ours, prettier, 'svelte');
+	const match = runPattern('css_comment_stable_quirk', ctx);
 	assertEquals(match, null);
 });
 

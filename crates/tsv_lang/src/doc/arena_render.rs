@@ -1,10 +1,11 @@
 //! Rendering algorithm for arena-based document trees.
 
-use crate::PrintConfig;
+use crate::EmbedContext;
 use std::collections::HashMap;
 
 use super::arena::{ArenaCommand, DocArena, DocId, DocNode};
 use super::arena_fits::{arena_fits_multi, arena_fits_with_lookahead, update_pos_for_text};
+use super::render_config::RenderConfig;
 use super::types::{
     DocContext, GroupId, LineKind, Mode, TEXT_WIDTH_HAS_NEWLINE, TextResolver, resolve_text,
 };
@@ -49,6 +50,18 @@ fn render_text<R: TextResolver + ?Sized>(
     }
 }
 
+/// Reserved trailing-punctuation width once the printer has crossed
+/// `first_line_offset`. Embedding contexts use this to keep the suffix
+/// (e.g., `}` after a Svelte template expression) on the same line.
+#[inline]
+fn effective_suffix_width(pos: usize, embed: &EmbedContext) -> usize {
+    if pos >= embed.first_line_offset {
+        embed.suffix_width
+    } else {
+        0
+    }
+}
+
 /// Trim trailing whitespace (spaces and tabs) from the end of the output buffer.
 /// Matches Prettier's `trim()` / `trimIndentation()` — called before each
 /// non-literal newline to strip trailing indentation/spaces from code lines.
@@ -69,7 +82,8 @@ fn render_line_break(
     base_indent_override: Option<usize>,
     output: &mut String,
     pos: &mut usize,
-    config: &PrintConfig,
+    render: &RenderConfig,
+    embed: &EmbedContext,
 ) -> bool {
     let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
     if mode == Mode::Break || is_hard {
@@ -82,8 +96,14 @@ fn render_line_break(
             // (matches Prettier's trim() call before non-literal newlines)
             trim_trailing_whitespace(output);
             output.push('\n');
-            write_indentation(output, indent_level, align_spaces, config);
-            *pos = line_start_column(indent_level, align_spaces, config, base_indent_override);
+            write_indentation(output, indent_level, align_spaces, render, embed);
+            *pos = line_start_column(
+                indent_level,
+                align_spaces,
+                render,
+                embed,
+                base_indent_override,
+            );
         }
         true
     } else if kind == LineKind::Normal {
@@ -101,7 +121,8 @@ fn flush_line_suffix<R: TextResolver + ?Sized>(
     line_suffix: &mut Vec<ArenaCommand>,
     output: &mut String,
     pos: &mut usize,
-    config: &PrintConfig,
+    render: &RenderConfig,
+    embed: &EmbedContext,
     resolver: Option<&R>,
 ) {
     if line_suffix.is_empty() {
@@ -115,7 +136,8 @@ fn flush_line_suffix<R: TextResolver + ?Sized>(
             pos,
             suffix_cmd.indent,
             suffix_cmd.mode,
-            config,
+            render,
+            embed,
             resolver,
             None,
             None,
@@ -154,75 +176,102 @@ fn process_indent_if_break(
 //
 
 /// Convert an arena doc tree to a formatted string (starting at column 0).
-pub fn arena_print_doc(arena: &DocArena, doc: DocId, config: &PrintConfig) -> String {
-    arena_print_doc_at_column(arena, doc, config, 0)
+pub fn arena_print_doc(arena: &DocArena, doc: DocId, embed: &EmbedContext) -> String {
+    arena_print_doc_at_column(arena, doc, embed, 0)
 }
 
 /// Convert an arena doc tree to a formatted string with symbol resolution.
 pub fn arena_print_doc_resolved<R: TextResolver + ?Sized>(
     arena: &DocArena,
     doc: DocId,
-    config: &PrintConfig,
+    embed: &EmbedContext,
     resolver: &R,
 ) -> String {
-    arena_print_doc_with_indent_resolved(arena, doc, config, 0, 0, resolver)
+    arena_print_doc_with_indent_resolved(arena, doc, embed, 0, 0, resolver)
+}
+
+/// Render with effectively infinite print width — every group flattens.
+///
+/// Used by callers that need to measure a doc's flat-layout width
+/// (e.g., template literal type sizing). The renderer still uses
+/// [`crate::TAB_WIDTH`] / [`crate::INDENT`].
+pub fn arena_print_doc_flat_resolved<R: TextResolver + ?Sized>(
+    arena: &DocArena,
+    doc: DocId,
+    embed: &EmbedContext,
+    resolver: &R,
+) -> String {
+    let render = RenderConfig {
+        print_width: usize::MAX / 2,
+        ..RenderConfig::default()
+    };
+    let mut output = String::with_capacity(arena.estimated_output_capacity());
+    let mut pos: usize = 0;
+
+    render_doc_iterative(
+        arena,
+        doc,
+        &mut output,
+        &mut pos,
+        0,
+        &render,
+        embed,
+        Some(resolver),
+    );
+
+    trim_last_line(output)
 }
 
 /// Convert an arena doc tree to a formatted string, starting at a specific column.
 pub fn arena_print_doc_at_column(
     arena: &DocArena,
     doc: DocId,
-    config: &PrintConfig,
+    embed: &EmbedContext,
     start_column: usize,
 ) -> String {
-    arena_print_doc_with_indent(arena, doc, config, start_column, 0)
+    arena_print_doc_with_indent(arena, doc, embed, start_column, 0)
 }
 
 /// Convert an arena doc tree to a formatted string at a specific column, with symbol resolution.
 pub fn arena_print_doc_at_column_resolved<R: TextResolver + ?Sized>(
     arena: &DocArena,
     doc: DocId,
-    config: &PrintConfig,
+    embed: &EmbedContext,
     start_column: usize,
     resolver: &R,
 ) -> String {
-    arena_print_doc_with_indent_resolved(arena, doc, config, start_column, 0, resolver)
+    arena_print_doc_with_indent_resolved(arena, doc, embed, start_column, 0, resolver)
 }
 
 /// Convert an arena doc tree to a formatted string with column and indent level.
 pub fn arena_print_doc_with_indent(
     arena: &DocArena,
     doc: DocId,
-    config: &PrintConfig,
+    embed: &EmbedContext,
     start_column: usize,
     start_indent_level: usize,
 ) -> String {
-    let mut output = String::with_capacity(256);
-    let mut pos: usize = start_column;
-
-    render_doc_iterative::<dyn TextResolver>(
+    arena_print_doc_with_indent_and_render(
         arena,
         doc,
-        &mut output,
-        &mut pos,
+        embed,
+        start_column,
         start_indent_level,
-        config,
-        None,
-    );
-
-    trim_last_line(output)
+        &RenderConfig::default(),
+    )
 }
 
 /// Convert an arena doc tree to a formatted string with column, indent, and symbol resolution.
 pub fn arena_print_doc_with_indent_resolved<R: TextResolver + ?Sized>(
     arena: &DocArena,
     doc: DocId,
-    config: &PrintConfig,
+    embed: &EmbedContext,
     start_column: usize,
     start_indent_level: usize,
     resolver: &R,
 ) -> String {
-    let mut output = String::with_capacity(256);
+    let render = RenderConfig::default();
+    let mut output = String::with_capacity(arena.estimated_output_capacity());
     let mut pos: usize = start_column;
 
     render_doc_iterative(
@@ -231,7 +280,8 @@ pub fn arena_print_doc_with_indent_resolved<R: TextResolver + ?Sized>(
         &mut output,
         &mut pos,
         start_indent_level,
-        config,
+        &render,
+        embed,
         Some(resolver),
     );
 
@@ -244,12 +294,13 @@ pub fn arena_print_doc_with_indent_resolved<R: TextResolver + ?Sized>(
 pub fn arena_print_doc_with_indent_resolved_preserve_whitespace<R: TextResolver + ?Sized>(
     arena: &DocArena,
     doc: DocId,
-    config: &PrintConfig,
+    embed: &EmbedContext,
     start_column: usize,
     start_indent_level: usize,
     resolver: &R,
 ) -> String {
-    let mut output = String::with_capacity(256);
+    let render = RenderConfig::default();
+    let mut output = String::with_capacity(arena.estimated_output_capacity());
     let mut pos: usize = start_column;
 
     render_doc_iterative(
@@ -258,11 +309,41 @@ pub fn arena_print_doc_with_indent_resolved_preserve_whitespace<R: TextResolver 
         &mut output,
         &mut pos,
         start_indent_level,
-        config,
+        &render,
+        embed,
         Some(resolver),
     );
 
     output
+}
+
+/// Test-only entry point: render with explicit width/tab/indent overrides.
+///
+/// Production callers should use [`arena_print_doc`] (which uses
+/// [`crate::PRINT_WIDTH`] / [`crate::TAB_WIDTH`] / [`crate::INDENT`]).
+pub(crate) fn arena_print_doc_with_indent_and_render(
+    arena: &DocArena,
+    doc: DocId,
+    embed: &EmbedContext,
+    start_column: usize,
+    start_indent_level: usize,
+    render: &RenderConfig,
+) -> String {
+    let mut output = String::with_capacity(arena.estimated_output_capacity());
+    let mut pos: usize = start_column;
+
+    render_doc_iterative::<dyn TextResolver>(
+        arena,
+        doc,
+        &mut output,
+        &mut pos,
+        start_indent_level,
+        render,
+        embed,
+        None,
+    );
+
+    trim_last_line(output)
 }
 
 //
@@ -270,13 +351,15 @@ pub fn arena_print_doc_with_indent_resolved_preserve_whitespace<R: TextResolver 
 //
 
 /// Command-stack-based rendering implementation with look-ahead.
+#[allow(clippy::too_many_arguments)]
 fn render_doc_iterative<R: TextResolver + ?Sized>(
     arena: &DocArena,
     doc: DocId,
     output: &mut String,
     pos: &mut usize,
     start_indent_level: usize,
-    config: &PrintConfig,
+    render: &RenderConfig,
+    embed: &EmbedContext,
     resolver: Option<&R>,
 ) {
     let mut commands: Vec<ArenaCommand> = vec![ArenaCommand {
@@ -290,22 +373,33 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
     let mut line_suffix: Vec<ArenaCommand> = Vec::new();
     let mut group_mode_map: HashMap<GroupId, Mode> = HashMap::new();
 
-    while let Some(cmd) = commands.pop() {
-        let nodes = arena.borrow_nodes();
-        let children_vec = arena.borrow_children();
+    // Hoist arena borrows out of the loop: the arena is read-only during
+    // rendering, so a single immutable borrow held for the whole render
+    // avoids the per-iteration dynamic borrow-check cost.
+    let nodes_outer = arena.borrow_nodes();
+    let children_outer = arena.borrow_children();
+    let nodes: &[DocNode] = &nodes_outer;
+    let children_vec: &[DocId] = &children_outer;
 
+    while let Some(cmd) = commands.pop() {
         match &nodes[cmd.doc.index()] {
             DocNode::Text(t) => {
-                render_text(t, output, pos, config.tab_width, resolver);
+                render_text(t, output, pos, render.tab_width, resolver);
             }
 
             DocNode::Line(kind) => {
                 let kind = *kind;
                 let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
-                drop(nodes);
-                drop(children_vec);
                 if cmd.mode == Mode::Break || is_hard {
-                    flush_line_suffix(arena, &mut line_suffix, output, pos, config, resolver);
+                    flush_line_suffix(
+                        arena,
+                        &mut line_suffix,
+                        output,
+                        pos,
+                        render,
+                        embed,
+                        resolver,
+                    );
                 }
                 render_line_break(
                     kind,
@@ -315,37 +409,30 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     cmd.base_indent_override,
                     output,
                     pos,
-                    config,
+                    render,
+                    embed,
                 );
             }
 
             DocNode::Indent(inner) => {
                 let inner = *inner;
-                drop(nodes);
-                drop(children_vec);
                 commands.push(cmd.indented(inner));
             }
 
             DocNode::Dedent(inner) => {
                 let inner = *inner;
-                drop(nodes);
-                drop(children_vec);
                 commands.push(cmd.dedented(inner));
             }
 
             DocNode::Align { n, contents } => {
                 let n = *n;
                 let contents = *contents;
-                drop(nodes);
-                drop(children_vec);
                 commands.push(cmd.with_indent(n, contents));
             }
 
             DocNode::AlignSpaces { spaces, contents } => {
                 let spaces = *spaces;
                 let contents = *contents;
-                drop(nodes);
-                drop(children_vec);
                 commands.push(cmd.with_align_spaces(spaces, contents));
             }
 
@@ -359,8 +446,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 let expanded_states = *expanded_states;
                 let id = *id;
                 let should_break = *should_break;
-                drop(nodes);
-                drop(children_vec);
 
                 if !expanded_states.is_empty() {
                     // conditionalGroup: try each state until one fits.
@@ -369,9 +454,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     // groups always try flat first, even inside a MODE_BREAK parent.
                     if should_break {
                         // Prettier: if (doc.break) → use most expanded in break mode
-                        let children_vec = arena.borrow_children();
-                        let states = expanded_states.resolve(&children_vec).to_vec();
-                        drop(children_vec);
+                        let states = expanded_states.resolve(children_vec).to_vec();
                         let most_expanded = states.last().copied().unwrap_or(contents);
                         let chosen_mode = Mode::Break;
                         commands.push(cmd.with_mode(chosen_mode, most_expanded));
@@ -380,12 +463,9 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         }
                     } else {
                         // Fits check regardless of parent mode — matches Prettier
-                        let suffix = if *pos >= config.first_line_offset {
-                            config.suffix_width
-                        } else {
-                            0
-                        };
-                        let effective_width = config.print_width.saturating_sub(suffix);
+                        let effective_width = render
+                            .print_width
+                            .saturating_sub(effective_suffix_width(*pos, embed));
                         let remaining_width = effective_width.saturating_sub(*pos) as isize;
 
                         let contents_fit = arena_fits_with_lookahead(
@@ -394,7 +474,8 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                             Mode::Flat,
                             &commands,
                             remaining_width,
-                            config,
+                            render,
+                            embed,
                             resolver,
                         );
 
@@ -404,9 +485,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                             chosen_mode = Mode::Flat;
                             commands.push(cmd.with_mode(chosen_mode, contents));
                         } else {
-                            let children_vec = arena.borrow_children();
-                            let states = expanded_states.resolve(&children_vec).to_vec();
-                            drop(children_vec);
+                            let states = expanded_states.resolve(children_vec).to_vec();
 
                             let mut found = false;
                             for i in 0..states.len() {
@@ -422,7 +501,8 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                                     Mode::Flat,
                                     &commands,
                                     remaining_width,
-                                    config,
+                                    render,
+                                    embed,
                                     resolver,
                                 );
                                 if state_fits {
@@ -453,12 +533,9 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         group_mode_map.insert(group_id, chosen_mode);
                     }
                 } else {
-                    let suffix = if *pos >= config.first_line_offset {
-                        config.suffix_width
-                    } else {
-                        0
-                    };
-                    let effective_width = config.print_width.saturating_sub(suffix);
+                    let effective_width = render
+                        .print_width
+                        .saturating_sub(effective_suffix_width(*pos, embed));
                     let remaining_width = effective_width.saturating_sub(*pos) as isize;
                     let fits = arena_fits_with_lookahead(
                         arena,
@@ -466,7 +543,8 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         Mode::Flat,
                         &commands,
                         remaining_width,
-                        config,
+                        render,
+                        embed,
                         resolver,
                     );
                     let chosen_mode = if fits { Mode::Flat } else { Mode::Break };
@@ -479,15 +557,10 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
 
             DocNode::IsolatedGroup { contents } => {
                 let contents = *contents;
-                drop(nodes);
-                drop(children_vec);
 
-                let suffix = if *pos >= config.first_line_offset {
-                    config.suffix_width
-                } else {
-                    0
-                };
-                let effective_width = config.print_width.saturating_sub(suffix);
+                let effective_width = render
+                    .print_width
+                    .saturating_sub(effective_suffix_width(*pos, embed));
                 let remaining_width = effective_width.saturating_sub(*pos) as isize;
                 let fits = arena_fits_with_lookahead(
                     arena,
@@ -495,7 +568,8 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     Mode::Flat,
                     &commands,
                     remaining_width,
-                    config,
+                    render,
+                    embed,
                     resolver,
                 );
                 let chosen_mode = if fits { Mode::Flat } else { Mode::Break };
@@ -511,8 +585,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 } else {
                     *flat_doc
                 };
-                drop(nodes);
-                drop(children_vec);
                 commands.push(cmd.with_doc(chosen));
             }
 
@@ -524,8 +596,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 let contents = *contents;
                 let group_id = *group_id;
                 let negate = *negate;
-                drop(nodes);
-                drop(children_vec);
                 commands.push(process_indent_if_break(
                     contents,
                     group_id,
@@ -536,25 +606,22 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
             }
 
             DocNode::Concat(range) => {
-                let kids = range.resolve(&children_vec);
+                let kids = range.resolve(children_vec);
                 for &child in kids.iter().rev() {
                     commands.push(cmd.with_doc(child));
                 }
-                drop(nodes);
-                drop(children_vec);
             }
 
             DocNode::Fill(range) => {
-                let parts: Vec<DocId> = range.resolve(&children_vec).to_vec();
-                drop(nodes);
-                drop(children_vec);
+                let parts: Vec<DocId> = range.resolve(children_vec).to_vec();
                 render_fill_iterative(
                     arena,
                     &parts,
                     output,
                     pos,
                     cmd.indent,
-                    config,
+                    render,
+                    embed,
                     &DocContext::default(),
                     &commands,
                     resolver,
@@ -567,31 +634,31 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 let merged_override = context.base_indent_override.or(cmd.base_indent_override);
 
                 if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
-                    let parts: Vec<DocId> = fill_range.resolve(&children_vec).to_vec();
-                    drop(nodes);
-                    drop(children_vec);
+                    let parts: Vec<DocId> = fill_range.resolve(children_vec).to_vec();
                     render_fill_iterative(
-                        arena, &parts, output, pos, cmd.indent, config, &context, &commands,
+                        arena, &parts, output, pos, cmd.indent, render, embed, &context, &commands,
                         resolver,
                     );
                 } else {
-                    drop(nodes);
-                    drop(children_vec);
                     commands.push(cmd.with_base_override(merged_override, inner_doc));
                 }
             }
 
             DocNode::LineSuffix(inner) => {
                 let inner = *inner;
-                drop(nodes);
-                drop(children_vec);
                 line_suffix.push(cmd.with_doc(inner));
             }
 
             DocNode::LineSuffixBoundary => {
-                drop(nodes);
-                drop(children_vec);
-                flush_line_suffix(arena, &mut line_suffix, output, pos, config, resolver);
+                flush_line_suffix(
+                    arena,
+                    &mut line_suffix,
+                    output,
+                    pos,
+                    render,
+                    embed,
+                    resolver,
+                );
             }
 
             DocNode::BreakParent => {
@@ -600,7 +667,15 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
         }
     }
 
-    flush_line_suffix(arena, &mut line_suffix, output, pos, config, resolver);
+    flush_line_suffix(
+        arena,
+        &mut line_suffix,
+        output,
+        pos,
+        render,
+        embed,
+        resolver,
+    );
 }
 
 /// Render a fill doc using greedy line packing (iterative version).
@@ -611,7 +686,8 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
     output: &mut String,
     pos: &mut usize,
     indent_level: usize,
-    config: &PrintConfig,
+    render: &RenderConfig,
+    embed: &EmbedContext,
     context: &DocContext,
     rest_commands: &[ArenaCommand],
     resolver: Option<&R>,
@@ -619,7 +695,7 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
     let mut offset = 0;
 
     while offset < parts.len() {
-        let remaining = config.print_width.saturating_sub(*pos);
+        let remaining = render.print_width.saturating_sub(*pos);
         let content = parts[offset];
 
         let is_final_segment = offset + 2 >= parts.len();
@@ -637,7 +713,8 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 Mode::Flat,
                 rest_commands,
                 remaining as isize,
-                config,
+                render,
+                embed,
                 resolver,
             )
         } else {
@@ -647,7 +724,8 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 Mode::Flat,
                 &[],
                 available as isize,
-                config,
+                render,
+                embed,
                 resolver,
             )
         };
@@ -656,11 +734,11 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
         if offset + 1 >= parts.len() {
             if !content_fits {
                 let line_start_pos =
-                    line_start_column(indent_level, 0, config, context.base_indent_override);
+                    line_start_column(indent_level, 0, render, embed, context.base_indent_override);
                 if *pos != line_start_pos {
                     trim_trailing_whitespace(output);
                     output.push('\n');
-                    write_indentation(output, indent_level, 0, config);
+                    write_indentation(output, indent_level, 0, render, embed);
                     *pos = line_start_pos;
                 }
             }
@@ -671,7 +749,8 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 pos,
                 indent_level,
                 Mode::Flat,
-                config,
+                render,
+                embed,
                 resolver,
                 context.base_indent_override,
             );
@@ -689,7 +768,8 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 pos,
                 indent_level,
                 Mode::Flat,
-                config,
+                render,
+                embed,
                 resolver,
                 context.base_indent_override,
             );
@@ -705,7 +785,8 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 pos,
                 indent_level,
                 sep_mode,
-                config,
+                render,
+                embed,
                 resolver,
                 context.base_indent_override,
             );
@@ -719,7 +800,8 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
             &[content, separator, next_content],
             available,
             Mode::Flat,
-            config,
+            render,
+            embed,
             resolver,
         );
 
@@ -731,7 +813,8 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 pos,
                 indent_level,
                 Mode::Flat,
-                config,
+                render,
+                embed,
                 resolver,
                 context.base_indent_override,
             );
@@ -742,7 +825,8 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 pos,
                 indent_level,
                 Mode::Flat,
-                config,
+                render,
+                embed,
                 resolver,
                 context.base_indent_override,
             );
@@ -754,7 +838,8 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 pos,
                 indent_level,
                 Mode::Flat,
-                config,
+                render,
+                embed,
                 resolver,
                 context.base_indent_override,
             );
@@ -765,30 +850,32 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 pos,
                 indent_level,
                 Mode::Break,
-                config,
+                render,
+                embed,
                 resolver,
                 context.base_indent_override,
             );
         } else {
             let line_start_pos =
-                line_start_column(indent_level, 0, config, context.base_indent_override);
+                line_start_column(indent_level, 0, render, embed, context.base_indent_override);
             let at_line_start = *pos == line_start_pos;
 
             if !at_line_start {
-                let remaining_at_start = config.print_width.saturating_sub(line_start_pos);
+                let remaining_at_start = render.print_width.saturating_sub(line_start_pos);
                 let content_fits_at_start = arena_fits_with_lookahead(
                     arena,
                     content,
                     Mode::Flat,
                     &[],
                     remaining_at_start as isize,
-                    config,
+                    render,
+                    embed,
                     resolver,
                 );
 
                 trim_trailing_whitespace(output);
                 output.push('\n');
-                write_indentation(output, indent_level, 0, config);
+                write_indentation(output, indent_level, 0, render, embed);
                 *pos = line_start_pos;
 
                 if content_fits_at_start {
@@ -799,7 +886,8 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                         pos,
                         indent_level,
                         Mode::Flat,
-                        config,
+                        render,
+                        embed,
                         resolver,
                         context.base_indent_override,
                     );
@@ -810,7 +898,8 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                         pos,
                         indent_level,
                         Mode::Break,
-                        config,
+                        render,
+                        embed,
                         resolver,
                         context.base_indent_override,
                     );
@@ -822,7 +911,8 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                         pos,
                         indent_level,
                         Mode::Break,
-                        config,
+                        render,
+                        embed,
                         resolver,
                         context.base_indent_override,
                     );
@@ -833,7 +923,8 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                         pos,
                         indent_level,
                         Mode::Break,
-                        config,
+                        render,
+                        embed,
                         resolver,
                         context.base_indent_override,
                     );
@@ -846,7 +937,8 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                     pos,
                     indent_level,
                     Mode::Break,
-                    config,
+                    render,
+                    embed,
                     resolver,
                     context.base_indent_override,
                 );
@@ -857,7 +949,8 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                     pos,
                     indent_level,
                     Mode::Break,
-                    config,
+                    render,
+                    embed,
                     resolver,
                     context.base_indent_override,
                 );
@@ -877,7 +970,8 @@ fn render_single_doc<R: TextResolver + ?Sized>(
     pos: &mut usize,
     indent_level: usize,
     mode: Mode,
-    config: &PrintConfig,
+    render: &RenderConfig,
+    embed: &EmbedContext,
     resolver: Option<&R>,
     base_indent_override: Option<usize>,
 ) {
@@ -889,12 +983,21 @@ fn render_single_doc<R: TextResolver + ?Sized>(
         pos,
         indent_level,
         mode,
-        config,
+        render,
+        embed,
         resolver,
         Some(&mut line_suffix),
         base_indent_override,
     );
-    flush_line_suffix(arena, &mut line_suffix, output, pos, config, resolver);
+    flush_line_suffix(
+        arena,
+        &mut line_suffix,
+        output,
+        pos,
+        render,
+        embed,
+        resolver,
+    );
 }
 
 /// Unified single-doc renderer with optional suffix handling.
@@ -906,7 +1009,8 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
     pos: &mut usize,
     indent_level: usize,
     mode: Mode,
-    config: &PrintConfig,
+    render: &RenderConfig,
+    embed: &EmbedContext,
     resolver: Option<&R>,
     suffix_buffer: Option<&mut Vec<ArenaCommand>>,
     base_indent_override: Option<usize>,
@@ -923,23 +1027,26 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
     let mut dummy_suffix: Vec<ArenaCommand> = Vec::new();
     let line_suffix = suffix_buffer.unwrap_or(&mut dummy_suffix);
 
-    while let Some(cmd) = commands.pop() {
-        let nodes = arena.borrow_nodes();
-        let children_vec = arena.borrow_children();
+    // Hoist arena borrows out of the loop: the arena is read-only during
+    // rendering, so a single immutable borrow held for the whole render
+    // avoids the per-iteration dynamic borrow-check cost.
+    let nodes_outer = arena.borrow_nodes();
+    let children_outer = arena.borrow_children();
+    let nodes: &[DocNode] = &nodes_outer;
+    let children_vec: &[DocId] = &children_outer;
 
+    while let Some(cmd) = commands.pop() {
         match &nodes[cmd.doc.index()] {
             DocNode::Text(t) => {
-                render_text(t, output, pos, config.tab_width, resolver);
+                render_text(t, output, pos, render.tab_width, resolver);
             }
 
             DocNode::Line(kind) => {
                 let kind = *kind;
-                drop(nodes);
-                drop(children_vec);
                 if tracking_suffix {
                     let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
                     if cmd.mode == Mode::Break || is_hard {
-                        flush_line_suffix(arena, line_suffix, output, pos, config, resolver);
+                        flush_line_suffix(arena, line_suffix, output, pos, render, embed, resolver);
                     }
                 }
                 render_line_break(
@@ -950,37 +1057,30 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                     cmd.base_indent_override,
                     output,
                     pos,
-                    config,
+                    render,
+                    embed,
                 );
             }
 
             DocNode::Indent(inner) => {
                 let inner = *inner;
-                drop(nodes);
-                drop(children_vec);
                 commands.push(cmd.indented(inner));
             }
 
             DocNode::Dedent(inner) => {
                 let inner = *inner;
-                drop(nodes);
-                drop(children_vec);
                 commands.push(cmd.dedented(inner));
             }
 
             DocNode::Align { n, contents } => {
                 let n = *n;
                 let contents = *contents;
-                drop(nodes);
-                drop(children_vec);
                 commands.push(cmd.with_indent(n, contents));
             }
 
             DocNode::AlignSpaces { spaces, contents } => {
                 let spaces = *spaces;
                 let contents = *contents;
-                drop(nodes);
-                drop(children_vec);
                 commands.push(cmd.with_align_spaces(spaces, contents));
             }
 
@@ -993,18 +1093,13 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                 let contents = *contents;
                 let expanded_states = *expanded_states;
                 let should_break = *should_break;
-                drop(nodes);
-                drop(children_vec);
 
                 if !tracking_suffix {
                     commands.push(cmd.with_doc(contents));
                 } else if !expanded_states.is_empty() {
-                    let suffix = if *pos >= config.first_line_offset {
-                        config.suffix_width
-                    } else {
-                        0
-                    };
-                    let effective_width = config.print_width.saturating_sub(suffix);
+                    let effective_width = render
+                        .print_width
+                        .saturating_sub(effective_suffix_width(*pos, embed));
                     let remaining = effective_width.saturating_sub(*pos) as isize;
 
                     if arena_fits_with_lookahead(
@@ -1013,14 +1108,13 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                         Mode::Flat,
                         &commands,
                         remaining,
-                        config,
+                        render,
+                        embed,
                         resolver,
                     ) {
                         commands.push(cmd.with_mode(Mode::Flat, contents));
                     } else {
-                        let children_vec = arena.borrow_children();
-                        let states = expanded_states.resolve(&children_vec).to_vec();
-                        drop(children_vec);
+                        let states = expanded_states.resolve(children_vec).to_vec();
 
                         let mut found = false;
                         for (i, &state) in states.iter().enumerate() {
@@ -1035,7 +1129,8 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                                 Mode::Flat,
                                 &commands,
                                 remaining,
-                                config,
+                                render,
+                                embed,
                                 resolver,
                             ) {
                                 commands.push(cmd.with_mode(Mode::Flat, state));
@@ -1051,12 +1146,9 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                 } else if should_break || arena.will_break(contents) {
                     commands.push(cmd.with_mode(Mode::Break, contents));
                 } else {
-                    let suffix = if *pos >= config.first_line_offset {
-                        config.suffix_width
-                    } else {
-                        0
-                    };
-                    let effective_width = config.print_width.saturating_sub(suffix);
+                    let effective_width = render
+                        .print_width
+                        .saturating_sub(effective_suffix_width(*pos, embed));
                     let remaining = effective_width.saturating_sub(*pos) as isize;
                     let chosen_mode = if arena_fits_with_lookahead(
                         arena,
@@ -1064,7 +1156,8 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                         Mode::Flat,
                         &commands,
                         remaining,
-                        config,
+                        render,
+                        embed,
                         resolver,
                     ) {
                         Mode::Flat
@@ -1077,18 +1170,13 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
 
             DocNode::IsolatedGroup { contents } => {
                 let contents = *contents;
-                drop(nodes);
-                drop(children_vec);
 
                 if !tracking_suffix {
                     commands.push(cmd.with_doc(contents));
                 } else {
-                    let suffix = if *pos >= config.first_line_offset {
-                        config.suffix_width
-                    } else {
-                        0
-                    };
-                    let effective_width = config.print_width.saturating_sub(suffix);
+                    let effective_width = render
+                        .print_width
+                        .saturating_sub(effective_suffix_width(*pos, embed));
                     let remaining = effective_width.saturating_sub(*pos) as isize;
                     let chosen_mode = if arena_fits_with_lookahead(
                         arena,
@@ -1096,7 +1184,8 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                         Mode::Flat,
                         &commands,
                         remaining,
-                        config,
+                        render,
+                        embed,
                         resolver,
                     ) {
                         Mode::Flat
@@ -1116,8 +1205,6 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                 } else {
                     *flat_doc
                 };
-                drop(nodes);
-                drop(children_vec);
                 commands.push(cmd.with_doc(chosen));
             }
 
@@ -1129,33 +1216,28 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                 let contents = *contents;
                 let group_id = *group_id;
                 let negate = *negate;
-                drop(nodes);
-                drop(children_vec);
                 commands.push(process_indent_if_break(
                     contents, group_id, negate, None, &cmd,
                 ));
             }
 
             DocNode::Concat(range) => {
-                let kids = range.resolve(&children_vec);
+                let kids = range.resolve(children_vec);
                 for &child in kids.iter().rev() {
                     commands.push(cmd.with_doc(child));
                 }
-                drop(nodes);
-                drop(children_vec);
             }
 
             DocNode::Fill(range) => {
-                let parts: Vec<DocId> = range.resolve(&children_vec).to_vec();
-                drop(nodes);
-                drop(children_vec);
+                let parts: Vec<DocId> = range.resolve(children_vec).to_vec();
                 render_fill_iterative(
                     arena,
                     &parts,
                     output,
                     pos,
                     cmd.indent,
-                    config,
+                    render,
+                    embed,
                     &DocContext::default(),
                     &[],
                     resolver,
@@ -1165,24 +1247,19 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
             DocNode::WithContext { doc, context } => {
                 let inner_doc = *doc;
                 let context = context.clone();
-                drop(nodes);
-                drop(children_vec);
 
                 if tracking_suffix {
-                    let nodes = arena.borrow_nodes();
                     if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
                         let fill_range = *fill_range;
-                        let children_vec = arena.borrow_children();
-                        let parts: Vec<DocId> = fill_range.resolve(&children_vec).to_vec();
-                        drop(children_vec);
-                        drop(nodes);
+                        let parts: Vec<DocId> = fill_range.resolve(children_vec).to_vec();
                         render_fill_iterative(
                             arena,
                             &parts,
                             output,
                             pos,
                             cmd.indent,
-                            config,
+                            render,
+                            embed,
                             &context,
                             &[],
                             resolver,
@@ -1190,7 +1267,6 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                     } else {
                         let merged_override =
                             context.base_indent_override.or(cmd.base_indent_override);
-                        drop(nodes);
                         commands.push(cmd.with_base_override(merged_override, inner_doc));
                     }
                 } else {
@@ -1201,8 +1277,6 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
 
             DocNode::LineSuffix(inner) => {
                 let inner = *inner;
-                drop(nodes);
-                drop(children_vec);
                 if tracking_suffix {
                     line_suffix.push(cmd.with_doc(inner));
                 } else {
@@ -1211,10 +1285,8 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
             }
 
             DocNode::LineSuffixBoundary => {
-                drop(nodes);
-                drop(children_vec);
                 if tracking_suffix {
-                    flush_line_suffix(arena, line_suffix, output, pos, config, resolver);
+                    flush_line_suffix(arena, line_suffix, output, pos, render, embed, resolver);
                 }
             }
 
@@ -1227,32 +1299,39 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
 // Utilities
 //
 
-fn write_indentation(output: &mut String, level: usize, align_spaces: usize, config: &PrintConfig) {
-    let extra = if config.first_line_offset > 0 {
-        config.base_indent_offset
+fn write_indentation(
+    output: &mut String,
+    level: usize,
+    align_spaces: usize,
+    render: &RenderConfig,
+    embed: &EmbedContext,
+) {
+    let extra = if embed.first_line_offset > 0 {
+        embed.base_indent_offset
     } else {
         0
     };
     for _ in 0..(level + extra) {
-        output.push_str(config.indent);
+        output.push_str(render.indent);
     }
     for _ in 0..align_spaces {
         output.push(' ');
     }
 }
 
-fn indent_width(level: usize, config: &PrintConfig) -> usize {
-    level * indent_str_width(config.indent, config.tab_width)
+fn indent_width(level: usize, render: &RenderConfig) -> usize {
+    level * indent_str_width(render.indent, render.tab_width)
 }
 
 fn line_start_column(
     indent_level: usize,
     align_spaces: usize,
-    config: &PrintConfig,
+    render: &RenderConfig,
+    embed: &EmbedContext,
     base_override: Option<usize>,
 ) -> usize {
-    let base = base_override.unwrap_or(config.base_indent_offset);
-    indent_width(indent_level, config) + base * config.tab_width + align_spaces
+    let base = base_override.unwrap_or(embed.base_indent_offset);
+    indent_width(indent_level, render) + base * render.tab_width + align_spaces
 }
 
 fn indent_str_width(indent: &str, tab_width: usize) -> usize {
