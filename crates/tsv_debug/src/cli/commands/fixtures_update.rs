@@ -1,40 +1,17 @@
+use argh::FromArgs;
 use std::process::{Command as StdCommand, exit};
-use tsv_cli::cli::args::Args;
-use tsv_cli::cli::commands::{Command, Executable};
 
-/// fixtures-update command - regenerate both expected.json and output_prettier.svelte files
-pub struct FixturesUpdateCommand;
-
-impl Command for FixturesUpdateCommand {
-    fn name(&self) -> &str {
-        "fixtures_update"
-    }
-
-    fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        // Collect remaining args as filters
-        let mut filters = Vec::new();
-        while let Some(filter) = args.positional() {
-            filters.push(filter);
-        }
-
-        Ok(Box::new(FixturesUpdateExecutable { filters }))
-    }
-
-    fn usage(&self) -> Vec<String> {
-        vec![
-            "fixtures_update                   Regenerate both expected.json and output_prettier.svelte"
-                .to_string(),
-            "fixtures_update <filter>...       Regenerate matching fixtures".to_string(),
-        ]
-    }
-}
-
-struct FixturesUpdateExecutable {
+/// Regenerate expected.json + output_prettier.* (runs parsed + formatted in sequence).
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "fixtures_update")]
+pub struct FixturesUpdateCommand {
+    /// fixture filter patterns (multiple = OR)
+    #[argh(positional)]
     filters: Vec<String>,
 }
 
-impl Executable for FixturesUpdateExecutable {
-    fn execute(&self) {
+impl FixturesUpdateCommand {
+    pub fn run(self) {
         println!("Running fixtures_update_parsed...\n");
 
         // Build command: cargo run -p tsv_debug --quiet fixtures_update_parsed [filters...]

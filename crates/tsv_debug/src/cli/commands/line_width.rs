@@ -1,87 +1,64 @@
-use tsv_cli::cli::args::Args;
-use tsv_cli::cli::commands::{Command, Executable};
+use argh::FromArgs;
 use tsv_cli::cli::input::Input;
 use tsv_lang::printing::visual_width;
 
-/// Line width measurement command - measures line widths accounting for tab width
-pub struct LineWidthCommand;
+/// Measure visual line widths (accounts for tab width).
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "line_width")]
+pub struct LineWidthCommand {
+    /// only measure this line number
+    #[argh(option)]
+    line: Option<usize>,
 
-impl Command for LineWidthCommand {
-    fn name(&self) -> &str {
-        "line_width"
-    }
+    /// tab width (default: 2, matches prettier)
+    #[argh(option, default = "2")]
+    tab_width: usize,
 
-    fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        // Parse input - no parser type needed, just measure raw text
-        let input = if let Some(content) = args.option("content") {
+    /// emit JSON
+    #[argh(switch)]
+    json: bool,
+
+    /// content to measure
+    #[argh(option)]
+    content: Option<String>,
+
+    /// read from stdin
+    #[argh(switch)]
+    stdin: bool,
+
+    /// file path
+    #[argh(positional)]
+    file: Option<String>,
+}
+
+impl LineWidthCommand {
+    pub fn run(self) {
+        let input = if let Some(content) = self.content {
             Input::from_content(content)
-        } else if args.flag("stdin") {
-            Input::from_stdin()?
-        } else if let Some(path) = args.positional() {
-            Input::from_file(&path)?
+        } else if self.stdin {
+            match Input::from_stdin() {
+                Ok(i) => i,
+                Err(e) => {
+                    eprintln!("Error: {e}");
+                    std::process::exit(1);
+                }
+            }
+        } else if let Some(path) = self.file {
+            match Input::from_file(&path) {
+                Ok(i) => i,
+                Err(e) => {
+                    eprintln!("Error: {e}");
+                    std::process::exit(1);
+                }
+            }
         } else {
-            return Err("No input provided. Use a file path, --content, or --stdin".to_string());
+            eprintln!("Error: No input provided. Use a file path, --content, or --stdin");
+            std::process::exit(1);
         };
 
-        // Parse optional flags
-        let line = args
-            .option("line")
-            .map(|s| {
-                s.parse::<usize>()
-                    .map_err(|_| format!("Invalid line number: {s}"))
-            })
-            .transpose()?;
-
-        let tab_width = args
-            .option("tab-width")
-            .map(|s| {
-                s.parse::<usize>()
-                    .map_err(|_| format!("Invalid tab width: {s}"))
-            })
-            .transpose()?
-            .unwrap_or(2); // Default to prettier's tabWidth: 2
-
-        let print_width = 100; // Prettier default
-        let json = args.flag("json");
-
-        Ok(Box::new(LineWidthExecutable {
-            input,
-            line,
-            tab_width,
-            print_width,
-            json,
-        }))
-    }
-
-    fn usage(&self) -> Vec<String> {
-        vec![
-            "line_width <file>                           Measure line widths for all lines in file"
-                .to_string(),
-            "line_width <file> --line <N>                Measure specific line number".to_string(),
-            "line_width --content <string>               Measure line widths for content string"
-                .to_string(),
-            "line_width --stdin                          Measure line widths from stdin"
-                .to_string(),
-            "line_width <file> --tab-width <N>           Use custom tab width (default: 2)"
-                .to_string(),
-            "line_width <file> --json                    Output in JSON format".to_string(),
-        ]
-    }
-}
-
-/// Executable instance for line_width command
-struct LineWidthExecutable {
-    input: Input,
-    line: Option<usize>,
-    tab_width: usize,
-    print_width: usize,
-    json: bool,
-}
-
-impl Executable for LineWidthExecutable {
-    fn execute(&self) {
-        let content = self.input.content();
+        let content = input.content();
         let lines: Vec<&str> = content.lines().collect();
+        let print_width = 100; // Prettier default
 
         if lines.is_empty() {
             if self.json {
@@ -123,7 +100,7 @@ impl Executable for LineWidthExecutable {
             let tab_width_total = tab_count * self.tab_width;
             let content_width = total - tab_width_total;
 
-            let exceeds = total > self.print_width;
+            let exceeds = total > print_width;
             if exceeds {
                 exceeds_count += 1;
             }
@@ -138,10 +115,10 @@ impl Executable for LineWidthExecutable {
                     "exceeds": exceeds,
                 }));
             } else {
-                let status = if total > self.print_width {
-                    format!("✗ EXCEEDS print_width ({})", self.print_width)
-                } else if total == self.print_width {
-                    format!("⚠️  EXACTLY print_width ({})", self.print_width)
+                let status = if total > print_width {
+                    format!("✗ EXCEEDS print_width ({print_width})")
+                } else if total == print_width {
+                    format!("⚠️  EXACTLY print_width ({print_width})")
                 } else {
                     "✓".to_string()
                 };
@@ -163,7 +140,7 @@ impl Executable for LineWidthExecutable {
                 "\nSummary: {}/{} lines exceed print_width ({})",
                 exceeds_count,
                 lines.len(),
-                self.print_width
+                print_width
             );
         }
 

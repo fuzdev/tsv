@@ -12,7 +12,7 @@
 		"@oxc-parser/binding-wasm32-wasi/parser.wasi-browser.js": "npm:@oxc-parser/binding-wasm32-wasi@0.131.0/parser.wasi-browser.js",
 		"oxfmt": "npm:oxfmt@0.50.0",
 		"zod": "npm:zod@4",
-		"@fuzdev/fuz_util": "npm:@fuzdev/fuz_util@0.59.1",
+		"@fuzdev/fuz_util": "npm:@fuzdev/fuz_util@0.60.1",
 		"@std/fs": "jsr:@std/fs@1"
 	},
 	"fmt": {

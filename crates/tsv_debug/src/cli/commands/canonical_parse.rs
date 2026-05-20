@@ -1,48 +1,48 @@
-use crate::cli::input_parser;
 use crate::deno;
 use crate::error;
-use tsv_cli::cli::args::Args;
-use tsv_cli::cli::commands::{Command, Executable};
-use tsv_cli::cli::input::{Input, ParserType};
+use argh::FromArgs;
+use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 use tsv_cli::json_utils::to_json_with_tabs;
 
-/// canonical_parse command - parse using canonical external parsers
-/// (Svelte's official parser, acorn+typescript, or Svelte's parseCss)
-pub struct CanonicalParseCommand;
+/// Parse using canonical external parsers (Svelte, acorn+typescript, parseCss).
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "canonical_parse")]
+pub struct CanonicalParseCommand {
+    /// content to parse (requires --parser)
+    #[argh(option)]
+    content: Option<String>,
 
-impl Command for CanonicalParseCommand {
-    fn name(&self) -> &str {
-        "canonical_parse"
-    }
+    /// read from stdin (requires --parser)
+    #[argh(switch)]
+    stdin: bool,
 
-    fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        let (input, parser_type) = input_parser::parse_input_and_parser_type(args)?;
-        Ok(Box::new(CanonicalParseExecutable { input, parser_type }))
-    }
+    /// parser type: svelte | typescript | css
+    #[argh(option)]
+    parser: Option<ParserType>,
 
-    fn usage(&self) -> Vec<String> {
-        vec![
-            "canonical_parse <file>                           Parse file using canonical parser"
-                .to_string(),
-            "canonical_parse --content <str> --parser <type>  Parse content using canonical parser (requires --parser)"
-                .to_string(),
-            "canonical_parse --stdin --parser <type>          Parse from stdin using canonical parser (requires --parser)"
-                .to_string(),
-        ]
-    }
+    /// file path (parser auto-detected from extension)
+    #[argh(positional)]
+    file: Option<String>,
 }
 
-struct CanonicalParseExecutable {
-    input: Input,
-    parser_type: ParserType,
-}
+impl CanonicalParseCommand {
+    pub fn run(self) {
+        let input_args = InputArgs {
+            content: self.content,
+            stdin: self.stdin,
+            parser: self.parser,
+            file: self.file,
+        };
+        let (input, parser_type) = match input_args.resolve() {
+            Ok(pair) => pair,
+            Err(e) => {
+                eprintln!("Error: {e}");
+                std::process::exit(1);
+            }
+        };
 
-impl Executable for CanonicalParseExecutable {
-    fn execute(&self) {
         let rt = super::create_runtime();
-        let result = rt.block_on(run(&self.input, self.parser_type));
-
-        match result {
+        match rt.block_on(run(&input, parser_type)) {
             Ok(json) => print!("{json}"),
             Err(err) => {
                 eprintln!("Error parsing: {err}");

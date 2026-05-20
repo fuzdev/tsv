@@ -1,53 +1,27 @@
 use crate::deno::{parse_css, parse_svelte, parse_typescript};
 use crate::fixtures;
 use crate::fixtures::InputType;
+use argh::FromArgs;
 use std::path::Path;
-use tsv_cli::cli::args::Args;
-use tsv_cli::cli::commands::{Command, Executable};
 use tsv_cli::json_utils::to_json_with_tabs;
 
-/// fixtures-update-parsed command - regenerate expected.json (or expected_ours.json + expected_svelte.json) files
-pub struct FixturesUpdateParsedCommand;
+/// Regenerate expected.json (or expected_ours.json + expected_svelte.json) files.
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "fixtures_update_parsed")]
+pub struct FixturesUpdateParsedCommand {
+    /// list matching fixtures only (do not regenerate)
+    #[argh(switch)]
+    list: bool,
 
-impl Command for FixturesUpdateParsedCommand {
-    fn name(&self) -> &str {
-        "fixtures_update_parsed"
-    }
-
-    fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        let list_only = args.flag("list");
-
-        // Collect remaining args as filters
-        let mut filters = Vec::new();
-        while let Some(filter) = args.positional() {
-            filters.push(filter);
-        }
-
-        Ok(Box::new(FixturesUpdateParsedExecutable {
-            list_only,
-            filters,
-        }))
-    }
-
-    fn usage(&self) -> Vec<String> {
-        vec![
-            "fixtures_update_parsed                    Regenerate all expected.json files"
-                .to_string(),
-            "fixtures_update_parsed --list             List all fixtures".to_string(),
-            "fixtures_update_parsed <filter>...        Regenerate matching fixtures".to_string(),
-        ]
-    }
-}
-
-struct FixturesUpdateParsedExecutable {
-    list_only: bool,
+    /// fixture filter patterns (multiple = OR)
+    #[argh(positional)]
     filters: Vec<String>,
 }
 
-impl Executable for FixturesUpdateParsedExecutable {
-    fn execute(&self) {
+impl FixturesUpdateParsedCommand {
+    pub fn run(self) {
         let rt = super::create_runtime();
-        rt.block_on(run(self.list_only, &self.filters));
+        rt.block_on(run(self.list, &self.filters));
     }
 }
 

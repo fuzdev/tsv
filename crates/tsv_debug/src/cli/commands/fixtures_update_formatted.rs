@@ -2,43 +2,19 @@ use crate::fixtures::{
     self, AUDIT_SIGNATURE_FILENAME, AuditSignature, discover_prettier_variant_variants,
     discover_unformatted_ours_variants, discover_variant_variants,
 };
-use tsv_cli::cli::args::Args;
-use tsv_cli::cli::commands::{Command, Executable};
+use argh::FromArgs;
 
-/// fixtures-update-formatted command - regenerate output_prettier.*, prettier_intermediate_*,
-/// and prettier_intermediate_to_variant_* files
-pub struct FixturesUpdateFormattedCommand;
-
-impl Command for FixturesUpdateFormattedCommand {
-    fn name(&self) -> &str {
-        "fixtures_update_formatted"
-    }
-
-    fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        // Collect remaining args as filters
-        let mut filters = Vec::new();
-        while let Some(filter) = args.positional() {
-            filters.push(filter);
-        }
-
-        Ok(Box::new(FixturesUpdateFormattedExecutable { filters }))
-    }
-
-    fn usage(&self) -> Vec<String> {
-        vec![
-            "fixtures_update_formatted                   Regenerate output_prettier.*, prettier_intermediate_*, and prettier_intermediate_to_variant_* files"
-                .to_string(),
-            "fixtures_update_formatted <filter>...       Regenerate matching fixtures".to_string(),
-        ]
-    }
-}
-
-struct FixturesUpdateFormattedExecutable {
+/// Regenerate output_prettier.*, prettier_intermediate_*, and audit_signature.txt.
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "fixtures_update_formatted")]
+pub struct FixturesUpdateFormattedCommand {
+    /// fixture filter patterns (multiple = OR)
+    #[argh(positional)]
     filters: Vec<String>,
 }
 
-impl Executable for FixturesUpdateFormattedExecutable {
-    fn execute(&self) {
+impl FixturesUpdateFormattedCommand {
+    pub fn run(self) {
         let rt = super::create_runtime();
         rt.block_on(run(&self.filters));
     }

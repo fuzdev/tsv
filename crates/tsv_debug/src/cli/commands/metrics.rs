@@ -1,33 +1,13 @@
+use argh::FromArgs;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use tsv_cli::cli::args::Args;
-use tsv_cli::cli::commands::{Command, Executable};
-
-/// Codebase metrics command — line counts by crate and phase
-pub struct MetricsCommand;
-
-impl Command for MetricsCommand {
-    fn name(&self) -> &str {
-        "metrics"
-    }
-
-    fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        let json = args.flag("json");
-
-        Ok(Box::new(MetricsExecutable { json }))
-    }
-
-    fn usage(&self) -> Vec<String> {
-        vec![
-			"metrics                                     Codebase structure metrics (line counts by crate/phase)"
-				.to_string(),
-			"metrics --json                               JSON output for scripting".to_string(),
-		]
-    }
-}
-
-struct MetricsExecutable {
+/// Codebase metrics — line counts by crate and phase.
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "metrics")]
+pub struct MetricsCommand {
+    /// emit JSON for scripting
+    #[argh(switch)]
     json: bool,
 }
 
@@ -55,21 +35,19 @@ const GROUPS: &[CrateGroup] = &[
     },
     CrateGroup {
         name: "tooling",
-        crates: &["tsv_cli", "tsv_debug", "tsv_ffi", "tsv_napi", "tsv_wasm"],
+        crates: &["tsv_cli", "tsv_debug", "tsv_ffi", "tsv_wasm"],
     },
 ];
 
-impl Executable for MetricsExecutable {
-    fn execute(&self) {
-        let crates_dir = find_crates_dir();
-        let Some(crates_dir) = crates_dir else {
+impl MetricsCommand {
+    pub fn run(self) {
+        let Some(crates_dir) = find_crates_dir() else {
             eprintln!("Error: Could not find crates/ directory. Run from the workspace root.");
             std::process::exit(1);
         };
 
         let mut results = Vec::new();
 
-        // Scan each crate directory
         let Ok(entries) = std::fs::read_dir(&crates_dir) else {
             eprintln!("Error: Could not read {}", crates_dir.display());
             std::process::exit(1);

@@ -1,64 +1,35 @@
 use crate::fixtures::{self, validation};
+use argh::FromArgs;
 use futures_util::stream::{self, StreamExt};
-use tsv_cli::cli::args::Args;
-use tsv_cli::cli::commands::{Command, Executable};
 
-/// fixtures-validate command - validate all fixture files
-pub struct FixturesValidateCommand;
+/// Validate all fixture files (CI).
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "fixtures_validate")]
+pub struct FixturesValidateCommand {
+    /// list matching fixtures only (do not validate)
+    #[argh(switch)]
+    list: bool,
 
-impl Command for FixturesValidateCommand {
-    fn name(&self) -> &str {
-        "fixtures_validate"
-    }
-
-    fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        let list_only = args.flag("list");
-        let verbose = args.flag("verbose") || args.flag("v");
-        let prettier_only = args.flag("prettier-only");
-
-        // Collect remaining args as filters
-        let mut filters = Vec::new();
-        while let Some(filter) = args.positional() {
-            filters.push(filter);
-        }
-
-        Ok(Box::new(FixturesValidateExecutable {
-            list_only,
-            verbose,
-            prettier_only,
-            filters,
-        }))
-    }
-
-    fn usage(&self) -> Vec<String> {
-        vec![
-            "fixtures_validate                           Validate all fixture files (CI)"
-                .to_string(),
-            "fixtures_validate --list                    List all fixtures".to_string(),
-            "fixtures_validate --verbose                 Show successful checks too".to_string(),
-            "fixtures_validate --prettier-only           Skip our parser/formatter (for fixture authoring)"
-                .to_string(),
-            "fixtures_validate <filter>...               Validate matching fixtures".to_string(),
-        ]
-    }
-}
-
-struct FixturesValidateExecutable {
-    list_only: bool,
+    /// show successful checks too
+    #[argh(switch, short = 'v')]
     verbose: bool,
+
+    /// skip our parser/formatter (for fixture authoring)
+    #[argh(switch)]
     prettier_only: bool,
+
+    /// fixture filter patterns (multiple = OR)
+    #[argh(positional)]
     filters: Vec<String>,
 }
 
-impl Executable for FixturesValidateExecutable {
-    fn execute(&self) {
+impl FixturesValidateCommand {
+    pub fn run(self) {
         let rt = crate::cli::commands::create_runtime();
-        rt.block_on(self.run());
+        rt.block_on(self.run_async());
     }
-}
 
-impl FixturesValidateExecutable {
-    async fn run(&self) {
+    async fn run_async(self) {
         let fixtures_dir = std::path::Path::new("tests/fixtures");
 
         if !fixtures_dir.exists() {
@@ -91,7 +62,7 @@ impl FixturesValidateExecutable {
             std::process::exit(1);
         }
 
-        if self.list_only {
+        if self.list {
             println!("Found fixtures:");
             for fixture in &fixture_list {
                 println!("  {} ({})", fixture.relative_path, fixture.input_file);

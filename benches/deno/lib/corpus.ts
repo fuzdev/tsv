@@ -42,6 +42,20 @@ const DEFAULT_EXCLUSIONS = [
 	'/.gro/',
 	'/build/',
 	'/dist/',
+	// Prettier test fixtures that aren't representative of standard parsing:
+	// `_errors_/` contains intentionally-malformed inputs prettier tracks for
+	// error-recovery testing, `front-matter/` files embed YAML front-matter
+	// (a prettier feature, not a property of the host language), `cursor/`
+	// files contain `<|>` markers for prettier's formatWithCursor() API tests
+	// (syntactically invalid for every parser; also triggers stderr noise from
+	// prettier-plugin-svelte's parser-fallback path), and `multiparser/` files
+	// test prettier's HTML routing of `<script type="text/X">` content to a
+	// matching language parser — prettier-plugin-svelte has no equivalent so
+	// markdown/unknown-language script content flows into babel and throws.
+	'/_errors_/',
+	'/front-matter/',
+	'/cursor/',
+	'/multiparser/',
 ];
 
 const DEFAULT_EXTENSIONS = ['svelte', 'ts', 'js', 'css'];

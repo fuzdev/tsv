@@ -67,3 +67,45 @@ impl FromStr for ParserType {
         }
     }
 }
+
+/// Shared input arguments for commands that accept a file path, `--content`, or `--stdin`.
+///
+/// Each command declares the four argh fields on its own struct and assembles an
+/// `InputArgs` to call [`InputArgs::resolve`]. argh has no struct-flattening
+/// attribute, so the field declarations are repeated per command.
+#[derive(Debug)]
+pub struct InputArgs {
+    pub content: Option<String>,
+    pub stdin: bool,
+    pub parser: Option<ParserType>,
+    pub file: Option<String>,
+}
+
+impl InputArgs {
+    /// Resolve to an `Input` + `ParserType`.
+    ///
+    /// Precedence: `--content` > `--stdin` > file positional. `--content` and
+    /// `--stdin` require `--parser`. On a file path, `--parser` overrides the
+    /// extension-based detection when present; otherwise it's inferred from the
+    /// extension.
+    pub fn resolve(self) -> Result<(Input, ParserType), String> {
+        if let Some(content) = self.content {
+            let parser_type = self
+                .parser
+                .ok_or("--content requires --parser <svelte|typescript|css>")?;
+            Ok((Input::from_content(content), parser_type))
+        } else if self.stdin {
+            let parser_type = self
+                .parser
+                .ok_or("--stdin requires --parser <svelte|typescript|css>")?;
+            Ok((Input::from_stdin()?, parser_type))
+        } else if let Some(path) = self.file {
+            let parser_type = self
+                .parser
+                .unwrap_or_else(|| ParserType::from_extension(&path));
+            Ok((Input::from_file(&path)?, parser_type))
+        } else {
+            Err("No input provided. Use a file path, --content, or --stdin".to_string())
+        }
+    }
+}

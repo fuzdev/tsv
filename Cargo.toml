@@ -10,7 +10,6 @@ members = [
     "crates/tsv_debug",
     "crates/tsv_wasm",
     "crates/tsv_ffi",
-    "crates/tsv_napi",
 ]
 
 [workspace.package]
@@ -34,6 +33,7 @@ tsv_css = { path = "crates/tsv_css", default-features = false }
 tsv_svelte = { path = "crates/tsv_svelte", default-features = false }
 
 # External dependencies
+argh = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 smallvec = "1.11"

@@ -6,7 +6,7 @@
     "jsr:@std/path@^1.1.4": "1.1.4",
     "npm:@biomejs/js-api@4.0.0": "4.0.0_@biomejs+wasm-bundler@2.4.15",
     "npm:@biomejs/wasm-bundler@2.4.15": "2.4.15",
-    "npm:@fuzdev/fuz_util@0.59.1": "0.59.1_svelte@5.55.7_zod@4.3.6",
+    "npm:@fuzdev/fuz_util@0.60.1": "0.60.1_svelte@5.55.7_zod@4.3.6",
     "npm:@oxc-parser/binding-wasm32-wasi@0.131.0": "0.131.0",
     "npm:@sveltejs/acorn-typescript@1.0.9": "1.0.9_acorn@8.16.0",
     "npm:acorn@8.16.0": "8.16.0",
@@ -66,8 +66,8 @@
         "tslib"
       ]
     },
-    "@fuzdev/fuz_util@0.59.1_svelte@5.55.7_zod@4.3.6": {
-      "integrity": "sha512-e8TwXw8isHcx66Q1jBNc7e9lEXpxGkSvEARRjkJAx/PVEmgNCD9VguyhpuZrh5x6GKs1CIop1pmJ0+rHEV/oIQ==",
+    "@fuzdev/fuz_util@0.60.1_svelte@5.55.7_zod@4.3.6": {
+      "integrity": "sha512-uJvpk0kfa0/IpVqTZb5zxJEYLg4i/LvuSudWhuoc00HyFAotD5go8WgxZRARibCfVczyyVk61ExaJ6flaNao2A==",
       "dependencies": [
         "svelte",
         "zod"
@@ -517,7 +517,7 @@
       "jsr:@std/fs@1",
       "npm:@biomejs/js-api@4.0.0",
       "npm:@biomejs/wasm-bundler@2.4.15",
-      "npm:@fuzdev/fuz_util@0.59.1",
+      "npm:@fuzdev/fuz_util@0.60.1",
       "npm:@oxc-parser/binding-wasm32-wasi@0.131.0",
       "npm:@sveltejs/acorn-typescript@1.0.9",
       "npm:acorn@8.16.0",

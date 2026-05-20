@@ -30,10 +30,9 @@ const pkg_path = `${pkg_root}/package.json`;
 
 const pkg = JSON.parse(Deno.readTextFileSync(pkg_path));
 pkg.name = target_name;
-pkg.description =
-	variant === 'fmt'
-		? 'formatter for TypeScript, Svelte, and CSS'
-		: 'parser for TypeScript, Svelte, and CSS';
+pkg.description = variant === 'fmt'
+	? 'formatter for TypeScript, Svelte, and CSS'
+	: 'parser for TypeScript, Svelte, and CSS';
 
 // Copy variant README into the package root, overwriting any wasm-pack default.
 const readme_src = `crates/tsv_wasm/README_${variant}.md`;
@@ -68,7 +67,7 @@ async function print_summary(dir: string): Promise<void> {
 		.filter((e) => e.isFile && !e.name.startsWith('.'))
 		.map((e) => {
 			const path = `${dir}/${e.name}`;
-			return {name: e.name, path, size: Deno.statSync(path).size};
+			return { name: e.name, path, size: Deno.statSync(path).size };
 		})
 		.sort((a, b) => b.size - a.size);
 
@@ -82,8 +81,9 @@ async function print_summary(dir: string): Promise<void> {
 	for (const e of entries) {
 		const name = e.name.padEnd(name_width);
 		const size = format_size(e.size).padStart(size_width);
-		const annotation =
-			e === wasm && wasm_gzipped !== null ? `  →  ${format_size(wasm_gzipped)} gzipped` : '';
+		const annotation = e === wasm && wasm_gzipped !== null
+			? `  →  ${format_size(wasm_gzipped)} gzipped`
+			: '';
 		console.log(`  ${name}  ${size}${annotation}`);
 	}
 }

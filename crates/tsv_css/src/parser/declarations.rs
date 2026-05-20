@@ -16,6 +16,7 @@ use tsv_lang::{ParseError, Span};
 /// - Identifier (type selector - but could also be a property name)
 ///
 /// For identifiers, we need to look ahead: if next non-whitespace/comment token is `:`, it's a declaration.
+/// Custom-property identifiers (`--*`) are always declarations and bypass the lookahead.
 pub(crate) fn is_nested_rule_start(parser: &mut CssParser) -> Result<bool, ParseError> {
     match &parser.current_kind {
         // Unambiguous selector start tokens
@@ -33,6 +34,17 @@ pub(crate) fn is_nested_rule_start(parser: &mut CssParser) -> Result<bool, Parse
         // Ambiguous: identifier could be type selector (nested rule) or property name (declaration)
         // Look ahead to check if next non-whitespace/comment token is `:` (declaration) or not (nested rule)
         TokenKind::Identifier => {
+            // CSS Custom Properties (`--foo`) are always declarations. CSS Variables
+            // Module Level 1 §2.1 defines their value as `<declaration-value>`, which
+            // permits any token sequence with balanced `()` / `[]` / `{}` — including
+            // a top-level `{...}` block. Without this short-circuit, `--foo: { ... }`
+            // would misclassify as a type-selector + pseudo-class.
+            if parser
+                .current_identifier()
+                .is_some_and(|s| s.starts_with("--"))
+            {
+                return Ok(false);
+            }
             // Peek past whitespace and comments to find the significant next token
             let next_kind = parser.peek_past_whitespace()?;
             match next_kind {
@@ -194,18 +206,38 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
     let value_start = parser.base_offset() + parser.current_start;
 
     // Parse value (collect tokens until ; or })
-    // IMPORTANT: Track parenthesis depth to handle semicolons inside functions like url(data:image/png;base64,...)
+    // IMPORTANT: Track bracket depth so balanced groups don't terminate the value:
+    // - parens for functions like `url(data:image/png;base64,...)`
+    // - braces and brackets for custom properties (`<declaration-value>` per CSS Syntax
+    //   Level 3 §4.3.7 permits balanced `()` / `[]` / `{}` blocks)
     let mut value_parts = Vec::new();
     let mut has_value_comment = false;
     let mut value_end = value_start;
     // Track recent end positions for !important stripping (stores ends for last 2 tokens)
     let mut prev_value_end = value_start;
     let mut prev_prev_value_end = value_start;
-    let mut paren_depth: i32 = 0; // Track nesting level of parentheses
+    let mut paren_depth: i32 = 0;
+    let mut brace_depth: i32 = 0;
+    let mut bracket_depth: i32 = 0;
     while !parser.check(TokenKind::Eof)
         && !(paren_depth == 0
+            && brace_depth == 0
+            && bracket_depth == 0
             && (parser.check(TokenKind::Semicolon) || parser.check(TokenKind::RightBrace)))
     {
+        // Track balanced-group depth. An outer `}` at depth 0 would have terminated
+        // the loop above, so reaching the RightBrace arm here means we're inside a
+        // value-level block (custom-property block values).
+        match &parser.current_kind {
+            TokenKind::LeftParen => paren_depth += 1,
+            TokenKind::RightParen => paren_depth = paren_depth.saturating_sub(1),
+            TokenKind::LeftBrace => brace_depth += 1,
+            TokenKind::RightBrace => brace_depth = brace_depth.saturating_sub(1),
+            TokenKind::LeftBracket => bracket_depth += 1,
+            TokenKind::RightBracket => bracket_depth = bracket_depth.saturating_sub(1),
+            _ => {}
+        }
+
         // Convert token to string representation for value
         let value_str = match &parser.current_kind {
             // Internal AST: use decoded value (spec-compliant)
@@ -235,17 +267,9 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
                 parser.advance()?;
                 continue;
             }
-            TokenKind::LeftParen => {
-                paren_depth += 1;
-                parser.current_value().to_string()
-            }
-            TokenKind::RightParen => {
-                paren_depth = paren_depth.saturating_sub(1);
-                parser.current_value().to_string()
-            }
             TokenKind::Bang => "!".to_string(),
             _ => {
-                // Other tokens - include them as-is from source
+                // Other tokens (including brackets/braces/parens) - include as-is from source
                 parser.current_value().to_string()
             }
         };

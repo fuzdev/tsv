@@ -1,55 +1,55 @@
-use crate::cli::input_parser;
 use crate::deno::{PrettierParser, run_prettier};
 use crate::diff::{digit_width, expand_tabs};
-use tsv_cli::cli::args::Args;
-use tsv_cli::cli::commands::{Command, Executable};
-use tsv_cli::cli::input::{Input, ParserType};
+use argh::FromArgs;
+use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 
 /// Default tab width for visual width calculations (matches prettier)
 const TAB_WIDTH: usize = 2;
 
-/// format_prettier command - format code using prettier
-pub struct FormatPrettierCommand;
+/// Format code using prettier (with line width annotations by default).
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "format_prettier")]
+pub struct FormatPrettierCommand {
+    /// suppress line width annotations
+    #[argh(switch)]
+    no_line_widths: bool,
 
-impl Command for FormatPrettierCommand {
-    fn name(&self) -> &str {
-        "format_prettier"
-    }
+    /// content to format (requires --parser)
+    #[argh(option)]
+    content: Option<String>,
 
-    fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        let no_line_widths = args.flag("no-line-widths");
-        let (input, parser_type) = input_parser::parse_input_and_parser_type(args)?;
-        Ok(Box::new(FormatPrettierExecutable {
-            input,
-            parser_type,
-            show_line_widths: !no_line_widths,
-        }))
-    }
+    /// read from stdin (requires --parser)
+    #[argh(switch)]
+    stdin: bool,
 
-    fn usage(&self) -> Vec<String> {
-        vec![
-            "format_prettier <file>                                Format file using prettier (shows line widths)"
-                .to_string(),
-            "format_prettier --no-line-widths <file>               Format without line width annotations"
-                .to_string(),
-            "format_prettier --content <str> --parser <type>        Format content using prettier (requires --parser)"
-                .to_string(),
-            "format_prettier --stdin --parser <type>                Format from stdin using prettier (requires --parser)"
-                .to_string(),
-        ]
-    }
+    /// parser type: svelte | typescript | css
+    #[argh(option)]
+    parser: Option<ParserType>,
+
+    /// file path (parser auto-detected from extension)
+    #[argh(positional)]
+    file: Option<String>,
 }
 
-struct FormatPrettierExecutable {
-    input: Input,
-    parser_type: ParserType,
-    show_line_widths: bool,
-}
+impl FormatPrettierCommand {
+    pub fn run(self) {
+        let show_line_widths = !self.no_line_widths;
+        let input_args = InputArgs {
+            content: self.content,
+            stdin: self.stdin,
+            parser: self.parser,
+            file: self.file,
+        };
+        let (input, parser_type) = match input_args.resolve() {
+            Ok(pair) => pair,
+            Err(e) => {
+                eprintln!("Error: {e}");
+                std::process::exit(1);
+            }
+        };
 
-impl Executable for FormatPrettierExecutable {
-    fn execute(&self) {
         let rt = super::create_runtime();
-        rt.block_on(run(&self.input, self.parser_type, self.show_line_widths));
+        rt.block_on(run(&input, parser_type, show_line_widths));
     }
 }
 

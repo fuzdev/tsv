@@ -1,62 +1,99 @@
-use crate::cli::input_parser;
 use crate::diff::{DiffOptions, diff_to_string};
 use crate::error;
 use crate::fixtures;
 use crate::{deno, subprocess};
-use tsv_cli::cli::args::Args;
-use tsv_cli::cli::commands::{Command, Executable};
-use tsv_cli::cli::input::{Input, ParserType};
+use argh::FromArgs;
+use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 
-/// ast_diff command - compare ASTs to verify semantic equivalence
-pub struct AstDiffCommand;
+/// Compare ASTs to verify semantic equivalence (round-trip or two-file).
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "ast_diff")]
+pub struct AstDiffCommand {
+    /// content to parse (requires --parser, single-input round-trip mode)
+    #[argh(option)]
+    content: Option<String>,
 
-impl Command for AstDiffCommand {
-    fn name(&self) -> &str {
-        "ast_diff"
-    }
+    /// read from stdin (requires --parser, single-input round-trip mode)
+    #[argh(switch)]
+    stdin: bool,
 
-    fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        // Parse first input
-        let (input1, parser_type) = input_parser::parse_input_and_parser_type(args)?;
+    /// parser type: svelte | typescript | css
+    #[argh(option)]
+    parser: Option<ParserType>,
 
-        // Parse optional second input (for two-file comparison mode)
-        let input2 = input_parser::parse_optional_second_input(args, parser_type)?;
-
-        Ok(Box::new(AstDiffExecutable {
-            input1,
-            input2,
-            parser_type,
-        }))
-    }
-
-    fn usage(&self) -> Vec<String> {
-        vec![
-            "ast_diff <file>                                 Parse → format → parse → compare ASTs"
-                .to_string(),
-            "ast_diff <file1> <file2>                        Parse both files and compare ASTs".to_string(),
-            "ast_diff --content <str> --parser <type>        Parse → format → parse (requires --parser)"
-                .to_string(),
-            "ast_diff --stdin --parser <type>                Parse → format → parse from stdin (requires --parser)"
-                .to_string(),
-        ]
-    }
+    /// file path(s) — one for round-trip, two for direct compare
+    #[argh(positional)]
+    files: Vec<String>,
 }
 
-struct AstDiffExecutable {
-    input1: Input,
-    input2: Option<Input>,
-    parser_type: ParserType,
-}
+impl AstDiffCommand {
+    pub fn run(self) {
+        if self.files.len() > 2 {
+            eprintln!("Error: ast_diff accepts at most two file positionals");
+            std::process::exit(1);
+        }
 
-impl Executable for AstDiffExecutable {
-    fn execute(&self) {
+        let has_content_or_stdin = self.content.is_some() || self.stdin;
+        if has_content_or_stdin && !self.files.is_empty() {
+            eprintln!("Error: cannot combine --content/--stdin with file positionals");
+            std::process::exit(1);
+        }
+
+        // Resolve the primary input
+        let (input1, parser_type) = if has_content_or_stdin {
+            let input_args = InputArgs {
+                content: self.content,
+                stdin: self.stdin,
+                parser: self.parser,
+                file: None,
+            };
+            match input_args.resolve() {
+                Ok(pair) => pair,
+                Err(e) => {
+                    eprintln!("Error: {e}");
+                    std::process::exit(1);
+                }
+            }
+        } else {
+            let Some(first) = self.files.first().cloned() else {
+                eprintln!("Error: No input provided. Use a file path, --content, or --stdin");
+                std::process::exit(1);
+            };
+            let input_args = InputArgs {
+                content: None,
+                stdin: false,
+                parser: self.parser,
+                file: Some(first),
+            };
+            match input_args.resolve() {
+                Ok(pair) => pair,
+                Err(e) => {
+                    eprintln!("Error: {e}");
+                    std::process::exit(1);
+                }
+            }
+        };
+
+        // Optional second file for direct comparison mode
+        let input2 = if self.files.len() == 2 {
+            match Input::from_file(&self.files[1]) {
+                Ok(i) => Some(i),
+                Err(e) => {
+                    eprintln!("Error: {e}");
+                    std::process::exit(1);
+                }
+            }
+        } else {
+            None
+        };
+
         let rt = super::create_runtime();
-        let result = if let Some(ref input2) = self.input2 {
+        let result = if let Some(ref input2) = input2 {
             // Two input mode: compare both directly
-            rt.block_on(compare_two_inputs(&self.input1, input2, self.parser_type))
+            rt.block_on(compare_two_inputs(&input1, input2, parser_type))
         } else {
             // Single input mode: parse → format → parse → compare
-            rt.block_on(compare_round_trip(&self.input1, self.parser_type))
+            rt.block_on(compare_round_trip(&input1, parser_type))
         };
 
         match result {

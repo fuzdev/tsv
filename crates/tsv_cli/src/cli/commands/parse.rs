@@ -1,69 +1,50 @@
-use super::{Command, Executable};
-use crate::cli::args::Args;
-use crate::cli::input::{Input, ParserType};
+use crate::cli::input::{InputArgs, ParserType};
 use crate::json_utils::to_json_with_tabs;
+use argh::FromArgs;
 use std::process;
 
-/// Parse command implementation
-pub struct ParseCommand;
+/// Parse source code into AST JSON.
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "parse")]
+pub struct ParseCommand {
+    /// pretty-print JSON output
+    #[argh(switch)]
+    pretty: bool,
 
-impl Command for ParseCommand {
-    fn name(&self) -> &str {
-        "parse"
-    }
+    /// content to parse (requires --parser)
+    #[argh(option)]
+    content: Option<String>,
 
-    fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        let pretty = args.flag("pretty");
-        let explicit_parser: Option<ParserType> =
-            args.option("parser").map(|s| s.parse()).transpose()?;
+    /// read from stdin (requires --parser)
+    #[argh(switch)]
+    stdin: bool,
 
-        let (input, parser_type) = if let Some(content) = args.option("content") {
-            // Parse from --content string argument (requires --parser)
-            let parser_type =
-                explicit_parser.ok_or("--content requires --parser <svelte|typescript|css>")?;
-            (Input::from_content(content), parser_type)
-        } else if args.flag("stdin") {
-            // Read from stdin (requires --parser)
-            let parser_type =
-                explicit_parser.ok_or("--stdin requires --parser <svelte|typescript|css>")?;
-            (Input::from_stdin()?, parser_type)
-        } else if let Some(path) = args.positional() {
-            // Read from file (auto-detects from extension, --parser overrides)
-            let parser_type = explicit_parser.unwrap_or_else(|| ParserType::from_extension(&path));
-            (Input::from_file(&path)?, parser_type)
-        } else {
-            return Err("No input provided. Use a file path, --content, or --stdin".to_string());
+    /// parser type: svelte | typescript | css
+    #[argh(option)]
+    parser: Option<ParserType>,
+
+    /// file path (parser auto-detected from extension)
+    #[argh(positional)]
+    file: Option<String>,
+}
+
+impl ParseCommand {
+    pub fn run(self) {
+        let input_args = InputArgs {
+            content: self.content,
+            stdin: self.stdin,
+            parser: self.parser,
+            file: self.file,
+        };
+        let (input, parser_type) = match input_args.resolve() {
+            Ok(pair) => pair,
+            Err(e) => {
+                eprintln!("Error: {e}");
+                process::exit(1);
+            }
         };
 
-        Ok(Box::new(ParseExecutable {
-            input,
-            pretty,
-            parser_type,
-        }))
-    }
-
-    fn usage(&self) -> Vec<String> {
-        vec![
-            "parse <file> [--pretty]                             Parse file, output AST as JSON"
-                .to_string(),
-            "parse --content <string> --parser <type> [--pretty]  Parse string (preferred)"
-                .to_string(),
-            "parse --stdin --parser <type> [--pretty]             Parse stdin (not preferred)"
-                .to_string(),
-        ]
-    }
-}
-
-/// Executable instance for parse command
-struct ParseExecutable {
-    input: Input,
-    pretty: bool,
-    parser_type: ParserType,
-}
-
-impl Executable for ParseExecutable {
-    fn execute(&self) {
-        match parse_to_json(&self.input, self.pretty, self.parser_type) {
+        match parse_to_json(input.content(), self.pretty, parser_type) {
             Ok(json) => println!("{json}"),
             Err(e) => {
                 eprintln!("Parse error: {e}");
@@ -73,10 +54,7 @@ impl Executable for ParseExecutable {
     }
 }
 
-/// Parse source code and convert to JSON
-fn parse_to_json(input: &Input, pretty: bool, parser_type: ParserType) -> Result<String, String> {
-    let source = input.content();
-
+fn parse_to_json(source: &str, pretty: bool, parser_type: ParserType) -> Result<String, String> {
     let json_value = match parser_type {
         ParserType::Svelte => {
             let ast = tsv_svelte::parse(source).map_err(|e| e.to_string())?;

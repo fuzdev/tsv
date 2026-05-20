@@ -1,8 +1,4 @@
-use std::env;
-use tsv_cli::cli;
-
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let registry = cli::build_registry();
-    registry.run(args);
+    let cmd: tsv_cli::cli::TopLevel = argh::from_env();
+    cmd.run();
 }

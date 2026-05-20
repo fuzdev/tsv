@@ -136,7 +136,7 @@ fn test_unknown_command() {
     assert!(!output.status.success(), "Unknown command should fail");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("Unknown command"),
+        stderr.contains("Unrecognized argument"),
         "Should report unknown command"
     );
 }
@@ -227,5 +227,8 @@ fn test_no_command() {
 
     assert!(!output.status.success(), "No command should fail");
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("Usage"), "Should show usage message");
+    assert!(
+        stderr.contains("subcommand") || stderr.contains("--help"),
+        "Should show usage/help message"
+    );
 }

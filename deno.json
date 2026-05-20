@@ -2,9 +2,8 @@
 	"tasks": {
 		"build": "cargo build --workspace",
 		"build:release": "cargo build --workspace --release",
-		"build:all": "deno task build:release && deno task build:ffi && deno task build:napi && deno task build:wasm && deno task build:wasm:parse",
+		"build:all": "deno task build:release && deno task build:ffi && deno task build:wasm && deno task build:wasm:parse",
 		"build:ffi": "cargo build -p tsv_ffi --release",
-		"build:napi": "cargo build -p tsv_napi --release",
 		"build:wasm": "deno task build:wasm:deno && deno task build:wasm:web && deno task build:wasm:node",
 		"build:wasm:deno": "wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/deno",
 		"build:wasm:web": "wasm-pack build crates/tsv_wasm --target web --release --out-dir pkg/web",
@@ -32,7 +31,8 @@
 		"fixtures:audit": "cargo run -p tsv_debug --quiet fixtures_audit",
 
 		"bench": "deno task build:ffi && deno task build:wasm:deno && deno task build:wasm:parse:deno && deno task bench:run",
-		"bench:run": "deno run --v8-flags=--expose-gc --allow-ffi --allow-read --allow-write=benches/deno/results,benches/deno/baseline.json --allow-run=git --allow-env --allow-net --allow-sys benches/deno/bench.ts",
+		"bench:run": "deno run --v8-flags=--expose-gc --allow-ffi --allow-read --allow-write=benches/deno/results --allow-run=git,gzip --allow-env --allow-net --allow-sys benches/deno/bench.ts",
+		"bench:clean": "rm -f benches/deno/results/baseline.json benches/deno/results/[0-9]*.json benches/deno/results/[0-9]*.md",
 		"smoke": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/smoke.ts",
 
 		"build:ffi:corpus": "cargo build -p tsv_ffi --profile corpus",

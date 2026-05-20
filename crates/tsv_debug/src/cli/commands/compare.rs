@@ -1,83 +1,70 @@
-use crate::cli::input_parser;
 use crate::diff::{Color, ColorChoice, DiffOptions, diff_to_string};
 use crate::error;
 use crate::{deno, subprocess};
-use tsv_cli::cli::args::Args;
-use tsv_cli::cli::commands::{Command, Executable};
-use tsv_cli::cli::input::{Input, ParserType};
+use argh::FromArgs;
+use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 
-/// Compare command - compares our printer output with prettier
-pub struct CompareCommand;
+/// Compare our printer output with prettier (shows diff).
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "compare")]
+pub struct CompareCommand {
+    /// only show output if outputs differ (exit 0 match, 1 differ)
+    #[argh(switch)]
+    quiet: bool,
 
-impl Command for CompareCommand {
-    fn name(&self) -> &str {
-        "compare"
-    }
+    /// show full input, ours, prettier, and diff
+    #[argh(switch, short = 'v')]
+    verbose: bool,
 
-    fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        // Parse flags
-        let quiet = args.flag("quiet");
-        let verbose = args.flag("verbose") || args.flag("v");
-        let json_output = args.flag("json");
-        let color_choice = if let Some(color_str) = args.option("color") {
-            Some(color_str.parse()?)
-        } else {
-            None
+    /// emit machine-readable JSON
+    #[argh(switch)]
+    json: bool,
+
+    /// color output: auto | always | never (default: auto)
+    #[argh(option)]
+    color: Option<ColorChoice>,
+
+    /// content to compare (requires --parser)
+    #[argh(option)]
+    content: Option<String>,
+
+    /// read from stdin (requires --parser)
+    #[argh(switch)]
+    stdin: bool,
+
+    /// parser type: svelte | typescript | css
+    #[argh(option)]
+    parser: Option<ParserType>,
+
+    /// file path (parser auto-detected from extension)
+    #[argh(positional)]
+    file: Option<String>,
+}
+
+impl CompareCommand {
+    pub fn run(self) {
+        let input_args = InputArgs {
+            content: self.content,
+            stdin: self.stdin,
+            parser: self.parser,
+            file: self.file,
+        };
+        let (input, parser_type) = match input_args.resolve() {
+            Ok(pair) => pair,
+            Err(e) => {
+                eprintln!("Error: {e}");
+                std::process::exit(1);
+            }
         };
 
-        // Parse input and detect parser type
-        let (input, parser_type) = input_parser::parse_input_and_parser_type(args)?;
-
-        Ok(Box::new(CompareExecutable {
-            input,
-            parser_type,
-            quiet,
-            verbose,
-            json_output,
-            color_choice,
-        }))
-    }
-
-    fn usage(&self) -> Vec<String> {
-        vec![
-            "compare <file>                                  Compare formatter output with prettier (shows diff only)"
-                .to_string(),
-            "compare --verbose <file>                        Show full input, ours, prettier, and diff"
-                .to_string(),
-            "compare --content <string> --parser <type>      Compare formatter output (requires --parser svelte|typescript|css)"
-                .to_string(),
-            "compare --stdin --parser <type>                 Compare formatter output from stdin (requires --parser)"
-                .to_string(),
-            "compare --quiet <file>                          Only show diff if outputs differ (exit 0 if match, 1 if differ)"
-                .to_string(),
-            "compare --color <auto|always|never>             Control color output (default: auto)"
-                .to_string(),
-            "compare --json <file>                           Output machine-readable JSON"
-                .to_string(),
-        ]
-    }
-}
-
-/// Executable instance for compare command
-struct CompareExecutable {
-    input: Input,
-    parser_type: ParserType,
-    quiet: bool,
-    verbose: bool,
-    json_output: bool,
-    color_choice: Option<ColorChoice>,
-}
-
-impl Executable for CompareExecutable {
-    fn execute(&self) {
         let rt = super::create_runtime();
         let exit_code = rt.block_on(run(
-            &self.input,
-            self.parser_type,
+            &input,
+            parser_type,
             self.quiet,
             self.verbose,
-            self.json_output,
-            self.color_choice,
+            self.json,
+            self.color,
         ));
         if exit_code != 0 {
             std::process::exit(exit_code);

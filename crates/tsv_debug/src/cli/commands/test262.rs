@@ -1,76 +1,40 @@
 //! test262 command - run ECMAScript conformance tests against our parser.
 
 use crate::test262::{DiscoveryOptions, TestSummary, discover_tests, format_failure, run_test};
+use argh::FromArgs;
 use std::path::PathBuf;
-use tsv_cli::cli::args::Args;
-use tsv_cli::cli::commands::{Command, Executable};
 
-/// test262 command - validate parser against ECMAScript conformance tests.
-pub struct Test262Command;
-
-impl Command for Test262Command {
-    fn name(&self) -> &str {
-        "test262"
-    }
-
-    fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        let list_only = args.flag("list");
-        let verbose = args.flag("verbose") || args.flag("v");
-        let negative_only = args.flag("negative-only");
-        let positive_only = args.flag("positive-only");
-
-        // Get path (--path or default)
-        let path = args
-            .option("path")
-            .map_or_else(|| PathBuf::from("../test262"), PathBuf::from);
-
-        // Collect remaining args as filters
-        let mut filters = Vec::new();
-        while let Some(filter) = args.positional() {
-            filters.push(filter);
-        }
-
-        Ok(Box::new(Test262Executable {
-            path,
-            list_only,
-            verbose,
-            negative_only,
-            positive_only,
-            filters,
-        }))
-    }
-
-    fn usage(&self) -> Vec<String> {
-        vec![
-            "test262                                     Run all test262 tests".to_string(),
-            "test262 --path /path/to/test262            Custom test262 location".to_string(),
-            "test262 --list                             List tests only".to_string(),
-            "test262 --verbose                          Show all results".to_string(),
-            "test262 --negative-only                    Only run negative parse tests".to_string(),
-            "test262 --positive-only                    Only run positive tests".to_string(),
-            "test262 <filter>...                        Filter by path pattern".to_string(),
-        ]
-    }
-}
-
-#[allow(clippy::struct_excessive_bools)] // CLI flags are naturally boolean
-struct Test262Executable {
+/// Validate parser against ECMAScript conformance tests.
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "test262")]
+pub struct Test262Command {
+    /// path to test262 checkout (default: ../test262)
+    #[argh(option, default = "PathBuf::from(\"../test262\")")]
     path: PathBuf,
-    list_only: bool,
+
+    /// list tests only (do not run)
+    #[argh(switch)]
+    list: bool,
+
+    /// show all failure details
+    #[argh(switch, short = 'v')]
     verbose: bool,
+
+    /// only run negative parse tests
+    #[argh(switch)]
     negative_only: bool,
+
+    /// only run positive parse tests
+    #[argh(switch)]
     positive_only: bool,
+
+    /// filter tests by path pattern (multiple = OR)
+    #[argh(positional)]
     filters: Vec<String>,
 }
 
-impl Executable for Test262Executable {
-    fn execute(&self) {
-        self.run();
-    }
-}
-
-impl Test262Executable {
-    fn run(&self) {
+impl Test262Command {
+    pub fn run(self) {
         println!("test262 validation");
         println!("==================");
         println!("Path: {}", self.path.display());
@@ -129,7 +93,7 @@ impl Test262Executable {
         println!();
 
         // List only mode
-        if self.list_only {
+        if self.list {
             println!("Test files:");
             for test in &filtered_tests {
                 println!("  {}", test.relative_path);

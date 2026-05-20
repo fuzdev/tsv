@@ -5,169 +5,38 @@ use crate::fixtures::{
     discover_unformatted_ours_variants, discover_unformatted_variants, discover_variant_variants,
     read_file,
 };
+use argh::FromArgs;
 use futures_util::stream::{self, StreamExt};
 use std::collections::HashMap;
-use tsv_cli::cli::args::Args;
-use tsv_cli::cli::commands::{Command, Executable};
 
-/// fixtures_audit command - diagnostic tool for investigating fixture normalization graphs
-pub struct FixturesAuditCommand;
-
-impl Command for FixturesAuditCommand {
-    fn name(&self) -> &str {
-        "fixtures_audit"
-    }
-
-    fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        let verbose = args.flag("verbose") || args.flag("v");
-        let all = args.flag("all");
-        let json = args.flag("json");
-
-        // Collect remaining args as filters
-        let mut filters = Vec::new();
-        while let Some(filter) = args.positional() {
-            filters.push(filter);
-        }
-
-        Ok(Box::new(FixturesAuditExecutable {
-            verbose,
-            all,
-            json,
-            filters,
-        }))
-    }
-
-    fn usage(&self) -> Vec<String> {
-        vec![
-            "fixtures_audit                              Audit _prettier_divergence fixtures"
-                .to_string(),
-            "fixtures_audit --all                        Audit all fixtures".to_string(),
-            "fixtures_audit --verbose                    Show full graph for every fixture"
-                .to_string(),
-            "fixtures_audit --json                       JSON output".to_string(),
-            "fixtures_audit <filter>...                  Audit matching fixtures".to_string(),
-        ]
-    }
-}
-
-struct FixturesAuditExecutable {
+/// Investigate fixture normalization graphs (diagnostic; --all for every fixture).
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "fixtures_audit")]
+pub struct FixturesAuditCommand {
+    /// show full graph for every fixture
+    #[argh(switch, short = 'v')]
     verbose: bool,
+
+    /// audit all fixtures (default: only _prettier_divergence)
+    #[argh(switch)]
     all: bool,
+
+    /// emit JSON
+    #[argh(switch)]
     json: bool,
+
+    /// fixture filter patterns (multiple = OR)
+    #[argh(positional)]
     filters: Vec<String>,
 }
 
-impl Executable for FixturesAuditExecutable {
-    fn execute(&self) {
+impl FixturesAuditCommand {
+    pub fn run(self) {
         let rt = crate::cli::commands::create_runtime();
-        rt.block_on(self.run());
+        rt.block_on(self.run_async());
     }
-}
 
-/// Classification of a formatting result
-#[derive(Debug, Clone)]
-enum FormatResult {
-    /// Output matches the file itself (idempotent)
-    IdempotentSelf,
-    /// Output matches input.*
-    MatchesInput,
-    /// Output matches output_prettier.*
-    MatchesOutputPrettier,
-    /// Output matches a prettier_variant_* file
-    MatchesPrettierVariant(String),
-    /// Output matches a variant_* file
-    MatchesVariant(String),
-    /// Output matches a prettier_intermediate_* file
-    MatchesPrettierIntermediate(String),
-    /// Novel output not matching any known file
-    Novel,
-}
-
-/// Suggestion for a novel result
-#[derive(Debug, Clone, serde::Serialize)]
-enum Suggestion {
-    /// Suggest creating a prettier_variant_* file
-    PrettierVariant(String),
-    /// Suggest creating a variant_* file
-    Variant(String),
-    /// Suggest creating a prettier_intermediate_* file
-    PrettierIntermediate(String),
-    /// Suggest creating a prettier_intermediate_to_variant_* file
-    PrettierIntermediateToVariant(String),
-    /// Prettier-chain from output_prettier is documented in audit_signature.txt (chain depth K)
-    DocumentedMultiPass(usize),
-    /// Needs investigation
-    Investigate(String),
-}
-
-/// Result of checking audit_signature.txt against the live prettier chain
-enum AuditSignatureCheck {
-    /// Signature file exists and matches the live chain. Carries chain depth.
-    MatchesRecorded(usize),
-    /// Signature file exists but the live chain differs from what's recorded —
-    /// genuine prettier drift since signature was captured.
-    Drift,
-    /// Check could not be performed: I/O failure, malformed signature, or prettier
-    /// failed during the live walk. Distinct from `Drift` because the remediation is
-    /// "investigate" rather than "regenerate" — regenerating would hit the same error.
-    Error(String),
-    /// No signature file present
-    NoSignature,
-}
-
-/// Check whether `output_prettier.*`'s prettier chain matches a recorded `audit_signature.txt`.
-///
-/// Reads the signature file (if present), walks prettier from `output_prettier.*` to its fixed
-/// point live, and byte-compares. This mirrors F4 validation but runs in audit context.
-async fn check_audit_signature(fixture: &Fixture) -> AuditSignatureCheck {
-    let signature_path = fixture.audit_signature_path();
-    if !signature_path.exists() {
-        return AuditSignatureCheck::NoSignature;
-    }
-    let raw = match read_file(&signature_path) {
-        Ok(s) => s,
-        Err(e) => return AuditSignatureCheck::Error(format!("read audit_signature.txt: {e}")),
-    };
-    let recorded = match AuditSignature::parse(&raw) {
-        Ok(s) => s,
-        Err(e) => return AuditSignatureCheck::Error(format!("parse audit_signature.txt: {e}")),
-    };
-    let output_prettier_path = fixture.output_prettier_path();
-    let output_prettier_content = match read_file(&output_prettier_path) {
-        Ok(s) => s,
-        Err(e) => return AuditSignatureCheck::Error(format!("read output_prettier: {e}")),
-    };
-    let parser = fixture.input_type().prettier_parser();
-    match AuditSignature::walk(&output_prettier_content, parser).await {
-        Ok(Some(live)) if live.passes == recorded.passes => {
-            AuditSignatureCheck::MatchesRecorded(live.passes.len())
-        }
-        Ok(_) => AuditSignatureCheck::Drift,
-        Err(e) => AuditSignatureCheck::Error(format!("prettier chain walk: {e}")),
-    }
-}
-
-/// Result of auditing one file within a fixture
-#[derive(Debug)]
-struct FileAudit {
-    filename: String,
-    ours_result: Option<FormatResult>,
-    prettier_result: Option<FormatResult>,
-    novel_suggestion: Option<Suggestion>,
-}
-
-/// Result of auditing an entire fixture
-#[derive(Debug, serde::Serialize)]
-struct FixtureAudit {
-    fixture_path: String,
-    #[serde(skip)]
-    file_audits: Vec<FileAudit>,
-    has_novel: bool,
-    suggestions: Vec<Suggestion>,
-}
-
-impl FixturesAuditExecutable {
-    async fn run(&self) {
+    async fn run_async(self) {
         let fixtures_dir = std::path::Path::new("tests/fixtures");
 
         if !fixtures_dir.exists() {
@@ -297,6 +166,108 @@ impl FixturesAuditExecutable {
             );
         }
     }
+}
+
+/// Classification of a formatting result
+#[derive(Debug, Clone)]
+enum FormatResult {
+    /// Output matches the file itself (idempotent)
+    IdempotentSelf,
+    /// Output matches input.*
+    MatchesInput,
+    /// Output matches output_prettier.*
+    MatchesOutputPrettier,
+    /// Output matches a prettier_variant_* file
+    MatchesPrettierVariant(String),
+    /// Output matches a variant_* file
+    MatchesVariant(String),
+    /// Output matches a prettier_intermediate_* file
+    MatchesPrettierIntermediate(String),
+    /// Novel output not matching any known file
+    Novel,
+}
+
+/// Suggestion for a novel result
+#[derive(Debug, Clone, serde::Serialize)]
+enum Suggestion {
+    /// Suggest creating a prettier_variant_* file
+    PrettierVariant(String),
+    /// Suggest creating a variant_* file
+    Variant(String),
+    /// Suggest creating a prettier_intermediate_* file
+    PrettierIntermediate(String),
+    /// Suggest creating a prettier_intermediate_to_variant_* file
+    PrettierIntermediateToVariant(String),
+    /// Prettier-chain from output_prettier is documented in audit_signature.txt (chain depth K)
+    DocumentedMultiPass(usize),
+    /// Needs investigation
+    Investigate(String),
+}
+
+/// Result of checking audit_signature.txt against the live prettier chain
+enum AuditSignatureCheck {
+    /// Signature file exists and matches the live chain. Carries chain depth.
+    MatchesRecorded(usize),
+    /// Signature file exists but the live chain differs from what's recorded —
+    /// genuine prettier drift since signature was captured.
+    Drift,
+    /// Check could not be performed: I/O failure, malformed signature, or prettier
+    /// failed during the live walk. Distinct from `Drift` because the remediation is
+    /// "investigate" rather than "regenerate" — regenerating would hit the same error.
+    Error(String),
+    /// No signature file present
+    NoSignature,
+}
+
+/// Check whether `output_prettier.*`'s prettier chain matches a recorded `audit_signature.txt`.
+///
+/// Reads the signature file (if present), walks prettier from `output_prettier.*` to its fixed
+/// point live, and byte-compares. This mirrors F4 validation but runs in audit context.
+async fn check_audit_signature(fixture: &Fixture) -> AuditSignatureCheck {
+    let signature_path = fixture.audit_signature_path();
+    if !signature_path.exists() {
+        return AuditSignatureCheck::NoSignature;
+    }
+    let raw = match read_file(&signature_path) {
+        Ok(s) => s,
+        Err(e) => return AuditSignatureCheck::Error(format!("read audit_signature.txt: {e}")),
+    };
+    let recorded = match AuditSignature::parse(&raw) {
+        Ok(s) => s,
+        Err(e) => return AuditSignatureCheck::Error(format!("parse audit_signature.txt: {e}")),
+    };
+    let output_prettier_path = fixture.output_prettier_path();
+    let output_prettier_content = match read_file(&output_prettier_path) {
+        Ok(s) => s,
+        Err(e) => return AuditSignatureCheck::Error(format!("read output_prettier: {e}")),
+    };
+    let parser = fixture.input_type().prettier_parser();
+    match AuditSignature::walk(&output_prettier_content, parser).await {
+        Ok(Some(live)) if live.passes == recorded.passes => {
+            AuditSignatureCheck::MatchesRecorded(live.passes.len())
+        }
+        Ok(_) => AuditSignatureCheck::Drift,
+        Err(e) => AuditSignatureCheck::Error(format!("prettier chain walk: {e}")),
+    }
+}
+
+/// Result of auditing one file within a fixture
+#[derive(Debug)]
+struct FileAudit {
+    filename: String,
+    ours_result: Option<FormatResult>,
+    prettier_result: Option<FormatResult>,
+    novel_suggestion: Option<Suggestion>,
+}
+
+/// Result of auditing an entire fixture
+#[derive(Debug, serde::Serialize)]
+struct FixtureAudit {
+    fixture_path: String,
+    #[serde(skip)]
+    file_audits: Vec<FileAudit>,
+    has_novel: bool,
+    suggestions: Vec<Suggestion>,
 }
 
 fn format_result_label(result: &FormatResult) -> String {

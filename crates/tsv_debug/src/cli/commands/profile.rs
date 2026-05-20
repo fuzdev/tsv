@@ -1,88 +1,49 @@
+use argh::FromArgs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use tsv_cli::cli::args::Args;
-use tsv_cli::cli::commands::{Command, Executable};
 use tsv_cli::cli::input::ParserType;
 
-/// Profile command - measure parse and format phase timing
-pub struct ProfileCommand;
-
-impl Command for ProfileCommand {
-    fn name(&self) -> &str {
-        "profile"
-    }
-
-    fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        let json = args.flag("json");
-        let iterations = args
-            .option("iterations")
-            .map(|s| {
-                s.parse::<usize>()
-                    .map_err(|_| format!("Invalid iterations: {s}"))
-            })
-            .transpose()?
-            .unwrap_or(10);
-
-        // Collect all positional args as file paths/patterns
-        let mut paths = Vec::new();
-        while let Some(path) = args.positional() {
-            paths.push(path);
-        }
-
-        if paths.is_empty() {
-            return Err(
-                "No files provided. Use file paths, directories, or glob patterns.".to_string(),
-            );
-        }
-
-        // Resolve paths to actual files
-        let files = resolve_files(&paths)?;
-        if files.is_empty() {
-            return Err("No supported files found (.ts, .svelte, .css)".to_string());
-        }
-
-        Ok(Box::new(ProfileExecutable {
-            files,
-            iterations,
-            json,
-        }))
-    }
-
-    fn usage(&self) -> Vec<String> {
-        vec![
-            "profile <files...>                          Profile parse + format timing".to_string(),
-            "profile <dir>                               Profile all supported files in directory"
-                .to_string(),
-            "profile <files...> --iterations <N>          Number of iterations (default: 10)"
-                .to_string(),
-            "profile <files...> --json                    Output in JSON format".to_string(),
-        ]
-    }
-}
-
-struct ProfileExecutable {
-    files: Vec<PathBuf>,
+/// Profile parse + format timing on files or directories.
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "profile")]
+pub struct ProfileCommand {
+    /// number of iterations (default: 10)
+    #[argh(option, default = "10")]
     iterations: usize,
+
+    /// emit JSON
+    #[argh(switch)]
     json: bool,
+
+    /// file paths, directories, or glob patterns
+    #[argh(positional)]
+    paths: Vec<String>,
 }
 
-/// Timing results for a single file
-struct FileResult {
-    path: PathBuf,
-    size: usize,
-    parser_type: ParserType,
-    parse_us: f64,
-    format_us: f64,
-    total_us: f64,
-}
+impl ProfileCommand {
+    pub fn run(self) {
+        if self.paths.is_empty() {
+            eprintln!("Error: No files provided. Use file paths, directories, or glob patterns.");
+            std::process::exit(1);
+        }
 
-impl Executable for ProfileExecutable {
-    fn execute(&self) {
+        let files = match resolve_files(&self.paths) {
+            Ok(f) => f,
+            Err(e) => {
+                eprintln!("Error: {e}");
+                std::process::exit(1);
+            }
+        };
+        if files.is_empty() {
+            eprintln!("Error: No supported files found (.ts, .svelte, .css)");
+            std::process::exit(1);
+        }
+
         let mut results = Vec::new();
         let mut skipped = 0usize;
 
-        for path in &self.files {
+        for path in &files {
             // Skip input_invalid_* files — they're expected to fail parsing
             if let Some(name) = path.file_name().and_then(|n| n.to_str())
                 && name.starts_with("input_invalid")
@@ -116,6 +77,16 @@ impl Executable for ProfileExecutable {
             print_table(&results, self.iterations, skipped);
         }
     }
+}
+
+/// Timing results for a single file
+struct FileResult {
+    path: PathBuf,
+    size: usize,
+    parser_type: ParserType,
+    parse_us: f64,
+    format_us: f64,
+    total_us: f64,
 }
 
 /// Profile a single file: parse and format N times, return median timing

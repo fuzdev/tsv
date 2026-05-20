@@ -17,12 +17,11 @@ node_modules
 # Drift-check generated file (left on failure for inspection)
 /scripts/.drift_check.gen.ts
 
-# Benchmark results (report.json and report.md are committed)
+# Benchmark results (report.json and report.md are committed; baseline.json lives here too)
 /benches/deno/results/*.json
 /benches/deno/results/*.md
 !/benches/deno/results/report.json
 !/benches/deno/results/report.md
-/benches/deno/baseline.json
 
 # Env
 .env*

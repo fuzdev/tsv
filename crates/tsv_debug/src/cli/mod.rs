@@ -1,6 +1,6 @@
 pub mod commands;
-pub mod input_parser;
 
+use argh::FromArgs;
 use commands::{
     ast_diff::AstDiffCommand, canonical_parse::CanonicalParseCommand, check::CheckCommand,
     compare::CompareCommand, fixture_init::FixtureInitCommand,
@@ -11,40 +11,52 @@ use commands::{
     line_width::LineWidthCommand, metrics::MetricsCommand, profile::ProfileCommand,
     test262::Test262Command,
 };
-use tsv_cli::cli::commands::CommandRegistry;
 
-/// Build and return the command registry with debug commands
-pub fn build_registry() -> CommandRegistry {
-    let mut registry = CommandRegistry::new();
+/// tsv_debug — internal debugging tools (fixtures, comparisons, conformance).
+#[derive(FromArgs, Debug)]
+pub struct TopLevel {
+    #[argh(subcommand)]
+    pub nested: Subcommand,
+}
 
-    // Register utility commands
-    registry.register(Box::new(CheckCommand));
+#[derive(FromArgs, Debug)]
+#[argh(subcommand)]
+pub enum Subcommand {
+    Check(CheckCommand),
+    Compare(CompareCommand),
+    AstDiff(AstDiffCommand),
+    LineWidth(LineWidthCommand),
+    CanonicalParse(CanonicalParseCommand),
+    FormatPrettier(FormatPrettierCommand),
+    FixtureInit(FixtureInitCommand),
+    FixturesUpdate(FixturesUpdateCommand),
+    FixturesUpdateParsed(FixturesUpdateParsedCommand),
+    FixturesUpdateFormatted(FixturesUpdateFormattedCommand),
+    FixturesValidate(FixturesValidateCommand),
+    FixturesAudit(FixturesAuditCommand),
+    Profile(ProfileCommand),
+    Metrics(MetricsCommand),
+    Test262(Test262Command),
+}
 
-    // Register debug commands
-    registry.register(Box::new(CompareCommand));
-    registry.register(Box::new(AstDiffCommand));
-    registry.register(Box::new(LineWidthCommand));
-
-    // Register parser commands
-    registry.register(Box::new(CanonicalParseCommand));
-    registry.register(Box::new(FormatPrettierCommand));
-
-    // Register fixture management commands
-    registry.register(Box::new(FixtureInitCommand));
-    registry.register(Box::new(FixturesUpdateCommand));
-    registry.register(Box::new(FixturesUpdateParsedCommand));
-    registry.register(Box::new(FixturesUpdateFormattedCommand));
-    registry.register(Box::new(FixturesValidateCommand));
-    registry.register(Box::new(FixturesAuditCommand));
-
-    // Register performance commands
-    registry.register(Box::new(ProfileCommand));
-
-    // Register analysis commands
-    registry.register(Box::new(MetricsCommand));
-
-    // Register test262 command
-    registry.register(Box::new(Test262Command));
-
-    registry
+impl TopLevel {
+    pub fn run(self) {
+        match self.nested {
+            Subcommand::Check(c) => c.run(),
+            Subcommand::Compare(c) => c.run(),
+            Subcommand::AstDiff(c) => c.run(),
+            Subcommand::LineWidth(c) => c.run(),
+            Subcommand::CanonicalParse(c) => c.run(),
+            Subcommand::FormatPrettier(c) => c.run(),
+            Subcommand::FixtureInit(c) => c.run(),
+            Subcommand::FixturesUpdate(c) => c.run(),
+            Subcommand::FixturesUpdateParsed(c) => c.run(),
+            Subcommand::FixturesUpdateFormatted(c) => c.run(),
+            Subcommand::FixturesValidate(c) => c.run(),
+            Subcommand::FixturesAudit(c) => c.run(),
+            Subcommand::Profile(c) => c.run(),
+            Subcommand::Metrics(c) => c.run(),
+            Subcommand::Test262(c) => c.run(),
+        }
+    }
 }

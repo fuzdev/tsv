@@ -14,8 +14,14 @@ import type { AllVersions } from './versions.ts';
 export interface BinarySize {
 	/** Display label */
 	label: string;
-	/** Size in bytes */
+	/** Raw on-disk size in bytes */
 	bytes: number;
+	/**
+	 * Gzipped size in bytes (approximates wire size for npm tarballs).
+	 * `null` if `gzip` wasn't available on PATH or the file couldn't be read.
+	 * Uses `gzip -c` (system default level), matching `scripts/publish_patch_npm.ts`.
+	 */
+	gzip_bytes: number | null;
 	/** Binary kind for grouping comparisons */
 	kind: 'wasm' | 'native';
 }
@@ -47,40 +53,55 @@ async function fileSize(path: string): Promise<number | null> {
 	}
 }
 
-/** Find the first file with a given extension in a directory */
-async function findFileByExtension(dir: string, ext: string): Promise<number | null> {
+/**
+ * Return the gzipped size of a file, or `null` if gzip isn't available or
+ * the file can't be read. Shells out to `gzip -c` (system default level) so
+ * the number matches what `publish_patch_npm.ts` reports — Deno's
+ * CompressionStream uses a different default level and runs ~2% high.
+ */
+async function gzipSize(path: string): Promise<number | null> {
 	try {
-		for await (const entry of Deno.readDir(dir)) {
-			if (entry.isFile && entry.name.endsWith(ext)) {
-				return await fileSize(`${dir}/${entry.name}`);
-			}
-		}
+		const output = await new Deno.Command('gzip', {
+			args: ['-c', path],
+			stdout: 'piped',
+			stderr: 'null',
+		}).output();
+		if (!output.success) return null;
+		return output.stdout.length;
 	} catch {
-		// Directory doesn't exist
+		// Subprocess failed to spawn — gzip not on PATH (likely Windows without WSL).
+		return null;
 	}
-	return null;
 }
 
-/** Try multiple directory candidates for a native npm binding (.node file) */
-async function findNpmNativeBinding(
-	npmCache: string,
-	scope: string,
-	bindingPrefix: string,
-	version: string,
-): Promise<number | null> {
-	const { os, arch } = getNpmPlatform();
-	const platformBase = bindingPrefix ? `${bindingPrefix}-${os}-${arch}` : `${os}-${arch}`;
+/** Add an entry to `out` for `path` if the file exists; defer gzip to the caller. */
+async function pushSize(
+	out: { entry: Omit<BinarySize, 'gzip_bytes'>; path: string }[],
+	label: string,
+	kind: 'wasm' | 'native',
+	path: string,
+): Promise<void> {
+	const bytes = await fileSize(path);
+	if (bytes !== null) out.push({ entry: { label, bytes, kind }, path });
+}
 
-	// Try gnu variant first (more common on Linux), then musl, then bare (macOS/Windows)
-	const candidates = [
-		`${npmCache}/${scope}/${platformBase}-gnu/${version}`,
-		`${npmCache}/${scope}/${platformBase}-musl/${version}`,
-		`${npmCache}/${scope}/${platformBase}/${version}`,
-	];
-
-	for (const dir of candidates) {
-		const size = await findFileByExtension(dir, '.node');
-		if (size !== null) return size;
+/** Resolve the first existing file (by extension) under any of the candidate dirs. */
+async function resolveFirst(
+	dirs: string[],
+	ext: string,
+): Promise<{ path: string; bytes: number } | null> {
+	for (const dir of dirs) {
+		try {
+			for await (const e of Deno.readDir(dir)) {
+				if (e.isFile && e.name.endsWith(ext)) {
+					const path = `${dir}/${e.name}`;
+					const bytes = await fileSize(path);
+					if (bytes !== null) return { path, bytes };
+				}
+			}
+		} catch {
+			// directory missing — try next candidate
+		}
 	}
 	return null;
 }
@@ -89,7 +110,10 @@ async function findNpmNativeBinding(
  * Collect binary sizes for all implementations.
  *
  * Uses known paths for tsv binaries (relative to project root)
- * and Deno npm cache paths for npm packages.
+ * and Deno npm cache paths for npm packages. Computes gzipped size
+ * alongside raw size; gzip is shelled out and parallelized across all
+ * collected entries, so adding it costs roughly the slowest single
+ * compression (biome's 35 MB dominates).
  */
 export async function collectBinarySizes(
 	versions: AllVersions,
@@ -100,78 +124,92 @@ export async function collectBinarySizes(
 		hasBiome?: boolean;
 	},
 ): Promise<BinarySize[]> {
-	const sizes: BinarySize[] = [];
 	const projectRoot = new URL('../../..', import.meta.url).pathname;
 	const npmCache = getDenoNpmCachePath();
+
+	// Stage 1: collect (label, kind, path) for everything that exists.
+	const staged: { entry: Omit<BinarySize, 'gzip_bytes'>; path: string }[] = [];
 
 	// tsv native (FFI shared library)
 	if (options?.hasNative !== false) {
 		const ext = Deno.build.os === 'darwin' ? 'dylib' : Deno.build.os === 'windows' ? 'dll' : 'so';
 		const prefix = Deno.build.os === 'windows' ? '' : 'lib';
-		const path = `${projectRoot}/target/release/${prefix}tsv_ffi.${ext}`;
-		const bytes = await fileSize(path);
-		if (bytes !== null) {
-			sizes.push({ label: 'tsv (native)', bytes, kind: 'native' });
-		}
+		await pushSize(
+			staged,
+			'tsv (native)',
+			'native',
+			`${projectRoot}/target/release/${prefix}tsv_ffi.${ext}`,
+		);
 	}
 
 	// tsv WASM — two builds from one crate via the `ast` feature:
 	// pkg/deno (format-only, @fuzdev/tsv_fmt) and pkg/deno-parse
 	// (parse + format, @fuzdev/tsv_parse).
 	if (options?.hasWasm !== false) {
-		const fmtPath = `${projectRoot}/crates/tsv_wasm/pkg/deno/tsv_wasm_bg.wasm`;
-		const fmtBytes = await fileSize(fmtPath);
-		if (fmtBytes !== null) {
-			sizes.push({ label: 'tsv_fmt (wasm)', bytes: fmtBytes, kind: 'wasm' });
-		}
-		const parsePath = `${projectRoot}/crates/tsv_wasm/pkg/deno-parse/tsv_wasm_bg.wasm`;
-		const parseBytes = await fileSize(parsePath);
-		if (parseBytes !== null) {
-			sizes.push({ label: 'tsv_parse (wasm)', bytes: parseBytes, kind: 'wasm' });
-		}
+		await pushSize(
+			staged,
+			'tsv_fmt (wasm)',
+			'wasm',
+			`${projectRoot}/crates/tsv_wasm/pkg/deno/tsv_wasm_bg.wasm`,
+		);
+		await pushSize(
+			staged,
+			'tsv_parse (wasm)',
+			'wasm',
+			`${projectRoot}/crates/tsv_wasm/pkg/deno-parse/tsv_wasm_bg.wasm`,
+		);
 	}
 
 	// biome WASM
 	if (options?.hasBiome !== false) {
 		const biomeDir = `${npmCache}/@biomejs/wasm-bundler/${versions.biome.wasm}`;
-		const bytes = await findFileByExtension(biomeDir, '.wasm');
-		if (bytes !== null) {
-			sizes.push({ label: 'biome (wasm)', bytes, kind: 'wasm' });
+		const found = await resolveFirst([biomeDir], '.wasm');
+		if (found !== null) {
+			staged.push({ entry: { label: 'biome (wasm)', bytes: found.bytes, kind: 'wasm' }, path: found.path });
 		}
 	}
 
-	// oxc-parser native binding
+	// oxc-parser + oxfmt
 	if (options?.hasOxc !== false) {
-		const oxcBytes = await findNpmNativeBinding(
-			npmCache,
-			'@oxc-parser',
-			'binding',
-			versions.oxc['oxc-parser'],
-		);
-		if (oxcBytes !== null) {
-			sizes.push({ label: 'oxc-parser (native)', bytes: oxcBytes, kind: 'native' });
+		const { os, arch } = getNpmPlatform();
+		const oxcVer = versions.oxc['oxc-parser'];
+		const oxfmtVer = versions.oxc.oxfmt;
+
+		const oxcDirs = [
+			`${npmCache}/@oxc-parser/binding-${os}-${arch}-gnu/${oxcVer}`,
+			`${npmCache}/@oxc-parser/binding-${os}-${arch}-musl/${oxcVer}`,
+			`${npmCache}/@oxc-parser/binding-${os}-${arch}/${oxcVer}`,
+		];
+		const oxcFound = await resolveFirst(oxcDirs, '.node');
+		if (oxcFound !== null) {
+			staged.push({ entry: { label: 'oxc-parser (native)', bytes: oxcFound.bytes, kind: 'native' }, path: oxcFound.path });
 		}
 
-		// oxfmt native binding
-		const oxfmtBytes = await findNpmNativeBinding(
-			npmCache,
-			'@oxfmt',
-			'',
-			versions.oxc.oxfmt,
-		);
-		if (oxfmtBytes !== null) {
-			sizes.push({ label: 'oxfmt (native)', bytes: oxfmtBytes, kind: 'native' });
+		// oxfmt native binding (0.50.0+: @oxfmt/binding-{platform}; pre-0.49: @oxfmt/{platform}).
+		const oxfmtDirs = [
+			`${npmCache}/@oxfmt/binding-${os}-${arch}-gnu/${oxfmtVer}`,
+			`${npmCache}/@oxfmt/binding-${os}-${arch}-musl/${oxfmtVer}`,
+			`${npmCache}/@oxfmt/binding-${os}-${arch}/${oxfmtVer}`,
+		];
+		const oxfmtFound = await resolveFirst(oxfmtDirs, '.node');
+		if (oxfmtFound !== null) {
+			staged.push({ entry: { label: 'oxfmt (native)', bytes: oxfmtFound.bytes, kind: 'native' }, path: oxfmtFound.path });
 		}
 
 		// oxc-parser WASM binding (@oxc-parser/binding-wasm32-wasi)
-		const oxcWasmDir = `${npmCache}/@oxc-parser/binding-wasm32-wasi/${versions.oxc['oxc-parser']}`;
-		const oxcWasmBytes = await findFileByExtension(oxcWasmDir, '.wasm');
-		if (oxcWasmBytes !== null) {
-			sizes.push({ label: 'oxc-parser (wasm)', bytes: oxcWasmBytes, kind: 'wasm' });
+		const oxcWasmFound = await resolveFirst(
+			[`${npmCache}/@oxc-parser/binding-wasm32-wasi/${oxcVer}`],
+			'.wasm',
+		);
+		if (oxcWasmFound !== null) {
+			staged.push({ entry: { label: 'oxc-parser (wasm)', bytes: oxcWasmFound.bytes, kind: 'wasm' }, path: oxcWasmFound.path });
 		}
 	}
 
-	return sizes;
+	// Stage 2: gzip every collected file in parallel.
+	const gzipped = await Promise.all(staged.map((s) => gzipSize(s.path)));
+
+	return staged.map(({ entry }, i) => ({ ...entry, gzip_bytes: gzipped[i] }));
 }
 
 /** Format bytes as human-readable size */
@@ -184,24 +222,37 @@ export function formatBytes(bytes: number): string {
 	return `${bytes} B`;
 }
 
+/** Display row: an entry plus ratios vs tsv on raw and gzipped bytes. */
+interface DisplayRow {
+	entry: BinarySize;
+	ratio: number | null;
+	gzipRatio: number | null;
+}
+
 /** Build display entries grouped by kind, with combined oxc and ratios */
 function buildDisplayEntries(sizes: BinarySize[]): {
-	wasmEntries: { entry: BinarySize; ratio: number | null }[];
-	nativeEntries: { entry: BinarySize; ratio: number | null }[];
+	wasmEntries: DisplayRow[];
+	nativeEntries: DisplayRow[];
 } {
 	const tsvNative = sizes.find((s) => s.label === 'tsv (native)');
-	const tsvWasm = sizes.find((s) => s.label === 'tsv_wasm');
+	const tsvWasm = sizes.find((s) => s.label === 'tsv_fmt (wasm)');
 
 	const wasmSizes = sizes.filter((s) => s.kind === 'wasm');
 	const nativeSizes = sizes.filter((s) => s.kind === 'native');
 
-	// Build combined oxc-parser+oxfmt entry if both exist
+	// Build combined oxc-parser+oxfmt entry if both exist. Combined gzip is
+	// the sum of the parts' gzipped sizes; that overstates wire size slightly
+	// (two streams don't share a dictionary) but matches how npm ships them
+	// — each binding is its own tarball.
 	const oxcParser = nativeSizes.find((s) => s.label === 'oxc-parser (native)');
 	const oxfmtEntry = nativeSizes.find((s) => s.label === 'oxfmt (native)');
 	const combinedOxc: BinarySize | null = oxcParser && oxfmtEntry
 		? {
 			label: 'oxc-parser+oxfmt (native)',
 			bytes: oxcParser.bytes + oxfmtEntry.bytes,
+			gzip_bytes: oxcParser.gzip_bytes !== null && oxfmtEntry.gzip_bytes !== null
+				? oxcParser.gzip_bytes + oxfmtEntry.gzip_bytes
+				: null,
 			kind: 'native',
 		}
 		: null;
@@ -211,17 +262,42 @@ function buildDisplayEntries(sizes: BinarySize[]): {
 		return entry.bytes / reference.bytes;
 	}
 
-	const wasmEntries = wasmSizes.map((entry) => ({ entry, ratio: ratioTo(entry, tsvWasm) }));
+	function gzipRatioTo(entry: BinarySize, reference: BinarySize | undefined): number | null {
+		if (!reference || entry === reference) return null;
+		if (entry.gzip_bytes === null || reference.gzip_bytes === null) return null;
+		return entry.gzip_bytes / reference.gzip_bytes;
+	}
 
-	const nativeEntries: { entry: BinarySize; ratio: number | null }[] = [];
+	function row(entry: BinarySize, reference: BinarySize | undefined): DisplayRow {
+		return { entry, ratio: ratioTo(entry, reference), gzipRatio: gzipRatioTo(entry, reference) };
+	}
+
+	const wasmEntries = wasmSizes.map((entry) => row(entry, tsvWasm));
+
+	const nativeEntries: DisplayRow[] = [];
 	for (const entry of nativeSizes) {
-		nativeEntries.push({ entry, ratio: ratioTo(entry, tsvNative) });
+		nativeEntries.push(row(entry, tsvNative));
 		if (entry === tsvNative && combinedOxc) {
-			nativeEntries.push({ entry: combinedOxc, ratio: ratioTo(combinedOxc, tsvNative) });
+			nativeEntries.push(row(combinedOxc, tsvNative));
 		}
 	}
 
 	return { wasmEntries, nativeEntries };
+}
+
+/** Format a gzipped byte count or fall back to em-dash when unavailable. */
+function formatGzipBytes(bytes: number | null): string {
+	return bytes === null ? '—' : formatBytes(bytes);
+}
+
+/** Format a ratio (e.g. "1.3x"), or em-dash when missing/self. */
+function formatRatio(ratio: number | null): string {
+	return ratio === null ? '—' : `${ratio.toFixed(1)}x`;
+}
+
+/** True if any row has a gzipped size — i.e., gzip ran successfully somewhere. */
+function anyGzipped(rows: DisplayRow[]): boolean {
+	return rows.some((r) => r.entry.gzip_bytes !== null);
 }
 
 /** Generate binary size comparison report (plain text) */
@@ -229,15 +305,20 @@ export function generateBinarySizeReport(sizes: BinarySize[]): string | null {
 	if (sizes.length === 0) return null;
 
 	const { wasmEntries, nativeEntries } = buildDisplayEntries(sizes);
+	const allRows = [...wasmEntries, ...nativeEntries];
+	const showGzip = anyGzipped(allRows);
 
-	// Find longest label for padding
-	const allEntries = [...wasmEntries, ...nativeEntries];
-	const maxLabelLen = Math.max(...allEntries.map((e) => e.entry.label.length));
+	const maxLabelLen = Math.max(...allRows.map((r) => r.entry.label.length));
 
-	function formatEntry(entry: BinarySize, ratio: number | null): string {
+	function formatRow({ entry, ratio, gzipRatio }: DisplayRow): string {
 		const sizeStr = formatBytes(entry.bytes).padStart(10);
-		const ratioStr = ratio !== null ? `  (${ratio.toFixed(1)}x tsv)` : '';
-		return `  ${entry.label.padEnd(maxLabelLen)} ${sizeStr}${ratioStr}`;
+		const gzipStr = showGzip ? `  gz ${formatGzipBytes(entry.gzip_bytes).padStart(8)}` : '';
+		const ratioStr = ratio !== null
+			? `  (${ratio.toFixed(1)}x tsv${
+				showGzip && gzipRatio !== null ? `, ${gzipRatio.toFixed(1)}x gz` : ''
+			})`
+			: '';
+		return `  ${entry.label.padEnd(maxLabelLen)} ${sizeStr}${gzipStr}${ratioStr}`;
 	}
 
 	const lines: string[] = [];
@@ -248,17 +329,18 @@ export function generateBinarySizeReport(sizes: BinarySize[]): string | null {
 	if (wasmEntries.length > 0) {
 		lines.push('');
 		lines.push('  WASM modules:');
-		for (const { entry, ratio } of wasmEntries) {
-			lines.push('  ' + formatEntry(entry, ratio));
-		}
+		for (const r of wasmEntries) lines.push('  ' + formatRow(r));
 	}
 
 	if (nativeEntries.length > 0) {
 		lines.push('');
 		lines.push('  Native binaries:');
-		for (const { entry, ratio } of nativeEntries) {
-			lines.push('  ' + formatEntry(entry, ratio));
-		}
+		for (const r of nativeEntries) lines.push('  ' + formatRow(r));
+	}
+
+	if (showGzip) {
+		lines.push('');
+		lines.push('  Gzipped column ≈ wire size for npm tarballs (`gzip -c`, system default level).');
 	}
 
 	return lines.join('\n');
@@ -269,21 +351,42 @@ export function generateBinarySizeMarkdown(sizes: BinarySize[]): string | null {
 	if (sizes.length === 0) return null;
 
 	const { wasmEntries, nativeEntries } = buildDisplayEntries(sizes);
+	const showGzip = anyGzipped([...wasmEntries, ...nativeEntries]);
 
 	const lines: string[] = [];
 	lines.push('## Binary Sizes\n');
-	lines.push('| Binary | Size | vs tsv |');
-	lines.push('| --- | ---: | ---: |');
+	if (showGzip) {
+		lines.push('| Binary | Size | Gzipped | vs tsv | vs tsv (gz) |');
+		lines.push('| --- | ---: | ---: | ---: | ---: |');
+	} else {
+		lines.push('| Binary | Size | vs tsv |');
+		lines.push('| --- | ---: | ---: |');
+	}
 
-	function addEntries(entries: { entry: BinarySize; ratio: number | null }[]): void {
-		for (const { entry, ratio } of entries) {
-			const ratioStr = ratio !== null ? `${ratio.toFixed(1)}x` : '-';
-			lines.push(`| ${entry.label} | ${formatBytes(entry.bytes)} | ${ratioStr} |`);
+	function addRows(rows: DisplayRow[]): void {
+		for (const { entry, ratio, gzipRatio } of rows) {
+			const cells = showGzip
+				? [
+					entry.label,
+					formatBytes(entry.bytes),
+					formatGzipBytes(entry.gzip_bytes),
+					formatRatio(ratio),
+					formatRatio(gzipRatio),
+				]
+				: [entry.label, formatBytes(entry.bytes), formatRatio(ratio)];
+			lines.push(`| ${cells.join(' | ')} |`);
 		}
 	}
 
-	addEntries(wasmEntries);
-	addEntries(nativeEntries);
+	addRows(wasmEntries);
+	addRows(nativeEntries);
+
+	if (showGzip) {
+		lines.push('');
+		lines.push(
+			'_Gzipped ≈ npm-tarball wire size (`gzip -c`, system default level). `vs tsv (gz)` compares gzipped bytes; `vs tsv` compares raw on-disk bytes._',
+		);
+	}
 
 	return lines.join('\n');
 }

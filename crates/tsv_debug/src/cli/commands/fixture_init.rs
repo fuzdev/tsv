@@ -1,78 +1,44 @@
 use crate::deno;
 use crate::fixtures::{self, InputType};
+use argh::FromArgs;
 use std::path::Path;
-use tsv_cli::cli::args::Args;
-use tsv_cli::cli::commands::{Command, Executable};
 use tsv_cli::json_utils::to_json_with_tabs;
 use tsv_lang::printing::visual_width;
 
-/// fixture_init command - create or reinitialize a fixture
+/// Create or reinitialize a fixture (formats through prettier + generates expected.json).
 ///
-/// Creates the fixture directory, formats content through prettier to produce
-/// the canonical input file, and generates expected.json from the canonical parser.
-///
-/// Content sources (in priority order):
-/// 1. `--content` flag
-/// 2. `--stdin` flag (for heredocs and pipes)
-/// 3. Existing input file in the directory (reformat mode)
-pub struct FixtureInitCommand;
-
-impl Command for FixtureInitCommand {
-    fn name(&self) -> &str {
-        "fixture_init"
-    }
-
-    fn parse_args(&self, args: &mut Args) -> Result<Box<dyn Executable>, String> {
-        let force = args.flag("force");
-        let use_stdin = args.flag("stdin");
-        let parser = args.option("parser");
-        let content = args.option("content");
-
-        let dir = args
-            .positional()
-            .ok_or("Error: fixture directory path required")?;
-
-        Ok(Box::new(FixtureInitExecutable {
-            dir,
-            content,
-            parser,
-            force,
-            use_stdin,
-        }))
-    }
-
-    fn usage(&self) -> Vec<String> {
-        vec![
-            "fixture_init <dir>                          Reformat existing input file + regenerate expected.json"
-                .to_string(),
-            "fixture_init <dir> --content '<code>'       Create fixture from content string"
-                .to_string(),
-            "fixture_init <dir> --stdin                  Create fixture from stdin (heredoc)"
-                .to_string(),
-            "fixture_init <dir> --parser typescript       Specify parser type (default: svelte)"
-                .to_string(),
-            "fixture_init <dir> --force                  Overwrite existing input file".to_string(),
-        ]
-    }
-}
-
-struct FixtureInitExecutable {
-    dir: String,
-    content: Option<String>,
-    parser: Option<String>,
+/// Content sources (in priority order): `--content`, `--stdin`, existing input file.
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "fixture_init")]
+pub struct FixtureInitCommand {
+    /// overwrite existing input file
+    #[argh(switch)]
     force: bool,
-    use_stdin: bool,
+
+    /// read content from stdin (for heredocs and pipes)
+    #[argh(switch)]
+    stdin: bool,
+
+    /// parser type: svelte | typescript | ts | css | svelte-ts | svelte.ts
+    #[argh(option)]
+    parser: Option<String>,
+
+    /// content string
+    #[argh(option)]
+    content: Option<String>,
+
+    /// fixture directory path
+    #[argh(positional)]
+    dir: String,
 }
 
-impl Executable for FixtureInitExecutable {
-    fn execute(&self) {
+impl FixtureInitCommand {
+    pub fn run(self) {
         let rt = super::create_runtime();
-        rt.block_on(self.run());
+        rt.block_on(self.run_async());
     }
-}
 
-impl FixtureInitExecutable {
-    async fn run(&self) {
+    async fn run_async(self) {
         let dir = Path::new(&self.dir);
 
         // Determine input type from --parser flag, existing file, or default
@@ -81,7 +47,7 @@ impl FixtureInitExecutable {
         // Get content from --content, --stdin, or existing file
         let raw_content = match resolve_content(
             self.content.as_deref(),
-            self.use_stdin,
+            self.stdin,
             self.force,
             dir,
             input_type,
