@@ -50,6 +50,12 @@ const samples: Sample[] = [
 		type: 'Program',
 	},
 	{
+		name: 'ts_directive_prologue',
+		source: '"use strict";\nlet a = 1;',
+		parser: 'typescript',
+		type: 'Program',
+	},
+	{
 		name: 'css_rule_at_media',
 		source: '.foo { color: red; }\n@media (min-width: 600px) {\n\t.bar { padding: 1em 2em; }\n}',
 		parser: 'css',

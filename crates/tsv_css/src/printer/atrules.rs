@@ -10,6 +10,7 @@
 // wrapping). The complex prelude and block handling remains imperative for clarity.
 
 use super::Printer;
+use super::source_fidelity;
 use crate::ast::internal;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::{self, Mode, arena::DocId};
@@ -63,7 +64,15 @@ impl<'a> Printer<'a> {
             }
             internal::PreludeValue::Supports { condition, span } => {
                 self.write(" ");
-                self.print_condition_query(None, condition, atrule.block.is_some(), Some(*span));
+                // @supports conditions are declarations, so prettier normalizes
+                // their values (e.g. numbers); @container queries are left raw.
+                self.print_condition_query(
+                    None,
+                    condition,
+                    atrule.block.is_some(),
+                    Some(*span),
+                    true,
+                );
             }
             internal::PreludeValue::Container {
                 name,
@@ -76,6 +85,7 @@ impl<'a> Printer<'a> {
                     condition,
                     atrule.block.is_some(),
                     Some(*span),
+                    false,
                 );
             }
             internal::PreludeValue::Media { content, .. } => {
@@ -347,6 +357,7 @@ impl<'a> Printer<'a> {
         condition: &internal::SupportsCondition,
         has_block: bool,
         prelude_span: Option<tsv_lang::Span>,
+        normalize_numbers: bool,
     ) {
         // Print optional name prefix (for @container)
         let name_end_pos = if let Some(n) = name {
@@ -358,7 +369,23 @@ impl<'a> Printer<'a> {
             prelude_span.map(|s| s.start)
         };
 
-        let parts = &condition.parts;
+        // Normalize numbers in each part's content (`.5px` → `0.5px`), matching
+        // the declaration-value path. Comments/strings within a part are
+        // preserved; inter-part comments come from source spans, unaffected.
+        let normalized_parts: Vec<internal::SupportsPart> = condition
+            .parts
+            .iter()
+            .map(|p| internal::SupportsPart {
+                connector: p.connector,
+                content: if normalize_numbers {
+                    source_fidelity::normalize_numbers_in_text(&p.content)
+                } else {
+                    p.content.clone()
+                },
+                span: p.span,
+            })
+            .collect();
+        let parts = &normalized_parts;
 
         if parts.len() <= 1 {
             // Single condition - emit leading comments, content, and trailing comments
@@ -671,6 +698,11 @@ impl<'a> Printer<'a> {
     /// Used by both @media prelude and @import media conditions.
     /// `suffix_len` accounts for trailing content (` {` for @media, `;` for @import).
     fn print_media_query_with_wrapping(&mut self, content: &str, suffix_len: usize) {
+        // Normalize numbers in the raw prelude (`.5px` → `0.5px`), matching the
+        // declaration-value path. Comments and strings are preserved.
+        let content = source_fidelity::normalize_numbers_in_text(content);
+        let content = content.as_str();
+
         let current_col = self.current_column();
         let total_width = current_col + content.len() + suffix_len;
 

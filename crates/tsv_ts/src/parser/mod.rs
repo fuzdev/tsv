@@ -1141,6 +1141,7 @@ impl<'a> Parser<'a> {
         while self.current_kind != TokenKind::Eof {
             body.push(self.parse_statement()?);
         }
+        self.adapt_directive_prologue(&mut body);
 
         // Use current_pos() to get global position (includes base_offset)
         let (_, end) = self.current_pos();

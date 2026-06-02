@@ -17,10 +17,10 @@ tsv_css = { workspace = true, features = ["convert"] }
 argh.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tokio = { version = "1", features = ["rt-multi-thread", "process", "io-util", "sync", "macros", "time"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "process", "io-util", "sync", "macros", "time"] }
 thiserror.workspace = true
 similar = "2.7"
-futures-util = "0.3"
+futures-util.workspace = true
 tempfile = "3"
 
 [lints]

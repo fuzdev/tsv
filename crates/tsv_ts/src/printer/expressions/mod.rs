@@ -19,7 +19,7 @@ mod functions;
 pub(crate) mod literals;
 mod patterns;
 
-pub(super) use literals::{format_string_literal_from_ast, normalize_number_literal};
+pub(super) use literals::format_string_literal_from_ast;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`
 use super::chain;
@@ -28,7 +28,7 @@ pub(super) use super::{
     ParenContext, PatternContext, Printer, needs_parens, object_pattern_should_expand,
     unwrap_parenthesized,
 };
-use crate::ast::internal::{BinaryExpression, BinaryOperator, Expression};
+use crate::ast::internal::{BinaryExpression, BinaryOperator, Expression, TSType};
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
 
@@ -37,6 +37,20 @@ impl<'a> Printer<'a> {
     pub(crate) fn print_expression(&mut self, expression: &Expression) {
         let doc = self.build_expression_doc(expression);
         self.write_arena_doc(doc);
+    }
+
+    /// Wrap `doc` in parens when `span` is the object/function/class node that
+    /// starts the enclosing expression statement (set by `build_expression_statement_doc`
+    /// via `leftmost_no_lookahead`). Consumes the target so it fires exactly once:
+    /// `(class {}).foo` wraps the class, not the whole member expression.
+    fn maybe_wrap_expr_stmt_paren(&self, span: tsv_lang::Span, doc: DocId) -> DocId {
+        if self.expr_stmt_paren_target.get() == Some(span) {
+            self.expr_stmt_paren_target.set(None);
+            let d = self.d();
+            d.concat(&[d.text("("), doc, d.text(")")])
+        } else {
+            doc
+        }
     }
 
     /// Build a Doc for an expression (for use in object/array contexts and statements)
@@ -59,12 +73,13 @@ impl<'a> Printer<'a> {
                 // would incorrectly consume the flag if we checked it after.
                 let needs_arrow_parens = self.arrow_body_object_needs_parens.replace(false);
                 let doc = self.build_object_doc(obj);
-                if needs_arrow_parens {
+                let doc = if needs_arrow_parens {
                     let d = self.d();
                     d.concat(&[d.text("("), doc, d.text(")")])
                 } else {
                     doc
-                }
+                };
+                self.maybe_wrap_expr_stmt_paren(obj.span, doc)
             }
             Expression::ArrayExpression(arr) => self.build_array_doc(arr),
             Expression::UnaryExpression(unary) => self.build_unary_doc(unary),
@@ -83,8 +98,13 @@ impl<'a> Printer<'a> {
                 self.build_conditional_doc_with_wrapping(cond)
             }
             Expression::ArrowFunctionExpression(arrow) => self.build_arrow_doc(arrow),
-            Expression::FunctionExpression(func) => self.build_function_doc(func),
-            Expression::ClassExpression(class_expr) => self.build_class_expression_doc(class_expr),
+            Expression::FunctionExpression(func) => {
+                self.maybe_wrap_expr_stmt_paren(func.span, self.build_function_doc(func))
+            }
+            Expression::ClassExpression(class_expr) => self.maybe_wrap_expr_stmt_paren(
+                class_expr.span,
+                self.build_class_expression_doc(class_expr),
+            ),
             Expression::SpreadElement(spread) => self.build_spread_doc(spread),
             Expression::TemplateLiteral(template) => self.build_template_literal_doc(template),
             Expression::TaggedTemplateExpression(tagged) => self.build_tagged_template_doc(tagged),
@@ -102,8 +122,18 @@ impl<'a> Printer<'a> {
             Expression::TSTypeAssertion(type_assert) => {
                 self.build_ts_type_assertion_doc(type_assert)
             }
-            Expression::TSAsExpression(as_expr) => self.build_ts_as_doc(as_expr),
-            Expression::TSSatisfiesExpression(sat_expr) => self.build_ts_satisfies_doc(sat_expr),
+            Expression::TSAsExpression(as_expr) => self.build_binary_cast_doc(
+                &as_expr.expression,
+                &as_expr.type_annotation,
+                "as",
+                true,
+            ),
+            Expression::TSSatisfiesExpression(sat_expr) => self.build_binary_cast_doc(
+                &sat_expr.expression,
+                &sat_expr.type_annotation,
+                "satisfies",
+                false,
+            ),
             Expression::TSInstantiationExpression(inst_expr) => {
                 self.build_ts_instantiation_doc(inst_expr)
             }
@@ -198,115 +228,156 @@ impl<'a> Printer<'a> {
         let type_start = type_assert.type_annotation.span().start;
         let comments_doc =
             self.build_comments_between(angle_end, type_start, CommentSpacing::Trailing);
-        let mut parts = vec![
+        let type_doc = self.build_type_doc_with_wrapping_type_args(&type_assert.type_annotation);
+
+        // Mirror Prettier's `printTypeAssertion`: the cast `<Type>` is its own
+        // group, breaking after `<` with the type on an indented line and `>`
+        // back at the outer indent. Crucially, a union cast type prints *flat* on
+        // that line — Prettier's `shouldIndentUnionType` returns false for
+        // `TSTypeAssertion`, so it never gets the leading-`|` hanging indent that
+        // `as`/`satisfies` casts use (see `build_union_hanging_indent_doc`).
+        let cast_group = d.group(d.concat(&[
             d.text("<"),
-            comments_doc,
-            self.build_type_doc_with_wrapping_type_args(&type_assert.type_annotation),
+            d.indent(d.concat(&[d.softline(), comments_doc, type_doc])),
+            d.softline(),
             d.text(">"),
-        ];
-        if expr_needs_parens {
-            parts.push(d.text("("));
+        ]));
+
+        let inner_expr = self.build_expression_doc(&type_assert.expression);
+        let expr_doc = if expr_needs_parens {
+            d.concat(&[d.text("("), inner_expr, d.text(")")])
+        } else {
+            inner_expr
+        };
+
+        // `shouldBreakAfterCast`: object/array-literal expressions hug the cast
+        // (they expand themselves), everything else may break the expression into
+        // its own parenthesized block before the cast group itself breaks.
+        let should_break_after_cast = !matches!(
+            &*type_assert.expression,
+            Expression::ArrayExpression(_) | Expression::ObjectExpression(_)
+        );
+
+        if should_break_after_cast {
+            let expr_contents = d.group_break(d.concat(&[
+                d.if_break(d.text("("), d.empty()),
+                d.indent(d.concat(&[d.softline(), expr_doc])),
+                d.softline(),
+                d.if_break(d.text(")"), d.empty()),
+            ]));
+            d.conditional_group(&[
+                d.concat(&[cast_group, expr_doc]),
+                d.concat(&[cast_group, expr_contents]),
+                d.concat(&[cast_group, expr_doc]),
+            ])
+        } else {
+            d.group(d.concat(&[cast_group, expr_doc]))
         }
-        parts.push(self.build_expression_doc(&type_assert.expression));
-        if expr_needs_parens {
-            parts.push(d.text(")"));
-        }
-        d.concat(&parts)
     }
 
-    /// Build a Doc for a TypeScript `as` expression
+    /// Build a Doc for a TypeScript binary cast expression — `expr as Type` or
+    /// `expr satisfies Type`. Mirrors Prettier's `printBinaryCastExpression`,
+    /// which prints both with one function (`isSatisfiesExpression ? "satisfies" : "as"`).
     ///
-    /// Preserves comments between expression and `as` keyword (Prettier 3.7 #18161)
-    /// Comments between `as` and type are moved to after the type (Prettier normalization)
-    fn build_ts_as_doc(&self, as_expr: &crate::ast::internal::TSAsExpression) -> DocId {
+    /// `keyword` is the bare keyword (`"as"` / `"satisfies"`); `is_as` gates the
+    /// `as const` special-case (comments move after `const`), which cannot apply
+    /// to `satisfies` (`satisfies const` is invalid TypeScript).
+    ///
+    /// Preserves comments between the expression and the keyword (Prettier 3.7
+    /// #18161 / #18162); comments between the keyword and the type are kept in
+    /// place except for `as const`, where Prettier relocates them after `const`.
+    fn build_binary_cast_doc(
+        &self,
+        expression: &Expression,
+        type_annotation: &TSType,
+        keyword: &'static str,
+        is_as: bool,
+    ) -> DocId {
         let d = self.d();
-        let needs_parens = needs_parens(&as_expr.expression, ParenContext::TypeAssertion);
+        let needs_parens = needs_parens(expression, ParenContext::TypeAssertion);
         let mut parts = Vec::new();
         if needs_parens {
             parts.push(d.text("("));
         }
-        parts.push(self.build_expression_doc(&as_expr.expression));
+        parts.push(self.build_expression_doc(expression));
         if needs_parens {
             parts.push(d.text(")"));
         }
 
-        // Find the `as` keyword position
-        let expr_end = as_expr.expression.span().end;
-        let type_start = as_expr.type_annotation.span().start;
-        let as_keyword_pos = self.find_keyword_in_range(expr_end, type_start, "as");
+        // Find the keyword position
+        let expr_end = expression.span().end;
+        let type_start = type_annotation.span().start;
+        let keyword_pos = self.find_keyword_in_range(expr_end, type_start, keyword);
 
-        // Comments between expression and `as` keyword → place before ` as`
-        if let Some(as_pos) = as_keyword_pos {
-            parts.push(self.build_inline_comments_between_doc(expr_end, as_pos));
+        // Comments between expression and keyword → place before the keyword
+        if let Some(kw_pos) = keyword_pos {
+            parts.push(self.build_inline_comments_between_doc(expr_end, kw_pos));
         }
 
-        parts.push(d.text(" as "));
+        // Union cast types break after the keyword with a hanging indent.
+        if let Some(tail) =
+            self.cast_union_hanging_tail(keyword, keyword_pos, type_annotation, type_start)
+        {
+            parts.push(tail);
+            return d.concat(&parts);
+        }
 
-        // Comments between `as` keyword and type
-        // For `as const`, prettier moves these after `const`; for regular types, keeps in place
-        let is_as_const = &self.source
-            [type_start as usize..as_expr.type_annotation.span().end as usize]
-            == "const";
-        if let Some(as_pos) = as_keyword_pos {
-            let as_end = as_pos + 2; // "as" is 2 chars
+        parts.push(d.text(" "));
+        parts.push(d.text(keyword));
+        parts.push(d.text(" "));
+
+        // Comments between keyword and type
+        if let Some(kw_pos) = keyword_pos {
+            let kw_end = kw_pos + keyword.len() as u32;
+            // `as const`: prettier moves comments after `const`; otherwise keep in place.
+            let is_as_const = is_as
+                && &self.source[type_start as usize..type_annotation.span().end as usize]
+                    == "const";
             if is_as_const {
-                // `as const`: comments go after `const` (prettier normalization)
-                parts.push(self.build_type_doc_with_wrapping_type_args(&as_expr.type_annotation));
-                parts.push(self.build_inline_comments_between_doc(as_end, type_start));
+                parts.push(self.build_type_doc_with_wrapping_type_args(type_annotation));
+                parts.push(self.build_inline_comments_between_doc(kw_end, type_start));
             } else {
-                // Regular type: comments stay before the type
                 parts.push(self.build_comments_between(
-                    as_end,
+                    kw_end,
                     type_start,
                     CommentSpacing::Trailing,
                 ));
-                parts.push(self.build_type_doc_with_wrapping_type_args(&as_expr.type_annotation));
+                parts.push(self.build_type_doc_with_wrapping_type_args(type_annotation));
             }
         } else {
-            parts.push(self.build_type_doc_with_wrapping_type_args(&as_expr.type_annotation));
+            parts.push(self.build_type_doc_with_wrapping_type_args(type_annotation));
         }
 
         d.concat(&parts)
     }
 
-    /// Build a Doc for a TypeScript `satisfies` expression
+    /// The keyword-plus-type tail for an `as`/`satisfies` cast when the cast type
+    /// is a non-hugging union: it breaks after the keyword with a hanging indent
+    /// (Prettier's `shouldIndentUnionType`). `keyword` is the bare keyword
+    /// (`"as"` / `"satisfies"`).
     ///
-    /// Preserves comments between expression and `satisfies` keyword (Prettier 3.7 #18162)
-    fn build_ts_satisfies_doc(
+    /// Returns `None` to fall through to the caller's inline layout — for
+    /// non-union or hugging types, or when a comment sits between the keyword and
+    /// the type.
+    ///
+    /// TODO: a comment before a *breaking* union (`x as /* c */ A | B` past print
+    /// width) still misses the hanging indent. Prettier is non-idempotent here (it
+    /// relocates the comment across the keyword), so the target is a
+    /// comment-position-philosophy case, not a clean match — deferred.
+    fn cast_union_hanging_tail(
         &self,
-        sat_expr: &crate::ast::internal::TSSatisfiesExpression,
-    ) -> DocId {
+        keyword: &'static str,
+        keyword_pos: Option<u32>,
+        type_annotation: &TSType,
+        type_start: u32,
+    ) -> Option<DocId> {
+        let keyword_len = keyword.len() as u32;
+        if keyword_pos.is_some_and(|pos| self.has_comments_between(pos + keyword_len, type_start)) {
+            return None;
+        }
+        let hanging = self.build_union_hanging_indent_doc(type_annotation)?;
         let d = self.d();
-        let needs_parens = needs_parens(&sat_expr.expression, ParenContext::TypeAssertion);
-        let mut parts = Vec::new();
-        if needs_parens {
-            parts.push(d.text("("));
-        }
-        parts.push(self.build_expression_doc(&sat_expr.expression));
-        if needs_parens {
-            parts.push(d.text(")"));
-        }
-
-        // Comments around `satisfies` keyword: split before and after
-        let expr_end = sat_expr.expression.span().end;
-        let type_start = sat_expr.type_annotation.span().start;
-        let sat_keyword_pos = self.find_keyword_in_range(expr_end, type_start, "satisfies");
-
-        // Comments between expression and `satisfies` keyword → before keyword
-        if let Some(sat_pos) = sat_keyword_pos {
-            parts.push(self.build_inline_comments_between_doc(expr_end, sat_pos));
-        }
-
-        parts.push(d.text(" satisfies "));
-
-        // Comments between `satisfies` keyword and type → before type
-        if let Some(sat_pos) = sat_keyword_pos {
-            let sat_end = sat_pos + 9; // "satisfies" is 9 chars
-            parts.push(self.build_comments_between(sat_end, type_start, CommentSpacing::Trailing));
-        }
-
-        parts.push(self.build_type_doc_with_wrapping_type_args(&sat_expr.type_annotation));
-        d.concat(&parts)
+        Some(d.concat(&[d.text(" "), d.text(keyword), hanging]))
     }
 
     /// Build a Doc for a TypeScript instantiation expression

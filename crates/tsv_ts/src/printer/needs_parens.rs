@@ -299,12 +299,19 @@ fn is_numeric_literal(expr: &Expression) -> bool {
 //
 
 /// Expression statement: `<expr>;`
-/// Object expressions and object pattern assignments need parens to avoid ambiguity
-/// with block statements. `({...});` not `{...};`
+/// Object/function/class expressions and object pattern assignments need parens
+/// when they start the statement, to avoid being reparsed as a block, function
+/// declaration, or class declaration. `({...});`, `(function () {});`,
+/// `(class {});` — matches prettier's "statement starts with `{`/`function`/`class`"
+/// rule (parentheses/needs-parentheses.js).
 fn needs_parens_expression_statement(expr: &Expression) -> bool {
     match expr {
         // Object expression: `({...});` needs parens to avoid being parsed as a block
         Expression::ObjectExpression(_) => true,
+        // Function/class expression: `(function () {});` / `(class {});` need parens
+        // to avoid being reparsed as a declaration (which also changes meaning —
+        // an anonymous declaration is a syntax error).
+        Expression::FunctionExpression(_) | Expression::ClassExpression(_) => true,
         // Object pattern assignment: `({a, b} = obj);` needs parens
         Expression::AssignmentExpression(assign) => {
             matches!(assign.left.as_ref(), Expression::ObjectPattern(_))
@@ -315,6 +322,50 @@ fn needs_parens_expression_statement(expr: &Expression) -> bool {
             .first()
             .is_some_and(needs_parens_expression_statement),
         _ => false,
+    }
+}
+
+/// Walk to the leftmost (first-printed) leaf of an expression, mirroring
+/// prettier's `startsWithNoLookaheadToken` (utilities/starts-with-no-lookahead-token.js).
+///
+/// Used to decide whether an expression statement must be wrapped in parens
+/// because its leftmost token is an object/function/class — e.g. `(class {}).foo`
+/// wraps the class, not the whole member expression. Recurses through the
+/// positions that print first (`.left`, `.object`, `.callee`, `.test`, …) and
+/// stops at IIFE callees/tags (already parenthesized) to match prettier.
+pub(crate) fn leftmost_no_lookahead(expr: &Expression) -> &Expression {
+    match expr {
+        // Binary and logical share `BinaryExpression` here — recurse into `.left`.
+        Expression::BinaryExpression(b) => leftmost_no_lookahead(&b.left),
+        Expression::AssignmentExpression(a) => leftmost_no_lookahead(&a.left),
+        Expression::MemberExpression(m) => leftmost_no_lookahead(&m.object),
+        Expression::ConditionalExpression(c) => leftmost_no_lookahead(&c.test),
+        Expression::SequenceExpression(s) => {
+            s.expressions.first().map_or(expr, leftmost_no_lookahead)
+        }
+        // IIFEs (`(function () {})()` / `` (function () {})`x` ``) are already
+        // parenthesized by their callee/tag, so prettier stops the walk there.
+        Expression::CallExpression(call) => {
+            if matches!(call.callee.as_ref(), Expression::FunctionExpression(_)) {
+                expr
+            } else {
+                leftmost_no_lookahead(&call.callee)
+            }
+        }
+        Expression::TaggedTemplateExpression(t) => {
+            if matches!(t.tag.as_ref(), Expression::FunctionExpression(_)) {
+                expr
+            } else {
+                leftmost_no_lookahead(&t.tag)
+            }
+        }
+        // Postfix update (`x++`) prints its argument first; prefix (`++x`) does not.
+        Expression::UpdateExpression(u) if !u.prefix => leftmost_no_lookahead(&u.argument),
+        Expression::TSAsExpression(e) => leftmost_no_lookahead(&e.expression),
+        Expression::TSSatisfiesExpression(e) => leftmost_no_lookahead(&e.expression),
+        Expression::TSNonNullExpression(e) => leftmost_no_lookahead(&e.expression),
+        Expression::TSInstantiationExpression(e) => leftmost_no_lookahead(&e.expression),
+        _ => expr,
     }
 }
 

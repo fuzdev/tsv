@@ -1,4 +1,5 @@
 use crate::ast::internal::CssValue;
+use crate::number::number_part_len;
 use tsv_lang::Span;
 
 /// Parse dimension value: "10px", "1.5em", "50%", or unitless number
@@ -11,40 +12,17 @@ pub fn parse_dimension(s: &str, span: Span) -> Option<CssValue> {
     })
 }
 
-/// Extract numeric part and unit from a dimension string
+/// Split a dimension string into its numeric value and unit, returning `None`
+/// when it doesn't start with a number. Uses the shared CSS number grammar so
+/// exponents and trailing dots are handled the same way as the lexer and
+/// printer (`1.5e10` → `(15000000000.0, "")`, `1.px` → `(1.0, ".px")`).
 fn parse_dimension_parts(s: &str) -> Option<(f64, String)> {
-    let mut num_end = 0;
-    let mut found_dot = false;
-    let bytes = s.as_bytes();
-
-    // Handle optional sign
-    if num_end < bytes.len() && (bytes[num_end] == b'-' || bytes[num_end] == b'+') {
-        num_end += 1;
-    }
-
-    // Parse digits and decimal point
-    while num_end < bytes.len() {
-        if bytes[num_end].is_ascii_digit() {
-            num_end += 1;
-        } else if bytes[num_end] == b'.'
-            && !found_dot
-            && num_end + 1 < bytes.len()
-            && bytes[num_end + 1].is_ascii_digit()
-        {
-            found_dot = true;
-            num_end += 1;
-        } else {
-            break;
-        }
-    }
-
-    // At least one digit required
-    if num_end == 0 || (num_end == 1 && (bytes[0] == b'-' || bytes[0] == b'+')) {
+    let num_end = number_part_len(s);
+    if num_end == 0 {
         return None;
     }
 
-    let num_str = &s[..num_end];
-    let number = num_str.parse::<f64>().ok()?;
+    let number = s[..num_end].parse::<f64>().ok()?;
     let unit = s[num_end..].to_string();
 
     Some((number, unit))

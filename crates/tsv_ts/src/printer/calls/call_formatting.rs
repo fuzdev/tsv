@@ -29,7 +29,7 @@ use super::arg_wrapping::{
     wrap_call_with_soft_breaks,
 };
 use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_module_path_no_break};
-use super::test_patterns::{get_member_chain_parts, is_test_call};
+use super::test_patterns::{callee_chain_string, is_test_call};
 use crate::ast::internal;
 use tsv_lang::SymbolResolver;
 use tsv_lang::doc::arena::DocId;
@@ -194,27 +194,62 @@ pub(super) fn build_call_doc_with_wrapping(
         let arg_end = first_arg.span().end;
         let paren_close = call.span.end;
 
+        // Own-line trailing comments after the arg (any line comment, or a block
+        // comment on a line below the arg) aren't handled by the single-arg
+        // branches below — defer to the general comment path (which emits them
+        // after the trailing comma). Same-line inline trailing block comments
+        // (e.g. `fn(/* c */ a /* t */)`) stay on this fast path.
+        let has_own_line_trailing_comment =
+            tsv_lang::comments_in_range(printer.comments, arg_end, paren_close).any(|c| {
+                !c.is_block
+                    || !tsv_lang::printing::is_same_line_fast(
+                        printer.line_breaks,
+                        arg_end,
+                        c.span.start,
+                    )
+            });
+
         let has_line_comments = printer.has_line_comments_between(paren_open, arg_start);
-        if has_line_comments {
-            // Multi-line format: fn(\n\t// comment\n\targ,\n)
-            let mut comment_parts = Vec::new();
-            for comment in tsv_lang::comments_in_range(printer.comments, paren_open, arg_start) {
-                comment_parts.push(printer.build_comment_doc(comment));
-                comment_parts.push(d.hardline());
+        if has_line_comments && !has_own_line_trailing_comment {
+            // Multi-line format: fn( // comment\n\targ,\n)
+            // Comments trailing the `(` on its own line stay there (a divergence from
+            // prettier, which relocates them to their own line); own-line comments
+            // stay on their own lines before the arg. See conformance_prettier.md
+            // §Comment relocation (Call open paren `(`).
+            let gap_pc = PartitionedComments::new(
+                printer.comments,
+                printer.line_breaks,
+                paren_open,
+                arg_start,
+            );
+
+            let mut paren_line_prefix = Vec::new();
+            gap_pc.emit_trailing_comments(&mut paren_line_prefix, printer);
+
+            let mut inner = Vec::new();
+            for comment in &gap_pc.leading {
+                inner.push(printer.build_comment_doc(comment));
+                inner.push(d.hardline());
             }
+            inner.push(printer.build_expression_doc(first_arg));
 
-            let arg_doc = d.concat(&[
-                d.concat(&comment_parts),
-                printer.build_expression_doc(first_arg),
+            return d.concat(&[
+                callee,
+                d.text("("),
+                d.concat(&paren_line_prefix),
+                d.indent(d.concat(&[d.hardline(), d.concat(&inner), d.text(",")])),
+                d.hardline(),
+                d.text(")"),
             ]);
-
-            return wrap_call_with_hard_breaks(d, callee, arg_doc);
         }
 
         // Check for inline block comments (single binary search via _opt)
         // Use build_rhs_comments_opt to get spaces between consecutive block comments:
         // fn(/** @type {A} */ /** @type {B} */ expr) — not fn(/** @type {A} *//** @type {B} */ expr)
-        if let Some(inline_comments) = printer.build_rhs_comments_opt(paren_open, arg_start) {
+        if let Some(inline_comments) = printer
+            .build_rhs_comments_opt(paren_open, arg_start)
+            .filter(|_| !has_own_line_trailing_comment)
+        {
             let arg_doc = printer.build_expression_doc(first_arg);
 
             // Build comment + arg, including any trailing comments after the arg
@@ -244,16 +279,9 @@ pub(super) fn build_call_doc_with_wrapping(
     if is_test_call(call, printer) {
         // Build callee as flat string (no conditionalGroup)
         // This prevents breaking at `.skip` etc. even when very long
-        let flat_callee = if let Some(parts) = get_member_chain_parts(&call.callee) {
-            let callee_str: String = parts
-                .iter()
-                .rev()
-                .map(|sym| printer.resolve_symbol(*sym))
-                .collect::<Vec<_>>()
-                .join(".");
-            d.text_owned(callee_str)
-        } else {
-            callee
+        let flat_callee = match callee_chain_string(&call.callee, printer) {
+            Some(callee_str) => d.text_owned(callee_str),
+            None => callee,
         };
 
         // Check for trailing comments on last arg
@@ -1027,12 +1055,7 @@ pub(super) fn build_call_doc_with_wrapping(
     // These need per-element handling to emit after the trailing comma.
     // Also checks inside spread spans for comments from stripped parens.
     let has_own_line_trailing_block = call.arguments.last().is_some_and(|last_arg| {
-        let mut search_start = last_arg.span().end;
-        if let internal::Expression::SpreadElement(spread) = last_arg
-            && printer.has_comments_between(spread.argument.span().end, spread.span.end)
-        {
-            search_start = spread.argument.span().end;
-        }
+        let search_start = printer.last_arg_comment_scan_start(last_arg);
         tsv_lang::comments_in_range(printer.comments, search_start, call.span.end).any(|c| {
             c.is_block
                 && !tsv_lang::printing::is_same_line_fast(
@@ -1050,8 +1073,15 @@ pub(super) fn build_call_doc_with_wrapping(
     {
         // Build arguments with leading and/or inter-argument comments
         let mut arg_parts = Vec::new();
+        // Comments trailing the `(` on its own line, kept on the `(` line when the
+        // call expands (divergence from prettier, which relocates them to their own
+        // line). Injected after `(` in the force-expansion wrap below.
+        let mut paren_line_prefix_parts: Vec<DocId> = Vec::new();
         let mut force_expansion = false;
         let mut has_trailing_comma_on_last = false;
+        // Block comment trailing the last arg after the comma — preserved after the
+        // (synthetic) trailing comma (prettier relocates before; see conformance_prettier.md).
+        let mut last_after_comma: Vec<DocId> = Vec::new();
 
         for (i, arg) in call.arguments.iter().enumerate() {
             // Handle leading comments before first argument
@@ -1062,30 +1092,52 @@ pub(super) fn build_call_doc_with_wrapping(
                     force_expansion = true;
                 }
 
-                // Build leading comments before first arg.
-                // Inline block comments use space between them (staying on one line).
-                // Line comments and standalone block comments use hardline.
-                let all_inline_block =
-                    printer.all_comments_are_inline_block(paren_open, first_arg_start);
-                let mut has_prev_comment = false;
-                for comment in
-                    tsv_lang::comments_in_range(printer.comments, paren_open, first_arg_start)
-                {
-                    if has_prev_comment {
-                        if all_inline_block {
-                            arg_parts.push(d.text(" "));
-                        } else {
-                            arg_parts.push(d.hardline());
-                        }
+                let gap_pc = PartitionedComments::new(
+                    printer.comments,
+                    printer.line_breaks,
+                    paren_open,
+                    first_arg_start,
+                );
+                let has_paren_line =
+                    !gap_pc.trailing_block.is_empty() || !gap_pc.trailing_line.is_empty();
+
+                if force_expansion && has_paren_line {
+                    // Comments trailing the `(` stay on the `(` line; own-line
+                    // comments stay on their own lines before the first arg.
+                    // (Inline-collapse cases keep the old behavior below, so a
+                    // block comment that hugs the arg — `fn(/* c */ a)` — is
+                    // unchanged when the call doesn't expand.)
+                    gap_pc.emit_trailing_comments(&mut paren_line_prefix_parts, printer);
+                    for comment in &gap_pc.leading {
+                        arg_parts.push(printer.build_comment_doc(comment));
+                        arg_parts.push(d.hardline());
                     }
-                    arg_parts.push(printer.build_comment_doc(comment));
-                    has_prev_comment = true;
-                }
-                // After last comment: inline block comments use space, others use line.
-                if all_inline_block {
-                    arg_parts.push(d.text(" "));
                 } else {
-                    arg_parts.push(d.line());
+                    // Build leading comments before first arg.
+                    // Inline block comments use space between them (staying on one line).
+                    // Line comments and standalone block comments use hardline.
+                    let all_inline_block =
+                        printer.all_comments_are_inline_block(paren_open, first_arg_start);
+                    let mut has_prev_comment = false;
+                    for comment in
+                        tsv_lang::comments_in_range(printer.comments, paren_open, first_arg_start)
+                    {
+                        if has_prev_comment {
+                            if all_inline_block {
+                                arg_parts.push(d.text(" "));
+                            } else {
+                                arg_parts.push(d.hardline());
+                            }
+                        }
+                        arg_parts.push(printer.build_comment_doc(comment));
+                        has_prev_comment = true;
+                    }
+                    // After last comment: inline block comments use space, others use line.
+                    if all_inline_block {
+                        arg_parts.push(d.text(" "));
+                    } else {
+                        arg_parts.push(d.line());
+                    }
                 }
             }
 
@@ -1199,17 +1251,11 @@ pub(super) fn build_call_doc_with_wrapping(
                     }
                 }
             } else {
-                // Last argument - check for trailing comments before closing paren
-                let mut effective_arg_end = arg.span().end;
+                // Last argument - check for trailing comments before closing paren.
+                // For spread elements, scan inside the spread span for comments from
+                // stripped parens (argument.end to spread.end).
+                let effective_arg_end = printer.last_arg_comment_scan_start(arg);
                 let paren_close = call.span.end;
-
-                // For spread elements, also check inside the spread span for
-                // comments from stripped parens (argument.end to spread.end)
-                if let internal::Expression::SpreadElement(spread) = arg
-                    && printer.has_comments_between(spread.argument.span().end, spread.span.end)
-                {
-                    effective_arg_end = spread.argument.span().end;
-                }
 
                 let pc = PartitionedComments::new(
                     printer.comments,
@@ -1218,20 +1264,16 @@ pub(super) fn build_call_doc_with_wrapping(
                     paren_close,
                 );
 
-                // Own-line block comments after the last arg (before closing paren).
-                // These appear as siblings after the trailing comma, forcing expansion.
-                // Also handles spread with stripped parens via effective_arg_end.
+                // Own-line comments (block or line) after the last arg (before closing
+                // paren). These appear as siblings after the trailing comma, forcing
+                // expansion. Also handles spread with stripped parens via effective_arg_end.
                 if !pc.leading.is_empty() {
-                    let leading_block: Vec<_> = pc.leading.iter().filter(|c| c.is_block).collect();
-                    if !leading_block.is_empty() {
-                        arg_parts.push(d.text(","));
-                        for comment in &leading_block {
-                            arg_parts.push(d.hardline());
-                            arg_parts.push(printer.build_comment_doc(comment));
-                        }
-                        force_expansion = true;
-                        has_trailing_comma_on_last = true;
-                    }
+                    force_expansion = true;
+                    pc.emit_last_arg_dangling_comments(
+                        &mut arg_parts,
+                        printer,
+                        &mut has_trailing_comma_on_last,
+                    );
                 }
 
                 if pc.has_trailing_line() {
@@ -1262,12 +1304,20 @@ pub(super) fn build_call_doc_with_wrapping(
                     }
                     has_trailing_comma_on_last = true;
                 } else if pc.has_trailing_block() {
-                    // Trailing block comments: place comment after arg
-                    // Don't force expansion - let the content decide based on width/source newlines
+                    // Trailing block comments: place relative to the source comma.
+                    // Before-comma stay after the arg; after-comma are preserved past
+                    // the trailing comma (emitted by the wrappers below). Don't force
+                    // expansion - let content decide based on width/source newlines.
                     // e.g., fn({short} /* c */) stays inline, fn({long...} /* c */) expands
+                    let comma_pos = find_comma_pos(printer.source, effective_arg_end, paren_close);
                     for comment in &pc.trailing_block {
-                        arg_parts.push(d.text(" "));
-                        arg_parts.push(printer.build_comment_doc(comment));
+                        if comma_pos.is_some_and(|cp| is_comment_after_comma(comment, cp)) {
+                            last_after_comma.push(d.text(" "));
+                            last_after_comma.push(printer.build_comment_doc(comment));
+                        } else {
+                            arg_parts.push(d.text(" "));
+                            arg_parts.push(printer.build_comment_doc(comment));
+                        }
                     }
                 }
             }
@@ -1295,8 +1345,14 @@ pub(super) fn build_call_doc_with_wrapping(
             return d.concat(&[
                 callee,
                 d.text("("),
+                d.concat(&paren_line_prefix_parts),
                 d.group_break(d.concat(&[
-                    d.indent(d.concat(&[d.hardline(), arg_doc, trailing])),
+                    d.indent(d.concat(&[
+                        d.hardline(),
+                        arg_doc,
+                        trailing,
+                        d.concat(&last_after_comma),
+                    ])),
                     d.hardline(),
                 ])),
                 d.text(")"),
@@ -1311,7 +1367,25 @@ pub(super) fn build_call_doc_with_wrapping(
                 callee,
                 d.group(d.concat(&[
                     d.text("("),
-                    d.indent_softline(arg_doc),
+                    d.indent_softline(d.concat(&[arg_doc, d.concat(&last_after_comma)])),
+                    d.softline(),
+                    d.text(")"),
+                ])),
+            ]);
+        }
+
+        // After-comma block comment on the last arg: preserve it past the trailing
+        // comma (soft-break wrapper with the comment inserted after `trailing_comma`).
+        if !last_after_comma.is_empty() {
+            return d.concat(&[
+                callee,
+                d.group(d.concat(&[
+                    d.text("("),
+                    d.indent_softline(d.concat(&[
+                        arg_doc,
+                        d.trailing_comma(),
+                        d.concat(&last_after_comma),
+                    ])),
                     d.softline(),
                     d.text(")"),
                 ])),

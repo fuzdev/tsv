@@ -30,8 +30,10 @@ mod test_patterns;
 
 // Re-export items needed by other printer modules
 pub(crate) use arg_comments::{
-    PartitionedComments, has_blank_line_between_args, has_inter_argument_comments_slice,
-    has_trailing_comments_slice, has_trailing_line_comments_slice, skip_stripped_open_paren,
+    PartitionedComments, emit_first_arg_leading_comments, has_blank_line_between_args,
+    has_inter_argument_comments_slice, has_trailing_comments_slice,
+    has_trailing_line_comments_slice, should_force_expansion_for_comments,
+    skip_stripped_open_paren,
 };
 pub(crate) use arg_wrapping::{
     arrow_has_type_reference_return, build_args_joined_with_comments, build_args_split_last,

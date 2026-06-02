@@ -11,6 +11,7 @@ use super::super::{has_newline_before_position, is_multiline_template_expression
 use super::{ParenContext, Printer, needs_parens, unwrap_parenthesized};
 use crate::ast::internal;
 use crate::printer::analysis::find_char_skipping_comments;
+use crate::printer::layout::hang_after_operator;
 use crate::printer::types::helpers::is_huggable_type;
 use crate::printer::{CommentFilter, CommentSpacing};
 use tsv_lang::comments_in_range;
@@ -180,7 +181,7 @@ impl<'a> Printer<'a> {
 
         // Return type annotation - union types need special handling for breaking
         if let Some(return_type) = &arrow.return_type {
-            sig_parts.push(self.build_arrow_return_type_doc(return_type));
+            sig_parts.push(self.build_arrow_return_type_doc(return_type, arrow.params_start));
         }
 
         // Calculate signature end position (after `)` or return type)
@@ -306,7 +307,7 @@ impl<'a> Printer<'a> {
                         // Own-line or line comments — always break
                         let body_with_comments =
                             self.build_arrow_body_with_comments_doc(expr, arrow_end, body_start);
-                        parts.push(d.group(d.indent(d.concat(&[d.line(), body_with_comments]))));
+                        parts.push(hang_after_operator(d, body_with_comments));
                     } else if should_hug {
                         // Hugged body (possibly with inline block comments):
                         // `() => ({...})` or `() => /* c */ ({...})`
@@ -383,7 +384,7 @@ impl<'a> Printer<'a> {
                         if d.will_break(body_doc) {
                             // Body has hardlines (multiline template in ternary, etc.)
                             // Use normal break layout — no parens needed
-                            parts.push(d.group(d.indent(d.concat(&[d.line(), body_doc]))));
+                            parts.push(hang_after_operator(d, body_doc));
                         } else {
                             parts.push(d.text(" "));
                             parts.push(d.group(d.concat(&[
@@ -411,13 +412,9 @@ impl<'a> Printer<'a> {
                             // `() => /* comment */ a + b`
                             let comments_doc =
                                 self.build_inline_post_arrow_comments_doc(arrow_end, body_start);
-                            parts.push(d.group(d.indent(d.concat(&[
-                                d.line(),
-                                comments_doc,
-                                body_doc,
-                            ]))));
+                            parts.push(hang_after_operator(d, d.concat(&[comments_doc, body_doc])));
                         } else {
-                            parts.push(d.group(d.indent(d.concat(&[d.line(), body_doc]))));
+                            parts.push(hang_after_operator(d, body_doc));
                         }
                     }
                 } // end of `else` (no trailing paren comments)
@@ -460,20 +457,32 @@ impl<'a> Printer<'a> {
     ///
     /// Function types as return types get wrapped in parentheses for disambiguation:
     /// `(x: T): ((y: T) => U) =>` not `(x: T): (y: T) => U =>`
-    fn build_arrow_return_type_doc(&self, annotation: &internal::TSTypeAnnotation) -> DocId {
+    fn build_arrow_return_type_doc(
+        &self,
+        annotation: &internal::TSTypeAnnotation,
+        params_start: Option<u32>,
+    ) -> DocId {
         let d = self.d();
+        // Preserve a block comment between `)` and the return type `:`
+        // (`(x) /* c */ : T => ...`); prettier adds a space before `:`.
+        let comment_prefix =
+            self.build_paren_to_return_type_comments(params_start, annotation.span.start);
+
         // Function types need parentheses to disambiguate from the arrow's `=>`
         // Example: `(x: T): ((y: T) => U) =>` not `(x: T): (y: T) => U =>`
         // Unwrap any explicit parenthesized types to check the inner type
         let inner_type = unwrap_parenthesized(&annotation.type_annotation);
         if matches!(inner_type, internal::TSType::Function(_)) {
             let type_doc = self.build_type_doc(inner_type);
-            return d.concat(&[d.text(": ("), type_doc, d.text(")")]);
+            return d.concat(&[comment_prefix, d.text(": ("), type_doc, d.text(")")]);
         }
 
         // Use return type version - only wraps for complex type args (unions/intersections)
         // Simple cases like Promise<void> let params break first
-        self.build_type_annotation_doc_for_return_type(annotation)
+        d.concat(&[
+            comment_prefix,
+            self.build_type_annotation_doc_for_return_type(annotation),
+        ])
     }
 
     /// Build doc for arrow function type params
@@ -488,6 +497,15 @@ impl<'a> Printer<'a> {
         let d = self.d();
         if decl.params.is_empty() {
             return d.text("<>");
+        }
+
+        // Expanding comments (e.g. a line comment trailing `<`) force the shared
+        // multiline layout — without this the arrow's own type-param printer drops
+        // the comment (content loss). The disambiguation trailing comma is moot here
+        // since the multiline form always emits one.
+        if self.has_expanding_comments_in_type_param_declaration(decl) {
+            let inner = self.build_type_parameter_declaration_doc_with_line_comments(decl);
+            return if grouped { d.group(inner) } else { inner };
         }
 
         let param_docs: Vec<_> = decl
@@ -590,7 +608,7 @@ impl<'a> Printer<'a> {
 
         // Return type annotation
         if let Some(return_type) = &arrow.return_type {
-            parts.push(self.build_arrow_return_type_doc(return_type));
+            parts.push(self.build_arrow_return_type_doc(return_type, arrow.params_start));
         }
 
         d.concat(&parts)
@@ -618,6 +636,41 @@ impl<'a> Printer<'a> {
     }
 
     /// Get the end position for trailing comments after a parameter
+    /// Compute the boundary for trailing comments after the last parameter: the
+    /// params' close paren `)`.
+    ///
+    /// Comments after `)` are not param-trailing — a comment between `)` and the body
+    /// is handled by `append_body_with_sig_comments`, and a comment between `)` and a
+    /// return type by `build_paren_to_return_type_comments`. Bounding here keeps the
+    /// params scan from consuming (and duplicating, or mis-positioning) either. Falls
+    /// back to `body_start` if the paren can't be located.
+    pub(in crate::printer) fn params_trailing_comments_end(
+        &self,
+        params_start: u32,
+        body_start: u32,
+    ) -> u32 {
+        self.find_closing_paren(params_start, body_start)
+            .map_or(body_start, |after_paren| after_paren - 1)
+    }
+
+    /// End of a function signature — where comments before the body begin. The
+    /// return type's end when present, otherwise just past the params' `)` (falling
+    /// back to `body_start` if the paren can't be located). Shared by the function
+    /// declaration and function expression printers.
+    pub(in crate::printer) fn signature_end(
+        &self,
+        return_type: Option<&internal::TSTypeAnnotation>,
+        params_start: u32,
+        body_start: u32,
+    ) -> u32 {
+        match return_type {
+            Some(rt) => rt.span.end,
+            None => self
+                .find_closing_paren(params_start, body_start)
+                .unwrap_or(body_start),
+        }
+    }
+
     fn param_trailing_end(
         &self,
         params: &[internal::Expression],
@@ -787,10 +840,11 @@ impl<'a> Printer<'a> {
         // Function parameters - NOT in their own group, just softlines
         sig_parts.push(self.build_method_params_doc_ungrouped(func));
 
-        // Return type annotation (e.g., `: number`)
-        // Use return type version - only wraps for complex type args (unions/intersections)
+        // Return type annotation (e.g., `: number`), preserving a comment between
+        // `)` and `:` in place. Only wraps for complex type args (unions/intersections).
         if let Some(return_type) = &func.return_type {
-            sig_parts.push(self.build_type_annotation_doc_for_return_type(return_type));
+            sig_parts
+                .push(self.build_function_return_type_doc(Some(func.params_start), return_type));
         }
 
         // Wrap signature in a group for width-aware breaking
@@ -809,14 +863,11 @@ impl<'a> Printer<'a> {
         let sig_doc = self.build_function_expression_signature_doc(func);
 
         // Find signature end for outer comment detection
-        let sig_end = if let Some(rt) = &func.return_type {
-            rt.span.end
-        } else if let Some(paren) = self.find_closing_paren(func.params_start, func.body.span.start)
-        {
-            paren
-        } else {
-            func.body.span.start
-        };
+        let sig_end = self.signature_end(
+            func.return_type.as_ref(),
+            func.params_start,
+            func.body.span.start,
+        );
 
         let mut parts = vec![sig_doc];
         self.append_body_with_sig_comments(&mut parts, sig_end, &func.body);
@@ -901,12 +952,10 @@ impl<'a> Printer<'a> {
         let params = &func.params;
         let params_start = Some(func.params_start);
 
-        // Compute trailing comments boundary
-        let trailing_comments_end = if let Some(rt) = &func.return_type {
-            Some(rt.span.start)
-        } else {
-            Some(func.body.span.start)
-        };
+        // Params trailing comments are bounded at the close paren; a comment between
+        // `)` and the return type is emitted by the signature's return-type path.
+        let trailing_comments_end =
+            Some(self.params_trailing_comments_end(func.params_start, func.body.span.start));
 
         // Delegate to shared implementation
         self.build_params_doc_with_comments(params, params_start, trailing_comments_end)
@@ -940,8 +989,10 @@ impl<'a> Printer<'a> {
             // Use find_closing_paren which skips comment/string content,
             // so comments containing ')' don't cause false matches.
             if let Some(open) = params_start {
-                let end_bound = trailing_comments_end.unwrap_or(self.source.len() as u32);
-                if let Some(close_after) = self.find_closing_paren(open, end_bound) {
+                // Find the close paren independently of `trailing_comments_end` — that
+                // boundary is clamped to the `)` position for non-empty params, which is
+                // too tight here (the depth-tracked search must reach the `)` itself).
+                if let Some(close_after) = self.find_closing_paren(open, self.source.len() as u32) {
                     let close = close_after - 1;
                     if let Some(comment_doc) =
                         self.build_inline_comments_between_doc_no_leading_space_opt(open + 1, close)
@@ -1019,6 +1070,10 @@ impl<'a> Printer<'a> {
             .is_some_and(|p| matches!(p, internal::Expression::RestElement(_)));
 
         let mut inner_parts = Vec::new();
+        // Block comment trailing the last param after the comma, when the comma is
+        // the synthetic trailing comma emitted after the loop (softline path) —
+        // preserved after it (prettier relocates before; see conformance_prettier.md).
+        let mut last_after_comma_docs = Vec::new();
         for (i, param) in params.iter().enumerate() {
             let param_start = param.span().start;
             let is_last = i == params.len() - 1;
@@ -1066,11 +1121,14 @@ impl<'a> Printer<'a> {
                 params[i + 1].span().start
             };
 
-            // Find comma position for non-last params
+            // Find comma position. For the last param, locate a source trailing
+            // comma (within the trailing range) so an after-comma block comment is
+            // preserved after the comma rather than relocated before it.
             let comma_pos = if !is_last {
                 self.find_comma_after(param.span().end)
             } else {
-                None
+                self.find_comma_after(param.span().end)
+                    .filter(|cp| *cp < search_end)
             };
 
             // Collect same-line comments
@@ -1094,6 +1152,25 @@ impl<'a> Printer<'a> {
             let needs_comma = !is_last || (force_break && !has_rest_param);
             if needs_comma {
                 inner_parts.push(d.text(","));
+            }
+
+            // Block comments AFTER the comma on the last param: preserve after the
+            // comma. When the comma is emitted here (needs_comma), emit inline;
+            // otherwise it is the synthetic trailing comma below — defer.
+            if is_last {
+                let after: Vec<_> = same_line_comments
+                    .iter()
+                    .filter(|c| c.is_block && comma_pos.is_some_and(|pos| c.span.start > pos))
+                    .collect();
+                let sink = if needs_comma {
+                    &mut inner_parts
+                } else {
+                    &mut last_after_comma_docs
+                };
+                for comment in after {
+                    sink.push(d.text(" "));
+                    sink.push(self.build_comment_doc(comment));
+                }
             }
 
             // Line comments (same-line) go after comma (excluded from width)
@@ -1127,6 +1204,8 @@ impl<'a> Printer<'a> {
             if !has_rest_param {
                 result.push(d.trailing_comma());
             }
+            // Preserved after-comma block comment(s) on the last param
+            result.append(&mut last_after_comma_docs);
             result.push(d.softline());
         }
 
@@ -1232,53 +1311,44 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Build a Doc for a class expression
+    /// Build a Doc for a class expression (`class …`, named or anonymous).
     pub(in crate::printer) fn build_class_expression_doc(
         &self,
         class_expr: &internal::ClassExpression,
     ) -> DocId {
         let d = self.d();
 
-        // Compute positions for heritage comment extraction
-        let pre_heritage_end = class_expr.type_parameters.as_ref().map_or_else(
-            || {
-                class_expr
-                    .id
-                    .as_ref()
-                    .map_or(class_expr.span.start + 5, |id| id.span.end)
-            },
-            |tp| tp.span.end,
+        // Compute heritage positions once (shared with the class-declaration printer).
+        let positions = self.class_heritage_positions(
+            class_expr.span.start,
+            class_expr.id.as_ref(),
+            class_expr.type_parameters.as_ref(),
+            class_expr.super_class.as_deref(),
+            class_expr.super_type_parameters.as_ref(),
+            &class_expr.implements,
         );
-        // Use `extends` keyword position (not super class expression start) so
-        // heritage leading comments only cover name-to-extends, not extends-to-base
-        let extends_keyword_start = class_expr.super_class.as_ref().and_then(|sc| {
-            self.find_keyword_in_range(pre_heritage_end, sc.span().start, "extends")
-        });
-        let first_heritage_start =
-            extends_keyword_start.or_else(|| class_expr.implements.first().map(|i| i.span.start));
-        let extends_clause_end = class_expr.super_class.as_ref().map(|sc| {
-            class_expr
-                .super_type_parameters
-                .as_ref()
-                .map_or_else(|| sc.span().end, |tp| tp.span.end)
-        });
 
-        // Check for heritage comments to determine if group mode is needed
-        let has_heritage_comments = first_heritage_start
-            .is_some_and(|hs| self.has_comments_between(pre_heritage_end, hs))
-            || extends_clause_end.is_some_and(|ext_end| {
+        // Determine group mode: structural reasons OR heritage comments
+        let has_heritage_comments = positions
+            .first_heritage_start
+            .is_some_and(|hs| self.has_comments_between(positions.pre_heritage_end, hs))
+            || positions.extends_clause_end.is_some_and(|ext_end| {
                 !class_expr.implements.is_empty()
                     && self.has_comments_between(ext_end, class_expr.implements[0].span.start)
             });
-        let has_heritage_line_comments = first_heritage_start
-            .is_some_and(|hs| self.has_line_comments_between(pre_heritage_end, hs))
-            || extends_clause_end.is_some_and(|ext_end| {
+        let group_mode = self.should_class_group_mode(
+            class_expr.super_class.as_deref(),
+            class_expr.super_type_parameters.as_ref(),
+            &class_expr.implements,
+        ) || has_heritage_comments;
+
+        let has_heritage_line_comments = positions
+            .first_heritage_start
+            .is_some_and(|hs| self.has_line_comments_between(positions.pre_heritage_end, hs))
+            || positions.extends_clause_end.is_some_and(|ext_end| {
                 !class_expr.implements.is_empty()
                     && self.has_line_comments_between(ext_end, class_expr.implements[0].span.start)
             });
-
-        // Group mode only when heritage comments need line breaks
-        let group_mode = has_heritage_comments;
 
         let mut parts = Vec::new();
 
@@ -1299,7 +1369,7 @@ impl<'a> Printer<'a> {
                     type_params.span.start,
                     CommentSpacing::Trailing,
                 ));
-            } else if first_heritage_start.is_none() {
+            } else if positions.first_heritage_start.is_none() {
                 // No type params, no heritage: comments between name and body `class A /* c */ {}`
                 // Heritage path handles name→heritage comments when heritage exists
                 parts.push(self.build_name_to_type_params_comments(
@@ -1341,107 +1411,41 @@ impl<'a> Printer<'a> {
             parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
         }
 
-        // Build extends doc
-        let extends_doc = if let Some(super_class) = &class_expr.super_class {
-            let mut ext_parts = vec![d.text("extends ")];
-            // Comments between `extends` keyword and base class: `extends /* c */ Base`
-            if let Some(kw_start) = extends_keyword_start {
-                let kw_end = kw_start + 7; // "extends".len()
-                ext_parts.push(self.build_comments_between(
-                    kw_end,
-                    super_class.span().start,
-                    CommentSpacing::Trailing,
-                ));
-            }
-            ext_parts.push(self.build_expression_doc(super_class));
-            if let Some(super_type_params) = &class_expr.super_type_parameters {
-                // Preserve comments between super class and type args
-                let gap_start = super_class.span().end;
-                let gap_end = super_type_params.span.start;
-                if let Some(doc) = self.build_name_to_type_params_comments_opt(
-                    gap_start,
-                    gap_end,
-                    CommentSpacing::Trailing,
-                ) {
-                    ext_parts.push(doc);
-                }
-                ext_parts.push(self.build_type_parameter_instantiation_doc(super_type_params));
-            }
-            Some(d.concat(&ext_parts))
-        } else {
-            None
-        };
+        // Build heritage docs (shared with the class-declaration printer).
+        let extends_doc = self.build_class_extends_doc(
+            class_expr.super_class.as_deref(),
+            class_expr.super_type_parameters.as_ref(),
+            positions.extends_keyword_start,
+        );
+        let implements_doc = self.build_class_implements_doc(
+            &class_expr.implements,
+            group_mode,
+            positions.implements_keyword_start,
+        );
 
-        // Build implements doc (extract from source — class expressions rarely have implements)
-        let implements_doc = if !class_expr.implements.is_empty() {
-            let first_impl = &class_expr.implements[0];
-            let last_impl = &class_expr.implements[class_expr.implements.len() - 1];
-            let impl_str = &self.source[first_impl.span.start_usize()..last_impl.span.end_usize()];
-            Some(d.concat(&[d.text("implements "), d.text_owned(impl_str.to_string())]))
-        } else {
-            None
-        };
+        // The bare name→body / anonymous→body comments are emitted above, so only
+        // scan for header→body comments here when heritage or type params exist.
+        let emit_pre_body_comments =
+            positions.first_heritage_start.is_some() || class_expr.type_parameters.is_some();
 
-        if group_mode {
-            // Comments between name/type-params and first heritage
-            let mut extra_heritage_comments = Vec::new();
-            if let Some(heritage_start) = first_heritage_start {
-                let (inline, indent) =
-                    self.build_heritage_leading_comment_parts(pre_heritage_end, heritage_start);
-                parts.extend(inline);
-                extra_heritage_comments = indent;
-            }
+        // Assemble the header (group-wrapped); the body is appended outside the
+        // group so its hardlines don't affect the header's fit check.
+        let header_doc = self.build_class_header_doc(
+            parts,
+            &positions,
+            extends_doc,
+            implements_doc,
+            &class_expr.implements,
+            class_expr.body.body.is_empty(),
+            class_expr.body.span.start,
+            group_mode,
+            has_heritage_line_comments,
+            emit_pre_body_comments,
+        );
 
-            // Heritage clauses with line breaks
-            let mut heritage_parts = extra_heritage_comments;
-            if let Some(ext) = extends_doc {
-                heritage_parts.push(d.line());
-                heritage_parts.push(ext);
-                // Comments between extends and implements
-                if let Some(ext_end) = extends_clause_end
-                    && !class_expr.implements.is_empty()
-                    && let Some(mid_comments) = self.build_inline_comments_between_doc_opt(
-                        ext_end,
-                        class_expr.implements[0].span.start,
-                    )
-                {
-                    heritage_parts.push(mid_comments);
-                }
-            }
-            if let Some(impl_doc) = implements_doc {
-                heritage_parts.push(d.line());
-                heritage_parts.push(impl_doc);
-            }
-            if !heritage_parts.is_empty() {
-                parts.push(d.indent(d.concat(&heritage_parts)));
-            }
-
-            // Space before body
-            parts.push(d.text(" "));
-            parts.push(self.build_class_body_doc(&class_expr.body, false));
-
-            let parts_doc = d.concat(&parts);
-            if has_heritage_line_comments {
-                d.group_break(parts_doc)
-            } else {
-                d.group(parts_doc)
-            }
-        } else {
-            // Non-group mode: heritage stays inline
-            if let Some(ext) = extends_doc {
-                parts.push(d.text(" "));
-                parts.push(ext);
-            }
-            if let Some(impl_doc) = implements_doc {
-                parts.push(d.text(" "));
-                parts.push(impl_doc);
-            }
-
-            // Space before body
-            parts.push(d.text(" "));
-            parts.push(self.build_class_body_doc(&class_expr.body, false));
-
-            d.concat(&parts)
-        }
+        d.concat(&[
+            header_doc,
+            self.build_class_body_doc(&class_expr.body, false),
+        ])
     }
 }

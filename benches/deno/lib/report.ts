@@ -15,7 +15,7 @@ export interface GroupResults {
 }
 
 /** Create a visual bar for comparison (based on time - slower = longer bar) */
-function createBar(value: number, max: number, width = 40): string {
+function create_bar(value: number, max: number, width = 40): string {
 	const filled = Math.round((value / max) * width);
 	return '█'.repeat(filled) + '░'.repeat(width - filled);
 }
@@ -58,20 +58,20 @@ const DISPLAY_ORDER = [
 ];
 
 /** Sort results by stable display order */
-function sortByDisplayOrder(results: BenchmarkResult[]): BenchmarkResult[] {
+function sort_by_display_order(results: BenchmarkResult[]): BenchmarkResult[] {
 	return [...results].sort((a, b) => {
-		const aIndex = DISPLAY_ORDER.indexOf(a.name);
-		const bIndex = DISPLAY_ORDER.indexOf(b.name);
+		const a_index = DISPLAY_ORDER.indexOf(a.name);
+		const b_index = DISPLAY_ORDER.indexOf(b.name);
 		// Unknown items go to the end
-		const aOrder = aIndex === -1 ? DISPLAY_ORDER.length : aIndex;
-		const bOrder = bIndex === -1 ? DISPLAY_ORDER.length : bIndex;
-		return aOrder - bOrder;
+		const a_order = a_index === -1 ? DISPLAY_ORDER.length : a_index;
+		const b_order = b_index === -1 ? DISPLAY_ORDER.length : b_index;
+		return a_order - b_order;
 	});
 }
 
 /** Generate the summary report */
-export function generateSummaryReport(
-	allGroupResults: GroupResults[],
+export function generate_summary_report(
+	all_group_results: GroupResults[],
 	languages: Language[],
 ): string {
 	const lines: string[] = [];
@@ -82,18 +82,18 @@ export function generateSummaryReport(
 	lines.push('='.repeat(80));
 
 	/** Get results for a specific group */
-	function getGroupResults(name: string): BenchmarkResult[] {
-		return allGroupResults.find((g) => g.name === name)?.results ?? [];
+	function get_group_results(name: string): BenchmarkResult[] {
+		return all_group_results.find((g) => g.name === name)?.results ?? [];
 	}
 
 	// Collect all times for consistent unit selection
-	const allMeanTimes: number[] = [];
-	for (const group of allGroupResults) {
+	const all_mean_times: number[] = [];
+	for (const group of all_group_results) {
 		for (const result of group.results) {
-			allMeanTimes.push(result.stats.mean_ns);
+			all_mean_times.push(result.stats.mean_ns);
 		}
 	}
-	const unit = time_unit_detect_best(allMeanTimes);
+	const unit = time_unit_detect_best(all_mean_times);
 	const fmt = (ns: number) => time_format(ns, unit, 2);
 
 	/**
@@ -101,7 +101,7 @@ export function generateSummaryReport(
 	 * `current` is faster, < 1 mean slower. Single convention so the reader
 	 * doesn't context-switch between "Nx faster" and "Nx slower" framings.
 	 */
-	function formatComparison(baseline: number, current: number): string {
+	function format_comparison(baseline: number, current: number): string {
 		const ratio = baseline / current;
 		return `(${ratio.toFixed(2)}x)`;
 	}
@@ -110,64 +110,64 @@ export function generateSummaryReport(
 	lines.push('');
 	lines.push('Parse Performance:');
 	for (const lang of languages) {
-		const results = getGroupResults(`parse/${lang}`);
+		const results = get_group_results(`parse/${lang}`);
 		if (results.length === 0) continue;
 
-		const canonicalName = CANONICAL_PARSERS[lang];
-		const canonicalResult = results.find((r) => r.name === canonicalName);
+		const canonical_name = CANONICAL_PARSERS[lang];
+		const canonical_result = results.find((r) => r.name === canonical_name);
 
 		// Get main results (excluding internal variants)
-		const mainResults = results.filter((r) => !INTERNAL_PARSE_VARIANTS.includes(r.name));
+		const main_results = results.filter((r) => !INTERNAL_PARSE_VARIANTS.includes(r.name));
 		// Get internal variants
-		const internalResults = results.filter((r) => INTERNAL_PARSE_VARIANTS.includes(r.name));
+		const internal_results = results.filter((r) => INTERNAL_PARSE_VARIANTS.includes(r.name));
 
-		if (mainResults.length === 0) continue;
+		if (main_results.length === 0) continue;
 
 		// Calculate max time for bar scaling (main results only)
-		const maxTime = Math.max(...mainResults.map((r) => r.stats.mean_ns));
-		const baseline = canonicalResult?.stats.mean_ns ?? mainResults[0].stats.mean_ns;
+		const max_time = Math.max(...main_results.map((r) => r.stats.mean_ns));
+		const baseline = canonical_result?.stats.mean_ns ?? main_results[0].stats.mean_ns;
 
 		// Find the longest name for padding
-		const maxNameLen = Math.max(...results.map((r) => r.name.length), 17);
+		const max_name_len = Math.max(...results.map((r) => r.name.length), 17);
 
 		lines.push('');
 		lines.push(`  ${lang}:`);
 
 		// Show canonical first (baseline)
-		if (canonicalResult) {
+		if (canonical_result) {
 			lines.push(
-				`    ${canonicalResult.name.padEnd(maxNameLen)} ${
-					createBar(canonicalResult.stats.mean_ns, maxTime)
-				} ${fmt(canonicalResult.stats.mean_ns)}`,
+				`    ${canonical_result.name.padEnd(max_name_len)} ${
+					create_bar(canonical_result.stats.mean_ns, max_time)
+				} ${fmt(canonical_result.stats.mean_ns)}`,
 			);
 		}
 
 		// Show alternatives in stable display order (tsv variants, then third-party)
-		const alternatives = sortByDisplayOrder(
-			mainResults.filter((r) => r.name !== canonicalName),
+		const alternatives = sort_by_display_order(
+			main_results.filter((r) => r.name !== canonical_name),
 		);
 
 		for (const result of alternatives) {
-			const comparison = formatComparison(baseline, result.stats.mean_ns);
+			const comparison = format_comparison(baseline, result.stats.mean_ns);
 			lines.push(
-				`    ${result.name.padEnd(maxNameLen)} ${createBar(result.stats.mean_ns, maxTime)} ${
+				`    ${result.name.padEnd(max_name_len)} ${create_bar(result.stats.mean_ns, max_time)} ${
 					fmt(result.stats.mean_ns)
 				} ${comparison}`,
 			);
 		}
 
 		// Show internal variants (JSON overhead measurement)
-		for (const internalResult of sortByDisplayOrder(internalResults)) {
+		for (const internal_result of sort_by_display_order(internal_results)) {
 			// Find the corresponding JSON variant
-			const jsonName = internalResult.name.includes('wasm') ? 'tsv_wasm-json' : 'tsv-json';
-			const jsonResult = results.find((r) => r.name === jsonName);
+			const json_name = internal_result.name.includes('wasm') ? 'tsv_wasm-json' : 'tsv-json';
+			const json_result = results.find((r) => r.name === json_name);
 
-			if (jsonResult) {
-				const jsonOverhead = jsonResult.stats.mean_ns / internalResult.stats.mean_ns;
+			if (json_result) {
+				const json_overhead = json_result.stats.mean_ns / internal_result.stats.mean_ns;
 				lines.push(
-					`    ${internalResult.name.padEnd(maxNameLen)} ${
-						createBar(internalResult.stats.mean_ns, maxTime)
-					} ${fmt(internalResult.stats.mean_ns)} (${jsonOverhead.toFixed(1)}x JSON overhead)`,
+					`    ${internal_result.name.padEnd(max_name_len)} ${
+						create_bar(internal_result.stats.mean_ns, max_time)
+					} ${fmt(internal_result.stats.mean_ns)} (${json_overhead.toFixed(1)}x JSON overhead)`,
 				);
 			}
 		}
@@ -178,38 +178,38 @@ export function generateSummaryReport(
 	lines.push('');
 	lines.push('Format Performance:');
 	for (const lang of languages) {
-		const results = getGroupResults(`format/${lang}`);
+		const results = get_group_results(`format/${lang}`);
 		if (results.length === 0) continue;
 
-		const canonicalResult = results.find((r) => r.name === CANONICAL_FORMATTER);
-		if (!canonicalResult) continue;
+		const canonical_result = results.find((r) => r.name === CANONICAL_FORMATTER);
+		if (!canonical_result) continue;
 
 		// Calculate max time for bar scaling
-		const maxTime = Math.max(...results.map((r) => r.stats.mean_ns));
-		const baseline = canonicalResult.stats.mean_ns;
+		const max_time = Math.max(...results.map((r) => r.stats.mean_ns));
+		const baseline = canonical_result.stats.mean_ns;
 
 		// Find the longest name for padding
-		const maxNameLen = Math.max(...results.map((r) => r.name.length), 8);
+		const max_name_len = Math.max(...results.map((r) => r.name.length), 8);
 
 		lines.push('');
 		lines.push(`  ${lang}:`);
 
 		// Show canonical first (baseline)
 		lines.push(
-			`    ${canonicalResult.name.padEnd(maxNameLen)} ${
-				createBar(canonicalResult.stats.mean_ns, maxTime)
-			} ${fmt(canonicalResult.stats.mean_ns)}`,
+			`    ${canonical_result.name.padEnd(max_name_len)} ${
+				create_bar(canonical_result.stats.mean_ns, max_time)
+			} ${fmt(canonical_result.stats.mean_ns)}`,
 		);
 
 		// Show alternatives in stable display order (tsv variants, then third-party)
-		const alternatives = sortByDisplayOrder(
+		const alternatives = sort_by_display_order(
 			results.filter((r) => r.name !== CANONICAL_FORMATTER),
 		);
 
 		for (const result of alternatives) {
-			const comparison = formatComparison(baseline, result.stats.mean_ns);
+			const comparison = format_comparison(baseline, result.stats.mean_ns);
 			lines.push(
-				`    ${result.name.padEnd(maxNameLen)} ${createBar(result.stats.mean_ns, maxTime)} ${
+				`    ${result.name.padEnd(max_name_len)} ${create_bar(result.stats.mean_ns, max_time)} ${
 					fmt(result.stats.mean_ns)
 				} ${comparison}`,
 			);
@@ -225,82 +225,82 @@ export function generateSummaryReport(
  * opt-in via `verbose` since for typical use it's mostly unsupported-syntax
  * fixtures, not actionable bugs.
  */
-export function generateSkippedFilesReport(
-	skippedFiles: Map<string, Map<string, string>>,
-	maxErrorLength = 200,
+export function generate_skipped_files_report(
+	skipped_files: Map<string, Map<string, string>>,
+	max_error_length = 200,
 	verbose = false,
-	taskTrackingByGroup?: Map<string, Map<string, string>>,
+	task_tracking_by_group?: Map<string, Map<string, string>>,
 ): string | null {
-	if (skippedFiles.size === 0) return null;
+	if (skipped_files.size === 0) return null;
 
 	const lines: string[] = [];
 	lines.push('');
 	lines.push('-'.repeat(80));
 	lines.push('SKIPPED FILES:');
 
-	const fileErrorMap = new Map<string, Map<string, string[]>>();
-	for (const [benchName, filesMap] of skippedFiles) {
-		for (const [filePath, error] of filesMap) {
-			if (!fileErrorMap.has(filePath)) {
-				fileErrorMap.set(filePath, new Map());
+	const file_error_map = new Map<string, Map<string, string[]>>();
+	for (const [bench_name, files_map] of skipped_files) {
+		for (const [file_path, error] of files_map) {
+			if (!file_error_map.has(file_path)) {
+				file_error_map.set(file_path, new Map());
 			}
-			const errorMap = fileErrorMap.get(filePath)!;
-			if (!errorMap.has(error)) {
-				errorMap.set(error, []);
+			const error_map = file_error_map.get(file_path)!;
+			if (!error_map.has(error)) {
+				error_map.set(error, []);
 			}
-			errorMap.get(error)!.push(benchName);
+			error_map.get(error)!.push(bench_name);
 		}
 	}
 
 	interface FileError {
-		filePath: string;
+		file_path: string;
 		error: string;
 		benchmarks: string[];
 		lang: SkipLang;
 	}
 
-	function classifyLang(path: string): SkipLang {
+	function classify_lang(path: string): SkipLang {
 		if (path.endsWith('.svelte') || path.endsWith('.html')) return 'svelte';
 		if (path.endsWith('.ts') || path.endsWith('.js')) return 'typescript';
 		if (path.endsWith('.css')) return 'css';
 		return 'other';
 	}
 
-	const allErrors: FileError[] = [];
-	for (const [filePath, errorMap] of fileErrorMap) {
-		const lang = classifyLang(filePath);
-		for (const [error, benchmarks] of errorMap) {
-			allErrors.push({ filePath, error, benchmarks, lang });
+	const all_errors: FileError[] = [];
+	for (const [file_path, error_map] of file_error_map) {
+		const lang = classify_lang(file_path);
+		for (const [error, benchmarks] of error_map) {
+			all_errors.push({ file_path, error, benchmarks, lang });
 		}
 	}
 	// Ascending by failure-set size — rare/impl-specific failures first.
-	const sortedErrors = allErrors.sort((a, b) => {
-		const benchDiff = a.benchmarks.length - b.benchmarks.length;
-		return benchDiff !== 0 ? benchDiff : a.filePath.localeCompare(b.filePath);
+	const sorted_errors = all_errors.sort((a, b) => {
+		const bench_diff = a.benchmarks.length - b.benchmarks.length;
+		return bench_diff !== 0 ? bench_diff : a.file_path.localeCompare(b.file_path);
 	});
 
-	const skipsByLang = { svelte: 0, typescript: 0, css: 0 };
-	for (const { lang } of sortedErrors) {
-		if (lang !== 'other') skipsByLang[lang]++;
+	const skips_by_lang = { svelte: 0, typescript: 0, css: 0 };
+	for (const { lang } of sorted_errors) {
+		if (lang !== 'other') skips_by_lang[lang]++;
 	}
 
-	lines.push(`Total unique file+error combinations: ${sortedErrors.length}`);
-	lines.push(`  Svelte:      ${skipsByLang.svelte} files skipped`);
-	lines.push(`  TypeScript:  ${skipsByLang.typescript} files skipped`);
-	lines.push(`  CSS:         ${skipsByLang.css} files skipped`);
+	lines.push(`Total unique file+error combinations: ${sorted_errors.length}`);
+	lines.push(`  Svelte:      ${skips_by_lang.svelte} files skipped`);
+	lines.push(`  TypeScript:  ${skips_by_lang.typescript} files skipped`);
+	lines.push(`  CSS:         ${skips_by_lang.css} files skipped`);
 
 	// Per-benchmark skip counts (always shown). Display names instead of
-	// trackingKeys so the labels match the bench tables.
-	const perBench: { name: string; skips: number }[] = [];
-	for (const [benchName, filesMap] of skippedFiles) {
-		perBench.push({ name: benchName, skips: filesMap.size });
+	// tracking_keys so the labels match the bench tables.
+	const per_bench: { name: string; skips: number }[] = [];
+	for (const [bench_name, files_map] of skipped_files) {
+		per_bench.push({ name: bench_name, skips: files_map.size });
 	}
-	perBench.sort((a, b) => b.skips - a.skips);
-	if (perBench.length > 0) {
+	per_bench.sort((a, b) => b.skips - a.skips);
+	if (per_bench.length > 0) {
 		lines.push('');
 		lines.push('Per-benchmark skip counts:');
-		for (const { name, skips } of perBench) {
-			lines.push(`  ${trackingKeyDisplay(name, taskTrackingByGroup)}: ${skips}`);
+		for (const { name, skips } of per_bench) {
+			lines.push(`  ${tracking_key_display(name, task_tracking_by_group)}: ${skips}`);
 		}
 	}
 
@@ -311,23 +311,23 @@ export function generateSkippedFilesReport(
 	}
 
 	lines.push('');
-	for (const { filePath, error, benchmarks, lang } of sortedErrors.slice(0, 10)) {
-		lines.push(filePath);
-		const truncated = error.length > maxErrorLength;
-		const displayError = truncated ? error.slice(0, maxErrorLength) + '...' : error;
-		lines.push(`  Error: ${displayError}`);
-		const failedIn = isUniversalTsvFailure(lang, benchmarks)
+	for (const { file_path, error, benchmarks, lang } of sorted_errors.slice(0, 10)) {
+		lines.push(file_path);
+		const truncated = error.length > max_error_length;
+		const display_error = truncated ? error.slice(0, max_error_length) + '...' : error;
+		lines.push(`  Error: ${display_error}`);
+		const failed_in = is_universal_tsv_failure(lang, benchmarks)
 			? 'all tsv variants'
-			: benchmarks.map((b) => trackingKeyDisplay(b, taskTrackingByGroup)).join(', ');
+			: benchmarks.map((b) => tracking_key_display(b, task_tracking_by_group)).join(', ');
 		const prefix = benchmarks.length === 1
 			? 'Failed in'
 			: `Failed in ${benchmarks.length} benchmarks`;
-		lines.push(`  ${prefix}: ${failedIn}`);
+		lines.push(`  ${prefix}: ${failed_in}`);
 		lines.push('');
 	}
 
-	if (sortedErrors.length > 10) {
-		lines.push(`  ... and ${sortedErrors.length - 10} more (sorted rarest failure-set first)`);
+	if (sorted_errors.length > 10) {
+		lines.push(`  ... and ${sorted_errors.length - 10} more (sorted rarest failure-set first)`);
 	}
 
 	return lines.join('\n');
@@ -337,13 +337,13 @@ export function generateSkippedFilesReport(
  * Versions block for the terminal run. (Corpus counts already print at the
  * top of the run, so this used to duplicate them — now versions only.)
  */
-export function generateVersionsInfo(versions: {
+export function generate_versions_info(versions: {
 	svelte: string;
 	acorn: string;
-	acornTs: string;
+	acorn_ts: string;
 	prettier: string;
-	prettierSvelte: string;
-	oxcParser?: string;
+	prettier_svelte: string;
+	oxc_parser?: string;
 	oxfmt?: string;
 	biome?: string;
 }): string {
@@ -352,17 +352,17 @@ export function generateVersionsInfo(versions: {
 	lines.push('-'.repeat(80));
 	lines.push('Versions:');
 	lines.push(
-		`  svelte@${versions.svelte}, acorn@${versions.acorn}, @sveltejs/acorn-typescript@${versions.acornTs}`,
+		`  svelte@${versions.svelte}, acorn@${versions.acorn}, @sveltejs/acorn-typescript@${versions.acorn_ts}`,
 	);
-	lines.push(`  prettier@${versions.prettier}, prettier-plugin-svelte@${versions.prettierSvelte}`);
+	lines.push(`  prettier@${versions.prettier}, prettier-plugin-svelte@${versions.prettier_svelte}`);
 
-	const altVersions: string[] = [];
-	if (versions.oxcParser) altVersions.push(`oxc-parser@${versions.oxcParser}`);
-	if (versions.oxfmt) altVersions.push(`oxfmt@${versions.oxfmt}`);
-	if (versions.biome) altVersions.push(`@biomejs/wasm-bundler@${versions.biome}`);
+	const alt_versions: string[] = [];
+	if (versions.oxc_parser) alt_versions.push(`oxc-parser@${versions.oxc_parser}`);
+	if (versions.oxfmt) alt_versions.push(`oxfmt@${versions.oxfmt}`);
+	if (versions.biome) alt_versions.push(`@biomejs/wasm-bundler@${versions.biome}`);
 
-	if (altVersions.length > 0) {
-		lines.push(`  ${altVersions.join(', ')}`);
+	if (alt_versions.length > 0) {
+		lines.push(`  ${alt_versions.join(', ')}`);
 	}
 
 	return lines.join('\n');
@@ -384,21 +384,21 @@ interface ComparisonSection {
 	rows: ComparisonRow[];
 }
 
-/** Resolve the iterated file count for a (group, displayName) pair via taskTracking. */
-function lookupIterated(
-	groupName: string,
-	displayName: string,
-	iteratedCounts: Map<string, number> | undefined,
-	taskTrackingByGroup: Map<string, Map<string, string>> | undefined,
+/** Resolve the iterated file count for a (group, display_name) pair via task_tracking. */
+function lookup_iterated(
+	group_name: string,
+	display_name: string,
+	iterated_counts: Map<string, number> | undefined,
+	task_tracking_by_group: Map<string, Map<string, string>> | undefined,
 ): number | undefined {
-	if (!iteratedCounts || !taskTrackingByGroup) return undefined;
-	const trackingKey = taskTrackingByGroup.get(groupName)?.get(displayName);
-	if (!trackingKey) return undefined;
-	return iteratedCounts.get(trackingKey);
+	if (!iterated_counts || !task_tracking_by_group) return undefined;
+	const tracking_key = task_tracking_by_group.get(group_name)?.get(display_name);
+	if (!tracking_key) return undefined;
+	return iterated_counts.get(tracking_key);
 }
 
 /** Format ratio as "Nx" (other_time / tsv_time) */
-function formatRatio(r: number): string {
+function format_ratio(r: number): string {
 	return r >= 10 ? `${r.toFixed(1)}x` : `${r.toFixed(2)}x`;
 }
 
@@ -408,28 +408,28 @@ function formatRatio(r: number): string {
  * min/max, vs baseline) but inverts the ratio: cells show
  * `r.ops_per_second / baseline.ops_per_second`, so `2.5x` means "this row is
  * 2.5× faster than baseline." The iterated file count is rendered as a
- * group-level annotation (see `generateGroupFilesMarkdown`) rather than per
+ * group-level annotation (see `generate_group_files_markdown`) rather than per
  * cell — same value across all rows in default intersection mode, so the
  * repetition was pure noise.
  */
-export function generateGroupBenchTableMarkdown(
+export function generate_group_bench_table_markdown(
 	results: BenchmarkResult[],
 	baseline: string | undefined,
 ): string {
 	if (results.length === 0) return '(no results)';
 
-	const meanTimes = results.map((r) => r.stats.mean_ns);
-	const unit = time_unit_detect_best(meanTimes);
-	const unitStr = TIME_UNIT_DISPLAY[unit];
+	const mean_times = results.map((r) => r.stats.mean_ns);
+	const unit = time_unit_detect_best(mean_times);
+	const unit_str = TIME_UNIT_DISPLAY[unit];
 
-	let baselineOps: number;
-	let vsHeader: string;
+	let baseline_ops: number;
+	let vs_header: string;
 	if (baseline !== undefined && results.some((r) => r.name === baseline)) {
-		baselineOps = results.find((r) => r.name === baseline)!.stats.ops_per_second;
-		vsHeader = `vs ${baseline} (speedup)`;
+		baseline_ops = results.find((r) => r.name === baseline)!.stats.ops_per_second;
+		vs_header = `vs ${baseline} (speedup)`;
 	} else {
-		baselineOps = Math.max(...results.map((r) => r.stats.ops_per_second));
-		vsHeader = 'vs Best (speedup)';
+		baseline_ops = Math.max(...results.map((r) => r.stats.ops_per_second));
+		vs_header = 'vs Best (speedup)';
 	}
 
 	const rows: string[][] = [];
@@ -437,25 +437,25 @@ export function generateGroupBenchTableMarkdown(
 		'Task Name',
 		'ops/sec',
 		'n',
-		`p50 (${unitStr})`,
-		`p75 (${unitStr})`,
-		`p90 (${unitStr})`,
-		`p95 (${unitStr})`,
-		`p99 (${unitStr})`,
-		`min (${unitStr})`,
-		`max (${unitStr})`,
-		vsHeader,
+		`p50 (${unit_str})`,
+		`p75 (${unit_str})`,
+		`p90 (${unit_str})`,
+		`p95 (${unit_str})`,
+		`p99 (${unit_str})`,
+		`min (${unit_str})`,
+		`max (${unit_str})`,
+		vs_header,
 	]);
 
 	for (const r of results) {
-		const fmt = (ns: number) => time_format(ns, unit, 2).replace(unitStr, '').trim();
-		const isBaseline = r.stats.ops_per_second === baselineOps;
-		const speedup = r.stats.ops_per_second / baselineOps;
-		const vsCell = isBaseline ? 'baseline' : formatRatio(speedup);
+		const fmt = (ns: number) => time_format(ns, unit, 2).replace(unit_str, '').trim();
+		const is_baseline = r.stats.ops_per_second === baseline_ops;
+		const speedup = r.stats.ops_per_second / baseline_ops;
+		const vs_cell = is_baseline ? 'baseline' : format_ratio(speedup);
 		// p95/p99 from <10 samples is essentially `max` (R-7 interpolation
 		// collapses to the last sorted index). Render `—` so readers don't
 		// misread interpolated noise as tail-latency data.
-		const tailCell = (ns: number) => (r.stats.sample_size < 10 ? '—' : fmt(ns));
+		const tail_cell = (ns: number) => (r.stats.sample_size < 10 ? '—' : fmt(ns));
 		rows.push([
 			r.name,
 			benchmark_format_number(r.stats.ops_per_second, 2),
@@ -463,22 +463,22 @@ export function generateGroupBenchTableMarkdown(
 			fmt(r.stats.p50_ns),
 			fmt(r.stats.p75_ns),
 			fmt(r.stats.p90_ns),
-			tailCell(r.stats.p95_ns),
-			tailCell(r.stats.p99_ns),
+			tail_cell(r.stats.p95_ns),
+			tail_cell(r.stats.p99_ns),
 			fmt(r.stats.min_ns),
 			fmt(r.stats.max_ns),
-			vsCell,
+			vs_cell,
 		]);
 	}
 
 	const widths = rows[0].map((_, i) => Math.max(...rows.map((row) => row[i].length)));
 	const lines: string[] = [];
-	const renderRow = (row: string[]) =>
+	const render_row = (row: string[]) =>
 		'| ' + row.map((c, i) => c.padEnd(widths[i])).join(' | ') + ' |';
-	lines.push(renderRow(rows[0]));
+	lines.push(render_row(rows[0]));
 	lines.push('| ' + widths.map((w) => '-'.repeat(w)).join(' | ') + ' |');
 	for (let i = 1; i < rows.length; i++) {
-		lines.push(renderRow(rows[i]));
+		lines.push(render_row(rows[i]));
 	}
 	return lines.join('\n');
 }
@@ -492,123 +492,123 @@ export function generateGroupBenchTableMarkdown(
  * for that group (the per-group intersection size in default mode; the
  * impl's preflight success set size in `BENCH_MODE=union`).
  */
-function buildComparisonData(
-	allGroupResults: GroupResults[],
+function build_comparison_data(
+	all_group_results: GroupResults[],
 	languages: Language[],
-	iteratedCounts: Map<string, number> | undefined,
-	taskTrackingByGroup: Map<string, Map<string, string>> | undefined,
+	iterated_counts: Map<string, number> | undefined,
+	task_tracking_by_group: Map<string, Map<string, string>> | undefined,
 ): ComparisonSection[] {
-	function getMeanNs(groupName: string, taskName: string): number | null {
-		const group = allGroupResults.find((g) => g.name === groupName);
+	function get_mean_ns(group_name: string, task_name: string): number | null {
+		const group = all_group_results.find((g) => g.name === group_name);
 		if (!group) return null;
-		const result = group.results.find((r) => r.name === taskName);
+		const result = group.results.find((r) => r.name === task_name);
 		return result?.stats.mean_ns ?? null;
 	}
 
-	function ratio(tsvNs: number, otherNs: number): number {
-		return otherNs / tsvNs;
+	function ratio(tsv_ns: number, other_ns: number): number {
+		return other_ns / tsv_ns;
 	}
 
 	const sections: ComparisonSection[] = [];
 
 	// Native comparisons
-	const nativeRows: ComparisonRow[] = [];
+	const native_rows: ComparisonRow[] = [];
 
 	for (const lang of languages) {
-		const groupName = `format/${lang}`;
-		const tsvNs = getMeanNs(groupName, 'tsv');
-		const prettierNs = getMeanNs(groupName, CANONICAL_FORMATTER);
-		if (tsvNs === null || prettierNs === null) continue;
+		const group_name = `format/${lang}`;
+		const tsv_ns = get_mean_ns(group_name, 'tsv');
+		const prettier_ns = get_mean_ns(group_name, CANONICAL_FORMATTER);
+		if (tsv_ns === null || prettier_ns === null) continue;
 
 		const comparisons: ComparisonRow['comparisons'] = [
-			{ name: 'prettier', ratio: ratio(tsvNs, prettierNs) },
+			{ name: 'prettier', ratio: ratio(tsv_ns, prettier_ns) },
 		];
-		const oxfmtNs = getMeanNs(groupName, 'oxfmt');
-		if (oxfmtNs !== null) comparisons.push({ name: 'oxfmt', ratio: ratio(tsvNs, oxfmtNs) });
+		const oxfmt_ns = get_mean_ns(group_name, 'oxfmt');
+		if (oxfmt_ns !== null) comparisons.push({ name: 'oxfmt', ratio: ratio(tsv_ns, oxfmt_ns) });
 
-		nativeRows.push({
+		native_rows.push({
 			operation: 'format',
 			language: lang,
-			files: lookupIterated(groupName, 'tsv', iteratedCounts, taskTrackingByGroup),
+			files: lookup_iterated(group_name, 'tsv', iterated_counts, task_tracking_by_group),
 			comparisons,
 		});
 	}
 
 	for (const lang of languages) {
-		const groupName = `parse/${lang}`;
-		const tsvNs = getMeanNs(groupName, 'tsv-json');
-		const canonicalParseName = CANONICAL_PARSERS[lang];
-		const canonicalNs = getMeanNs(groupName, canonicalParseName);
-		if (tsvNs === null || canonicalNs === null) continue;
+		const group_name = `parse/${lang}`;
+		const tsv_ns = get_mean_ns(group_name, 'tsv-json');
+		const canonical_parse_name = CANONICAL_PARSERS[lang];
+		const canonical_ns = get_mean_ns(group_name, canonical_parse_name);
+		if (tsv_ns === null || canonical_ns === null) continue;
 
 		const comparisons: ComparisonRow['comparisons'] = [
-			{ name: 'svelte', ratio: ratio(tsvNs, canonicalNs) },
+			{ name: 'svelte', ratio: ratio(tsv_ns, canonical_ns) },
 		];
-		const oxcNs = getMeanNs(groupName, 'oxc-parser');
-		if (oxcNs !== null) comparisons.push({ name: 'oxc-parser', ratio: ratio(tsvNs, oxcNs) });
+		const oxc_ns = get_mean_ns(group_name, 'oxc-parser');
+		if (oxc_ns !== null) comparisons.push({ name: 'oxc-parser', ratio: ratio(tsv_ns, oxc_ns) });
 
-		nativeRows.push({
+		native_rows.push({
 			operation: 'parse',
 			language: lang,
-			files: lookupIterated(groupName, 'tsv-json', iteratedCounts, taskTrackingByGroup),
+			files: lookup_iterated(group_name, 'tsv-json', iterated_counts, task_tracking_by_group),
 			comparisons,
 		});
 	}
 
-	if (nativeRows.length > 0) {
-		sections.push({ label: 'tsv (native)', rows: nativeRows });
+	if (native_rows.length > 0) {
+		sections.push({ label: 'tsv (native)', rows: native_rows });
 	}
 
 	// WASM comparisons
-	const wasmRows: ComparisonRow[] = [];
+	const wasm_rows: ComparisonRow[] = [];
 
 	for (const lang of languages) {
-		const groupName = `format/${lang}`;
-		const tsvWasmNs = getMeanNs(groupName, 'tsv_wasm');
-		const prettierNs = getMeanNs(groupName, CANONICAL_FORMATTER);
-		if (tsvWasmNs === null || prettierNs === null) continue;
+		const group_name = `format/${lang}`;
+		const tsv_wasm_ns = get_mean_ns(group_name, 'tsv_wasm');
+		const prettier_ns = get_mean_ns(group_name, CANONICAL_FORMATTER);
+		if (tsv_wasm_ns === null || prettier_ns === null) continue;
 
 		const comparisons: ComparisonRow['comparisons'] = [
-			{ name: 'prettier', ratio: ratio(tsvWasmNs, prettierNs) },
+			{ name: 'prettier', ratio: ratio(tsv_wasm_ns, prettier_ns) },
 		];
-		const biomeNs = getMeanNs(groupName, 'biome-wasm');
-		if (biomeNs !== null) {
-			comparisons.push({ name: 'biome-wasm', ratio: ratio(tsvWasmNs, biomeNs) });
+		const biome_ns = get_mean_ns(group_name, 'biome-wasm');
+		if (biome_ns !== null) {
+			comparisons.push({ name: 'biome-wasm', ratio: ratio(tsv_wasm_ns, biome_ns) });
 		}
 
-		wasmRows.push({
+		wasm_rows.push({
 			operation: 'format',
 			language: lang,
-			files: lookupIterated(groupName, 'tsv_wasm', iteratedCounts, taskTrackingByGroup),
+			files: lookup_iterated(group_name, 'tsv_wasm', iterated_counts, task_tracking_by_group),
 			comparisons,
 		});
 	}
 
 	for (const lang of languages) {
-		const groupName = `parse/${lang}`;
-		const tsvWasmNs = getMeanNs(groupName, 'tsv_wasm-json');
-		const canonicalParseName = CANONICAL_PARSERS[lang];
-		const canonicalNs = getMeanNs(groupName, canonicalParseName);
-		if (tsvWasmNs === null || canonicalNs === null) continue;
+		const group_name = `parse/${lang}`;
+		const tsv_wasm_ns = get_mean_ns(group_name, 'tsv_wasm-json');
+		const canonical_parse_name = CANONICAL_PARSERS[lang];
+		const canonical_ns = get_mean_ns(group_name, canonical_parse_name);
+		if (tsv_wasm_ns === null || canonical_ns === null) continue;
 
 		const comparisons: ComparisonRow['comparisons'] = [
-			{ name: 'svelte', ratio: ratio(tsvWasmNs, canonicalNs) },
+			{ name: 'svelte', ratio: ratio(tsv_wasm_ns, canonical_ns) },
 		];
-		const oxcWasmNs = getMeanNs(groupName, 'oxc-parser-wasm');
-		if (oxcWasmNs !== null) {
-			comparisons.push({ name: 'oxc-parser-wasm', ratio: ratio(tsvWasmNs, oxcWasmNs) });
+		const oxc_wasm_ns = get_mean_ns(group_name, 'oxc-parser-wasm');
+		if (oxc_wasm_ns !== null) {
+			comparisons.push({ name: 'oxc-parser-wasm', ratio: ratio(tsv_wasm_ns, oxc_wasm_ns) });
 		}
 
-		wasmRows.push({
+		wasm_rows.push({
 			operation: 'parse',
 			language: lang,
-			files: lookupIterated(groupName, 'tsv_wasm-json', iteratedCounts, taskTrackingByGroup),
+			files: lookup_iterated(group_name, 'tsv_wasm-json', iterated_counts, task_tracking_by_group),
 			comparisons,
 		});
 	}
 
-	if (wasmRows.length > 0) {
-		sections.push({ label: 'tsv_wasm', rows: wasmRows });
+	if (wasm_rows.length > 0) {
+		sections.push({ label: 'tsv_wasm', rows: wasm_rows });
 	}
 
 	return sections;
@@ -622,31 +622,31 @@ function buildComparisonData(
  * Each cell carries an `(Mf)` annotation — the iterated file count timing
  * reflects.
  */
-export function generateComparisonSummary(
-	allGroupResults: GroupResults[],
+export function generate_comparison_summary(
+	all_group_results: GroupResults[],
 	languages: Language[],
-	iteratedCounts?: Map<string, number>,
-	taskTrackingByGroup?: Map<string, Map<string, string>>,
+	iterated_counts?: Map<string, number>,
+	task_tracking_by_group?: Map<string, Map<string, string>>,
 ): string {
-	const sections = buildComparisonData(
-		allGroupResults,
+	const sections = build_comparison_data(
+		all_group_results,
 		languages,
-		iteratedCounts,
-		taskTrackingByGroup,
+		iterated_counts,
+		task_tracking_by_group,
 	);
 	const lines: string[] = [];
 
 	// (Nf) is uniform across cells in default intersection mode and describes
 	// the self impl in union mode — either way it belongs on the row label,
 	// not on each opponent cell. Pad to the widest label so ratios align.
-	const buildLabel = (row: ComparisonRow): string => {
-		const filesSuffix = row.files !== undefined ? ` (${row.files}f)` : '';
-		return `  ${row.operation.padEnd(7)}${row.language}${filesSuffix}:`;
+	const build_label = (row: ComparisonRow): string => {
+		const files_suffix = row.files !== undefined ? ` (${row.files}f)` : '';
+		return `  ${row.operation.padEnd(7)}${row.language}${files_suffix}:`;
 	};
-	let labelWidth = 0;
+	let label_width = 0;
 	for (const section of sections) {
 		for (const row of section.rows) {
-			labelWidth = Math.max(labelWidth, buildLabel(row).length + 1);
+			label_width = Math.max(label_width, build_label(row).length + 1);
 		}
 	}
 
@@ -656,18 +656,18 @@ export function generateComparisonSummary(
 		lines.push(`COMPARISONS to ${section.label}:`);
 
 		for (const row of section.rows) {
-			const label = buildLabel(row).padEnd(labelWidth);
-			const ratios = row.comparisons.map((c) => `${formatRatio(c.ratio)} ${c.name}`).join(', ');
+			const label = build_label(row).padEnd(label_width);
+			const ratios = row.comparisons.map((c) => `${format_ratio(c.ratio)} ${c.name}`).join(', ');
 			lines.push(label + ratios);
 		}
 	}
 
 	// Fairness notes (only shown when oxc-parser data is present)
-	const hasNativeOxc = sections.some((s) =>
+	const has_native_oxc = sections.some((s) =>
 		s.label === 'tsv (native)' &&
 		s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser'))
 	);
-	const hasWasmOxc = sections.some((s) =>
+	const has_wasm_oxc = sections.some((s) =>
 		s.label === 'tsv_wasm' &&
 		s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser-wasm'))
 	);
@@ -675,7 +675,7 @@ export function generateComparisonSummary(
 	lines.push('');
 	lines.push('  (`Nx` = self is N× faster; `(Mf)` = files the timing reflects)');
 	lines.push('  (parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts)');
-	if (hasNativeOxc || hasWasmOxc) {
+	if (has_native_oxc || has_wasm_oxc) {
 		lines.push(
 			'  (oxc-parser returns a lazy proxy backed by raw buffer; tsv-json eagerly',
 		);
@@ -700,17 +700,17 @@ export function generateComparisonSummary(
  * Ratios are speedup form (other_time / self_time): >1 means self is faster.
  * `(Mf)` is the iterated file count for the self impl in that group.
  */
-export function generateComparisonMarkdown(
-	allGroupResults: GroupResults[],
+export function generate_comparison_markdown(
+	all_group_results: GroupResults[],
 	languages: Language[],
-	iteratedCounts?: Map<string, number>,
-	taskTrackingByGroup?: Map<string, Map<string, string>>,
+	iterated_counts?: Map<string, number>,
+	task_tracking_by_group?: Map<string, Map<string, string>>,
 ): string | null {
-	const sections = buildComparisonData(
-		allGroupResults,
+	const sections = build_comparison_data(
+		all_group_results,
 		languages,
-		iteratedCounts,
-		taskTrackingByGroup,
+		iterated_counts,
+		task_tracking_by_group,
 	);
 	if (sections.length === 0) return null;
 
@@ -722,10 +722,10 @@ export function generateComparisonMarkdown(
 		lines.push('| --- | --- |');
 
 		for (const row of section.rows) {
-			const filesSuffix = row.files !== undefined ? ` (${row.files}f)` : '';
-			const label = `${row.operation} ${row.language}${filesSuffix}`;
+			const files_suffix = row.files !== undefined ? ` (${row.files}f)` : '';
+			const label = `${row.operation} ${row.language}${files_suffix}`;
 			const ratios = row.comparisons
-				.map((c) => `**${formatRatio(c.ratio)}** ${c.name}`)
+				.map((c) => `**${format_ratio(c.ratio)}** ${c.name}`)
 				.join(', ');
 			lines.push(`| ${label} | ${ratios} |`);
 		}
@@ -734,11 +734,11 @@ export function generateComparisonMarkdown(
 	}
 
 	// Fairness notes (only shown when oxc-parser data is present)
-	const hasNativeOxc = sections.some((s) =>
+	const has_native_oxc = sections.some((s) =>
 		s.label === 'tsv (native)' &&
 		s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser'))
 	);
-	const hasWasmOxc = sections.some((s) =>
+	const has_wasm_oxc = sections.some((s) =>
 		s.label === 'tsv_wasm' &&
 		s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser-wasm'))
 	);
@@ -748,7 +748,7 @@ export function generateComparisonMarkdown(
 		"`(Mf)` is the self impl's iterated count (per-group intersection in default mode; per-impl success set in `BENCH_MODE=union`)",
 		'Parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts',
 	];
-	if (hasNativeOxc || hasWasmOxc) {
+	if (has_native_oxc || has_wasm_oxc) {
 		notes.push(
 			'oxc-parser returns a lazy proxy backed by raw buffer; tsv-json eagerly materializes the full JS AST tree — comparison is not apples-to-apples',
 		);
@@ -777,20 +777,20 @@ export interface EffectiveCorpusEntry {
  * corpus byte total they didn't actually process. Returns null when tracking
  * info is unavailable.
  */
-export function generateGroupThroughputMarkdown(
+export function generate_group_throughput_markdown(
 	results: BenchmarkResult[],
 	tracking: Map<string, string> | undefined,
-	effectiveCorpusBytes: Map<string, number>,
+	effective_corpus_bytes: Map<string, number>,
 ): string | null {
 	if (!tracking || results.length === 0) return null;
 	const parts: string[] = [];
 	for (const r of results) {
-		const trackingKey = tracking.get(r.name);
-		if (!trackingKey) continue;
-		const effectiveBytes = effectiveCorpusBytes.get(trackingKey);
-		if (effectiveBytes === undefined || effectiveBytes === 0) continue;
-		const mbPerSec = (r.stats.ops_per_second * effectiveBytes) / 1_000_000;
-		parts.push(`${r.name} ${mbPerSec.toFixed(1)} MB/s`);
+		const tracking_key = tracking.get(r.name);
+		if (!tracking_key) continue;
+		const effective_bytes = effective_corpus_bytes.get(tracking_key);
+		if (effective_bytes === undefined || effective_bytes === 0) continue;
+		const mb_per_sec = (r.stats.ops_per_second * effective_bytes) / 1_000_000;
+		parts.push(`${r.name} ${mb_per_sec.toFixed(1)} MB/s`);
 	}
 	if (parts.length === 0) return null;
 	return `**Throughput:** ${parts.join(', ')}`;
@@ -802,11 +802,11 @@ export function generateGroupThroughputMarkdown(
  * group. In union mode the per-impl Coverage line already discloses the
  * varying counts, so this returns null to avoid duplicating that info.
  */
-export function generateGroupFilesMarkdown(
-	iteratedCounts: Map<string, number> | undefined,
+export function generate_group_files_markdown(
+	iterated_counts: Map<string, number> | undefined,
 ): string | null {
-	if (!iteratedCounts || iteratedCounts.size === 0) return null;
-	const values = [...iteratedCounts.values()];
+	if (!iterated_counts || iterated_counts.size === 0) return null;
+	const values = [...iterated_counts.values()];
 	const uniform = values.every((v) => v === values[0]);
 	if (!uniform) return null;
 	return `**Files (intersection):** ${values[0]}`;
@@ -817,22 +817,22 @@ export function generateGroupFilesMarkdown(
  * diverge — if every participating impl processed 100% of files there's
  * nothing to disclose.
  */
-export function generateGroupCoverageMarkdown(
+export function generate_group_coverage_markdown(
 	results: BenchmarkResult[],
 	tracking: Map<string, string> | undefined,
-	effectiveCorpusSize: Map<string, EffectiveCorpusEntry>,
+	effective_corpus_size: Map<string, EffectiveCorpusEntry>,
 ): string | null {
 	if (!tracking || results.length === 0) return null;
 	const entries: { name: string; processed: number; total: number }[] = [];
 	for (const r of results) {
-		const trackingKey = tracking.get(r.name);
-		if (!trackingKey) continue;
-		const e = effectiveCorpusSize.get(trackingKey);
+		const tracking_key = tracking.get(r.name);
+		if (!tracking_key) continue;
+		const e = effective_corpus_size.get(tracking_key);
 		if (!e) continue;
 		entries.push({ name: r.name, processed: e.processed, total: e.total });
 	}
-	const allFull = entries.length > 0 && entries.every((e) => e.processed === e.total);
-	if (allFull || entries.length === 0) return null;
+	const all_full = entries.length > 0 && entries.every((e) => e.processed === e.total);
+	if (all_full || entries.length === 0) return null;
 	// Section presence already signals "some impl skipped"; per-row ⚠ added
 	// no signal when every row was sub-100% (the common case).
 	const parts = entries.map((e) => {
@@ -854,18 +854,18 @@ export function generateGroupCoverageMarkdown(
  * overhead/cost ratio, where higher = more expensive); the label spells out
  * the direction.
  */
-export function generateJsonOverheadNote(results: BenchmarkResult[]): string | null {
+export function generate_json_overhead_note(results: BenchmarkResult[]): string | null {
 	const pairs = [
 		['tsv-internal', 'tsv-json'],
 		['tsv_wasm-internal', 'tsv_wasm-json'],
 	] as const;
 	const notes: string[] = [];
-	for (const [internalName, jsonName] of pairs) {
-		const internal = results.find((r) => r.name === internalName);
-		const json = results.find((r) => r.name === jsonName);
+	for (const [internal_name, json_name] of pairs) {
+		const internal = results.find((r) => r.name === internal_name);
+		const json = results.find((r) => r.name === json_name);
 		if (!internal || !json) continue;
 		const overhead = json.stats.mean_ns / internal.stats.mean_ns;
-		notes.push(`${jsonName} ${overhead.toFixed(1)}x ${internalName}`);
+		notes.push(`${json_name} ${overhead.toFixed(1)}x ${internal_name}`);
 	}
 	if (notes.length === 0) return null;
 	return `**JSON overhead** (json_ns / internal_ns, higher = more cost): ${notes.join(', ')}`;
@@ -883,14 +883,14 @@ export function generateJsonOverheadNote(results: BenchmarkResult[]): string | n
 type SkipLang = 'svelte' | 'typescript' | 'css' | 'other';
 
 /**
- * The "universal tsv failure" pattern per language — the 6 trackingKeys
+ * The "universal tsv failure" pattern per language — the 6 tracking_keys
  * that fail together on unsupported-syntax fixtures (SCSS, JSX in .js,
  * stage-1 proposals, etc.). When a file's failure set matches this
  * exactly, the per-file `Failed in:` list collapses to one short label;
  * anything else is rendered explicitly because it might be an
  * impl-specific bug worth chasing.
  */
-function tsvUniversalSet(lang: Exclude<SkipLang, 'other'>): Set<string> {
+function tsv_universal_set(lang: Exclude<SkipLang, 'other'>): Set<string> {
 	return new Set([
 		`parse/${lang}/native`,
 		`parse/${lang}/wasm`,
@@ -901,111 +901,111 @@ function tsvUniversalSet(lang: Exclude<SkipLang, 'other'>): Set<string> {
 	]);
 }
 
-function isUniversalTsvFailure(lang: SkipLang, benchmarks: string[]): boolean {
+function is_universal_tsv_failure(lang: SkipLang, benchmarks: string[]): boolean {
 	if (lang === 'other') return false;
-	const universal = tsvUniversalSet(lang);
+	const universal = tsv_universal_set(lang);
 	if (benchmarks.length !== universal.size) return false;
 	for (const b of benchmarks) if (!universal.has(b)) return false;
 	return true;
 }
 
 /**
- * Resolve a trackingKey (`parse/svelte/native`) to a display label
- * (`parse/svelte: tsv-json`). Falls back to the raw trackingKey when the
+ * Resolve a tracking_key (`parse/svelte/native`) to a display label
+ * (`parse/svelte: tsv-json`). Falls back to the raw tracking_key when the
  * mapping isn't available — readers still see something useful.
  */
-function trackingKeyDisplay(
-	trackingKey: string,
-	taskTrackingByGroup: Map<string, Map<string, string>> | undefined,
+function tracking_key_display(
+	tracking_key: string,
+	task_tracking_by_group: Map<string, Map<string, string>> | undefined,
 ): string {
-	if (!taskTrackingByGroup) return trackingKey;
-	const parts = trackingKey.split('/');
-	if (parts.length < 3) return trackingKey;
-	const groupName = `${parts[0]}/${parts[1]}`;
-	const tracking = taskTrackingByGroup.get(groupName);
-	if (!tracking) return trackingKey;
-	for (const [displayName, key] of tracking) {
-		if (key === trackingKey) return `${groupName}: ${displayName}`;
+	if (!task_tracking_by_group) return tracking_key;
+	const parts = tracking_key.split('/');
+	if (parts.length < 3) return tracking_key;
+	const group_name = `${parts[0]}/${parts[1]}`;
+	const tracking = task_tracking_by_group.get(group_name);
+	if (!tracking) return tracking_key;
+	for (const [display_name, key] of tracking) {
+		if (key === tracking_key) return `${group_name}: ${display_name}`;
 	}
-	return trackingKey;
+	return tracking_key;
 }
 
-export function generateSkippedFilesMarkdown(
-	skippedFiles: Map<string, Map<string, string>>,
-	maxErrorLength = 200,
+export function generate_skipped_files_markdown(
+	skipped_files: Map<string, Map<string, string>>,
+	max_error_length = 200,
 	verbose = false,
-	taskTrackingByGroup?: Map<string, Map<string, string>>,
+	task_tracking_by_group?: Map<string, Map<string, string>>,
 ): string | null {
-	if (skippedFiles.size === 0) return null;
+	if (skipped_files.size === 0) return null;
 
 	interface FileError {
-		filePath: string;
+		file_path: string;
 		error: string;
 		benchmarks: string[];
 		lang: SkipLang;
 	}
 
-	const fileErrorMap = new Map<string, Map<string, string[]>>();
-	for (const [benchName, filesMap] of skippedFiles) {
-		for (const [filePath, error] of filesMap) {
-			if (!fileErrorMap.has(filePath)) {
-				fileErrorMap.set(filePath, new Map());
+	const file_error_map = new Map<string, Map<string, string[]>>();
+	for (const [bench_name, files_map] of skipped_files) {
+		for (const [file_path, error] of files_map) {
+			if (!file_error_map.has(file_path)) {
+				file_error_map.set(file_path, new Map());
 			}
-			const errorMap = fileErrorMap.get(filePath)!;
-			if (!errorMap.has(error)) {
-				errorMap.set(error, []);
+			const error_map = file_error_map.get(file_path)!;
+			if (!error_map.has(error)) {
+				error_map.set(error, []);
 			}
-			errorMap.get(error)!.push(benchName);
+			error_map.get(error)!.push(bench_name);
 		}
 	}
 
-	function classifyLang(path: string): SkipLang {
+	function classify_lang(path: string): SkipLang {
 		if (path.endsWith('.svelte') || path.endsWith('.html')) return 'svelte';
 		if (path.endsWith('.ts') || path.endsWith('.js')) return 'typescript';
 		if (path.endsWith('.css')) return 'css';
 		return 'other';
 	}
 
-	const allErrors: FileError[] = [];
-	for (const [filePath, errorMap] of fileErrorMap) {
-		const lang = classifyLang(filePath);
-		for (const [error, benchmarks] of errorMap) {
-			allErrors.push({ filePath, error, benchmarks, lang });
+	const all_errors: FileError[] = [];
+	for (const [file_path, error_map] of file_error_map) {
+		const lang = classify_lang(file_path);
+		for (const [error, benchmarks] of error_map) {
+			all_errors.push({ file_path, error, benchmarks, lang });
 		}
 	}
 	// Sort ascending by failure-set size (rare/impl-specific first), then
 	// alphabetical. Files that fail in every tsv variant are usually
 	// unsupported-syntax fixtures — push them to the bottom so actionable
 	// bugs surface at the top.
-	const sortFn = (a: FileError, b: FileError): number => {
-		const benchDiff = a.benchmarks.length - b.benchmarks.length;
-		return benchDiff !== 0 ? benchDiff : a.filePath.localeCompare(b.filePath);
+	const sort_fn = (a: FileError, b: FileError): number => {
+		const bench_diff = a.benchmarks.length - b.benchmarks.length;
+		return bench_diff !== 0 ? bench_diff : a.file_path.localeCompare(b.file_path);
 	};
 
-	const byLang = {
-		svelte: allErrors.filter((e) => e.lang === 'svelte').sort(sortFn),
-		typescript: allErrors.filter((e) => e.lang === 'typescript').sort(sortFn),
-		css: allErrors.filter((e) => e.lang === 'css').sort(sortFn),
+	const by_lang = {
+		svelte: all_errors.filter((e) => e.lang === 'svelte').sort(sort_fn),
+		typescript: all_errors.filter((e) => e.lang === 'typescript').sort(sort_fn),
+		css: all_errors.filter((e) => e.lang === 'css').sort(sort_fn),
 	};
 
 	// Per-benchmark skip totals, sorted descending. Lets the reader see
 	// "which implementation is the noisy one" at a glance.
-	const perBench: { name: string; skips: number }[] = [];
-	for (const [benchName, filesMap] of skippedFiles) {
-		perBench.push({ name: benchName, skips: filesMap.size });
+	const per_bench: { name: string; skips: number }[] = [];
+	for (const [bench_name, files_map] of skipped_files) {
+		per_bench.push({ name: bench_name, skips: files_map.size });
 	}
-	perBench.sort((a, b) => b.skips - a.skips);
+	per_bench.sort((a, b) => b.skips - a.skips);
 
 	const lines: string[] = [];
 	lines.push('## Skipped Files\n');
 	lines.push(
-		`${allErrors.length} unique file+error combinations — Svelte ${byLang.svelte.length}, TypeScript ${byLang.typescript.length}, CSS ${byLang.css.length}.\n`,
+		`${all_errors.length} unique file+error combinations — Svelte ${by_lang.svelte.length}, TypeScript ${by_lang.typescript.length}, CSS ${by_lang.css.length}.\n`,
 	);
 
-	if (perBench.length > 0) {
+	if (per_bench.length > 0) {
 		lines.push('**Per-benchmark skip counts:**');
-		for (const { name, skips } of perBench) {
-			lines.push(`- ${trackingKeyDisplay(name, taskTrackingByGroup)}: ${skips}`);
+		for (const { name, skips } of per_bench) {
+			lines.push(`- ${tracking_key_display(name, task_tracking_by_group)}: ${skips}`);
 		}
 		lines.push('');
 	}
@@ -1018,36 +1018,36 @@ export function generateSkippedFilesMarkdown(
 	}
 
 	const TOP_N_PER_LANG = 10;
-	function renderEntry(e: FileError): string[] {
-		const truncated = e.error.length > maxErrorLength;
-		const displayError = (truncated ? e.error.slice(0, maxErrorLength) + '…' : e.error)
+	function render_entry(e: FileError): string[] {
+		const truncated = e.error.length > max_error_length;
+		const display_error = (truncated ? e.error.slice(0, max_error_length) + '…' : e.error)
 			.replace(/`/g, '\\`')
 			.replace(/\n/g, ' ');
-		const failedIn = isUniversalTsvFailure(e.lang, e.benchmarks)
+		const failed_in = is_universal_tsv_failure(e.lang, e.benchmarks)
 			? 'all tsv variants'
-			: e.benchmarks.map((b) => trackingKeyDisplay(b, taskTrackingByGroup)).join(', ');
+			: e.benchmarks.map((b) => tracking_key_display(b, task_tracking_by_group)).join(', ');
 		return [
-			`- \`${e.filePath}\``,
-			`  - Error: ${displayError}`,
-			`  - Failed in: ${failedIn}`,
+			`- \`${e.file_path}\``,
+			`  - Error: ${display_error}`,
+			`  - Failed in: ${failed_in}`,
 		];
 	}
 
-	function renderBucket(label: string, entries: FileError[]): void {
+	function render_bucket(label: string, entries: FileError[]): void {
 		if (entries.length === 0) return;
 		const more = entries.length > TOP_N_PER_LANG
 			? ` (showing top ${TOP_N_PER_LANG} of ${entries.length}, sorted rarest failure-set first)`
 			: '';
 		lines.push(`### ${label}${more}\n`);
 		for (const e of entries.slice(0, TOP_N_PER_LANG)) {
-			lines.push(...renderEntry(e));
+			lines.push(...render_entry(e));
 		}
 		lines.push('');
 	}
 
-	renderBucket('Svelte', byLang.svelte);
-	renderBucket('TypeScript', byLang.typescript);
-	renderBucket('CSS', byLang.css);
+	render_bucket('Svelte', by_lang.svelte);
+	render_bucket('TypeScript', by_lang.typescript);
+	render_bucket('CSS', by_lang.css);
 
 	return lines.join('\n').trimEnd();
 }
@@ -1055,33 +1055,33 @@ export function generateSkippedFilesMarkdown(
 /**
  * Generate effective corpus report showing files actually processed per benchmark.
  *
- * `taskTrackingByGroup` is the per-group `displayName → trackingKey` map
+ * `task_tracking_by_group` is the per-group `display_name → tracking_key` map
  * captured in `bench.ts`. We invert it here to render display names
- * (e.g. `svelte/compiler`, `tsv_wasm-internal`) instead of the trackingKey
+ * (e.g. `svelte/compiler`, `tsv_wasm-internal`) instead of the tracking_key
  * suffix (e.g. `canonical`, `wasm-internal`) so the labels line up with
  * the bench tables.
  */
-export function generateEffectiveCorpusReport(
-	effectiveCorpusSize: Map<string, EffectiveCorpusEntry>,
-	taskTrackingByGroup?: Map<string, Map<string, string>>,
+export function generate_effective_corpus_report(
+	effective_corpus_size: Map<string, EffectiveCorpusEntry>,
+	task_tracking_by_group?: Map<string, Map<string, string>>,
 ): string | null {
 	// Check if any benchmarks had skipped files
-	let hasSkips = false;
-	for (const { processed, total } of effectiveCorpusSize.values()) {
+	let has_skips = false;
+	for (const { processed, total } of effective_corpus_size.values()) {
 		if (processed < total) {
-			hasSkips = true;
+			has_skips = true;
 			break;
 		}
 	}
 
-	if (!hasSkips) return null;
+	if (!has_skips) return null;
 
-	// Build trackingKey → displayName lookup
-	const trackingToDisplay = new Map<string, string>();
-	if (taskTrackingByGroup) {
-		for (const groupTracking of taskTrackingByGroup.values()) {
-			for (const [displayName, trackingKey] of groupTracking) {
-				trackingToDisplay.set(trackingKey, displayName);
+	// Build tracking_key → display_name lookup
+	const tracking_to_display = new Map<string, string>();
+	if (task_tracking_by_group) {
+		for (const group_tracking of task_tracking_by_group.values()) {
+			for (const [display_name, tracking_key] of group_tracking) {
+				tracking_to_display.set(tracking_key, display_name);
 			}
 		}
 	}
@@ -1097,38 +1097,38 @@ export function generateEffectiveCorpusReport(
 
 	// Group by operation/language
 	const grouped = new Map<string, Map<string, EffectiveCorpusEntry>>();
-	for (const [benchName, entry] of effectiveCorpusSize) {
-		// benchName format: "parse/svelte/canonical" or "format/typescript/native"
-		const parts = benchName.split('/');
-		const groupKey = parts.slice(0, 2).join('/'); // "parse/svelte"
+	for (const [bench_name, entry] of effective_corpus_size) {
+		// bench_name format: "parse/svelte/canonical" or "format/typescript/native"
+		const parts = bench_name.split('/');
+		const group_key = parts.slice(0, 2).join('/'); // "parse/svelte"
 		// Prefer the display name when we have the tracking map; fall back
-		// to the trackingKey suffix otherwise.
-		const label = trackingToDisplay.get(benchName) ?? parts[2] ?? 'unknown';
+		// to the tracking_key suffix otherwise.
+		const label = tracking_to_display.get(bench_name) ?? parts[2] ?? 'unknown';
 
-		if (!grouped.has(groupKey)) {
-			grouped.set(groupKey, new Map());
+		if (!grouped.has(group_key)) {
+			grouped.set(group_key, new Map());
 		}
-		grouped.get(groupKey)!.set(label, entry);
+		grouped.get(group_key)!.set(label, entry);
 	}
 
 	// Pad column widths consistently across all groups so impl names line up.
-	let maxLabelLen = 0;
+	let max_label_len = 0;
 	for (const impls of grouped.values()) {
 		for (const label of impls.keys()) {
-			if (label.length > maxLabelLen) maxLabelLen = label.length;
+			if (label.length > max_label_len) max_label_len = label.length;
 		}
 	}
 
-	for (const [groupName, impls] of grouped) {
+	for (const [group_name, impls] of grouped) {
 		const entries = Array.from(impls.entries());
-		const anySkips = entries.some(([, e]) => e.processed < e.total);
-		if (!anySkips) continue;
+		const any_skips = entries.some(([, e]) => e.processed < e.total);
+		if (!any_skips) continue;
 
-		lines.push(`  ${groupName}:`);
+		lines.push(`  ${group_name}:`);
 		for (const [label, entry] of entries) {
 			const pct = ((entry.processed / entry.total) * 100).toFixed(0);
 			lines.push(
-				`    ${label.padEnd(maxLabelLen)} ${entry.processed}/${entry.total} files (${pct}%)`,
+				`    ${label.padEnd(max_label_len)} ${entry.processed}/${entry.total} files (${pct}%)`,
 			);
 		}
 		lines.push('');

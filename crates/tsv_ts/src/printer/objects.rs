@@ -10,8 +10,10 @@
 use super::Printer;
 use super::expression_stringifier::is_valid_js_identifier;
 use super::expressions::literals::format_string_literal_from_ast;
+use super::layout::hang_after_operator;
 use crate::ast::internal::{self, Expression, Literal, LiteralValue};
 use crate::printer::CommentSpacing;
+use tsv_lang::Comment;
 use tsv_lang::SymbolResolver;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
@@ -70,6 +72,13 @@ impl<'a> Printer<'a> {
             let mut parts = Vec::new();
             let mut prev_end = obj.span.start + 1; // After opening brace
 
+            // A comment trailing the opening `{` on its own line is kept on the `{`
+            // line when the object expands (divergence from prettier, which relocates
+            // it to its own line as the first property's leading comment). See
+            // conformance_prettier.md §Comment relocation (Object literal `{`).
+            let (brace_line_prefix, brace_pull_pos) =
+                self.delimiter_line_comment_prefix(obj.span.start, first_prop_start);
+
             for (i, prop) in obj.properties.iter().enumerate() {
                 let prop_start = prop.span().start;
                 let is_first = i == 0;
@@ -83,6 +92,14 @@ impl<'a> Printer<'a> {
                 // Block comments after comma on same line are leading
                 let comments: Vec<_> = comments_in_range(self.comments, search_start, prop_start)
                     .filter(|c| {
+                        // Brace-line comments pulled onto the `{` line above are emitted
+                        // as the prefix, not here (only relevant for the first property).
+                        if is_first
+                            && let Some(dpos) = brace_pull_pos
+                            && self.comment_on_delimiter_line(dpos, c)
+                        {
+                            return false;
+                        }
                         is_first ||
                         c.is_block || // Block comments after comma are always leading
                         !self.is_same_line( prev_end, c.span.start) // Line comments must be on different line
@@ -160,8 +177,13 @@ impl<'a> Printer<'a> {
                     parts.push(d.hardline());
                 }
 
-                // Build property doc
-                let prop_doc = self.build_object_property_doc(prop);
+                // Build property doc — a preceding `// prettier-ignore` keeps the
+                // property's source verbatim (trailing comment/comma handled normally)
+                let prop_doc = if self.has_prettier_ignore_in_range(search_start, prop_start) {
+                    self.raw_source_doc(prop.span())
+                } else {
+                    self.build_object_property_doc(prop)
+                };
                 parts.push(prop_doc);
 
                 // Handle trailing inline comments on same line after property
@@ -173,19 +195,28 @@ impl<'a> Printer<'a> {
                     .map_or(obj.span.end, |next| next.span().start);
 
                 let comma_pos = self.find_comma_after(prop_end);
+                let is_last = i == obj.properties.len() - 1;
 
-                // Collect same-line trailing comments
-                // Line comments: always trailing if on same line (they extend to end of line)
-                // Block comments: only trailing if before comma
+                // Collect same-line trailing comments.
+                // Line comments: always trailing if on same line (they extend to end of line).
+                // Block comments: before the comma are trailing here; after the comma normally
+                // belong to the next property as leading — except on the LAST property, where
+                // there is no next property and we preserve them after the comma (prettier
+                // relocates before — see conformance_prettier.md §Comment relocation).
                 let trailing: Vec<_> = comments_in_range(self.comments, prop_end, upper_bound)
                     .filter(|c| {
                         self.is_same_line(prop_end, c.span.start)
-                            && (!c.is_block || comma_pos.is_none_or(|pos| c.span.start < pos))
+                            && (!c.is_block
+                                || is_last
+                                || comma_pos.is_none_or(|pos| c.span.start < pos))
                     })
                     .collect();
 
-                // Block comments go before comma
-                for comment in trailing.iter().filter(|c| c.is_block) {
+                let is_after_comma =
+                    |c: &Comment| c.is_block && comma_pos.is_some_and(|pos| c.span.start > pos);
+
+                // Block comments before the comma go before it
+                for comment in trailing.iter().filter(|c| c.is_block && !is_after_comma(c)) {
                     parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
@@ -201,6 +232,12 @@ impl<'a> Printer<'a> {
                 } else {
                     // Last property: trailing comma only when broken
                     parts.push(d.trailing_comma());
+                }
+
+                // Block comments after the comma (last property): preserve position
+                for comment in trailing.iter().filter(|c| is_after_comma(c)) {
+                    parts.push(d.text(" "));
+                    parts.push(self.build_comment_doc(comment));
                 }
 
                 // Line comments go after comma (excluded from width calculations)
@@ -251,9 +288,16 @@ impl<'a> Printer<'a> {
                 let (indented_content, closing_line) =
                     self.wrap_with_decl_indent(inner, d.hardline());
 
-                d.concat(&[d.text("{"), indented_content, closing_line, d.text("}")])
+                d.concat(&[
+                    d.text("{"),
+                    d.concat(&brace_line_prefix),
+                    indented_content,
+                    closing_line,
+                    d.text("}"),
+                ])
             } else {
                 // May stay inline - use group with softlines for width-based breaking
+                // (brace_line_prefix is empty here — pulling implies must_break).
                 let inner = d.concat(&[d.softline(), d.concat(&parts)]);
                 let (indented_content, closing_line) =
                     self.wrap_with_decl_indent(inner, d.softline());
@@ -554,7 +598,7 @@ impl<'a> Printer<'a> {
                     d.group(d.concat(&[
                         d.group(lhs_doc),
                         d.text(":"),
-                        d.group(d.indent(d.concat(&[d.line(), rhs_doc]))),
+                        hang_after_operator(d, rhs_doc),
                     ]))
                 } else {
                     // Inline block comments: use assignment layout so choose_layout
@@ -629,7 +673,8 @@ impl<'a> Printer<'a> {
                 LiteralValue::String { content, .. } => {
                     // For computed keys, quotes are always preserved: ["x"] prints as ['x']
                     // For non-computed keys, valid identifiers are unquoted: {"x":1} → {x:1}
-                    if computed || !is_valid_js_identifier(content) {
+                    // Escape-bearing keys keep their quotes (see `string_key_unquotes`).
+                    if computed || !self.string_key_unquotes(lit, content) {
                         visual_width(content, tsv_lang::TAB_WIDTH) + 2 // Include quotes
                     } else {
                         visual_width(content, tsv_lang::TAB_WIDTH)
@@ -656,6 +701,23 @@ impl<'a> Printer<'a> {
         total_width < threshold
     }
 
+    /// A quoted string key may be unquoted only when its *raw* source (escape
+    /// sequences intact) is already a valid identifier. Keys whose raw form
+    /// differs from the decoded value carry escapes (`'b'`, `'\a'`,
+    /// `'\x66\x69\x73\x6b\x65\x72'`) and keep their quotes so the escapes are
+    /// preserved — matching Prettier, which only unquotes when
+    /// `rawText.slice(1, -1) === value`. Unquoting from the decoded value would
+    /// silently rewrite the source text (data loss).
+    pub(super) fn string_key_unquotes(&self, lit: &Literal, content: &str) -> bool {
+        if !is_valid_js_identifier(content) {
+            return false;
+        }
+        let raw = lit.span.extract(self.source);
+        // Strip the surrounding quotes; compare the raw inner text to the
+        // decoded value. Equal ⇒ no escapes ⇒ safe to unquote.
+        raw.len() >= 2 && raw[1..raw.len() - 1] == *content
+    }
+
     /// Build a Doc for a property key
     ///
     /// String literal keys that are valid identifiers are output without quotes.
@@ -669,15 +731,45 @@ impl<'a> Printer<'a> {
                     ..
                 },
             ) => {
-                if is_valid_js_identifier(content) {
+                if self.string_key_unquotes(lit, content) {
                     d.text_owned(content.clone())
                 } else {
-                    // Use quote optimization (switches to double quotes when
-                    // content contains single quotes to minimize escaping)
+                    // Keep quotes (and apply quote optimization). Covers
+                    // non-identifier keys (`'kebab-case'`) and escape-bearing
+                    // keys (`'b'`) whose escapes must be preserved.
                     d.text_owned(format_string_literal_from_ast(lit, self.source))
                 }
             }
             _ => self.build_expression_doc(key),
+        }
+    }
+
+    /// Emit a type-member key (`PropertySignature`/`MethodSignature`), returning
+    /// `(doc, key_region_end)` where `key_region_end` is the source offset just
+    /// past the key — after the `]` for computed keys — used to anchor the search
+    /// for following comments/modifiers.
+    ///
+    /// `unquote` drops quotes from an identifier-valid string-literal key: `true`
+    /// for property signatures (`'plain': T` → `plain: T`), `false` for method
+    /// signatures (`'foo'(): void` keeps its quotes — prettier's rule). Computed
+    /// keys are always emitted verbatim inside their brackets.
+    pub(super) fn build_type_member_key_doc(
+        &self,
+        search_start: u32,
+        key: &Expression,
+        computed: bool,
+        unquote: bool,
+    ) -> (DocId, u32) {
+        if computed {
+            let key_doc = self.build_expression_doc(key);
+            self.build_computed_key_bracket_doc(search_start, key, key_doc)
+        } else {
+            let doc = if unquote {
+                self.build_property_key_doc(key)
+            } else {
+                self.build_expression_doc(key)
+            };
+            (doc, key.span().end)
         }
     }
 

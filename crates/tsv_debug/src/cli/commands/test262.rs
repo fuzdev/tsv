@@ -5,6 +5,9 @@ use argh::FromArgs;
 use std::path::PathBuf;
 
 /// Validate parser against ECMAScript conformance tests.
+// argh models each flag as an independent `#[argh(switch)]` bool — orthogonal
+// CLI toggles, not a state machine to refactor into an enum.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "test262")]
 pub struct Test262Command {

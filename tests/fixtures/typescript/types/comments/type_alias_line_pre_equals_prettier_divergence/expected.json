@@ -1,0 +1,416 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 204,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " line comment before = with type params stays before =",
+			"start": 20,
+			"end": 76,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 90,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment before = without type params stays before =",
+			"start": 108,
+			"end": 167,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 178,
+			"end": 182,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 6
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 203,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 78,
+					"end": 105,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 10
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 83,
+						"end": 84,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 84,
+						"end": 87,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 7
+							},
+							"end": {
+								"line": 3,
+								"column": 10
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 85,
+								"end": 86,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 8
+									},
+									"end": {
+										"line": 3,
+										"column": 9
+									}
+								},
+								"name": "X"
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 99,
+						"end": 104,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 4
+							},
+							"end": {
+								"line": 5,
+								"column": 9
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 99,
+								"end": 100,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 4
+									},
+									"end": {
+										"line": 5,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 99,
+									"end": 100,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 4
+										},
+										"end": {
+											"line": 5,
+											"column": 5
+										}
+									},
+									"name": "B"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 103,
+								"end": 104,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 8
+									},
+									"end": {
+										"line": 5,
+										"column": 9
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 103,
+									"end": 104,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 8
+										},
+										"end": {
+											"line": 5,
+											"column": 9
+										}
+									},
+									"name": "C"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 90,
+								"end": 94
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment before = with type params stays before =",
+							"start": 20,
+							"end": 76
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 169,
+					"end": 193,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 10
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 174,
+						"end": 175,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 187,
+						"end": 192,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 4
+							},
+							"end": {
+								"line": 10,
+								"column": 9
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 187,
+								"end": 188,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 4
+									},
+									"end": {
+										"line": 10,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 187,
+									"end": 188,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 4
+										},
+										"end": {
+											"line": 10,
+											"column": 5
+										}
+									},
+									"name": "E"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 191,
+								"end": 192,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 8
+									},
+									"end": {
+										"line": 10,
+										"column": 9
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 191,
+									"end": 192,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 8
+										},
+										"end": {
+											"line": 10,
+											"column": 9
+										}
+									},
+									"name": "F"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 178,
+								"end": 182
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment before = without type params stays before =",
+							"start": 108,
+							"end": 167
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

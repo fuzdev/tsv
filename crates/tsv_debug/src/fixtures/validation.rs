@@ -153,6 +153,14 @@ pub enum ValidationError {
     )]
     NormalizationPrettierIntermediateToVariantNoVariantTarget(String),
 
+    // Undocumented prettier output (N10): a fixture that pins prettier's stable
+    // forms (has output_prettier / prettier_variant_* / variant_*) must account
+    // for prettier's output of every unformatted_ours_* variant.
+    #[error(
+        "prettier output of {0} matches no documented form (output_prettier / prettier_variant_* / variant_*) — prettier may have drifted, or the target is undocumented"
+    )]
+    UndocumentedPrettierOutput(String),
+
     // Duplicates (within fixture)
     #[error("Duplicate unformatted files: {}", .0.join(", "))]
     DuplicateUnformattedWithinFixture(Vec<String>),
@@ -297,6 +305,9 @@ impl ValidationError {
             Self::NormalizationPrettierIntermediateToVariantNoVariantTarget(_) => {
                 "Add a variant_* or prettier_variant_* file documenting the convergence target"
             }
+            Self::UndocumentedPrettierOutput(_) => {
+                "Document prettier's output: add a variant_* / prettier_variant_* (or prettier_intermediate*_*) sibling matching it, or update the existing one if prettier changed"
+            }
             Self::DuplicateUnformattedWithinFixture(_)
             | Self::DuplicatePrettierVariantWithinFixture(_) => {
                 "Remove duplicate files (identical content)"
@@ -369,7 +380,8 @@ impl ValidationError {
             | Self::NormalizationPrettierIntermediateToVariantConvergesToInput(_)
             | Self::NormalizationPrettierIntermediateToVariantNotConverging(_)
             | Self::NormalizationPrettierIntermediateToVariantMissingSource(_)
-            | Self::NormalizationPrettierIntermediateToVariantNoVariantTarget(_) => "Normalization",
+            | Self::NormalizationPrettierIntermediateToVariantNoVariantTarget(_)
+            | Self::UndocumentedPrettierOutput(_) => "Normalization",
 
             Self::DuplicateUnformattedWithinFixture(_)
             | Self::DuplicatePrettierVariantWithinFixture(_)
@@ -1779,12 +1791,22 @@ async fn validate_normalization_prettier(
             let is_known = known_contents.iter().any(|c| c == prettier_output);
             if !is_known {
                 let source_file = format!("unformatted_ours_{suffix}{input_ext}");
-                result
-                    .undocumented_prettier_outputs
-                    .push(UndocumentedPrettierOutput {
-                        source_file,
-                        suffix: suffix.clone(),
-                    });
+                // When the fixture documents prettier's stable forms (it has
+                // output_prettier / prettier_variant_* / variant_* files), every
+                // unformatted_ours_* prettier output must match one of them — an
+                // unmatched output means prettier drifted or the target is
+                // undocumented, so block. Fixtures that document the divergence by
+                // README alone (no stable-form files) keep this informational.
+                if known_contents.is_empty() {
+                    result
+                        .undocumented_prettier_outputs
+                        .push(UndocumentedPrettierOutput {
+                            source_file,
+                            suffix: suffix.clone(),
+                        });
+                } else {
+                    result.add_error(ValidationError::UndocumentedPrettierOutput(source_file));
+                }
             }
         }
     }

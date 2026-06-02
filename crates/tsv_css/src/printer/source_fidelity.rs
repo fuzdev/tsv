@@ -19,69 +19,6 @@ pub(crate) fn format_identifier_value(name: &str) -> String {
     name.to_string()
 }
 
-/// Format a dimension value semantically
-///
-/// Formats a numeric value with its unit (or just the number if unitless).
-/// Normalizes decimal representation to match prettier:
-/// - Removes trailing zeros: 1.50 → 1.5, 100.0 → 100
-/// - Adds leading zero: .5 → 0.5 (handled by f64 representation)
-///
-/// # Example
-/// ```ignore
-/// assert_eq!(format_dimension_value(10.0, "px"), "10px");
-/// assert_eq!(format_dimension_value(0.5, "em"), "0.5em");
-/// assert_eq!(format_dimension_value(1.5, "em"), "1.5em");
-/// assert_eq!(format_dimension_value(100.0, "px"), "100px");
-/// ```
-#[cfg(feature = "convert")]
-pub(crate) fn format_dimension_value(value: f64, unit: &str) -> String {
-    let normalized = normalize_number(value);
-    if unit.is_empty() {
-        normalized
-    } else {
-        format!("{normalized}{unit}")
-    }
-}
-
-/// Normalize a number's decimal representation to match prettier
-///
-/// Prettier's decimal normalization rules:
-/// - Removes trailing zeros after decimal: 1.50 → 1.5, 100.0 → 100
-/// - Adds leading zero for decimals: .5 → 0.5 (handled by f64 formatting)
-/// - Preserves leading zeros before decimal: 01 → 01, 007 → 007
-///
-/// The key insight: f64 representation loses leading zeros like `01`,
-/// so we can safely use f64::to_string() and only normalize trailing zeros.
-#[cfg(feature = "convert")]
-fn normalize_number(value: f64) -> String {
-    // Handle special cases first
-    if value == 0.0 {
-        return "0".to_string();
-    }
-
-    // Convert to string - this automatically adds leading zero for .5 → 0.5
-    // but loses leading zeros like 01 (becomes 1.0)
-    let mut s = value.to_string();
-
-    // If no decimal point, return as-is
-    if !s.contains('.') {
-        return s;
-    }
-
-    // Remove trailing zeros after decimal point
-    // Keep the decimal point initially to detect whole numbers
-    while s.ends_with('0') && s.contains('.') {
-        s.pop();
-    }
-
-    // If we removed all digits after decimal, remove the decimal point too
-    if s.ends_with('.') {
-        s.pop();
-    }
-
-    s
-}
-
 /// Normalize a dimension value from raw source string
 ///
 /// This function matches prettier's exact behavior:
@@ -96,32 +33,207 @@ fn normalize_number(value: f64) -> String {
 /// # Returns
 /// Normalized dimension string matching prettier's output
 pub(crate) fn normalize_dimension_from_source(raw: &str) -> String {
-    // If no decimal point, return as-is (preserves leading zeros, signs)
-    if !raw.contains('.') {
+    let (num_part, unit_part) = split_number_and_unit(raw);
+
+    // Not a number we recognize (e.g. a bare identifier) — leave untouched.
+    if num_part.is_empty() {
         return raw.to_string();
     }
 
-    // Split into number part and unit part
-    // Find where the number ends (first non-numeric, non-sign, non-decimal char)
-    let unit_start = raw
-        .chars()
-        .position(|c| !c.is_ascii_digit() && c != '.' && c != '+' && c != '-')
-        .unwrap_or(raw.len());
-
-    let num_part = &raw[..unit_start];
-    let unit_part = &raw[unit_start..];
-
-    // Edge case: if number ends with a decimal point and there's a unit after,
-    // this is likely not a dimension (e.g., "1.png" where .png is a file extension)
-    // In valid CSS, dimensions with units must have digits after the decimal: "1.5px" not "1.px"
-    if num_part.ends_with('.') && !unit_part.is_empty() {
-        return raw.to_string();
-    }
-
-    // Normalize the number part (preserve sign, leading zeros, add leading zero, trim trailing zeros)
-    let normalized_num = normalize_decimal_preserving_prefix(num_part);
-
+    let normalized_num = normalize_css_number(num_part);
     format!("{normalized_num}{unit_part}")
+}
+
+/// Split a dimension into its numeric part and trailing unit, e.g.
+/// `1.5px` → (`1.5`, `px`), `1.png` → (`1`, `.png`).
+fn split_number_and_unit(raw: &str) -> (&str, &str) {
+    raw.split_at(crate::number::number_part_len(raw))
+}
+
+/// Normalize a CSS number to match prettier's `printNumber` / `printCssNumber`.
+///
+/// Mantissa: add a leading zero (`.5` → `0.5`), trim trailing fraction zeros
+/// and a trailing dot (`1.50` → `1.5`, `1.` → `1`), preserve sign and leading
+/// integer zeros. Exponent: lowercase `e`, drop a `+` sign, strip leading
+/// zeros (`e+0010` → `e10`), and drop a zero exponent entirely (`5e0` → `5`).
+fn normalize_css_number(num: &str) -> String {
+    let (mantissa, exponent) = match num.find(['e', 'E']) {
+        Some(idx) => (&num[..idx], &num[idx + 1..]),
+        None => (num, ""),
+    };
+
+    let normalized_mantissa = normalize_decimal_preserving_prefix(mantissa);
+
+    if exponent.is_empty() {
+        return normalized_mantissa;
+    }
+
+    let (exp_sign, exp_digits) = if let Some(rest) = exponent.strip_prefix('-') {
+        ("-", rest)
+    } else if let Some(rest) = exponent.strip_prefix('+') {
+        ("", rest)
+    } else {
+        ("", exponent)
+    };
+
+    let trimmed_digits = exp_digits.trim_start_matches('0');
+    if trimmed_digits.is_empty() {
+        // Exponent is zero (`5e0`, `5e-00`) — drop it entirely.
+        return normalized_mantissa;
+    }
+
+    format!("{normalized_mantissa}e{exp_sign}{trimmed_digits}")
+}
+
+/// Known CSS units (lowercase), used to gate number normalization in raw
+/// prelude text — only a number with a known unit (or no unit) is normalized,
+/// matching prettier's `adjustNumbers` (which checks `css-units-list`).
+static CSS_UNITS: phf::Set<&'static str> = phf::phf_set! {
+    // Absolute length
+    "px", "cm", "mm", "in", "pt", "pc", "q",
+    // Font-relative length
+    "em", "rem", "ex", "rex", "ch", "rch", "cap", "rcap", "ic", "ric", "lh", "rlh",
+    // Viewport-relative length
+    "vw", "vh", "vi", "vb", "vmin", "vmax",
+    "svw", "svh", "svi", "svb", "svmin", "svmax",
+    "lvw", "lvh", "lvi", "lvb", "lvmin", "lvmax",
+    "dvw", "dvh", "dvi", "dvb", "dvmin", "dvmax",
+    // Container-relative length
+    "cqw", "cqh", "cqi", "cqb", "cqmin", "cqmax",
+    // Angle
+    "deg", "grad", "rad", "turn",
+    // Time
+    "s", "ms",
+    // Frequency
+    "hz", "khz",
+    // Resolution
+    "dpi", "dpcm", "dppx", "x",
+    // Flex / grid
+    "fr",
+};
+
+/// Normalize CSS numbers within a raw prelude string, mirroring prettier's
+/// `adjustNumbers`. Quoted strings, `/* */` comments and `#`-prefixed tokens
+/// (hex colors) are copied verbatim. A number is normalized only when it isn't
+/// part of an identifier (`min-width` is untouched) and its trailing unit is a
+/// known CSS unit or empty (so `1abc` is left alone). Unit casing is preserved.
+pub(crate) fn normalize_numbers_in_text(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut out = String::with_capacity(input.len());
+    let mut i = 0;
+
+    while i < bytes.len() {
+        let b = bytes[i];
+
+        // Copy quoted strings verbatim (handling backslash escapes).
+        if b == b'"' || b == b'\'' {
+            let start = i;
+            i += 1;
+            while i < bytes.len() {
+                if bytes[i] == b'\\' {
+                    // Skip the backslash and the escaped byte (if any).
+                    i += if i + 1 < bytes.len() { 2 } else { 1 };
+                    continue;
+                }
+                let closed = bytes[i] == b;
+                i += 1;
+                if closed {
+                    break;
+                }
+            }
+            out.push_str(&input[start..i]);
+            continue;
+        }
+
+        // Copy block comments verbatim.
+        if b == b'/' && bytes.get(i + 1) == Some(&b'*') {
+            let start = i;
+            i += 2;
+            while i < bytes.len() && !(bytes[i] == b'*' && bytes.get(i + 1) == Some(&b'/')) {
+                i += 1;
+            }
+            i = (i + 2).min(bytes.len());
+            out.push_str(&input[start..i]);
+            continue;
+        }
+
+        let Some(ch) = input[i..].chars().next() else {
+            break;
+        };
+
+        // Copy identifiers verbatim — including any digits they contain, so a
+        // number attached to a word (`foo2`, `min-width`) is never normalized.
+        if is_ident_start(ch) {
+            let start = i;
+            i += ch.len_utf8();
+            while let Some(c) = input[i..].chars().next() {
+                if is_ident_continue(c) {
+                    i += c.len_utf8();
+                } else {
+                    break;
+                }
+            }
+            out.push_str(&input[start..i]);
+            continue;
+        }
+
+        // Copy `#`-prefixed tokens (hex colors) verbatim so exponent-looking
+        // hex like `#1e2` isn't mangled.
+        if b == b'#' {
+            let start = i;
+            i += 1;
+            while let Some(c) = input[i..].chars().next() {
+                if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                    i += c.len_utf8();
+                } else {
+                    break;
+                }
+            }
+            out.push_str(&input[start..i]);
+            continue;
+        }
+
+        // A number (not attached to an identifier — those are consumed above).
+        let num_len = crate::number::number_part_len(&input[i..]);
+        if num_len > 0 {
+            let num = &input[i..i + num_len];
+            i += num_len;
+            // Trailing unit: ASCII letters only (matches prettier's unit regex;
+            // `%` and operators are not part of the unit).
+            let unit_start = i;
+            while i < bytes.len() && bytes[i].is_ascii_alphabetic() {
+                i += 1;
+            }
+            let unit = &input[unit_start..i];
+            if unit.is_empty() || unit.eq_ignore_ascii_case("n") || is_known_css_unit(unit) {
+                out.push_str(&normalize_css_number(num));
+                out.push_str(unit);
+            } else {
+                out.push_str(num);
+                out.push_str(unit);
+            }
+            continue;
+        }
+
+        out.push(ch);
+        i += ch.len_utf8();
+    }
+
+    out
+}
+
+fn is_known_css_unit(unit: &str) -> bool {
+    CSS_UNITS.contains(unit.to_ascii_lowercase().as_str())
+}
+
+/// Can `ch` begin a CSS identifier? (letter, `_`, `$`, `@`, or non-ASCII)
+fn is_ident_start(ch: char) -> bool {
+    ch.is_alphabetic() || ch == '_' || ch == '$' || ch == '@' || !ch.is_ascii()
+}
+
+/// Can `ch` continue a CSS identifier? (`is_ident_start` plus digits and `-`)
+fn is_ident_continue(ch: char) -> bool {
+    is_ident_start(ch) || ch.is_ascii_digit() || ch == '-'
 }
 
 /// Normalize decimal number while preserving sign and leading zeros

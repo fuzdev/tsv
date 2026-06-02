@@ -58,6 +58,10 @@ pub struct ExpressionStatement {
     pub end: u32,
     pub loc: SourceLocation,
     pub expression: Expression,
+    /// Present only for directive prologue entries (acorn `directive`): the
+    /// raw string contents without surrounding quotes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub directive: Option<String>,
 }
 
 /// Block statement (function body with braces)

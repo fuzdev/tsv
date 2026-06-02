@@ -8,10 +8,12 @@
 use super::helpers::{
     find_separator_position, intersection_has_expanding_first_type,
     intersection_has_huggable_last_type, should_hug_union_type,
-    type_args_should_wrap_for_return_type, type_needs_parens_in_intersection, unwrap_parenthesized,
+    type_args_should_wrap_for_return_type, type_needs_parens_in_union_or_intersection,
+    unwrap_parenthesized,
 };
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType};
+use crate::printer::layout::hang_after_operator;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -88,14 +90,10 @@ impl<'a> Printer<'a> {
                         type_start,
                         CommentSpacing::Trailing,
                     );
-                    d.group(d.concat(&[
+                    d.concat(&[
                         d.text(":"),
-                        d.indent(d.concat(&[
-                            d.line(), // space when flat, newline when broken
-                            comments_doc,
-                            type_doc,
-                        ])),
-                    ]))
+                        hang_after_operator(d, d.concat(&[comments_doc, type_doc])),
+                    ])
                 }
                 TSType::Intersection(i) => {
                     // Build intersection with proper indentation for type annotation context:
@@ -223,7 +221,7 @@ impl<'a> Printer<'a> {
                 return d.conditional_group(&[flat_state, break_state]);
             }
 
-            let union_group = d.group(d.indent_line(d.concat(&[comments_doc, type_doc])));
+            let union_group = hang_after_operator(d, d.concat(&[comments_doc, type_doc]));
             return d.concat(&[d.text(":"), union_group]);
         }
 
@@ -245,6 +243,10 @@ impl<'a> Printer<'a> {
     /// Both functions share the same grouping rule: 2-type with a huggable/expanding
     /// boundary (TypeLiteral/MappedType at first or last position) skips the group;
     /// all other cases need one.
+    ///
+    /// Line comments between members are delegated to `build_intersection_type_doc`
+    /// (which owns the multiline-with-comments layout) — the continuation loop here
+    /// has no line-comment handling and would otherwise drop them.
     fn build_intersection_type_annotation_doc(
         &self,
         intersection: &internal::TSIntersectionType,
@@ -266,6 +268,30 @@ impl<'a> Printer<'a> {
                 comments_doc,
                 self.build_type_doc_with_wrapping_type_args(&intersection.types[0]),
             ]);
+        }
+
+        // Line comments between members force the multiline layout. Delegate to the
+        // shared bare-intersection path (which handles them) instead of the
+        // continuation loop below, which has no line-comment handling and would
+        // silently drop the comments. Mirrors the type-alias layout: `: ` + the
+        // huggable-aware `group(indent(...))` wrapper.
+        let has_line_comments_between_members = intersection
+            .types
+            .windows(2)
+            .any(|pair| self.has_line_comments_between(pair[0].span().end, pair[1].span().start));
+        if has_line_comments_between_members {
+            let first_type_start = intersection.types[0].span().start;
+            let comments_doc =
+                self.build_comments_between(colon_end, first_type_start, CommentSpacing::Trailing);
+            let type_doc = self.build_intersection_type_doc(intersection, false);
+            let wrapped = if intersection_has_huggable_last_type(intersection)
+                || intersection_has_expanding_first_type(intersection)
+            {
+                type_doc
+            } else {
+                d.group(d.indent(type_doc))
+            };
+            return d.concat(&[d.text(": "), comments_doc, wrapped]);
         }
 
         // Check for huggable boundary types (TypeLiteral/MappedType at first or last position)
@@ -382,7 +408,7 @@ impl<'a> Printer<'a> {
     /// Build intersection member type with optional parens and wrapping type args.
     fn build_intersection_member_type_doc(&self, t: &TSType) -> DocId {
         let d = self.d();
-        if type_needs_parens_in_intersection(t) {
+        if type_needs_parens_in_union_or_intersection(t) {
             // Special case: parenthesized union type
             if let TSType::Union(union) = unwrap_parenthesized(t) {
                 return self.build_parenthesized_union_doc(union);

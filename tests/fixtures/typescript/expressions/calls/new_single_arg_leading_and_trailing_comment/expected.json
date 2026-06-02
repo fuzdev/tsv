@@ -1,0 +1,375 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 146,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " lead",
+			"start": 21,
+			"end": 28,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trail",
+			"start": 36,
+			"end": 44,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " lead ",
+			"start": 62,
+			"end": 72,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trail",
+			"start": 78,
+			"end": 86,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " lead ",
+			"start": 104,
+			"end": 114,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " trail ",
+			"start": 120,
+			"end": 131,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 13
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 145,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 136,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 10,
+					"end": 48,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 10,
+						"end": 47,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 14,
+							"end": 17,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 5
+								},
+								"end": {
+									"line": 2,
+									"column": 8
+								}
+							},
+							"name": "Foo"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 31,
+								"end": 32,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 3
+									}
+								},
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " lead",
+										"start": 21,
+										"end": 28
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 51,
+					"end": 90,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 51,
+						"end": 89,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 11,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 55,
+							"end": 58,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 5
+								},
+								"end": {
+									"line": 8,
+									"column": 8
+								}
+							},
+							"name": "Foo"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 73,
+								"end": 74,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 13
+									},
+									"end": {
+										"line": 9,
+										"column": 14
+									}
+								},
+								"name": "b",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " lead ",
+										"start": 62,
+										"end": 72
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " trail",
+							"start": 36,
+							"end": 44
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 93,
+					"end": 135,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 93,
+						"end": 134,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 1
+							},
+							"end": {
+								"line": 16,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 97,
+							"end": 100,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 5
+								},
+								"end": {
+									"line": 13,
+									"column": 8
+								}
+							},
+							"name": "Foo"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 115,
+								"end": 116,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 13
+									},
+									"end": {
+										"line": 14,
+										"column": 14
+									}
+								},
+								"name": "c",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " lead ",
+										"start": 104,
+										"end": 114
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " trail",
+							"start": 78,
+							"end": 86
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " trail ",
+							"start": 120,
+							"end": 131
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

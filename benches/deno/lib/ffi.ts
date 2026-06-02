@@ -6,42 +6,55 @@
 
 import type { Language, TsvImplementation } from './types.ts';
 
-// FFI symbol definitions
+// FFI symbol definitions.
+//
+// The source and out-length arguments are passed as explicit `pointer`s
+// (`Deno.UnsafePointer.of(...)` in `call_ffi`) rather than the `buffer`
+// parameter type. Deno 2.8's `buffer` fast-call marshalling intermittently
+// hands the native side a stale/wrong source pointer under memory pressure
+// (e.g. mid a long corpus/benchmark run with prettier and other WASM modules
+// active), so the formatter reads corrupted input and silently drops content —
+// a non-deterministic false data-loss signal. The native `.so` is correct
+// (verified byte-for-byte from
+// Python ctypes, which passes immovable `bytes`); the bug is in Deno's buffer
+// path. ArrayBuffer backing stores are off-heap and not relocated by GC, so an
+// explicit `UnsafePointer.of` pointer is stable for the synchronous call as
+// long as the typed array stays alive (we keep references through the call).
 const symbols = {
 	tsv_parse_svelte: {
-		parameters: ['buffer', 'usize', 'buffer'],
+		parameters: ['pointer', 'usize', 'pointer'],
 		result: 'pointer',
 	},
 	tsv_parse_internal_svelte: {
-		parameters: ['buffer', 'usize', 'buffer'],
+		parameters: ['pointer', 'usize', 'pointer'],
 		result: 'pointer',
 	},
 	tsv_format_svelte: {
-		parameters: ['buffer', 'usize', 'buffer'],
+		parameters: ['pointer', 'usize', 'pointer'],
 		result: 'pointer',
 	},
 	tsv_parse_typescript: {
-		parameters: ['buffer', 'usize', 'buffer'],
+		parameters: ['pointer', 'usize', 'pointer'],
 		result: 'pointer',
 	},
 	tsv_parse_internal_typescript: {
-		parameters: ['buffer', 'usize', 'buffer'],
+		parameters: ['pointer', 'usize', 'pointer'],
 		result: 'pointer',
 	},
 	tsv_format_typescript: {
-		parameters: ['buffer', 'usize', 'buffer'],
+		parameters: ['pointer', 'usize', 'pointer'],
 		result: 'pointer',
 	},
 	tsv_parse_css: {
-		parameters: ['buffer', 'usize', 'buffer'],
+		parameters: ['pointer', 'usize', 'pointer'],
 		result: 'pointer',
 	},
 	tsv_parse_internal_css: {
-		parameters: ['buffer', 'usize', 'buffer'],
+		parameters: ['pointer', 'usize', 'pointer'],
 		result: 'pointer',
 	},
 	tsv_format_css: {
-		parameters: ['buffer', 'usize', 'buffer'],
+		parameters: ['pointer', 'usize', 'pointer'],
 		result: 'pointer',
 	},
 	tsv_free: {
@@ -51,9 +64,9 @@ const symbols = {
 } as const;
 
 type FfiFn = (
-	source: Uint8Array,
+	source: Deno.PointerValue,
 	len: number | bigint,
-	outLen: BigUint64Array,
+	out_len: Deno.PointerValue,
 ) => Deno.PointerValue;
 type LibSymbols = Deno.DynamicLibrary<typeof symbols>['symbols'];
 
@@ -61,8 +74,8 @@ type LibSymbols = Deno.DynamicLibrary<typeof symbols>['symbols'];
  * Uses TSV_FFI_PROFILE env var to select cargo profile (default: "release").
  * The corpus comparison task sets this to "corpus" for panic recovery.
  */
-function getLibraryPath(): string {
-	const libName = Deno.build.os === 'linux'
+function get_library_path(): string {
+	const lib_name = Deno.build.os === 'linux'
 		? 'libtsv_ffi.so'
 		: Deno.build.os === 'darwin'
 		? 'libtsv_ffi.dylib'
@@ -73,8 +86,8 @@ function getLibraryPath(): string {
 		})();
 
 	const profile = Deno.env.get('TSV_FFI_PROFILE') ?? 'release';
-	const targetDir = new URL('../../../target', import.meta.url).pathname;
-	return `${targetDir}/${profile}/${libName}`;
+	const target_dir = new URL('../../../target', import.meta.url).pathname;
+	return `${target_dir}/${profile}/${lib_name}`;
 }
 
 export class NativeImplementation implements TsvImplementation {
@@ -101,48 +114,55 @@ export class NativeImplementation implements TsvImplementation {
 	}
 
 	async init(): Promise<void> {
-		const libPath = getLibraryPath();
+		const lib_path = get_library_path();
 
 		const profile = Deno.env.get('TSV_FFI_PROFILE') ?? 'release';
 		try {
-			await Deno.stat(libPath);
+			await Deno.stat(lib_path);
 		} catch {
 			throw new Error(
-				`Native library not found at ${libPath}. ` +
+				`Native library not found at ${lib_path}. ` +
 					`Run 'cargo build -p tsv_ffi --${
 						profile === 'release' ? 'release' : `profile ${profile}`
 					}' first.`,
 			);
 		}
 
-		this._lib = Deno.dlopen(libPath, symbols);
+		this._lib = Deno.dlopen(lib_path, symbols);
 	}
 
-	private callFfi(fn: FfiFn, source: string): string {
-		const sourceBytes = this.encoder.encode(source);
-		const outLenBuffer = new BigUint64Array(1);
+	private call_ffi(fn: FfiFn, source: string): string {
+		const source_bytes = this.encoder.encode(source);
+		const out_len_buffer = new BigUint64Array(1);
 
-		const resultPtr = fn(sourceBytes, sourceBytes.length, outLenBuffer);
+		// Pass explicit pointers (see the `symbols` comment for why). `source_bytes`
+		// and `out_len_buffer` must stay alive across the synchronous call — they're
+		// referenced again below, which keeps them reachable.
+		const result_ptr = fn(
+			Deno.UnsafePointer.of(source_bytes),
+			source_bytes.length,
+			Deno.UnsafePointer.of(out_len_buffer),
+		);
 
-		if (resultPtr === null) {
+		if (result_ptr === null) {
 			throw new Error('FFI function returned null pointer');
 		}
 
-		const resultLen = outLenBuffer[0];
+		const result_len = out_len_buffer[0];
 
 		// Read the result
-		const resultView = new Deno.UnsafePointerView(resultPtr);
-		const resultBytes = new Uint8Array(Number(resultLen));
-		resultView.copyInto(resultBytes);
+		const result_view = new Deno.UnsafePointerView(result_ptr);
+		const result_bytes = new Uint8Array(Number(result_len));
+		result_view.copyInto(result_bytes);
 
 		// Free the allocated memory (keep as bigint throughout)
-		this.symbols.tsv_free(resultPtr, resultLen);
+		this.symbols.tsv_free(result_ptr, result_len);
 
-		return this.decoder.decode(resultBytes);
+		return this.decoder.decode(result_bytes);
 	}
 
 	/** Check FFI result for error and throw if present */
-	private checkError(result: string): void {
+	private check_error(result: string): void {
 		// Error responses are JSON objects with an "error" key
 		// Check prefix first to avoid JSON.parse overhead on success
 		if (result.length > 0 && result[0] === '{') {
@@ -160,17 +180,17 @@ export class NativeImplementation implements TsvImplementation {
 	}
 
 	/** Check if parsing is supported for this language */
-	supportsParseLanguage(language: Language): boolean {
+	supports_parse_language(language: Language): boolean {
 		return NativeImplementation.PARSE_LANGUAGES.includes(language);
 	}
 
 	/** Check if formatting is supported for this language */
-	supportsFormatLanguage(language: Language): boolean {
+	supports_format_language(language: Language): boolean {
 		return NativeImplementation.FORMAT_LANGUAGES.includes(language);
 	}
 
 	// Lookup tables for FFI functions by language
-	private get parseFns(): Record<Language, FfiFn> {
+	private get parse_fns(): Record<Language, FfiFn> {
 		return {
 			svelte: this.symbols.tsv_parse_svelte as FfiFn,
 			typescript: this.symbols.tsv_parse_typescript as FfiFn,
@@ -178,7 +198,7 @@ export class NativeImplementation implements TsvImplementation {
 		};
 	}
 
-	private get parseInternalFns(): Record<Language, FfiFn> {
+	private get parse_internal_fns(): Record<Language, FfiFn> {
 		return {
 			svelte: this.symbols.tsv_parse_internal_svelte as FfiFn,
 			typescript: this.symbols.tsv_parse_internal_typescript as FfiFn,
@@ -186,7 +206,7 @@ export class NativeImplementation implements TsvImplementation {
 		};
 	}
 
-	private get formatFns(): Record<Language, FfiFn> {
+	private get format_fns(): Record<Language, FfiFn> {
 		return {
 			svelte: this.symbols.tsv_format_svelte as FfiFn,
 			typescript: this.symbols.tsv_format_typescript as FfiFn,
@@ -195,7 +215,7 @@ export class NativeImplementation implements TsvImplementation {
 	}
 
 	parse(source: string, language: Language): unknown {
-		const result = this.callFfi(this.parseFns[language], source);
+		const result = this.call_ffi(this.parse_fns[language], source);
 		const parsed = JSON.parse(result);
 		if (parsed.error) {
 			throw new Error(parsed.error);
@@ -203,14 +223,14 @@ export class NativeImplementation implements TsvImplementation {
 		return parsed;
 	}
 
-	parseInternal(source: string, language: Language): void {
-		const result = this.callFfi(this.parseInternalFns[language], source);
-		this.checkError(result);
+	parse_internal(source: string, language: Language): void {
+		const result = this.call_ffi(this.parse_internal_fns[language], source);
+		this.check_error(result);
 	}
 
 	format(source: string, language: Language): string {
-		const result = this.callFfi(this.formatFns[language], source);
-		this.checkError(result);
+		const result = this.call_ffi(this.format_fns[language], source);
+		this.check_error(result);
 		return result;
 	}
 

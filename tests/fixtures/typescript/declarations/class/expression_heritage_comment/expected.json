@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 204,
+	"end": 397,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -73,24 +73,88 @@
 					"column": 30
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " Block comment between superclass and body",
+			"start": 196,
+			"end": 240,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 268,
+			"end": 281,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 27
+				},
+				"end": {
+					"line": 10,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Block comment between superclass and body, anonymous",
+			"start": 288,
+			"end": 343,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 369,
+			"end": 382,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 25
+				},
+				"end": {
+					"line": 13,
+					"column": 38
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 203,
+		"end": 396,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 194,
+			"end": 387,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 8,
+					"line": 14,
 					"column": 9
 				}
 			},
@@ -348,6 +412,247 @@
 							"value": " Block comment between name and extends",
 							"start": 107,
 							"end": 148
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 242,
+					"end": 285,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 44
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 246,
+							"end": 284,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 5
+								},
+								"end": {
+									"line": 10,
+									"column": 43
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 246,
+								"end": 247,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 5
+									},
+									"end": {
+										"line": 10,
+										"column": 6
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 250,
+								"end": 284,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 9
+									},
+									"end": {
+										"line": 10,
+										"column": 43
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 256,
+									"end": 257,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 15
+										},
+										"end": {
+											"line": 10,
+											"column": 16
+										}
+									},
+									"name": "D"
+								},
+								"superClass": {
+									"type": "Identifier",
+									"start": 266,
+									"end": 267,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 25
+										},
+										"end": {
+											"line": 10,
+											"column": 26
+										}
+									},
+									"name": "B",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " comment ",
+											"start": 268,
+											"end": 281
+										}
+									]
+								},
+								"body": {
+									"type": "ClassBody",
+									"start": 282,
+									"end": 284,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 41
+										},
+										"end": {
+											"line": 10,
+											"column": 43
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block comment between superclass and body",
+							"start": 196,
+							"end": 240
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 345,
+					"end": 386,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 42
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 349,
+							"end": 385,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 5
+								},
+								"end": {
+									"line": 13,
+									"column": 41
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 349,
+								"end": 350,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 5
+									},
+									"end": {
+										"line": 13,
+										"column": 6
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 353,
+								"end": 385,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 9
+									},
+									"end": {
+										"line": 13,
+										"column": 41
+									}
+								},
+								"id": null,
+								"superClass": {
+									"type": "Identifier",
+									"start": 367,
+									"end": 368,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 23
+										},
+										"end": {
+											"line": 13,
+											"column": 24
+										}
+									},
+									"name": "B",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " comment ",
+											"start": 369,
+											"end": 382
+										}
+									]
+								},
+								"body": {
+									"type": "ClassBody",
+									"start": 383,
+									"end": 385,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 39
+										},
+										"end": {
+											"line": 13,
+											"column": 41
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block comment between superclass and body, anonymous",
+							"start": 288,
+							"end": 343
 						}
 					]
 				}

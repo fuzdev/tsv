@@ -26,7 +26,7 @@ export const LANGUAGE_PRETTIER_PARSERS: Record<Language, string> = {
 };
 
 /** Extract version from npm specifier (e.g., "npm:prettier@3.7.4" -> "3.7.4") */
-export function extractVersion(specifier: string): string {
+export function extract_version(specifier: string): string {
 	const match = specifier.match(/@(\d+\.\d+\.\d+)/);
 	return match ? match[1] : 'unknown';
 }
@@ -60,22 +60,22 @@ export interface TsvImplementation {
 	init(): Promise<void>;
 
 	/** Check if parsing is supported for this language */
-	supportsParseLanguage(language: Language): boolean;
+	supports_parse_language(language: Language): boolean;
 
 	/** Check if formatting is supported for this language */
-	supportsFormatLanguage(language: Language): boolean;
+	supports_format_language(language: Language): boolean;
 
 	/** Parse source and return AST (as object or JSON string) */
 	parse(source: string, language: Language): unknown;
 
 	/** Parse source without JSON serialization (native/wasm only, for measuring pure parse speed) */
-	parseInternal?(source: string, language: Language): void;
+	parse_internal?(source: string, language: Language): void;
 
 	/** Format source synchronously (native, wasm) */
 	format?(source: string, language: Language): string;
 
 	/** Format source asynchronously (canonical/prettier) */
-	formatAsync?(source: string, language: Language): Promise<string>;
+	format_async?(source: string, language: Language): Promise<string>;
 
 	/** Clean up resources */
 	dispose(): void;

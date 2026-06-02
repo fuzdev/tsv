@@ -2,34 +2,34 @@
  * Divergence detection module - programmatic detection of known formatting divergences.
  *
  * Three main functions:
- * - `checkSafety()` - Compare character frequencies to detect data loss - BUGS
- * - `detectDivergences()` - Identify known pattern matches - INTENTIONAL DIFFERENCES
- * - `generateAuditReport()` - Cross-reference patterns against conformance_prettier.md
+ * - `check_safety_vs_prettier()` - Differential data-loss check (ours beyond prettier) - BUGS
+ * - `detect_divergences()` - Identify known pattern matches - INTENTIONAL DIFFERENCES
+ * - `generate_audit_report()` - Cross-reference patterns against conformance_prettier.md
  */
 
-export { checkSafety, type SafetyViolation } from './safety.ts';
+export { check_safety_vs_prettier, type SafetyViolation } from './safety.ts';
 export {
-	detectDivergences,
+	detect_divergences,
 	type DetectionContext,
 	type DivergenceMatch,
 	type DivergencePattern,
-	enrichDetectionContext,
+	enrich_detection_context,
 	type HunkCoverageResult,
 	PATTERNS,
 } from './patterns.ts';
 export {
-	checkExpectedError,
+	check_expected_error,
 	EXPECTED_ERROR_PATTERNS,
 	type ExpectedErrorPattern,
 	type ExpectedErrorResult,
 } from './expected_errors.ts';
-export { type DiffHunk, extractHunks } from '../diff.ts';
+export { type DiffHunk, extract_hunks } from '../diff.ts';
 export {
 	type AuditReport,
 	type DocumentedDivergence,
-	formatAuditReport,
-	generateAuditReport,
-	loadDocumentedDivergences,
-	parseConformancePrettierMd,
+	format_audit_report,
+	generate_audit_report,
+	load_documented_divergences,
+	parse_conformance_prettier_md,
 	type PatternCoverage,
 } from './validation.ts';

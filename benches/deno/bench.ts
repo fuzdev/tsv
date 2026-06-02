@@ -43,34 +43,34 @@ import {
 	benchmark_baseline_format,
 	benchmark_baseline_save,
 } from '@fuzdev/fuz_util/benchmark_baseline.js';
-import { DevReposLoader, groupByLanguage } from './lib/corpus.ts';
+import { DevReposLoader, group_by_language } from './lib/corpus.ts';
 import {
-	canonicalParserLabel,
-	getAlternativeVersions,
-	getBenchmarkTasks,
-	initImplementations,
+	canonical_parser_label,
+	get_alternative_versions,
+	get_benchmark_tasks,
+	init_implementations,
 } from './lib/implementations.ts';
 import {
 	type EffectiveCorpusEntry,
-	generateComparisonMarkdown,
-	generateComparisonSummary,
-	generateEffectiveCorpusReport,
-	generateGroupBenchTableMarkdown,
-	generateGroupCoverageMarkdown,
-	generateGroupFilesMarkdown,
-	generateGroupThroughputMarkdown,
-	generateJsonOverheadNote,
-	generateSkippedFilesMarkdown,
-	generateSkippedFilesReport,
-	generateSummaryReport,
-	generateVersionsInfo,
+	generate_comparison_markdown,
+	generate_comparison_summary,
+	generate_effective_corpus_report,
+	generate_group_bench_table_markdown,
+	generate_group_coverage_markdown,
+	generate_group_files_markdown,
+	generate_group_throughput_markdown,
+	generate_json_overhead_note,
+	generate_skipped_files_markdown,
+	generate_skipped_files_report,
+	generate_summary_report,
+	generate_versions_info,
 	type GroupResults,
 } from './lib/report.ts';
 import {
 	type BinarySize,
-	collectBinarySizes,
-	generateBinarySizeMarkdown,
-	generateBinarySizeReport,
+	collect_binary_sizes,
+	generate_binary_size_markdown,
+	generate_binary_size_report,
 } from './lib/binary_sizes.ts';
 import { type Language, LANGUAGES, type SourceFile } from './lib/types.ts';
 
@@ -113,17 +113,17 @@ if (parsed.data._.length > 0) {
 const args = {
 	json: parsed.data.json,
 	markdown: parsed.data.markdown,
-	saveBaseline: parsed.data['save-baseline'],
-	compareBaseline: parsed.data['compare-baseline'],
-	saveReport: parsed.data['save-report'],
+	save_baseline: parsed.data['save-baseline'],
+	compare_baseline: parsed.data['compare-baseline'],
+	save_report: parsed.data['save-report'],
 	verbose: parsed.data.verbose,
 };
 
 // In JSON/markdown mode, progress goes to stderr so stdout is clean structured output
-const structuredOutput = args.json || args.markdown;
+const structured_output = args.json || args.markdown;
 
 function log(...messages: unknown[]): void {
-	if (structuredOutput) {
+	if (structured_output) {
 		console.error(...messages);
 	} else {
 		console.log(...messages);
@@ -155,19 +155,19 @@ const NOISE_PATTERNS = [
 	'oxfmt::textToDoc',
 	'panicked at crates/biome_rowan',
 ];
-const originalConsoleError = console.error.bind(console);
-const suppressedNoise = new Map<string, number>();
+const original_console_error = console.error.bind(console);
+const suppressed_noise = new Map<string, number>();
 console.error = (...args: unknown[]): void => {
 	const probe = args
 		.map((a) => (a instanceof Error ? a.message : typeof a === 'string' ? a : ''))
 		.join(' ');
 	for (const pattern of NOISE_PATTERNS) {
 		if (probe.includes(pattern)) {
-			suppressedNoise.set(pattern, (suppressedNoise.get(pattern) ?? 0) + 1);
+			suppressed_noise.set(pattern, (suppressed_noise.get(pattern) ?? 0) + 1);
 			return;
 		}
 	}
-	originalConsoleError(...args);
+	original_console_error(...args);
 };
 
 //
@@ -175,22 +175,22 @@ console.error = (...args: unknown[]): void => {
 //
 
 /** Parse optional integer from env var */
-const envInt = (name: string): number | undefined => {
+const env_int = (name: string): number | undefined => {
 	const val = Deno.env.get(name);
 	return val ? parseInt(val) : undefined;
 };
 
 /** Limit files per language (default: all) */
-const MAX_FILES_PER_LANGUAGE = envInt('BENCH_LIMIT');
+const MAX_FILES_PER_LANGUAGE = env_int('BENCH_LIMIT');
 
 /** Filter files by path pattern (default: none) */
 const FILE_FILTER = Deno.env.get('BENCH_FILTER');
 
 /** Duration per benchmark in ms (default: 5000) */
-const BENCH_DURATION = envInt('BENCH_DURATION') ?? 5000;
+const BENCH_DURATION = env_int('BENCH_DURATION') ?? 5000;
 
 /** Number of warmup iterations (default: 3) */
-const BENCH_WARMUP = envInt('BENCH_WARMUP') ?? 3;
+const BENCH_WARMUP = env_int('BENCH_WARMUP') ?? 3;
 
 /**
  * Enable the per-iteration forced-GC hook (default: off — measures realistic
@@ -242,41 +242,41 @@ const RESULTS_DIR = './benches/deno/results';
 //
 
 log('Loading corpus...\n');
-const corpusLoader = new DevReposLoader();
+const corpus_loader = new DevReposLoader();
 // Drain `stream()` directly instead of `load()` so we skip the loader's
 // own corpus summary — bench.ts prints its own tighter one below that
 // includes byte counts and (when applicable) limit annotations.
 const files: SourceFile[] = [];
-for await (const file of corpusLoader.stream(log)) {
+for await (const file of corpus_loader.stream(log)) {
 	files.push(file);
 }
-const byLanguage = groupByLanguage(files);
+const by_language = group_by_language(files);
 
 // Preserve total counts before limiting
-const totalFileCounts = {
-	svelte: byLanguage.svelte.length,
-	typescript: byLanguage.typescript.length,
-	css: byLanguage.css.length,
+const total_file_counts = {
+	svelte: by_language.svelte.length,
+	typescript: by_language.typescript.length,
+	css: by_language.css.length,
 };
 
 // Apply file filter and limit
-function limitFiles(files: SourceFile[]): SourceFile[] {
+function limit_files(files: SourceFile[]): SourceFile[] {
 	const filtered = FILE_FILTER ? files.filter((f) => f.path.includes(FILE_FILTER)) : files;
 	return MAX_FILES_PER_LANGUAGE ? filtered.slice(0, MAX_FILES_PER_LANGUAGE) : filtered;
 }
 
-const svelteFiles = limitFiles(byLanguage.svelte);
-const tsFiles = limitFiles(byLanguage.typescript);
-const cssFiles = limitFiles(byLanguage.css);
+const svelte_files = limit_files(by_language.svelte);
+const ts_files = limit_files(by_language.typescript);
+const css_files = limit_files(by_language.css);
 
 // Track if corpus is limited
-const isLimited = MAX_FILES_PER_LANGUAGE !== undefined || FILE_FILTER !== undefined;
+const is_limited = MAX_FILES_PER_LANGUAGE !== undefined || FILE_FILTER !== undefined;
 
 // Calculate total bytes per language for throughput metrics
-const bytesByLanguage: Record<Language, number> = {
-	svelte: svelteFiles.reduce((sum, f) => sum + f.bytes, 0),
-	typescript: tsFiles.reduce((sum, f) => sum + f.bytes, 0),
-	css: cssFiles.reduce((sum, f) => sum + f.bytes, 0),
+const bytes_by_language: Record<Language, number> = {
+	svelte: svelte_files.reduce((sum, f) => sum + f.bytes, 0),
+	typescript: ts_files.reduce((sum, f) => sum + f.bytes, 0),
+	css: css_files.reduce((sum, f) => sum + f.bytes, 0),
 };
 
 /**
@@ -284,140 +284,140 @@ const bytesByLanguage: Record<Language, number> = {
  * (renders as e.g. `0.4 MB/s`) so a column of throughput numbers scans
  * uniformly without unit-switching mid-table.
  */
-function formatThroughput(bytesPerSec: number): string {
-	return `${(bytesPerSec / 1_000_000).toFixed(1)} MB/s`;
+function format_throughput(bytes_per_sec: number): string {
+	return `${(bytes_per_sec / 1_000_000).toFixed(1)} MB/s`;
 }
 
 // Compact corpus summary: file counts + MB per language + total. When
 // limited, each line reads `N of M files` so the subset is obvious.
-const totalFiles = svelteFiles.length + tsFiles.length + cssFiles.length;
-const totalBytes = bytesByLanguage.svelte + bytesByLanguage.typescript + bytesByLanguage.css;
-const fmtCount = (
+const total_files = svelte_files.length + ts_files.length + css_files.length;
+const total_bytes = bytes_by_language.svelte + bytes_by_language.typescript + bytes_by_language.css;
+const fmt_count = (
 	n: number,
 	total: number,
-) => (isLimited && n !== total ? `${n} of ${total}` : `${n}`);
-const fmtBytes = (b: number) => `${(b / 1_000_000).toFixed(1)} MB`;
+) => (is_limited && n !== total ? `${n} of ${total}` : `${n}`);
+const fmt_bytes = (b: number) => `${(b / 1_000_000).toFixed(1)} MB`;
 log(`Corpus:`);
 log(
-	`  Svelte:      ${fmtCount(svelteFiles.length, totalFileCounts.svelte).padEnd(11)} files (${
-		fmtBytes(bytesByLanguage.svelte)
+	`  Svelte:      ${fmt_count(svelte_files.length, total_file_counts.svelte).padEnd(11)} files (${
+		fmt_bytes(bytes_by_language.svelte)
 	})`,
 );
 log(
-	`  TypeScript:  ${fmtCount(tsFiles.length, totalFileCounts.typescript).padEnd(11)} files (${
-		fmtBytes(bytesByLanguage.typescript)
+	`  TypeScript:  ${fmt_count(ts_files.length, total_file_counts.typescript).padEnd(11)} files (${
+		fmt_bytes(bytes_by_language.typescript)
 	})`,
 );
 log(
-	`  CSS:         ${fmtCount(cssFiles.length, totalFileCounts.css).padEnd(11)} files (${
-		fmtBytes(bytesByLanguage.css)
+	`  CSS:         ${fmt_count(css_files.length, total_file_counts.css).padEnd(11)} files (${
+		fmt_bytes(bytes_by_language.css)
 	})`,
 );
-log(`  Total:       ${String(totalFiles).padEnd(11)} files (${fmtBytes(totalBytes)})`);
+log(`  Total:       ${String(total_files).padEnd(11)} files (${fmt_bytes(total_bytes)})`);
 log();
 
 // Initialize implementations
-const impls = await initImplementations({ logger: log });
+const impls = await init_implementations({ logger: log });
 
 //
 // Benchmark Helpers
 //
 
 //
-// Per-impl tracking maps (keyed by trackingKey, e.g. `parse/svelte/native`).
+// Per-impl tracking maps (keyed by tracking_key, e.g. `parse/svelte/native`).
 //
 // Populated by the **untimed pre-flight pass** before each group's timed
 // bench run. The pre-flight records each impl's success/skip set; the timed
 // loop then iterates either the per-group all-N intersection (default) or
 // each impl's preflight success set (`BENCH_MODE=union`).
 //
-// `successfulFiles` and `skippedFiles` always reflect preflight results,
+// `successful_files` and `skipped_files` always reflect preflight results,
 // independent of the iteration mode — they are the source of truth for
-// coverage disclosure. `effectiveCorpusBytes` and `iteratedFileCount` are
+// coverage disclosure. `effective_corpus_bytes` and `iterated_file_count` are
 // updated to reflect what was actually timed (intersection or per-impl).
 //
 
-/** Files an impl successfully processed during pre-flight, keyed by trackingKey. */
-const successfulFiles: Map<string, Set<string>> = new Map();
+/** Files an impl successfully processed during pre-flight, keyed by tracking_key. */
+const successful_files: Map<string, Set<string>> = new Map();
 /** Files an impl failed on during pre-flight, with the error message. */
-const skippedFiles: Map<string, Map<string, string>> = new Map();
+const skipped_files: Map<string, Map<string, string>> = new Map();
 /** Effective corpus size per benchmark (processed / total files). */
-const effectiveCorpusSize: Map<string, { processed: number; total: number }> = new Map();
+const effective_corpus_size: Map<string, { processed: number; total: number }> = new Map();
 /** Effective corpus bytes per benchmark — used for honest throughput math. */
-const effectiveCorpusBytes: Map<string, number> = new Map();
+const effective_corpus_bytes: Map<string, number> = new Map();
 /**
  * Files actually iterated by the timed loop per task. Distinct from
- * `effectiveCorpusSize` (which records preflight success — disclosure-only
+ * `effective_corpus_size` (which records preflight success — disclosure-only
  * coverage info): in `intersection` mode this is the per-group all-N
  * intersection (uniform across tasks in a group); in `union` mode it's the
  * task's preflight success set. Used by the bench-table `Nx (Mf)` annotation
  * and the Comparisons table's pairwise file counts.
  */
-const iteratedFileCount: Map<string, number> = new Map();
+const iterated_file_count: Map<string, number> = new Map();
 /**
  * Wall-clock ms for one preflight pass per task (iterating every file once).
  * Used to tier per-task `min_iterations` so slow tasks (multi-second per pass)
  * get a higher sample-size floor for trustworthy percentile/CI math, while
  * fast tasks rely on `duration_ms` to drive sample count.
  */
-const preflightElapsedMs: Map<string, number> = new Map();
+const preflight_elapsed_ms: Map<string, number> = new Map();
 /**
- * Map result.name → trackingKey per group, so the markdown report can look up
- * coverage/throughput by display name (the bench library doesn't surface trackingKey).
+ * Map result.name → tracking_key per group, so the markdown report can look up
+ * coverage/throughput by display name (the bench library doesn't surface tracking_key).
  */
-const taskTrackingByGroup: Map<string, Map<string, string>> = new Map();
+const task_tracking_by_group: Map<string, Map<string, string>> = new Map();
 
-function recordSkip(benchName: string, filePath: string, error: unknown): void {
-	if (!skippedFiles.has(benchName)) {
-		skippedFiles.set(benchName, new Map());
+function record_skip(bench_name: string, file_path: string, error: unknown): void {
+	if (!skipped_files.has(bench_name)) {
+		skipped_files.set(bench_name, new Map());
 	}
-	const benchMap = skippedFiles.get(benchName)!;
-	if (benchMap.has(filePath)) return;
-	const errorMsg = error instanceof Error ? error.message : String(error);
-	benchMap.set(filePath, errorMsg);
+	const bench_map = skipped_files.get(bench_name)!;
+	if (bench_map.has(file_path)) return;
+	const error_msg = error instanceof Error ? error.message : String(error);
+	bench_map.set(file_path, error_msg);
 }
 
 /**
- * Iterate files and run `processFn` for each. The iteration list is
+ * Iterate files and run `process_fn` for each. The iteration list is
  * pre-filtered to files this task succeeded on during pre-flight (or the
  * group's all-N intersection in `intersection` mode), so throws are real
  * bugs — let them propagate to surface as benchmark errors rather than
  * silently catalog.
  */
-function processCorpus(files: SourceFile[], processFn: (file: SourceFile) => void): void {
+function process_corpus(files: SourceFile[], process_fn: (file: SourceFile) => void): void {
 	for (const file of files) {
-		processFn(file);
+		process_fn(file);
 	}
 }
 
-/** Async variant of `processCorpus`. */
-async function processCorpusAsync(
+/** Async variant of `process_corpus`. */
+async function process_corpus_async(
 	files: SourceFile[],
-	processFn: (file: SourceFile) => Promise<void>,
+	process_fn: (file: SourceFile) => Promise<void>,
 ): Promise<void> {
 	for (const file of files) {
-		await processFn(file);
+		await process_fn(file);
 	}
 }
 
 /** Files by language lookup */
-const filesByLanguage: Record<Language, SourceFile[]> = {
-	svelte: svelteFiles,
-	typescript: tsFiles,
-	css: cssFiles,
+const files_by_language: Record<Language, SourceFile[]> = {
+	svelte: svelte_files,
+	typescript: ts_files,
+	css: css_files,
 };
 
 /**
  * Run every task once per file untimed to discover each impl's effective
- * corpus. Populates `successfulFiles`, `skippedFiles`, and
- * `effectiveCorpusSize` so the caller can compute the per-group iteration
+ * corpus. Populates `successful_files`, `skipped_files`, and
+ * `effective_corpus_size` so the caller can compute the per-group iteration
  * set (intersection or per-impl) and the report can disclose coverage.
  *
  * Cost: O(impls × files), each call is one parse/format. Small relative
  * to the timed loop (which iterates the same files for 5s+ per task).
  */
-async function runPreflight(
-	tasks: ReturnType<typeof getBenchmarkTasks>,
+async function run_preflight(
+	tasks: ReturnType<typeof get_benchmark_tasks>,
 	files: SourceFile[],
 	language: Language,
 ): Promise<void> {
@@ -425,25 +425,25 @@ async function runPreflight(
 		const task = tasks[i];
 		const success = new Set<string>();
 		let bytes = 0;
-		const startMs = performance.now();
+		const start_ms = performance.now();
 		for (const file of files) {
 			try {
-				if (task.isAsync) {
-					await task.runAsync!(file.content, language);
+				if (task.is_async) {
+					await task.run_async!(file.content, language);
 				} else {
 					task.run(file.content, language);
 				}
 				success.add(file.path);
 				bytes += file.bytes;
 			} catch (e) {
-				recordSkip(task.trackingKey, file.path, e);
+				record_skip(task.tracking_key, file.path, e);
 			}
 		}
-		const elapsedMs = performance.now() - startMs;
-		successfulFiles.set(task.trackingKey, success);
-		effectiveCorpusSize.set(task.trackingKey, { processed: success.size, total: files.length });
-		effectiveCorpusBytes.set(task.trackingKey, bytes);
-		preflightElapsedMs.set(task.trackingKey, elapsedMs);
+		const elapsed_ms = performance.now() - start_ms;
+		successful_files.set(task.tracking_key, success);
+		effective_corpus_size.set(task.tracking_key, { processed: success.size, total: files.length });
+		effective_corpus_bytes.set(task.tracking_key, bytes);
+		preflight_elapsed_ms.set(task.tracking_key, elapsed_ms);
 		log(`  [${i + 1}/${tasks.length}] ${task.name}: ${success.size}/${files.length} files`);
 	}
 }
@@ -452,43 +452,46 @@ async function runPreflight(
 // Run Benchmarks
 //
 
-const allGroupResults: GroupResults[] = [];
+const all_group_results: GroupResults[] = [];
 
 /**
  * Per-group setup captured during the up-front pre-flight pass. Reused by
- * `runBenchmarkGroup` so the timed loop is purely measurement.
+ * `run_benchmark_group` so the timed loop is purely measurement.
  */
 interface GroupSetup {
-	tasks: ReturnType<typeof getBenchmarkTasks>;
-	filteredFilesByTask: Map<string, SourceFile[]>;
+	tasks: ReturnType<typeof get_benchmark_tasks>;
+	filtered_files_by_task: Map<string, SourceFile[]>;
 }
-const groupSetups: Map<string, GroupSetup> = new Map();
+const group_setups: Map<string, GroupSetup> = new Map();
 
 /**
  * Run pre-flight + iteration-set computation for one group. Populates
- * `successfulFiles`, `skippedFiles`, `effectiveCorpusSize`,
- * `effectiveCorpusBytes`, `iteratedFileCount`, and `taskTrackingByGroup`,
- * and stashes the per-group setup in `groupSetups` for the timed pass.
+ * `successful_files`, `skipped_files`, `effective_corpus_size`,
+ * `effective_corpus_bytes`, `iterated_file_count`, and `task_tracking_by_group`,
+ * and stashes the per-group setup in `group_setups` for the timed pass.
  *
  * Doing this for every group up front (before any timed run) means the
  * coverage picture lands in the terminal/report before any 5s+ timed
  * benchmark starts — easier to spot a broken impl early.
  */
-async function runPreflightGroup(operation: 'parse' | 'format', language: Language): Promise<void> {
-	const files = filesByLanguage[language];
+async function run_preflight_group(
+	operation: 'parse' | 'format',
+	language: Language,
+): Promise<void> {
+	const files = files_by_language[language];
 	if (files.length === 0) return;
 
-	const groupName = `${operation}/${language}`;
-	log(`\n· ${groupName}`);
+	const group_name = `${operation}/${language}`;
+	log(`\n· ${group_name}`);
 
-	const tasks = getBenchmarkTasks(impls, operation, language);
-	await runPreflight(tasks, files, language);
+	const tasks = get_benchmark_tasks(impls, operation, language);
+	await run_preflight(tasks, files, language);
 
-	const taskTracking = new Map<string, string>();
+	const task_tracking = new Map<string, string>();
 	for (const task of tasks) {
-		taskTracking.set(task.name, task.trackingKey);
+		task_tracking.set(task.name, task.tracking_key);
 	}
-	taskTrackingByGroup.set(groupName, taskTracking);
+	task_tracking_by_group.set(group_name, task_tracking);
 
 	// Build each task's iteration file list. In `intersection` mode (default)
 	// every task in the group iterates the same all-N intersection, making
@@ -496,56 +499,59 @@ async function runPreflightGroup(operation: 'parse' | 'format', language: Langua
 	// task iterates its own preflight success set — ratios then reflect
 	// different file sets per impl, useful for auditing what intersection
 	// mode hides.
-	const filteredFilesByTask = new Map<string, SourceFile[]>();
+	const filtered_files_by_task = new Map<string, SourceFile[]>();
 	if (USE_INTERSECTION) {
 		let intersection: Set<string> | null = null;
 		for (const task of tasks) {
-			const successSet = successfulFiles.get(task.trackingKey) ?? new Set<string>();
+			const success_set = successful_files.get(task.tracking_key) ?? new Set<string>();
 			if (intersection === null) {
-				intersection = new Set(successSet);
+				intersection = new Set(success_set);
 			} else {
 				for (const path of intersection) {
-					if (!successSet.has(path)) intersection.delete(path);
+					if (!success_set.has(path)) intersection.delete(path);
 				}
 			}
 		}
-		const intersectionList = files.filter((f) => (intersection ?? new Set<string>()).has(f.path));
+		const intersection_list = files.filter((f) => (intersection ?? new Set<string>()).has(f.path));
 		for (const task of tasks) {
-			filteredFilesByTask.set(task.trackingKey, intersectionList);
+			filtered_files_by_task.set(task.tracking_key, intersection_list);
 		}
-		log(`  Intersection: ${intersectionList.length}/${files.length} files`);
+		log(`  Intersection: ${intersection_list.length}/${files.length} files`);
 	} else {
 		for (const task of tasks) {
-			const successSet = successfulFiles.get(task.trackingKey) ?? new Set<string>();
-			filteredFilesByTask.set(
-				task.trackingKey,
-				files.filter((f) => successSet.has(f.path)),
+			const success_set = successful_files.get(task.tracking_key) ?? new Set<string>();
+			filtered_files_by_task.set(
+				task.tracking_key,
+				files.filter((f) => success_set.has(f.path)),
 			);
 		}
 	}
 
 	// Overwrite preflight-derived byte counts with iteration byte counts so
-	// throughput math (`ops_per_sec × effectiveCorpusBytes`) reflects what was
+	// throughput math (`ops_per_sec × effective_corpus_bytes`) reflects what was
 	// actually measured. Also record per-task iteration size for the
 	// `Nx (Mf)` annotation in the bench-table `vs baseline` column.
 	for (const task of tasks) {
-		const taskFiles = filteredFilesByTask.get(task.trackingKey)!;
-		effectiveCorpusBytes.set(task.trackingKey, taskFiles.reduce((sum, f) => sum + f.bytes, 0));
-		iteratedFileCount.set(task.trackingKey, taskFiles.length);
+		const task_files = filtered_files_by_task.get(task.tracking_key)!;
+		effective_corpus_bytes.set(task.tracking_key, task_files.reduce((sum, f) => sum + f.bytes, 0));
+		iterated_file_count.set(task.tracking_key, task_files.length);
 	}
 
-	groupSetups.set(groupName, { tasks, filteredFilesByTask });
+	group_setups.set(group_name, { tasks, filtered_files_by_task });
 }
 
 /** Run the timed measurement loop for one group using its stashed pre-flight setup. */
-async function runBenchmarkGroup(operation: 'parse' | 'format', language: Language): Promise<void> {
-	const groupName = `${operation}/${language}`;
-	const setup = groupSetups.get(groupName);
+async function run_benchmark_group(
+	operation: 'parse' | 'format',
+	language: Language,
+): Promise<void> {
+	const group_name = `${operation}/${language}`;
+	const setup = group_setups.get(group_name);
 	if (!setup) return;
-	const { tasks, filteredFilesByTask } = setup;
-	const taskTracking = taskTrackingByGroup.get(groupName) ?? new Map<string, string>();
+	const { tasks, filtered_files_by_task } = setup;
+	const task_tracking = task_tracking_by_group.get(group_name) ?? new Map<string, string>();
 
-	log(`\n▶ ${groupName}`);
+	log(`\n▶ ${group_name}`);
 
 	const bench = new Benchmark({
 		duration_ms: BENCH_DURATION,
@@ -563,44 +569,44 @@ async function runBenchmarkGroup(operation: 'parse' | 'format', language: Langua
 		// See benches/deno/CLAUDE.md → Known Issues.
 		cooldown_ms: 0,
 		on_iteration: BENCH_GC ? () => globalThis.gc?.() : undefined,
-		on_task_complete: (result, index, total) => {
-			const opsPerSec = result.stats.ops_per_second.toFixed(1);
+		on_task_complete: (result: BenchmarkResult, index: number, total: number) => {
+			const ops_per_sec = result.stats.ops_per_second.toFixed(1);
 			// Throughput uses effective bytes (this impl's success set) so
 			// the displayed MB/s is what this impl actually achieved, not
 			// what it would have done on the full corpus.
-			const trackingKey = taskTracking.get(result.name);
-			const effectiveBytes = trackingKey ? effectiveCorpusBytes.get(trackingKey) ?? 0 : 0;
-			const throughput = formatThroughput(result.stats.ops_per_second * effectiveBytes);
-			log(`  [${index + 1}/${total}] ${result.name}: ${opsPerSec} ops/sec (${throughput})`);
+			const tracking_key = task_tracking.get(result.name);
+			const effective_bytes = tracking_key ? effective_corpus_bytes.get(tracking_key) ?? 0 : 0;
+			const throughput = format_throughput(result.stats.ops_per_second * effective_bytes);
+			log(`  [${index + 1}/${total}] ${result.name}: ${ops_per_sec} ops/sec (${throughput})`);
 		},
 	});
 
 	for (const task of tasks) {
-		const taskFiles = filteredFilesByTask.get(task.trackingKey)!;
+		const task_files = filtered_files_by_task.get(task.tracking_key)!;
 		// Tier per-task `min_iterations` based on preflight pass time. The
 		// suite floor (5) handles most cases; very slow tasks (>5s/pass —
 		// prettier on the full TS corpus, oxfmt full passes) get a bump to 7
 		// because at n=5 their p75/p90 still sit too close to max and the
 		// Welch DOF is on the edge. Above that we don't keep climbing: each
 		// extra iteration on a 14s/pass task costs another 14s of wall clock.
-		const preflightMs = preflightElapsedMs.get(task.trackingKey) ?? 0;
-		const minIter = preflightMs > 5000 ? 7 : undefined;
-		const baseTask = { name: task.name, min_iterations: minIter };
-		if (task.isAsync) {
+		const preflight_ms = preflight_elapsed_ms.get(task.tracking_key) ?? 0;
+		const min_iter = preflight_ms > 5000 ? 7 : undefined;
+		const base_task = { name: task.name, min_iterations: min_iter };
+		if (task.is_async) {
 			bench.add({
-				...baseTask,
+				...base_task,
 				fn: async () => {
-					await processCorpusAsync(taskFiles, async (f) => {
-						await task.runAsync!(f.content, language);
+					await process_corpus_async(task_files, async (f) => {
+						await task.run_async!(f.content, language);
 					});
 				},
 				async: true,
 			});
 		} else {
 			bench.add({
-				...baseTask,
+				...base_task,
 				fn: () => {
-					processCorpus(taskFiles, (f) => task.run(f.content, language));
+					process_corpus(task_files, (f) => task.run(f.content, language));
 				},
 				async: false,
 			});
@@ -608,21 +614,21 @@ async function runBenchmarkGroup(operation: 'parse' | 'format', language: Langua
 	}
 
 	const results = await bench.run();
-	allGroupResults.push({ name: groupName, results });
+	all_group_results.push({ name: group_name, results });
 }
 
 // Two-phase run: pre-flight every group up front (so the coverage picture
 // lands before any 5s+ timed run starts), then time every group.
 log('Pre-flight (discover coverage before timing):');
 for (const lang of LANGUAGES) {
-	await runPreflightGroup('parse', lang);
-	await runPreflightGroup('format', lang);
+	await run_preflight_group('parse', lang);
+	await run_preflight_group('format', lang);
 }
 
 log('\nRunning benchmarks:');
 for (const lang of LANGUAGES) {
-	await runBenchmarkGroup('parse', lang);
-	await runBenchmarkGroup('format', lang);
+	await run_benchmark_group('parse', lang);
+	await run_benchmark_group('format', lang);
 }
 
 //
@@ -650,10 +656,10 @@ interface BaselineEntry {
 interface BaselineVersions {
 	svelte: string;
 	acorn: string;
-	acornTs: string;
+	acorn_ts: string;
 	prettier: string;
-	prettierSvelte: string;
-	oxcParser?: string;
+	prettier_svelte: string;
+	oxc_parser?: string;
 	oxfmt?: string;
 	biome?: string;
 }
@@ -673,7 +679,7 @@ interface Baseline {
 }
 
 /** Get current git commit hash */
-async function getGitCommit(): Promise<string | null> {
+async function get_git_commit(): Promise<string | null> {
 	try {
 		const cmd = new Deno.Command('git', {
 			args: ['rev-parse', 'HEAD'],
@@ -691,11 +697,11 @@ async function getGitCommit(): Promise<string | null> {
 }
 
 /** Build results data from current benchmark run */
-async function buildResultsData(
+async function build_results_data(
 	groups: GroupResults[],
 	corpus: { svelte: number; typescript: number; css: number },
 	versions: BaselineVersions,
-	binarySizes: BinarySize[],
+	binary_sizes: BinarySize[],
 ): Promise<Baseline> {
 	const entries: BaselineEntry[] = [];
 	for (const group of groups) {
@@ -722,60 +728,60 @@ async function buildResultsData(
 	return {
 		version: 2,
 		timestamp: new Date().toISOString(),
-		git_commit: await getGitCommit(),
+		git_commit: await get_git_commit(),
 		corpus,
 		versions,
-		binary_sizes: binarySizes,
+		binary_sizes: binary_sizes,
 		entries,
 	};
 }
 
 /** Format bytes as MB with one decimal */
-function formatMB(bytes: number): string {
+function format_mb(bytes: number): string {
 	return `${(bytes / 1_000_000).toFixed(1)} MB`;
 }
 
 /** Generate a full markdown report from benchmark data */
-function generateMarkdownReport(
+function generate_markdown_report(
 	groups: GroupResults[],
-	binarySizes: BinarySize[],
+	binary_sizes: BinarySize[],
 	corpus: { svelte: number; typescript: number; css: number },
-	corpusBytes: Record<Language, number>,
+	corpus_bytes: Record<Language, number>,
 	versions: BaselineVersions,
 	timestamp: string,
-	gitCommit: string | null,
-	taskTracking: Map<string, Map<string, string>>,
-	effectiveSize: Map<string, EffectiveCorpusEntry>,
-	effectiveBytes: Map<string, number>,
-	iteratedCounts: Map<string, number>,
+	git_commit: string | null,
+	task_tracking: Map<string, Map<string, string>>,
+	effective_size: Map<string, EffectiveCorpusEntry>,
+	effective_bytes: Map<string, number>,
+	iterated_counts: Map<string, number>,
 	skipped: Map<string, Map<string, string>>,
 ): string {
 	const lines: string[] = [];
 	lines.push('# TSV Benchmark Results\n');
-	const commitStr = gitCommit ? ` (${gitCommit})` : '';
-	lines.push(`**Date:** ${timestamp}${commitStr}\n`);
+	const commit_str = git_commit ? ` (${git_commit})` : '';
+	lines.push(`**Date:** ${timestamp}${commit_str}\n`);
 
-	const totalFiles = corpus.svelte + corpus.typescript + corpus.css;
-	const totalBytes = corpusBytes.svelte + corpusBytes.typescript + corpusBytes.css;
+	const total_files = corpus.svelte + corpus.typescript + corpus.css;
+	const total_bytes = corpus_bytes.svelte + corpus_bytes.typescript + corpus_bytes.css;
 	lines.push(
-		`**Corpus:** ${corpus.svelte} Svelte (${formatMB(corpusBytes.svelte)}), ` +
-			`${corpus.typescript} TypeScript (${formatMB(corpusBytes.typescript)}), ` +
-			`${corpus.css} CSS (${formatMB(corpusBytes.css)}) — ` +
-			`${totalFiles} files, ${formatMB(totalBytes)} total\n`,
+		`**Corpus:** ${corpus.svelte} Svelte (${format_mb(corpus_bytes.svelte)}), ` +
+			`${corpus.typescript} TypeScript (${format_mb(corpus_bytes.typescript)}), ` +
+			`${corpus.css} CSS (${format_mb(corpus_bytes.css)}) — ` +
+			`${total_files} files, ${format_mb(total_bytes)} total\n`,
 	);
 
 	// Versions
-	const versionParts = [
+	const version_parts = [
 		`svelte@${versions.svelte}`,
 		`acorn@${versions.acorn}`,
-		`acorn-typescript@${versions.acornTs}`,
+		`acorn-typescript@${versions.acorn_ts}`,
 		`prettier@${versions.prettier}`,
-		`prettier-plugin-svelte@${versions.prettierSvelte}`,
+		`prettier-plugin-svelte@${versions.prettier_svelte}`,
 	];
-	if (versions.oxcParser) versionParts.push(`oxc-parser@${versions.oxcParser}`);
-	if (versions.oxfmt) versionParts.push(`oxfmt@${versions.oxfmt}`);
-	if (versions.biome) versionParts.push(`@biomejs/wasm-bundler@${versions.biome}`);
-	lines.push(`**Versions:** ${versionParts.join(', ')}\n`);
+	if (versions.oxc_parser) version_parts.push(`oxc-parser@${versions.oxc_parser}`);
+	if (versions.oxfmt) version_parts.push(`oxfmt@${versions.oxfmt}`);
+	if (versions.biome) version_parts.push(`@biomejs/wasm-bundler@${versions.biome}`);
+	lines.push(`**Versions:** ${version_parts.join(', ')}\n`);
 
 	for (const group of groups) {
 		if (group.results.length === 0) continue;
@@ -783,38 +789,38 @@ function generateMarkdownReport(
 		// Use the canonical reference as the bench-table baseline. Without this,
 		// the library picks the fastest task (often `tsv-internal`, a non-public
 		// optimization variant) which is not the comparison readers want.
-		const baseline = operation === 'format' ? 'prettier' : canonicalParserLabel(language);
-		const baselineExists = group.results.some((r) => r.name === baseline);
+		const baseline = operation === 'format' ? 'prettier' : canonical_parser_label(language);
+		const baseline_exists = group.results.some((r) => r.name === baseline);
 
-		const tracking = taskTracking.get(group.name);
+		const tracking = task_tracking.get(group.name);
 		// Build display-name → iterated-count map for this group, so the table
 		// renderer can append `(Mf)` to each row's `vs baseline` cell.
-		const groupIteratedCounts = new Map<string, number>();
+		const group_iterated_counts = new Map<string, number>();
 		if (tracking) {
-			for (const [displayName, trackingKey] of tracking) {
-				const m = iteratedCounts.get(trackingKey);
-				if (m !== undefined) groupIteratedCounts.set(displayName, m);
+			for (const [display_name, tracking_key] of tracking) {
+				const m = iterated_counts.get(tracking_key);
+				if (m !== undefined) group_iterated_counts.set(display_name, m);
 			}
 		}
 
 		lines.push(`## ${group.name}\n`);
 		lines.push(
-			generateGroupBenchTableMarkdown(group.results, baselineExists ? baseline : undefined),
+			generate_group_bench_table_markdown(group.results, baseline_exists ? baseline : undefined),
 		);
 		lines.push('');
 
-		const files = generateGroupFilesMarkdown(groupIteratedCounts);
+		const files = generate_group_files_markdown(group_iterated_counts);
 		if (files) lines.push(files, '');
 
-		const throughput = generateGroupThroughputMarkdown(group.results, tracking, effectiveBytes);
+		const throughput = generate_group_throughput_markdown(group.results, tracking, effective_bytes);
 		if (throughput) lines.push(throughput, '');
 
-		const coverage = generateGroupCoverageMarkdown(group.results, tracking, effectiveSize);
+		const coverage = generate_group_coverage_markdown(group.results, tracking, effective_size);
 		if (coverage) lines.push(coverage, '');
 
 		if (operation === 'parse') {
-			const jsonNote = generateJsonOverheadNote(group.results);
-			if (jsonNote) lines.push(jsonNote, '');
+			const json_note = generate_json_overhead_note(group.results);
+			if (json_note) lines.push(json_note, '');
 		}
 	}
 
@@ -825,31 +831,31 @@ function generateMarkdownReport(
 		'_Note: every `Nx` is speedup form — values > 1 mean self is faster. File counts come from the per-group `Files (intersection):` / `Coverage:` lines and the Comparisons table row labels._\n',
 	);
 
-	const binarySizeMarkdown = generateBinarySizeMarkdown(binarySizes);
-	if (binarySizeMarkdown) {
-		lines.push(binarySizeMarkdown);
+	const binary_size_markdown = generate_binary_size_markdown(binary_sizes);
+	if (binary_size_markdown) {
+		lines.push(binary_size_markdown);
 		lines.push('');
 	}
 
-	const comparisonMarkdown = generateComparisonMarkdown(
+	const comparison_markdown = generate_comparison_markdown(
 		groups,
 		LANGUAGES,
-		iteratedCounts,
-		taskTracking,
+		iterated_counts,
+		task_tracking,
 	);
-	if (comparisonMarkdown) {
-		lines.push(comparisonMarkdown);
+	if (comparison_markdown) {
+		lines.push(comparison_markdown);
 		lines.push('');
 	}
 
-	const skippedMarkdown = generateSkippedFilesMarkdown(
+	const skipped_markdown = generate_skipped_files_markdown(
 		skipped,
 		MAX_ERROR_MESSAGE_LENGTH,
 		args.verbose,
-		taskTracking,
+		task_tracking,
 	);
-	if (skippedMarkdown) {
-		lines.push(skippedMarkdown);
+	if (skipped_markdown) {
+		lines.push(skipped_markdown);
 		lines.push('');
 	}
 
@@ -860,42 +866,42 @@ function generateMarkdownReport(
  * Save results to the results directory.
  *
  * Always writes a timestamped pair. Only overwrites the canonical
- * `report.{json,md}` when `writeReport` is true — gated by the caller so
+ * `report.{json,md}` when `write_report` is true — gated by the caller so
  * that partial runs (BENCH_LIMIT, BENCH_FILTER) don't clobber the
  * committed canonical report.
  */
-async function saveResults(
+async function save_results(
 	data: Baseline,
 	groups: GroupResults[],
-	binarySizes: BinarySize[],
-	writeReport: boolean,
+	binary_sizes: BinarySize[],
+	write_report: boolean,
 ): Promise<string> {
 	await Deno.mkdir(RESULTS_DIR, { recursive: true });
 	const timestamp = data.timestamp.replace(/[:.]/g, '-').slice(0, 19);
 	const commit = data.git_commit ?? 'unknown';
-	const basePath = `${RESULTS_DIR}/${timestamp}_${commit}`;
+	const base_path = `${RESULTS_DIR}/${timestamp}_${commit}`;
 
-	const markdown = generateMarkdownReport(
+	const markdown = generate_markdown_report(
 		groups,
-		binarySizes,
+		binary_sizes,
 		data.corpus,
-		bytesByLanguage,
+		bytes_by_language,
 		data.versions,
 		data.timestamp,
 		data.git_commit,
-		taskTrackingByGroup,
-		effectiveCorpusSize,
-		effectiveCorpusBytes,
-		iteratedFileCount,
-		skippedFiles,
+		task_tracking_by_group,
+		effective_corpus_size,
+		effective_corpus_bytes,
+		iterated_file_count,
+		skipped_files,
 	);
 
 	const json = JSON.stringify(data, null, '\t');
 	const writes: Promise<void>[] = [
-		Deno.writeTextFile(`${basePath}.json`, json),
-		Deno.writeTextFile(`${basePath}.md`, markdown),
+		Deno.writeTextFile(`${base_path}.json`, json),
+		Deno.writeTextFile(`${base_path}.md`, markdown),
 	];
-	if (writeReport) {
+	if (write_report) {
 		writes.push(
 			Deno.writeTextFile(`${RESULTS_DIR}/report.json`, json),
 			Deno.writeTextFile(`${RESULTS_DIR}/report.md`, markdown),
@@ -903,17 +909,17 @@ async function saveResults(
 	}
 	await Promise.all(writes);
 
-	return basePath;
+	return base_path;
 }
 
 /**
- * Flatten `allGroupResults` into a single list with namespaced names. The
+ * Flatten `all_group_results` into a single list with namespaced names. The
  * fuz_util baseline module joins by `result.name` and our task names repeat
  * across groups (`tsv` lives in `format/svelte`, `format/typescript`,
  * `format/css`). Without namespacing, the last write wins and three groups
  * collapse into one.
  */
-function flattenResultsForBaseline(groups: GroupResults[]): BenchmarkResult[] {
+function flatten_results_for_baseline(groups: GroupResults[]): BenchmarkResult[] {
 	const out: BenchmarkResult[] = [];
 	for (const group of groups) {
 		for (const r of group.results) {
@@ -930,7 +936,7 @@ function flattenResultsForBaseline(groups: GroupResults[]): BenchmarkResult[] {
  * on corpus drift (and to display the same `corpus`/`versions`/`binary_sizes`
  * context the old custom baseline used to carry).
  */
-function buildBaselineMetadata(data: Baseline): Record<string, unknown> {
+function build_baseline_metadata(data: Baseline): Record<string, unknown> {
 	return {
 		corpus: data.corpus,
 		versions: data.versions,
@@ -944,10 +950,10 @@ interface BaselineMeta {
 }
 
 /** Save the current run as the regression baseline. */
-async function saveBaseline(data: Baseline): Promise<void> {
-	await benchmark_baseline_save(flattenResultsForBaseline(allGroupResults), {
+async function save_baseline(data: Baseline): Promise<void> {
+	await benchmark_baseline_save(flatten_results_for_baseline(all_group_results), {
 		path: BASELINE_DIR,
-		metadata: buildBaselineMetadata(data),
+		metadata: build_baseline_metadata(data),
 	});
 	log(`Baseline saved to ${BASELINE_DIR}/baseline.json`);
 }
@@ -960,18 +966,21 @@ async function saveBaseline(data: Baseline): Promise<void> {
  * here previously is gone — see `benchmark_baseline_compare` and the
  * fairness caveats in benches/deno/CLAUDE.md.
  */
-async function compareBaseline(current: Baseline): Promise<void> {
-	const comparison = await benchmark_baseline_compare(flattenResultsForBaseline(allGroupResults), {
-		path: BASELINE_DIR,
-		// 1.0 means "any statistically significant slowdown counts." Tune
-		// upward (e.g. 1.05) to suppress trivial regressions in CI without
-		// losing the practical-significance gate already inside the Welch
-		// comparison (`min_percent_difference` default 0.10).
-		regression_threshold: 1.0,
-		// Mark the baseline stale after a week so a long-untouched baseline
-		// doesn't quietly mask drift accumulated over months.
-		staleness_warning_days: 7,
-	});
+async function compare_baseline(current: Baseline): Promise<void> {
+	const comparison = await benchmark_baseline_compare(
+		flatten_results_for_baseline(all_group_results),
+		{
+			path: BASELINE_DIR,
+			// 1.0 means "any statistically significant slowdown counts." Tune
+			// upward (e.g. 1.05) to suppress trivial regressions in CI without
+			// losing the practical-significance gate already inside the Welch
+			// comparison (`min_percent_difference` default 0.10).
+			regression_threshold: 1.0,
+			// Mark the baseline stale after a week so a long-untouched baseline
+			// doesn't quietly mask drift accumulated over months.
+			staleness_warning_days: 7,
+		},
+	);
 
 	if (!comparison.baseline_found) {
 		console.error(
@@ -989,15 +998,15 @@ async function compareBaseline(current: Baseline): Promise<void> {
 	// between baseline and current is still surfaced (the per-task results
 	// would silently move with the corpus otherwise).
 	const meta = comparison.baseline_metadata as BaselineMeta | null;
-	const baselineCorpus = meta?.corpus;
-	const corpusMatch = baselineCorpus &&
-		baselineCorpus.svelte === current.corpus.svelte &&
-		baselineCorpus.typescript === current.corpus.typescript &&
-		baselineCorpus.css === current.corpus.css;
-	if (baselineCorpus && !corpusMatch) {
+	const baseline_corpus = meta?.corpus;
+	const corpus_match = baseline_corpus &&
+		baseline_corpus.svelte === current.corpus.svelte &&
+		baseline_corpus.typescript === current.corpus.typescript &&
+		baseline_corpus.css === current.corpus.css;
+	if (baseline_corpus && !corpus_match) {
 		log(`\n⚠️  Corpus size differs from baseline:`);
 		log(
-			`   Baseline: svelte=${baselineCorpus.svelte}, ts=${baselineCorpus.typescript}, css=${baselineCorpus.css}`,
+			`   Baseline: svelte=${baseline_corpus.svelte}, ts=${baseline_corpus.typescript}, css=${baseline_corpus.css}`,
 		);
 		log(
 			`   Current:  svelte=${current.corpus.svelte}, ts=${current.corpus.typescript}, css=${current.corpus.css}`,
@@ -1013,83 +1022,88 @@ async function compareBaseline(current: Baseline): Promise<void> {
 //
 
 // Collect binary sizes once (used by all output paths)
-const binarySizes = await collectBinarySizes(impls.versions, {
-	hasNative: !!impls.native,
-	hasWasm: !!impls.wasm,
-	hasOxc: !!impls.oxc,
-	hasBiome: !!impls.biome,
+const binary_sizes = await collect_binary_sizes(impls.versions, {
+	has_native: !!impls.native,
+	has_wasm: !!impls.wasm,
+	has_oxc: !!impls.oxc,
+	has_biome: !!impls.biome,
 });
 
 // Build results data (used by all output paths and always saved)
 const corpus = {
-	svelte: svelteFiles.length,
-	typescript: tsFiles.length,
-	css: cssFiles.length,
+	svelte: svelte_files.length,
+	typescript: ts_files.length,
+	css: css_files.length,
 };
-const altVersions = getAlternativeVersions(impls);
+const alt_versions = get_alternative_versions(impls);
 const v = impls.versions.canonical;
 const versions: BaselineVersions = {
 	svelte: v.svelte,
 	acorn: v.acorn,
-	acornTs: v['@sveltejs/acorn-typescript'],
+	acorn_ts: v['@sveltejs/acorn-typescript'],
 	prettier: v.prettier,
-	prettierSvelte: v['prettier-plugin-svelte'],
-	...altVersions,
+	prettier_svelte: v['prettier-plugin-svelte'],
+	...alt_versions,
 };
-const resultsData = await buildResultsData(allGroupResults, corpus, versions, binarySizes);
+const results_data = await build_results_data(all_group_results, corpus, versions, binary_sizes);
 
 if (args.json) {
 	// JSON output (same structure as saved results)
-	console.log(JSON.stringify(resultsData, null, '\t'));
+	console.log(JSON.stringify(results_data, null, '\t'));
 } else if (args.markdown) {
 	console.log(
-		generateMarkdownReport(
-			allGroupResults,
-			binarySizes,
+		generate_markdown_report(
+			all_group_results,
+			binary_sizes,
 			corpus,
-			bytesByLanguage,
+			bytes_by_language,
 			versions,
-			resultsData.timestamp,
-			resultsData.git_commit,
-			taskTrackingByGroup,
-			effectiveCorpusSize,
-			effectiveCorpusBytes,
-			iteratedFileCount,
-			skippedFiles,
+			results_data.timestamp,
+			results_data.git_commit,
+			task_tracking_by_group,
+			effective_corpus_size,
+			effective_corpus_bytes,
+			iterated_file_count,
+			skipped_files,
 		),
 	);
 } else {
 	// Standard text output
-	console.log(generateSummaryReport(allGroupResults, LANGUAGES));
+	console.log(generate_summary_report(all_group_results, LANGUAGES));
 
-	console.log(generateVersionsInfo(versions));
+	console.log(generate_versions_info(versions));
 
-	const effectiveCorpusReport = generateEffectiveCorpusReport(
-		effectiveCorpusSize,
-		taskTrackingByGroup,
+	const effective_corpus_report = generate_effective_corpus_report(
+		effective_corpus_size,
+		task_tracking_by_group,
 	);
-	if (effectiveCorpusReport) {
-		console.log(effectiveCorpusReport);
+	if (effective_corpus_report) {
+		console.log(effective_corpus_report);
 	}
 
-	const skippedReport = generateSkippedFilesReport(
-		skippedFiles,
+	const skipped_report = generate_skipped_files_report(
+		skipped_files,
 		MAX_ERROR_MESSAGE_LENGTH,
 		args.verbose,
-		taskTrackingByGroup,
+		task_tracking_by_group,
 	);
-	if (skippedReport) {
-		console.log(skippedReport);
+	if (skipped_report) {
+		console.log(skipped_report);
 	}
 
-	const binarySizeReport = generateBinarySizeReport(binarySizes);
-	if (binarySizeReport) {
-		console.log(binarySizeReport);
+	const binary_size_report = generate_binary_size_report(binary_sizes);
+	if (binary_size_report) {
+		console.log(binary_size_report);
 	}
 
 	// Compact comparison summary
 	console.log(
-		generateComparisonSummary(allGroupResults, LANGUAGES, iteratedFileCount, taskTrackingByGroup),
+		generate_comparison_summary(
+			all_group_results,
+			LANGUAGES,
+			iterated_file_count,
+			task_tracking_by_group,
+		),
 	);
 
 	console.log('\n' + '='.repeat(80));
@@ -1097,22 +1111,27 @@ if (args.json) {
 
 // Surface suppressed stderr noise counts so silenced upstream bugs don't
 // just vanish. Counts are accurate even when individual messages aren't.
-if (suppressedNoise.size > 0) {
+if (suppressed_noise.size > 0) {
 	log('');
 	log('Suppressed stderr noise from upstream impls:');
-	for (const [pattern, count] of suppressedNoise) {
+	for (const [pattern, count] of suppressed_noise) {
 		log(`  ${count}× ${pattern}`);
 	}
 }
 
 // Always save the timestamped pair; only overwrite the canonical
 // `report.{json,md}` on full-corpus runs or when --save-report is set.
-const writeReport = args.saveReport || !isLimited;
-const resultsPath = await saveResults(resultsData, allGroupResults, binarySizes, writeReport);
+const write_report = args.save_report || !is_limited;
+const results_path = await save_results(
+	results_data,
+	all_group_results,
+	binary_sizes,
+	write_report,
+);
 log(`\nResults saved to:`);
-log(`  ${resultsPath}.json`);
-log(`  ${resultsPath}.md`);
-if (writeReport) {
+log(`  ${results_path}.json`);
+log(`  ${results_path}.md`);
+if (write_report) {
 	log(`Canonical report updated:`);
 	log(`  ${RESULTS_DIR}/report.json`);
 	log(`  ${RESULTS_DIR}/report.md`);
@@ -1121,10 +1140,10 @@ if (writeReport) {
 }
 
 // Handle baseline operations
-if (args.saveBaseline) {
-	await saveBaseline(resultsData);
+if (args.save_baseline) {
+	await save_baseline(results_data);
 }
 
-if (args.compareBaseline) {
-	await compareBaseline(resultsData);
+if (args.compare_baseline) {
+	await compare_baseline(results_data);
 }

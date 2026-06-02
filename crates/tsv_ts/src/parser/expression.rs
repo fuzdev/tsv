@@ -2209,7 +2209,7 @@ impl<'a> Parser<'a> {
     /// Parse arrow function body: expression or block statement
     fn parse_arrow_body(&mut self) -> Result<ArrowFunctionBody, ParseError> {
         if self.check(&TokenKind::BraceOpen) {
-            let block = self.parse_block_statement()?;
+            let block = self.parse_function_body()?;
             Ok(ArrowFunctionBody::BlockStatement(block))
         } else {
             // Use assignment_expression so comma doesn't consume next object property
@@ -2385,7 +2385,7 @@ impl<'a> Parser<'a> {
             None
         };
 
-        let body = self.parse_block_statement()?;
+        let body = self.parse_function_body()?;
         let end = body.span.end;
 
         Ok(FunctionExpression {
@@ -2404,6 +2404,16 @@ impl<'a> Parser<'a> {
     /// Parse a block statement: `{ stmt1; stmt2; }`
     ///
     /// Parses the statements inside a block body (used for function bodies).
+    /// Parse a function/arrow block body, marking its directive prologue.
+    ///
+    /// Function bodies (unlike arbitrary blocks) carry a directive prologue per
+    /// acorn — see `adapt_directive_prologue`.
+    pub(super) fn parse_function_body(&mut self) -> Result<BlockStatement, ParseError> {
+        let mut block = self.parse_block_statement()?;
+        self.adapt_directive_prologue(&mut block.body);
+        Ok(block)
+    }
+
     pub(super) fn parse_block_statement(&mut self) -> Result<BlockStatement, ParseError> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?; // consume '{'

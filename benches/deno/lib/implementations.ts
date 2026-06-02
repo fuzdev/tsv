@@ -16,7 +16,7 @@ import { WasmImplementation } from './wasm.ts';
 import { OxcImplementation } from './oxc.ts';
 import { OxcWasmImplementation } from './oxc_wasm.ts';
 import { BiomeImplementation } from './biome.ts';
-import { type AllVersions, loadAllVersions } from './versions.ts';
+import { type AllVersions, load_all_versions } from './versions.ts';
 
 export type { TsvImplementation };
 
@@ -33,7 +33,7 @@ export interface InitializedImplementations {
 	/** OXC implementation (oxc-parser + oxfmt) - undefined if not available */
 	oxc: OxcImplementation | undefined;
 	/** OXC WASM implementation (oxc-parser via wasm32-wasi) - undefined if not available */
-	oxcWasm: OxcWasmImplementation | undefined;
+	oxc_wasm: OxcWasmImplementation | undefined;
 	/** Biome implementation (via WASM) - undefined if not available */
 	biome: BiomeImplementation | undefined;
 }
@@ -43,9 +43,9 @@ export interface InitOptions {
 	/** Logger for status messages */
 	logger?: Logger;
 	/** Whether to skip missing implementations (default: true) */
-	skipMissing?: boolean;
+	skip_missing?: boolean;
 	/** Whether canonical is required (default: true) */
-	requireCanonical?: boolean;
+	require_canonical?: boolean;
 }
 
 /**
@@ -53,19 +53,19 @@ export interface InitOptions {
  *
  * @example
  * ```ts
- * const impls = await initImplementations({ logger: console.log });
+ * const impls = await init_implementations({ logger: console.log });
  * if (impls.native) {
  *   const result = impls.native.format(source, 'svelte');
  * }
  * ```
  */
-export async function initImplementations(
+export async function init_implementations(
 	options: InitOptions = {},
 ): Promise<InitializedImplementations> {
-	const { logger = console.log, skipMissing = true, requireCanonical = true } = options;
+	const { logger = console.log, skip_missing = true, require_canonical = true } = options;
 
 	// Load all versions once from deno.json
-	const versions = await loadAllVersions();
+	const versions = await load_all_versions();
 
 	const canonical = new CanonicalImplementation(versions.canonical);
 	const native = new NativeImplementation();
@@ -78,7 +78,7 @@ export async function initImplementations(
 		await canonical.init();
 		logger('  ✓ Canonical (prettier + svelte/compiler)');
 	} catch (e) {
-		if (requireCanonical) {
+		if (require_canonical) {
 			logger(`  ✗ Canonical: ${e}`);
 			throw e;
 		}
@@ -86,13 +86,13 @@ export async function initImplementations(
 	}
 
 	// Initialize native (optional)
-	let nativeImpl: NativeImplementation | undefined;
+	let native_impl: NativeImplementation | undefined;
 	try {
 		await native.init();
 		logger('  ✓ Native (FFI)');
-		nativeImpl = native;
+		native_impl = native;
 	} catch (e) {
-		if (skipMissing) {
+		if (skip_missing) {
 			logger(`  ⚠ Native (FFI): not available`);
 		} else {
 			throw e;
@@ -100,13 +100,13 @@ export async function initImplementations(
 	}
 
 	// Initialize WASM (optional)
-	let wasmImpl: WasmImplementation | undefined;
+	let wasm_impl: WasmImplementation | undefined;
 	try {
 		await wasm.init();
 		logger('  ✓ WASM');
-		wasmImpl = wasm;
+		wasm_impl = wasm;
 	} catch (e) {
-		if (skipMissing) {
+		if (skip_missing) {
 			logger(`  ⚠ WASM: not available`);
 		} else {
 			throw e;
@@ -114,14 +114,14 @@ export async function initImplementations(
 	}
 
 	// Initialize OXC (optional)
-	let oxcImpl: OxcImplementation | undefined;
+	let oxc_impl: OxcImplementation | undefined;
 	const oxc = new OxcImplementation(versions.oxc);
 	try {
 		await oxc.init();
 		logger('  ✓ OXC (oxc-parser + oxfmt)');
-		oxcImpl = oxc;
+		oxc_impl = oxc;
 	} catch (e) {
-		if (skipMissing) {
+		if (skip_missing) {
 			logger(`  ⚠ OXC: not available`);
 		} else {
 			throw e;
@@ -129,14 +129,14 @@ export async function initImplementations(
 	}
 
 	// Initialize OXC WASM (optional)
-	let oxcWasmImpl: OxcWasmImplementation | undefined;
-	const oxcWasm = new OxcWasmImplementation(versions.oxc);
+	let oxc_wasm_impl: OxcWasmImplementation | undefined;
+	const oxc_wasm = new OxcWasmImplementation(versions.oxc);
 	try {
-		await oxcWasm.init();
+		await oxc_wasm.init();
 		logger('  ✓ OXC WASM (oxc-parser)');
-		oxcWasmImpl = oxcWasm;
+		oxc_wasm_impl = oxc_wasm;
 	} catch (e) {
-		if (skipMissing) {
+		if (skip_missing) {
 			logger(`  ⚠ OXC WASM: not available`);
 		} else {
 			throw e;
@@ -144,14 +144,14 @@ export async function initImplementations(
 	}
 
 	// Initialize Biome (optional)
-	let biomeImpl: BiomeImplementation | undefined;
+	let biome_impl: BiomeImplementation | undefined;
 	const biome = new BiomeImplementation(versions.biome);
 	try {
 		await biome.init();
 		logger('  ✓ Biome (WASM)');
-		biomeImpl = biome;
+		biome_impl = biome;
 	} catch (e) {
-		if (skipMissing) {
+		if (skip_missing) {
 			logger(`  ⚠ Biome: not available`);
 		} else {
 			throw e;
@@ -163,11 +163,11 @@ export async function initImplementations(
 	return {
 		versions,
 		canonical,
-		native: nativeImpl,
-		wasm: wasmImpl,
-		oxc: oxcImpl,
-		oxcWasm: oxcWasmImpl,
-		biome: biomeImpl,
+		native: native_impl,
+		wasm: wasm_impl,
+		oxc: oxc_impl,
+		oxc_wasm: oxc_wasm_impl,
+		biome: biome_impl,
 	};
 }
 
@@ -176,33 +176,33 @@ export interface BenchmarkTask {
 	/** Display name in benchmark output */
 	name: string;
 	/** Key for corpus size tracking (e.g., "parse/svelte/native") */
-	trackingKey: string;
+	tracking_key: string;
 	/** Whether this benchmark runs async */
-	isAsync: boolean;
+	is_async: boolean;
 	/** The benchmark function - processes all files once */
 	run: (source: string, language: Language) => unknown;
-	/** Async version if isAsync is true */
-	runAsync?: (source: string, language: Language) => Promise<unknown>;
+	/** Async version if is_async is true */
+	run_async?: (source: string, language: Language) => Promise<unknown>;
 }
 
 /**
  * Get all benchmark tasks for a specific operation and language.
  * Returns tasks in display order (canonical first, then alternatives).
  */
-export function getBenchmarkTasks(
+export function get_benchmark_tasks(
 	impls: InitializedImplementations,
 	operation: 'parse' | 'format',
 	language: Language,
 ): BenchmarkTask[] {
 	const tasks: BenchmarkTask[] = [];
-	const groupName = `${operation}/${language}`;
+	const group_name = `${operation}/${language}`;
 
 	if (operation === 'parse') {
 		// Canonical parser (always available)
 		tasks.push({
-			name: canonicalParserLabel(language),
-			trackingKey: `${groupName}/canonical`,
-			isAsync: false,
+			name: canonical_parser_label(language),
+			tracking_key: `${group_name}/canonical`,
+			is_async: false,
 			run: (source) => impls.canonical.parse(source, language),
 		});
 
@@ -210,8 +210,8 @@ export function getBenchmarkTasks(
 		if (impls.native) {
 			tasks.push({
 				name: 'tsv-json',
-				trackingKey: `${groupName}/native`,
-				isAsync: false,
+				tracking_key: `${group_name}/native`,
+				is_async: false,
 				run: (source) => impls.native!.parse(source, language),
 			});
 		}
@@ -220,68 +220,68 @@ export function getBenchmarkTasks(
 		if (impls.wasm) {
 			tasks.push({
 				name: 'tsv_wasm-json',
-				trackingKey: `${groupName}/wasm`,
-				isAsync: false,
+				tracking_key: `${group_name}/wasm`,
+				is_async: false,
 				run: (source) => impls.wasm!.parse(source, language),
 			});
 		}
 
 		// Internal parsing variants (no JSON serialization) - shows JSON overhead
-		if (impls.native?.parseInternal) {
+		if (impls.native?.parse_internal) {
 			tasks.push({
 				name: 'tsv-internal',
-				trackingKey: `${groupName}/native-internal`,
-				isAsync: false,
-				run: (source) => impls.native!.parseInternal!(source, language),
+				tracking_key: `${group_name}/native-internal`,
+				is_async: false,
+				run: (source) => impls.native!.parse_internal!(source, language),
 			});
 		}
 
-		if (impls.wasm?.parseInternal) {
+		if (impls.wasm?.parse_internal) {
 			tasks.push({
 				name: 'tsv_wasm-internal',
-				trackingKey: `${groupName}/wasm-internal`,
-				isAsync: false,
-				run: (source) => impls.wasm!.parseInternal!(source, language),
+				tracking_key: `${group_name}/wasm-internal`,
+				is_async: false,
+				run: (source) => impls.wasm!.parse_internal!(source, language),
 			});
 		}
 
 		// OXC parser (TypeScript/JS only)
-		if (impls.oxc?.supportsParseLanguage(language)) {
+		if (impls.oxc?.supports_parse_language(language)) {
 			tasks.push({
 				name: 'oxc-parser',
-				trackingKey: `${groupName}/oxc`,
-				isAsync: false,
+				tracking_key: `${group_name}/oxc`,
+				is_async: false,
 				run: (source) => impls.oxc!.parse(source, language),
 			});
 		}
 
 		// OXC WASM parser (TypeScript/JS only)
-		if (impls.oxcWasm?.supportsParseLanguage(language)) {
+		if (impls.oxc_wasm?.supports_parse_language(language)) {
 			tasks.push({
 				name: 'oxc-parser-wasm',
-				trackingKey: `${groupName}/oxc-wasm`,
-				isAsync: false,
-				run: (source) => impls.oxcWasm!.parse(source, language),
+				tracking_key: `${group_name}/oxc-wasm`,
+				is_async: false,
+				run: (source) => impls.oxc_wasm!.parse(source, language),
 			});
 		}
 	} else {
 		// Canonical formatter (prettier) - async
 		tasks.push({
 			name: 'prettier',
-			trackingKey: `${groupName}/canonical`,
-			isAsync: true,
+			tracking_key: `${group_name}/canonical`,
+			is_async: true,
 			run: () => {
-				throw new Error('Use runAsync for prettier');
+				throw new Error('Use run_async for prettier');
 			},
-			runAsync: (source) => impls.canonical.formatAsync(source, language),
+			run_async: (source) => impls.canonical.format_async(source, language),
 		});
 
 		// Native formatter
 		if (impls.native?.format) {
 			tasks.push({
 				name: 'tsv',
-				trackingKey: `${groupName}/native`,
-				isAsync: false,
+				tracking_key: `${group_name}/native`,
+				is_async: false,
 				run: (source) => impls.native!.format!(source, language),
 			});
 		}
@@ -290,31 +290,31 @@ export function getBenchmarkTasks(
 		if (impls.wasm?.format) {
 			tasks.push({
 				name: 'tsv_wasm',
-				trackingKey: `${groupName}/wasm`,
-				isAsync: false,
+				tracking_key: `${group_name}/wasm`,
+				is_async: false,
 				run: (source) => impls.wasm!.format!(source, language),
 			});
 		}
 
 		// OXC formatter (TypeScript/JS/CSS only) - async
-		if (impls.oxc?.supportsFormatLanguage(language)) {
+		if (impls.oxc?.supports_format_language(language)) {
 			tasks.push({
 				name: 'oxfmt',
-				trackingKey: `${groupName}/oxfmt`,
-				isAsync: true,
+				tracking_key: `${group_name}/oxfmt`,
+				is_async: true,
 				run: () => {
-					throw new Error('Use runAsync for oxfmt');
+					throw new Error('Use run_async for oxfmt');
 				},
-				runAsync: (source) => impls.oxc!.formatAsync(source, language),
+				run_async: (source) => impls.oxc!.format_async(source, language),
 			});
 		}
 
 		// Biome formatter
-		if (impls.biome?.supportsFormatLanguage(language)) {
+		if (impls.biome?.supports_format_language(language)) {
 			tasks.push({
 				name: 'biome-wasm',
-				trackingKey: `${groupName}/biome`,
-				isAsync: false,
+				tracking_key: `${group_name}/biome`,
+				is_async: false,
 				run: (source) => impls.biome!.format(source, language),
 			});
 		}
@@ -324,7 +324,7 @@ export function getBenchmarkTasks(
 }
 
 /** Get canonical parser label for a language */
-export function canonicalParserLabel(lang: Language): string {
+export function canonical_parser_label(lang: Language): string {
 	switch (lang) {
 		case 'svelte':
 			return 'svelte/compiler';
@@ -338,35 +338,35 @@ export function canonicalParserLabel(lang: Language): string {
 /** Uniform formatter handle (sync or async, with per-language support gate) */
 export interface FormatterInfo {
 	name: string;
-	isAsync: boolean;
+	is_async: boolean;
 	format?: (source: string, language: Language) => string;
-	formatAsync?: (source: string, language: Language) => Promise<string>;
-	supportsLanguage: (language: Language) => boolean;
+	format_async?: (source: string, language: Language) => Promise<string>;
+	supports_language: (language: Language) => boolean;
 }
 
 /**
  * Collect every available formatter wrapped in a uniform handle.
  * Used by the smoke test (`deno task smoke`). Preserves the sync/async
- * distinction — callers should branch on `isAsync`.
+ * distinction — callers should branch on `is_async`.
  */
-export function getFormatters(impls: InitializedImplementations): FormatterInfo[] {
+export function get_formatters(impls: InitializedImplementations): FormatterInfo[] {
 	const formatters: FormatterInfo[] = [];
 
 	// Canonical (prettier) - async
 	formatters.push({
 		name: 'prettier',
-		isAsync: true,
-		formatAsync: (source, lang) => impls.canonical.formatAsync(source, lang),
-		supportsLanguage: () => true,
+		is_async: true,
+		format_async: (source, lang) => impls.canonical.format_async(source, lang),
+		supports_language: () => true,
 	});
 
 	// Native - sync
 	if (impls.native?.format) {
 		formatters.push({
 			name: 'tsv',
-			isAsync: false,
+			is_async: false,
 			format: (source, lang) => impls.native!.format!(source, lang),
-			supportsLanguage: () => true,
+			supports_language: () => true,
 		});
 	}
 
@@ -374,9 +374,9 @@ export function getFormatters(impls: InitializedImplementations): FormatterInfo[
 	if (impls.wasm?.format) {
 		formatters.push({
 			name: 'tsv_wasm',
-			isAsync: false,
+			is_async: false,
 			format: (source, lang) => impls.wasm!.format!(source, lang),
-			supportsLanguage: () => true,
+			supports_language: () => true,
 		});
 	}
 
@@ -384,9 +384,9 @@ export function getFormatters(impls: InitializedImplementations): FormatterInfo[
 	if (impls.oxc) {
 		formatters.push({
 			name: 'oxfmt',
-			isAsync: true,
-			formatAsync: (source, lang) => impls.oxc!.formatAsync(source, lang),
-			supportsLanguage: (lang) => impls.oxc!.supportsFormatLanguage(lang),
+			is_async: true,
+			format_async: (source, lang) => impls.oxc!.format_async(source, lang),
+			supports_language: (lang) => impls.oxc!.supports_format_language(lang),
 		});
 	}
 
@@ -394,9 +394,9 @@ export function getFormatters(impls: InitializedImplementations): FormatterInfo[
 	if (impls.biome) {
 		formatters.push({
 			name: 'biome-wasm',
-			isAsync: false,
+			is_async: false,
 			format: (source, lang) => impls.biome!.format(source, lang),
-			supportsLanguage: (lang) => impls.biome!.supportsFormatLanguage(lang),
+			supports_language: (lang) => impls.biome!.supports_format_language(lang),
 		});
 	}
 
@@ -405,7 +405,7 @@ export function getFormatters(impls: InitializedImplementations): FormatterInfo[
 
 /** Version info for available alternative implementations */
 export interface AlternativeVersions {
-	oxcParser?: string;
+	oxc_parser?: string;
 	oxfmt?: string;
 	biome?: string;
 }
@@ -414,9 +414,9 @@ export interface AlternativeVersions {
  * Get version info for available alternative implementations.
  * Only includes versions for implementations that initialized successfully.
  */
-export function getAlternativeVersions(impls: InitializedImplementations): AlternativeVersions {
+export function get_alternative_versions(impls: InitializedImplementations): AlternativeVersions {
 	return {
-		oxcParser: impls.oxc?.versions['oxc-parser'],
+		oxc_parser: impls.oxc?.versions['oxc-parser'],
 		oxfmt: impls.oxc?.versions.oxfmt,
 		biome: impls.biome?.versions.wasm,
 	};

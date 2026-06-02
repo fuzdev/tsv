@@ -29,7 +29,7 @@ mod strings;
 pub mod token;
 
 use comments::read_comment;
-use identifiers::read_identifier;
+use identifiers::{is_identifier_start, read_identifier};
 use numbers::read_number;
 use strings::read_string;
 pub use token::{Token, TokenKind};
@@ -171,6 +171,12 @@ impl<'a> Lexer<'a> {
             '=' => single_char_token!(TokenKind::Equals),
             '%' => single_char_token!(TokenKind::Percent),
             '^' => single_char_token!(TokenKind::Caret),
+            // `$`-prefixed identifier (SCSS variable / property name like `$foo`).
+            // Svelte's parseCss treats it as a single identifier. A bare `$` (e.g.
+            // the `$=` attribute selector) falls through to the Dollar token below.
+            '$' if self.peek_char(1).is_some_and(is_identifier_start) => {
+                read_identifier(self.source, &mut self.pos)
+            }
             '$' => single_char_token!(TokenKind::Dollar),
             '!' => single_char_token!(TokenKind::Bang),
             '|' => {
@@ -191,9 +197,7 @@ impl<'a> Lexer<'a> {
             }
 
             // Identifiers (including those with unicode escapes)
-            _ if ch.is_alphabetic() || ch == '-' || ch == '_' || ch == '\\' => {
-                read_identifier(self.source, &mut self.pos)
-            }
+            _ if is_identifier_start(ch) => read_identifier(self.source, &mut self.pos),
 
             // Unknown character
             _ => Err(ParseError::InvalidSyntax {

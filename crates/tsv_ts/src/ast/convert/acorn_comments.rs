@@ -66,6 +66,23 @@ pub fn collect_acorn_type_reparse_ranges(
         });
     }
     ranges.extend(resolved);
+    // Resolve empty-param function-type ranges: strip the marker and shrink the
+    // end from the `=>` down to the close paren so only in-paren comments are
+    // duplicated (a pre-arrow comment lives after `)` and must not duplicate).
+    for range in &mut ranges {
+        if range.0 & EMPTY_PAREN_MARKER != 0 {
+            let open = (range.0 & !EMPTY_PAREN_MARKER) as usize;
+            let close = tsv_lang::source_scan::find_char_skipping_comments(
+                bytes,
+                open + 1,
+                range.1 as usize,
+                b')',
+            )
+            .map_or(range.1, |p| p as u32);
+            range.0 = open as u32;
+            range.1 = close;
+        }
+    }
     // Narrow computed method signature ranges: the broad (span.start, span.end) range
     // duplicates comments outside brackets. Find `]` and use it as the range end.
     for range in &mut ranges {
@@ -88,6 +105,11 @@ pub fn collect_acorn_type_reparse_ranges(
 /// Marker bit for mapped type name-to-in ranges (encoded in the start field).
 /// Uses bit 31 of u32 — valid source positions are well below 2^31.
 const MAPPED_TYPE_MARKER: u32 = 1 << 31;
+
+/// Marker bit for empty-param function-type ranges (encoded in the start field).
+/// Uses bit 30 — resolved at the top level by finding the close paren so the range
+/// covers only the parens, not a trailing pre-arrow comment.
+const EMPTY_PAREN_MARKER: u32 = 1 << 30;
 
 /// Build a comment list with acorn-typescript duplicates for type re-parse ranges.
 ///
@@ -705,6 +727,18 @@ fn collect_ranges_from_type(ty: &internal::TSType, ranges: &mut Vec<(u32, u32)>)
             let any_param_typed = func.params.iter().any(expr_has_type_annotation);
             if !func.params.is_empty() && !any_param_typed {
                 ranges.push((func.span.start, func.span.end));
+            } else if func.params.is_empty() {
+                // Empty parens containing a comment (`(/* c */) =>`) still trigger
+                // acorn's parenthesized-expression backtracking, duplicating the
+                // in-paren comment. The range must cover only the parens — a
+                // pre-arrow comment (`() /* c */ =>`) is parsed once, not
+                // duplicated. The close-paren position needs source, so encode the
+                // open-paren start with EMPTY_PAREN_MARKER and resolve it at the
+                // top level (bounded by the `=>` at the return annotation's start).
+                ranges.push((
+                    func.span.start | EMPTY_PAREN_MARKER,
+                    func.return_type.span.start,
+                ));
             }
             // Recurse into nested types
             for param in &func.params {

@@ -1,12 +1,33 @@
 use super::token::{Token, TokenKind};
 use tsv_lang::ParseError;
 
+/// Whether `ch` can begin a CSS identifier token in the lexer dispatch.
+///
+/// Covers ASCII/Unicode letters (`is_alphabetic`), `-`, `_`, and the `\` escape
+/// introducer. Digits and a leading `$` have their own dispatch arms (numbers,
+/// and `$`-prefixed identifiers), so they're intentionally excluded here — but a
+/// `$` arm uses this to confirm the *next* char begins an identifier.
+pub(crate) fn is_identifier_start(ch: char) -> bool {
+    ch.is_alphabetic() || ch == '-' || ch == '_' || ch == '\\'
+}
+
 /// Read a CSS identifier
-/// CSS identifiers can contain unicode escapes and the characters a-z, A-Z, 0-9, -, _
+/// CSS identifiers can contain unicode escapes and the characters a-z, A-Z, 0-9, -, _,
+/// plus an optional leading `$` (SCSS-style; the lexer dispatch only routes `$` here when
+/// it begins an identifier).
 /// Per CSS Syntax Level 3 spec, escape sequences are decoded to their actual characters
 pub(crate) fn read_identifier(source: &str, pos: &mut usize) -> Result<Token, ParseError> {
     let start = *pos;
     let mut decoded = String::new();
+
+    // Optional leading `$` (SCSS-style variable / property identifiers). Svelte's
+    // `parseCss` treats `$foo` as a single identifier; a bare `$` (e.g. the `$=`
+    // attribute selector) is kept as a Dollar token by the lexer dispatch, so this
+    // arm is only reached when `$` begins an identifier.
+    if source[*pos..].starts_with('$') {
+        decoded.push('$');
+        *pos += 1;
+    }
 
     // CSS identifiers can contain escape sequences that must be decoded
     loop {

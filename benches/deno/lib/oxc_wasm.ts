@@ -43,18 +43,18 @@ export class OxcWasmImplementation implements TsvImplementation {
 	static readonly FORMAT_LANGUAGES: Language[] = [];
 
 	/** Check if parsing is supported for this language */
-	supportsParseLanguage(language: Language): boolean {
+	supports_parse_language(language: Language): boolean {
 		return OxcWasmImplementation.PARSE_LANGUAGES.includes(language);
 	}
 
 	/** Check if formatting is supported for this language */
-	supportsFormatLanguage(_language: Language): boolean {
+	supports_format_language(_language: Language): boolean {
 		return false;
 	}
 
 	parse(source: string, language: Language): unknown {
 		if (!this._parser) throw new Error('OXC WASM parser not initialized');
-		if (!this.supportsParseLanguage(language)) {
+		if (!this.supports_parse_language(language)) {
 			throw new Error(`OXC WASM parser does not support ${language}`);
 		}
 

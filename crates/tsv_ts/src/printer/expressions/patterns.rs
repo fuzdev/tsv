@@ -36,6 +36,9 @@ enum AssignmentContext {
 struct TrailingComments<'a> {
     /// Block comments that go before the comma
     block: SmallVec<[&'a Comment; 2]>,
+    /// Block comments after the comma, preserved in place (last element only —
+    /// prettier relocates these before the comma; see conformance_prettier.md)
+    block_after: SmallVec<[&'a Comment; 2]>,
     /// Line comments that go after the comma (in line_suffix)
     line: SmallVec<[&'a Comment; 2]>,
     /// Position after all trailing comments (for updating prev_end)
@@ -232,11 +235,13 @@ impl<'a> Printer<'a> {
         if obj.properties.is_empty() {
             self.build_empty_object_pattern_doc(obj)
         } else {
-            // Expand if: nested patterns, line comments, or blank lines between properties
+            // Expand if: nested patterns, line comments, blank lines, or own-line
+            // block comments between/around properties
             let should_expand = object_pattern_should_expand(obj, context);
             let (has_line_comments, has_blank_lines) = self.object_pattern_formatting_hints(obj);
+            let has_own_line_block = self.object_pattern_has_own_line_block_comments(obj);
 
-            if should_expand || has_line_comments || has_blank_lines {
+            if should_expand || has_line_comments || has_blank_lines || has_own_line_block {
                 self.build_expanded_object_pattern_doc(obj)
             } else {
                 // Use group with line breaks for width-based expansion
@@ -269,20 +274,18 @@ impl<'a> Printer<'a> {
                         .map(|next| next.span().start)
                         .or_else(|| obj.type_annotation.as_ref().map(|t| t.span.start))
                         .unwrap_or(obj.span.end);
-                    let trailing = self.collect_trailing_comments(prop_end, upper_bound);
+                    let trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
 
-                    // Block comments go before comma
-                    parts.push(self.build_block_comments_doc(&trailing.block));
-
-                    // Add comma
-                    if !is_last {
-                        parts.push(d.text(","));
+                    // Hard comma between properties; trailing comma (break-only) on
+                    // the last unless it is the rest element
+                    let comma = if !is_last {
+                        d.text(",")
                     } else if !last_is_rest {
-                        parts.push(d.trailing_comma());
-                    }
-
-                    // Line comments go after comma
-                    parts.push(self.build_line_comments_suffix_doc(&trailing.line));
+                        d.trailing_comma()
+                    } else {
+                        d.empty()
+                    };
+                    self.push_element_comma_trailing(&mut parts, &trailing, comma);
 
                     // Add line break between properties
                     if !is_last {
@@ -315,10 +318,13 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build trailing comments doc for object pattern (between last property and `}`)
+    /// Build trailing comments doc for the inline (single-line) object pattern
+    /// path (between last property and `}`), e.g. `{a /*, b*/}`.
     ///
     /// Only captures comments on NEW lines (not same-line trailing comments,
-    /// which are handled in the main loop).
+    /// which are handled in the main loop). The expanded paths use
+    /// `build_pattern_trailing_dangling_comments` instead, which puts each
+    /// comment on its own line.
     fn build_object_pattern_trailing_comments(&self, obj: &internal::ObjectPattern) -> DocId {
         let d = self.d();
         if let Some(last_prop) = obj.properties.last() {
@@ -341,6 +347,34 @@ impl<'a> Printer<'a> {
         } else {
             d.empty()
         }
+    }
+
+    /// Build dangling comments after the last element of an *expanded* pattern
+    /// (between the last element and the closing `}`/`]`).
+    ///
+    /// Each comment goes on its own line, with blank lines preserved. Same-line
+    /// trailing comments are handled in the per-element loop, so they are
+    /// skipped here. Mirrors the object/array expression printers' handling of
+    /// trailing comments before the closing delimiter (`objects.rs`). Without
+    /// this, expanded array patterns dropped these comments entirely (content
+    /// loss) and expanded object patterns glued them onto the last property's
+    /// line.
+    fn build_pattern_trailing_dangling_comments(&self, prev_end: u32, boundary: u32) -> DocId {
+        let d = self.d();
+        let mut parts = Vec::new();
+        let mut last_pos = prev_end;
+        for comment in comments_in_range(self.comments, prev_end, boundary) {
+            if self.is_same_line(prev_end, comment.span.start) {
+                continue;
+            }
+            if self.has_blank_line_between(last_pos, comment.span.start) {
+                parts.push(d.literalline());
+            }
+            parts.push(d.hardline());
+            parts.push(self.build_comment_doc(comment));
+            last_pos = comment.span.end;
+        }
+        d.concat(&parts)
     }
 
     /// Generic helper: Check for line comments and blank lines in a collection
@@ -410,31 +444,68 @@ impl<'a> Printer<'a> {
         )
     }
 
+    /// Check if object pattern has any own-line single-line block comments
+    ///
+    /// Mirrors `array_pattern_has_own_line_block_comments`: an own-line block
+    /// comment (between, before, or after properties) forces expansion, matching
+    /// prettier.
+    fn object_pattern_has_own_line_block_comments(&self, obj: &internal::ObjectPattern) -> bool {
+        let boundary = obj
+            .type_annotation
+            .as_ref()
+            .map_or(obj.span.end, |t| t.span.start);
+        let span = tsv_lang::Span::new(obj.span.start, boundary);
+        self.has_own_line_block_comments_in_bracket_list(
+            span,
+            &obj.properties,
+            ObjectPatternProperty::span,
+        )
+    }
+
     /// Collect trailing comments for a list element (property or array element)
     ///
     /// Trailing comments are same-line comments after the element:
     /// - Block comments: only if they appear BEFORE the comma
     /// - Line comments: always belong to this element (they consume the rest of the line)
-    fn collect_trailing_comments(&self, elem_end: u32, upper_bound: u32) -> TrailingComments<'_> {
+    fn collect_trailing_comments(
+        &self,
+        elem_end: u32,
+        upper_bound: u32,
+        is_last: bool,
+    ) -> TrailingComments<'_> {
         // Find comma position in source (if any)
         let comma_pos = self.source[elem_end as usize..upper_bound as usize]
             .find(',')
             .map(|offset| elem_end + offset as u32);
 
-        // Collect same-line trailing comments
+        // Collect same-line trailing comments. A block comment after the comma
+        // normally belongs to the next element as leading — except on the LAST
+        // element, where it is preserved after the comma (prettier relocates it
+        // before — see conformance_prettier.md §Comment relocation).
         let all: Vec<_> = comments_in_range(self.comments, elem_end, upper_bound)
             .filter(|c| {
                 self.is_same_line(elem_end, c.span.start)
-                    && (!c.is_block || comma_pos.is_none_or(|comma| c.span.start < comma))
+                    && (!c.is_block
+                        || is_last
+                        || comma_pos.is_none_or(|comma| c.span.start < comma))
             })
             .collect();
 
-        let block = all.iter().filter(|c| c.is_block).copied().collect();
+        let is_after_comma =
+            |c: &Comment| c.is_block && comma_pos.is_some_and(|comma| c.span.start > comma);
+
+        let block = all
+            .iter()
+            .filter(|c| c.is_block && !is_after_comma(c))
+            .copied()
+            .collect();
+        let block_after = all.iter().filter(|c| is_after_comma(c)).copied().collect();
         let line = all.iter().filter(|c| !c.is_block).copied().collect();
         let end_pos = all.last().map_or(elem_end, |c| c.span.end);
 
         TrailingComments {
             block,
+            block_after,
             line,
             end_pos,
         }
@@ -461,6 +532,23 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
+    /// Push one element's trailing comments around its `comma` doc, in the order
+    /// that preserves comment position: block comments before the comma, the
+    /// comma, block comments after the comma (last-element case), then line
+    /// comments as a suffix. Shared by the object/array pattern element loops so
+    /// this ordering — the comment-position contract — can't drift between them.
+    fn push_element_comma_trailing(
+        &self,
+        parts: &mut Vec<DocId>,
+        trailing: &TrailingComments,
+        comma: DocId,
+    ) {
+        parts.push(self.build_block_comments_doc(&trailing.block));
+        parts.push(comma);
+        parts.push(self.build_block_comments_doc(&trailing.block_after));
+        parts.push(self.build_line_comments_suffix_doc(&trailing.line));
+    }
+
     /// Build doc for empty object pattern: `{}` with optional type annotation
     fn build_empty_object_pattern_doc(&self, obj: &internal::ObjectPattern) -> DocId {
         let d = self.d();
@@ -480,6 +568,14 @@ impl<'a> Printer<'a> {
             Some(ObjectPatternProperty::RestElement(_))
         );
 
+        // A comment trailing the opening `{` on its own line is kept on the `{`
+        // line when the pattern expands (divergence from prettier, which relocates
+        // it to its own line as the first property's leading comment). See
+        // conformance_prettier.md §Comment relocation (Object destructuring `{`).
+        let first_prop_start = obj.properties[0].span().start;
+        let (brace_line_prefix, brace_pull_pos) =
+            self.delimiter_line_comment_prefix(obj.span.start, first_prop_start);
+
         // Track previous end for comment detection (start after `{`)
         let mut prev_end = obj.span.start + 1;
 
@@ -487,14 +583,27 @@ impl<'a> Printer<'a> {
         for (i, prop) in obj.properties.iter().enumerate() {
             // Handle leading comments before this property (with blank line preservation)
             let prop_start = prop.span().start;
-            let leading_comments: Vec<_> =
-                comments_in_range(self.comments, prev_end, prop_start).collect();
+            let leading_comments: Vec<_> = comments_in_range(self.comments, prev_end, prop_start)
+                .filter(|c| {
+                    // The brace-line comment pulled onto the `{` line above is emitted
+                    // as the prefix, not here (only relevant for the first property).
+                    !(i == 0
+                        && brace_pull_pos
+                            .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c)))
+                })
+                .collect();
 
             prop_parts.extend(
                 self.build_leading_comments_with_blank_lines(&leading_comments, prop_start),
             );
 
-            prop_parts.push(self.build_object_pattern_property_doc(prop));
+            // A preceding `// prettier-ignore` keeps the property's source verbatim
+            // (trailing comment/comma handled normally)
+            if self.has_prettier_ignore_in_range(prev_end, prop_start) {
+                prop_parts.push(self.raw_source_doc(prop.span()));
+            } else {
+                prop_parts.push(self.build_object_pattern_property_doc(prop));
+            }
 
             let prop_end = prop.span().end;
             let is_last = i == obj.properties.len() - 1;
@@ -506,18 +615,15 @@ impl<'a> Printer<'a> {
                 .map(|next| next.span().start)
                 .or_else(|| obj.type_annotation.as_ref().map(|t| t.span.start))
                 .unwrap_or(obj.span.end);
-            let trailing = self.collect_trailing_comments(prop_end, upper_bound);
+            let trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
 
-            // Block comments go before comma
-            prop_parts.push(self.build_block_comments_doc(&trailing.block));
-
-            // Add trailing comma unless it's a rest element (syntax error)
-            if !is_last || !last_is_rest {
-                prop_parts.push(d.text(","));
-            }
-
-            // Line comments go after comma
-            prop_parts.push(self.build_line_comments_suffix_doc(&trailing.line));
+            // Trailing comma unless this is the rest element (syntax error)
+            let comma = if !is_last || !last_is_rest {
+                d.text(",")
+            } else {
+                d.empty()
+            };
+            self.push_element_comma_trailing(&mut prop_parts, &trailing, comma);
 
             if !is_last {
                 // Check for blank line before next property
@@ -539,13 +645,17 @@ impl<'a> Printer<'a> {
             prev_end = trailing.end_pos;
         }
 
-        // Check for trailing comments after last property
-        let trailing = self.build_object_pattern_trailing_comments(obj);
-        prop_parts.push(trailing);
+        // Check for dangling comments after the last property (before `}`)
+        let boundary = obj
+            .type_annotation
+            .as_ref()
+            .map_or(obj.span.end, |t| t.span.start);
+        prop_parts.push(self.build_pattern_trailing_dangling_comments(prev_end, boundary));
 
-        // Structure: { + indent(hardline + props) + hardline + } + type_annotation
+        // Structure: { + brace-line prefix + indent(hardline + props) + hardline + } + type_annotation
         let mut result_parts = vec![
             d.text("{"),
+            d.concat(&brace_line_prefix),
             d.indent(d.concat(&[d.hardline(), d.concat(&prop_parts)])),
             d.hardline(),
             d.text("}"),
@@ -738,7 +848,7 @@ impl<'a> Printer<'a> {
                     .get(i + 1)
                     .and_then(|opt| opt.as_ref().map(|e| e.span().start))
                     .unwrap_or(arr.span.end);
-                let trailing = self.collect_trailing_comments(elem_end, upper_bound);
+                let trailing = self.collect_trailing_comments(elem_end, upper_bound, is_last);
 
                 // Block comments go before comma (line comments handled in expanded version)
                 parts.push(self.build_block_comments_doc(&trailing.block));
@@ -750,6 +860,9 @@ impl<'a> Printer<'a> {
                 } else {
                     parts.push(d.trailing_comma());
                 }
+
+                // Block comments after the comma (last element): preserve position
+                parts.push(self.build_block_comments_doc(&trailing.block_after));
 
                 prev_end = trailing.end_pos;
             } else {
@@ -794,6 +907,20 @@ impl<'a> Printer<'a> {
             .and_then(|opt| opt.as_ref())
             .is_some_and(|e| matches!(e, Expression::RestElement(_)));
 
+        // A comment trailing the opening `[` on its own line is kept on the `[`
+        // line when the pattern expands (divergence from prettier, which relocates
+        // it to its own line as the first element's leading comment). See
+        // conformance_prettier.md §Comment relocation (Array destructuring `[`).
+        // Only applies when the first element is present (a leading hole has no
+        // span to anchor the range); otherwise the existing path handles comments.
+        let (bracket_line_prefix, bracket_pull_pos) =
+            match arr.elements.first().and_then(|opt| opt.as_ref()) {
+                Some(first) => {
+                    self.delimiter_line_comment_prefix(arr.span.start, first.span().start)
+                }
+                None => (Vec::new(), None),
+            };
+
         for (i, elem) in arr.elements.iter().enumerate() {
             let is_last = i == arr.elements.len() - 1;
 
@@ -801,7 +928,15 @@ impl<'a> Printer<'a> {
                 // Check for leading comments before this element (with blank line preservation)
                 let elem_start = e.span().start;
                 let leading_comments: Vec<_> =
-                    comments_in_range(self.comments, prev_end, elem_start).collect();
+                    comments_in_range(self.comments, prev_end, elem_start)
+                        .filter(|c| {
+                            // The bracket-line comment pulled onto the `[` line above is
+                            // emitted as the prefix, not here (only the first element).
+                            !(i == 0
+                                && bracket_pull_pos
+                                    .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c)))
+                        })
+                        .collect();
                 parts.extend(
                     self.build_leading_comments_with_blank_lines(&leading_comments, elem_start),
                 );
@@ -816,18 +951,15 @@ impl<'a> Printer<'a> {
                     .get(i + 1)
                     .and_then(|opt| opt.as_ref().map(|e| e.span().start))
                     .unwrap_or(arr.span.end);
-                let trailing = self.collect_trailing_comments(elem_end, upper_bound);
+                let trailing = self.collect_trailing_comments(elem_end, upper_bound, is_last);
 
-                // Block comments go before comma
-                parts.push(self.build_block_comments_doc(&trailing.block));
-
-                // Add comma (unless it's the last element AND it's a rest element)
-                if !is_last || !last_is_rest {
-                    parts.push(d.text(","));
-                }
-
-                // Line comments go after comma
-                parts.push(self.build_line_comments_suffix_doc(&trailing.line));
+                // Comma unless this is the last element AND a rest element
+                let comma = if !is_last || !last_is_rest {
+                    d.text(",")
+                } else {
+                    d.empty()
+                };
+                self.push_element_comma_trailing(&mut parts, &trailing, comma);
 
                 if !is_last {
                     // Check for blank line before next element (or its leading comment)
@@ -855,9 +987,17 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Structure: [ + indent(hardline + elements) + hardline + ] + type_annotation
+        // Check for dangling comments after the last element (before `]`)
+        let boundary = arr
+            .type_annotation
+            .as_ref()
+            .map_or(arr.span.end, |t| t.span.start);
+        parts.push(self.build_pattern_trailing_dangling_comments(prev_end, boundary));
+
+        // Structure: [ + bracket-line prefix + indent(hardline + elements) + hardline + ] + type_annotation
         let mut result_parts = vec![
             d.text("["),
+            d.concat(&bracket_line_prefix),
             d.indent(d.concat(&[d.hardline(), d.concat(&parts)])),
             d.hardline(),
             d.text("]"),

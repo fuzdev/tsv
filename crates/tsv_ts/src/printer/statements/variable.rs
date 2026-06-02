@@ -2,6 +2,7 @@
 
 use super::Printer;
 use crate::ast::internal::{self, Expression};
+use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::{
     CommentFilter, CommentSpacing, ParenContext, analysis, conditional_should_break_after_op,
     is_call_on_member_chain, is_curried_arrow_with_return_type, is_literal_member_chain,
@@ -34,9 +35,7 @@ fn build_fluid_assignment_doc(d: &DocArena, id_doc: DocId, init_doc: DocId) -> D
     d.group(d.concat(&[
         id_doc,
         d.text(" ="),
-        d.group_with_id(d.indent(d.line()), GroupId::Assignment),
-        d.line_suffix_boundary(),
-        d.indent_if_break(init_doc, GroupId::Assignment, false),
+        fluid_after_operator(d, init_doc, GroupId::Assignment),
     ]))
 }
 
@@ -607,7 +606,7 @@ impl<'a> Printer<'a> {
                         init,
                     );
                     let rhs_doc = d.concat(&[comments_doc, init_doc]);
-                    parts.push(d.group(d.indent(d.concat(&[d.line(), rhs_doc]))));
+                    parts.push(hang_after_operator(d, rhs_doc));
                 } else if is_curried_arrow {
                     // Curried arrow with return type: mandatory break after `=`
                     // The arrow expression formatter handles the rest of the breaking
@@ -708,7 +707,7 @@ impl<'a> Printer<'a> {
                         self.build_expression_doc_with_paren_comments(init, declarator.span.end),
                         init,
                     ));
-                    parts.push(d.group(d.indent(d.concat(&[d.line(), init_doc]))));
+                    parts.push(hang_after_operator(d, init_doc));
                 } else if is_layout_eligible && !is_simple_value(init) {
                     // Fluid layout (default for layout-eligible values)
                     //

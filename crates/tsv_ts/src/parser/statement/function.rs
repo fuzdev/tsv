@@ -116,7 +116,7 @@ impl<'a> Parser<'a> {
             }))
         } else {
             // Function implementation - parse body
-            let body = self.parse_block_statement()?;
+            let body = self.parse_function_body()?;
             let end = body.span.end;
 
             Ok(Statement::FunctionDeclaration(FunctionDeclaration {
@@ -241,7 +241,7 @@ impl<'a> Parser<'a> {
             }))
         } else {
             // Has body - regular function declaration
-            let body = self.parse_block_statement()?;
+            let body = self.parse_function_body()?;
             let end = body.span.end;
 
             Ok(ExportFunctionDeclaration::Declaration(
@@ -336,7 +336,7 @@ impl<'a> Parser<'a> {
         };
 
         // Parse function body
-        let body = self.parse_block_statement()?;
+        let body = self.parse_function_body()?;
         let end = body.span.end;
 
         Ok(Expression::FunctionExpression(FunctionExpression {

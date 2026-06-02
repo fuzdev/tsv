@@ -34,10 +34,14 @@ tsv_svelte = { path = "crates/tsv_svelte", default-features = false }
 
 # External dependencies
 argh = "0.1"
+# Async runtime + combinators — dev/debug tooling only (tsv_debug, integration tests)
+tokio = { version = "1" }
+futures-util = "0.3"
+phf = { version = "0.13", features = ["macros"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 smallvec = "1.11"
-string-interner = "0.19"
+string-interner = "0.20"
 thiserror = "2"
 unicode-ident = "1.0"
 unicode-segmentation = "1.12.0"
@@ -116,8 +120,7 @@ useless_let_if_seq = "allow"
 elidable_lifetime_names = "allow"
 
 # Cargo overrides
-cargo_common_metadata = "allow"
-multiple_crate_versions = "allow"
+cargo_common_metadata = "allow"      # internal crates, not published to crates.io
 
 # Restriction lints (panic points need explicit #[allow] with justification)
 clone_on_ref_ptr = "warn"
@@ -144,8 +147,8 @@ serde_json.workspace = true
 [dev-dependencies]
 tsv_debug = { path = "crates/tsv_debug" }
 tsv_cli = { path = "crates/tsv_cli" }
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
-futures-util = "0.3"
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+futures-util.workspace = true
 
 [lints]
 workspace = true

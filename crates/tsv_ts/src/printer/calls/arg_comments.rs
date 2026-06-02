@@ -194,7 +194,7 @@ pub(super) fn is_comment_inline_with_next(
 ///
 /// Only truly standalone block comments (different line from both `start` AND `next_code_pos`)
 /// force expansion.
-pub(super) fn should_force_expansion_for_comments(
+pub(crate) fn should_force_expansion_for_comments(
     printer: &Printer,
     start: u32,
     next_code_pos: u32,
@@ -364,6 +364,35 @@ pub(crate) fn has_trailing_line_comments_slice(
     })
 }
 
+/// Emit the leading comments between `(` and the first argument into `parts`.
+///
+/// Same-line trailing block comments are emitted inline (`/* c */ arg`); own-line
+/// comments stay on their own line. Several per-argument printer loops only emit
+/// leading comments for args `1..n` (via the previous arg's gap), so the first
+/// arg's leading comment must be emitted explicitly or it's dropped.
+pub(crate) fn emit_first_arg_leading_comments(
+    printer: &Printer,
+    parts: &mut Vec<DocId>,
+    paren_open: u32,
+    first_arg_start: u32,
+) {
+    if !printer.has_comments_between(paren_open, first_arg_start) {
+        return;
+    }
+    let d = printer.d();
+    let pc = PartitionedComments::new(
+        printer.comments,
+        printer.line_breaks,
+        paren_open,
+        first_arg_start,
+    );
+    for comment in &pc.trailing_block {
+        parts.push(printer.build_comment_doc(comment));
+        parts.push(d.text(" "));
+    }
+    pc.emit_leading_comments_inline_aware(parts, printer, first_arg_start);
+}
+
 /// Check if there are trailing comments (line OR block) on any arguments
 ///
 /// Used when we need to detect ALL trailing comments, not just line comments.
@@ -503,6 +532,34 @@ impl<'a> PartitionedComments<'a> {
         }
         for comment in &self.trailing_line {
             parts.push(d.text(" "));
+            parts.push(printer.build_comment_doc(comment));
+        }
+    }
+
+    /// Emit own-line ("leading") comments after the last argument, past its
+    /// trailing comma — each on its own line (hardline before).
+    ///
+    /// Ensures the trailing comma is present first, updating `comma_added`. Used by
+    /// the last-argument path of every call-shaped printer (plain, `new`, and
+    /// member-callee chains); without it, own-line line comments before the closing
+    /// paren are dropped (content loss). Block-only callers already worked via their
+    /// own filters, but line comments need this shared path.
+    pub fn emit_last_arg_dangling_comments(
+        &self,
+        parts: &mut Vec<DocId>,
+        printer: &Printer,
+        comma_added: &mut bool,
+    ) {
+        if self.leading.is_empty() {
+            return;
+        }
+        let d = printer.d();
+        if !*comma_added {
+            parts.push(d.text(","));
+            *comma_added = true;
+        }
+        for comment in &self.leading {
+            parts.push(d.hardline());
             parts.push(printer.build_comment_doc(comment));
         }
     }

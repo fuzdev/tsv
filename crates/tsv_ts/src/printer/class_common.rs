@@ -1,0 +1,306 @@
+// Shared class-printer helpers used by both the class-declaration printer
+// (`statements/class.rs`) and the class-expression printer
+// (`expressions/functions.rs`).
+//
+// Class declarations and expressions share their entire heritage layout:
+// position computation, `extends`/`implements` rendering, the group-mode
+// decision, and the body brace placement. Only the prefix differs —
+// decorators plus `declare`/`abstract` for declarations, the `class` keyword
+// and anonymous-class comment handling for expressions. Everything from the
+// heritage clauses onward lives here so the two printers can't drift.
+
+use crate::ast::internal;
+use crate::printer::CommentSpacing;
+use crate::printer::Printer;
+use tsv_lang::doc::arena::DocId;
+
+/// Heritage positions computed once and reused for group-mode detection,
+/// heritage-comment extraction, and the header→body boundary.
+pub(in crate::printer) struct ClassHeritagePositions {
+    /// End of the name/type-params region — where heritage leading comments start.
+    pub pre_heritage_end: u32,
+    /// Position of the `extends` keyword (not the superclass expression start).
+    pub extends_keyword_start: Option<u32>,
+    /// Position of the `implements` keyword.
+    pub implements_keyword_start: Option<u32>,
+    /// Start of the first heritage clause keyword (`extends` or `implements`).
+    pub first_heritage_start: Option<u32>,
+    /// End of the `extends` clause (superclass end, or its type-args end).
+    pub extends_clause_end: Option<u32>,
+    /// End of the header (last heritage / type-params / name) before the body.
+    pub header_end: u32,
+}
+
+impl<'a> Printer<'a> {
+    /// Compute the heritage positions shared by both class printers.
+    pub(in crate::printer) fn class_heritage_positions(
+        &self,
+        span_start: u32,
+        id: Option<&internal::Identifier>,
+        type_parameters: Option<&internal::TSTypeParameterDeclaration>,
+        super_class: Option<&internal::Expression>,
+        super_type_parameters: Option<&internal::TSTypeParameterInstantiation>,
+        implements: &[internal::TSInterfaceHeritage],
+    ) -> ClassHeritagePositions {
+        let pre_heritage_end = type_parameters.map_or_else(
+            || id.map_or(span_start + 5, |id| id.span.end),
+            |tp| tp.span.end,
+        );
+        // Find `extends`/`implements` keyword positions (not expression starts) so
+        // heritage leading comments only cover name-to-keyword, not keyword-to-item.
+        let extends_keyword_start = super_class.and_then(|sc| {
+            self.find_keyword_in_range(pre_heritage_end, sc.span().start, "extends")
+        });
+        let implements_keyword_start = if implements.is_empty() {
+            None
+        } else {
+            let search_start = extends_keyword_start.map_or(pre_heritage_end, |ek| {
+                // After the extends clause.
+                super_class.map_or(ek + 7, |sc| {
+                    super_type_parameters.map_or_else(|| sc.span().end, |tp| tp.span.end)
+                })
+            });
+            self.find_keyword_in_range(search_start, implements[0].span.start, "implements")
+        };
+        let first_heritage_start = extends_keyword_start.or(implements_keyword_start);
+        let extends_clause_end = super_class
+            .map(|sc| super_type_parameters.map_or_else(|| sc.span().end, |tp| tp.span.end));
+        let header_end = implements
+            .last()
+            .map(|i| i.span.end)
+            .or(extends_clause_end)
+            .or_else(|| type_parameters.map(|tp| tp.span.end))
+            .or_else(|| id.map(|id| id.span.end))
+            .unwrap_or(span_start + 5);
+
+        ClassHeritagePositions {
+            pre_heritage_end,
+            extends_keyword_start,
+            implements_keyword_start,
+            first_heritage_start,
+            extends_clause_end,
+            header_end,
+        }
+    }
+
+    /// Whether a class should use heritage "group mode" for structural
+    /// (non-comment) reasons:
+    /// 1. Multiple heritage items (extends + implements count > 1), or
+    /// 2. A member-expression superclass without type arguments.
+    ///
+    /// Comment-based group mode is OR'd in by each caller using the already
+    /// computed position data (avoids duplicate binary searches).
+    pub(in crate::printer) fn should_class_group_mode(
+        &self,
+        super_class: Option<&internal::Expression>,
+        super_type_parameters: Option<&internal::TSTypeParameterInstantiation>,
+        implements: &[internal::TSInterfaceHeritage],
+    ) -> bool {
+        let mut count = if super_class.is_some() { 1 } else { 0 };
+        count += implements.len();
+        if count > 1 {
+            return true;
+        }
+        if let Some(super_class) = super_class
+            && super_type_parameters.is_none()
+            && matches!(super_class, internal::Expression::MemberExpression(_))
+        {
+            return true;
+        }
+        false
+    }
+
+    /// `extends <super_class>[<type args>]`, preserving comments between the
+    /// `extends` keyword and the base (`extends /* c */ Base`) and between the
+    /// base and its type args (`extends Base/* c */ <T>`).
+    ///
+    /// The superclass is rendered with the full expression printer so it breaks
+    /// width-aware and keeps inner comments; the type args use the wrapping
+    /// type-argument builder (the same one the `implements` clause uses).
+    pub(in crate::printer) fn build_class_extends_doc(
+        &self,
+        super_class: Option<&internal::Expression>,
+        super_type_parameters: Option<&internal::TSTypeParameterInstantiation>,
+        extends_keyword_start: Option<u32>,
+    ) -> Option<DocId> {
+        let d = self.d();
+        let super_class = super_class?;
+        let mut ext_parts = vec![d.text("extends ")];
+        if let Some(kw_start) = extends_keyword_start {
+            let kw_end = kw_start + 7; // "extends".len()
+            ext_parts.push(self.build_comments_between(
+                kw_end,
+                super_class.span().start,
+                CommentSpacing::Trailing,
+            ));
+        }
+        ext_parts.push(self.build_expression_doc(super_class));
+        if let Some(type_args) = super_type_parameters {
+            let gap_start = super_class.span().end;
+            let gap_end = type_args.span.start;
+            if let Some(doc) = self.build_name_to_type_params_comments_opt(
+                gap_start,
+                gap_end,
+                CommentSpacing::Trailing,
+            ) {
+                ext_parts.push(doc);
+            }
+            ext_parts.push(self.build_type_arguments_doc_wrapping(type_args));
+        }
+        Some(d.concat(&ext_parts))
+    }
+
+    /// `implements <items>`, delegating to the shared heritage-clause builder
+    /// (normalizes whitespace, breaks long lists per item, renders type args
+    /// and inter-item comments).
+    pub(in crate::printer) fn build_class_implements_doc(
+        &self,
+        implements: &[internal::TSInterfaceHeritage],
+        group_mode: bool,
+        implements_keyword_start: Option<u32>,
+    ) -> Option<DocId> {
+        if implements.is_empty() {
+            return None;
+        }
+        Some(self.build_heritage_clause_doc(
+            "implements",
+            implements,
+            group_mode,
+            implements_keyword_start,
+        ))
+    }
+
+    /// Spacing (and any comment) between a class header and its body brace:
+    /// `extends B /* c */ {}`, `class A<T> /* c */ {}`. Line comments force a
+    /// hardline (they'd absorb the brace); block comments keep a space.
+    ///
+    /// `emit_comments` gates the comment scan: the class-expression printer's
+    /// bare name→body / anonymous→body paths emit their own comments, so it
+    /// passes `false` when there is no heritage or type params.
+    fn build_class_pre_body_doc(
+        &self,
+        emit_comments: bool,
+        header_end: u32,
+        body_start: u32,
+    ) -> DocId {
+        let d = self.d();
+        if emit_comments && self.has_comments_between(header_end, body_start) {
+            let comments = self.build_inline_comments_between_doc(header_end, body_start);
+            if self.has_line_comments_between(header_end, body_start) {
+                d.concat(&[comments, d.hardline()])
+            } else {
+                d.concat(&[comments, d.text(" ")])
+            }
+        } else {
+            d.text(" ")
+        }
+    }
+
+    /// Assemble the class header and wrap it in the header group.
+    ///
+    /// `parts` already holds the prefix (keyword/name/type params). This appends
+    /// the heritage clauses and the pre-body brace spacing, then returns the
+    /// group-wrapped header. The body is appended by the caller OUTSIDE this
+    /// group so the body's hardlines don't pollute the header's fit check.
+    ///
+    /// `emit_pre_body_comments` gates the header→body comment scan: the
+    /// class-expression printer's bare name→body / anonymous→body paths emit
+    /// their own comments, so it passes `false` when there is no heritage or
+    /// type params (the declaration always passes `true`).
+    #[allow(clippy::too_many_arguments)]
+    pub(in crate::printer) fn build_class_header_doc(
+        &self,
+        mut parts: Vec<DocId>,
+        positions: &ClassHeritagePositions,
+        extends_doc: Option<DocId>,
+        implements_doc: Option<DocId>,
+        implements: &[internal::TSInterfaceHeritage],
+        body_is_empty: bool,
+        body_start: u32,
+        group_mode: bool,
+        has_heritage_line_comments: bool,
+        emit_pre_body_comments: bool,
+    ) -> DocId {
+        let d = self.d();
+        let header_end = positions.header_end;
+
+        if !group_mode {
+            // Non-group mode: heritage stays inline, type params break independently.
+            if let Some(ext) = extends_doc {
+                parts.push(d.text(" "));
+                parts.push(ext);
+            }
+            if let Some(impl_doc) = implements_doc {
+                parts.push(d.text(" "));
+                parts.push(impl_doc);
+            }
+            parts.push(self.build_class_pre_body_doc(
+                emit_pre_body_comments,
+                header_end,
+                body_start,
+            ));
+            return d.concat(&parts);
+        }
+
+        // Group mode: one unified group — when it breaks, heritage breaks too.
+        // Comments between name/type-params and the first heritage clause.
+        let mut extra_heritage_comments = Vec::new();
+        if let Some(heritage_start) = positions.first_heritage_start {
+            let (inline, indent) = self
+                .build_heritage_leading_comment_parts(positions.pre_heritage_end, heritage_start);
+            parts.extend(inline);
+            extra_heritage_comments = indent;
+        }
+
+        let mut heritage_parts = extra_heritage_comments;
+        if let Some(ext) = extends_doc {
+            heritage_parts.push(d.line());
+            heritage_parts.push(ext);
+            // Comments between the extends clause and the implements keyword.
+            // Use implements_keyword_start to avoid double-counting keyword comments.
+            if let Some(ext_end) = positions.extends_clause_end
+                && !implements.is_empty()
+            {
+                let mid_end = positions
+                    .implements_keyword_start
+                    .unwrap_or(implements[0].span.start);
+                if let Some(mid_comments) =
+                    self.build_inline_comments_between_doc_opt(ext_end, mid_end)
+                {
+                    heritage_parts.push(mid_comments);
+                }
+            }
+        }
+        if let Some(impl_doc) = implements_doc {
+            heritage_parts.push(d.line());
+            heritage_parts.push(impl_doc);
+        }
+        if !heritage_parts.is_empty() {
+            parts.push(d.indent(d.concat(&heritage_parts)));
+        }
+
+        // Comments between header and body, plus the pre-brace spacing.
+        // Line comments force a hardline (they'd absorb the brace). For a
+        // non-empty body, `line()` puts the brace on its own line when the
+        // group breaks; an empty body always keeps ` {}` on the heritage line.
+        let has_line_comment =
+            emit_pre_body_comments && self.has_line_comments_between(header_end, body_start);
+        if emit_pre_body_comments && self.has_comments_between(header_end, body_start) {
+            parts.push(self.build_inline_comments_between_doc(header_end, body_start));
+        }
+        if has_line_comment {
+            parts.push(d.hardline());
+        } else if body_is_empty {
+            parts.push(d.text(" "));
+        } else {
+            parts.push(d.line());
+        }
+
+        let parts_doc = d.concat(&parts);
+        if has_heritage_line_comments {
+            d.group_break(parts_doc)
+        } else {
+            d.group(parts_doc)
+        }
+    }
+}

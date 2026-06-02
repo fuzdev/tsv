@@ -36,17 +36,17 @@ export class WasmImplementation implements TsvImplementation {
 	}
 
 	/** Check if parsing is supported for this language */
-	supportsParseLanguage(language: Language): boolean {
+	supports_parse_language(language: Language): boolean {
 		return WasmImplementation.PARSE_LANGUAGES.includes(language);
 	}
 
 	/** Check if formatting is supported for this language */
-	supportsFormatLanguage(language: Language): boolean {
+	supports_format_language(language: Language): boolean {
 		return WasmImplementation.FORMAT_LANGUAGES.includes(language);
 	}
 
 	// Lookup tables for WASM functions by language
-	private get parseFns(): Record<Language, (source: string) => unknown> {
+	private get parse_fns(): Record<Language, (source: string) => unknown> {
 		return {
 			svelte: this.module.parse_svelte,
 			typescript: this.module.parse_typescript,
@@ -54,7 +54,7 @@ export class WasmImplementation implements TsvImplementation {
 		};
 	}
 
-	private get parseInternalFns(): Record<Language, (source: string) => void> {
+	private get parse_internal_fns(): Record<Language, (source: string) => void> {
 		return {
 			svelte: this.module.parse_internal_svelte,
 			typescript: this.module.parse_internal_typescript,
@@ -62,7 +62,7 @@ export class WasmImplementation implements TsvImplementation {
 		};
 	}
 
-	private get formatFns(): Record<Language, (source: string) => string> {
+	private get format_fns(): Record<Language, (source: string) => string> {
 		return {
 			svelte: this.module.format_svelte,
 			typescript: this.module.format_typescript,
@@ -71,22 +71,22 @@ export class WasmImplementation implements TsvImplementation {
 	}
 
 	async init(): Promise<void> {
-		const wasmPath = new URL(
+		const wasm_path = new URL(
 			'../../../crates/tsv_wasm/pkg/deno-parse/tsv_wasm.js',
 			import.meta.url,
 		).pathname;
 
 		try {
-			await Deno.stat(wasmPath);
+			await Deno.stat(wasm_path);
 		} catch {
 			throw new Error(
-				`WASM module not found at ${wasmPath}. ` +
+				`WASM module not found at ${wasm_path}. ` +
 					`Run 'deno task build:wasm:parse:deno' first.`,
 			);
 		}
 
 		// Dynamic import of wasm-pack generated module
-		const module = await import(wasmPath);
+		const module = await import(wasm_path);
 
 		// wasm-pack for Deno generates a default export that initializes the module
 		if (typeof module.default === 'function') {
@@ -107,15 +107,15 @@ export class WasmImplementation implements TsvImplementation {
 	}
 
 	parse(source: string, language: Language): unknown {
-		return this.parseFns[language](source);
+		return this.parse_fns[language](source);
 	}
 
-	parseInternal(source: string, language: Language): void {
-		this.parseInternalFns[language](source);
+	parse_internal(source: string, language: Language): void {
+		this.parse_internal_fns[language](source);
 	}
 
 	format(source: string, language: Language): string {
-		return this.formatFns[language](source);
+		return this.format_fns[language](source);
 	}
 
 	dispose(): void {

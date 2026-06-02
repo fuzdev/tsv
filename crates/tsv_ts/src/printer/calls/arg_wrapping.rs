@@ -7,8 +7,8 @@
 
 use super::super::Printer;
 use super::arg_comments::{
-    PartitionedComments, find_comma_pos, is_comment_after_comma, is_comment_before_comma,
-    is_inline_block_after_comma, is_inline_block_before_comma,
+    PartitionedComments, emit_first_arg_leading_comments, find_comma_pos, is_comment_after_comma,
+    is_comment_before_comma, is_inline_block_after_comma, is_inline_block_before_comma,
 };
 use crate::ast::internal;
 use tsv_lang::doc::arena::{DocArena, DocId};
@@ -657,21 +657,7 @@ pub(crate) fn build_args_joined_with_comments(
 
     // Leading comments before first arg (e.g., `fn(/* c */ arg)`)
     let first_arg_start = arguments[0].span().start;
-    if printer.has_comments_between(paren_open, first_arg_start) {
-        let pc = PartitionedComments::new(
-            printer.comments,
-            printer.line_breaks,
-            paren_open,
-            first_arg_start,
-        );
-        // Trailing block comments (same line as paren) are inline
-        for comment in &pc.trailing_block {
-            parts.push(printer.build_comment_doc(comment));
-            parts.push(d.text(" "));
-        }
-        // Leading comments: inline with first arg or own line
-        pc.emit_leading_comments_inline_aware(&mut parts, printer, first_arg_start);
-    }
+    emit_first_arg_leading_comments(printer, &mut parts, paren_open, first_arg_start);
 
     let no_comment_sep = if use_hardline {
         d.comma_hardline()

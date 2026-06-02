@@ -21,6 +21,7 @@ pub(super) use super::{
     intersection_has_huggable_last_type, should_hug_union_type, unwrap_parenthesized,
 };
 
+use super::needs_parens::leftmost_no_lookahead;
 use super::{ParenContext, needs_parens};
 use crate::ast::internal::{self, Expression, LiteralValue, Statement};
 use tsv_lang::doc::arena::DocId;
@@ -77,28 +78,54 @@ impl<'a> Printer<'a> {
     /// Preserves source parens around string literals: `('hello');` stays parenthesized.
     fn build_expression_statement_doc(&self, stmt: &internal::ExpressionStatement) -> DocId {
         let d = self.d();
-        // Parens required for correctness (object expressions, object pattern assignments)
-        // OR preserved from source for string literals (matches Prettier behavior)
-        let needs_parens = needs_parens(&stmt.expression, ParenContext::ExpressionStatement)
-            || self.has_expression_statement_source_parens(stmt);
 
         let mut parts = Vec::new();
 
-        if needs_parens {
-            parts.push(d.text("("));
-        }
+        if stmt.is_directive {
+            // Directives print verbatim from source: Prettier preserves the
+            // original quote style and escapes rather than re-normalizing the
+            // string literal. Directives are never parenthesized.
+            parts.push(d.text_owned(stmt.expression.span().extract(self.source).to_string()));
+        } else {
+            // Parens required for correctness (object expressions, object pattern assignments)
+            // OR preserved from source for string literals (matches Prettier behavior)
+            let needs_parens = needs_parens(&stmt.expression, ParenContext::ExpressionStatement)
+                || self.has_expression_statement_source_parens(stmt);
 
-        // Set context flags for chain handling
-        // is_expression_statement: allows short identifier names to merge with first call
-        // in_top_level_assignment: tells assignments to use regular layout (not chain formatting)
-        self.is_expression_statement.set(true);
-        self.in_top_level_assignment.set(true);
-        parts.push(self.build_expression_doc(&stmt.expression));
-        self.in_top_level_assignment.set(false);
-        self.is_expression_statement.set(false);
+            if needs_parens {
+                parts.push(d.text("("));
+            } else {
+                // When the whole expression isn't wrapped, a nested leftmost
+                // object/function/class still needs parens around itself:
+                // `(class {}).foo`, `({}).foo`, `(class {}) + 1`. The matching
+                // node's doc builder consumes this target and wraps itself.
+                let leftmost = leftmost_no_lookahead(&stmt.expression);
+                if matches!(
+                    leftmost,
+                    Expression::ObjectExpression(_)
+                        | Expression::FunctionExpression(_)
+                        | Expression::ClassExpression(_)
+                ) {
+                    self.expr_stmt_paren_target.set(Some(leftmost.span()));
+                }
+            }
 
-        if needs_parens {
-            parts.push(d.text(")"));
+            // Set context flags for chain handling
+            // is_expression_statement: allows short identifier names to merge with first call
+            // in_top_level_assignment: tells assignments to use regular layout (not chain formatting)
+            self.is_expression_statement.set(true);
+            self.in_top_level_assignment.set(true);
+            parts.push(self.build_expression_doc(&stmt.expression));
+            self.in_top_level_assignment.set(false);
+            self.is_expression_statement.set(false);
+            // Defensively clear in case the target node was printed via a path that
+            // bypasses the consuming arms (should not happen, but avoids leaking
+            // the target into a sibling statement).
+            self.expr_stmt_paren_target.set(None);
+
+            if needs_parens {
+                parts.push(d.text(")"));
+            }
         }
 
         // Handle comments before semicolon

@@ -1,0 +1,469 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 437,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " union `extends` constraint breaks after `extends` with leading-pipe members",
+			"start": 20,
+			"end": 98,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " union default breaks after `=` the same way",
+			"start": 243,
+			"end": 289,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 47
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 436,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 427,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 100,
+					"end": 240,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 7
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 105,
+						"end": 115,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 16
+							}
+						},
+						"name": "Constraint"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 115,
+						"end": 235,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 16
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 119,
+								"end": 231,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 39
+									}
+								},
+								"name": "AAAAAAAAAAAAAAAAAAAAAAAAA",
+								"constraint": {
+									"type": "TSUnionType",
+									"start": 156,
+									"end": 231,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 3
+										},
+										"end": {
+											"line": 6,
+											"column": 39
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 158,
+											"end": 191,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 5
+												},
+												"end": {
+													"line": 5,
+													"column": 38
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 158,
+												"end": 191,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 5
+													},
+													"end": {
+														"line": 5,
+														"column": 38
+													}
+												},
+												"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 197,
+											"end": 231,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 5
+												},
+												"end": {
+													"line": 6,
+													"column": 39
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 197,
+												"end": 231,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 5
+													},
+													"end": {
+														"line": 6,
+														"column": 39
+													}
+												},
+												"name": "Cccccccccccccccccccccccccccccccccc"
+											}
+										}
+									]
+								}
+							}
+						],
+						"extra": {
+							"trailingComma": 231
+						}
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 238,
+						"end": 239,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 5
+							},
+							"end": {
+								"line": 7,
+								"column": 6
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 238,
+							"end": 239,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 5
+								},
+								"end": {
+									"line": 7,
+									"column": 6
+								}
+							},
+							"name": "X"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " union `extends` constraint breaks after `extends` with leading-pipe members",
+							"start": 20,
+							"end": 98
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 291,
+					"end": 426,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 7
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 296,
+						"end": 303,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 6
+							},
+							"end": {
+								"line": 10,
+								"column": 13
+							}
+						},
+						"name": "Default"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 303,
+						"end": 421,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 13
+							},
+							"end": {
+								"line": 14,
+								"column": 2
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 307,
+								"end": 417,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 39
+									}
+								},
+								"name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+								"default": {
+									"type": "TSUnionType",
+									"start": 342,
+									"end": 417,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 3
+										},
+										"end": {
+											"line": 13,
+											"column": 39
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 344,
+											"end": 377,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 5
+												},
+												"end": {
+													"line": 12,
+													"column": 38
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 344,
+												"end": 377,
+												"loc": {
+													"start": {
+														"line": 12,
+														"column": 5
+													},
+													"end": {
+														"line": 12,
+														"column": 38
+													}
+												},
+												"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 383,
+											"end": 417,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 5
+												},
+												"end": {
+													"line": 13,
+													"column": 39
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 383,
+												"end": 417,
+												"loc": {
+													"start": {
+														"line": 13,
+														"column": 5
+													},
+													"end": {
+														"line": 13,
+														"column": 39
+													}
+												},
+												"name": "Cccccccccccccccccccccccccccccccccc"
+											}
+										}
+									]
+								}
+							}
+						],
+						"extra": {
+							"trailingComma": 417
+						}
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 424,
+						"end": 425,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 5
+							},
+							"end": {
+								"line": 14,
+								"column": 6
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 424,
+							"end": 425,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 5
+								},
+								"end": {
+									"line": 14,
+									"column": 6
+								}
+							},
+							"name": "X"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " union default breaks after `=` the same way",
+							"start": 243,
+							"end": 289
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

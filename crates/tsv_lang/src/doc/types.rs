@@ -12,6 +12,12 @@ pub enum GroupId {
     /// Fluid assignment layout: `a = value`
     /// Used in assignment.rs for conditional right-hand side indentation
     Assignment,
+    /// Type parameter `extends` constraint: `<T extends Long>` breaks after
+    /// `extends` and indents the constraint when it overflows.
+    TypeParameterConstraint,
+    /// Type parameter `=` default: `<T = Long>` breaks after `=` and indents
+    /// the default when it overflows.
+    TypeParameterDefault,
 }
 
 /// Context for doc rendering - provides hints about trailing punctuation,

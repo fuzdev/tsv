@@ -1,4 +1,5 @@
 use super::token::{Token, TokenKind};
+use crate::number::{continues_unit, exponent_len};
 use tsv_lang::ParseError;
 
 /// Read a CSS number, percentage, or dimension
@@ -16,6 +17,7 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
     }
 
     // Read integer part
+    let int_start = *pos;
     loop {
         match source[*pos..].chars().next() {
             Some(ch) if ch.is_ascii_digit() => {
@@ -24,6 +26,7 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
             _ => break,
         }
     }
+    let has_integer_digits = *pos > int_start;
 
     // Read decimal part
     if source[*pos..].starts_with('.') {
@@ -38,6 +41,36 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
                     }
                     _ => break,
                 }
+            }
+        } else if has_integer_digits
+            && (exponent_len(&source[*pos + 1..]) > 0
+                || peek_char.is_none_or(|ch| !continues_unit(ch)))
+        {
+            // Trailing dot that belongs to the number: before an exponent
+            // (`1.e1` → `1e1`) or a terminator (`;`, `)`, `,`, `%`, whitespace,
+            // EOF — `1.` → `1`). A following identifier char is left alone, so
+            // `1.png` (a url path, or the invalid number-dot-ident sequence) is
+            // preserved verbatim rather than merged into a dimension.
+            *pos += 1; // consume '.'
+        }
+    }
+
+    // Read scientific-notation exponent: [eE][+-]?\d+
+    // Consumed as part of the number so it normalizes (and isn't mistaken for a
+    // dimension unit). `1em` keeps `em` as a unit because `m` is not a digit.
+    if exponent_len(&source[*pos..]) > 0 {
+        *pos += 1; // 'e' / 'E'
+        if let Some(ch) = source[*pos..].chars().next()
+            && (ch == '+' || ch == '-')
+        {
+            *pos += 1;
+        }
+        loop {
+            match source[*pos..].chars().next() {
+                Some(ch) if ch.is_ascii_digit() => {
+                    *pos += 1;
+                }
+                _ => break,
             }
         }
     }

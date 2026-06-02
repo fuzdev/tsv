@@ -3,13 +3,14 @@ pub mod commands;
 use argh::FromArgs;
 use commands::{
     ast_diff::AstDiffCommand, canonical_parse::CanonicalParseCommand, check::CheckCommand,
-    compare::CompareCommand, fixture_init::FixtureInitCommand,
-    fixtures_audit::FixturesAuditCommand, fixtures_update::FixturesUpdateCommand,
+    compare::CompareCommand, conformance_audit::ConformanceAuditCommand,
+    fixture_init::FixtureInitCommand, fixtures_audit::FixturesAuditCommand,
+    fixtures_update::FixturesUpdateCommand,
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
     fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
     line_width::LineWidthCommand, metrics::MetricsCommand, profile::ProfileCommand,
-    test262::Test262Command,
+    test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand,
 };
 
 /// tsv_debug — internal debugging tools (fixtures, comparisons, conformance).
@@ -24,6 +25,7 @@ pub struct TopLevel {
 pub enum Subcommand {
     Check(CheckCommand),
     Compare(CompareCommand),
+    ConformanceAudit(ConformanceAuditCommand),
     AstDiff(AstDiffCommand),
     LineWidth(LineWidthCommand),
     CanonicalParse(CanonicalParseCommand),
@@ -37,6 +39,7 @@ pub enum Subcommand {
     Profile(ProfileCommand),
     Metrics(MetricsCommand),
     Test262(Test262Command),
+    TsFixtureAudit(TsFixtureAuditCommand),
 }
 
 impl TopLevel {
@@ -44,6 +47,7 @@ impl TopLevel {
         match self.nested {
             Subcommand::Check(c) => c.run(),
             Subcommand::Compare(c) => c.run(),
+            Subcommand::ConformanceAudit(c) => c.run(),
             Subcommand::AstDiff(c) => c.run(),
             Subcommand::LineWidth(c) => c.run(),
             Subcommand::CanonicalParse(c) => c.run(),
@@ -57,6 +61,7 @@ impl TopLevel {
             Subcommand::Profile(c) => c.run(),
             Subcommand::Metrics(c) => c.run(),
             Subcommand::Test262(c) => c.run(),
+            Subcommand::TsFixtureAudit(c) => c.run(),
         }
     }
 }

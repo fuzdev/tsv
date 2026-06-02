@@ -9,12 +9,16 @@
 // - Entity names: `A.B.C`
 
 use super::super::comments_in_range;
-use super::helpers::{type_needs_parens_for_array_element, unwrap_parenthesized};
+use super::helpers::{
+    type_needs_parens_for_array_element, type_needs_parens_for_conditional_check,
+    type_needs_parens_for_conditional_extends, unwrap_parenthesized,
+};
 use super::{CommentSpacing, Printer};
 use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
 use crate::printer::analysis::find_char_skipping_comments;
+use crate::printer::layout::hang_after_operator;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -152,7 +156,10 @@ impl<'a> Printer<'a> {
         let extends_type_doc = self.build_conditional_type_extends_doc(c, extends_kw_end);
 
         d.concat(&[
-            self.build_type_doc(&c.check_type),
+            self.build_type_doc_maybe_parens(
+                &c.check_type,
+                type_needs_parens_for_conditional_check,
+            ),
             comments_before_extends,
             d.text(" extends"),
             extends_type_doc,
@@ -228,7 +235,10 @@ impl<'a> Printer<'a> {
             d.concat(&[
                 d.text(" "),
                 comments_after_extends,
-                self.build_type_doc(&c.extends_type),
+                self.build_type_doc_maybe_parens(
+                    &c.extends_type,
+                    type_needs_parens_for_conditional_extends,
+                ),
             ])
         }
     }
@@ -412,7 +422,10 @@ impl<'a> Printer<'a> {
         };
 
         d.concat(&[
-            self.build_type_doc(&c.check_type),
+            self.build_type_doc_maybe_parens(
+                &c.check_type,
+                type_needs_parens_for_conditional_check,
+            ),
             comments_before_extends,
             d.text(" extends"),
             extends_type_doc,
@@ -568,7 +581,7 @@ impl<'a> Printer<'a> {
             if let TSType::Union(u) = type_ann.as_ref() {
                 if self.union_has_line_comments_between_members(u) {
                     let type_doc = self.build_union_type_doc(u, false);
-                    body_parts.push(d.group(d.indent(d.concat(&[d.line(), type_doc]))));
+                    body_parts.push(hang_after_operator(d, type_doc));
                 } else {
                     body_parts.push(d.text(" "));
                     body_parts.push(self.build_type_doc(type_ann));
@@ -658,6 +671,10 @@ impl<'a> Printer<'a> {
         // Build element docs with commas, inline block comments, and line breaks
         let mut parts = Vec::new();
         let mut prev_end = t.span.start + 1; // After opening `[`
+        // Block comment trailing the last element after the comma — preserved after
+        // the (synthetic) trailing comma (prettier relocates before; see
+        // conformance_prettier.md §Comment relocation).
+        let mut last_after_comma = Vec::new();
         for (i, elem) in t.element_types.iter().enumerate() {
             if i > 0 {
                 parts.push(d.text(","));
@@ -679,13 +696,23 @@ impl<'a> Printer<'a> {
                 comma_pos + 1 // After comma
             } else {
                 let before_close = t.span.end - 1;
-                self.append_trailing_inline_block_comments(&mut parts, elem_end, before_close);
+                self.append_last_trailing_block_comments_split(
+                    &mut parts,
+                    &mut last_after_comma,
+                    elem_end,
+                    before_close,
+                );
                 before_close
             };
         }
 
         // Width-aware breaking: inline if fits, one-per-line if not
-        let inner = d.concat(&[d.softline(), d.concat(&parts), d.trailing_comma()]);
+        let inner = d.concat(&[
+            d.softline(),
+            d.concat(&parts),
+            d.trailing_comma(),
+            d.concat(&last_after_comma),
+        ]);
 
         d.group(d.concat(&[d.text("["), d.indent(inner), d.softline(), d.text("]")]))
     }
@@ -752,37 +779,13 @@ impl<'a> Printer<'a> {
         &self,
         expr_name: &internal::TSTypeQueryExprName,
     ) -> DocId {
-        let d = self.d();
         match expr_name {
             internal::TSTypeQueryExprName::EntityName(entity) => {
                 self.build_type_entity_name_doc(entity)
             }
-            internal::TSTypeQueryExprName::Import(i) => {
-                let mut parts = vec![d.text("import(")];
-                parts.push(self.build_literal_doc(&i.argument));
-                parts.push(d.text(")"));
-                if let Some(qualifier) = &i.qualifier {
-                    parts.push(d.text("."));
-                    parts.push(self.build_type_entity_name_doc(qualifier));
-                }
-                if let Some(type_args) = &i.type_arguments {
-                    // Preserve comments before type args: `import("a").Foo/* c */ <string>`
-                    let gap_start = i
-                        .qualifier
-                        .as_ref()
-                        .map_or(i.argument.span.end + 1, |q| q.span().end);
-                    let gap_end = type_args.span.start;
-                    if let Some(doc) = self.build_name_to_type_params_comments_opt(
-                        gap_start,
-                        gap_end,
-                        CommentSpacing::Trailing,
-                    ) {
-                        parts.push(doc);
-                    }
-                    parts.push(self.build_type_parameter_instantiation_doc(type_args));
-                }
-                d.concat(&parts)
-            }
+            // `typeof import(...)` — identical to `TSType::Import`, including comment
+            // preservation around the specifier, qualifier, and type arguments.
+            internal::TSTypeQueryExprName::Import(i) => self.build_import_type_doc(i),
         }
     }
 

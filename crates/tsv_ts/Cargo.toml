@@ -16,7 +16,7 @@ serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 smallvec.workspace = true
 string-interner.workspace = true
-phf = { version = "0.11", features = ["macros"] }
+phf.workspace = true
 unicode-ident.workspace = true
 
 [lints]

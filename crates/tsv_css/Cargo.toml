@@ -14,7 +14,7 @@ convert = ["dep:serde", "dep:serde_json"]
 tsv_lang.workspace = true
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
-phf = { version = "0.11", features = ["macros"] }
+phf.workspace = true
 
 [lints]
 workspace = true

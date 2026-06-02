@@ -22,7 +22,7 @@ export class BiomeImplementation implements TsvImplementation {
 	name = 'biome-wasm' as const;
 	readonly versions: BiomeVersions;
 	private _biome: Biome | null = null;
-	private _projectKey: number | null = null;
+	private _project_key: number | null = null;
 
 	/** Languages supported for parsing (none - not implemented) */
 	static readonly PARSE_LANGUAGES: Language[] = [];
@@ -38,7 +38,7 @@ export class BiomeImplementation implements TsvImplementation {
 	async init(): Promise<void> {
 		this._biome = new Biome();
 		const { projectKey } = this._biome.openProject('/tmp');
-		this._projectKey = projectKey;
+		this._project_key = projectKey;
 
 		// Configure to match prettier defaults (useTabs) and enable Svelte/HTML
 		this._biome.applyConfiguration(projectKey, {
@@ -62,12 +62,12 @@ export class BiomeImplementation implements TsvImplementation {
 	}
 
 	/** Check if parsing is supported for this language */
-	supportsParseLanguage(language: Language): boolean {
+	supports_parse_language(language: Language): boolean {
 		return BiomeImplementation.PARSE_LANGUAGES.includes(language);
 	}
 
 	/** Check if formatting is supported for this language */
-	supportsFormatLanguage(language: Language): boolean {
+	supports_format_language(language: Language): boolean {
 		return BiomeImplementation.FORMAT_LANGUAGES.includes(language);
 	}
 
@@ -76,15 +76,15 @@ export class BiomeImplementation implements TsvImplementation {
 	}
 
 	format(source: string, language: Language): string {
-		if (!this._biome || !this._projectKey) {
+		if (!this._biome || !this._project_key) {
 			throw new Error('Biome not initialized');
 		}
-		if (!this.supportsFormatLanguage(language)) {
+		if (!this.supports_format_language(language)) {
 			throw new Error(`Biome does not support ${language}`);
 		}
 
 		try {
-			const result = this._biome.formatContent(this._projectKey, source, {
+			const result = this._biome.formatContent(this._project_key, source, {
 				filePath: `file${LANGUAGE_EXTENSIONS[language]}`,
 			});
 			return result.content;
@@ -93,8 +93,8 @@ export class BiomeImplementation implements TsvImplementation {
 			// is printed to stderr by the WASM module (not capturable here).
 			// Provide a cleaner error message for the benchmark output.
 			if (e && typeof e === 'object' && 'stackTrace' in e) {
-				const stackTrace = String((e as { stackTrace: unknown }).stackTrace);
-				if (stackTrace.includes('unreachable')) {
+				const stack_trace = String((e as { stackTrace: unknown }).stackTrace);
+				if (stack_trace.includes('unreachable')) {
 					throw new Error('Biome internal error (WASM panic)');
 				}
 			}
@@ -107,12 +107,12 @@ export class BiomeImplementation implements TsvImplementation {
 	}
 
 	// deno-lint-ignore require-await
-	async formatAsync(source: string, language: Language): Promise<string> {
+	async format_async(source: string, language: Language): Promise<string> {
 		return this.format(source, language);
 	}
 
 	dispose(): void {
 		this._biome = null;
-		this._projectKey = null;
+		this._project_key = null;
 	}
 }

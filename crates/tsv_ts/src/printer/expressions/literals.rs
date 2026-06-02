@@ -33,62 +33,162 @@ pub(crate) fn format_string_literal_from_ast(literal: &internal::Literal, source
 
 /// Normalize a number literal to match Prettier's output format.
 ///
-/// Transformations:
-/// - Hex to lowercase: `0xFF` → `0xff`
-/// - Scientific notation to lowercase without `+`: `2E+10` → `2e10`
-/// - Leading decimal gets zero: `.5` → `0.5`
-/// - Trailing decimal removed: `5.` → `5`
-/// - BigInt hex to lowercase: `0xFFn` → `0xffn`
-/// - Numeric separators preserved
+/// Mirrors Prettier's `printNumber` (`src/utilities/print-number.js`) so that
+/// numerically-equal literals collapse to one canonical spelling:
+/// - Lowercase everything: `0xFF` → `0xff`, `2E10` → `2e10`
+/// - Strip `+` and leading zeros from the exponent: `1e+1` → `1e1`, `1.1e0010` → `1.1e10`
+/// - Drop a zero exponent: `0.5e0` → `0.5`
+/// - Leading decimal gets a zero: `.5` → `0.5`
+/// - Strip trailing fractional zeros: `1.00500` → `1.005`
+/// - Drop a trailing dot: `5.` → `5`, `1.e1` → `1e1`
+///
+/// BigInt literals are only lowercased (Prettier's `printBigInt`); the BigInt
+/// grammar has no exponent or fraction, so the rest of the pipeline is inert.
 pub fn normalize_number_literal(raw: &str) -> String {
-    let mut result = String::with_capacity(raw.len());
-    let chars: Vec<char> = raw.chars().collect();
-    let len = chars.len();
-
-    // Handle leading decimal: .5 → 0.5
-    if chars.first() == Some(&'.') {
-        result.push('0');
-        result.push_str(raw);
-        return result;
+    // Prettier short-circuits single-character literals (`0`, `1`).
+    if raw.chars().count() == 1 {
+        return raw.to_string();
     }
 
-    // Check for BigInt suffix
-    let is_bigint = chars.last() == Some(&'n');
-    let num_end = if is_bigint { len - 1 } else { len };
-
-    // Check for trailing decimal: 5. → 5
-    if num_end > 0 && chars[num_end - 1] == '.' {
-        // Copy everything except the trailing decimal
-        for &c in &chars[..num_end - 1] {
-            result.push(c.to_ascii_lowercase());
-        }
-        if is_bigint {
-            result.push('n');
-        }
-        return result;
+    // BigInt (`printBigInt`): lowercase only, suffix included (`0xFFn` → `0xffn`).
+    if raw.ends_with('n') {
+        return raw.to_ascii_lowercase();
     }
 
-    // Process the number, lowercasing hex digits and 'e'/'E', removing '+' after 'e'
+    print_number(raw)
+}
+
+/// Port of Prettier's `printNumber` regex pipeline (order matters).
+fn print_number(raw: &str) -> String {
+    let lowered = raw.to_ascii_lowercase();
+    let s = strip_exponent_plus_and_zeros(&lowered);
+    let s = strip_zero_exponent(&s);
+    let s = ensure_leading_digit(&s);
+    let s = strip_trailing_fraction_zeros(&s);
+    strip_trailing_dot(&s)
+}
+
+/// `/^([+-]?[\d.]+e)(?:\+|(-))?0*(?=\d)/` → `$1$2`
+/// Removes a `+` and any leading zeros from the exponent (keeps a `-`).
+fn strip_exponent_plus_and_zeros(s: &str) -> String {
+    let bytes = s.as_bytes();
     let mut i = 0;
-    while i < num_end {
-        let c = chars[i];
-        if c == 'E' {
-            result.push('e');
-            // Skip '+' after e/E if present
-            if i + 1 < num_end && chars[i + 1] == '+' {
-                i += 1;
-            }
-        } else {
-            result.push(c.to_ascii_lowercase());
-        }
+    // Optional leading sign.
+    if matches!(bytes.first(), Some(b'+' | b'-')) {
         i += 1;
     }
-
-    if is_bigint {
-        result.push('n');
+    // `[\d.]+` (at least one digit-or-dot).
+    let mantissa_start = i;
+    while i < bytes.len() && (bytes[i].is_ascii_digit() || bytes[i] == b'.') {
+        i += 1;
     }
+    if i == mantissa_start || i >= bytes.len() || bytes[i] != b'e' {
+        return s.to_string();
+    }
+    i += 1; // consume 'e'
+    let after_e = i; // prefix `[+-]?[\d.]+e` ends here
+    // Optional `+` (dropped) or `-` (kept).
+    let mut sign = "";
+    match bytes.get(i) {
+        Some(b'+') => i += 1,
+        Some(b'-') => {
+            sign = "-";
+            i += 1;
+        }
+        _ => {}
+    }
+    // Leading zeros, but the lookahead `(?=\d)` requires a following digit.
+    while i < bytes.len() && bytes[i] == b'0' {
+        i += 1;
+    }
+    if i >= bytes.len() || !bytes[i].is_ascii_digit() {
+        return s.to_string();
+    }
+    // Rebuild: prefix through 'e', kept sign, then the remaining digits.
+    format!("{}{}{}", &s[..after_e], sign, &s[i..])
+}
 
-    result
+/// `/^([+-]?[\d.]+)e[+-]?0+$/` → `$1`  (removes a whole zero exponent: `0.5e0` → `0.5`)
+fn strip_zero_exponent(s: &str) -> String {
+    let Some(e_idx) = s.find('e') else {
+        return s.to_string();
+    };
+    let mantissa = &s[..e_idx];
+    let exp = &s[e_idx + 1..];
+    if mantissa.is_empty() {
+        return s.to_string();
+    }
+    // mantissa must be `[+-]?[\d.]+`
+    let m = mantissa.strip_prefix(['+', '-']).unwrap_or(mantissa);
+    if m.is_empty() || !m.bytes().all(|b| b.is_ascii_digit() || b == b'.') {
+        return s.to_string();
+    }
+    // exp must be `[+-]?0+`
+    let e = exp.strip_prefix(['+', '-']).unwrap_or(exp);
+    if !e.is_empty() && e.bytes().all(|b| b == b'0') {
+        mantissa.to_string()
+    } else {
+        s.to_string()
+    }
+}
+
+/// `/^([+-])?\./` → `$10.`  (`.5` → `0.5`, `-.5` → `-0.5`)
+fn ensure_leading_digit(s: &str) -> String {
+    if let Some(rest) = s.strip_prefix('.') {
+        format!("0.{rest}")
+    } else if let Some(rest) = s.strip_prefix("+.") {
+        format!("+0.{rest}")
+    } else if let Some(rest) = s.strip_prefix("-.") {
+        format!("-0.{rest}")
+    } else {
+        s.to_string()
+    }
+}
+
+/// `/(\.\d+?)0+(?=e|$)/` → `$1`  (first match only; `1.00500` → `1.005`, `1.50` → `1.5`)
+fn strip_trailing_fraction_zeros(s: &str) -> String {
+    let Some(dot) = s.find('.') else {
+        return s.to_string();
+    };
+    let bytes = s.as_bytes();
+    // `\.\d+?` — need at least one digit after the dot.
+    let mut i = dot + 1;
+    if i >= bytes.len() || !bytes[i].is_ascii_digit() {
+        return s.to_string();
+    }
+    // Non-greedy `\d+?` keeps the first digit, then we look for trailing zeros
+    // that run up to `e` or end-of-string.
+    // Find the end of the fractional digit run.
+    let frac_start = i;
+    while i < bytes.len() && bytes[i].is_ascii_digit() {
+        i += 1;
+    }
+    let frac_end = i; // first non-digit after fraction (could be 'e' or len)
+    // Boundary must be `e` or end.
+    if frac_end != bytes.len() && bytes[frac_end] != b'e' {
+        return s.to_string();
+    }
+    // Strip trailing zeros from [frac_start, frac_end), keeping at least one digit.
+    let mut keep = frac_end;
+    while keep > frac_start + 1 && bytes[keep - 1] == b'0' {
+        keep -= 1;
+    }
+    if keep == frac_end {
+        return s.to_string();
+    }
+    format!("{}{}", &s[..keep], &s[frac_end..])
+}
+
+/// `/\.(?=e|$)/` → ``  (drop a trailing dot before `e` or end: `1.` → `1`, `1.e1` → `1e1`)
+fn strip_trailing_dot(s: &str) -> String {
+    let bytes = s.as_bytes();
+    if let Some(dot) = s.find('.') {
+        let after = dot + 1;
+        if after == bytes.len() || bytes[after] == b'e' {
+            return format!("{}{}", &s[..dot], &s[after..]);
+        }
+    }
+    s.to_string()
 }
 
 /// Sort regex flags alphabetically to match Prettier's output format.
@@ -279,5 +379,65 @@ impl<'a> Printer<'a> {
             parts.push(d.text(")"));
         }
         d.concat(&parts)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_number_literal as norm;
+
+    #[test]
+    fn keeps_single_char_and_simple() {
+        assert_eq!(norm("0"), "0");
+        assert_eq!(norm("5"), "5");
+        assert_eq!(norm("123"), "123");
+        assert_eq!(norm("1.0"), "1.0"); // a lone fractional zero is kept
+    }
+
+    #[test]
+    fn exponent_plus_and_leading_zeros() {
+        assert_eq!(norm("2E+10"), "2e10");
+        assert_eq!(norm("1e+1"), "1e1");
+        assert_eq!(norm("1.1e0010"), "1.1e10");
+        assert_eq!(norm("1e-05"), "1e-5"); // negative sign kept, zeros stripped
+        assert_eq!(norm(".1e+0010"), "0.1e10");
+    }
+
+    #[test]
+    fn zero_exponent_dropped() {
+        assert_eq!(norm("0.5e0"), "0.5");
+        assert_eq!(norm("1e0"), "1");
+        assert_eq!(norm("1e-0"), "1");
+    }
+
+    #[test]
+    fn leading_and_trailing_dot() {
+        assert_eq!(norm(".5"), "0.5");
+        assert_eq!(norm("-.5"), "-0.5");
+        assert_eq!(norm("5."), "5");
+        assert_eq!(norm("1.e1"), "1e1");
+    }
+
+    #[test]
+    fn trailing_fraction_zeros() {
+        assert_eq!(norm("1.00500"), "1.005");
+        assert_eq!(norm("1.50"), "1.5");
+        assert_eq!(norm("0.0000"), "0.0");
+        assert_eq!(norm("500600.001230045000"), "500600.001230045");
+    }
+
+    #[test]
+    fn radix_literals_only_lowercased() {
+        assert_eq!(norm("0xFF"), "0xff");
+        assert_eq!(norm("0xE5"), "0xe5"); // the 'e' is a hex digit, not an exponent
+        assert_eq!(norm("0o17"), "0o17");
+        assert_eq!(norm("0B101"), "0b101");
+    }
+
+    #[test]
+    fn bigint_keeps_suffix() {
+        assert_eq!(norm("100n"), "100n");
+        assert_eq!(norm("0xFFn"), "0xffn");
+        assert_eq!(norm("0x1Fn"), "0x1fn");
     }
 }

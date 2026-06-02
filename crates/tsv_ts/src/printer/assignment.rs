@@ -17,6 +17,7 @@ use super::Printer;
 use super::analysis::conditional_should_break_after_op;
 use super::expressions::format_string_literal_from_ast;
 use super::is_string_literal;
+use super::layout::{fluid_after_operator, hang_after_operator};
 use crate::ast::internal::{self, Expression};
 use tsv_lang::Comment;
 use tsv_lang::doc::GroupId;
@@ -894,7 +895,7 @@ impl<'a> Printer<'a> {
                 d.group(d.concat(&[
                     d.group(left_doc),
                     d.text(operator),
-                    d.group(d.indent_line(right_doc_with_comments)),
+                    hang_after_operator(d, right_doc_with_comments),
                 ]))
             }
 
@@ -923,9 +924,7 @@ impl<'a> Printer<'a> {
                 d.group(d.concat(&[
                     d.group(left_doc),
                     d.text(operator),
-                    d.group_with_id(d.indent(d.line()), GroupId::Assignment),
-                    d.line_suffix_boundary(),
-                    d.indent_if_break(right_doc_with_comments, GroupId::Assignment, false),
+                    fluid_after_operator(d, right_doc_with_comments, GroupId::Assignment),
                 ]))
             }
         }

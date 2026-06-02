@@ -20,19 +20,19 @@ import { z } from 'zod';
 import { DevReposLoader, DirectoryLoader } from './lib/corpus.ts';
 import { CanonicalImplementation } from './lib/canonical.ts';
 import {
+	diff_lines,
 	type DiffHunk,
-	diffLines,
-	extractHunks,
-	filterDiffContext,
-	formatDiffForTerminal,
+	extract_hunks,
+	filter_diff_context,
+	format_diff_for_terminal,
 } from './lib/diff.ts';
 import { NativeImplementation } from './lib/ffi.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
-import { loadAllVersions } from './lib/versions.ts';
+import { load_all_versions } from './lib/versions.ts';
 import {
-	checkExpectedError,
-	checkSafety,
-	detectDivergences,
+	check_expected_error,
+	check_safety_vs_prettier,
+	detect_divergences,
 	type HunkCoverageResult,
 	type SafetyViolation,
 } from './lib/divergence/mod.ts';
@@ -49,17 +49,18 @@ const CorpusCompareArgs = z.object({
 	strict: z.boolean().default(false),
 	'audit-patterns': z.boolean().default(false),
 	summary: z.boolean().default(false),
+	json: z.boolean().default(false),
 	help: z.boolean().default(false).meta({ aliases: ['h'] }),
 });
 
 interface LanguageStats {
 	total: number;
 	match: number;
-	knownDivergence: number;
-	partialDivergence: number;
-	unknownDiff: number;
-	safetyViolation: number;
-	expectedErrors: number;
+	known_divergence: number;
+	partial_divergence: number;
+	unknown_diff: number;
+	safety_violation: number;
+	expected_errors: number;
 	errors: number;
 }
 
@@ -76,22 +77,22 @@ interface CompareResult {
 		| 'error';
 	error?: string;
 	/** Reason the error is expected (only for expected_error status) */
-	expectedReason?: string;
+	expected_reason?: string;
 	/** Only stored for unknown_diff (needed for full diff recomputation) */
 	ours?: string;
 	/** Only stored for unknown_diff (needed for full diff recomputation) */
 	prettier?: string;
 	coverage?: HunkCoverageResult;
-	safetyViolations?: SafetyViolation[];
+	safety_violations?: SafetyViolation[];
 }
 
 /** Get relative path from base directory */
-function relPath(filePath: string, base: string): string {
-	return filePath.startsWith(base + '/') ? filePath.slice(base.length + 1) : filePath;
+function rel_path(file_path: string, base: string): string {
+	return file_path.startsWith(base + '/') ? file_path.slice(base.length + 1) : file_path;
 }
 
 /** Format bytes as human-readable string */
-function formatBytes(bytes: number): string {
+function format_bytes(bytes: number): string {
 	if (bytes < 1024) return `${bytes}B`;
 	const kb = bytes / 1024;
 	if (kb < 10) return `${kb.toFixed(1)}KB`;
@@ -99,51 +100,81 @@ function formatBytes(bytes: number): string {
 }
 
 /** Get a brief diff summary for unknown differences (for agent comprehension) */
-function getDiffSummary(prettier: string, ours: string): string {
-	const diff = diffLines(prettier, ours);
+function get_diff_summary(prettier: string, ours: string): string {
+	const diff = diff_lines(prettier, ours);
 	const removals = diff.filter((d) => d.type === 'remove');
 	const additions = diff.filter((d) => d.type === 'add');
 
 	// Check for blank line differences
-	const blankRemovals = removals.filter((d) => !d.line.trim()).length;
-	const blankAdditions = additions.filter((d) => !d.line.trim()).length;
+	const blank_removals = removals.filter((d) => !d.line.trim()).length;
+	const blank_additions = additions.filter((d) => !d.line.trim()).length;
 
 	// Check for line count difference (we break more/less)
-	const prettierLineCount = prettier.split('\n').length;
-	const oursLineCount = ours.split('\n').length;
-	const lineDiff = oursLineCount - prettierLineCount;
+	const prettier_line_count = prettier.split('\n').length;
+	const ours_line_count = ours.split('\n').length;
+	const line_diff = ours_line_count - prettier_line_count;
 
 	// Find the first meaningful (non-empty) change
-	const firstRemoval = removals.find((d) => d.line.trim())?.line.trim();
-	const firstAddition = additions.find((d) => d.line.trim())?.line.trim();
+	const first_removal = removals.find((d) => d.line.trim())?.line.trim();
+	const first_addition = additions.find((d) => d.line.trim())?.line.trim();
 
 	// Describe the difference
-	if (lineDiff !== 0 && firstRemoval && firstAddition) {
+	if (line_diff !== 0 && first_removal && first_addition) {
 		// Line count changed - likely a breaking difference
-		const direction = lineDiff > 0 ? 'we break' : 'prettier breaks';
-		const snippet = firstRemoval.slice(0, 40);
-		return `${direction} (+${Math.abs(lineDiff)} lines): "${snippet}..."`;
-	} else if (firstRemoval && firstAddition) {
+		const direction = line_diff > 0 ? 'we break' : 'prettier breaks';
+		const snippet = first_removal.slice(0, 40);
+		return `${direction} (+${Math.abs(line_diff)} lines): "${snippet}..."`;
+	} else if (first_removal && first_addition) {
 		// Same line count, content differs
-		const r = firstRemoval.slice(0, 35);
-		const a = firstAddition.slice(0, 35);
+		const r = first_removal.slice(0, 35);
+		const a = first_addition.slice(0, 35);
 		return `"${r}..." → "${a}..."`;
-	} else if (blankRemovals !== blankAdditions) {
+	} else if (blank_removals !== blank_additions) {
 		// Only blank line differences
-		if (blankAdditions > blankRemovals) {
-			return `prettier adds ${blankAdditions - blankRemovals} blank line(s)`;
+		if (blank_additions > blank_removals) {
+			return `prettier adds ${blank_additions - blank_removals} blank line(s)`;
 		} else {
-			return `ours adds ${blankRemovals - blankAdditions} blank line(s)`;
+			return `ours adds ${blank_removals - blank_additions} blank line(s)`;
 		}
-	} else if (firstRemoval) {
-		return `prettier has: "${firstRemoval.slice(0, 50)}"`;
-	} else if (firstAddition) {
-		return `ours has: "${firstAddition.slice(0, 50)}"`;
+	} else if (first_removal) {
+		return `prettier has: "${first_removal.slice(0, 50)}"`;
+	} else if (first_addition) {
+		return `ours has: "${first_addition.slice(0, 50)}"`;
 	}
 	return `${removals.length} line(s) differ`;
 }
 
-function printUsage(): void {
+/** A zeroed per-language stats accumulator. */
+function empty_stats(): LanguageStats {
+	return {
+		total: 0,
+		match: 0,
+		known_divergence: 0,
+		partial_divergence: 0,
+		unknown_diff: 0,
+		safety_violation: 0,
+		expected_errors: 0,
+		errors: 0,
+	};
+}
+
+/** All stored results across languages with the given status (sorted callers chain `.sort`). */
+function results_by_status(
+	results: Map<Language, CompareResult[]>,
+	status: CompareResult['status'],
+): CompareResult[] {
+	return LANGUAGES.flatMap((lang) => results.get(lang)!.filter((r) => r.status === status));
+}
+
+/** Run hunk-aware divergence detection for one file: diff → hunks → coverage. */
+function run_detection(content: string, ours: string, prettier: string, language: Language) {
+	const diff = diff_lines(prettier, ours);
+	const hunks = extract_hunks(diff);
+	const coverage = detect_divergences({ source: content, ours, prettier, diff, hunks, language });
+	return { diff, hunks, coverage };
+}
+
+function print_usage(): void {
 	console.log(`
 Usage: deno task corpus:compare <path> [options]
        deno task corpus:compare --all [options]
@@ -162,6 +193,8 @@ Options:
   --summary         Compact output (no diffs, just file lists with brief descriptions)
   --strict          Fail on any difference (disable divergence detection)
   --audit-patterns  Show per-pattern corpus coverage with sample diffs for spot-checking
+  --json            Emit a single JSON report to stdout (stats + safety/partial/
+                    unknown/error file lists); all human/progress output → stderr
   --help            Show this help message
 
 Examples:
@@ -176,72 +209,179 @@ Examples:
 `);
 }
 
+// --- JSON output (--json) ----------------------------------------------------
+//
+// In --json mode all human/progress output is routed to stderr and stdout
+// carries a single buffered JSON object: a `stats` block plus per-file lists for
+// the statuses that need attention (safety / partial / unknown / errors). The
+// `results` map already holds every non-match result in memory for the end-of-run
+// report, so there's nothing to stream — and excluding `match` records and full
+// diffs keeps the object small regardless of corpus size.
+
+/** Flatten a {@link LanguageStats} to the count shape used in JSON. */
+function stats_to_counts(s: LanguageStats) {
+	return {
+		total: s.total,
+		match: s.match,
+		known: s.known_divergence,
+		partial: s.partial_divergence,
+		unknown: s.unknown_diff,
+		safety: s.safety_violation,
+		errors: s.errors,
+		expected_errors: s.expected_errors,
+	};
+}
+
+/** Build the `stats` block: per-language counts plus a summed total. */
+function build_stats_block(stats: Map<Language, LanguageStats>) {
+	const languages: Record<string, ReturnType<typeof stats_to_counts>> = {};
+	const totals = empty_stats();
+	for (const lang of LANGUAGES) {
+		const s = stats.get(lang)!;
+		if (s.total === 0) continue;
+		languages[lang] = stats_to_counts(s);
+		totals.total += s.total;
+		totals.match += s.match;
+		totals.known_divergence += s.known_divergence;
+		totals.partial_divergence += s.partial_divergence;
+		totals.unknown_diff += s.unknown_diff;
+		totals.safety_violation += s.safety_violation;
+		totals.expected_errors += s.expected_errors;
+		totals.errors += s.errors;
+	}
+	return { languages, total: stats_to_counts(totals) };
+}
+
+/** One per-file entry in a JSON status list. Detail varies by status; diffs are never included. */
+function json_file_entry(
+	r: CompareResult,
+	lang: Language,
+	base_path: string,
+): Record<string, unknown> {
+	const base = { path: rel_path(r.path, base_path), language: lang, bytes: r.bytes };
+	switch (r.status) {
+		case 'safety_violation':
+			return { ...base, violations: r.safety_violations ?? [] };
+		case 'partial_divergence':
+			return { ...base, patterns: r.coverage?.matches.map((m) => m.pattern) ?? [] };
+		case 'unknown_diff':
+			// One-line summary instead of the full diff, to keep the object bounded.
+			return { ...base, diff_summary: get_diff_summary(r.prettier ?? '', r.ours ?? '') };
+		case 'expected_error':
+			return { ...base, error: r.error, expected_reason: r.expected_reason };
+		case 'error':
+			return { ...base, error: r.error };
+		default:
+			return base;
+	}
+}
+
+/**
+ * Build the single buffered JSON report: stats + per-file lists for the statuses
+ * worth inspecting. `match` and `known_divergence` are excluded (their counts
+ * live in `stats`); full diffs are excluded (unknowns carry a one-line summary).
+ */
+function build_json_report(
+	results: Map<Language, CompareResult[]>,
+	stats: Map<Language, LanguageStats>,
+	base_path: string,
+): Record<string, unknown> {
+	const by_status = (status: CompareResult['status']) =>
+		LANGUAGES.flatMap((lang) =>
+			results.get(lang)!.filter((r) => r.status === status).map((r) =>
+				json_file_entry(r, lang, base_path)
+			)
+		);
+	return {
+		stats: build_stats_block(stats),
+		safety: by_status('safety_violation'),
+		partial: by_status('partial_divergence'),
+		unknown: by_status('unknown_diff'),
+		errors: by_status('error'),
+		expected_errors: by_status('expected_error'),
+	};
+}
+
+/** Write the buffered JSON report to stdout (the only thing on stdout in --json mode). */
+function emit_json_report(report: Record<string, unknown>): void {
+	Deno.stdout.writeSync(new TextEncoder().encode(JSON.stringify(report, null, '\t') + '\n'));
+}
+
 async function main(): Promise<void> {
 	const parsed = args_parse(argv_parse(process.argv.slice(2)), CorpusCompareArgs);
 	if (!parsed.success) {
 		console.error(z.prettifyError(parsed.error));
-		printUsage();
+		print_usage();
 		Deno.exit(1);
 	}
 	const args = parsed.data;
 
 	if (args.help) {
-		printUsage();
+		print_usage();
 		return;
 	}
 
-	const useAllRepos = args.all;
+	const use_all_repos = args.all;
 	const path = args._[0]?.toString();
 
-	if (!path && !useAllRepos) {
+	if (!path && !use_all_repos) {
 		console.error('Error: No path provided (use --all for all repos)\n');
-		printUsage();
+		print_usage();
 		Deno.exit(1);
 	}
 
 	// Resolve path (handle ~)
-	const homeDir = Deno.env.get('HOME') ?? '';
-	const basePath = useAllRepos
-		? `${homeDir}/dev`
+	const home_dir = Deno.env.get('HOME') ?? '';
+	const base_path = use_all_repos
+		? `${home_dir}/dev`
 		: path!.startsWith('~')
-		? path!.replace('~', homeDir)
+		? path!.replace('~', home_dir)
 		: path!;
 
 	// Validate filter
-	const filterLang = args.filter as Language | undefined;
-	if (filterLang && !LANGUAGES.includes(filterLang)) {
-		console.error(`Error: Invalid filter "${filterLang}". Must be one of: ${LANGUAGES.join(', ')}`);
+	const filter_lang = args.filter as Language | undefined;
+	if (filter_lang && !LANGUAGES.includes(filter_lang)) {
+		console.error(
+			`Error: Invalid filter "${filter_lang}". Must be one of: ${LANGUAGES.join(', ')}`,
+		);
 		Deno.exit(1);
 	}
 
 	const limit = args.limit;
 	const verbose = args.verbose;
-	const exitOnFirst = args['exit-on-first'];
-	const safetyOnly = args['safety-only'];
+	const exit_on_first = args['exit-on-first'];
+	const safety_only = args['safety-only'];
 	const explain = args.explain;
 	const strict = args.strict;
-	const auditPatterns = args['audit-patterns'];
+	const audit_patterns = args['audit-patterns'];
 	const summary = args.summary;
+	const json_mode = args.json;
 
-	if (useAllRepos) {
+	if (json_mode) {
+		// stdout is reserved for the JSON report; route all human/progress
+		// output (including the report and per-file logs below) to stderr.
+		console.log = (...a: unknown[]) => console.error(...a);
+	}
+
+	if (use_all_repos) {
 		console.log('Comparing: All default corpus repos');
 	} else {
-		console.log(`Comparing: ${basePath}`);
+		console.log(`Comparing: ${base_path}`);
 	}
-	if (filterLang) console.log(`Filter: ${filterLang} only`);
+	if (filter_lang) console.log(`Filter: ${filter_lang} only`);
 	if (limit) console.log(`Limit: ${limit} files per language`);
-	if (safetyOnly) console.log(`Mode: safety-only (checking for data loss)`);
+	if (safety_only) console.log(`Mode: safety-only (checking for data loss)`);
 	if (strict) console.log(`Mode: strict (no divergence detection)`);
 	if (explain) console.log(`Mode: explain (show divergence patterns)`);
-	if (auditPatterns) console.log(`Mode: audit-patterns (per-pattern coverage report)`);
+	if (audit_patterns) console.log(`Mode: audit-patterns (per-pattern coverage report)`);
 	if (summary) console.log(`Mode: summary (compact output, no diffs)`);
 	console.log();
 
 	// Create loader
-	const loader = useAllRepos ? new DevReposLoader() : new DirectoryLoader(basePath);
+	const loader = use_all_repos ? new DevReposLoader() : new DirectoryLoader(base_path);
 
 	// Initialize implementations (fail fast before streaming)
-	const versions = await loadAllVersions();
+	const versions = await load_all_versions();
 	const canonical = new CanonicalImplementation(versions.canonical);
 	const native = new NativeImplementation();
 
@@ -266,204 +406,177 @@ async function main(): Promise<void> {
 
 	for (const lang of LANGUAGES) {
 		results.set(lang, []);
-		stats.set(lang, {
-			total: 0,
-			match: 0,
-			knownDivergence: 0,
-			partialDivergence: 0,
-			unknownDiff: 0,
-			safetyViolation: 0,
-			expectedErrors: 0,
-			errors: 0,
-		});
+		stats.set(lang, empty_stats());
 	}
 
 	// Track divergence pattern counts
-	const divergenceCounts: Map<string, number> = new Map();
+	const divergence_counts: Map<string, number> = new Map();
 
 	// Track per-pattern file claims for audit (pattern → file samples with hunk info)
 	interface PatternAuditEntry {
 		path: string;
-		hunkIndices: number[];
-		hunkPreview: string; // first hunk's first changed line
+		hunk_indices: number[];
+		hunk_preview: string; // first hunk's first changed line
 	}
-	const patternAuditMap: Map<string, PatternAuditEntry[]> = new Map();
+	const pattern_audit_map: Map<string, PatternAuditEntry[]> = new Map();
 
 	/** Record a pattern match into the audit map */
-	function recordAuditEntry(
-		patternName: string,
-		filePath: string,
-		hunkIndices: number[],
+	function record_audit_entry(
+		pattern_name: string,
+		file_path: string,
+		hunk_indices: number[],
 		hunks: DiffHunk[],
 	): void {
-		const entries = patternAuditMap.get(patternName) ?? [];
-		const firstHunk = hunks[hunkIndices[0]];
-		const preview = (firstHunk?.addedLines[0] || firstHunk?.removedLines[0] || '')
+		const entries = pattern_audit_map.get(pattern_name) ?? [];
+		const first_hunk = hunks[hunk_indices[0]];
+		const preview = (first_hunk?.added_lines[0] || first_hunk?.removed_lines[0] || '')
 			.trim().slice(0, 60);
 		entries.push({
-			path: relPath(filePath, basePath),
-			hunkIndices,
-			hunkPreview: preview,
+			path: rel_path(file_path, base_path),
+			hunk_indices,
+			hunk_preview: preview,
 		});
-		patternAuditMap.set(patternName, entries);
+		pattern_audit_map.set(pattern_name, entries);
+	}
+
+	/** Tally a file's explained pattern matches into the global counts (and audit map). */
+	function tally_patterns(
+		coverage: HunkCoverageResult,
+		file_path: string,
+		hunks: DiffHunk[],
+	): void {
+		for (const d of coverage.matches) {
+			divergence_counts.set(d.pattern, (divergence_counts.get(d.pattern) || 0) + 1);
+			if (audit_patterns) record_audit_entry(d.pattern, file_path, d.hunk_indices, hunks);
+		}
 	}
 
 	// Track per-language file counts for filtering/limiting
-	const langCounts: Record<Language, number> = { svelte: 0, typescript: 0, css: 0 };
+	const lang_counts: Record<Language, number> = { svelte: 0, typescript: 0, css: 0 };
 
 	// Stream and process files (file content is GC'd after each iteration)
 	for await (const file of loader.stream(verbose ? console.log : () => {})) {
 		const lang = file.language;
-		if (filterLang && lang !== filterLang) continue;
-		if (limit && langCounts[lang] >= limit) continue;
-		langCounts[lang]++;
+		if (filter_lang && lang !== filter_lang) continue;
+		if (limit && lang_counts[lang] >= limit) continue;
+		lang_counts[lang]++;
 
-		const langStats = stats.get(lang)!;
-		const langResults = results.get(lang)!;
-		langStats.total++;
+		const lang_stats = stats.get(lang)!;
+		const lang_results = results.get(lang)!;
+		lang_stats.total++;
 
 		if (verbose) {
 			console.log(`  ${file.path}`);
 		}
 
-		let shouldExit = false;
+		let should_exit = false;
 		try {
 			// Format with both
 			const ours = native.format(file.content, lang);
-			const prettier = await canonical.formatAsync(file.content, lang);
+			const prettier = await canonical.format_async(file.content, lang);
 
-			// Safety check FIRST (always) - compare source vs OUR output
-			const safetyViolations = checkSafety(file.content, ours);
-			if (safetyViolations.length > 0 && ours !== prettier) {
-				// Only report safety violations when our output differs from prettier.
-				// If ours === prettier, the transformation is shared (e.g., shorthand
-				// collapsing: foo={foo} → {foo}) and not a bug in our formatter.
+			// Safety check FIRST (always) — DIFFERENTIAL against prettier.
+			// Prettier is the source of truth, so any char transformation prettier
+			// ALSO performs (redundant leading `|` removal, number normalization,
+			// CSS keyword lowercasing, shorthand collapsing foo={foo} → {foo}) is a
+			// legitimate normalization, not data loss. The differential reports only
+			// the loss/addition OUR output incurs BEYOND prettier — false positives
+			// from shared normalizations cancel out. This subsumes the old
+			// `ours !== prettier` guard: when ours === prettier the real set is empty.
+			const safety_violations = check_safety_vs_prettier(file.content, ours, prettier);
+			if (safety_violations.length > 0) {
+				// A real (non-shared) violation remains. Still run divergence detection
+				// so intentional divergences that legitimately differ from prettier —
+				// BOM stripping (prettier keeps the BOM), self-closing normalization —
+				// reclassify as known rather than SAFETY.
 				//
-				// Check if all ours-vs-prettier differences are explained by known
-				// divergence patterns. Intentional divergences (BOM stripping,
-				// self-closing normalization) trigger safety checks but aren't bugs.
-				//
-				// Safety guarantee: if we lose content that prettier preserves, it
-				// creates an unexplained diff hunk → classification stays SAFETY.
-				// Content lost by both formatters has no diff hunk and is a shared
-				// transformation (not our bug). Overmatching risk is low because
+				// Safety guarantee: if we lose content that prettier preserves, the
+				// differential keeps it AND it surfaces as an unexplained diff hunk →
+				// classification stays SAFETY. Overmatching risk is low because
 				// patterns like comment_position require the comment text to exist
 				// in both outputs — a dropped comment won't match.
-				const diff = diffLines(prettier, ours);
-				const hunks = extractHunks(diff);
-				const coverage = detectDivergences({
-					source: file.content,
-					ours,
-					prettier,
-					diff,
-					hunks,
-					language: lang,
-				});
+				const { hunks, coverage } = run_detection(file.content, ours, prettier, lang);
 
 				if (coverage.classification === 'all_explained') {
 					// Safety violations are fully explained by known divergence patterns
-					langStats.knownDivergence++;
-					langResults.push({
+					lang_stats.known_divergence++;
+					lang_results.push({
 						path: file.path,
 						bytes: file.bytes,
 						status: 'known_divergence',
 						coverage,
 					});
-					for (const d of coverage.matches) {
-						divergenceCounts.set(d.pattern, (divergenceCounts.get(d.pattern) || 0) + 1);
-						if (auditPatterns) {
-							recordAuditEntry(d.pattern, file.path, d.hunkIndices, hunks);
-						}
-					}
+					tally_patterns(coverage, file.path, hunks);
 				} else {
 					// Unexplained safety violations — real data loss
-					langStats.safetyViolation++;
-					langResults.push({
+					lang_stats.safety_violation++;
+					lang_results.push({
 						path: file.path,
 						bytes: file.bytes,
 						status: 'safety_violation',
-						safetyViolations,
+						safety_violations,
 						coverage: coverage.classification !== 'none_explained' ? coverage : undefined,
 					});
-					if (exitOnFirst) {
-						const rel = relPath(file.path, basePath);
+					if (exit_on_first) {
+						const rel = rel_path(file.path, base_path);
 						console.log(`\nSafety violation: ${rel}`);
-						for (const v of safetyViolations) {
+						for (const v of safety_violations) {
 							console.log(`  ${v.type}: ${v.summary}`);
 						}
-						shouldExit = true;
+						should_exit = true;
 					}
 				}
-			} else if (safetyOnly) {
+			} else if (safety_only) {
 				// In safety-only mode, we're done after safety check passes
-				langStats.match++;
+				lang_stats.match++;
 			} else if (ours === prettier) {
 				// Exact match — only counted, not stored
-				langStats.match++;
+				lang_stats.match++;
 			} else {
 				// Difference detected
-				const rel = relPath(file.path, basePath);
+				const rel = rel_path(file.path, base_path);
 				if (strict) {
 					// Strict mode: any difference is a failure
-					langStats.unknownDiff++;
-					langResults.push({
+					lang_stats.unknown_diff++;
+					lang_results.push({
 						path: file.path,
 						bytes: file.bytes,
 						status: 'unknown_diff',
 						ours,
 						prettier,
 					});
-					if (exitOnFirst) {
+					if (exit_on_first) {
 						console.log(`\nDifference (strict mode): ${rel}`);
-						shouldExit = true;
+						should_exit = true;
 					}
 				} else {
 					// Detect known divergence patterns (hunk-aware)
-					const diff = diffLines(prettier, ours);
-					const hunks = extractHunks(diff);
-					const coverage = detectDivergences({
-						source: file.content,
-						ours,
-						prettier,
-						diff,
-						hunks,
-						language: lang,
-					});
+					const { diff, hunks, coverage } = run_detection(file.content, ours, prettier, lang);
 
 					if (coverage.classification === 'all_explained') {
 						// All hunks explained by known patterns
-						langStats.knownDivergence++;
-						langResults.push({
+						lang_stats.known_divergence++;
+						lang_results.push({
 							path: file.path,
 							bytes: file.bytes,
 							status: 'known_divergence',
 							coverage,
 						});
-						for (const d of coverage.matches) {
-							divergenceCounts.set(d.pattern, (divergenceCounts.get(d.pattern) || 0) + 1);
-							if (auditPatterns) {
-								recordAuditEntry(d.pattern, file.path, d.hunkIndices, hunks);
-							}
-						}
+						tally_patterns(coverage, file.path, hunks);
 					} else if (coverage.classification === 'partial') {
 						// Some hunks explained, some not
-						langStats.partialDivergence++;
-						langResults.push({
+						lang_stats.partial_divergence++;
+						lang_results.push({
 							path: file.path,
 							bytes: file.bytes,
 							status: 'partial_divergence',
 							coverage,
 						});
-						for (const d of coverage.matches) {
-							divergenceCounts.set(d.pattern, (divergenceCounts.get(d.pattern) || 0) + 1);
-							if (auditPatterns) {
-								recordAuditEntry(d.pattern, file.path, d.hunkIndices, hunks);
-							}
-						}
+						tally_patterns(coverage, file.path, hunks);
 					} else {
 						// No hunks explained - unknown difference
-						langStats.unknownDiff++;
-						langResults.push({
+						lang_stats.unknown_diff++;
+						lang_results.push({
 							path: file.path,
 							bytes: file.bytes,
 							status: 'unknown_diff',
@@ -471,7 +584,7 @@ async function main(): Promise<void> {
 							prettier,
 							coverage,
 						});
-						if (exitOnFirst) {
+						if (exit_on_first) {
 							console.log(`\nUnknown difference: ${rel}`);
 							console.log('─'.repeat(70));
 							const removals = diff.filter((d) => d.type === 'remove').length;
@@ -480,81 +593,82 @@ async function main(): Promise<void> {
 								`Diff: \x1b[31m- Prettier\x1b[0m → \x1b[32m+ Ours\x1b[0m  (${removals} prettier-only, ${additions} ours-only)`,
 							);
 							console.log('');
-							for (const line of formatDiffForTerminal(filterDiffContext(diff))) {
+							for (const line of format_diff_for_terminal(filter_diff_context(diff))) {
 								console.log(line);
 							}
-							shouldExit = true;
+							should_exit = true;
 						}
 					}
 				}
 			}
 		} catch (e) {
-			const errorMsg = e instanceof Error ? e.message : String(e);
-			const expectedCheck = checkExpectedError(file.content);
-			if (expectedCheck.expected) {
-				langStats.expectedErrors++;
-				langResults.push({
+			const error_msg = e instanceof Error ? e.message : String(e);
+			const expected_check = check_expected_error(file.content);
+			if (expected_check.expected) {
+				lang_stats.expected_errors++;
+				lang_results.push({
 					path: file.path,
 					bytes: file.bytes,
 					status: 'expected_error',
-					error: errorMsg,
-					expectedReason: expectedCheck.pattern!.reason,
+					error: error_msg,
+					expected_reason: expected_check.pattern!.reason,
 				});
 			} else {
-				langStats.errors++;
-				langResults.push({
+				lang_stats.errors++;
+				lang_results.push({
 					path: file.path,
 					bytes: file.bytes,
 					status: 'error',
-					error: errorMsg,
+					error: error_msg,
 				});
-				if (exitOnFirst) {
-					console.log(`\nError: ${relPath(file.path, basePath)}`);
-					console.log(`  ${errorMsg}`);
-					shouldExit = true;
+				if (exit_on_first) {
+					console.log(`\nError: ${rel_path(file.path, base_path)}`);
+					console.log(`  ${error_msg}`);
+					should_exit = true;
 				}
 			}
 		}
 
-		if (shouldExit) {
+		if (should_exit) {
 			canonical.dispose();
 			native.dispose();
 			Deno.exit(1);
 		}
 	}
 
-	const totalProcessed = Object.values(langCounts).reduce((a, b) => a + b, 0);
-	if (totalProcessed === 0) {
+	const total_processed = Object.values(lang_counts).reduce((a, b) => a + b, 0);
+	if (total_processed === 0) {
 		console.log('No files found.');
+		if (json_mode) emit_json_report(build_json_report(results, stats, base_path));
 		canonical.dispose();
 		native.dispose();
 		return;
 	}
 
-	const counts = LANGUAGES.map((lang) => `${langCounts[lang]} ${lang}`).join(', ');
-	console.log(`\nProcessed: ${totalProcessed} files (${counts})\n`);
+	const counts = LANGUAGES.map((lang) => `${lang_counts[lang]} ${lang}`).join(', ');
+	console.log(`\nProcessed: ${total_processed} files (${counts})\n`);
 
 	// Print results
 	console.log('Results:');
 
-	let totalMatch = 0;
-	let totalKnownDivergence = 0;
-	let totalPartialDivergence = 0;
-	let totalUnknownDiff = 0;
-	let totalSafetyViolation = 0;
-	let totalExpectedErrors = 0;
-	let totalErrors = 0;
-	let totalCount = 0;
+	let total_match = 0;
+	let total_known_divergence = 0;
+	let total_partial_divergence = 0;
+	let total_unknown_diff = 0;
+	let total_safety_violation = 0;
+	let total_expected_errors = 0;
+	let total_errors = 0;
+	let total_count = 0;
 
 	/** Build the detail parts array for a stats row */
-	function buildDetailParts(s: LanguageStats): string[] {
+	function build_detail_parts(s: LanguageStats): string[] {
 		const parts: string[] = [];
-		if (s.knownDivergence > 0) parts.push(`${s.knownDivergence} known`);
-		if (s.partialDivergence > 0) parts.push(`\x1b[33m${s.partialDivergence} partial\x1b[0m`);
-		if (s.unknownDiff > 0) parts.push(`${s.unknownDiff} unknown`);
-		if (s.safetyViolation > 0) parts.push(`\x1b[31m${s.safetyViolation} SAFETY\x1b[0m`);
+		if (s.known_divergence > 0) parts.push(`${s.known_divergence} known`);
+		if (s.partial_divergence > 0) parts.push(`\x1b[33m${s.partial_divergence} partial\x1b[0m`);
+		if (s.unknown_diff > 0) parts.push(`${s.unknown_diff} unknown`);
+		if (s.safety_violation > 0) parts.push(`\x1b[31m${s.safety_violation} SAFETY\x1b[0m`);
 		if (s.errors > 0) parts.push(`${s.errors} errors`);
-		if (s.expectedErrors > 0) parts.push(`\x1b[2m${s.expectedErrors} expected errors\x1b[0m`);
+		if (s.expected_errors > 0) parts.push(`\x1b[2m${s.expected_errors} expected errors\x1b[0m`);
 		return parts;
 	}
 
@@ -562,68 +676,72 @@ async function main(): Promise<void> {
 		const s = stats.get(lang)!;
 		if (s.total === 0) continue;
 
-		totalMatch += s.match;
-		totalKnownDivergence += s.knownDivergence;
-		totalPartialDivergence += s.partialDivergence;
-		totalUnknownDiff += s.unknownDiff;
-		totalSafetyViolation += s.safetyViolation;
-		totalExpectedErrors += s.expectedErrors;
-		totalErrors += s.errors;
-		totalCount += s.total;
+		total_match += s.match;
+		total_known_divergence += s.known_divergence;
+		total_partial_divergence += s.partial_divergence;
+		total_unknown_diff += s.unknown_diff;
+		total_safety_violation += s.safety_violation;
+		total_expected_errors += s.expected_errors;
+		total_errors += s.errors;
+		total_count += s.total;
 
 		const pct = s.total > 0 ? ((s.match / s.total) * 100).toFixed(1) : '100.0';
-		const matchStr = `${s.match}/${s.total} match (${pct}%)`.padEnd(24);
-		const parts = buildDetailParts(s);
-		const detailStr = parts.length > 0 ? parts.join(' | ') : 'all match';
-		console.log(`  ${lang.padEnd(12)} ${matchStr} | ${detailStr}`);
+		const match_str = `${s.match}/${s.total} match (${pct}%)`.padEnd(24);
+		const parts = build_detail_parts(s);
+		const detail_str = parts.length > 0 ? parts.join(' | ') : 'all match';
+		console.log(`  ${lang.padEnd(12)} ${match_str} | ${detail_str}`);
 	}
 
-	if (totalCount > 0) {
+	if (total_count > 0) {
 		console.log('  ' + '─'.repeat(72));
-		const pct = totalCount > 0 ? ((totalMatch / totalCount) * 100).toFixed(1) : '100.0';
-		const matchStr = `${totalMatch}/${totalCount} match (${pct}%)`.padEnd(24);
+		const pct = total_count > 0 ? ((total_match / total_count) * 100).toFixed(1) : '100.0';
+		const match_str = `${total_match}/${total_count} match (${pct}%)`.padEnd(24);
 
 		const totals: LanguageStats = {
-			total: totalCount,
-			match: totalMatch,
-			knownDivergence: totalKnownDivergence,
-			partialDivergence: totalPartialDivergence,
-			unknownDiff: totalUnknownDiff,
-			safetyViolation: totalSafetyViolation,
-			expectedErrors: totalExpectedErrors,
-			errors: totalErrors,
+			total: total_count,
+			match: total_match,
+			known_divergence: total_known_divergence,
+			partial_divergence: total_partial_divergence,
+			unknown_diff: total_unknown_diff,
+			safety_violation: total_safety_violation,
+			expected_errors: total_expected_errors,
+			errors: total_errors,
 		};
-		const parts = buildDetailParts(totals);
+		const parts = build_detail_parts(totals);
 
-		const detailStr = parts.length > 0 ? parts.join(' | ') : 'all match';
-		console.log(`  ${'total'.padEnd(12)} ${matchStr} | ${detailStr}`);
+		const detail_str = parts.length > 0 ? parts.join(' | ') : 'all match';
+		console.log(`  ${'total'.padEnd(12)} ${match_str} | ${detail_str}`);
 	}
 
+	// Emit the buffered JSON report now — before any FAIL Deno.exit below, so it
+	// is always written regardless of exit code.
+	if (json_mode) emit_json_report(build_json_report(results, stats, base_path));
+
 	// Show divergence pattern breakdown if any detected
-	if (divergenceCounts.size > 0 && (explain || verbose)) {
+	if (divergence_counts.size > 0 && (explain || verbose)) {
 		console.log('\nKnown Divergence Patterns:');
-		const sorted = [...divergenceCounts.entries()].sort((a, b) => b[1] - a[1]);
+		const sorted = [...divergence_counts.entries()].sort((a, b) => b[1] - a[1]);
 		for (const [pattern, count] of sorted) {
 			console.log(`  ${pattern}: ${count} files`);
 		}
 	}
 
 	// Show per-pattern audit report with sample diffs
-	if (auditPatterns && patternAuditMap.size > 0) {
+	if (audit_patterns && pattern_audit_map.size > 0) {
 		console.log('\nPattern Audit (per-pattern corpus coverage)');
 		console.log('─'.repeat(70));
 
-		const sorted = [...patternAuditMap.entries()].sort((a, b) => b[1].length - a[1].length);
+		const sorted = [...pattern_audit_map.entries()].sort((a, b) => b[1].length - a[1].length);
 		for (const [pattern, entries] of sorted) {
 			console.log(`\n${pattern}: ${entries.length} files`);
 			const samples = entries.slice(0, 3);
 			for (const sample of samples) {
-				const hunkStr = sample.hunkIndices.length === 1
-					? `hunk ${sample.hunkIndices[0]}`
-					: `hunks ${sample.hunkIndices.join(',')}`;
-				console.log(`  ${sample.path} (${hunkStr})`);
-				if (sample.hunkPreview) {
-					console.log(`    "${sample.hunkPreview}"`);
+				const hunk_str = sample.hunk_indices.length === 1
+					? `hunk ${sample.hunk_indices[0]}`
+					: `hunks ${sample.hunk_indices.join(',')}`;
+				console.log(`  ${sample.path} (${hunk_str})`);
+				if (sample.hunk_preview) {
+					console.log(`    "${sample.hunk_preview}"`);
 				}
 			}
 			if (entries.length > 3) {
@@ -633,97 +751,93 @@ async function main(): Promise<void> {
 	}
 
 	// Show safety violations (CRITICAL)
-	const allSafetyViolations = LANGUAGES.flatMap((lang) =>
-		results.get(lang)!.filter((r) => r.status === 'safety_violation')
-	);
+	const all_safety_violations = results_by_status(results, 'safety_violation');
 
-	if (allSafetyViolations.length > 0) {
-		console.log(`\n\x1b[31mSAFETY VIOLATIONS (${allSafetyViolations.length} files):\x1b[0m`);
-		for (const r of allSafetyViolations) {
-			console.log(`  ${relPath(r.path, basePath)}`);
-			for (const v of r.safetyViolations!) {
+	if (all_safety_violations.length > 0) {
+		console.log(`\n\x1b[31mSAFETY VIOLATIONS (${all_safety_violations.length} files):\x1b[0m`);
+		for (const r of all_safety_violations) {
+			console.log(`  ${rel_path(r.path, base_path)}`);
+			for (const v of r.safety_violations!) {
 				console.log(`    - ${v.type}: ${v.summary}`);
 			}
 		}
 	}
 
 	// Show partial divergences (some hunks unexplained)
-	const allPartial = LANGUAGES.flatMap((lang) =>
-		results.get(lang)!.filter((r) => r.status === 'partial_divergence')
-	).sort((a, b) => a.bytes - b.bytes);
+	const all_partial = results_by_status(results, 'partial_divergence')
+		.sort((a, b) => a.bytes - b.bytes);
 
 	// Show unknown differences (needs investigation)
-	const allUnknown = LANGUAGES.flatMap((lang) =>
-		results.get(lang)!.filter((r) => r.status === 'unknown_diff')
-	).sort((a, b) => a.bytes - b.bytes);
+	const all_unknown = results_by_status(results, 'unknown_diff')
+		.sort((a, b) => a.bytes - b.bytes);
 
 	// Default: show unexplained diffs (partial hunks + unknown files)
 	// --summary: compact output without diffs
 	if (summary) {
 		// Compact partial divergence listing
-		if (allPartial.length > 0) {
+		if (all_partial.length > 0) {
 			console.log(
-				`\nPartial Divergences (${allPartial.length} files):`,
+				`\nPartial Divergences (${all_partial.length} files):`,
 			);
-			for (const r of allPartial.slice(0, 10)) {
+			for (const r of all_partial.slice(0, 10)) {
 				const coverage = r.coverage!;
 				const patterns = coverage.matches.map((d) => d.pattern).join(', ');
 				console.log(
 					`  ${
-						relPath(r.path, basePath)
-					}: ${patterns} (${coverage.unexplainedHunks.length} unexplained hunks)`,
+						rel_path(r.path, base_path)
+					}: ${patterns} (${coverage.unexplained_hunks.length} unexplained hunks)`,
 				);
 			}
-			if (allPartial.length > 10) {
-				console.log(`  ... and ${allPartial.length - 10} more`);
+			if (all_partial.length > 10) {
+				console.log(`  ... and ${all_partial.length - 10} more`);
 			}
 		}
 
 		// Compact unknown differences listing
-		if (allUnknown.length > 0) {
+		if (all_unknown.length > 0) {
 			console.log(
-				`\nUnknown Differences (${allUnknown.length} files, needs investigation):`,
+				`\nUnknown Differences (${all_unknown.length} files, needs investigation):`,
 			);
-			for (const r of allUnknown.slice(0, 10)) {
-				const sizeStr = formatBytes(r.bytes);
-				const diffSummary = getDiffSummary(r.prettier!, r.ours!);
-				console.log(`  ${relPath(r.path, basePath)} (${sizeStr})`);
-				console.log(`    ${diffSummary}`);
+			for (const r of all_unknown.slice(0, 10)) {
+				const size_str = format_bytes(r.bytes);
+				const diff_summary = get_diff_summary(r.prettier!, r.ours!);
+				console.log(`  ${rel_path(r.path, base_path)} (${size_str})`);
+				console.log(`    ${diff_summary}`);
 			}
-			if (allUnknown.length > 10) {
-				console.log(`  ... and ${allUnknown.length - 10} more`);
+			if (all_unknown.length > 10) {
+				console.log(`  ... and ${all_unknown.length - 10} more`);
 			}
 		}
 	} else {
 		// Default: show all unexplained diffs
-		const totalUnexplainedFiles = allPartial.length + allUnknown.length;
-		if (totalUnexplainedFiles > 0) {
+		const total_unexplained_files = all_partial.length + all_unknown.length;
+		if (total_unexplained_files > 0) {
 			console.log(
-				`\nUnexplained Differences (${allPartial.length} partial + ${allUnknown.length} unknown = ${totalUnexplainedFiles} files):`,
+				`\nUnexplained Differences (${all_partial.length} partial + ${all_unknown.length} unknown = ${total_unexplained_files} files):`,
 			);
 		}
 
 		// Partial files: show only unexplained hunks with diffs
-		if (allPartial.length > 0) {
+		if (all_partial.length > 0) {
 			console.log(`\n${'─'.repeat(70)}`);
-			console.log(`Partial files (${allPartial.length} — unexplained hunks only):`);
-			for (const r of allPartial) {
+			console.log(`Partial files (${all_partial.length} — unexplained hunks only):`);
+			for (const r of all_partial) {
 				const coverage = r.coverage!;
 				const patterns = coverage.matches.map((d) => d.pattern).join(', ');
-				const explainedCount = coverage.explainedHunks.size;
-				const totalHunks = coverage.hunks.length;
-				console.log(`\n  ${relPath(r.path, basePath)}:`);
+				const explained_count = coverage.explained_hunks.size;
+				const total_hunks = coverage.hunks.length;
+				console.log(`\n  ${rel_path(r.path, base_path)}:`);
 				console.log(
-					`    explained ${explainedCount}/${totalHunks} hunks: ${patterns}`,
+					`    explained ${explained_count}/${total_hunks} hunks: ${patterns}`,
 				);
-				for (const idx of coverage.unexplainedHunks) {
+				for (const idx of coverage.unexplained_hunks) {
 					const hunk = coverage.hunks[idx];
-					const oursLabel = hunk.oursRange ? `ours:${hunk.oursRange.start}` : '';
-					const prettierLabel = hunk.prettierRange ? `prettier:${hunk.prettierRange.start}` : '';
+					const ours_label = hunk.ours_range ? `ours:${hunk.ours_range.start}` : '';
+					const prettier_label = hunk.prettier_range ? `prettier:${hunk.prettier_range.start}` : '';
 					console.log(
-						`    \x1b[33mhunk ${idx}\x1b[0m: @@ ${oursLabel} / ${prettierLabel} @@`,
+						`    \x1b[33mhunk ${idx}\x1b[0m: @@ ${ours_label} / ${prettier_label} @@`,
 					);
-					for (const line of formatDiffForTerminal(hunk.lines)) {
+					for (const line of format_diff_for_terminal(hunk.lines)) {
 						console.log(`      ${line}`);
 					}
 				}
@@ -731,18 +845,18 @@ async function main(): Promise<void> {
 		}
 
 		// Unknown files: show full diffs
-		if (allUnknown.length > 0) {
+		if (all_unknown.length > 0) {
 			console.log(`\n${'─'.repeat(70)}`);
-			console.log(`Unknown files (${allUnknown.length} — full diffs):`);
-			for (const r of allUnknown) {
-				const diff = diffLines(r.prettier!, r.ours!);
+			console.log(`Unknown files (${all_unknown.length} — full diffs):`);
+			for (const r of all_unknown) {
+				const diff = diff_lines(r.prettier!, r.ours!);
 				const removals = diff.filter((d) => d.type === 'remove').length;
 				const additions = diff.filter((d) => d.type === 'add').length;
-				console.log(`\n  ${relPath(r.path, basePath)} (${formatBytes(r.bytes)}):`);
+				console.log(`\n  ${rel_path(r.path, base_path)} (${format_bytes(r.bytes)}):`);
 				console.log(
 					`    \x1b[31m-${removals} prettier-only\x1b[0m, \x1b[32m+${additions} ours-only\x1b[0m`,
 				);
-				for (const line of formatDiffForTerminal(filterDiffContext(diff))) {
+				for (const line of format_diff_for_terminal(filter_diff_context(diff))) {
 					console.log(`      ${line}`);
 				}
 			}
@@ -751,71 +865,66 @@ async function main(): Promise<void> {
 
 	// Show known divergences with explanations if --explain
 	if (explain) {
-		const allKnown = LANGUAGES.flatMap((lang) =>
-			results.get(lang)!.filter((r) => r.status === 'known_divergence')
-		);
+		const all_known = results_by_status(results, 'known_divergence');
 
-		if (allKnown.length > 0) {
-			console.log(`\nKnown Divergences (${allKnown.length} files):`);
-			for (const r of allKnown) {
+		if (all_known.length > 0) {
+			console.log(`\nKnown Divergences (${all_known.length} files):`);
+			for (const r of all_known) {
 				const patterns = r.coverage!.matches.map((d) => d.pattern).join(', ');
-				console.log(`  ${relPath(r.path, basePath)}: ${patterns}`);
+				console.log(`  ${rel_path(r.path, base_path)}: ${patterns}`);
 			}
 		}
 	}
 
 	// Show errors (unexpected only)
-	const allErrors = LANGUAGES.flatMap((lang) =>
-		results.get(lang)!.filter((r) => r.status === 'error')
-	).sort((a, b) => a.bytes - b.bytes);
+	const all_errors = results_by_status(results, 'error').sort((a, b) => a.bytes - b.bytes);
 
-	if (allErrors.length > 0) {
-		console.log(`\nErrors (${allErrors.length} files):`);
-		for (const r of allErrors.slice(0, 3)) {
-			const sizeStr = formatBytes(r.bytes);
-			console.log(`  ${relPath(r.path, basePath)} (${sizeStr}): ${r.error?.slice(0, 80)}`);
+	if (all_errors.length > 0) {
+		console.log(`\nErrors (${all_errors.length} files):`);
+		for (const r of all_errors.slice(0, 3)) {
+			const size_str = format_bytes(r.bytes);
+			console.log(`  ${rel_path(r.path, base_path)} (${size_str}): ${r.error?.slice(0, 80)}`);
 		}
-		if (allErrors.length > 3) {
-			console.log(`  ... and ${allErrors.length - 3} more`);
+		if (all_errors.length > 3) {
+			console.log(`  ... and ${all_errors.length - 3} more`);
 		}
 	}
 
 	// Show expected errors (dimmed, verbose/explain only for details)
-	const allExpectedErrors = LANGUAGES.flatMap((lang) =>
-		results.get(lang)!.filter((r) => r.status === 'expected_error')
-	).sort((a, b) => a.bytes - b.bytes);
+	const all_expected_errors = results_by_status(results, 'expected_error')
+		.sort((a, b) => a.bytes - b.bytes);
 
-	if (allExpectedErrors.length > 0 && (verbose || explain)) {
-		console.log(`\n\x1b[2mExpected Errors (${allExpectedErrors.length} files):\x1b[0m`);
-		for (const r of allExpectedErrors) {
-			console.log(`\x1b[2m  ${relPath(r.path, basePath)}: ${r.expectedReason}\x1b[0m`);
+	if (all_expected_errors.length > 0 && (verbose || explain)) {
+		console.log(`\n\x1b[2mExpected Errors (${all_expected_errors.length} files):\x1b[0m`);
+		for (const r of all_expected_errors) {
+			console.log(`\x1b[2m  ${rel_path(r.path, base_path)}: ${r.expected_reason}\x1b[0m`);
 		}
 	}
 
 	// Final status
 	console.log();
-	if (totalSafetyViolation > 0) {
+	if (total_safety_violation > 0) {
 		console.log(
-			`\x1b[31mFAIL: ${totalSafetyViolation} safety violations (data loss detected)\x1b[0m`,
+			`\x1b[31mFAIL: ${total_safety_violation} safety violations (data loss detected)\x1b[0m`,
 		);
 		canonical.dispose();
 		native.dispose();
 		Deno.exit(1);
-	} else if ((totalUnknownDiff > 0 || totalPartialDivergence > 0) && strict) {
-		const issues = totalUnknownDiff + totalPartialDivergence;
+	} else if ((total_unknown_diff > 0 || total_partial_divergence > 0) && strict) {
+		const issues = total_unknown_diff + total_partial_divergence;
 		console.log(`\x1b[31mFAIL: ${issues} unexplained differences (strict mode)\x1b[0m`);
 		canonical.dispose();
 		native.dispose();
 		Deno.exit(1);
-	} else if (totalUnknownDiff > 0 || totalPartialDivergence > 0) {
+	} else if (total_unknown_diff > 0 || total_partial_divergence > 0) {
 		const parts: string[] = [];
-		if (totalUnknownDiff > 0) parts.push(`${totalUnknownDiff} unknown`);
-		if (totalPartialDivergence > 0) parts.push(`${totalPartialDivergence} partial`);
+		if (total_unknown_diff > 0) parts.push(`${total_unknown_diff} unknown`);
+		if (total_partial_divergence > 0) parts.push(`${total_partial_divergence} partial`);
 		console.log(
 			`\x1b[33mWARN: ${parts.join(', ')} differences (may need investigation)\x1b[0m`,
 		);
-	} else if (totalErrors > 0) {
-		console.log(`\x1b[33mWARN: ${totalErrors} errors occurred\x1b[0m`);
+	} else if (total_errors > 0) {
+		console.log(`\x1b[33mWARN: ${total_errors} errors occurred\x1b[0m`);
 	} else {
 		console.log('\x1b[32mPASS: No safety violations or unknown differences\x1b[0m');
 	}

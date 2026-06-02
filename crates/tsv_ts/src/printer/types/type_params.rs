@@ -7,7 +7,9 @@
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
 use crate::printer::analysis::find_char_skipping_comments;
+use crate::printer::layout::fluid_after_operator;
 use tsv_lang::SymbolToU32;
+use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -26,8 +28,13 @@ impl<'a> Printer<'a> {
         }
 
         let d = self.d();
-        let param_docs = self.build_type_parameter_docs_with_comments(decl);
-        d.concat(&[d.text("<"), d.join(param_docs, ", "), d.text(">")])
+        let (param_docs, deferred_after) = self.build_type_parameter_docs_with_comments(decl);
+        d.concat(&[
+            d.text("<"),
+            d.join(param_docs, ", "),
+            deferred_after,
+            d.text(">"),
+        ])
     }
 
     /// Build doc for type parameter declaration with wrapping support
@@ -55,8 +62,8 @@ impl<'a> Printer<'a> {
             return self.build_type_parameter_declaration_doc_with_line_comments(decl);
         }
 
-        let param_docs = self.build_type_parameter_docs_with_comments(decl);
-        let inner = d.join_trailing(param_docs, d.comma_line());
+        let (param_docs, deferred_after) = self.build_type_parameter_docs_with_comments(decl);
+        let inner = d.concat(&[d.join_trailing(param_docs, d.comma_line()), deferred_after]);
         d.concat(&[
             d.text("<"),
             d.indent_softline(inner),
@@ -66,7 +73,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for type parameter declaration with expanding comments
-    fn build_type_parameter_declaration_doc_with_line_comments(
+    pub(in crate::printer) fn build_type_parameter_declaration_doc_with_line_comments(
         &self,
         decl: &TSTypeParameterDeclaration,
     ) -> DocId {
@@ -74,13 +81,31 @@ impl<'a> Printer<'a> {
         let mut inner_parts = Vec::new();
         let mut prev_end = decl.span.start + 1; // After the opening `<`
 
+        // A line comment trailing the opening `<` is kept on the `<` line (divergence
+        // from prettier, which relocates it to its own line as the first param's
+        // leading comment). See conformance_prettier.md §Comment relocation
+        // (Type-parameter `<` trailing). Same mechanism as the object/array/block
+        // and call-`(` open-delimiter family.
+        let first_start = decl.params[0].span.start; // caller guarantees non-empty
+        let (angle_prefix, angle_pull_pos) =
+            self.delimiter_line_comment_prefix(decl.span.start, first_start);
+
         for (i, param) in decl.params.iter().enumerate() {
             let param_start = param.span.start;
             let param_end = param.span.end;
             let is_last = i == decl.params.len() - 1;
 
-            // Leading comments (after previous comma or `<`)
-            inner_parts.extend(self.build_leading_comments_multiline(prev_end, param_start));
+            // Leading comments (after previous comma or `<`); for the first param,
+            // exclude comments already pulled onto the `<` line.
+            if i == 0 && angle_pull_pos.is_some() {
+                inner_parts.extend(self.build_leading_comments_multiline_after_delim(
+                    prev_end,
+                    param_start,
+                    decl.span.start,
+                ));
+            } else {
+                inner_parts.extend(self.build_leading_comments_multiline(prev_end, param_start));
+            }
 
             inner_parts.push(self.build_type_parameter_doc(param));
 
@@ -102,6 +127,7 @@ impl<'a> Printer<'a> {
 
         d.concat(&[
             d.text("<"),
+            d.concat(&angle_prefix),
             d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])),
             d.hardline(),
             d.text(">"),
@@ -111,35 +137,44 @@ impl<'a> Printer<'a> {
     /// Check for expanding comments in type param declarations: line comments,
     /// own-line block comments, or line comments inside param spans (e.g.,
     /// `T extends // comment\n  A`). Used by both wrapping and non-wrapping paths.
-    fn has_expanding_comments_in_type_param_declaration(
+    pub(in crate::printer) fn has_expanding_comments_in_type_param_declaration(
         &self,
         decl: &TSTypeParameterDeclaration,
     ) -> bool {
-        !decl.params.is_empty()
-            && (self.has_line_comments_in_delimited_list(
-                &decl.params,
-                |p| p.span,
-                decl.span.end - 1,
-            ) || self.has_own_line_block_comments_in_bracket_list(
-                decl.span,
-                &decl.params,
-                |p| p.span,
-            ) || decl
+        let Some(first) = decl.params.first() else {
+            return false;
+        };
+        // A line comment trailing the opening `<` (`<// c\n T>`) forces expansion;
+        // `has_line_comments_in_delimited_list` only covers between/after params,
+        // not the `<`→first-param gap, so check it explicitly. Without this the
+        // inline path runs and emits block-only comments, dropping the line comment
+        // entirely (content loss). Own-line block comments in this gap are already
+        // handled by `has_own_line_block_comments_in_bracket_list`.
+        self.has_line_comments_between(decl.span.start + 1, first.span.start)
+            || self.has_line_comments_in_delimited_list(&decl.params, |p| p.span, decl.span.end - 1)
+            || self.has_own_line_block_comments_in_bracket_list(decl.span, &decl.params, |p| p.span)
+            || decl
                 .params
                 .iter()
-                .any(|p| self.has_line_comments_between(p.span.start, p.span.end)))
+                .any(|p| self.has_line_comments_between(p.span.start, p.span.end))
     }
 
     /// Build enriched param docs with surrounding block comments from the declaration.
     /// Comments outside param spans (e.g., `</* c */ T /* c */>`) are captured here.
     /// Uses comma position to split: comments before comma = trailing, after = leading.
+    /// Returns the per-param docs and a deferred doc for a block comment trailing
+    /// the last param after the comma — emitted by the caller after the (synthetic)
+    /// trailing comma so the comment is preserved after the comma rather than
+    /// relocated before it (prettier relocates; see conformance_prettier.md).
     fn build_type_parameter_docs_with_comments(
         &self,
         decl: &TSTypeParameterDeclaration,
-    ) -> Vec<DocId> {
+    ) -> (Vec<DocId>, DocId) {
         let d = self.d();
         let mut prev_end = decl.span.start + 1; // After `<`
-        decl.params
+        let mut deferred_after = d.empty();
+        let param_docs = decl
+            .params
             .iter()
             .enumerate()
             .map(|(i, param)| {
@@ -166,17 +201,40 @@ impl<'a> Printer<'a> {
                     ));
                     prev_end = comma_pos + 1; // After comma
                 } else {
-                    // Last param: trailing comments before `>`
-                    parts.push(self.build_comments_between_filtered(
-                        param.span.end,
-                        decl.span.end - 1,
-                        CommentSpacing::Leading,
-                        CommentFilter::BlockOnly,
-                    ));
+                    // Last param: split trailing block comments around a source
+                    // trailing comma. Before-comma stay with the param; after-comma
+                    // are deferred past the synthetic comma by the caller.
+                    let before_close = decl.span.end - 1;
+                    match self
+                        .find_comma_after(param.span.end)
+                        .filter(|cp| *cp < before_close)
+                    {
+                        Some(comma_pos) => {
+                            parts.push(self.build_comments_between_filtered(
+                                param.span.end,
+                                comma_pos,
+                                CommentSpacing::Leading,
+                                CommentFilter::BlockOnly,
+                            ));
+                            deferred_after = self.build_comments_between_filtered(
+                                comma_pos,
+                                before_close,
+                                CommentSpacing::Leading,
+                                CommentFilter::BlockOnly,
+                            );
+                        }
+                        None => parts.push(self.build_comments_between_filtered(
+                            param.span.end,
+                            before_close,
+                            CommentSpacing::Leading,
+                            CommentFilter::BlockOnly,
+                        )),
+                    }
                 }
                 d.concat(&parts)
             })
-            .collect()
+            .collect();
+        (param_docs, deferred_after)
     }
 
     /// Build doc for a single type parameter
@@ -225,22 +283,20 @@ impl<'a> Printer<'a> {
             // comment inside the parens as if it were between `extends` and the
             // constraint so it forces the indent-and-break layout (matching
             // prettier's paren stripping).
-            let (value_search_end, value_doc) = if let TSType::Parenthesized(p) =
+            let (value_search_end, value_type): (u32, &TSType) = if let TSType::Parenthesized(p) =
                 constraint.as_ref()
                 && self.paren_has_leading_line_comment(p)
             {
-                (
-                    p.type_annotation.span().start,
-                    self.build_type_doc(&p.type_annotation),
-                )
+                (p.type_annotation.span().start, p.type_annotation.as_ref())
             } else {
-                (constraint.span().start, self.build_type_doc(constraint))
+                (constraint.span().start, constraint.as_ref())
             };
             self.append_keyword_value_with_comments(
                 &mut parts,
                 extends_end,
                 value_search_end,
-                value_doc,
+                value_type,
+                GroupId::TypeParameterConstraint,
             );
             prev_end = constraint.span().end;
         }
@@ -266,7 +322,8 @@ impl<'a> Printer<'a> {
                 &mut parts,
                 eq_end,
                 default.span().start,
-                self.build_type_doc(default),
+                default.as_ref(),
+                GroupId::TypeParameterDefault,
             );
             prev_end = default.span().end;
         }
@@ -277,16 +334,24 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Append a value doc after a keyword, handling comments in between.
+    /// Append a constraint/default value after its keyword (`extends` / `=`),
+    /// handling comments in between.
     /// Block comments are inlined: `extends /* c */ A`
     /// Line comments force break+indent: `extends // c\n  A`
-    /// No comments: `extends A` (space + value)
+    /// No comments, non-hugging union: hanging indent (`extends\n  | A\n  | B`)
+    /// No comments, otherwise: break after the keyword and indent when the value
+    /// overflows (`extends\n  Long`), hugging object-like types (`extends {`).
+    ///
+    /// `group_id` ties the after-keyword line break to `indent_if_break` so the
+    /// value is indented exactly when that break fires — Prettier's
+    /// `printTypeParameter` pattern.
     fn append_keyword_value_with_comments(
         &self,
         parts: &mut Vec<DocId>,
         keyword_end: u32,
         value_start: u32,
-        value_doc: DocId,
+        value_type: &TSType,
+        group_id: GroupId,
     ) {
         let d = self.d();
         let comments = self.build_comments_between_filtered_opt(
@@ -298,12 +363,29 @@ impl<'a> Printer<'a> {
         if let Some(c) = comments {
             parts.push(c);
             if self.has_line_comments_between(keyword_end, value_start) {
-                parts.push(d.indent(d.concat(&[d.hardline(), value_doc])));
+                parts.push(d.indent(d.concat(&[d.hardline(), self.build_type_doc(value_type)])));
                 return;
             }
+            // Block comment present: keep the value inline after it.
+            parts.push(d.text(" "));
+            parts.push(self.build_type_doc(value_type));
+            return;
         }
-        parts.push(d.text(" "));
-        parts.push(value_doc);
+        // No comments: a non-hugging union breaks after the keyword with a
+        // hanging indent (Prettier's shouldIndentUnionType — true for type
+        // parameter constraints and defaults).
+        if let Some(hanging) = self.build_union_hanging_indent_doc(value_type) {
+            parts.push(hanging);
+            return;
+        }
+        // Other types: break after the keyword and indent when the value would
+        // overflow. The group holds only the line, so an object-like type still
+        // hugs the keyword (`extends {`) while a plain type wraps and indents.
+        parts.push(fluid_after_operator(
+            d,
+            self.build_type_doc(value_type),
+            group_id,
+        ));
     }
 
     //

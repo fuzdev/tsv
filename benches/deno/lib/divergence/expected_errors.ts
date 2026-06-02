@@ -46,7 +46,7 @@ export const EXPECTED_ERROR_PATTERNS: ExpectedErrorPattern[] = [
 ];
 
 /** Check if a parse error is expected (canonical parser also fails) */
-export function checkExpectedError(content: string): ExpectedErrorResult {
+export function check_expected_error(content: string): ExpectedErrorResult {
 	for (const pattern of EXPECTED_ERROR_PATTERNS) {
 		if (pattern.matches(content)) {
 			return { expected: true, pattern };

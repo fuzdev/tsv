@@ -94,6 +94,11 @@ impl Statement {
 pub struct ExpressionStatement {
     pub expression: Expression,
     pub span: Span,
+    /// True when this is a directive prologue entry — an unparenthesized
+    /// string-literal statement in the leading run of a `Program` or function
+    /// body (e.g. `"use strict";`). Directives are printed verbatim from source
+    /// and emit acorn's `directive` field in the public AST.
+    pub is_directive: bool,
 }
 
 /// Block statement: `{ stmt1; stmt2; }`

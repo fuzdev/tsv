@@ -18,7 +18,7 @@
 		"typecheck": "cargo check --workspace",
 		"test": "cargo test --workspace",
 		"lint": "cargo clippy --workspace",
-		"check": "deno task typecheck && deno task test && deno task lint && deno fmt --check && deno task check:ast-types",
+		"check": "deno task typecheck && deno task test && deno task lint && deno task conformance:audit && deno fmt --check && deno task check:ast-types",
 		"check:ast-types": "deno run --allow-read --allow-write=scripts --allow-run=cargo,deno scripts/check_ast_types.ts",
 		"format": "cargo fmt && deno fmt",
 
@@ -29,6 +29,8 @@
 		"fixtures:update:parsed": "cargo run -p tsv_debug --quiet fixtures_update_parsed",
 		"fixtures:update:formatted": "cargo run -p tsv_debug --quiet fixtures_update_formatted",
 		"fixtures:audit": "cargo run -p tsv_debug --quiet fixtures_audit",
+		"fixtures:ts-audit": "cargo run -p tsv_debug --quiet ts_fixture_audit",
+		"conformance:audit": "cargo run -p tsv_debug --quiet conformance_audit",
 
 		"bench": "deno task build:ffi && deno task build:wasm:deno && deno task build:wasm:parse:deno && deno task bench:run",
 		"bench:run": "deno run --v8-flags=--expose-gc --allow-ffi --allow-read --allow-write=benches/deno/results --allow-run=git,gzip --allow-env --allow-net --allow-sys benches/deno/bench.ts",
@@ -43,7 +45,7 @@
 
 		"divergence:audit": "deno run --allow-read benches/deno/divergence_audit.ts",
 
-		"test:divergence": "deno test --config benches/deno/deno.json benches/deno/lib/divergence/patterns_test.ts",
+		"test:divergence": "deno test --config benches/deno/deno.json benches/deno/lib/divergence/",
 
 		"publish:npm:build:fmt": "wasm-pack build crates/tsv_wasm --target bundler --release --scope fuzdev --out-dir pkg/npm-fmt && deno run --allow-read --allow-write=crates/tsv_wasm/pkg/npm-fmt --allow-run=gzip scripts/publish_patch_npm.ts fmt",
 		"publish:npm:build:parse": "wasm-pack build crates/tsv_wasm --target bundler --release --scope fuzdev --out-dir pkg/npm-parse -- --features ast && deno run --allow-read --allow-write=crates/tsv_wasm/pkg/npm-parse --allow-run=gzip scripts/publish_patch_npm.ts parse",

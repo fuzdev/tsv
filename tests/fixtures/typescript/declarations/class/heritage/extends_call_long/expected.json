@@ -1,0 +1,793 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 616,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Short — superclass call stays inline",
+			"start": 20,
+			"end": 59,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " At 100 chars — stays inline",
+			"start": 103,
+			"end": 133,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " At 101 chars — superclass call arguments break onto their own lines",
+			"start": 236,
+			"end": 306,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Class expression — same superclass call breaks identically",
+			"start": 424,
+			"end": 485,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 62
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 615,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 606,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 25,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 61,
+					"end": 100,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 40
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 67,
+						"end": 72,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 7
+							},
+							"end": {
+								"line": 3,
+								"column": 12
+							}
+						},
+						"name": "Short"
+					},
+					"superClass": {
+						"type": "CallExpression",
+						"start": 81,
+						"end": 97,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 21
+							},
+							"end": {
+								"line": 3,
+								"column": 37
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 81,
+							"end": 91,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 21
+								},
+								"end": {
+									"line": 3,
+									"column": 31
+								}
+							},
+							"name": "createBase"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 92,
+								"end": 93,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 32
+									},
+									"end": {
+										"line": 3,
+										"column": 33
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "Identifier",
+								"start": 95,
+								"end": 96,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 35
+									},
+									"end": {
+										"line": 3,
+										"column": 36
+									}
+								},
+								"name": "b"
+							}
+						],
+						"optional": false
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 98,
+						"end": 100,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 38
+							},
+							"end": {
+								"line": 3,
+								"column": 40
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Short — superclass call stays inline",
+							"start": 20,
+							"end": 59
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 135,
+					"end": 233,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 99
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 141,
+						"end": 145,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 7
+							},
+							"end": {
+								"line": 6,
+								"column": 11
+							}
+						},
+						"name": "Fits"
+					},
+					"superClass": {
+						"type": "CallExpression",
+						"start": 154,
+						"end": 230,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 20
+							},
+							"end": {
+								"line": 6,
+								"column": 96
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 154,
+							"end": 164,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 20
+								},
+								"end": {
+									"line": 6,
+									"column": 30
+								}
+							},
+							"name": "createBase"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 165,
+								"end": 173,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 31
+									},
+									"end": {
+										"line": 6,
+										"column": 39
+									}
+								},
+								"name": "aaaaaaaa"
+							},
+							{
+								"type": "Identifier",
+								"start": 175,
+								"end": 183,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 41
+									},
+									"end": {
+										"line": 6,
+										"column": 49
+									}
+								},
+								"name": "bbbbbbbb"
+							},
+							{
+								"type": "Identifier",
+								"start": 185,
+								"end": 193,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 51
+									},
+									"end": {
+										"line": 6,
+										"column": 59
+									}
+								},
+								"name": "cccccccc"
+							},
+							{
+								"type": "Identifier",
+								"start": 195,
+								"end": 203,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 61
+									},
+									"end": {
+										"line": 6,
+										"column": 69
+									}
+								},
+								"name": "dddddddd"
+							},
+							{
+								"type": "Identifier",
+								"start": 205,
+								"end": 229,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 71
+									},
+									"end": {
+										"line": 6,
+										"column": 95
+									}
+								},
+								"name": "eeeeeeeeeeeeeeeeeeeeeeee"
+							}
+						],
+						"optional": false
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 231,
+						"end": 233,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 97
+							},
+							"end": {
+								"line": 6,
+								"column": 99
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 100 chars — stays inline",
+							"start": 103,
+							"end": 133
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 308,
+					"end": 421,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 314,
+						"end": 319,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 7
+							},
+							"end": {
+								"line": 9,
+								"column": 12
+							}
+						},
+						"name": "Overr"
+					},
+					"superClass": {
+						"type": "CallExpression",
+						"start": 328,
+						"end": 418,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 21
+							},
+							"end": {
+								"line": 15,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 328,
+							"end": 338,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 21
+								},
+								"end": {
+									"line": 9,
+									"column": 31
+								}
+							},
+							"name": "createBase"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 342,
+								"end": 350,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 10
+									}
+								},
+								"name": "aaaaaaaa"
+							},
+							{
+								"type": "Identifier",
+								"start": 354,
+								"end": 362,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 10
+									}
+								},
+								"name": "bbbbbbbb"
+							},
+							{
+								"type": "Identifier",
+								"start": 366,
+								"end": 374,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 10
+									}
+								},
+								"name": "cccccccc"
+							},
+							{
+								"type": "Identifier",
+								"start": 378,
+								"end": 386,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 10
+									}
+								},
+								"name": "dddddddd"
+							},
+							{
+								"type": "Identifier",
+								"start": 390,
+								"end": 414,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 26
+									}
+								},
+								"name": "eeeeeeeeeeeeeeeeeeeeeeee"
+							}
+						],
+						"optional": false
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 419,
+						"end": 421,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 3
+							},
+							"end": {
+								"line": 15,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 101 chars — superclass call arguments break onto their own lines",
+							"start": 236,
+							"end": 306
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 487,
+					"end": 605,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 493,
+							"end": 604,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 7
+								},
+								"end": {
+									"line": 24,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 493,
+								"end": 494,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 8
+									}
+								},
+								"name": "G"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 497,
+								"end": 604,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 11
+									},
+									"end": {
+										"line": 24,
+										"column": 5
+									}
+								},
+								"id": null,
+								"superClass": {
+									"type": "CallExpression",
+									"start": 511,
+									"end": 601,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 25
+										},
+										"end": {
+											"line": 24,
+											"column": 2
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 511,
+										"end": 521,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 25
+											},
+											"end": {
+												"line": 18,
+												"column": 35
+											}
+										},
+										"name": "createBase"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 525,
+											"end": 533,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 2
+												},
+												"end": {
+													"line": 19,
+													"column": 10
+												}
+											},
+											"name": "aaaaaaaa"
+										},
+										{
+											"type": "Identifier",
+											"start": 537,
+											"end": 545,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 2
+												},
+												"end": {
+													"line": 20,
+													"column": 10
+												}
+											},
+											"name": "bbbbbbbb"
+										},
+										{
+											"type": "Identifier",
+											"start": 549,
+											"end": 557,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 2
+												},
+												"end": {
+													"line": 21,
+													"column": 10
+												}
+											},
+											"name": "cccccccc"
+										},
+										{
+											"type": "Identifier",
+											"start": 561,
+											"end": 569,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 2
+												},
+												"end": {
+													"line": 22,
+													"column": 10
+												}
+											},
+											"name": "dddddddd"
+										},
+										{
+											"type": "Identifier",
+											"start": 573,
+											"end": 597,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 2
+												},
+												"end": {
+													"line": 23,
+													"column": 26
+												}
+											},
+											"name": "eeeeeeeeeeeeeeeeeeeeeeee"
+										}
+									],
+									"optional": false
+								},
+								"body": {
+									"type": "ClassBody",
+									"start": 602,
+									"end": 604,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 3
+										},
+										"end": {
+											"line": 24,
+											"column": 5
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Class expression — same superclass call breaks identically",
+							"start": 424,
+							"end": 485
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -10,7 +10,11 @@
  * Exit codes: 0 = all pass, 1 = any failure.
  */
 
-import { getBenchmarkTasks, getFormatters, initImplementations } from './lib/implementations.ts';
+import {
+	get_benchmark_tasks,
+	get_formatters,
+	init_implementations,
+} from './lib/implementations.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 
 /**
@@ -38,35 +42,35 @@ interface Failure {
 const failures: Failure[] = [];
 let passed = 0;
 
-function recordPass(): void {
+function record_pass(): void {
 	passed++;
 }
 
-function recordFail(f: Failure): void {
+function record_fail(f: Failure): void {
 	failures.push(f);
 }
 
-const impls = await initImplementations({ logger: () => {} });
+const impls = await init_implementations({ logger: () => {} });
 
 //
 // Formatters
 //
 
 console.log('Formatters:');
-const formatters = getFormatters(impls);
+const formatters = get_formatters(impls);
 
 for (const lang of LANGUAGES) {
 	console.log(`  ${lang}:`);
 	const input = INPUTS[lang];
 
 	for (const fmt of formatters) {
-		if (!fmt.supportsLanguage(lang)) {
+		if (!fmt.supports_language(lang)) {
 			console.log(`    ${fmt.name.padEnd(12)} - (unsupported)`);
 			continue;
 		}
 
 		const call = (src: string) =>
-			fmt.isAsync ? fmt.formatAsync!(src, lang) : Promise.resolve(fmt.format!(src, lang));
+			fmt.is_async ? fmt.format_async!(src, lang) : Promise.resolve(fmt.format!(src, lang));
 
 		let first: string;
 		try {
@@ -74,13 +78,13 @@ for (const lang of LANGUAGES) {
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
 			console.log(`    ${fmt.name.padEnd(12)} ✗ threw: ${msg.slice(0, 80)}`);
-			recordFail({ kind: 'format', lang, impl: fmt.name, reason: `threw: ${msg}` });
+			record_fail({ kind: 'format', lang, impl: fmt.name, reason: `threw: ${msg}` });
 			continue;
 		}
 
 		if (typeof first !== 'string' || first.length === 0) {
 			console.log(`    ${fmt.name.padEnd(12)} ✗ empty or non-string output`);
-			recordFail({ kind: 'format', lang, impl: fmt.name, reason: 'empty/non-string output' });
+			record_fail({ kind: 'format', lang, impl: fmt.name, reason: 'empty/non-string output' });
 			continue;
 		}
 
@@ -90,7 +94,7 @@ for (const lang of LANGUAGES) {
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
 			console.log(`    ${fmt.name.padEnd(12)} ✗ second pass threw: ${msg.slice(0, 80)}`);
-			recordFail({
+			record_fail({
 				kind: 'format',
 				lang,
 				impl: fmt.name,
@@ -103,12 +107,12 @@ for (const lang of LANGUAGES) {
 			console.log(`    ${fmt.name.padEnd(12)} ✗ not idempotent`);
 			console.log(`      first:  ${JSON.stringify(first)}`);
 			console.log(`      second: ${JSON.stringify(second)}`);
-			recordFail({ kind: 'format', lang, impl: fmt.name, reason: 'not idempotent' });
+			record_fail({ kind: 'format', lang, impl: fmt.name, reason: 'not idempotent' });
 			continue;
 		}
 
 		console.log(`    ${fmt.name.padEnd(12)} ✓`);
-		recordPass();
+		record_pass();
 	}
 }
 
@@ -120,28 +124,28 @@ console.log('\nParsers:');
 for (const lang of LANGUAGES) {
 	console.log(`  ${lang}:`);
 	const input = INPUTS[lang];
-	const tasks = getBenchmarkTasks(impls, 'parse', lang);
+	const tasks = get_benchmark_tasks(impls, 'parse', lang);
 
 	for (const task of tasks) {
 		try {
-			const result = task.isAsync ? await task.runAsync!(input, lang) : task.run(input, lang);
+			const result = task.is_async ? await task.run_async!(input, lang) : task.run(input, lang);
 			// Internal parsers return void; treat that as success.
 			if (task.name.includes('internal')) {
 				console.log(`    ${task.name.padEnd(20)} ✓`);
-				recordPass();
+				record_pass();
 				continue;
 			}
 			if (result == null) {
 				console.log(`    ${task.name.padEnd(20)} ✗ null result`);
-				recordFail({ kind: 'parse', lang, impl: task.name, reason: 'null result' });
+				record_fail({ kind: 'parse', lang, impl: task.name, reason: 'null result' });
 				continue;
 			}
 			console.log(`    ${task.name.padEnd(20)} ✓`);
-			recordPass();
+			record_pass();
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
 			console.log(`    ${task.name.padEnd(20)} ✗ threw: ${msg.slice(0, 80)}`);
-			recordFail({ kind: 'parse', lang, impl: task.name, reason: `threw: ${msg}` });
+			record_fail({ kind: 'parse', lang, impl: task.name, reason: `threw: ${msg}` });
 		}
 	}
 }

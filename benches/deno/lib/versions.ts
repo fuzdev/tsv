@@ -4,7 +4,7 @@
  * Single source of truth for all package versions used in benchmarks.
  */
 
-import { extractVersion } from './types.ts';
+import { extract_version } from './types.ts';
 
 /** Canonical implementation versions */
 export interface CanonicalVersions {
@@ -23,7 +23,7 @@ export interface OxcVersions {
 
 /** Biome implementation versions */
 export interface BiomeVersions {
-	jsApi: string;
+	js_api: string;
 	wasm: string;
 }
 
@@ -48,7 +48,7 @@ const DEFAULT_VERSIONS: AllVersions = {
 		oxfmt: 'unknown',
 	},
 	biome: {
-		jsApi: 'unknown',
+		js_api: 'unknown',
 		wasm: 'unknown',
 	},
 };
@@ -58,30 +58,30 @@ const DEFAULT_VERSIONS: AllVersions = {
  *
  * Reads benches/deno/deno.json to extract versions for all implementations.
  */
-export async function loadAllVersions(): Promise<AllVersions> {
+export async function load_all_versions(): Promise<AllVersions> {
 	try {
-		const denoJsonPath = new URL('../deno.json', import.meta.url).pathname;
-		const content = await Deno.readTextFile(denoJsonPath);
+		const deno_json_path = new URL('../deno.json', import.meta.url).pathname;
+		const content = await Deno.readTextFile(deno_json_path);
 		const config = JSON.parse(content);
 		const imports = config.imports || {};
 
 		return {
 			canonical: {
-				prettier: extractVersion(imports['prettier'] || ''),
-				'prettier-plugin-svelte': extractVersion(imports['prettier-plugin-svelte'] || ''),
-				svelte: extractVersion(imports['svelte'] || ''),
-				acorn: extractVersion(imports['acorn'] || ''),
-				'@sveltejs/acorn-typescript': extractVersion(
+				prettier: extract_version(imports['prettier'] || ''),
+				'prettier-plugin-svelte': extract_version(imports['prettier-plugin-svelte'] || ''),
+				svelte: extract_version(imports['svelte'] || ''),
+				acorn: extract_version(imports['acorn'] || ''),
+				'@sveltejs/acorn-typescript': extract_version(
 					imports['@sveltejs/acorn-typescript'] || '',
 				),
 			},
 			oxc: {
-				'oxc-parser': extractVersion(imports['oxc-parser'] || ''),
-				oxfmt: extractVersion(imports['oxfmt'] || ''),
+				'oxc-parser': extract_version(imports['oxc-parser'] || ''),
+				oxfmt: extract_version(imports['oxfmt'] || ''),
 			},
 			biome: {
-				jsApi: extractVersion(imports['@biomejs/js-api'] || ''),
-				wasm: extractVersion(imports['@biomejs/wasm-bundler'] || ''),
+				js_api: extract_version(imports['@biomejs/js-api'] || ''),
+				wasm: extract_version(imports['@biomejs/wasm-bundler'] || ''),
 			},
 		};
 	} catch {

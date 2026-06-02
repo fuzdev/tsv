@@ -142,6 +142,8 @@ export interface ExpressionStatement {
 	end: number;
 	loc: SourceLocation;
 	expression: Expression;
+	/** Present only for directive prologue entries: raw string contents without quotes. */
+	directive?: string;
 }
 
 export interface BlockStatement {

@@ -10,9 +10,10 @@
 use super::super::comments_in_range;
 use super::CommentSpacing;
 use super::Printer;
-use super::helpers::intersection_has_huggable_last_type;
+use super::helpers::{intersection_has_expanding_first_type, intersection_has_huggable_last_type};
 use crate::ast::internal::{self, TSType, TSTypeElement};
 use crate::printer::analysis::{find_char_skipping_comments, skip_identifier_at};
+use crate::printer::layout::hang_after_operator;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::DocId;
 
@@ -27,17 +28,9 @@ impl<'a> Printer<'a> {
                 if prop.readonly {
                     parts.push(d.text("readonly "));
                 }
-                let key_region_end;
-                if prop.computed {
-                    let key_doc = self.build_expression_doc(&prop.key);
-                    let (doc, end) =
-                        self.build_computed_key_bracket_doc(prop.span.start, &prop.key, key_doc);
-                    key_region_end = end;
-                    parts.push(doc);
-                } else {
-                    key_region_end = prop.key.span().end;
-                    parts.push(self.build_expression_doc(&prop.key));
-                }
+                let (key_doc, key_region_end) =
+                    self.build_type_member_key_doc(prop.span.start, &prop.key, prop.computed, true);
+                parts.push(key_doc);
 
                 // Handle comments between key and colon (e.g., `b /* comment */: B`)
                 // key_region_end is after `]` for computed, avoiding re-finding bracket comments
@@ -75,20 +68,13 @@ impl<'a> Printer<'a> {
                     internal::MethodKind::Set => parts.push(d.text("set ")),
                     _ => {}
                 }
-                let key_region_end;
-                if method.computed {
-                    let key_doc = self.build_expression_doc(&method.key);
-                    let (doc, end) = self.build_computed_key_bracket_doc(
-                        method.span.start,
-                        &method.key,
-                        key_doc,
-                    );
-                    key_region_end = end;
-                    parts.push(doc);
-                } else {
-                    key_region_end = method.key.span().end;
-                    parts.push(self.build_expression_doc(&method.key));
-                }
+                let (key_doc, key_region_end) = self.build_type_member_key_doc(
+                    method.span.start,
+                    &method.key,
+                    method.computed,
+                    false,
+                );
+                parts.push(key_doc);
 
                 // Handle comments around method signature parts
                 // Comments between key and type_params/`(` go before `?`
@@ -137,7 +123,7 @@ impl<'a> Printer<'a> {
                 let content_end = method.return_type.as_ref().map_or_else(
                     || {
                         paren_pos
-                            .and_then(|p| self.find_close_paren(p))
+                            .and_then(|p| self.find_closing_paren(p, method.span.end))
                             .unwrap_or(method.span.end)
                     },
                     |rt| rt.span.end,
@@ -183,7 +169,7 @@ impl<'a> Printer<'a> {
                 let content_end = call.return_type.as_ref().map_or_else(
                     || {
                         paren_pos
-                            .and_then(|p| self.find_close_paren(p))
+                            .and_then(|p| self.find_closing_paren(p, call.span.end))
                             .unwrap_or(call.span.end)
                     },
                     |rt| rt.span.end,
@@ -229,7 +215,7 @@ impl<'a> Printer<'a> {
                 let content_end = ctor.return_type.as_ref().map_or_else(
                     || {
                         paren_pos
-                            .and_then(|p| self.find_close_paren(p))
+                            .and_then(|p| self.find_closing_paren(p, ctor.span.end))
                             .unwrap_or(ctor.span.end)
                     },
                     |rt| rt.span.end,
@@ -292,11 +278,8 @@ impl<'a> Printer<'a> {
                             CommentSpacing::Trailing,
                         );
                         param_parts.push(d.text(if has_pre_colon_comment { " :" } else { ":" }));
-                        param_parts.push(d.group(d.indent(d.concat(&[
-                            d.line(),
-                            comments_doc,
-                            type_doc,
-                        ]))));
+                        param_parts
+                            .push(hang_after_operator(d, d.concat(&[comments_doc, type_doc])));
                     } else {
                         // Regular key type: use standard annotation
                         // build_type_annotation_doc emits `: type`, need space before `:` with comments
@@ -370,11 +353,7 @@ impl<'a> Printer<'a> {
                         CommentSpacing::Trailing,
                     );
                     parts.push(d.text(":"));
-                    parts.push(d.group(d.indent(d.concat(&[
-                        d.line(), // space when flat, newline when broken
-                        comments_doc,
-                        type_doc,
-                    ]))));
+                    parts.push(hang_after_operator(d, d.concat(&[comments_doc, type_doc])));
                 }
                 TSType::Intersection(i) => {
                     let type_doc = self.build_intersection_type_doc(i, false);
@@ -383,18 +362,33 @@ impl<'a> Printer<'a> {
                         val_type_start,
                         CommentSpacing::Trailing,
                     );
-                    if intersection_has_huggable_last_type(i) {
+                    let has_line_comments_between_members = i.types.windows(2).any(|p| {
+                        self.has_line_comments_between(p[0].span().end, p[1].span().start)
+                    });
+                    if has_line_comments_between_members {
+                        // Keep the first type inline after `:` (prettier does too); the
+                        // continuation is indented. `hang_after_operator` would instead
+                        // break after `:` because the line comment's forced hardline
+                        // turns its leading `line` into a break. Mirrors the line-comment
+                        // branch of `build_intersection_type_annotation_doc`.
+                        let wrapped = if intersection_has_huggable_last_type(i)
+                            || intersection_has_expanding_first_type(i)
+                        {
+                            type_doc
+                        } else {
+                            d.group(d.indent(type_doc))
+                        };
+                        parts.push(d.text(": "));
+                        parts.push(comments_doc);
+                        parts.push(wrapped);
+                    } else if intersection_has_huggable_last_type(i) {
                         // No indent/line - keep `: Type & {` hugged
                         parts.push(d.text(": "));
                         parts.push(comments_doc);
                         parts.push(type_doc);
                     } else {
                         parts.push(d.text(":"));
-                        parts.push(d.group(d.indent(d.concat(&[
-                            d.line(),
-                            comments_doc,
-                            type_doc,
-                        ]))));
+                        parts.push(hang_after_operator(d, d.concat(&[comments_doc, type_doc])));
                     }
                 }
                 _ => {

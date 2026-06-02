@@ -43,7 +43,7 @@ pub(super) const TEST_CALL_PATTERNS: &[&str] = &[
 ];
 
 /// Get the name of an identifier if it's a simple identifier
-pub(super) fn get_identifier_name(expr: &internal::Expression) -> Option<DefaultSymbol> {
+fn get_identifier_name(expr: &internal::Expression) -> Option<DefaultSymbol> {
     if let internal::Expression::Identifier(id) = expr {
         Some(id.name)
     } else {
@@ -51,9 +51,30 @@ pub(super) fn get_identifier_name(expr: &internal::Expression) -> Option<Default
     }
 }
 
+/// Build the dotted callee string (e.g. `test.describe.only`) for a simple
+/// identifier or a non-computed, non-optional member chain. Returns `None` for
+/// anything else (computed access, optional chains, or non-identifier callees).
+///
+/// Shared by `is_test_call` (pattern lookup) and the test-call layout (flat
+/// callee text) so the two stay in lockstep.
+pub(super) fn callee_chain_string(
+    expr: &internal::Expression,
+    printer: &Printer,
+) -> Option<String> {
+    let parts = get_member_chain_parts(expr)?;
+    Some(
+        parts
+            .iter()
+            .rev()
+            .map(|sym| printer.resolve_symbol(*sym))
+            .collect::<Vec<_>>()
+            .join("."),
+    )
+}
+
 /// Get the member chain parts from an expression
-/// Returns (parts_reversed, is_optional) where parts_reversed is e.g. ["skip", "test"]
-pub(super) fn get_member_chain_parts(expr: &internal::Expression) -> Option<Vec<DefaultSymbol>> {
+/// Returns parts reversed, e.g. `["skip", "test"]` for `test.skip`.
+fn get_member_chain_parts(expr: &internal::Expression) -> Option<Vec<DefaultSymbol>> {
     let mut parts = Vec::new();
 
     match expr {
@@ -83,6 +104,13 @@ pub(super) fn get_member_chain_parts(expr: &internal::Expression) -> Option<Vec<
 
 /// Check if a call expression is a test function call that should stay on one line
 pub(super) fn is_test_call(call: &internal::CallExpression, printer: &Printer) -> bool {
+    // Optional calls (`describe?.(...)`) are never test calls — they format like
+    // a normal call (wrap when long), preserving the `?.`. Mirrors prettier's
+    // isTestCall guard (`utilities/test-libraries.js`: `node.optional` → false).
+    if call.optional {
+        return false;
+    }
+
     // Must have 2-3 arguments
     let arg_count = call.arguments.len();
     if !(2..=3).contains(&arg_count) {
@@ -125,17 +153,9 @@ pub(super) fn is_test_call(call: &internal::CallExpression, printer: &Printer) -
     }
 
     // Check if callee matches a test pattern
-    let Some(parts) = get_member_chain_parts(&call.callee) else {
+    let Some(callee_str) = callee_chain_string(&call.callee, printer) else {
         return false;
     };
-
-    // Build the callee string in correct order (parts are reversed)
-    let callee_str: String = parts
-        .iter()
-        .rev()
-        .map(|sym| printer.resolve_symbol(*sym))
-        .collect::<Vec<_>>()
-        .join(".");
 
     // Check against known test patterns
     TEST_CALL_PATTERNS.contains(&callee_str.as_str())

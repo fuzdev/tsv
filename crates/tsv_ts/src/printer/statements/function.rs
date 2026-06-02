@@ -45,12 +45,10 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let params_start = Some(decl.params_start);
 
-        // Compute trailing comments boundary
-        let trailing_comments_end = if let Some(rt) = &decl.return_type {
-            Some(rt.span.start)
-        } else {
-            Some(decl.body.span.start)
-        };
+        // Params trailing comments are bounded at the close paren; a comment between
+        // `)` and the return type is emitted via build_paren_to_return_type_comments.
+        let trailing_comments_end =
+            Some(self.params_trailing_comments_end(decl.params_start, decl.body.span.start));
 
         let params_doc = self.build_params_doc_with_comments_ext(
             &decl.params,
@@ -72,6 +70,15 @@ impl<'a> Printer<'a> {
 
         let mut sig_parts = vec![params_doc];
         if let Some(rt_doc) = return_type_doc {
+            // Preserve a comment between `)` and the return type `:` in place.
+            if let Some(rt) = &decl.return_type {
+                sig_parts.push(
+                    self.build_paren_to_return_type_comments(
+                        Some(decl.params_start),
+                        rt.span.start,
+                    ),
+                );
+            }
             sig_parts.push(rt_doc);
         }
 
@@ -167,14 +174,11 @@ impl<'a> Printer<'a> {
         parts.push(self.build_function_signature_doc(decl));
 
         // Handle comments between signature and body: function a() /* comment */ {}
-        let sig_end = if let Some(rt) = &decl.return_type {
-            rt.span.end
-        } else if let Some(paren) = self.find_closing_paren(decl.params_start, decl.body.span.start)
-        {
-            paren
-        } else {
-            decl.body.span.start
-        };
+        let sig_end = self.signature_end(
+            decl.return_type.as_ref(),
+            decl.params_start,
+            decl.body.span.start,
+        );
         self.append_body_with_sig_comments(&mut parts, sig_end, &decl.body);
 
         d.concat(&parts)

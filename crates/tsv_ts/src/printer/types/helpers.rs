@@ -186,12 +186,14 @@ pub(super) fn type_needs_parens_for_indexed_access_object(ts_type: &TSType) -> b
 /// Without parens: `A | B[]` parses as `A | (B[])`, not `(A | B)[]`
 pub(super) fn type_needs_parens_for_array_element(ts_type: &TSType) -> bool {
     let inner = unwrap_parenthesized(ts_type);
-    // TypeOperator excluded: `(readonly T)[]` is invalid TypeScript
+    // TypeOperator included: `(keyof T)[]` differs from `keyof T[]`, and
+    // `(readonly string[])[]` differs from `readonly string[][]`.
     matches!(
         inner,
         TSType::Union(_)
             | TSType::Intersection(_)
             | TSType::TypeQuery(_)
+            | TSType::TypeOperator(_)
             | TSType::Conditional(_)
             | TSType::Infer(_)
             | TSType::Function(_)
@@ -199,32 +201,92 @@ pub(super) fn type_needs_parens_for_array_element(ts_type: &TSType) -> bool {
     )
 }
 
+/// Check if a type needs parentheses when used as an optional tuple element (`[T?]`).
+/// Matches Prettier's `TSOptionalType` parent rule in `needs-parentheses.js`
+/// (union/intersection plus the `TSTypeOperator`-case fall-through). Without
+/// parens the `?` rebinds: `[() => void?]` / `[A | B?]` are invalid or change
+/// meaning.
+pub(super) fn type_needs_parens_for_optional_element(ts_type: &TSType) -> bool {
+    let inner = unwrap_parenthesized(ts_type);
+    matches!(
+        inner,
+        TSType::Union(_)
+            | TSType::Intersection(_)
+            | TSType::TypeOperator(_)
+            | TSType::Conditional(_)
+            | TSType::Infer(_)
+            | TSType::Function(_)
+            | TSType::Constructor(_)
+    )
+}
+
+/// Check if a type needs parentheses when used as the check type of a conditional
+/// (`T extends U ? ...`). A function, constructor, or nested conditional check type
+/// keeps its parens (`(() => void) extends E ? ...`, `(A extends B ? C : D) extends E ? ...`);
+/// without them the `extends`/`?` rebinds. Union/intersection/keyof check types need
+/// none. Matches Prettier's `checkType` rule (`needs-parentheses.js`).
+pub(super) fn type_needs_parens_for_conditional_check(ts_type: &TSType) -> bool {
+    let inner = unwrap_parenthesized(ts_type);
+    matches!(
+        inner,
+        TSType::Function(_) | TSType::Constructor(_) | TSType::Conditional(_)
+    )
+}
+
+/// Check if a type needs parentheses when used as the extends type of a conditional
+/// (`T extends U ? ...`). A nested conditional keeps its parens
+/// (`A extends (B extends C ? D : E) ? ...`); without them the trailing `? :` rebinds.
+/// Matches Prettier's `extendsType` rule (`needs-parentheses.js`).
+pub(super) fn type_needs_parens_for_conditional_extends(ts_type: &TSType) -> bool {
+    matches!(unwrap_parenthesized(ts_type), TSType::Conditional(_))
+}
+
 /// Check if a type needs parentheses when used as the operand of a prefix type operator
-/// (keyof, readonly, unique). Without parens: `keyof A | B` parses as `(keyof A) | B`
+/// (keyof, readonly, unique). Without parens: `keyof A | B` parses as `(keyof A) | B`,
+/// and lower-precedence operands lose their meaning entirely (`keyof (() => void)` →
+/// the invalid `keyof () => void`). Matches Prettier's `TSTypeOperator` case in
+/// `needs-parentheses.js` (parens when `parent.type === "TSTypeOperator"`).
 pub(super) fn type_needs_parens_for_prefix_operator(ts_type: &TSType) -> bool {
     let inner = unwrap_parenthesized(ts_type);
-    matches!(inner, TSType::Union(_) | TSType::Intersection(_))
-}
-
-/// Check if a type needs parentheses when used as a member of an intersection.
-/// Union, function, constructor, and conditional types have lower precedence than `&`.
-pub(super) fn type_needs_parens_in_intersection(ts_type: &TSType) -> bool {
-    let inner = unwrap_parenthesized(ts_type);
     matches!(
         inner,
-        TSType::Union(_) | TSType::Function(_) | TSType::Constructor(_) | TSType::Conditional(_)
+        TSType::Union(_)
+            | TSType::Intersection(_)
+            | TSType::TypeOperator(_)
+            | TSType::Conditional(_)
+            | TSType::Infer(_)
+            | TSType::Function(_)
+            | TSType::Constructor(_)
     )
 }
 
-/// Check if a type needs parentheses when used as a member of a union.
-/// Function, constructor, and conditional types have lower precedence than `|`.
-pub(super) fn type_needs_parens_in_union(ts_type: &TSType) -> bool {
+/// Check if a type needs parentheses when used as a member of a union or
+/// intersection. Function, constructor, and conditional types have lower
+/// precedence than `|`/`&`; a nested union/intersection also keeps its parens
+/// (`A | (B | C)`, `A & (B & C)`).
+///
+/// Both operators share one rule because Prettier does: `TSFunctionType`,
+/// `TSConstructorType`, `TSConditionalType`, `TSUnionType`, and
+/// `TSIntersectionType` all fall through to the same check in
+/// `needs-parentheses.js` — `isUnionType(parent) || isIntersectionType(parent)`.
+pub(super) fn type_needs_parens_in_union_or_intersection(ts_type: &TSType) -> bool {
     let inner = unwrap_parenthesized(ts_type);
     matches!(
         inner,
-        TSType::Function(_)
+        TSType::Union(_)
+            | TSType::Intersection(_)
+            | TSType::Function(_)
             | TSType::Constructor(_)
             | TSType::Conditional(_)
-            | TSType::Intersection(_)
     )
+}
+
+/// Member-parens predicate for a *single-member* union/intersection. Prettier
+/// drops single-element union/intersection nodes in postprocess, so the lone
+/// member prints in the union's own position and needs no precedence parens of
+/// its own — any required parens come from the union's parent context, applied
+/// one level up. Pairs with `type_needs_parens_in_union_or_intersection` (used
+/// for 2+ members).
+pub(super) fn type_never_needs_parens(_ts_type: &TSType) -> bool {
+    false
 }

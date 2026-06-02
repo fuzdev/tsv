@@ -65,6 +65,25 @@ impl<'a> Printer<'a> {
         docs
     }
 
+    /// Build docs for block comments between the opening brace and the first
+    /// member, emitted inline (`{/* c */ a: number}`). Used by the non-multiline
+    /// type-literal paths, where leading comments before the first member would
+    /// otherwise be dropped. Line / own-line comments don't reach here — they
+    /// force the multiline path via `type_literal_force_multiline`.
+    fn build_type_literal_leading_comments_inline(
+        &self,
+        brace_start: u32,
+        first_member_start: u32,
+    ) -> Vec<DocId> {
+        let d = self.d();
+        let mut docs = Vec::new();
+        for comment in comments_in_range(self.comments, brace_start + 1, first_member_start) {
+            docs.push(self.build_comment_doc(comment));
+            docs.push(d.text(" "));
+        }
+        docs
+    }
+
     /// Build docs for trailing comments partitioned around a semicolon.
     ///
     /// Returns docs for: `[space + comment]* ";" [space + comment]*`
@@ -316,13 +335,24 @@ impl<'a> Printer<'a> {
     /// - Contains block comments on their own line
     pub(super) fn type_literal_force_multiline(&self, obj: &TSTypeLiteral) -> bool {
         let source_is_multiline = super::super::is_brace_block_multiline(self.source, obj.span);
+        // Prettier breaks an object type when its first member starts on a line
+        // below the opening brace. `is_brace_block_multiline` only sees a newline
+        // *immediately* after `{`, so a block comment on the brace line
+        // (`{ /* c */\n a: T }`) defeats it — detect the newline before the first
+        // member directly here.
+        let first_member_on_new_line = obj.members.first().is_some_and(|m| {
+            self.source[obj.span.start as usize..m.span().start as usize].contains('\n')
+        });
         let has_line_or_multiline_block =
             comments_in_range(self.comments, obj.span.start, obj.span.end)
                 .any(|c| !c.is_block || c.content.contains('\n'));
         let member_spans: Vec<_> = obj.members.iter().map(TSTypeElement::span).collect();
         let has_standalone_block =
             self.has_standalone_block_comment(obj.span.start, obj.span.end, &member_spans);
-        source_is_multiline || has_line_or_multiline_block || has_standalone_block
+        source_is_multiline
+            || first_member_on_new_line
+            || has_line_or_multiline_block
+            || has_standalone_block
     }
 
     /// Build aligned object literal doc with custom opening/closing.
@@ -457,6 +487,14 @@ impl<'a> Printer<'a> {
         } else if hug {
             // Hugging mode: inline content with `; ` separators
             // Preserve comment position relative to semicolon
+            if let Some(first) = t.members.first() {
+                parts.extend(
+                    self.build_type_literal_leading_comments_inline(
+                        t.span.start,
+                        first.span().start,
+                    ),
+                );
+            }
             for (i, m) in t.members.iter().enumerate() {
                 let is_last = i == t.members.len() - 1;
                 // Use content_end for comment detection (before trailing separator)
@@ -489,6 +527,14 @@ impl<'a> Printer<'a> {
         } else {
             // Width-aware format: stays inline if fits, wraps if too long
             // Preserve comment position relative to semicolon
+            if let Some(first) = t.members.first() {
+                parts.extend(
+                    self.build_type_literal_leading_comments_inline(
+                        t.span.start,
+                        first.span().start,
+                    ),
+                );
+            }
             let mut member_parts = vec![];
             for (i, m) in t.members.iter().enumerate() {
                 let is_last = i == t.members.len() - 1;

@@ -8,12 +8,25 @@
 use super::super::comments_in_range;
 use super::helpers::{
     find_separator_position, intersection_has_expanding_first_type,
-    intersection_has_huggable_last_type, should_hug_union_type, type_needs_parens_in_intersection,
-    type_needs_parens_in_union,
+    intersection_has_huggable_last_type, should_hug_union_type,
+    type_needs_parens_in_union_or_intersection, type_never_needs_parens,
 };
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSIntersectionType, TSParenthesizedType, TSType, TSUnionType};
+use crate::printer::layout::hang_after_operator;
 use tsv_lang::doc::arena::DocId;
+
+/// Member-parens predicate for a union/intersection with `member_count` members.
+/// A single-member union/intersection collapses to its member (Prettier
+/// postprocess), so the lone member needs no precedence parens of its own;
+/// 2+ members use the normal `|`/`&` precedence rule.
+fn union_member_parens(member_count: usize) -> fn(&TSType) -> bool {
+    if member_count == 1 {
+        type_never_needs_parens
+    } else {
+        type_needs_parens_in_union_or_intersection
+    }
+}
 
 impl<'a> Printer<'a> {
     //
@@ -42,6 +55,16 @@ impl<'a> Printer<'a> {
         if union.types.is_empty() {
             return d.empty();
         }
+
+        // A single-member union collapses to its member — Prettier drops
+        // single-element `TSUnionType`/`TSIntersectionType` nodes in postprocess
+        // (`parse/postprocess/index.js`). The member prints in the union's own
+        // position, so any precedence parens around a nested union/intersection
+        // member fall away (`| (A | B)` → `A | B`); required parens come from the
+        // union's parent context one level up. The member still flows through the
+        // normal comment-aware paths so comments clinging to the `|`/parens are
+        // preserved.
+        let member_parens = union_member_parens(union.types.len());
 
         // Check for any comments on or between union members (disqualifies hugging).
         // Prettier's `hasComment(node)` includes attached trailing comments, which in
@@ -72,7 +95,7 @@ impl<'a> Printer<'a> {
                 if i > 0 {
                     parts.push(d.text(" | "));
                 }
-                parts.push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_union));
+                parts.push(self.build_type_doc_maybe_parens(t, member_parens));
             }
             return d.concat(&parts);
         }
@@ -141,7 +164,7 @@ impl<'a> Printer<'a> {
             if let TSType::TypeLiteral(obj) = t {
                 parts.push(self.build_union_member_object_literal_doc(obj));
             } else {
-                parts.push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_union));
+                parts.push(self.build_type_doc_maybe_parens(t, member_parens));
             }
 
             // Add trailing block comments after this type (before the next `|` separator)
@@ -177,6 +200,34 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Hanging-indent layout for a union used in a position where Prettier's
+    /// `printUnionType` applies `shouldIndentUnionType` — an `as`/`satisfies`
+    /// cast type, or a type-parameter `extends` constraint / `=` default. The
+    /// union breaks after the keyword with leading-pipe members indented one
+    /// level:
+    ///
+    /// ```text
+    /// value as
+    ///     | A
+    ///     | B
+    /// ```
+    ///
+    /// Returns `None` when the type is not an indentable union — hugging unions
+    /// (`{ ... } | null`, which expand the object member inline) and non-union
+    /// types use the caller's default inline layout.
+    pub(in crate::printer) fn build_union_hanging_indent_doc(&self, ty: &TSType) -> Option<DocId> {
+        let TSType::Union(union) = ty else {
+            return None;
+        };
+        if should_hug_union_type(union) {
+            return None;
+        }
+        // `wrap_in_group = false`: the union inherits breaking from the hanging
+        // group so the after-keyword line and the member separators break together.
+        let union_doc = self.build_union_type_doc(union, false);
+        Some(hang_after_operator(self.d(), union_doc))
+    }
+
     /// Build a Doc for a union type with line comments between members.
     ///
     /// Line comments force the union to be multiline because a line comment
@@ -191,6 +242,7 @@ impl<'a> Printer<'a> {
     fn build_union_type_doc_with_line_comments(&self, union: &TSUnionType) -> DocId {
         let d = self.d();
         let mut parts = Vec::new();
+        let member_parens = union_member_parens(union.types.len());
 
         for (i, t) in union.types.iter().enumerate() {
             let type_start = t.span().start;
@@ -225,12 +277,29 @@ impl<'a> Printer<'a> {
                         parts.push(self.build_trailing_line_comment_doc(comment));
                     }
 
-                    // Newline before `| `
                     parts.push(d.hardline());
-                    parts.push(d.text("| "));
 
-                    // Comments after the pipe (leading on this type)
-                    parts.extend(self.build_leading_comments_multiline(pipe_pos + 1, type_start));
+                    // Comments after the pipe lead this member. Line comments (and
+                    // own-line block comments) go on their own line BEFORE the `| `
+                    // separator so the pipe stays attached to the type
+                    // (`| A\n// c\n| B`). Inline block comments stay after `| `
+                    // (`| /* c */ B`). Prettier instead relocates such comments to
+                    // trail the previous member — see
+                    // union_infix_pipe_line_comment_prettier_divergence.
+                    let after_pipe = pipe_pos + 1;
+                    for comment in comments_in_range(self.comments, after_pipe, type_start) {
+                        if !(comment.is_block && self.is_same_line(comment.span.end, type_start)) {
+                            parts.push(self.build_comment_doc(comment));
+                            parts.push(d.hardline());
+                        }
+                    }
+                    parts.push(d.text("| "));
+                    for comment in comments_in_range(self.comments, after_pipe, type_start) {
+                        if comment.is_block && self.is_same_line(comment.span.end, type_start) {
+                            parts.push(self.build_comment_doc(comment));
+                            parts.push(d.text(" "));
+                        }
+                    }
                 } else {
                     // No pipe found, just add separator
                     parts.push(d.hardline());
@@ -253,7 +322,7 @@ impl<'a> Printer<'a> {
             if !relocated_paren_leading.is_empty()
                 && let TSType::Parenthesized(p) = t
             {
-                if type_needs_parens_in_union(&p.type_annotation) {
+                if type_needs_parens_in_union_or_intersection(&p.type_annotation) {
                     parts.push(d.text("("));
                     parts.push(self.build_type_doc(&p.type_annotation));
                     parts.push(d.text(")"));
@@ -263,7 +332,7 @@ impl<'a> Printer<'a> {
             } else if let TSType::TypeLiteral(obj) = t {
                 parts.push(self.build_union_member_object_literal_doc(obj));
             } else {
-                parts.push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_union));
+                parts.push(self.build_type_doc_maybe_parens(t, member_parens));
             }
 
             // Trailing comments on last type
@@ -326,6 +395,12 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
+        // A single-member intersection collapses to its member — see the matching
+        // note in `build_union_type_doc`. The lone member needs no precedence
+        // parens (the parent context supplies any), while comment-aware paths
+        // below still preserve comments around the `&`/parens.
+        let member_parens = union_member_parens(intersection.types.len());
+
         // Hoist leading line comments inside the first member's stripped parens
         // OUT of the intersection (e.g., `(// c\n a) & b` → `// c\n a & b`).
         // The comment goes on its own line BEFORE the intersection so the
@@ -354,7 +429,20 @@ impl<'a> Printer<'a> {
             .windows(2)
             .any(|pair| self.has_line_comments_between(pair[0].span().end, pair[1].span().start));
         if has_line_comments_between_members {
-            return self.build_intersection_type_doc_with_line_comments(intersection);
+            let doc = self.build_intersection_type_doc_with_line_comments(intersection);
+            // The line-comment layout emits continuation members with a bare hardline
+            // and no indent, relying on the caller to supply the hanging indent. When
+            // `wrap_in_group` is set — the generic `build_type_doc` path used for type
+            // arguments, tuple elements, mapped-type values, and conditional branches —
+            // there is no such caller, so own the continuation indent here, mirroring
+            // Prettier's `printIntersectionType` (each continuation member is wrapped in
+            // `indent([" &", line, doc])`). When unset, the type-alias / annotation /
+            // function-return callers already wrap the result in `indent(...)`.
+            return if wrap_in_group {
+                d.group(d.indent(doc))
+            } else {
+                doc
+            };
         }
 
         // For intersection types, prettier uses trailing `&` when breaking,
@@ -388,8 +476,7 @@ impl<'a> Printer<'a> {
             CommentFilter::BlockOnly,
         ));
 
-        first_parts
-            .push(self.build_type_doc_maybe_parens(first_type, type_needs_parens_in_intersection));
+        first_parts.push(self.build_type_doc_maybe_parens(first_type, member_parens));
 
         // Add trailing block comments after first type
         if intersection.types.len() > 1 {
@@ -519,6 +606,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let mut parts = Vec::new();
+        let member_parens = union_member_parens(intersection.types.len());
 
         for (i, t) in intersection.types.iter().enumerate() {
             let type_start = t.span().start;
@@ -580,7 +668,7 @@ impl<'a> Printer<'a> {
             }
 
             // Add the type
-            parts.push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_intersection));
+            parts.push(self.build_type_doc_maybe_parens(t, member_parens));
 
             // Add trailing `&` for all but last type
             if i < intersection.types.len() - 1 {
@@ -608,8 +696,9 @@ impl<'a> Printer<'a> {
         first_paren: &TSParenthesizedType,
     ) -> DocId {
         let d = self.d();
+        let member_parens = union_member_parens(intersection.types.len());
         let inner = first_paren.type_annotation.as_ref();
-        let first_doc = if type_needs_parens_in_intersection(inner) {
+        let first_doc = if member_parens(inner) {
             // Re-wrap inner in parens (e.g., union in intersection: `(A | B) & C`).
             if let TSType::Union(union) = inner {
                 self.build_parenthesized_union_doc(union)
@@ -630,7 +719,7 @@ impl<'a> Printer<'a> {
         let mut parts = vec![first_doc];
         for t in intersection.types.iter().skip(1) {
             parts.push(d.text(" & "));
-            parts.push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_intersection));
+            parts.push(self.build_type_doc_maybe_parens(t, member_parens));
         }
         d.concat(&parts)
     }
@@ -662,7 +751,7 @@ impl<'a> Printer<'a> {
             ));
         }
 
-        parts.push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_intersection));
+        parts.push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_union_or_intersection));
 
         // Trailing block comments + `&` separator (or end-of-intersection comments)
         if !is_last {

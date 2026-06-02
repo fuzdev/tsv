@@ -129,6 +129,11 @@ impl<'a> Printer<'a> {
             // Check if the overall export is type-only
             let is_type_export = decl.export_kind == internal::ExportKind::Type;
 
+            // Position just past the specifier list's closing `}` (no-source case);
+            // used to scan for comments between `}` and the terminating `;`.
+            // Set unconditionally in both the empty and non-empty branches below.
+            let close_brace_end: u32;
+
             if decl.specifiers.is_empty() {
                 // Empty braces case: `export {}` or `export /* c */ {}`
                 // Extract comments between keyword and braces + inside braces.
@@ -142,6 +147,7 @@ impl<'a> Printer<'a> {
                 let brace_close = self
                     .find_char_outside_comments(keyword_end, semi_or_source, b'}')
                     .unwrap_or(semi_or_source);
+                close_brace_end = brace_close + 1;
                 if decl.source.is_none() {
                     // No re-export: comments go before braces (`export /* c */ {}`)
                     if let Some(comments_doc) =
@@ -180,6 +186,7 @@ impl<'a> Printer<'a> {
                 let brace_close = self.source[last_spec_end as usize..semi_or_source as usize]
                     .find('}')
                     .map_or(semi_or_source, |p| last_spec_end + p as u32);
+                close_brace_end = brace_close + 1;
 
                 // Check for expanding comments (force multiline):
                 // line comments, or own-line single-line block comments
@@ -234,10 +241,28 @@ impl<'a> Printer<'a> {
                 };
                 parts.push(self.build_from_source_doc(decl.span.start, source, empty_brace_start));
             }
-            parts.push(d.text(";"));
 
-            // Wrap entire statement in a group for width-based wrapping
-            d.group(d.concat(&parts))
+            // Comments between the closing `}` (or source literal) and the
+            // terminating `;` — preserved where the user placed them (prettier
+            // relocates no-`from` ones inside the braces). Emitted outside the
+            // content group so a line-comment break doesn't expand the braces.
+            let content_end = decl.source.as_ref().map_or(close_brace_end, |s| s.span.end);
+            let mut trailing = Vec::new();
+            let broke = self.append_pre_semi_comments(&mut trailing, content_end, decl.span.end);
+            if trailing.is_empty() {
+                parts.push(d.text(";"));
+                // Wrap entire statement in a group for width-based wrapping
+                d.group(d.concat(&parts))
+            } else {
+                let group = d.group(d.concat(&parts));
+                trailing.insert(0, group);
+                // A line comment ends its line — the `;` must follow on a new line.
+                if broke {
+                    trailing.push(d.hardline());
+                }
+                trailing.push(d.text(";"));
+                d.concat(&trailing)
+            }
         }
     }
 
@@ -346,6 +371,10 @@ impl<'a> Printer<'a> {
             parts.push(d.symbol(exported.name.to_u32()));
         }
         parts.push(self.build_from_source_doc(decl.span.start, &decl.source, None));
+        // Comments between the source literal and `;` — preserved in place.
+        if self.append_pre_semi_comments(&mut parts, decl.source.span.end, decl.span.end) {
+            parts.push(d.hardline());
+        }
         parts.push(d.text(";"));
         d.concat(&parts)
     }
@@ -660,10 +689,33 @@ impl<'a> Printer<'a> {
             }
         }
 
-        parts.push(d.text(";"));
-
-        // Wrap entire statement in a group for width-based wrapping
-        d.group(d.concat(&parts))
+        // Comments between the last content token (source literal, or attribute
+        // `}` if present) and the terminating `;` — preserved where the user
+        // placed them. Emitted outside the content group (see export above).
+        let content_end = if decl.attributes.is_empty() {
+            decl.source.span.end
+        } else {
+            let last_attr_end = decl.attributes.last().map_or(0, |a| a.span.end);
+            self.source[last_attr_end as usize..decl.span.end as usize]
+                .find('}')
+                .map_or(decl.span.end, |p| last_attr_end + p as u32 + 1)
+        };
+        let mut trailing = Vec::new();
+        let broke = self.append_pre_semi_comments(&mut trailing, content_end, decl.span.end);
+        if trailing.is_empty() {
+            parts.push(d.text(";"));
+            // Wrap entire statement in a group for width-based wrapping
+            d.group(d.concat(&parts))
+        } else {
+            let group = d.group(d.concat(&parts));
+            trailing.insert(0, group);
+            // A line comment ends its line — the `;` must follow on a new line.
+            if broke {
+                trailing.push(d.hardline());
+            }
+            trailing.push(d.text(";"));
+            d.concat(&trailing)
+        }
     }
 
     /// Build doc for `import x = require("y")` or `import x = A.B`
@@ -745,6 +797,14 @@ impl<'a> Printer<'a> {
             }
         }
 
+        // Comments between the module reference and `;` — preserved in place.
+        let ref_end = match &decl.module_reference {
+            internal::TSModuleReference::ExternalModuleReference(ext_ref) => ext_ref.span.end,
+            internal::TSModuleReference::EntityName(entity_name) => entity_name.span().end,
+        };
+        if self.append_pre_semi_comments(&mut parts, ref_end, decl.span.end) {
+            parts.push(d.hardline());
+        }
         parts.push(d.text(";"));
 
         d.concat(&parts)
@@ -880,6 +940,10 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut inner_parts = Vec::new();
         let mut prev_end = brace_start + 1; // After opening `{`
+        // Block comment trailing the LAST item after the comma — preserved after
+        // the (synthetic) trailing comma rather than relocated before it (prettier
+        // relocates before; see conformance_prettier.md §Comment relocation).
+        let mut last_after_comma = Vec::new();
 
         for (i, item) in items.iter().enumerate() {
             let span = get_span(item);
@@ -904,7 +968,15 @@ impl<'a> Printer<'a> {
                 self.append_trailing_inline_block_comments(&mut item_parts, item_end, comma_pos);
                 prev_end = comma_pos + 1;
             } else {
-                self.append_trailing_inline_block_comments(&mut item_parts, item_end, brace_close);
+                // Split the last item's trailing block comments around a source
+                // trailing comma: before-comma stay with the item; after-comma are
+                // preserved after the comma (emitted below, after `trailing_comma`).
+                self.append_last_trailing_block_comments_split(
+                    &mut item_parts,
+                    &mut last_after_comma,
+                    item_end,
+                    brace_close,
+                );
             }
 
             if i > 0 {
@@ -919,6 +991,8 @@ impl<'a> Printer<'a> {
         // Trailing comma when broken (matches join_trailing behavior)
         let trailing_comma = d.if_break(d.text(","), d.text(""));
         inner_parts.push(trailing_comma);
+        // Preserved after-comma block comment(s) on the last item
+        inner_parts.extend(last_after_comma);
 
         d.concat(&inner_parts)
     }

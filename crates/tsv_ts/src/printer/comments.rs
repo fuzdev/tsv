@@ -8,6 +8,7 @@
 
 use super::Printer;
 use super::analysis::{find_char_skipping_comments, skip_string_or_comment};
+use super::layout::hang_after_operator;
 use crate::ast::internal;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::{comments_in_range, printing};
@@ -533,7 +534,7 @@ impl<'a> Printer<'a> {
                 let types_joined = d.join_doc(item_docs, comma_line);
                 d.concat(&[
                     d.text(keyword),
-                    d.group(d.indent(d.concat(&[d.line(), kw_comments, types_joined]))),
+                    hang_after_operator(d, d.concat(&[kw_comments, types_joined])),
                 ])
             }
         } else {
@@ -544,6 +545,47 @@ impl<'a> Printer<'a> {
             };
             d.concat(&[d.text(keyword_space), kw_comments, d.join(item_docs, ", ")])
         }
+    }
+
+    /// Build the leading-comment doc for comments between an opening `(` and the
+    /// value that follows, concatenated with `value_doc`. Returns the combined doc
+    /// plus whether a line or own-line block comment forces the enclosing parens to
+    /// break across lines.
+    ///
+    /// An own-line block comment requires a newline BOTH before and after it —
+    /// prettier keeps `(\n/* c */value)` inline because nothing separates the comment
+    /// from the value. Shared by dynamic `import(...)` and TS `import(...)` types.
+    pub(crate) fn build_paren_leading_value_doc(
+        &self,
+        open_paren_end: u32,
+        value_start: u32,
+        value_doc: DocId,
+    ) -> (DocId, bool) {
+        let d = self.d();
+        let own_line = comments_in_range(self.comments, open_paren_end, value_start).any(|c| {
+            c.is_block
+                && self.has_newline_between(open_paren_end, c.span.start)
+                && self.has_newline_between(c.span.end, value_start)
+        });
+        let line = self.has_line_comments_between(open_paren_end, value_start);
+        let force_break = own_line || line;
+
+        let doc = if force_break {
+            // Each comment on its own line inside the broken parens.
+            let mut parts = Vec::new();
+            for comment in comments_in_range(self.comments, open_paren_end, value_start) {
+                parts.push(self.build_comment_doc(comment));
+                parts.push(d.hardline());
+            }
+            parts.push(value_doc);
+            d.concat(&parts)
+        } else if let Some(lead) = self.build_rhs_comments_opt(open_paren_end, value_start) {
+            // Inline block comment(s): `/* c */ value`
+            d.concat(&[lead, value_doc])
+        } else {
+            value_doc
+        };
+        (doc, force_break)
     }
 
     /// Build inline comments between two positions with line-comment-safe trailing spacing.
@@ -610,6 +652,50 @@ impl<'a> Printer<'a> {
                 parts.push(d.line_suffix(suffix));
             }
         }
+    }
+
+    /// Append comments between a declaration's last content token and its
+    /// terminating `;`, preserving the user's placement (consistent with the
+    /// before-semicolon and do-while `)`→`;` divergences — see
+    /// `conformance_prettier.md` §Comment relocation). A same-line block comment
+    /// trails the content inline (` /* c */`); line comments and own-line block
+    /// comments stay on their own line, forcing the `;` onto a following line.
+    ///
+    /// Returns `true` if any comment forced a line break, so the caller emits the
+    /// `;` after a `hardline` (and keeps these comments outside the content group
+    /// so the break doesn't expand the specifier braces).
+    pub(crate) fn append_pre_semi_comments(
+        &self,
+        parts: &mut Vec<DocId>,
+        start: u32,
+        end: u32,
+    ) -> bool {
+        let d = self.d();
+        let mut prev_end = start;
+        let mut broke = false;
+        for comment in comments_in_range(self.comments, start, end) {
+            let same_line = self.is_same_line(prev_end, comment.span.start);
+            if comment.is_block && same_line {
+                // Same-line block comment trails inline.
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
+            } else if same_line {
+                // Trailing line comment: stays on the content line, forces a break.
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
+                broke = true;
+            } else {
+                // Own-line comment (line or block): preserve its own line.
+                if self.has_blank_line_between(prev_end, comment.span.start) {
+                    parts.push(d.literalline());
+                }
+                parts.push(d.hardline());
+                parts.push(self.build_comment_doc(comment));
+                broke = true;
+            }
+            prev_end = comment.span.end;
+        }
+        broke
     }
 
     /// Append trailing comments from stripped grouping parens in spread elements,
@@ -884,6 +970,35 @@ impl<'a> Printer<'a> {
         parts
     }
 
+    /// Like `build_leading_comments_multiline`, but skips comments on the same
+    /// source line as `delim_pos`.
+    ///
+    /// Used for the first element of a forced-multiline list when those same-line
+    /// comments were already emitted as a trailing prefix on the opening delimiter's
+    /// line (see `delimiter_line_comment_prefix`) — calling this for the first element
+    /// avoids emitting them twice. `delim_pos` is the opening `<`/`(`/etc.
+    pub(crate) fn build_leading_comments_multiline_after_delim(
+        &self,
+        start: u32,
+        end: u32,
+        delim_pos: u32,
+    ) -> Vec<DocId> {
+        let d = self.d();
+        let mut parts = Vec::new();
+        for comment in comments_in_range(self.comments, start, end) {
+            if self.comment_on_delimiter_line(delim_pos, comment) {
+                continue; // pulled onto the delimiter line
+            }
+            parts.push(self.build_comment_doc(comment));
+            if comment.is_block && self.is_same_line(comment.span.end, end) {
+                parts.push(d.text(" "));
+            } else {
+                parts.push(d.hardline());
+            }
+        }
+        parts
+    }
+
     /// Build docs for trailing comments in a forced-multiline context.
     ///
     /// Same-line comments (block or line): ` /*content*/` or ` //content` (inline with leading space)
@@ -946,6 +1061,24 @@ impl<'a> Printer<'a> {
             }
         }
         found_any
+    }
+
+    /// True when a block comment in `(search_start, end)` sits on its own line —
+    /// i.e. not on the same source line as `line_ref`.
+    ///
+    /// Used to force a parameter/element list to multiline when an own-line block
+    /// comment follows the last element (`line_ref` = `search_start` = last elem end)
+    /// or fills the opening-delimiter→first-element gap (`line_ref` = the delimiter,
+    /// `search_start` = just past it). Line comments in the same position are detected
+    /// separately (they always force a break).
+    pub(crate) fn has_own_line_block_comment_after(
+        &self,
+        line_ref: u32,
+        search_start: u32,
+        end: u32,
+    ) -> bool {
+        comments_in_range(self.comments, search_start, end)
+            .any(|c| c.is_block && !self.is_same_line(line_ref, c.span.start))
     }
 
     /// Check if there's a block comment on its own line within a container.
@@ -1160,6 +1293,57 @@ impl<'a> Printer<'a> {
         }
 
         docs
+    }
+
+    /// Compute the "delimiter-line prefix" for the open-delimiter trailing-comment
+    /// divergence (object literals, array literals, and block bodies).
+    ///
+    /// A comment on the same source line as the opening delimiter at `delim_pos`
+    /// is kept on that line — instead of being relocated to its own line as the
+    /// first element's leading comment (prettier's behavior). Returns the emitted
+    /// prefix docs (` /* c */` / ` // c`, leading-space convention) and, when the
+    /// pull fired, `Some(delim_pos)` — the position the caller passes back to
+    /// exclude those same-line comments from the first element's leading set
+    /// (`None` when nothing was pulled, so the prefix is empty).
+    ///
+    /// Gated on `should_force_expansion_for_comments`, so an inline block comment
+    /// hugging the first element (`{ /* c */ a: 1 }`, `[/* c */ x]`) is left in
+    /// place and the result is `(empty, None)`. See conformance_prettier.md
+    /// §Comment relocation.
+    pub(in crate::printer) fn delimiter_line_comment_prefix(
+        &self,
+        delim_pos: u32,
+        first_elem_start: u32,
+    ) -> (Vec<DocId>, Option<u32>) {
+        let pc = super::calls::PartitionedComments::new(
+            self.comments,
+            self.line_breaks,
+            delim_pos,
+            first_elem_start,
+        );
+        let pull = (!pc.trailing_block.is_empty() || !pc.trailing_line.is_empty())
+            && super::calls::should_force_expansion_for_comments(self, delim_pos, first_elem_start);
+        let mut prefix = Vec::new();
+        if pull {
+            pc.emit_trailing_comments(&mut prefix, self);
+        }
+        (prefix, pull.then_some(delim_pos))
+    }
+
+    /// Whether `comment` was pulled onto the opening delimiter's line by
+    /// `delimiter_line_comment_prefix` — i.e. it shares a source line with the
+    /// delimiter at `delim_pos`.
+    ///
+    /// The prefix helper emits these comments on the delimiter's line; every
+    /// consumer must then drop the same comments from the first element's
+    /// leading-comment set so they aren't emitted twice. Centralizing the test
+    /// keeps that exclusion in lockstep with what the prefix actually pulls.
+    pub(in crate::printer) fn comment_on_delimiter_line(
+        &self,
+        delim_pos: u32,
+        comment: &internal::Comment,
+    ) -> bool {
+        self.is_same_line(delim_pos, comment.span.start)
     }
 
     /// Build a Doc for a single comment
@@ -1455,6 +1639,30 @@ impl<'a> Printer<'a> {
             if comment.is_block {
                 parts.push(d.text_owned(format!(" /*{}*/", comment.content)));
             }
+        }
+    }
+
+    /// Split the last list-member's trailing inline block comments around a source
+    /// trailing comma (in `elem_end..end_boundary`): comments before the comma go
+    /// to `before`, comments after it to `after`. Callers emit `after` past the
+    /// synthetic trailing comma so the comment is preserved after the comma rather
+    /// than relocated before it (see conformance_prettier.md §Comment relocation).
+    pub(crate) fn append_last_trailing_block_comments_split(
+        &self,
+        before: &mut Vec<DocId>,
+        after: &mut Vec<DocId>,
+        elem_end: u32,
+        end_boundary: u32,
+    ) {
+        match self
+            .find_comma_after(elem_end)
+            .filter(|cp| *cp < end_boundary)
+        {
+            Some(comma_pos) => {
+                self.append_trailing_inline_block_comments(before, elem_end, comma_pos);
+                self.append_trailing_inline_block_comments(after, comma_pos, end_boundary);
+            }
+            None => self.append_trailing_inline_block_comments(before, elem_end, end_boundary),
         }
     }
 

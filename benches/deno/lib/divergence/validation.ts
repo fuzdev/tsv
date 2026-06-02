@@ -19,18 +19,18 @@ export interface DocumentedDivergence {
 	/** Reason category (e.g., "Spec violation", "Design choice", "Stable quirk") */
 	reason: string;
 	/** Fixture path relative to tests/fixtures/ */
-	fixturePath: string;
+	fixture_path: string;
 	/** Fixture name from markdown link */
-	fixtureName: string;
+	fixture_name: string;
 }
 
 /** Coverage report for a single pattern */
 export interface PatternCoverage {
-	patternId: string;
+	pattern_id: string;
 	description: string;
-	documentedFixtures: string[];
-	claimedFixtures: string[];
-	uncoveredFixtures: string[];
+	documented_fixtures: string[];
+	claimed_fixtures: string[];
+	uncovered_fixtures: string[];
 }
 
 /** Full audit report */
@@ -38,19 +38,19 @@ export interface AuditReport {
 	/** All divergences documented in conformance_prettier.md */
 	documented: DocumentedDivergence[];
 	/** Fixtures covered by at least one pattern */
-	coveredFixtures: string[];
+	covered_fixtures: string[];
 	/** Fixtures with no pattern coverage */
-	uncoveredFixtures: string[];
+	uncovered_fixtures: string[];
 	/** Per-pattern coverage details */
-	patternCoverage: PatternCoverage[];
+	pattern_coverage: PatternCoverage[];
 	/** Patterns that claim fixtures not in the doc */
-	orphanedPatternFixtures: { patternId: string; fixtures: string[] }[];
+	orphaned_pattern_fixtures: { pattern_id: string; fixtures: string[] }[];
 	/** Summary stats */
 	stats: {
-		totalDocumented: number;
-		totalCovered: number;
-		totalUncovered: number;
-		coveragePercent: number;
+		total_documented: number;
+		total_covered: number;
+		total_uncovered: number;
+		coverage_percent: number;
 	};
 }
 
@@ -63,18 +63,18 @@ export interface AuditReport {
  *
  * Handles edge cases like escaped pipes in feature names (e.g., `||`).
  */
-export function parseConformancePrettierMd(content: string): DocumentedDivergence[] {
+export function parse_conformance_prettier_md(content: string): DocumentedDivergence[] {
 	const divergences: DocumentedDivergence[] = [];
 	const lines = content.split('\n');
 
-	let currentSection = '';
+	let current_section = '';
 
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
 
 		// Track section headings (### level)
 		if (line.startsWith('### ')) {
-			currentSection = line.slice(4).trim();
+			current_section = line.slice(4).trim();
 			continue;
 		}
 
@@ -82,35 +82,42 @@ export function parseConformancePrettierMd(content: string): DocumentedDivergenc
 		if (!line.startsWith('|')) continue;
 		if (line.includes('---')) continue;
 
-		// Find fixture link in the line - this is the most reliable anchor
-		const fixtureMatch = line.match(/\[([^\]]+)\]\(\.\.\/tests\/fixtures\/([^)]+)\/?(?:\)|\s)/);
-		if (!fixtureMatch) continue;
+		// Find fixture link in the line - this is the most reliable anchor.
+		// The fixture-name class excludes `|` and backtick so a `[` inside a
+		// backticked feature cell (e.g. "Array literal `[` trailing") can't start
+		// a spurious match that swallows the cell up to the real link's `]`.
+		const fixture_match = line.match(/\[([^\]|`]+)\]\(\.\.\/tests\/fixtures\/([^)]+)\/?(?:\)|\s)/);
+		if (!fixture_match) continue;
 
-		const [, fixtureName, fixturePath] = fixtureMatch;
+		const [, fixture_name, fixture_path] = fixture_match;
 
 		// Skip header rows (fixture column would be "Fixture")
-		if (fixtureName.toLowerCase() === 'fixture') continue;
+		if (fixture_name.toLowerCase() === 'fixture') continue;
 
 		// Extract reason by finding the cell before the fixture link
 		// Split by | but be careful of escaped pipes in backticks
-		const beforeFixture = line.slice(0, line.indexOf(fixtureMatch[0]));
-		const cells = splitTableRow(beforeFixture);
+		const before_fixture = line.slice(0, line.indexOf(fixture_match[0]));
+		const cells = split_table_row(before_fixture);
 
 		// cells should be: ['', feature, reason, ''] or similar
 		// We want the second-to-last non-empty cell as the reason
-		const nonEmptyCells = cells.filter((c) => c.trim());
-		const reason = nonEmptyCells.length >= 2 ? nonEmptyCells[nonEmptyCells.length - 1].trim() : '';
-		const feature = nonEmptyCells.length >= 2 ? nonEmptyCells[nonEmptyCells.length - 2].trim() : '';
+		const non_empty_cells = cells.filter((c) => c.trim());
+		const reason = non_empty_cells.length >= 2
+			? non_empty_cells[non_empty_cells.length - 1].trim()
+			: '';
+		const feature = non_empty_cells.length >= 2
+			? non_empty_cells[non_empty_cells.length - 2].trim()
+			: '';
 
 		// Skip if we couldn't extract valid data
 		if (!feature || feature.toLowerCase() === 'feature') continue;
 
 		divergences.push({
-			section: currentSection,
+			section: current_section,
 			feature,
 			reason,
-			fixtureName: fixtureName.trim(),
-			fixturePath: fixturePath.trim().replace(/\/$/, ''), // Remove trailing slash
+			fixture_name: fixture_name.trim(),
+			fixture_path: fixture_path.trim().replace(/\/$/, ''), // Remove trailing slash
 		});
 	}
 
@@ -121,18 +128,18 @@ export function parseConformancePrettierMd(content: string): DocumentedDivergenc
  * Split a table row by | while respecting backtick-quoted content.
  * Handles cases like `||` where pipes appear inside code spans.
  */
-function splitTableRow(row: string): string[] {
+function split_table_row(row: string): string[] {
 	const cells: string[] = [];
 	let current = '';
-	let inBacktick = false;
+	let in_backtick = false;
 
 	for (let i = 0; i < row.length; i++) {
 		const char = row[i];
 
 		if (char === '`') {
-			inBacktick = !inBacktick;
+			in_backtick = !in_backtick;
 			current += char;
-		} else if (char === '|' && !inBacktick) {
+		} else if (char === '|' && !in_backtick) {
 			cells.push(current);
 			current = '';
 		} else {
@@ -147,86 +154,86 @@ function splitTableRow(row: string): string[] {
 /**
  * Load and parse conformance_prettier.md from the repo.
  */
-export async function loadDocumentedDivergences(): Promise<DocumentedDivergence[]> {
-	const docPath = new URL('../../../../docs/conformance_prettier.md', import.meta.url).pathname;
-	const content = await Deno.readTextFile(docPath);
-	return parseConformancePrettierMd(content);
+export async function load_documented_divergences(): Promise<DocumentedDivergence[]> {
+	const doc_path = new URL('../../../../docs/conformance_prettier.md', import.meta.url).pathname;
+	const content = await Deno.readTextFile(doc_path);
+	return parse_conformance_prettier_md(content);
 }
 
 /**
  * Generate a full audit report comparing documented divergences against detection patterns.
  */
-export async function generateAuditReport(): Promise<AuditReport> {
-	const documented = await loadDocumentedDivergences();
-	const documentedPaths = new Set(documented.map((d) => d.fixturePath));
+export async function generate_audit_report(): Promise<AuditReport> {
+	const documented = await load_documented_divergences();
+	const documented_paths = new Set(documented.map((d) => d.fixture_path));
 
 	// Collect all fixtures claimed by patterns
-	const patternFixtures = new Map<string, Set<string>>();
-	const allClaimedFixtures = new Set<string>();
+	const pattern_fixtures = new Map<string, Set<string>>();
+	const all_claimed_fixtures = new Set<string>();
 
 	for (const pattern of PATTERNS) {
 		const fixtures = new Set(pattern.fixtures || []);
-		patternFixtures.set(pattern.id, fixtures);
+		pattern_fixtures.set(pattern.id, fixtures);
 		for (const f of fixtures) {
-			allClaimedFixtures.add(f);
+			all_claimed_fixtures.add(f);
 		}
 	}
 
 	// Calculate coverage
-	const coveredFixtures: string[] = [];
-	const uncoveredFixtures: string[] = [];
+	const covered_fixtures: string[] = [];
+	const uncovered_fixtures: string[] = [];
 
-	for (const path of documentedPaths) {
-		if (allClaimedFixtures.has(path)) {
-			coveredFixtures.push(path);
+	for (const path of documented_paths) {
+		if (all_claimed_fixtures.has(path)) {
+			covered_fixtures.push(path);
 		} else {
-			uncoveredFixtures.push(path);
+			uncovered_fixtures.push(path);
 		}
 	}
 
 	// Per-pattern coverage — use fixtures array as primary link
-	// (conformanceSections is kept for display/grouping metadata only)
-	const patternCoverage: PatternCoverage[] = PATTERNS.map((pattern) => {
+	// (conformance_sections is kept for display/grouping metadata only)
+	const pattern_coverage: PatternCoverage[] = PATTERNS.map((pattern) => {
 		const claimed = pattern.fixtures || [];
 		// Fixtures the pattern claims that are documented in conformance_prettier.md
-		const documentedInClaimed = claimed.filter((f) => documentedPaths.has(f));
+		const documented_in_claimed = claimed.filter((f) => documented_paths.has(f));
 		// Fixtures the pattern claims that aren't documented (orphaned at pattern level)
-		const undocumentedInClaimed = claimed.filter((f) => !documentedPaths.has(f));
+		const undocumented_in_claimed = claimed.filter((f) => !documented_paths.has(f));
 
 		return {
-			patternId: pattern.id,
+			pattern_id: pattern.id,
 			description: pattern.description,
-			documentedFixtures: documentedInClaimed,
-			claimedFixtures: claimed,
-			uncoveredFixtures: undocumentedInClaimed,
+			documented_fixtures: documented_in_claimed,
+			claimed_fixtures: claimed,
+			uncovered_fixtures: undocumented_in_claimed,
 		};
 	});
 
 	// Find orphaned pattern fixtures (claimed but not documented)
-	const orphanedPatternFixtures: { patternId: string; fixtures: string[] }[] = [];
+	const orphaned_pattern_fixtures: { pattern_id: string; fixtures: string[] }[] = [];
 	for (const pattern of PATTERNS) {
 		const claimed = pattern.fixtures || [];
-		const orphaned = claimed.filter((f) => !documentedPaths.has(f));
+		const orphaned = claimed.filter((f) => !documented_paths.has(f));
 		if (orphaned.length > 0) {
-			orphanedPatternFixtures.push({ patternId: pattern.id, fixtures: orphaned });
+			orphaned_pattern_fixtures.push({ pattern_id: pattern.id, fixtures: orphaned });
 		}
 	}
 
 	const stats = {
-		totalDocumented: documentedPaths.size,
-		totalCovered: coveredFixtures.length,
-		totalUncovered: uncoveredFixtures.length,
-		coveragePercent: documentedPaths.size > 0
-			? Math.round((coveredFixtures.length / documentedPaths.size) * 100)
+		total_documented: documented_paths.size,
+		total_covered: covered_fixtures.length,
+		total_uncovered: uncovered_fixtures.length,
+		coverage_percent: documented_paths.size > 0
+			? Math.round((covered_fixtures.length / documented_paths.size) * 100)
 			: 100,
 	};
 
 	return {
 		documented,
-		coveredFixtures,
-		uncoveredFixtures,
-		patternCoverage,
-		orphanedPatternFixtures,
+		covered_fixtures,
+		uncovered_fixtures,
+		pattern_coverage,
+		orphaned_pattern_fixtures,
 		stats,
 	};
 }
@@ -234,7 +241,7 @@ export async function generateAuditReport(): Promise<AuditReport> {
 /**
  * Format audit report for terminal output.
  */
-export function formatAuditReport(report: AuditReport): string {
+export function format_audit_report(report: AuditReport): string {
 	const lines: string[] = [];
 
 	lines.push('Divergence Detection Audit Report');
@@ -242,44 +249,44 @@ export function formatAuditReport(report: AuditReport): string {
 	lines.push('');
 
 	// Summary stats
-	lines.push(`Documented divergences: ${report.stats.totalDocumented}`);
-	lines.push(`Covered by patterns:    ${report.stats.totalCovered}`);
-	lines.push(`Uncovered:              ${report.stats.totalUncovered}`);
-	lines.push(`Coverage:               ${report.stats.coveragePercent}%`);
+	lines.push(`Documented divergences: ${report.stats.total_documented}`);
+	lines.push(`Covered by patterns:    ${report.stats.total_covered}`);
+	lines.push(`Uncovered:              ${report.stats.total_uncovered}`);
+	lines.push(`Coverage:               ${report.stats.coverage_percent}%`);
 	lines.push('');
 
 	// Uncovered fixtures (grouped by section)
-	if (report.uncoveredFixtures.length > 0) {
+	if (report.uncovered_fixtures.length > 0) {
 		lines.push('Uncovered Fixtures (no pattern detects these):');
 		lines.push('-'.repeat(50));
 
 		// Group by section
-		const bySection = new Map<string, DocumentedDivergence[]>();
-		for (const fixture of report.uncoveredFixtures) {
-			const doc = report.documented.find((d) => d.fixturePath === fixture);
+		const by_section = new Map<string, DocumentedDivergence[]>();
+		for (const fixture of report.uncovered_fixtures) {
+			const doc = report.documented.find((d) => d.fixture_path === fixture);
 			if (doc) {
-				const list = bySection.get(doc.section) || [];
+				const list = by_section.get(doc.section) || [];
 				list.push(doc);
-				bySection.set(doc.section, list);
+				by_section.set(doc.section, list);
 			}
 		}
 
-		for (const [section, fixtures] of bySection) {
+		for (const [section, fixtures] of by_section) {
 			lines.push(`\n  ${section}:`);
 			for (const f of fixtures) {
-				lines.push(`    - ${f.fixtureName} (${f.reason})`);
-				lines.push(`      ${f.fixturePath}`);
+				lines.push(`    - ${f.fixture_name} (${f.reason})`);
+				lines.push(`      ${f.fixture_path}`);
 			}
 		}
 		lines.push('');
 	}
 
 	// Orphaned pattern fixtures
-	if (report.orphanedPatternFixtures.length > 0) {
+	if (report.orphaned_pattern_fixtures.length > 0) {
 		lines.push('Orphaned Pattern Fixtures (claimed but not documented):');
 		lines.push('-'.repeat(50));
-		for (const { patternId, fixtures } of report.orphanedPatternFixtures) {
-			lines.push(`\n  ${patternId}:`);
+		for (const { pattern_id, fixtures } of report.orphaned_pattern_fixtures) {
+			lines.push(`\n  ${pattern_id}:`);
 			for (const f of fixtures) {
 				lines.push(`    - ${f}`);
 			}
@@ -290,10 +297,10 @@ export function formatAuditReport(report: AuditReport): string {
 	// Pattern coverage summary
 	lines.push('Pattern Coverage Summary:');
 	lines.push('-'.repeat(50));
-	for (const pc of report.patternCoverage) {
-		const claimed = pc.claimedFixtures.length;
+	for (const pc of report.pattern_coverage) {
+		const claimed = pc.claimed_fixtures.length;
 		const status = claimed > 0 ? `${claimed} fixtures` : 'NO FIXTURES';
-		lines.push(`  ${pc.patternId.padEnd(30)} ${status}`);
+		lines.push(`  ${pc.pattern_id.padEnd(30)} ${status}`);
 	}
 
 	return lines.join('\n');

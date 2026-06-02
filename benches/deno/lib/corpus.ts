@@ -18,7 +18,7 @@ import type { Language, Logger, SourceFile } from './types.ts';
 //
 
 /** Detect language from file extension */
-function detectLanguage(path: string): Language | null {
+function detect_language(path: string): Language | null {
 	const ext = extname(path).toLowerCase();
 	switch (ext) {
 		case '.svelte':
@@ -61,7 +61,7 @@ const DEFAULT_EXCLUSIONS = [
 const DEFAULT_EXTENSIONS = ['svelte', 'ts', 'js', 'css'];
 
 /** Check if file should be excluded */
-function shouldExclude(path: string): boolean {
+function should_exclude(path: string): boolean {
 	const name = basename(path);
 	for (const pattern of DEFAULT_EXCLUSIONS) {
 		if (pattern.startsWith('/')) {
@@ -81,23 +81,23 @@ function shouldExclude(path: string): boolean {
  *
  * Caches directory-level checks to avoid redundant filesystem calls.
  */
-const optionsDirCache = new Map<string, boolean>();
+const options_dir_cache = new Map<string, boolean>();
 
-async function hasCompanionOptions(filePath: string): Promise<boolean> {
-	const dir = dirname(filePath);
+async function has_companion_options(file_path: string): Promise<boolean> {
+	const dir = dirname(file_path);
 
 	// Check dir/options.json (cached per directory)
-	if (optionsDirCache.has(dir)) {
-		if (optionsDirCache.get(dir)) return true;
+	if (options_dir_cache.has(dir)) {
+		if (options_dir_cache.get(dir)) return true;
 	} else {
-		const dirHasOptions = await exists(join(dir, 'options.json'));
-		optionsDirCache.set(dir, dirHasOptions);
-		if (dirHasOptions) return true;
+		const dir_has_options = await exists(join(dir, 'options.json'));
+		options_dir_cache.set(dir, dir_has_options);
+		if (dir_has_options) return true;
 	}
 
 	// Check name.options.json (per-file, not cached)
-	const nameWithoutExt = basename(filePath).replace(/\.[^.]+$/, '');
-	return exists(join(dir, `${nameWithoutExt}.options.json`));
+	const name_without_ext = basename(file_path).replace(/\.[^.]+$/, '');
+	return exists(join(dir, `${name_without_ext}.options.json`));
 }
 
 //
@@ -111,16 +111,16 @@ interface WalkOptions {
 }
 
 /** Walk a directory and yield source files one at a time */
-async function* walkCorpus(
-	dirPath: string,
+async function* walk_corpus(
+	dir_path: string,
 	options: WalkOptions = {},
 ): AsyncGenerator<SourceFile> {
 	const extensions = options.extensions ?? DEFAULT_EXTENSIONS;
 
-	for await (const entry of walk(dirPath, { exts: extensions, includeDirs: false })) {
-		if (shouldExclude(entry.path)) continue;
+	for await (const entry of walk(dir_path, { exts: extensions, includeDirs: false })) {
+		if (should_exclude(entry.path)) continue;
 
-		const language = detectLanguage(entry.path);
+		const language = detect_language(entry.path);
 		if (!language) continue;
 
 		if (options.skip && (await options.skip(entry.path))) continue;
@@ -140,19 +140,19 @@ async function* walkCorpus(
 }
 
 /** Log corpus summary */
-function logCorpusSummary(files: SourceFile[], logger: Logger): void {
-	const totalBytes = files.reduce((sum, f) => sum + f.bytes, 0);
-	const byLang = { svelte: 0, typescript: 0, css: 0 };
-	for (const f of files) byLang[f.language]++;
+function log_corpus_summary(files: SourceFile[], logger: Logger): void {
+	const total_bytes = files.reduce((sum, f) => sum + f.bytes, 0);
+	const by_lang = { svelte: 0, typescript: 0, css: 0 };
+	for (const f of files) by_lang[f.language]++;
 	logger(`\nCorpus loaded:`);
-	logger(`  Total: ${files.length} files, ${(totalBytes / 1024 / 1024).toFixed(2)} MB`);
-	logger(`  Svelte: ${byLang.svelte} files`);
-	logger(`  TypeScript: ${byLang.typescript} files`);
-	logger(`  CSS: ${byLang.css} files`);
+	logger(`  Total: ${files.length} files, ${(total_bytes / 1024 / 1024).toFixed(2)} MB`);
+	logger(`  Svelte: ${by_lang.svelte} files`);
+	logger(`  TypeScript: ${by_lang.typescript} files`);
+	logger(`  CSS: ${by_lang.css} files`);
 }
 
 /** Group files by language for targeted benchmarks */
-export function groupByLanguage(files: SourceFile[]): Record<Language, SourceFile[]> {
+export function group_by_language(files: SourceFile[]): Record<Language, SourceFile[]> {
 	return {
 		svelte: files.filter((f) => f.language === 'svelte'),
 		typescript: files.filter((f) => f.language === 'typescript'),
@@ -205,7 +205,7 @@ const DEFAULT_CORPUS_PATHS: CorpusPath[] = [
 	'../svelte.dev/packages/repl/src',
 	'../svelte.dev/packages/site-kit/src',
 	// prettier-plugin-svelte test cases (.html treated as Svelte, skip non-default options)
-	{ path: '../prettier-plugin-svelte/test', extensions: ['html'], skip: hasCompanionOptions },
+	{ path: '../prettier-plugin-svelte/test', extensions: ['html'], skip: has_companion_options },
 	// Prettier test cases (formatting edge cases and regression tests)
 	'../prettier/tests/format/typescript',
 	'../prettier/tests/format/js',
@@ -224,24 +224,24 @@ export class DevReposLoader {
 		logger(`Loading ${DEFAULT_CORPUS_PATHS.length} corpus paths`);
 
 		for (const entry of DEFAULT_CORPUS_PATHS) {
-			const isObject = typeof entry !== 'string';
-			const entryPath = isObject ? entry.path : entry;
-			const extensions = isObject ? entry.extensions : undefined;
-			const skip = isObject ? entry.skip : undefined;
-			const resolvedPath = resolve(entryPath);
+			const is_object = typeof entry !== 'string';
+			const entry_path = is_object ? entry.path : entry;
+			const extensions = is_object ? entry.extensions : undefined;
+			const skip = is_object ? entry.skip : undefined;
+			const resolved_path = resolve(entry_path);
 
-			if (!(await exists(resolvedPath))) {
+			if (!(await exists(resolved_path))) {
 				continue;
 			}
 
 			let count = 0;
-			for await (const file of walkCorpus(resolvedPath, { extensions, skip })) {
+			for await (const file of walk_corpus(resolved_path, { extensions, skip })) {
 				count++;
 				yield file;
 			}
 
 			if (count > 0) {
-				logger(`  ${entryPath}: ${count} files`);
+				logger(`  ${entry_path}: ${count} files`);
 			}
 		}
 	}
@@ -251,7 +251,7 @@ export class DevReposLoader {
 		for await (const file of this.stream(logger)) {
 			files.push(file);
 		}
-		logCorpusSummary(files, logger);
+		log_corpus_summary(files, logger);
 		return files;
 	}
 }
@@ -272,14 +272,14 @@ export class DirectoryLoader {
 	}
 
 	async *stream(logger: Logger = console.log): AsyncGenerator<SourceFile> {
-		const resolvedPath = resolve(this.#path);
+		const resolved_path = resolve(this.#path);
 
-		if (!(await exists(resolvedPath))) {
+		if (!(await exists(resolved_path))) {
 			throw new Error(`Directory not found: ${this.#path}`);
 		}
 
 		logger(`Loading from ${this.#path}`);
-		yield* walkCorpus(resolvedPath);
+		yield* walk_corpus(resolved_path);
 	}
 
 	async load(logger: Logger = console.log): Promise<SourceFile[]> {
@@ -287,7 +287,7 @@ export class DirectoryLoader {
 		for await (const file of this.stream(logger)) {
 			files.push(file);
 		}
-		logCorpusSummary(files, logger);
+		log_corpus_summary(files, logger);
 		return files;
 	}
 }

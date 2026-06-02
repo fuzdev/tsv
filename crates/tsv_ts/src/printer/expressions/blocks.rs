@@ -127,25 +127,104 @@ impl<'a> Printer<'a> {
             };
         }
 
-        // Build statements with line breaks between them
-        // Preserve blank lines and comments from source
-        let mut body_parts = Vec::new();
+        // A comment trailing the opening `{` on its own line is kept on the `{`
+        // line when the body expands (divergence from prettier, which relocates it
+        // to its own line as the body's leading comment). Only when there's no
+        // hoisted outer content (which would already occupy the first body line).
+        // See conformance_prettier.md §Comment relocation (Block body `{`).
+        let first_stmt_start = block.body[0].span().start;
+        let (brace_line_prefix, delimiter_pull_pos) = if has_leading {
+            (Vec::new(), None)
+        } else {
+            self.delimiter_line_comment_prefix(block.span.start, first_stmt_start)
+        };
 
-        // Add leading content first (outer comments when present)
-        if has_leading {
-            body_parts.extend(leading_content);
+        // Build statements (leading comments, blank-line separators,
+        // prettier-ignore, trailing same-line comments) via the shared walk.
+        let (mut body_parts, _prev_end, prev_stmt_end) = self.build_statement_list_docs(
+            &block.body,
+            block_start,
+            block_end,
+            leading_content,
+            delimiter_pull_pos,
+        );
+
+        // Handle trailing comments after the last statement (on their own line)
+        // Preserve blank lines between last statement and trailing comments, and between comments
+        if let Some(last_stmt_end) = prev_stmt_end {
+            let trailing_start = self.find_end_with_trailing_comments(last_stmt_end);
+            let mut trailing_prev_end = trailing_start;
+            for comment in tsv_lang::comments_in_range(self.comments, trailing_start, block_end) {
+                if self.is_same_line(trailing_start, comment.span.start) {
+                    continue; // Skip same-line comments (already handled above)
+                }
+                // Check for blank line before this comment
+                if self.has_blank_line_between(trailing_prev_end, comment.span.start) {
+                    body_parts.push(d.literalline());
+                }
+                body_parts.push(d.hardline());
+                body_parts.push(self.build_comment_doc(comment));
+                trailing_prev_end = comment.span.end;
+            }
         }
 
-        let mut prev_end = block_start;
+        d.concat(&[
+            d.text("{"),
+            d.concat(&brace_line_prefix),
+            d.indent(d.concat(&[d.hardline(), d.concat(&body_parts)])),
+            d.hardline(),
+            d.text("}"),
+        ])
+    }
+
+    /// Build docs for a `{ }`-delimited statement list — the shared per-statement
+    /// walk for block-statement bodies and `namespace`/`module` bodies.
+    ///
+    /// For each statement, appends (in order): blank-line separators, leading
+    /// comments, the statement doc (or raw source under `prettier-ignore`), and
+    /// trailing same-line comments. `leading_content` (outer comments hoisted into
+    /// the body) is emitted first.
+    ///
+    /// `body_start` is the offset just after `{`; `body_end` is the offset of `}`.
+    /// Returns `(docs, prev_end, prev_stmt_end)` where `prev_end` is advanced past
+    /// the final statement's trailing same-line comments (the start position for
+    /// own-line trailing-comment handling) and `prev_stmt_end` is the final
+    /// statement's span end (`None` for an empty body).
+    ///
+    /// `delimiter_pull_pos`, when `Some(pos)`, excludes the first statement's
+    /// leading comments that share a source line with `pos` (the opening `{`) —
+    /// the caller emits those as a prefix on the `{` line instead (the open-brace
+    /// trailing-comment divergence). Pass `None` to keep the default behavior.
+    ///
+    /// Callers handle the empty-body case, own-line trailing comments after the
+    /// last statement, and the enclosing braces — those differ between contexts.
+    pub(in crate::printer) fn build_statement_list_docs(
+        &self,
+        body: &[internal::Statement],
+        body_start: u32,
+        body_end: u32,
+        leading_content: Vec<DocId>,
+        delimiter_pull_pos: Option<u32>,
+    ) -> (Vec<DocId>, u32, Option<u32>) {
+        let d = self.d();
+        let has_leading = !leading_content.is_empty();
+        let mut body_parts = leading_content;
+        let mut prev_end = body_start;
         let mut prev_stmt_end: Option<u32> = None;
 
-        for (i, stmt) in block.body.iter().enumerate() {
+        for (i, stmt) in body.iter().enumerate() {
             let stmt_start = stmt.span().start;
             let is_first = i == 0;
 
             // Collect leading comments (skip trailing same-line from previous statement)
-            let leading_comments =
+            let mut leading_comments =
                 self.collect_leading_comments(prev_end, stmt_start, prev_stmt_end);
+
+            // First statement: drop comments pulled onto the opening `{` line (they
+            // are emitted as the brace-line prefix by the caller).
+            if is_first && let Some(dpos) = delimiter_pull_pos {
+                leading_comments.retain(|c| !self.comment_on_delimiter_line(dpos, c));
+            }
 
             // Handle blank lines and separators
             if is_first && has_leading {
@@ -171,15 +250,18 @@ impl<'a> Printer<'a> {
 
             // prettier-ignore: emit raw source instead of formatting
             if self.has_prettier_ignore_in_range(prev_end, stmt_start) {
-                let raw = stmt.span().extract(self.source);
-                body_parts.push(d.text_owned(raw.to_string()));
+                body_parts.push(self.raw_source_doc(stmt.span()));
             } else {
                 body_parts.push(self.build_statement_doc(stmt));
             }
 
-            // Handle trailing same-line comments after this statement
+            // Handle trailing same-line comments after this statement. Bound the
+            // scan by the next statement's start so a comment only attaches to the
+            // statement it immediately follows — multiple statements on one source
+            // line (`a(); b(); // c`) must not each grab the trailing comment.
             let stmt_end = stmt.span().end;
-            body_parts.extend(self.build_trailing_same_line_comment_docs(stmt_end, block_end));
+            let next_start = body.get(i + 1).map_or(body_end, |s| s.span().start);
+            body_parts.extend(self.build_trailing_same_line_comment_docs(stmt_end, next_start));
 
             // Update prev_end past trailing comments (including comments on the
             // closing */ line of multi-line block comments)
@@ -187,31 +269,7 @@ impl<'a> Printer<'a> {
             prev_stmt_end = Some(stmt_end);
         }
 
-        // Handle trailing comments after the last statement (on their own line)
-        // Preserve blank lines between last statement and trailing comments, and between comments
-        if let Some(last_stmt_end) = prev_stmt_end {
-            let trailing_start = self.find_end_with_trailing_comments(last_stmt_end);
-            let mut trailing_prev_end = trailing_start;
-            for comment in tsv_lang::comments_in_range(self.comments, trailing_start, block_end) {
-                if self.is_same_line(trailing_start, comment.span.start) {
-                    continue; // Skip same-line comments (already handled above)
-                }
-                // Check for blank line before this comment
-                if self.has_blank_line_between(trailing_prev_end, comment.span.start) {
-                    body_parts.push(d.literalline());
-                }
-                body_parts.push(d.hardline());
-                body_parts.push(self.build_comment_doc(comment));
-                trailing_prev_end = comment.span.end;
-            }
-        }
-
-        d.concat(&[
-            d.text("{"),
-            d.indent(d.concat(&[d.hardline(), d.concat(&body_parts)])),
-            d.hardline(),
-            d.text("}"),
-        ])
+        (body_parts, prev_end, prev_stmt_end)
     }
 
     /// Collect leading comments for a statement, filtering out trailing same-line from previous

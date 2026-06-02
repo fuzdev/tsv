@@ -14,39 +14,45 @@
 		x // a
 			in
 			obj
-	) expr;
+	)
+		expr;
 
 	for (
 		x // a
 			of
 			arr
-	) expr;
+	)
+		expr;
 
 	// Line comment between keyword and right (breaks)
 	for (
 		x
 			in // a
 			obj
-	) expr;
+	)
+		expr;
 
 	for (
 		x
 			of // a
 			arr
-	) expr;
+	)
+		expr;
 
 	// Block comment between ) and body in breaking layout
 	for (
 		x // a
 			in
 			obj
-	) /* b */ expr;
+	)
+		/* b */ expr;
 
 	for (
 		x // a
 			of
 			arr
-	) /* b */ expr;
+	)
+		/* b */ expr;
 
 	// With declaration
 	for (const a /* a */ in obj) expr;

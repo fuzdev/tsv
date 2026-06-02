@@ -17,7 +17,6 @@
 // - Both derive from the same semantic AST, not from source slices
 
 use super::internal;
-use crate::printer::source_fidelity;
 
 /// Split a declaration source into property and value, matching Svelte's quirky behavior.
 ///
@@ -257,54 +256,6 @@ fn convert_pseudo_class_args(args: &internal::PseudoClassArgs) -> serde_json::Va
         internal::PseudoClassArgs::Slotted { .. } | internal::PseudoClassArgs::Part { .. } => {
             unreachable!("Pseudo-element args not exposed in public AST")
         }
-    }
-}
-
-/// Format a CssValue as a string for semantic output (no Svelte quirks)
-///
-/// Uses centralized formatting utilities from `printer::source_fidelity` to ensure
-/// consistency between formatter and JSON output.
-///
-/// This function implements clean semantic formatting without Svelte quirks.
-///
-/// # Current Status
-/// Not currently used - source extraction is required to preserve ALL fidelity
-/// (leading zeros, original formatting). Kept as infrastructure for future optimization.
-///
-/// # Future Use
-/// Could be used for values without backslashes IF we add raw value storage to AST.
-/// Trade-off: cleaner JSON vs increased AST memory usage (Sprint 1 removed raw values).
-#[allow(dead_code)]
-fn format_css_value_for_json(value: &internal::CssValue) -> String {
-    match value {
-        internal::CssValue::Identifier { name, .. } => {
-            source_fidelity::format_identifier_value(name)
-        }
-        internal::CssValue::String { content, quote, .. } => {
-            source_fidelity::format_string_value(content, *quote)
-        }
-        internal::CssValue::Dimension { value, unit, .. } => {
-            source_fidelity::format_dimension_value(*value, unit)
-        }
-        internal::CssValue::Color { color, .. } => source_fidelity::format_color_value(color),
-        internal::CssValue::Function { name, args, .. } => {
-            let args_str = args
-                .iter()
-                .map(format_css_value_for_json)
-                .collect::<Vec<_>>()
-                .join(", ");
-            format!("{name}({args_str})")
-        }
-        internal::CssValue::List { values, .. } => values
-            .iter()
-            .map(format_css_value_for_json)
-            .collect::<Vec<_>>()
-            .join(" "),
-        internal::CssValue::CommaSeparated { values, .. } => values
-            .iter()
-            .map(format_css_value_for_json)
-            .collect::<Vec<_>>()
-            .join(", "),
     }
 }
 

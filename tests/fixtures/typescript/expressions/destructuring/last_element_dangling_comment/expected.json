@@ -1,0 +1,788 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 482,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " object pattern: own-line comments after last property",
+			"start": 10,
+			"end": 66,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 83,
+			"end": 88,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 91,
+			"end": 96,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " array pattern: own-line comments after last element",
+			"start": 110,
+			"end": 164,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 181,
+			"end": 186,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 189,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " object pattern: interior comment then trailing comment after last property",
+			"start": 208,
+			"end": 285,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " between",
+			"start": 302,
+			"end": 312,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " after",
+			"start": 320,
+			"end": 328,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " array pattern: interior comment then trailing comment after last element",
+			"start": 342,
+			"end": 417,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " between",
+			"start": 434,
+			"end": 444,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 2
+				},
+				"end": {
+					"line": 27,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " after",
+			"start": 452,
+			"end": 460,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 2
+				},
+				"end": {
+					"line": 29,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 481,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 472,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 31,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 68,
+					"end": 107,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 10
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 74,
+							"end": 106,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 9
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 74,
+								"end": 99,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 78,
+										"end": 79,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 78,
+											"end": 79,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 2
+												},
+												"end": {
+													"line": 4,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 78,
+											"end": 79,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 2
+												},
+												"end": {
+													"line": 4,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 102,
+								"end": 106,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 5
+									},
+									"end": {
+										"line": 7,
+										"column": 9
+									}
+								},
+								"name": "obj1",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 83,
+										"end": 88
+									},
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 91,
+										"end": 96
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " object pattern: own-line comments after last property",
+							"start": 10,
+							"end": 66
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 166,
+					"end": 205,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 10
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 172,
+							"end": 204,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 14,
+									"column": 9
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 172,
+								"end": 197,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 176,
+										"end": 177,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 3
+											}
+										},
+										"name": "b"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 200,
+								"end": 204,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 5
+									},
+									"end": {
+										"line": 14,
+										"column": 9
+									}
+								},
+								"name": "arr1",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 181,
+										"end": 186
+									},
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 189,
+										"end": 194
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " array pattern: own-line comments after last element",
+							"start": 110,
+							"end": 164
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 287,
+					"end": 339,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 10
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 293,
+							"end": 338,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 7
+								},
+								"end": {
+									"line": 22,
+									"column": 9
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 293,
+								"end": 331,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 7
+									},
+									"end": {
+										"line": 22,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 297,
+										"end": 298,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 2
+											},
+											"end": {
+												"line": 18,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 297,
+											"end": 298,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 2
+												},
+												"end": {
+													"line": 18,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 297,
+											"end": 298,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 2
+												},
+												"end": {
+													"line": 18,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 315,
+										"end": 316,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 2
+											},
+											"end": {
+												"line": 20,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 315,
+											"end": 316,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 2
+												},
+												"end": {
+													"line": 20,
+													"column": 3
+												}
+											},
+											"name": "d"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 315,
+											"end": 316,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 2
+												},
+												"end": {
+													"line": 20,
+													"column": 3
+												}
+											},
+											"name": "d"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " between",
+												"start": 302,
+												"end": 312
+											}
+										]
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 334,
+								"end": 338,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 5
+									},
+									"end": {
+										"line": 22,
+										"column": 9
+									}
+								},
+								"name": "obj2",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " after",
+										"start": 320,
+										"end": 328
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " object pattern: interior comment then trailing comment after last property",
+							"start": 208,
+							"end": 285
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 419,
+					"end": 471,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 10
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 425,
+							"end": 470,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 7
+								},
+								"end": {
+									"line": 30,
+									"column": 9
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 425,
+								"end": 463,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 7
+									},
+									"end": {
+										"line": 30,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 429,
+										"end": 430,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 2
+											},
+											"end": {
+												"line": 26,
+												"column": 3
+											}
+										},
+										"name": "e"
+									},
+									{
+										"type": "Identifier",
+										"start": 447,
+										"end": 448,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 2
+											},
+											"end": {
+												"line": 28,
+												"column": 3
+											}
+										},
+										"name": "f",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " between",
+												"start": 434,
+												"end": 444
+											}
+										]
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 466,
+								"end": 470,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 5
+									},
+									"end": {
+										"line": 30,
+										"column": 9
+									}
+								},
+								"name": "arr2",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " after",
+										"start": 452,
+										"end": 460
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " array pattern: interior comment then trailing comment after last element",
+							"start": 342,
+							"end": 417
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

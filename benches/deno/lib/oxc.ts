@@ -46,10 +46,10 @@ export class OxcImplementation implements TsvImplementation {
 	}
 
 	async init(): Promise<void> {
-		const [parserMod, formatterMod] = await Promise.all([import('oxc-parser'), import('oxfmt')]);
+		const [parser_mod, formatter_mod] = await Promise.all([import('oxc-parser'), import('oxfmt')]);
 
-		this._parser = parserMod as OxcParserModule;
-		this._formatter = formatterMod as OxfmtModule;
+		this._parser = parser_mod as OxcParserModule;
+		this._formatter = formatter_mod as OxfmtModule;
 	}
 
 	/** Languages supported for parsing */
@@ -59,18 +59,18 @@ export class OxcImplementation implements TsvImplementation {
 	static readonly FORMAT_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
 
 	/** Check if parsing is supported for this language */
-	supportsParseLanguage(language: Language): boolean {
+	supports_parse_language(language: Language): boolean {
 		return OxcImplementation.PARSE_LANGUAGES.includes(language);
 	}
 
 	/** Check if formatting is supported for this language */
-	supportsFormatLanguage(language: Language): boolean {
+	supports_format_language(language: Language): boolean {
 		return OxcImplementation.FORMAT_LANGUAGES.includes(language);
 	}
 
 	parse(source: string, language: Language): unknown {
 		if (!this._parser) throw new Error('OXC parser not initialized');
-		if (!this.supportsParseLanguage(language)) {
+		if (!this.supports_parse_language(language)) {
 			throw new Error(`OXC parser does not support ${language}`);
 		}
 
@@ -85,12 +85,12 @@ export class OxcImplementation implements TsvImplementation {
 
 	format(_source: string, _language: Language): string {
 		// oxfmt is async, so we can't implement sync format
-		throw new Error('OXC formatter is async-only, use formatAsync');
+		throw new Error('OXC formatter is async-only, use format_async');
 	}
 
-	async formatAsync(source: string, language: Language): Promise<string> {
+	async format_async(source: string, language: Language): Promise<string> {
 		if (!this._formatter) throw new Error('OXC formatter not initialized');
-		if (!this.supportsFormatLanguage(language)) {
+		if (!this.supports_format_language(language)) {
 			throw new Error(`OXC formatter does not support ${language}`);
 		}
 

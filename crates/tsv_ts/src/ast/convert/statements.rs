@@ -34,6 +34,12 @@ pub(in crate::ast) fn convert_statement(
 ) -> public::Statement {
     match stmt {
         internal::Statement::ExpressionStatement(expr_stmt) => {
+            // Directive: acorn stores the raw string contents without quotes,
+            // taken from the source of the directive literal expression.
+            let directive = expr_stmt.is_directive.then(|| {
+                let raw = expr_stmt.expression.span().extract(source);
+                raw[1..raw.len() - 1].to_string()
+            });
             public::Statement::ExpressionStatement(public::ExpressionStatement {
                 node_type: "ExpressionStatement".to_string(),
                 start: expr_stmt.span.start,
@@ -46,6 +52,7 @@ pub(in crate::ast) fn convert_statement(
                     interner,
                     offset,
                 ),
+                directive,
             })
         }
         internal::Statement::VariableDeclaration(var_decl) => {

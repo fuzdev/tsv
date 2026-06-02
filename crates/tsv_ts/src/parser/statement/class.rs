@@ -608,7 +608,7 @@ impl<'a> Parser<'a> {
                     end,
                 )
             } else {
-                let body_block = self.parse_block_statement()?;
+                let body_block = self.parse_function_body()?;
                 let end = body_block.span.end;
                 (body_block, end)
             };

@@ -67,7 +67,7 @@ pub fn linearize_chain_from_member<'a>(
 ) -> Vec<ChainNode<'a>> {
     let mut nodes = Vec::new();
     let mut paren_gaps = Vec::new();
-    linearize_recursive(&member.object, &mut nodes, &mut paren_gaps);
+    linearize_member_object(&member.object, &mut nodes, &mut paren_gaps);
     linearize_member_node(member, &mut nodes, &mut paren_gaps);
     apply_paren_gaps(&mut nodes, &paren_gaps);
     nodes
@@ -125,18 +125,26 @@ fn linearize_recursive<'a>(
 
         // MemberExpression: recurse into object, then add Member node
         Expression::MemberExpression(member) => {
-            linearize_recursive(&member.object, nodes, paren_gaps);
+            linearize_member_object(&member.object, nodes, paren_gaps);
             linearize_member_node(member, nodes, paren_gaps);
         }
 
         // TSNonNullExpression: recurse into expression, then add NonNull node
+        // TODO: a TSInstantiationExpression operand here (`(A<T>)!.x`) is recursed
+        // transparently and loses its type args (no Call node recovers them, unlike
+        // the call-callee path). Same root cause as the member-object case fixed via
+        // linearize_member_object. Untested because prettier's parser rejects the
+        // syntax, so there's no canonical source for a fixture.
         Expression::TSNonNullExpression(non_null) => {
             linearize_recursive(&non_null.expression, nodes, paren_gaps);
             nodes.push(ChainNode::non_null());
         }
 
-        // TSInstantiationExpression: recurse into expression (transparent in chains)
-        // Type args are recovered by get_call_type_arguments() in chain_args.rs.
+        // TSInstantiationExpression as a call callee (`expr<T>(args)`): transparent.
+        // The Call node recovers the type args via get_call_type_arguments() in
+        // chain_args.rs, so the instantiation itself emits nothing here. Member
+        // objects (`(A<T>).x`) take the `linearize_member_object` path instead,
+        // which keeps the type args and parens.
         Expression::TSInstantiationExpression(inst) => {
             linearize_recursive(&inst.expression, nodes, paren_gaps);
         }
@@ -146,6 +154,26 @@ fn linearize_recursive<'a>(
             let needs_parens = needs_parens(expr, ParenContext::ChainBase);
             nodes.push(ChainNode::base(expr, needs_parens));
         }
+    }
+}
+
+/// Linearize a MemberExpression's object.
+///
+/// A `TSInstantiationExpression` object must keep its type args and be
+/// parenthesized: `(A<T>).x`, not `A.x` (data loss) or `A<T>.x` (ambiguous).
+/// Prettier parenthesizes an instantiation only when it is the object of a
+/// member access, so it becomes a parenthesized base node here rather than
+/// being recursed transparently (which would drop the type args, since no Call
+/// node follows to recover them). All other objects recurse normally.
+fn linearize_member_object<'a>(
+    object: &'a Expression,
+    nodes: &mut Vec<ChainNode<'a>>,
+    paren_gaps: &mut Vec<ParenGap>,
+) {
+    if matches!(object, Expression::TSInstantiationExpression(_)) {
+        nodes.push(ChainNode::base(object, true));
+    } else {
+        linearize_recursive(object, nodes, paren_gaps);
     }
 }
 

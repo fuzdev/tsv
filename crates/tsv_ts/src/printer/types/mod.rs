@@ -35,9 +35,11 @@ pub use helpers::{
 // Re-export for submodules to use `super::X` instead of `super::super::X`
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 
-use crate::ast::internal::{TSParenthesizedType, TSType};
+use crate::ast::internal::{TSImportType, TSParenthesizedType, TSType};
 use crate::printer::analysis::find_char_skipping_comments;
+use crate::printer::calls::PartitionedComments;
 use helpers::type_needs_parens_for_indexed_access_object;
+use helpers::type_needs_parens_for_optional_element;
 use helpers::type_needs_parens_for_prefix_operator;
 use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
@@ -182,47 +184,7 @@ impl<'a> Printer<'a> {
                     ])
                 }
             }
-            TSType::Import(i) => {
-                let mut parts = vec![d.text("import(")];
-                parts.push(self.build_literal_doc(&i.argument));
-                // Import type options
-                if let Some(options) = &i.options {
-                    parts.push(d.text(", "));
-                    parts.push(self.build_expression_doc(options));
-                }
-                parts.push(d.text(")"));
-                if let Some(qualifier) = &i.qualifier {
-                    // Comments between `)` or closing paren and qualifier
-                    let dot_area_start = i
-                        .options
-                        .as_ref()
-                        .map_or(i.argument.span.end, |o| o.span().end);
-                    let qualifier_start = qualifier.span().start;
-                    parts.push(d.text("."));
-                    parts.push(self.build_comments_between(
-                        dot_area_start,
-                        qualifier_start,
-                        CommentSpacing::Trailing,
-                    ));
-                    parts.push(self.build_type_entity_name_doc(qualifier));
-                }
-                if let Some(type_args) = &i.type_arguments {
-                    // Preserve comments before type args: `import("a").Foo/* c */ <string>`
-                    let gap_start = i
-                        .qualifier
-                        .as_ref()
-                        .map_or(i.argument.span.end + 1, |q| q.span().end);
-                    if let Some(doc) = self.build_name_to_type_params_comments_opt(
-                        gap_start,
-                        type_args.span.start,
-                        CommentSpacing::Trailing,
-                    ) {
-                        parts.push(doc);
-                    }
-                    parts.push(self.build_type_arguments_doc(type_args));
-                }
-                d.concat(&parts)
-            }
+            TSType::Import(i) => self.build_import_type_doc(i),
             TSType::TypeQuery(q) => {
                 let mut parts = vec![d.text("typeof ")];
                 // Comments between `typeof` and the expression
@@ -287,7 +249,11 @@ impl<'a> Printer<'a> {
                 ])
             }
             TSType::Optional(o) => {
-                d.concat(&[self.build_type_doc(&o.type_annotation), d.text("?")])
+                let inner = self.build_type_doc_maybe_parens(
+                    &o.type_annotation,
+                    type_needs_parens_for_optional_element,
+                );
+                d.concat(&[inner, d.text("?")])
             }
             TSType::NamedTupleMember(n) => {
                 let mut parts = vec![d.symbol(n.label.name.to_u32())];
@@ -357,6 +323,114 @@ impl<'a> Printer<'a> {
         )
         .filter(|c| !c.is_block)
         .collect()
+    }
+
+    /// Build a complete import type: the `import(<specifier>)` call plus its
+    /// optional `.qualifier` and `<type args>`, preserving comments at each
+    /// boundary. Shared by `TSType::Import` and the `typeof import(...)` form
+    /// (`TSTypeQueryExprName::Import`), which must format identically.
+    pub(in crate::printer) fn build_import_type_doc(&self, i: &TSImportType) -> DocId {
+        let d = self.d();
+        // Closing `)` of the `import(...)` call, skipping any inside comments.
+        let after_args = i
+            .options
+            .as_ref()
+            .map_or(i.argument.span.end, |o| o.span().end);
+        let paren_close = self
+            .find_char_outside_comments(after_args, i.span.end, b')')
+            .unwrap_or(after_args);
+
+        let mut parts = vec![self.build_import_type_call_doc(i, paren_close)];
+        if let Some(qualifier) = &i.qualifier {
+            // Comments between `)` and qualifier (e.g. `import('a') /* c */ .Foo`)
+            let dot_area_start = paren_close + 1;
+            let qualifier_start = qualifier.span().start;
+            parts.push(d.text("."));
+            parts.push(self.build_comments_between(
+                dot_area_start,
+                qualifier_start,
+                CommentSpacing::Trailing,
+            ));
+            parts.push(self.build_type_entity_name_doc(qualifier));
+        }
+        if let Some(type_args) = &i.type_arguments {
+            // Preserve comments before type args: `import("a").Foo/* c */ <string>`
+            let gap_start = i
+                .qualifier
+                .as_ref()
+                .map_or(paren_close + 1, |q| q.span().end);
+            if let Some(doc) = self.build_name_to_type_params_comments_opt(
+                gap_start,
+                type_args.span.start,
+                CommentSpacing::Trailing,
+            ) {
+                parts.push(doc);
+            }
+            parts.push(self.build_type_arguments_doc(type_args));
+        }
+        d.concat(&parts)
+    }
+
+    /// Build the `import(<specifier>)` call portion of an import type, preserving
+    /// comments between `import(` and the specifier (leading) and between the
+    /// specifier and `)` (trailing). Leading comments go through the shared
+    /// `build_paren_leading_value_doc` (also used by the dynamic-import expression in
+    /// `calls/import_expr.rs`). Qualifier / type arguments are appended by the caller.
+    ///
+    /// - leading line / own-line block comment → break the parens multiline
+    /// - inline block comment → stay inline (`import(/* c */ 'a')`)
+    /// - trailing line comment → break multiline; trailing block → inline
+    fn build_import_type_call_doc(&self, i: &TSImportType, paren_close: u32) -> DocId {
+        let d = self.d();
+        let open_paren_end = i.span.start + 7; // "import(".len()
+        let arg_start = i.argument.span.start;
+        let arg_end = i.argument.span.end;
+        let literal_doc = self.build_literal_doc(&i.argument);
+
+        // Options present: keep the inline `import('a', {...})` layout, preserving
+        // any leading comments before the specifier.
+        if let Some(options) = &i.options {
+            let arg_doc = match self.build_rhs_comments_opt(open_paren_end, arg_start) {
+                Some(lead) => d.concat(&[lead, literal_doc]),
+                None => literal_doc,
+            };
+            return d.concat(&[
+                d.text("import("),
+                arg_doc,
+                d.text(", "),
+                self.build_expression_doc(options),
+                d.text(")"),
+            ]);
+        }
+
+        // Leading comments between `import(` and the specifier.
+        let (arg_doc, leading_forces_break) =
+            self.build_paren_leading_value_doc(open_paren_end, arg_start, literal_doc);
+
+        // Trailing comments between the specifier and `)`.
+        let has_trailing = self.has_comments_between(arg_end, paren_close);
+        let has_trailing_line = self.has_line_comments_between(arg_end, paren_close);
+
+        let mut inner = vec![arg_doc];
+        if has_trailing {
+            let pc =
+                PartitionedComments::new(self.comments, self.line_breaks, arg_end, paren_close);
+            pc.emit_trailing_comments(&mut inner, self);
+        }
+        let inner = d.concat(&inner);
+
+        if leading_forces_break || has_trailing_line {
+            // Line / own-line comments force the parens to break across lines.
+            d.concat(&[
+                d.text("import("),
+                d.indent(d.concat(&[d.hardline(), inner])),
+                d.hardline(),
+                d.text(")"),
+            ])
+        } else {
+            // Block comments only (or none) — stay inline.
+            d.concat(&[d.text("import("), inner, d.text(")")])
+        }
     }
 
     /// Unwrap a parenthesized type, preserving any comments inside the parens.

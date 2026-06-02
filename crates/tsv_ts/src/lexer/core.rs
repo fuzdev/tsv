@@ -2,10 +2,10 @@
 
 use super::comments;
 use super::escapes;
+use super::ident::{is_id_continue, is_id_start};
 use super::token::{Token, TokenKind, keyword_kind};
 use std::str::Chars;
 use tsv_lang::ParseError;
-use unicode_ident::{is_xid_continue, is_xid_start};
 
 /// Try to decode a unicode escape sequence at the given position.
 /// Returns Some((decoded_char, bytes_consumed)) if valid, None otherwise.
@@ -156,7 +156,7 @@ impl<'a> Lexer<'a> {
             // First char is a unicode escape
             has_escapes = true;
             if let Some((ch, len)) = try_decode_unicode_escape(self.source, self.position) {
-                if !is_xid_start(ch) && ch != '_' && ch != '$' {
+                if !is_id_start(ch) {
                     return Err(ParseError::InvalidSyntax {
                         message: format!(
                             "Invalid identifier start character from unicode escape: '{ch}'"
@@ -185,14 +185,14 @@ impl<'a> Lexer<'a> {
         // Continue scanning identifier characters (including escapes)
         loop {
             match self.current {
-                Some(ch) if is_xid_continue(ch) || ch == '$' => {
+                Some(ch) if is_id_continue(ch) => {
                     decoded.push(ch);
                     self.advance();
                 }
                 Some('\\') => {
                     // Potential unicode escape in identifier
                     if let Some((ch, len)) = try_decode_unicode_escape(self.source, self.position) {
-                        if !is_xid_continue(ch) && ch != '$' {
+                        if !is_id_continue(ch) {
                             // Not a valid identifier continue char, stop here
                             break;
                         }
@@ -242,22 +242,40 @@ impl<'a> Lexer<'a> {
     }
 
     /// Scan a decimal number (integer, float, or scientific notation)
-    /// Handles: 123, 1.5, 1e3, 1.5e-2, 1_000
+    /// Handles: 123, 1.5, 1e3, 1.5e-2, 1_000, 1.e1
     fn scan_decimal_number(&mut self) {
+        // `s` starts at the char after a `.`. Returns true when `s` begins a valid
+        // exponent (`e`/`E`, optional sign, then a digit) — i.e. `1.e1` is one number.
+        fn is_exponent_start(s: &str) -> bool {
+            let mut chars = s.chars();
+            if !matches!(chars.next(), Some('e' | 'E')) {
+                return false;
+            }
+            let mut c = chars.next();
+            if matches!(c, Some('+' | '-')) {
+                c = chars.next();
+            }
+            c.is_some_and(|c| c.is_ascii_digit())
+        }
+
         // Integer part (with optional separators)
         self.scan_digits(|c| c.is_ascii_digit());
 
         // Decimal point and fractional part
         if self.current == Some('.') {
             // Peek ahead: if next char is a digit or if this is trailing decimal (5.)
-            let next_char = self.source[self.position + 1..].chars().next();
+            let rest = &self.source[self.position + 1..];
+            let next_char = rest.chars().next();
             if next_char.is_some_and(|c| c.is_ascii_digit()) {
                 // Normal decimal: 3.14
                 self.advance(); // consume '.'
                 self.scan_digits(|c| c.is_ascii_digit());
-            } else if next_char.is_none()
-                || !next_char.is_some_and(|c| is_xid_start(c) || c == '_' || c == '$')
-            {
+            } else if is_exponent_start(rest) {
+                // Trailing-dot exponent: `1.e1` is a single numeric literal (= 1e1).
+                // Consume the '.'; the exponent block below consumes `e1`.
+                // Without this, `1.e1` would lex as `1.` followed by member access `.e1`.
+                self.advance(); // consume '.'
+            } else if next_char.is_none() || !next_char.is_some_and(is_id_start) {
                 // Trailing decimal: 5. or 0. (followed by operator, punctuation, or end)
                 // Don't consume if followed by identifier: 5.toString() is invalid anyway
                 // Do consume for 0..toString() so the number is "0." and second dot is member access
@@ -410,14 +428,12 @@ impl<'a> Lexer<'a> {
             // ECMAScript identifiers: start with XID_Start, _, or $; continue with XID_Continue or $
             // Note: _ is in XID_Continue but not XID_Start, so we check it explicitly for start
             // Identifiers may contain unicode escapes: \u0066oo → foo, b\u0061r → bar
-            Some(ch) if is_xid_start(ch) || ch == '_' || ch == '$' => {
-                self.scan_identifier_with_escapes(ch)
-            }
+            Some(ch) if is_id_start(ch) => self.scan_identifier_with_escapes(ch),
             // Unicode escape at start of identifier: \u0066oo → foo
             Some('\\') => {
                 // Check if this is a valid unicode escape that decodes to an identifier start
                 if let Some((ch, _)) = try_decode_unicode_escape(self.source, self.position)
-                    && (is_xid_start(ch) || ch == '_' || ch == '$')
+                    && is_id_start(ch)
                 {
                     return self.scan_identifier_with_escapes('\\');
                 }
@@ -972,7 +988,7 @@ impl<'a> Lexer<'a> {
         // TODO: Support Unicode escape sequences in flags (e.g., /test/\u0067 for 'g')
         let flags_start = self.position;
         while let Some(ch) = self.current {
-            if is_xid_continue(ch) || ch == '$' {
+            if is_id_continue(ch) {
                 self.advance();
             } else {
                 break;

@@ -6,8 +6,9 @@ use super::{
 };
 use crate::ast::internal::{self, TSType};
 use crate::printer::analysis::{find_char_skipping_comments, skip_identifier_at};
+use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentFilter, CommentSpacing};
-use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::doc::arena::DocId;
 use tsv_lang::{Comment, SymbolToU32, comments_in_range};
 
 /// Check if a type is "generic" - i.e., has type parameters.
@@ -35,17 +36,19 @@ fn type_has_internal_breaking(ts_type: &TSType) -> bool {
         | TSType::Mapped(_)
         | TSType::Tuple(_)
         | TSType::Function(_)
-        | TSType::Constructor(_) => true,
+        | TSType::Constructor(_)
+        // `import(...)` hugs the `=` like a call — its specifier path doesn't
+        // break, and any comments expand the parens internally.
+        | TSType::Import(_) => true,
+        // `typeof import(...)` hugs the `=` for the same reason — the import
+        // call inside the type query provides the internal break.
+        TSType::TypeQuery(q) => {
+            matches!(q.expr_name, internal::TSTypeQueryExprName::Import(_))
+        }
         // TypeReference with type arguments has internal breaking via `<>`
         TSType::TypeReference(r) => r.type_arguments.is_some(),
         _ => false,
     }
-}
-
-/// Build a fluid-style doc that can break after `=` when the line is too long.
-/// Flat: ` <type>`, Broken: `\n\t<type>`
-fn fluid_assignment_doc(d: &DocArena, type_doc: DocId) -> DocId {
-    d.group(d.indent_line(type_doc))
 }
 
 impl<'a> Printer<'a> {
@@ -102,12 +105,14 @@ impl<'a> Printer<'a> {
         let type_start = decl.type_annotation.span().start;
         let eq_pos = self.find_equals_position(header_end, type_start);
 
-        // Comments between name and type params/`=`: `type A/* c */ <T> = T` or `type A /* c */ = T`
-        // Line comments get a hardline to prevent absorbing type params as comment text
+        // Comments between name and type params: `type A/* c */ <T> = T`. The
+        // name→`=` gap (no params) and type-params→`=` gap are handled below as
+        // pre-`=` comments so they stay on the head side. Line comments get a
+        // hardline to prevent absorbing type params as comment text.
         let comment_end = decl
             .type_parameters
             .as_ref()
-            .map_or(eq_pos, |tp| tp.span.start);
+            .map_or(decl.id.span.end, |tp| tp.span.start);
         parts.push(self.build_name_to_type_params_comments(
             decl.id.span.end,
             comment_end,
@@ -118,10 +123,86 @@ impl<'a> Printer<'a> {
             parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
         }
 
-        parts.push(d.text(" ="));
+        // Comments between the head (name + type params) and `=`. A single-line
+        // block comment stays inline before `=` (`type A<X> /* c */ = B`); a line
+        // comment or multiline block can't share the `=` line, so it stays on its
+        // own line before `=` with the value pushed down. tsv keeps these on the
+        // head side; prettier relocates them after `=` (see conformance_prettier.md
+        // §Comment relocation). They were previously dropped entirely when type
+        // parameters were present (content loss).
+        let pre_eq_forces_own_line = self.comments_force_own_line_between(header_end, eq_pos);
 
-        let force_break = self.has_line_comments_between(eq_pos + 1, type_start)
-            || self.has_multiline_block_comments_between(eq_pos + 1, type_start);
+        if pre_eq_forces_own_line {
+            let mut indent_parts = vec![d.hardline()];
+            for comment in comments_in_range(self.comments, header_end, eq_pos) {
+                indent_parts.push(self.build_comment_doc(comment));
+                indent_parts.push(d.hardline());
+            }
+            indent_parts.push(self.build_type_alias_eq_value_doc(
+                decl,
+                eq_pos,
+                type_start,
+                has_complex_params,
+                false,
+            ));
+            parts.push(d.indent(d.concat(&indent_parts)));
+        } else {
+            // Single-line block comments before `=` stay inline: `<head> /* c */ =`
+            if let Some(block_doc) = self.build_comments_between_filtered_opt(
+                header_end,
+                eq_pos,
+                CommentSpacing::Leading,
+                CommentFilter::BlockOnly,
+            ) {
+                parts.push(block_doc);
+            }
+            parts.push(self.build_type_alias_eq_value_doc(
+                decl,
+                eq_pos,
+                type_start,
+                has_complex_params,
+                true,
+            ));
+        }
+
+        // Comments between the value and `;`: block comments stay before `;`
+        // (`type A = B /* c */;`), matching prettier; line comments move after `;`
+        // (`type A = B; // c`) since a line comment can't precede `;` on the same
+        // line. These were previously dropped entirely (content loss).
+        let value_end = decl.type_annotation.span().end;
+        let mut trailing_line_parts = Vec::new();
+        for comment in comments_in_range(self.comments, value_end, decl.span.end) {
+            if comment.is_block {
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
+            } else {
+                trailing_line_parts.push(d.text(" "));
+                trailing_line_parts.push(self.build_comment_doc(comment));
+            }
+        }
+
+        parts.push(d.text(";"));
+        parts.extend(trailing_line_parts);
+
+        d.concat(&parts)
+    }
+
+    /// Build the `=` token and the type-alias value, including any comments
+    /// between `=` and the value. `lead_space` controls the leading space before
+    /// `=` (true for the inline `... =` form, false when the caller has already
+    /// emitted a hardline, e.g. after an own-line pre-`=` comment).
+    fn build_type_alias_eq_value_doc(
+        &self,
+        decl: &internal::TSTypeAliasDeclaration,
+        eq_pos: u32,
+        type_start: u32,
+        has_complex_params: bool,
+        lead_space: bool,
+    ) -> DocId {
+        let d = self.d();
+        let mut parts = vec![d.text(if lead_space { " =" } else { "=" })];
+
+        let force_break = self.comments_force_own_line_between(eq_pos + 1, type_start);
 
         if force_break {
             // Line/multiline block comments force type to next line with indent.
@@ -173,7 +254,7 @@ impl<'a> Printer<'a> {
                     parts.push(type_doc);
                 } else {
                     // Normal unions: break after `=` with leading `| `
-                    parts.push(fluid_assignment_doc(d, type_doc));
+                    parts.push(hang_after_operator(d, type_doc));
                 }
             } else if let TSType::Intersection(i) = &decl.type_annotation {
                 // Intersection types: first element stays inline, subsequent wrap with indent
@@ -194,7 +275,7 @@ impl<'a> Printer<'a> {
                 // Conditional types: break after `=` only if check/extends has type parameters
                 let type_doc = self.build_type_doc(&decl.type_annotation);
                 if should_break_before_conditional_type(cond) {
-                    parts.push(fluid_assignment_doc(d, type_doc));
+                    parts.push(hang_after_operator(d, type_doc));
                 } else {
                     parts.push(d.text(" "));
                     parts.push(type_doc);
@@ -218,13 +299,11 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(" "));
                 parts.push(type_doc);
             } else {
-                // Other types: fluid layout - can break after `=` when line is too long
+                // Other types: break after `=` with a hanging indent when too long
                 let type_doc = self.build_type_doc(&decl.type_annotation);
-                parts.push(fluid_assignment_doc(d, type_doc));
+                parts.push(hang_after_operator(d, type_doc));
             }
         }
-
-        parts.push(d.text(";"));
 
         d.concat(&parts)
     }
@@ -451,9 +530,9 @@ impl<'a> Printer<'a> {
         }
         parts.push(self.build_signature_params_doc(&decl.params, paren_pos));
 
-        // Return type
+        // Return type (preserves a comment between `)` and `:`)
         if let Some(return_type) = &decl.return_type {
-            parts.push(self.build_type_annotation_doc(return_type));
+            parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
         }
 
         // Comments between return type (or `)`) and `;`
@@ -890,17 +969,9 @@ impl<'a> Printer<'a> {
                     parts.push(d.text("readonly "));
                 }
                 // Handle computed property keys: [key]: type
-                let key_region_end;
-                if p.computed {
-                    let key_doc = self.build_expression_doc(&p.key);
-                    let (doc, end) =
-                        self.build_computed_key_bracket_doc(p.span.start, &p.key, key_doc);
-                    key_region_end = end;
-                    parts.push(doc);
-                } else {
-                    key_region_end = p.key.span().end;
-                    parts.push(self.build_expression_doc(&p.key));
-                }
+                let (key_doc, key_region_end) =
+                    self.build_type_member_key_doc(p.span.start, &p.key, p.computed, true);
+                parts.push(key_doc);
                 // Comments before `?` modifier (e.g., `a /* c */?: number`)
                 if p.optional {
                     let search_end = p
@@ -957,17 +1028,9 @@ impl<'a> Printer<'a> {
                     _ => {}
                 }
                 // Handle computed method keys: [key](): type
-                let key_region_end;
-                if m.computed {
-                    let key_doc = self.build_expression_doc(&m.key);
-                    let (doc, end) =
-                        self.build_computed_key_bracket_doc(m.span.start, &m.key, key_doc);
-                    key_region_end = end;
-                    parts.push(doc);
-                } else {
-                    key_region_end = m.key.span().end;
-                    parts.push(self.build_expression_doc(&m.key));
-                }
+                let (key_doc, key_region_end) =
+                    self.build_type_member_key_doc(m.span.start, &m.key, m.computed, false);
+                parts.push(key_doc);
                 // Comments before `?` modifier (e.g., `b /* c */?(x): void`)
                 if m.optional {
                     let search_end = m.type_parameters.as_ref().map_or_else(
@@ -1044,7 +1107,7 @@ impl<'a> Printer<'a> {
                 // Width-based breaking for params
                 parts.push(self.build_signature_params_doc(&m.params, method_paren_pos));
                 if let Some(rt) = &m.return_type {
-                    parts.push(self.build_type_annotation_doc(rt));
+                    parts.push(self.build_signature_return_type_doc(method_paren_pos, rt));
                 }
                 // Comments between return type (or params) and `;`
                 let content_end = m.return_type.as_ref().map_or_else(
@@ -1090,7 +1153,7 @@ impl<'a> Printer<'a> {
                 // Width-based breaking for params
                 parts.push(self.build_signature_params_doc(&c.params, call_paren_pos));
                 if let Some(rt) = &c.return_type {
-                    parts.push(self.build_type_annotation_doc(rt));
+                    parts.push(self.build_signature_return_type_doc(call_paren_pos, rt));
                 }
                 // Comments between return type (or params) and `;`
                 let content_end = c.return_type.as_ref().map_or_else(
@@ -1136,7 +1199,7 @@ impl<'a> Printer<'a> {
                 // Width-based breaking for params
                 parts.push(self.build_signature_params_doc(&c.params, ctor_paren_pos));
                 if let Some(rt) = &c.return_type {
-                    parts.push(self.build_type_annotation_doc(rt));
+                    parts.push(self.build_signature_return_type_doc(ctor_paren_pos, rt));
                 }
                 // Comments between return type (or params) and `;`
                 let content_end = c.return_type.as_ref().map_or_else(
@@ -1309,22 +1372,10 @@ impl<'a> Printer<'a> {
 
                 if let Some(cp) = comma_pos {
                     let cp = cp as u32;
-                    // Trailing same-line comments before comma
-                    // Track line reference for multi-line block comments
-                    let mut line_ref = member_end;
-                    for comment in comments_in_range(self.comments, member_end, cp) {
-                        if self.is_same_line(line_ref, comment.span.start) {
-                            if comment.is_block {
-                                member_parts.push(d.text(" "));
-                                member_parts.push(self.build_comment_doc(comment));
-                                if !self.is_same_line(comment.span.start, comment.span.end) {
-                                    line_ref = comment.span.end;
-                                }
-                            } else {
-                                member_parts.push(self.build_trailing_line_comment_doc(comment));
-                            }
-                        }
-                    }
+                    // Trailing same-line comments before the comma (block comments
+                    // inline, line comments in line_suffix) — same dispatch as the
+                    // statement-list / class-member paths.
+                    member_parts.extend(self.build_trailing_same_line_comment_docs(member_end, cp));
 
                     // Comma
                     member_parts.push(d.text(","));
@@ -1493,46 +1544,21 @@ impl<'a> Printer<'a> {
                 } else {
                     parts.push(d.text("{"));
 
-                    // Build statement docs with blank line preservation
-                    let mut stmt_parts = Vec::new();
-                    let mut prev_end = block.span.start + 1; // After opening '{'
-
-                    for (i, stmt) in block.body.iter().enumerate() {
-                        let curr_start = stmt.span().start;
-
-                        // Collect leading comments before this statement
-                        let leading_comments = self.collect_leading_comments(
-                            prev_end,
-                            curr_start,
-                            if i == 0 { None } else { Some(prev_end) },
+                    // Shared per-statement walk (leading comments, blank-line
+                    // separators, prettier-ignore, trailing same-line comments) —
+                    // same as block-statement bodies.
+                    let body_start = block.span.start + 1; // After opening '{'
+                    let body_end = block.span.end.saturating_sub(1); // Before '}'
+                    let (mut stmt_parts, prev_end, _prev_stmt_end) = self
+                        .build_statement_list_docs(
+                            &block.body,
+                            body_start,
+                            body_end,
+                            Vec::new(),
+                            None,
                         );
 
-                        // Add separator: literalline + hardline if blank line in source, single hardline otherwise
-                        // literalline() produces a bare newline (no indent), preserving truly blank lines
-                        if !stmt_parts.is_empty() {
-                            let blank_check = if !leading_comments.is_empty() {
-                                leading_comments[0].span.start
-                            } else {
-                                curr_start
-                            };
-                            if self.has_blank_line_between(prev_end, blank_check) {
-                                stmt_parts.push(d.literalline()); // blank line (no indent)
-                            }
-                            stmt_parts.push(d.hardline()); // next statement with indent
-                        }
-
-                        // Print leading comments
-                        stmt_parts.extend(self.build_leading_comments_with_blank_lines(
-                            &leading_comments,
-                            curr_start,
-                        ));
-
-                        stmt_parts.push(self.build_statement_doc(stmt));
-                        prev_end = stmt.span().end;
-                    }
-
-                    // Handle trailing comments after the last statement
-                    let body_end = block.span.end.saturating_sub(1);
+                    // Handle own-line trailing comments after the last statement
                     stmt_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
 
                     parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&stmt_parts)])));

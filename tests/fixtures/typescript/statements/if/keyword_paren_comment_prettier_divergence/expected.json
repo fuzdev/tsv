@@ -1,0 +1,329 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 232,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Comment between `if` and `(` — tsv keeps it before the paren.",
+			"start": 10,
+			"end": 74,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 79,
+			"end": 86,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 4
+				},
+				"end": {
+					"line": 3,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Comment text containing `(` must not be mistaken for the condition's open paren.",
+			"start": 105,
+			"end": 188,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " (note) ",
+			"start": 193,
+			"end": 205,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 4
+				},
+				"end": {
+					"line": 8,
+					"column": 16
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 231,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 222,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 76,
+					"end": 102,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 88,
+						"end": 89,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 13
+							},
+							"end": {
+								"line": 3,
+								"column": 14
+							}
+						},
+						"name": "a",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 79,
+								"end": 86
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 91,
+						"end": 102,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 16
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 95,
+								"end": 99,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 95,
+									"end": 98,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 95,
+										"end": 96,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 3
+											}
+										},
+										"name": "b"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Comment between `if` and `(` — tsv keeps it before the paren.",
+							"start": 10,
+							"end": 74
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 190,
+					"end": 221,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 207,
+						"end": 208,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 18
+							},
+							"end": {
+								"line": 8,
+								"column": 19
+							}
+						},
+						"name": "a",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " (note) ",
+								"start": 193,
+								"end": 205
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 210,
+						"end": 221,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 21
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 214,
+								"end": 218,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 214,
+									"end": 217,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 214,
+										"end": 215,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 3
+											}
+										},
+										"name": "b"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Comment text containing `(` must not be mistaken for the condition's open paren.",
+							"start": 105,
+							"end": 188
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

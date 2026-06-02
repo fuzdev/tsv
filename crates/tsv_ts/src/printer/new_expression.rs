@@ -6,9 +6,10 @@ use super::calls::{
     PartitionedComments, arrow_has_type_reference_return, build_args_joined_with_comments,
     build_args_split_last, build_arrow_call_body_states, build_arrow_sig_doc,
     build_break_body_state, build_expand_all_args, build_inline_args, build_inline_or_expand_all,
-    could_expand_arrow_chain, has_blank_line_between_args, has_inter_argument_comments_slice,
-    has_trailing_comments_slice, has_trailing_line_comments_slice, last_two_args_same_type,
-    prepend_arrow_body_comments, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
+    could_expand_arrow_chain, emit_first_arg_leading_comments, has_blank_line_between_args,
+    has_inter_argument_comments_slice, has_trailing_comments_slice,
+    has_trailing_line_comments_slice, last_two_args_same_type, prepend_arrow_body_comments,
+    should_force_expansion_for_comments, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
     wrap_call_with_will_break_guard,
 };
 use super::comments::{CommentFilter, CommentSpacing};
@@ -507,6 +508,19 @@ impl<'a> Printer<'a> {
             let mut has_trailing_comma_on_last = false;
 
             for (i, arg) in new_expr.arguments.iter().enumerate() {
+                // Leading comments before the first argument (e.g. `new Foo(/* c */ a, // t)`).
+                // The inter-argument loop below only emits leading comments for args 1..n
+                // (via the previous arg's gap), so the first arg's leading comment must be
+                // emitted here or it's dropped.
+                if i == 0 {
+                    emit_first_arg_leading_comments(
+                        self,
+                        &mut arg_parts,
+                        paren_open,
+                        arg.span().start,
+                    );
+                }
+
                 // Build the argument (use build_expression_doc to match calls.rs comment handling)
                 arg_parts.push(self.build_expression_doc(arg));
 
@@ -558,6 +572,14 @@ impl<'a> Printer<'a> {
                         pc.emit_trailing_comments(&mut arg_parts, self);
                         // has_trailing_comma_on_last stays false, so trailing comma will be added
                     }
+
+                    // Own-line comments (block or line) after the last arg, before the
+                    // closing paren — emit after the trailing comma, each on its own line.
+                    pc.emit_last_arg_dangling_comments(
+                        &mut arg_parts,
+                        self,
+                        &mut has_trailing_comma_on_last,
+                    );
                 }
             }
 
@@ -596,16 +618,26 @@ impl<'a> Printer<'a> {
                 .map(|arg| self.build_arg_expression_doc(arg))
                 .collect();
 
-            // Add trailing block comment to last arg
-            let last_arg = &new_expr.arguments[last_idx];
-            let mut effective_arg_end = last_arg.span().end;
-
-            // For spread elements, also check inside the spread span
-            if let internal::Expression::SpreadElement(spread) = last_arg
-                && self.has_comments_between(spread.argument.span().end, spread.span.end)
-            {
-                effective_arg_end = spread.argument.span().end;
+            // Prepend leading comments before the first arg (e.g. `new Foo(/* c */ a /* t */)`);
+            // this path otherwise emits only trailing comments, dropping the leading one.
+            if let Some(first_arg) = new_expr.arguments.first() {
+                let mut lead = Vec::new();
+                emit_first_arg_leading_comments(
+                    self,
+                    &mut lead,
+                    paren_open,
+                    first_arg.span().start,
+                );
+                if !lead.is_empty() {
+                    lead.push(arg_docs[0]);
+                    arg_docs[0] = d.concat(&lead);
+                }
             }
+
+            // Add trailing block comment to last arg. For spread elements, scan
+            // inside the spread span for comments from stripped parens.
+            let last_arg = &new_expr.arguments[last_idx];
+            let effective_arg_end = self.last_arg_comment_scan_start(last_arg);
 
             let pc = PartitionedComments::new(
                 self.comments,
@@ -785,6 +817,55 @@ impl<'a> Printer<'a> {
         let has_leading_comments = !new_expr.arguments.is_empty()
             && self.has_comments_between(paren_open, new_expr.arguments[0].span().start);
         let has_inter_arg_comments = has_inter_argument_comments_slice(&new_expr.arguments, self);
+
+        // Comments trailing the `(` on the same line stay on the `(` line, with
+        // own-line comments on their own lines before the first arg — preserving
+        // the author's placement and source order (divergence from prettier,
+        // which floats a line comment past the statement and relocates a block
+        // before `(`). Also fixes content loss: a line comment trailing `(` was
+        // previously dropped. See conformance_prettier.md §Comment relocation.
+        if has_leading_comments {
+            let first_arg_start = new_expr.arguments[0].span().start;
+            let gap_pc = PartitionedComments::new(
+                self.comments,
+                self.line_breaks,
+                paren_open,
+                first_arg_start,
+            );
+            let has_paren_line =
+                !gap_pc.trailing_block.is_empty() || !gap_pc.trailing_line.is_empty();
+            if has_paren_line
+                && should_force_expansion_for_comments(self, paren_open, first_arg_start)
+            {
+                let mut paren_line_prefix = Vec::new();
+                gap_pc.emit_trailing_comments(&mut paren_line_prefix, self);
+
+                let mut inner = Vec::new();
+                for comment in &gap_pc.leading {
+                    inner.push(self.build_comment_doc(comment));
+                    inner.push(d.hardline());
+                }
+                // Build the args without re-emitting the first-arg leading gap
+                // (pass first_arg_start so the gap scan finds nothing).
+                inner.push(build_args_joined_with_comments(
+                    self,
+                    &new_expr.arguments,
+                    first_arg_start,
+                    true,
+                    #[allow(clippy::redundant_closure_for_method_calls)]
+                    |p, a| p.build_expression_doc(a),
+                ));
+
+                return d.concat(&[
+                    callee_with_types,
+                    d.text("("),
+                    d.concat(&paren_line_prefix),
+                    d.indent(d.concat(&[d.hardline(), d.concat(&inner), d.text(",")])),
+                    d.hardline(),
+                    d.text(")"),
+                ]);
+            }
+        }
 
         if has_leading_comments || has_inter_arg_comments {
             let arg_parts = build_args_joined_with_comments(

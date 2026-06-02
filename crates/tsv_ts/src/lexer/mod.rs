@@ -6,6 +6,7 @@
 mod comments;
 mod core;
 pub mod escapes;
+pub(crate) mod ident;
 mod token;
 
 // Re-export public API

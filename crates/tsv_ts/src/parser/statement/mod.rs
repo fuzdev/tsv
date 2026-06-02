@@ -202,6 +202,33 @@ impl<'a> Parser<'a> {
         Ok(Statement::ExpressionStatement(ExpressionStatement {
             expression: expr,
             span: Span::new(start, end),
+            is_directive: false,
         }))
+    }
+
+    /// Mark the directive prologue of a `Program` or function body.
+    ///
+    /// Mirrors acorn's `adaptDirectivePrologue`: the leading run of
+    /// unparenthesized string-literal expression statements are directives
+    /// (`"use strict";` and friends). Iteration stops at the first statement
+    /// that isn't a directive candidate.
+    pub(super) fn adapt_directive_prologue(&self, statements: &mut [Statement]) {
+        for stmt in statements {
+            let Statement::ExpressionStatement(expr_stmt) = stmt else {
+                break;
+            };
+            let Expression::Literal(lit) = &expr_stmt.expression else {
+                break;
+            };
+            if !matches!(lit.value, LiteralValue::String { .. }) {
+                break;
+            }
+            // Reject parenthesized strings: the statement must open with a quote.
+            let local_start = (expr_stmt.span.start as usize).saturating_sub(self.base_offset);
+            if !matches!(self.source.as_bytes().get(local_start), Some(b'"' | b'\'')) {
+                break;
+            }
+            expr_stmt.is_directive = true;
+        }
     }
 }

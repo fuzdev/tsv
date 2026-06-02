@@ -11,6 +11,7 @@ use super::helpers::type_args_should_wrap_for_return_type;
 use super::{CommentSpacing, Printer};
 use crate::ast::internal::{self, TSConstructorType, TSFunctionType, TSType};
 use crate::printer::analysis::find_char_skipping_comments;
+use crate::printer::layout::hang_after_operator;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
@@ -109,7 +110,7 @@ impl<'a> Printer<'a> {
                 let type_doc = self.build_union_type_doc(u, false);
                 d.concat(&[
                     d.text(" =>"),
-                    d.group(d.indent_line(d.concat(&[comments_doc, type_doc]))),
+                    hang_after_operator(d, d.concat(&[comments_doc, type_doc])),
                 ])
             }
             TSType::Intersection(i) => {
@@ -151,18 +152,35 @@ impl<'a> Printer<'a> {
     pub(super) fn build_function_type_doc(&self, f: &TSFunctionType) -> DocId {
         let d = self.d();
         let mut parts = Vec::new();
+        self.append_type_params_and_signature(
+            &mut parts,
+            f.type_parameters.as_ref(),
+            &f.params,
+            &f.return_type,
+            f.span.start,
+        );
+        d.group(d.concat(&parts))
+    }
 
-        if let Some(type_params) = &f.type_parameters {
+    /// Append the shared tail of a function/constructor type to `parts`: the type
+    /// parameters, any comments between them and `(`, the parameter list, and the
+    /// ` => ReturnType`. `span_start` locates the `(` when there are no type params.
+    fn append_type_params_and_signature(
+        &self,
+        parts: &mut Vec<DocId>,
+        type_parameters: Option<&internal::TSTypeParameterDeclaration>,
+        params: &[internal::Expression],
+        return_type: &internal::TSTypeAnnotation,
+        span_start: u32,
+    ) {
+        if let Some(type_params) = type_parameters {
             parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
         }
 
-        let paren_search_start = f
-            .type_parameters
-            .as_ref()
-            .map_or(f.span.start, |tp| tp.span.end);
+        let paren_search_start = type_parameters.map_or(span_start, |tp| tp.span.end);
 
         // Comments between type_params and `(` go after type_params
-        if let Some(tp) = &f.type_parameters
+        if let Some(tp) = type_parameters
             && let Some(pp) = find_char_skipping_comments(
                 self.source.as_bytes(),
                 tp.span.end as usize,
@@ -170,17 +188,15 @@ impl<'a> Printer<'a> {
                 b'(',
             )
         {
-            self.append_type_params_to_paren_comments(&mut parts, tp.span.end, pp as u32);
+            self.append_type_params_to_paren_comments(parts, tp.span.end, pp as u32);
         }
 
         parts.extend(self.build_grouped_params_and_return_type(
-            &f.params,
+            params,
             paren_search_start,
-            &f.return_type,
-            f.type_parameters.as_ref(),
+            return_type,
+            type_parameters,
         ));
-
-        d.group(d.concat(&parts))
     }
 
     /// Build a Doc for a constructor type: `new () => T` or `abstract new <T>() => T`
@@ -191,35 +207,40 @@ impl<'a> Printer<'a> {
         if c.abstract_ {
             parts.push(d.text("abstract "));
         }
-        parts.push(d.text("new "));
 
-        if let Some(type_params) = &c.type_parameters {
-            parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
-        }
-
-        let paren_search_start = c
+        // Comments between `new` and the type params / `(` (e.g. `new /* c */ ()`).
+        // Prettier relocates these (after `)`, before the first param, or — with
+        // type params — keeps them in place); per Comment Position Philosophy we
+        // preserve the user's position after `new`. Without this they were dropped.
+        parts.push(d.text("new"));
+        let new_end = self
+            .find_keyword_in_range(c.span.start, c.return_type.span.start, "new")
+            .map_or(c.span.start, |p| p + 3);
+        let next_token_start = c
             .type_parameters
             .as_ref()
-            .map_or(c.span.start, |tp| tp.span.end);
-
-        // Comments between type_params and `(` go after type_params
-        if let Some(tp) = &c.type_parameters
-            && let Some(pp) = find_char_skipping_comments(
-                self.source.as_bytes(),
-                tp.span.end as usize,
-                self.source.len(),
-                b'(',
-            )
-        {
-            self.append_type_params_to_paren_comments(&mut parts, tp.span.end, pp as u32);
+            .map(|tp| tp.span.start)
+            .or_else(|| {
+                find_char_skipping_comments(
+                    self.source.as_bytes(),
+                    new_end as usize,
+                    self.source.len(),
+                    b'(',
+                )
+                .map(|p| p as u32)
+            });
+        if let Some(next_start) = next_token_start {
+            self.append_type_params_to_paren_comments(&mut parts, new_end, next_start);
         }
+        parts.push(d.text(" "));
 
-        parts.extend(self.build_grouped_params_and_return_type(
-            &c.params,
-            paren_search_start,
-            &c.return_type,
+        self.append_type_params_and_signature(
+            &mut parts,
             c.type_parameters.as_ref(),
-        ));
+            &c.params,
+            &c.return_type,
+            c.span.start,
+        );
 
         d.group(d.concat(&parts))
     }
@@ -241,6 +262,27 @@ impl<'a> Printer<'a> {
         // Build return type first so we can check will_break for grouping
         let return_type_doc = self.build_function_type_return_doc(return_type);
 
+        // Comments between the close paren and `=>` (e.g. `() /* c */ => void`).
+        // Without this they are dropped — the params doc ends at `)` and the
+        // return doc begins at `=>`, so nothing else covers the gap.
+        let arrow_start = return_type.span.start;
+        let pre_arrow_doc = find_char_skipping_comments(
+            self.source.as_bytes(),
+            paren_search_start as usize,
+            self.source.len(),
+            b'(',
+        )
+        .and_then(|open| self.find_closing_paren(open as u32, arrow_start))
+        .filter(|&after_close| self.has_comments_between(after_close, arrow_start))
+        .map_or_else(
+            || d.empty(),
+            |after_close| {
+                self.build_comments_between(after_close, arrow_start, CommentSpacing::Leading)
+            },
+        );
+
+        let return_type_doc = d.concat(&[pre_arrow_doc, return_type_doc]);
+
         let params_doc = d.concat(&self.build_function_params_doc(params, paren_search_start));
         let params_doc = if params.len() == 1
             && type_params_allow_grouping(type_parameters)
@@ -258,40 +300,87 @@ impl<'a> Printer<'a> {
     // Signature Helpers (shared with type members)
     //
 
-    /// Find closing paren position given opening paren position
-    pub(super) fn find_close_paren(&self, paren_pos: u32) -> Option<u32> {
-        self.source[paren_pos as usize + 1..]
-            .find(')')
-            .map(|p| paren_pos + 1 + p as u32)
+    /// Build the doc for an empty parameter list, preserving any dangling block
+    /// comments inside the parens (`(/* c */)`). Returns `()` when there are none.
+    ///
+    /// Shared by function/constructor types (`build_function_params_doc`) and
+    /// the type-member signatures (`build_signature_params_doc`) — without this
+    /// the dangling comment is dropped (content loss).
+    fn build_empty_params_doc(&self, paren_pos: Option<u32>) -> DocId {
+        let d = self.d();
+        if let Some(paren_pos) = paren_pos
+            && let Some(close_pos) = self.matching_close_paren(paren_pos)
+            && self.has_comments_between(paren_pos + 1, close_pos)
+        {
+            let mut parts = vec![d.text("(")];
+            for comment in comments_in_range(self.comments, paren_pos + 1, close_pos) {
+                parts.push(self.build_comment_doc(comment));
+            }
+            parts.push(d.text(")"));
+            d.concat(&parts)
+        } else {
+            d.text("()")
+        }
+    }
+
+    /// Emit any block comments in the `)`→return-type gap, with a trailing space.
+    ///
+    /// Prettier adds a space before `:` when a comment precedes it
+    /// (`m(a) /* c */ : void`), so the caller appends the `: type` after this prefix.
+    /// Returns an empty doc when there is no such comment.
+    pub(in crate::printer) fn build_paren_to_return_type_comments(
+        &self,
+        paren_pos: Option<u32>,
+        return_type_start: u32,
+    ) -> DocId {
+        let d = self.d();
+        let mut parts = vec![];
+        // Depth-tracked close paren (skips nested parens / comments) — the naive
+        // first-`)` scan mis-fires on complex params and pulls real param-trailing
+        // comments into this range (duplication).
+        if let Some(paren_pos) = paren_pos
+            && let Some(close_after) = self.find_closing_paren(paren_pos, return_type_start)
+        {
+            for comment in comments_in_range(self.comments, close_after, return_type_start) {
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
+            }
+        }
+        // Prettier adds space before `:` when there's a preceding comment
+        if !parts.is_empty() {
+            parts.push(d.text(" "));
+        }
+        d.concat(&parts)
     }
 
     /// Build return type annotation with comment handling between `)` and `:`
-    /// Used by MethodSignature, CallSignature, ConstructSignature
-    pub(super) fn build_signature_return_type_doc(
+    /// Used by MethodSignature, CallSignature, ConstructSignature (type-literal and
+    /// interface members) and the declare-function signature.
+    pub(in crate::printer) fn build_signature_return_type_doc(
         &self,
         paren_pos: Option<u32>,
         return_type: &internal::TSTypeAnnotation,
     ) -> DocId {
         let d = self.d();
-        let mut parts = vec![];
-        let mut has_comment = false;
+        let prefix = self.build_paren_to_return_type_comments(paren_pos, return_type.span.start);
+        d.concat(&[prefix, self.build_type_annotation_doc(return_type)])
+    }
 
-        if let Some(paren_pos) = paren_pos
-            && let Some(close_pos) = self.find_close_paren(paren_pos)
-        {
-            for comment in comments_in_range(self.comments, close_pos + 1, return_type.span.start) {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-                has_comment = true;
-            }
-        }
-
-        // Prettier adds space before `:` when there's a preceding comment
-        if has_comment {
-            parts.push(d.text(" "));
-        }
-        parts.push(self.build_type_annotation_doc(return_type));
-        d.concat(&parts)
+    /// Build a function-declaration return type (`: T`) with `)`→`:` comment
+    /// handling, using the return-type type variant (wraps unions/intersections so
+    /// params break first). Sibling of `build_signature_return_type_doc`, which
+    /// serves type-member signatures and uses the plain type variant.
+    pub(in crate::printer) fn build_function_return_type_doc(
+        &self,
+        paren_pos: Option<u32>,
+        return_type: &internal::TSTypeAnnotation,
+    ) -> DocId {
+        let d = self.d();
+        let prefix = self.build_paren_to_return_type_comments(paren_pos, return_type.span.start);
+        d.concat(&[
+            prefix,
+            self.build_type_annotation_doc_for_return_type(return_type),
+        ])
     }
 
     /// Build signature params doc with width-based breaking.
@@ -309,21 +398,11 @@ impl<'a> Printer<'a> {
         let d = self.d();
         if params.is_empty() {
             // Handle comments inside empty params (e.g., `a(/* comment */): void`)
-            if let Some(paren_pos) = paren_pos
-                && let Some(close_pos) = self.find_close_paren(paren_pos)
-            {
-                let mut parts = vec![d.text("(")];
-                for comment in comments_in_range(self.comments, paren_pos + 1, close_pos) {
-                    parts.push(self.build_comment_doc(comment));
-                }
-                parts.push(d.text(")"));
-                return d.concat(&parts);
-            }
-            return d.text("()");
+            return self.build_empty_params_doc(paren_pos);
         }
 
         // Check for line comments or own-line block comments that force multiline
-        let close_paren_pos = paren_pos.and_then(|p| self.find_close_paren(p));
+        let close_paren_pos = paren_pos.and_then(|p| self.matching_close_paren(p));
         let end_boundary =
             close_paren_pos.unwrap_or_else(|| params.last().map_or(0, |p| p.span().end));
         let has_forcing_comments = self.has_line_comments_in_delimited_list(
@@ -331,8 +410,7 @@ impl<'a> Printer<'a> {
             internal::Expression::span,
             end_boundary,
         ) || params.last().is_some_and(|last| {
-            comments_in_range(self.comments, last.span().end, end_boundary)
-                .any(|c| c.is_block && !self.is_same_line(last.span().end, c.span.start))
+            self.has_own_line_block_comment_after(last.span().end, last.span().end, end_boundary)
         });
 
         if has_forcing_comments {
@@ -476,10 +554,10 @@ impl<'a> Printer<'a> {
         .map(|p| p as u32);
 
         if params.is_empty() {
-            parts.push(d.text("()"));
+            parts.push(self.build_empty_params_doc(paren_pos));
         } else {
             // Check for line comments or own-line block comments between/after params (force multiline)
-            let close_paren_pos = paren_pos.and_then(|p| self.find_close_paren(p));
+            let close_paren_pos = paren_pos.and_then(|p| self.matching_close_paren(p));
             // Use last param end as fallback if close paren not found (no trailing check)
             let end_boundary =
                 close_paren_pos.unwrap_or_else(|| params.last().map_or(0, |p| p.span().end));
@@ -490,10 +568,24 @@ impl<'a> Printer<'a> {
             );
             // Also check for own-line block comments after the last param
             let has_own_line_block_after_last = params.last().is_some_and(|last| {
-                comments_in_range(self.comments, last.span().end, end_boundary)
-                    .any(|c| c.is_block && !self.is_same_line(last.span().end, c.span.start))
+                self.has_own_line_block_comment_after(
+                    last.span().end,
+                    last.span().end,
+                    end_boundary,
+                )
             });
-            if has_line_comments || has_own_line_block_after_last {
+            // A line comment trailing `(` (`(// c\n p`), or an own-line block comment
+            // in the `(`→first-param gap (`(\n/* c */\n p`), forces multiline.
+            // `has_line_comments_in_delimited_list` skips this leading gap, and the
+            // inline path below emits these with trailing spacing — a line comment
+            // swallows the following tokens, a block comment collapses inline. Route
+            // to the hardline path so they land on their own line (matches prettier).
+            let has_leading_gap_forcing = paren_pos.is_some_and(|p| {
+                let first_start = params[0].span().start;
+                self.has_line_comments_between(p + 1, first_start)
+                    || self.has_own_line_block_comment_after(p, p + 1, first_start)
+            });
+            if has_line_comments || has_own_line_block_after_last || has_leading_gap_forcing {
                 return self.build_function_params_doc_with_line_comments(params, paren_pos);
             }
 
@@ -551,7 +643,7 @@ impl<'a> Printer<'a> {
                 // Handle trailing comments after the param (between type literal and close paren)
                 let param_end = params[0].span().end;
                 let close_paren = paren_pos
-                    .and_then(|p| self.find_close_paren(p))
+                    .and_then(|p| self.matching_close_paren(p))
                     .unwrap_or(param_end);
                 for comment in comments_in_range(self.comments, param_end, close_paren) {
                     parts.push(d.text(" "));
@@ -561,6 +653,10 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(")"));
             } else {
                 let mut param_parts = Vec::new();
+                // Block comment trailing the last param after the comma — preserved
+                // after the synthetic trailing comma (prettier relocates before; see
+                // conformance_prettier.md §Comment relocation).
+                let mut last_after_comma = Vec::new();
                 let mut prev_end = paren_pos.map_or(0, |p| p + 1); // After `(`
                 for (i, p) in params.iter().enumerate() {
                     if i > 0 {
@@ -590,10 +686,11 @@ impl<'a> Printer<'a> {
                     } else {
                         // Last param: trailing comments before `)`
                         let close_paren = paren_pos
-                            .and_then(|p| self.find_close_paren(p))
+                            .and_then(|p| self.matching_close_paren(p))
                             .unwrap_or(param_end);
-                        self.append_trailing_inline_block_comments(
+                        self.append_last_trailing_block_comments_split(
                             &mut param_parts,
+                            &mut last_after_comma,
                             param_end,
                             close_paren,
                         );
@@ -608,6 +705,8 @@ impl<'a> Printer<'a> {
                 if !last_is_rest {
                     parts.push(d.trailing_comma());
                 }
+                // Preserved after-comma block comment(s) on the last param
+                parts.extend(last_after_comma);
                 parts.push(d.softline());
                 parts.push(d.text(")"));
             }
@@ -628,13 +727,32 @@ impl<'a> Printer<'a> {
         let open_paren = paren_pos.unwrap_or(0);
         let mut prev_end = open_paren + 1; // After `(`
 
+        // A line comment trailing the opening `(` is kept on the `(` line (divergence
+        // from prettier, which relocates it to its own line as the first param's
+        // leading comment). See conformance_prettier.md §Comment relocation
+        // (Function/constructor-type `(` trailing). Same mechanism as the call-`(`
+        // and object/array/block open-delimiter family.
+        let (paren_prefix, paren_pull_pos) = paren_pos.map_or_else(
+            || (Vec::new(), None),
+            |open| self.delimiter_line_comment_prefix(open, params[0].span().start),
+        );
+
         for (i, p) in params.iter().enumerate() {
             let param_start = p.span().start;
             let param_end = p.span().end;
             let is_last = i == params.len() - 1;
 
-            // Leading comments (after previous comma or `(`)
-            inner_parts.extend(self.build_leading_comments_multiline(prev_end, param_start));
+            // Leading comments (after previous comma or `(`); for the first param,
+            // exclude comments already pulled onto the `(` line.
+            if i == 0 && paren_pull_pos.is_some() {
+                inner_parts.extend(self.build_leading_comments_multiline_after_delim(
+                    prev_end,
+                    param_start,
+                    open_paren,
+                ));
+            } else {
+                inner_parts.extend(self.build_leading_comments_multiline(prev_end, param_start));
+            }
 
             inner_parts.push(self.build_function_type_param_expression_doc(p));
 
@@ -650,7 +768,7 @@ impl<'a> Printer<'a> {
             } else {
                 // Last param: trailing comma (unless rest) + comments before `)`
                 let close_paren = paren_pos
-                    .and_then(|p| self.find_close_paren(p))
+                    .and_then(|p| self.matching_close_paren(p))
                     .unwrap_or(param_end);
                 if !is_rest {
                     inner_parts.push(d.text(","));
@@ -661,6 +779,7 @@ impl<'a> Printer<'a> {
         }
 
         parts.push(d.text("("));
+        parts.push(d.concat(&paren_prefix));
         parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])));
         parts.push(d.hardline());
         parts.push(d.text(")"));

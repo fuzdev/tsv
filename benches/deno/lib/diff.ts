@@ -5,7 +5,7 @@
  */
 
 /** Number of digits needed to display `n` (minimum 1) */
-function digitWidth(n: number): number {
+function digit_width(n: number): number {
 	return n === 0 ? 1 : Math.floor(Math.log10(n)) + 1;
 }
 
@@ -16,8 +16,8 @@ const TAB_WIDTH = 2;
 const LINE_WIDTH_THRESHOLD = 90;
 
 /** Expand tabs to spaces for consistent display */
-function expandTabs(line: string, tabWidth: number = TAB_WIDTH): string {
-	return line.replace(/\t/g, ' '.repeat(tabWidth));
+function expand_tabs(line: string, tab_width: number = TAB_WIDTH): string {
+	return line.replace(/\t/g, ' '.repeat(tab_width));
 }
 
 /** Line diff result */
@@ -33,32 +33,32 @@ export interface DiffLine {
  * @param b - The new/actual string
  * @returns Array of diff lines with type annotations
  */
-export function diffLines(a: string, b: string): DiffLine[] {
-	const aLines = a.split('\n');
-	const bLines = b.split('\n');
+export function diff_lines(a: string, b: string): DiffLine[] {
+	const a_lines = a.split('\n');
+	const b_lines = b.split('\n');
 	const result: DiffLine[] = [];
 
-	const lcs = computeLCS(aLines, bLines);
+	const lcs = compute_lcs(a_lines, b_lines);
 	let ai = 0,
 		bi = 0,
 		li = 0;
 
-	while (ai < aLines.length || bi < bLines.length) {
-		if (li < lcs.length && ai < aLines.length && aLines[ai] === lcs[li]) {
-			if (bi < bLines.length && bLines[bi] === lcs[li]) {
-				result.push({ type: 'same', line: aLines[ai] });
+	while (ai < a_lines.length || bi < b_lines.length) {
+		if (li < lcs.length && ai < a_lines.length && a_lines[ai] === lcs[li]) {
+			if (bi < b_lines.length && b_lines[bi] === lcs[li]) {
+				result.push({ type: 'same', line: a_lines[ai] });
 				ai++;
 				bi++;
 				li++;
 			} else {
-				result.push({ type: 'add', line: bLines[bi] });
+				result.push({ type: 'add', line: b_lines[bi] });
 				bi++;
 			}
-		} else if (ai < aLines.length && (li >= lcs.length || aLines[ai] !== lcs[li])) {
-			result.push({ type: 'remove', line: aLines[ai] });
+		} else if (ai < a_lines.length && (li >= lcs.length || a_lines[ai] !== lcs[li])) {
+			result.push({ type: 'remove', line: a_lines[ai] });
 			ai++;
-		} else if (bi < bLines.length) {
-			result.push({ type: 'add', line: bLines[bi] });
+		} else if (bi < b_lines.length) {
+			result.push({ type: 'add', line: b_lines[bi] });
 			bi++;
 		}
 	}
@@ -67,7 +67,7 @@ export function diffLines(a: string, b: string): DiffLine[] {
 }
 
 /** Compute longest common subsequence of two string arrays */
-function computeLCS(a: string[], b: string[]): string[] {
+function compute_lcs(a: string[], b: string[]): string[] {
 	const m = a.length,
 		n = b.length;
 	const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
@@ -108,13 +108,13 @@ export interface DiffHunk {
 	/** All diff lines in this hunk (including context lines adjacent to changes) */
 	lines: DiffLine[];
 	/** Line range in "ours" (added side) that this hunk covers, or null if only removals */
-	oursRange: { start: number; end: number } | null;
+	ours_range: { start: number; end: number } | null;
 	/** Line range in "prettier" (removed side) that this hunk covers, or null if only additions */
-	prettierRange: { start: number; end: number } | null;
+	prettier_range: { start: number; end: number } | null;
 	/** Lines added (ours-only) in this hunk */
-	addedLines: string[];
+	added_lines: string[];
 	/** Lines removed (prettier-only) in this hunk */
-	removedLines: string[];
+	removed_lines: string[];
 }
 
 /**
@@ -123,69 +123,69 @@ export interface DiffHunk {
  * A hunk is a contiguous group of changes (add/remove lines). Any context (same) line
  * between changes separates hunks. Line numbers for both sides are tracked.
  */
-export function extractHunks(diff: DiffLine[]): DiffHunk[] {
+export function extract_hunks(diff: DiffLine[]): DiffHunk[] {
 	const hunks: DiffHunk[] = [];
-	let currentLines: DiffLine[] = [];
-	let addedLines: string[] = [];
-	let removedLines: string[] = [];
+	let current_lines: DiffLine[] = [];
+	let added_lines: string[] = [];
+	let removed_lines: string[] = [];
 
 	// Track line numbers for both sides
-	let oursLine = 0; // "add" lines increment this
-	let prettierLine = 0; // "remove" lines increment this
+	let ours_line = 0; // "add" lines increment this
+	let prettier_line = 0; // "remove" lines increment this
 
-	let hunkOursStart: number | null = null;
-	let hunkOursEnd: number | null = null;
-	let hunkPrettierStart: number | null = null;
-	let hunkPrettierEnd: number | null = null;
+	let hunk_ours_start: number | null = null;
+	let hunk_ours_end: number | null = null;
+	let hunk_prettier_start: number | null = null;
+	let hunk_prettier_end: number | null = null;
 
-	function flushHunk(): void {
-		if (currentLines.length === 0) return;
+	function flush_hunk(): void {
+		if (current_lines.length === 0) return;
 
 		hunks.push({
 			index: hunks.length,
-			lines: currentLines,
-			oursRange: hunkOursStart !== null && hunkOursEnd !== null
-				? { start: hunkOursStart, end: hunkOursEnd }
+			lines: current_lines,
+			ours_range: hunk_ours_start !== null && hunk_ours_end !== null
+				? { start: hunk_ours_start, end: hunk_ours_end }
 				: null,
-			prettierRange: hunkPrettierStart !== null && hunkPrettierEnd !== null
-				? { start: hunkPrettierStart, end: hunkPrettierEnd }
+			prettier_range: hunk_prettier_start !== null && hunk_prettier_end !== null
+				? { start: hunk_prettier_start, end: hunk_prettier_end }
 				: null,
-			addedLines,
-			removedLines,
+			added_lines: added_lines,
+			removed_lines: removed_lines,
 		});
 
-		currentLines = [];
-		addedLines = [];
-		removedLines = [];
-		hunkOursStart = null;
-		hunkOursEnd = null;
-		hunkPrettierStart = null;
-		hunkPrettierEnd = null;
+		current_lines = [];
+		added_lines = [];
+		removed_lines = [];
+		hunk_ours_start = null;
+		hunk_ours_end = null;
+		hunk_prettier_start = null;
+		hunk_prettier_end = null;
 	}
 
 	for (const d of diff) {
 		if (d.type === 'same') {
 			// Context line closes any open hunk
-			flushHunk();
-			oursLine++;
-			prettierLine++;
+			flush_hunk();
+			ours_line++;
+			prettier_line++;
 		} else if (d.type === 'add') {
-			if (hunkOursStart === null) hunkOursStart = oursLine;
-			hunkOursEnd = oursLine;
-			currentLines.push(d);
-			addedLines.push(d.line);
-			oursLine++;
+			if (hunk_ours_start === null) hunk_ours_start = ours_line;
+			hunk_ours_end = ours_line;
+			current_lines.push(d);
+			added_lines.push(d.line);
+			ours_line++;
 		} else {
 			// remove
-			if (hunkPrettierStart === null) hunkPrettierStart = prettierLine;
-			hunkPrettierEnd = prettierLine;
-			currentLines.push(d);
-			removedLines.push(d.line);
-			prettierLine++;
+			if (hunk_prettier_start === null) hunk_prettier_start = prettier_line;
+			hunk_prettier_end = prettier_line;
+			current_lines.push(d);
+			removed_lines.push(d.line);
+			prettier_line++;
 		}
 	}
 
-	flushHunk();
+	flush_hunk();
 	return hunks;
 }
 
@@ -193,46 +193,46 @@ export function extractHunks(diff: DiffLine[]): DiffHunk[] {
  * Filter diff to only include lines within N lines of context around changes.
  *
  * @param diff - The full diff lines
- * @param contextLines - Number of context lines to show around changes (default: 3)
+ * @param context_lines - Number of context lines to show around changes (default: 3)
  * @returns Filtered diff with ellipsis markers for skipped regions
  */
-export function filterDiffContext(diff: DiffLine[], contextLines = 3): DiffLine[] {
+export function filter_diff_context(diff: DiffLine[], context_lines = 3): DiffLine[] {
 	if (diff.length === 0) return [];
 
 	// Find indices of all changed lines
-	const changedIndices: number[] = [];
+	const changed_indices: number[] = [];
 	for (let i = 0; i < diff.length; i++) {
 		if (diff[i].type !== 'same') {
-			changedIndices.push(i);
+			changed_indices.push(i);
 		}
 	}
 
-	if (changedIndices.length === 0) return [];
+	if (changed_indices.length === 0) return [];
 
 	// Build set of indices to include (changed lines + context)
-	const includeIndices = new Set<number>();
-	for (const idx of changedIndices) {
+	const include_indices = new Set<number>();
+	for (const idx of changed_indices) {
 		for (
-			let i = Math.max(0, idx - contextLines);
-			i <= Math.min(diff.length - 1, idx + contextLines);
+			let i = Math.max(0, idx - context_lines);
+			i <= Math.min(diff.length - 1, idx + context_lines);
 			i++
 		) {
-			includeIndices.add(i);
+			include_indices.add(i);
 		}
 	}
 
 	// Build result with ellipsis markers for gaps
 	const result: DiffLine[] = [];
-	let lastIncluded = -1;
+	let last_included = -1;
 
 	for (let i = 0; i < diff.length; i++) {
-		if (includeIndices.has(i)) {
+		if (include_indices.has(i)) {
 			// Add ellipsis if there's a gap
-			if (lastIncluded >= 0 && i > lastIncluded + 1) {
+			if (last_included >= 0 && i > last_included + 1) {
 				result.push({ type: 'same', line: '...' });
 			}
 			result.push(diff[i]);
-			lastIncluded = i;
+			last_included = i;
 		}
 	}
 
@@ -248,22 +248,22 @@ export function filterDiffContext(diff: DiffLine[], contextLines = 3): DiffLine[
  * @param useColor - Whether to use ANSI color codes (default: true)
  * @returns Formatted string lines
  */
-export function formatDiffForTerminal(diff: DiffLine[], useColor = true): string[] {
+export function format_diff_for_terminal(diff: DiffLine[], use_color = true): string[] {
 	// Expand tabs for consistent display, then find max width among lines exceeding threshold
-	const expandedLines = diff.map((d) => ({
+	const expanded_lines = diff.map((d) => ({
 		...d,
-		expanded: expandTabs(d.line),
+		expanded: expand_tabs(d.line),
 	}));
 
-	let maxWidth = 0;
-	for (const d of expandedLines) {
+	let max_width = 0;
+	for (const d of expanded_lines) {
 		if (d.type !== 'same' && d.expanded.length > LINE_WIDTH_THRESHOLD) {
-			maxWidth = Math.max(maxWidth, d.expanded.length);
+			max_width = Math.max(max_width, d.expanded.length);
 		}
 	}
-	const numWidth = digitWidth(maxWidth);
+	const num_width = digit_width(max_width);
 
-	return expandedLines.map((d) => {
+	return expanded_lines.map((d) => {
 		const prefix = d.type === 'add' ? '+' : d.type === 'remove' ? '-' : ' ';
 		const width = d.expanded.length;
 
@@ -273,14 +273,14 @@ export function formatDiffForTerminal(diff: DiffLine[], useColor = true): string
 		}
 
 		// Changed lines: show width only if exceeds threshold
-		const color = useColor ? (d.type === 'add' ? '\x1b[32m' : '\x1b[31m') : '';
-		const reset = useColor ? '\x1b[0m' : '';
+		const color = use_color ? (d.type === 'add' ? '\x1b[32m' : '\x1b[31m') : '';
+		const reset = use_color ? '\x1b[0m' : '';
 
 		if (width > LINE_WIDTH_THRESHOLD) {
 			// Pad to max width + 2 spaces, then right-aligned width
-			const padding = maxWidth - width + 2;
-			const widthStr = String(width).padStart(numWidth, ' ');
-			return `${color}${prefix}${d.expanded}${' '.repeat(padding)}${widthStr}${reset}`;
+			const padding = max_width - width + 2;
+			const width_str = String(width).padStart(num_width, ' ');
+			return `${color}${prefix}${d.expanded}${' '.repeat(padding)}${width_str}${reset}`;
 		}
 
 		// No width suffix for lines at or below threshold

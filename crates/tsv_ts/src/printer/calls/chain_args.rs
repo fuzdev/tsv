@@ -441,6 +441,10 @@ fn build_call_args_doc_for_chain_impl(
         // Forced expansion: use hardlines instead of softlines
         // Build arguments with blank line preservation and full comment handling
         let mut arg_parts = Vec::new();
+        // Comments trailing the `(` on its own line, kept on the `(` line
+        // (divergence from prettier, which relocates them to their own line).
+        // Injected after the `(` in the wrap below.
+        let mut paren_line_prefix_parts: Vec<DocId> = Vec::new();
         let mut trailing_comma_already_added = false;
 
         for (i, arg) in call.arguments.iter().enumerate() {
@@ -455,42 +459,47 @@ fn build_call_args_doc_for_chain_impl(
                     arg_start,
                 );
 
-                // Emit leading comments
-                // When ALL leading comments are block comments and the last one is
-                // inline with the first arg, keep them all inline (space between).
-                // This matches prettier which normalizes consecutive block comments
-                // before an argument to a single line regardless of source positioning.
-                let all_block_inline = !first_pc.leading.is_empty()
-                    && first_pc.leading.iter().all(|c| c.is_block)
-                    && first_pc.leading.last().is_some_and(|last_c| {
-                        is_comment_inline_with_next(printer, last_c.span.end, arg_start)
-                    });
-                for comment in &first_pc.leading {
-                    if comment.is_block && all_block_inline {
-                        // All block comments inline with arg
-                        arg_parts.push(printer.build_comment_doc(comment));
-                        arg_parts.push(d.text(" "));
-                    } else if comment.is_block
-                        && is_comment_inline_with_next(printer, comment.span.end, arg_start)
-                    {
-                        // Individual inline block comment
-                        arg_parts.push(printer.build_comment_doc(comment));
-                        arg_parts.push(d.text(" "));
-                    } else {
-                        // On own line
+                let has_paren_line =
+                    !first_pc.trailing_block.is_empty() || !first_pc.trailing_line.is_empty();
+
+                if has_paren_line {
+                    // Comments trailing the `(` stay on the `(` line; own-line
+                    // comments stay on their own lines before the first arg
+                    // (preserving source order — see conformance_prettier.md
+                    // §Comment relocation, Call open paren `(`).
+                    first_pc.emit_trailing_comments(&mut paren_line_prefix_parts, printer);
+                    for comment in &first_pc.leading {
                         arg_parts.push(printer.build_comment_doc(comment));
                         arg_parts.push(d.hardline());
                     }
-                }
-
-                // Emit trailing comments from paren (inline block comments)
-                for comment in &first_pc.trailing_block {
-                    arg_parts.push(printer.build_comment_doc(comment));
-                    arg_parts.push(d.text(" "));
-                }
-                for comment in &first_pc.trailing_line {
-                    arg_parts.push(printer.build_comment_doc(comment));
-                    arg_parts.push(d.hardline());
+                } else {
+                    // Emit leading comments
+                    // When ALL leading comments are block comments and the last one is
+                    // inline with the first arg, keep them all inline (space between).
+                    // This matches prettier which normalizes consecutive block comments
+                    // before an argument to a single line regardless of source positioning.
+                    let all_block_inline = !first_pc.leading.is_empty()
+                        && first_pc.leading.iter().all(|c| c.is_block)
+                        && first_pc.leading.last().is_some_and(|last_c| {
+                            is_comment_inline_with_next(printer, last_c.span.end, arg_start)
+                        });
+                    for comment in &first_pc.leading {
+                        if comment.is_block && all_block_inline {
+                            // All block comments inline with arg
+                            arg_parts.push(printer.build_comment_doc(comment));
+                            arg_parts.push(d.text(" "));
+                        } else if comment.is_block
+                            && is_comment_inline_with_next(printer, comment.span.end, arg_start)
+                        {
+                            // Individual inline block comment
+                            arg_parts.push(printer.build_comment_doc(comment));
+                            arg_parts.push(d.text(" "));
+                        } else {
+                            // On own line
+                            arg_parts.push(printer.build_comment_doc(comment));
+                            arg_parts.push(d.hardline());
+                        }
+                    }
                 }
             }
 
@@ -595,16 +604,25 @@ fn build_call_args_doc_for_chain_impl(
                 // blank line preservation at top of next iteration adds literalline + hardline
                 pc.emit_leading_comments_inline_aware(&mut arg_parts, printer, next_arg_start);
             } else {
-                // Last argument - check for trailing comments before closing paren
+                // Last argument - same-line trailing comments before closing paren
                 if pc.has_trailing_line() || pc.has_trailing_block() {
                     arg_parts.push(d.text(","));
                     pc.emit_trailing_comments(&mut arg_parts, printer);
                     trailing_comma_already_added = true;
                 }
+
+                // Own-line comments (block or line) after the last arg, before the
+                // closing paren. Emitted after the trailing comma, each on its own line.
+                pc.emit_last_arg_dangling_comments(
+                    &mut arg_parts,
+                    printer,
+                    &mut trailing_comma_already_added,
+                );
             }
         }
 
         parts.push(d.text(prefix));
+        parts.push(d.concat(&paren_line_prefix_parts));
         let trailing = if trailing_comma_already_added {
             d.empty()
         } else {

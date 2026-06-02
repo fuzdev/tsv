@@ -2,6 +2,7 @@ pub mod ast_diff;
 pub mod canonical_parse;
 pub mod check;
 pub mod compare;
+pub mod conformance_audit;
 pub mod fixture_init;
 pub mod fixtures_audit;
 pub mod fixtures_update;
@@ -13,6 +14,7 @@ pub mod line_width;
 pub mod metrics;
 pub mod profile;
 pub mod test262;
+pub mod ts_fixture_audit;
 
 /// Create a tokio runtime for async operations.
 ///

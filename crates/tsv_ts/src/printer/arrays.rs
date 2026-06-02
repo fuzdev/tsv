@@ -418,15 +418,29 @@ impl<'a> Printer<'a> {
             e.span().end
         });
         let mut trailing_own_line_comments = Vec::new();
+        // Same-line block comment trailing the LAST element's comma — preserved
+        // after the comma (prettier relocates before; see conformance_prettier.md
+        // §Comment relocation). Own-line comments are handled below as siblings.
+        let mut trailing_same_line_after_comma = Vec::new();
         if let Some(search_start) = last_elem_end {
+            let comma_pos = self.find_comma_after(search_start);
             for comment in comments_in_range(self.comments, search_start, arr.span.end - 1) {
-                if comment.is_block && !self.is_same_line(search_start, comment.span.start) {
+                if !comment.is_block {
+                    continue;
+                }
+                if !self.is_same_line(search_start, comment.span.start) {
                     trailing_own_line_comments.push(comment);
+                } else if comma_pos.is_some_and(|pos| comment.span.start > pos) {
+                    trailing_same_line_after_comma.push(comment);
                 }
             }
         }
 
         let mut inner_parts = vec![d.softline(), d.concat(&parts), trailing];
+        for comment in &trailing_same_line_after_comma {
+            inner_parts.push(d.text(" "));
+            inner_parts.push(self.build_comment_doc(comment));
+        }
         if !trailing_own_line_comments.is_empty() {
             for comment in &trailing_own_line_comments {
                 inner_parts.push(d.line());
@@ -518,6 +532,19 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = Vec::new();
 
+        // A comment trailing the opening `[` on its own line is kept on the `[`
+        // line (divergence from prettier, which relocates it to its own line as the
+        // first element's leading comment). See conformance_prettier.md §Comment
+        // relocation (Array literal `[`).
+        let first_elem_start = arr
+            .elements
+            .iter()
+            .flatten()
+            .next()
+            .map_or(arr.span.end - 1, |e| e.span().start);
+        let (bracket_line_prefix, bracket_pull_pos) =
+            self.delimiter_line_comment_prefix(arr.span.start, first_elem_start);
+
         // End of the most recently emitted REAL element. Holes don't advance it;
         // this lets the next real element's leading-comment range walk back across
         // any intervening hole commas to claim the comments between them and the
@@ -563,6 +590,14 @@ impl<'a> Printer<'a> {
                     .flatten();
                 comments_in_range(self.comments, last_real_emit_end, upper)
                     .filter(|c| {
+                        // Bracket-line comments pulled onto the `[` line above are
+                        // emitted as the prefix, not as leading on the first element.
+                        // (Only the first element's gap can be same-line as `[`.)
+                        if let Some(dpos) = bracket_pull_pos
+                            && self.comment_on_delimiter_line(dpos, c)
+                        {
+                            return false;
+                        }
                         if i > 0 && self.is_same_line(last_real_emit_end, c.span.start) {
                             c.is_block && prev_comma_pos.is_some_and(|pos| c.span.start > pos)
                         } else {
@@ -728,7 +763,13 @@ impl<'a> Printer<'a> {
         let inner = d.concat(&[d.hardline(), d.concat(&parts)]);
         let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.hardline());
 
-        d.concat(&[d.text("["), indented_content, closing_line, d.text("]")])
+        d.concat(&[
+            d.text("["),
+            d.concat(&bracket_line_prefix),
+            indented_content,
+            closing_line,
+            d.text("]"),
+        ])
     }
 
     /// Build a Doc for an array expression (for nested contexts)

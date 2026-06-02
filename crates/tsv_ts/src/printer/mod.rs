@@ -14,7 +14,7 @@
 // - **arrays.rs**: Array expression printing
 // - **operators.rs**: Unary and binary expression printing
 // - **calls.rs**: Call, member, and conditional expression printing
-// - **expression_stringifier.rs**: Generic expression-to-string conversion utility
+// - **class_common.rs**: Shared class-header layout for declaration + expression printers
 //
 // ## Design Principles
 //
@@ -27,16 +27,17 @@ mod arrays;
 mod assignment;
 mod calls;
 mod chain;
+mod class_common;
 mod comments;
 mod conditional;
 mod expression_stringifier;
 mod expressions;
+mod layout;
 mod needs_parens;
 mod new_expression;
 mod objects;
 mod operators;
 mod statements;
-mod type_stringifier;
 mod types;
 mod utils;
 
@@ -126,6 +127,12 @@ pub struct Printer<'a> {
     /// Set when printing arrow body with chained as/satisfies wrapping an object:
     /// `() => ({}) as unknown as Logger` — parens go around inner object only.
     pub(crate) arrow_body_object_needs_parens: Cell<bool>,
+    /// Span of the object/function/class node that starts an expression statement
+    /// and must be wrapped in parens, even when nested as the leftmost token of a
+    /// member/binary/etc. chain: `(class {}).foo`, `({}).foo`, `(class {}) + 1`.
+    /// Matches prettier's `startsWithNoLookaheadToken` traversal. Consumed (cleared)
+    /// by the matching node's doc builder so it wraps exactly once.
+    pub(crate) expr_stmt_paren_target: Cell<Option<tsv_lang::Span>>,
 }
 
 impl<'a> Printer<'a> {
@@ -160,6 +167,7 @@ impl<'a> Printer<'a> {
             in_curried_typed_arrow: Cell::new(false),
             skip_arrow_chain: Cell::new(false),
             arrow_body_object_needs_parens: Cell::new(false),
+            expr_stmt_paren_target: Cell::new(None),
         }
     }
 
@@ -437,6 +445,23 @@ impl<'a> Printer<'a> {
         has_comments_in_range(self.comments, start, end)
     }
 
+    /// Position to start scanning from when looking for comments that trail the
+    /// last argument (between the argument and the closing paren).
+    ///
+    /// For a spread element whose stripped grouping parens hide comments
+    /// (`...( /* c */ x )`), the spread span extends past the inner argument, so
+    /// scan from the inner argument's end to find those comments; otherwise scan
+    /// from the argument's own end.
+    pub(crate) fn last_arg_comment_scan_start(&self, arg: &internal::Expression) -> u32 {
+        if let internal::Expression::SpreadElement(spread) = arg
+            && self.has_comments_between(spread.argument.span().end, spread.span.end)
+        {
+            spread.argument.span().end
+        } else {
+            arg.span().end
+        }
+    }
+
     /// Check if a source position falls inside any comment span.
     /// Uses binary search: O(log n).
     pub(crate) fn is_pos_inside_comment(&self, pos: u32) -> bool {
@@ -472,6 +497,15 @@ impl<'a> Printer<'a> {
     /// Prettier ref: `hasLeadingOwnLineComment` in assignment.js `chooseLayout`
     pub(crate) fn has_multiline_block_comments_between(&self, start: u32, end: u32) -> bool {
         tsv_lang::has_multiline_block_comments_in_range(self.comments, start, end)
+    }
+
+    /// Whether comments in the range cannot share the surrounding operator's
+    /// line — a line comment (runs to end-of-line) or a multiline block comment
+    /// forces the adjacent value onto its own line. Single-line block comments
+    /// stay inline and do not force a break.
+    pub(crate) fn comments_force_own_line_between(&self, start: u32, end: u32) -> bool {
+        self.has_line_comments_between(start, end)
+            || self.has_multiline_block_comments_between(start, end)
     }
 
     /// Check if a delimited list (tuple, type params, etc.) has line comments
@@ -539,16 +573,25 @@ impl<'a> Printer<'a> {
                 continue;
             }
 
-            // Find following element start (or closing bracket)
-            let next_boundary = items
+            // Find the following element start, if any.
+            let next_elem_start = items
                 .iter()
                 .map(|e| get_span(e).start)
-                .find(|&start| start > comment.span.end)
-                .unwrap_or(span.end - 1);
+                .find(|&start| start > comment.span.end);
 
-            // Own-line if NOT on same line as following element
-            if !self.is_same_line(comment.span.end, next_boundary) {
-                return true;
+            match next_elem_start {
+                // A comment between two elements is own-line when it doesn't share
+                // a line with the following element.
+                Some(next) => {
+                    if !self.is_same_line(comment.span.end, next) {
+                        return true;
+                    }
+                }
+                // A trailing comment before the closing bracket is a dangling
+                // comment: own-line whenever it cleared the same-line-as-preceding
+                // check above, even if the closing bracket was pulled onto its line
+                // (`/* c */ ]`). Prettier expands in that case.
+                None => return true,
             }
         }
         false
@@ -582,6 +625,16 @@ impl<'a> Printer<'a> {
             i += 1;
         }
         None
+    }
+
+    /// Position of the `)` that closes the `(` at `open` — the index OF the `)`,
+    /// located with the depth-tracked, comment-aware scan over the rest of the
+    /// source. Use when only the open-paren position is known and the close lies
+    /// somewhere ahead; call `find_closing_paren` directly when a tighter search
+    /// bound is available. Returns `None` if no matching `)` is found.
+    pub(crate) fn matching_close_paren(&self, open: u32) -> Option<u32> {
+        self.find_closing_paren(open, self.source.len() as u32)
+            .map(|after| after - 1)
     }
 
     /// Find the end position of a keyword in source text.
@@ -964,6 +1017,13 @@ impl<'a> Printer<'a> {
     fn has_prettier_ignore_in_range(&self, start: u32, end: u32) -> bool {
         comments_in_range(self.comments, start, end).any(|c| c.content.trim() == "prettier-ignore")
     }
+
+    /// Emit a node's source span verbatim. Used to round-trip the source of a
+    /// `// prettier-ignore`d node (statement, block statement, object/pattern
+    /// property) instead of reformatting it.
+    fn raw_source_doc(&self, span: tsv_lang::Span) -> DocId {
+        self.d().text_owned(span.extract(self.source).to_string())
+    }
 }
 
 impl<'a> Printer<'a> {
@@ -1056,15 +1116,21 @@ impl<'a> Printer<'a> {
 
             // Statement — if preceded by prettier-ignore, emit raw source
             if has_ignore {
-                let raw = statement.span().extract(self.source);
-                parts.push(d.text_owned(raw.to_string()));
+                parts.push(self.raw_source_doc(statement.span()));
             } else {
                 parts.push(self.build_statement_doc(statement));
             }
 
-            // Trailing same-line comments
+            // Trailing same-line comments. Bound the scan by the next statement's
+            // start so a comment only attaches to the statement it immediately
+            // follows — multiple statements on one source line (`a(); b(); // c`)
+            // must not each grab the trailing comment.
+            let next_start = program
+                .body
+                .get(stmt_idx + 1)
+                .map_or(program.span.end, |s| s.span().start);
             let trailing_docs =
-                self.build_trailing_same_line_comment_docs(statement.span().end, u32::MAX);
+                self.build_trailing_same_line_comment_docs(statement.span().end, next_start);
             parts.extend(trailing_docs);
 
             // Update prev_end to be after any trailing same-line comments

@@ -6,6 +6,7 @@
 pub mod ast;
 mod escapes;
 mod lexer;
+mod number;
 mod parser;
 mod printer;
 
