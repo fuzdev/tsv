@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod discover;
 pub mod input;
 
 use argh::FromArgs;

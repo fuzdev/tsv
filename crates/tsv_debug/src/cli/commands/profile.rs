@@ -66,6 +66,89 @@ struct FileResult {
     total_us: f64,
 }
 
+/// Aggregate timing over a set of file results (whole run or one language).
+///
+/// Exposes per-KB and per-file rates alongside wall totals — wall-clock
+/// totals on a moving corpus carry no drift signal on their own (corpus
+/// growth/shrink and machine state both move them), so the rates are the
+/// portable numbers to compare across runs.
+struct Aggregate {
+    files: usize,
+    size_bytes: usize,
+    parse_us: f64,
+    format_us: f64,
+}
+
+impl Aggregate {
+    fn from_results<'a>(results: impl Iterator<Item = &'a FileResult>) -> Self {
+        let mut agg = Self {
+            files: 0,
+            size_bytes: 0,
+            parse_us: 0.0,
+            format_us: 0.0,
+        };
+        for r in results {
+            agg.files += 1;
+            agg.size_bytes += r.size;
+            agg.parse_us += r.parse_us;
+            agg.format_us += r.format_us;
+        }
+        agg
+    }
+
+    fn total_us(&self) -> f64 {
+        self.parse_us + self.format_us
+    }
+
+    fn parse_pct(&self) -> f64 {
+        let total = self.total_us();
+        if total > 0.0 {
+            self.parse_us / total * 100.0
+        } else {
+            0.0
+        }
+    }
+
+    fn us_per_kb(&self, us: f64) -> f64 {
+        us_per_kb(self.size_bytes, us)
+    }
+
+    #[allow(clippy::cast_precision_loss)]
+    fn us_per_file(&self, us: f64) -> f64 {
+        if self.files == 0 {
+            return 0.0;
+        }
+        us / self.files as f64
+    }
+}
+
+#[allow(clippy::cast_precision_loss)]
+fn us_per_kb(size_bytes: usize, us: f64) -> f64 {
+    if size_bytes == 0 {
+        return 0.0;
+    }
+    us / (size_bytes as f64 / 1024.0)
+}
+
+/// Per-language aggregates in fixed order, skipping absent languages.
+fn lang_groups(results: &[FileResult]) -> Vec<(&'static str, Aggregate)> {
+    [ParserType::TypeScript, ParserType::Svelte, ParserType::Css]
+        .into_iter()
+        .filter_map(|pt| {
+            let agg = Aggregate::from_results(results.iter().filter(|r| r.parser_type == pt));
+            (agg.files > 0).then(|| (lang_label(pt), agg))
+        })
+        .collect()
+}
+
+fn files_label(n: usize) -> String {
+    if n == 1 {
+        "(1 file)".to_string()
+    } else {
+        format!("({n} files)")
+    }
+}
+
 /// Profile a single file: parse and format N times, return median timing
 fn profile_file(path: &Path, iterations: usize) -> Result<FileResult, String> {
     let source = std::fs::read_to_string(path).map_err(|e| format!("read error: {e}"))?;
@@ -179,68 +262,107 @@ pub(crate) fn lang_label(parser_type: ParserType) -> &'static str {
 }
 
 fn print_table(results: &[FileResult], iterations: usize, skipped: usize) {
+    let total = Aggregate::from_results(results.iter());
+    let langs = lang_groups(results);
+    let total_label = files_label(total.files);
+
     // Calculate column widths
     let name_width = results
         .iter()
         .map(|r| display_path(&r.path).len())
+        .chain(std::iter::once(total_label.len()))
         .max()
         .unwrap_or(4)
-        .max(4);
+        .max(8); // "per file"
 
-    // Header
-    eprintln!(
-        "{:>name_width$}  {:>5}  {:>4}  {:>10}  {:>10}  {:>10}  {:>5}",
-        "file", "lang", "size", "parse", "format", "total", "split"
+    let row = |file: &str,
+               lang: &str,
+               size: &str,
+               parse: &str,
+               format: &str,
+               total: &str,
+               split: &str,
+               rate: &str| {
+        let line = format!(
+            "{file:>name_width$}  {lang:>6}  {size:>7}  {parse:>10}  {format:>10}  {total:>10}  {split:>5}  {rate:>7}"
+        );
+        eprintln!("{}", line.trim_end());
+    };
+
+    row(
+        "file", "lang", "size", "parse", "format", "total", "split", "us/KB",
     );
-    eprintln!(
-        "{:>name_width$}  {:>5}  {:>4}  {:>10}  {:>10}  {:>10}  {:>5}",
-        "----", "----", "----", "-----", "------", "-----", "-----"
+    row(
+        "----", "----", "----", "-----", "------", "-----", "-----", "-----",
     );
 
-    // Rows
     for r in results {
         let parse_pct = if r.total_us > 0.0 {
             r.parse_us / r.total_us * 100.0
         } else {
             0.0
         };
-        eprintln!(
-            "{:>name_width$}  {:>5}  {:>4}  {:>10}  {:>10}  {:>10}  {:>4.0}%",
-            display_path(&r.path),
+        row(
+            &display_path(&r.path),
             lang_label(r.parser_type),
-            format_size(r.size),
-            format_duration(r.parse_us),
-            format_duration(r.format_us),
-            format_duration(r.total_us),
-            parse_pct
+            &format_size(r.size),
+            &format_duration(r.parse_us),
+            &format_duration(r.format_us),
+            &format_duration(r.total_us),
+            &format!("{parse_pct:.0}%"),
+            &format!("{:.1}", us_per_kb(r.size, r.total_us)),
         );
     }
 
-    // Totals
-    let total_size: usize = results.iter().map(|r| r.size).sum();
-    let total_parse: f64 = results.iter().map(|r| r.parse_us).sum();
-    let total_format: f64 = results.iter().map(|r| r.format_us).sum();
-    let total: f64 = total_parse + total_format;
-    let parse_pct = if total > 0.0 {
-        total_parse / total * 100.0
-    } else {
-        0.0
-    };
-
-    eprintln!(
-        "{:>name_width$}  {:>5}  {:>4}  {:>10}  {:>10}  {:>10}  {:>4.0}%",
-        "", "", "----", "-----", "------", "-----", ""
-    );
-    eprintln!(
-        "{:>name_width$}  {:>5}  {:>4}  {:>10}  {:>10}  {:>10}  {:>4.0}%",
-        format!("({} files)", results.len()),
+    // Totals — per-language rows first (when mixed), then the grand total
+    row("", "", "----", "-----", "------", "-----", "", "");
+    if langs.len() > 1 {
+        for (label, agg) in &langs {
+            row(
+                &files_label(agg.files),
+                label,
+                &format_size(agg.size_bytes),
+                &format_duration(agg.parse_us),
+                &format_duration(agg.format_us),
+                &format_duration(agg.total_us()),
+                &format!("{:.0}%", agg.parse_pct()),
+                &format!("{:.1}", agg.us_per_kb(agg.total_us())),
+            );
+        }
+    }
+    row(
+        &total_label,
         "",
-        format_size(total_size),
-        format_duration(total_parse),
-        format_duration(total_format),
-        format_duration(total),
-        parse_pct
+        &format_size(total.size_bytes),
+        &format_duration(total.parse_us),
+        &format_duration(total.format_us),
+        &format_duration(total.total_us()),
+        &format!("{:.0}%", total.parse_pct()),
+        &format!("{:.1}", total.us_per_kb(total.total_us())),
     );
+
+    // Normalized rates — the portable metrics across corpus changes
+    row(
+        "per file",
+        "",
+        &format_size(total.size_bytes / total.files.max(1)),
+        &format_duration(total.us_per_file(total.parse_us)),
+        &format_duration(total.us_per_file(total.format_us)),
+        &format_duration(total.us_per_file(total.total_us())),
+        "",
+        "",
+    );
+    row(
+        "per KB",
+        "",
+        "",
+        &format!("{:.1}us", total.us_per_kb(total.parse_us)),
+        &format!("{:.1}us", total.us_per_kb(total.format_us)),
+        &format!("{:.1}us", total.us_per_kb(total.total_us())),
+        "",
+        "",
+    );
+
     eprintln!();
     let skip_msg = if skipped > 0 {
         format!(", {skipped} invalid skipped")
@@ -251,9 +373,7 @@ fn print_table(results: &[FileResult], iterations: usize, skipped: usize) {
 }
 
 fn print_json(results: &[FileResult], iterations: usize, skipped: usize) {
-    let total_parse: f64 = results.iter().map(|r| r.parse_us).sum();
-    let total_format: f64 = results.iter().map(|r| r.format_us).sum();
-    let total: f64 = total_parse + total_format;
+    let total = Aggregate::from_results(results.iter());
 
     let files: Vec<serde_json::Value> = results
         .iter()
@@ -265,28 +385,45 @@ fn print_json(results: &[FileResult], iterations: usize, skipped: usize) {
                 "parse_us": r.parse_us,
                 "format_us": r.format_us,
                 "total_us": r.total_us,
+                "total_us_per_kb": us_per_kb(r.size, r.total_us),
             })
         })
+        .collect();
+
+    let langs: serde_json::Map<String, serde_json::Value> = lang_groups(results)
+        .iter()
+        .map(|(label, agg)| ((*label).to_string(), aggregate_json(agg)))
         .collect();
 
     let output = serde_json::json!({
         "iterations": iterations,
         "skipped": skipped,
         "files": files,
-        "totals": {
-            "files": results.len(),
-            "size_bytes": results.iter().map(|r| r.size).sum::<usize>(),
-            "parse_us": total_parse,
-            "format_us": total_format,
-            "total_us": total,
-            "parse_pct": if total > 0.0 { total_parse / total * 100.0 } else { 0.0 },
-        }
+        "langs": langs,
+        "totals": aggregate_json(&total),
     });
 
     // SAFETY: serde_json Value types always serialize successfully
     #[allow(clippy::unwrap_used)]
     let json_str = serde_json::to_string_pretty(&output).unwrap();
     println!("{json_str}");
+}
+
+fn aggregate_json(agg: &Aggregate) -> serde_json::Value {
+    serde_json::json!({
+        "files": agg.files,
+        "size_bytes": agg.size_bytes,
+        "parse_us": agg.parse_us,
+        "format_us": agg.format_us,
+        "total_us": agg.total_us(),
+        "parse_pct": agg.parse_pct(),
+        "parse_us_per_kb": agg.us_per_kb(agg.parse_us),
+        "format_us_per_kb": agg.us_per_kb(agg.format_us),
+        "total_us_per_kb": agg.us_per_kb(agg.total_us()),
+        "parse_us_per_file": agg.us_per_file(agg.parse_us),
+        "format_us_per_file": agg.us_per_file(agg.format_us),
+        "total_us_per_file": agg.us_per_file(agg.total_us()),
+    })
 }
 
 /// Shorten path for display (show last 3 components)
